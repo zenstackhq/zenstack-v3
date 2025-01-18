@@ -1,0 +1,15 @@
+{
+    "name": "@zenstackhq/runtime",
+    "version": "3.0.0-alpha.1",
+    "description": "ZenStack Runtime",
+    "main": "index.js",
+    "scripts": {
+        "test": "vitest"
+    },
+    "keywords": [],
+    "author": "ZenStack Team",
+    "license": "MIT",
+    "dependencies": {
+        "decimal.js": "^10.4.3"
+    }
+}

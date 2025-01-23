@@ -1,5 +1,5 @@
 export type SchemaDef = {
-    [key: string]: ModelDef;
+    models: { [key: string]: ModelDef };
 };
 
 export type ModelDef = {
@@ -27,33 +27,68 @@ export type FieldDef = {
     updatedAt?: boolean;
     default?: any;
     relation?: RelationInfo;
+    foreignKeyFor?: string[];
 };
 
-export type Fields<
+//#region extraction
+
+export type GetModels<Schema extends SchemaDef> = keyof Schema['models'];
+
+export type GetModel<
     Schema extends SchemaDef,
-    Model extends keyof Schema
-> = keyof Schema[Model]['fields'];
+    Model extends GetModels<Schema>
+> = Schema['models'][Model];
+
+export type GetFields<
+    Schema extends SchemaDef,
+    Model extends keyof Schema['models']
+> = keyof Schema['models'][Model]['fields'];
+
+export type GetField<
+    Schema extends SchemaDef,
+    Model extends keyof Schema['models'],
+    Field extends GetFields<Schema, Model>
+> = Schema['models'][Model]['fields'][Field];
 
 export type ScalarFields<
     Schema extends SchemaDef,
-    Model extends keyof Schema
+    Model extends keyof Schema['models']
 > = keyof {
-    [Key in Fields<
+    [Key in GetFields<Schema, Model> as GetField<
         Schema,
-        Model
-    > as Schema[Model]['fields'][Key]['relation'] extends object
+        Model,
+        Key
+    >['relation'] extends object
+        ? never
+        : GetField<Schema, Model, Key>['foreignKeyFor'] extends string[]
         ? never
         : Key]: Key;
 };
 
-export type RelationFields<
+export type ForeignKeyFields<
     Schema extends SchemaDef,
-    Model extends keyof Schema
+    Model extends keyof Schema['models']
 > = keyof {
-    [Key in Fields<
+    [Key in GetFields<Schema, Model> as GetField<
         Schema,
-        Model
-    > as Schema[Model]['fields'][Key]['relation'] extends object
+        Model,
+        Key
+    >['foreignKeyFor'] extends string[]
         ? Key
         : never]: Key;
 };
+
+export type RelationFields<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = keyof {
+    [Key in GetFields<Schema, Model> as GetField<
+        Schema,
+        Model,
+        Key
+    >['relation'] extends object
+        ? Key
+        : never]: Key;
+};
+
+//#endregion

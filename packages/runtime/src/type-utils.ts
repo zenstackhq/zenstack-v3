@@ -25,8 +25,9 @@ export type MapBaseType<T> = T extends 'String'
     ? Date
     : unknown;
 
-export type FieldType<T extends Pick<FieldDef, 'type' | 'optional' | 'array'>> =
-    WrapType<MapBaseType<T['type']>, T['optional'], T['array']>;
+export type FieldMappedType<
+    T extends Pick<FieldDef, 'type' | 'optional' | 'array'>
+> = WrapType<MapBaseType<T['type']>, T['optional'], T['array']>;
 
 export type Simplify<T> = { [Key in keyof T]: T[Key] } & {};
 
@@ -47,3 +48,11 @@ export type AtLeast<O extends object, K extends string> = NoExpand<
               | ({ [P in keyof O as P extends K ? K : never]-?: O[P] } & O)
         : never
 >;
+
+type Without<T, U> = { [P in Exclude<keyof T, keyof U>]?: never };
+
+export type XOR<T, U> = T extends object
+    ? U extends object
+        ? (Without<T, U> & U) | (Without<U, T> & T)
+        : U
+    : T;

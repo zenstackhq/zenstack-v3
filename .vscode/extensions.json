@@ -3,9 +3,5 @@
     // Extension identifier format: ${publisher}.${name}. Example: vscode.csharp
 
     // List of extensions which should be recommended for users of this workspace.
-    "recommendations": [
-        "langium.langium-vscode",
-        "ZixuanChen.vitest-explorer",
-        "kingwl.vscode-vitest-runner"
-    ]
+    "recommendations": ["langium.langium-vscode", "kingwl.vscode-vitest-runner"]
 }

@@ -1,24 +1,34 @@
 import type { Optional } from 'utility-types';
 import type {
     FieldDef,
+    FieldHasDefault,
+    FieldHasGenerator,
+    FieldIsArray,
+    FieldIsOptional,
+    FieldIsRelationArray,
+    FieldType,
     ForeignKeyFields,
+    GetEnum,
+    GetEnums,
+    GetField,
     GetFields,
+    GetModel,
+    GetModels,
     RelationFields,
     RelationInfo,
     ScalarFields,
     SchemaDef,
-    GetModels,
-    GetField,
-    GetModel,
 } from '../schema';
 import type {
     AtLeast,
-    FieldMappedType,
+    // FieldMappedType,
     MapBaseType,
     OrArray,
     WrapType,
     XOR,
 } from '../type-utils';
+
+//#region Query results
 
 type DefaultModelResult<
     Schema extends SchemaDef,
@@ -27,9 +37,7 @@ type DefaultModelResult<
     Array = false
 > = WrapType<
     {
-        [Key in ScalarFields<Schema, Model>]: FieldMappedType<
-            Schema['models'][Model]['fields'][Key]
-        >;
+        [Key in ScalarFields<Schema, Model>]: MapFieldType<Schema, Model, Key>;
     },
     Optional,
     Array
@@ -45,7 +53,7 @@ type ModelSelectResult<
         | undefined
         ? never
         : Key]: Key extends ScalarFields<Schema, Model>
-        ? FieldMappedType<GetField<Schema, Model, Key>>
+        ? MapFieldType<Schema, Model, Key>
         : S[Key] extends FindArgs<Schema, FieldType<Schema, Model, Key>>
         ? ModelResult<
               Schema,
@@ -104,13 +112,17 @@ export type ModelResult<
     Array
 >;
 
+//#endregion
+
+//#region Common structures
+
 export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in GetFields<Schema, Model>]?: Key extends RelationFields<
         Schema,
         Model
     >
         ? RelationFilter<Schema, Model, Key>
-        : FieldMappedType<GetField<Schema, Model, Key>>;
+        : MapFieldType<Schema, Model, Key>;
 };
 
 export type WhereUnique<
@@ -122,7 +134,10 @@ export type WhereUnique<
             Schema,
             Model
         >['uniqueFields'][Key] extends Pick<FieldDef, 'type'>
-            ? FieldMappedType<GetModel<Schema, Model>['uniqueFields'][Key]>
+            ? MapFieldDefType<
+                  Schema,
+                  GetModel<Schema, Model>['uniqueFields'][Key]
+              >
             : {
                   [Key1 in keyof GetModel<
                       Schema,
@@ -131,7 +146,8 @@ export type WhereUnique<
                       Schema,
                       Model
                   >['uniqueFields'][Key][Key1] extends Pick<FieldDef, 'type'>
-                      ? FieldMappedType<
+                      ? MapFieldDefType<
+                            Schema,
                             GetModel<Schema, Model>['uniqueFields'][Key][Key1]
                         >
                       : never;
@@ -148,72 +164,62 @@ export type SelectInclude<
     include?: Include<Schema, Model>;
 };
 
-export type FindArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>
-> = {
-    where?: Where<Schema, Model>;
-} & SelectInclude<Schema, Model>;
+type Select<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    [Key in ScalarFields<Schema, Model>]?: boolean;
+} & Include<Schema, Model>;
 
-export type FindUniqueArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>
-> = {
-    where?: WhereUnique<Schema, Model>;
-} & SelectInclude<Schema, Model>;
-
-export type CreateArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>
-> = {
-    data: CreateInput<Schema, Model>;
-    select?: Select<Schema, Model>;
-    include?: Include<Schema, Model>;
+type Include<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    [Key in RelationFields<Schema, Model>]?:
+        | boolean
+        | FindArgs<Schema, FieldType<Schema, Model, Key>>;
 };
 
-type FieldType<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>
-> = GetField<Schema, Model, Field>['type'];
+export type SelectSubset<T, U> = {
+    [key in keyof T]: key extends keyof U ? T[key] : never;
+} & (T extends { select: any; include: any }
+    ? 'Please either choose `select` or `include`.'
+    : {});
 
-type FieldIsOptional<
+type RelationFilter<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetFields<Schema, Model>
-> = GetField<Schema, Model, Field>['optional'];
+> = FieldIsArray<Schema, Model, Field> extends true
+    ? {
+          every?: Where<Schema, FieldType<Schema, Model, Field>>;
+          some?: Where<Schema, FieldType<Schema, Model, Field>>;
+          none?: Where<Schema, FieldType<Schema, Model, Field>>;
+      }
+    : Where<Schema, FieldType<Schema, Model, Field>>;
 
-type FieldIsRelation<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>
-> = GetField<Schema, Model, Field>['relation'] extends object ? true : false;
+//#endregion
 
-type FieldIsArray<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>
-> = GetField<Schema, Model, Field>['array'];
+//#region Field utils
 
-type FieldHasDefault<
+export type MapFieldType<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetFields<Schema, Model>
-> = GetField<Schema, Model, Field>['default'] extends
-    | object
-    | number
-    | string
-    | boolean
-    ? true
-    : false;
+> = MapFieldDefType<Schema, GetField<Schema, Model, Field>>;
 
-type FieldIsRelationArray<
+// WrapType<
+//     GetFieldType<Schema, Model, Field> extends GetEnums<Schema>
+//         ? 'foo'
+//         : MapBaseType<GetField<Schema, Model, Field>>,
+//     FieldIsOptional<Schema, Model, Field>,
+//     FieldIsArray<Schema, Model, Field>
+// >;
+
+type MapFieldDefType<
     Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>
-> = FieldIsRelation<Schema, Model, Field> extends true
-    ? FieldIsArray<Schema, Model, Field>
-    : false;
+    T extends Pick<FieldDef, 'type' | 'optional' | 'array'>
+> = WrapType<
+    T['type'] extends GetEnums<Schema>
+        ? keyof GetEnum<Schema, T['type']>
+        : MapBaseType<T['type']>,
+    T['optional'],
+    T['array']
+>;
 
 export type OptionalFieldsForCreate<
     Schema extends SchemaDef,
@@ -227,24 +233,14 @@ export type OptionalFieldsForCreate<
         ? Key
         : FieldHasDefault<Schema, Model, Key> extends true
         ? Key
+        : FieldHasGenerator<Schema, Model, Key> extends true
+        ? Key
         : GetField<Schema, Model, Key>['updatedAt'] extends true
         ? Key
         : FieldIsRelationArray<Schema, Model, Key> extends true
         ? Key
         : never]: GetField<Schema, Model, Key>;
 };
-
-export type OptionalForCreate<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>
-> = GetField<Schema, Model, Field>['optional'] extends true
-    ? true
-    : FieldHasDefault<Schema, Model, Field> extends true
-    ? true
-    : GetField<Schema, Model, Field>['updatedAt'] extends true
-    ? true
-    : false;
 
 type GetRelation<
     Schema extends SchemaDef,
@@ -296,7 +292,36 @@ export type OppositeRelationAndFK<
         : never
     : never;
 
-//#region create input
+//#endregion
+
+//#region Find args
+
+export type FindArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    where?: Where<Schema, Model>;
+} & SelectInclude<Schema, Model>;
+
+export type FindUniqueArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    where?: WhereUnique<Schema, Model>;
+} & SelectInclude<Schema, Model>;
+
+//#endregion
+
+//#region Create args
+
+export type CreateArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    data: CreateInput<Schema, Model>;
+    select?: Select<Schema, Model>;
+    include?: Include<Schema, Model>;
+};
 
 type OptionalWrap<
     Schema extends SchemaDef,
@@ -311,9 +336,7 @@ type CreateScalarPayload<
     Schema,
     Model,
     {
-        [Key in ScalarFields<Schema, Model>]: MapBaseType<
-            FieldType<Schema, Model, Key>
-        >;
+        [Key in ScalarFields<Schema, Model>]: MapFieldType<Schema, Model, Key>;
     }
 >;
 
@@ -324,8 +347,10 @@ type CreateFKPayload<
     Schema,
     Model,
     {
-        [Key in ForeignKeyFields<Schema, Model>]: MapBaseType<
-            FieldType<Schema, Model, Key>
+        [Key in ForeignKeyFields<Schema, Model>]: MapFieldType<
+            Schema,
+            Model,
+            Key
         >;
     }
 >;
@@ -429,33 +454,7 @@ export type CreateInput<
 
 //#endregion
 
-type Select<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in ScalarFields<Schema, Model>]?: boolean;
-} & Include<Schema, Model>;
-
-type Include<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in RelationFields<Schema, Model>]?:
-        | boolean
-        | FindArgs<Schema, FieldType<Schema, Model, Key>>;
-};
-
-export type SelectSubset<T, U> = {
-    [key in keyof T]: key extends keyof U ? T[key] : never;
-} & (T extends { select: any; include: any }
-    ? 'Please either choose `select` or `include`.'
-    : {});
-
-type RelationFilter<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>
-> = FieldIsArray<Schema, Model, Field> extends true
-    ? {
-          every?: Where<Schema, FieldType<Schema, Model, Field>>;
-          some?: Where<Schema, FieldType<Schema, Model, Field>>;
-          none?: Where<Schema, FieldType<Schema, Model, Field>>;
-      }
-    : Where<Schema, FieldType<Schema, Model, Field>>;
+//#region Client API
 
 type ModelOperations<
     Schema extends SchemaDef,
@@ -483,3 +482,5 @@ export type DBClient<Schema extends SchemaDef> = {
         ? Uncapitalize<Key>
         : never]: ModelOperations<Schema, Key>;
 };
+
+//#endregion

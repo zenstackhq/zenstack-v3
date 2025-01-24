@@ -17,6 +17,8 @@
         "kysely": "^0.27.5"
     },
     "devDependencies": {
+        "@paralleldrive/cuid2": "^2.2.2",
+        "@types/better-sqlite3": "^7.6.12",
         "better-sqlite3": "^11.8.1"
     }
 }

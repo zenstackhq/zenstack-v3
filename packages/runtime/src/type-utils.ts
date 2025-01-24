@@ -1,5 +1,4 @@
 import type Decimal from 'decimal.js';
-import type { FieldDef } from './schema';
 
 export type PartialRecord<K extends string | number | symbol, T> = Partial<
     Record<K, T>
@@ -24,10 +23,6 @@ export type MapBaseType<T> = T extends 'String'
     : T extends 'DateTime'
     ? Date
     : unknown;
-
-export type FieldMappedType<
-    T extends Pick<FieldDef, 'type' | 'optional' | 'array'>
-> = WrapType<MapBaseType<T['type']>, T['optional'], T['array']>;
 
 export type Simplify<T> = { [Key in keyof T]: T[Key] } & {};
 

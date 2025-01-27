@@ -1,41 +1,12 @@
+import { createId } from '@paralleldrive/cuid2';
 import SQLite from 'better-sqlite3';
-import { Kysely, sql, SqliteDialect } from 'kysely';
+import { Kysely, SqliteDialect } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import type { toKysely } from '../src/client/query-builder';
-import { Schema } from './test-schema';
-import { createId } from '@paralleldrive/cuid2';
+import { pushSchema, Schema } from './test-schema';
 
 describe('Client API tests', () => {
     type KyselyTable = toKysely<typeof Schema>;
-
-    async function pushSchema(db: Kysely<KyselyTable>) {
-        await db.schema
-            .createTable('user')
-            .addColumn('id', 'text', (col) => col.primaryKey())
-            .addColumn('createdAt', 'datetime', (col) =>
-                col.defaultTo(sql`CURRENT_TIMESTAMP`)
-            )
-            .addColumn('updatedAt', 'datetime', (col) => col.notNull())
-            .addColumn('email', 'varchar', (col) => col.unique().notNull())
-            .addColumn('name', 'varchar')
-            .addColumn('role', 'varchar', (col) => col.defaultTo('USER'))
-            .execute();
-
-        await db.schema
-            .createTable('post')
-            .addColumn('id', 'text', (col) => col.primaryKey())
-            .addColumn('createdAt', 'timestamp', (col) =>
-                col.defaultTo(sql`CURRENT_TIMESTAMP`)
-            )
-            .addColumn('updatedAt', 'timestamp', (col) => col.notNull())
-            .addColumn('title', 'varchar', (col) => col.notNull())
-            .addColumn('content', 'varchar')
-            .addColumn('published', 'boolean', (col) => col.defaultTo(false))
-            .addColumn('authorId', 'varchar', (col) =>
-                col.references('user.id').notNull()
-            )
-            .execute();
-    }
 
     it('works with queries', async () => {
         const dialect = new SqliteDialect({ database: new SQLite(':memory:') });
@@ -43,7 +14,7 @@ describe('Client API tests', () => {
         await pushSchema(db);
 
         const uid = createId();
-        const u = await db
+        await db
             .insertInto('user')
             .values({
                 id: uid,
@@ -51,14 +22,13 @@ describe('Client API tests', () => {
                 updatedAt: new Date().toISOString(),
             })
             .execute();
-        console.log(u);
 
         const u1 = await db
             .selectFrom('user')
             .select('email')
             .where('id', '=', uid)
             .executeTakeFirst();
-        console.log(u1);
+        expect(u1).toBeTruthy();
 
         await db
             .insertInto('post')
@@ -76,12 +46,14 @@ describe('Client API tests', () => {
             .innerJoin('post', 'user.id', 'post.authorId')
             .select(['user.email', 'post.title'])
             .executeTakeFirstOrThrow();
-        console.log(`${u2.title} by ${u2.email}`);
+        console.log(u2);
+        expect(u2).toMatchObject({ title: 'Post1', email: 'a@b.com' });
 
         const u3 = await db
             .selectFrom('user')
             .selectAll()
             .executeTakeFirstOrThrow();
-        expect(u3.role, 'USER');
+        console.log(u3);
+        expect(u3).toMatchObject({ email: 'a@b.com', role: 'USER' });
     });
 });

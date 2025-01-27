@@ -1,9 +1,47 @@
-import { describe, it } from 'vitest';
-import { getClient } from '../src/client';
-import { Schema } from './test-schema';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { makeClient } from '../src/client';
+import { pushSchema, Schema } from './test-schema';
+import type { DBClient } from '../src/client/types';
 
 describe('Client API tests', () => {
-    const client = getClient(Schema);
+    let client: DBClient<typeof Schema>;
+
+    // const client = makeClient(Schema);
+
+    beforeEach(async () => {
+        client = makeClient(Schema);
+        await pushSchema(client.$db);
+    });
+
+    it('works with simple create', async () => {
+        const user = await client.user.create({
+            data: {
+                email: 'a@b.com',
+                name: 'name',
+            },
+        });
+        expect(user).toMatchObject({
+            id: expect.any(String),
+            email: 'a@b.com',
+            name: 'name',
+        });
+    });
+
+    it('works with nested create', async () => {
+        const user = await client.user.create({
+            data: {
+                email: 'a@b.com',
+                name: 'name',
+                posts: {
+                    create: {
+                        title: 'Post1',
+                        content: 'My post',
+                    },
+                },
+            },
+        });
+        console.log(user);
+    });
 
     it('works with simple findUnique', async () => {
         const r1 = await client.user.findUnique({
@@ -76,7 +114,7 @@ describe('Client API tests', () => {
         console.log(r3[0]?.posts.length);
     });
 
-    it('works with simple create', async () => {
+    it('create', async () => {
         const user1 = await client.user.create({
             data: {
                 email: 'a@b.com',

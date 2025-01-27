@@ -1,3 +1,5 @@
+import type Decimal from 'decimal.js';
+
 export type SupportedProviders = 'sqlite' | 'postgresql';
 
 export type SchemaDef = {
@@ -15,6 +17,7 @@ export type ModelDef = {
         // compound unique field
         | Record<string, Pick<FieldDef, 'type'>>
     >;
+    idFields: string[];
 };
 
 export type RelationInfo = {
@@ -23,28 +26,48 @@ export type RelationInfo = {
     opposite?: string;
 };
 
+export type FieldGenerators =
+    | 'autoincrement'
+    | 'uuid4'
+    | 'uuid7'
+    | 'cuid'
+    | 'cuid2'
+    | 'nanoid'
+    | 'ulid';
+
 export type FieldDef = {
     type: string;
+    id?: boolean;
     array?: boolean;
     optional?: boolean;
     unique?: boolean;
     updatedAt?: boolean;
-    default?: any;
-    generator?:
-        | 'autoincrement'
-        | 'uuid4'
-        | 'uuid7'
-        | 'cuid'
-        | 'cuid2'
-        | 'nanoid'
-        | 'ulid';
+    default?: MappedBuiltinTypes | { call: string };
+    generator?: FieldGenerators;
     relation?: RelationInfo;
     foreignKeyFor?: string[];
 };
 
+export type BuiltinTypes =
+    | 'String'
+    | 'Boolean'
+    | 'Int'
+    | 'Float'
+    | 'BigInt'
+    | 'Decimal'
+    | 'DateTime';
+
+export type MappedBuiltinTypes =
+    | string
+    | boolean
+    | number
+    | bigint
+    | Decimal
+    | Date;
+
 export type EnumDef = Record<string, string>;
 
-//#region extraction
+//#region Extraction
 
 export type GetModels<Schema extends SchemaDef> = keyof Schema['models'];
 

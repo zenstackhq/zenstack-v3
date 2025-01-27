@@ -1,5 +1,6 @@
+import { sql, type Kysely } from 'kysely';
+import type { toKysely } from '../src/client/query-builder';
 import type { SchemaDef } from '../src/schema';
-import { call } from '../src/type-utils';
 
 export const Schema = {
     provider: 'sqlite',
@@ -8,6 +9,7 @@ export const Schema = {
             fields: {
                 id: {
                     type: 'String',
+                    id: true,
                     generator: 'cuid',
                 },
                 email: {
@@ -20,7 +22,7 @@ export const Schema = {
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: call('now()'),
+                    default: { call: 'now()' },
                 },
                 updatedAt: {
                     type: 'DateTime',
@@ -38,6 +40,7 @@ export const Schema = {
                     },
                 },
             },
+            idFields: ['id'],
             uniqueFields: {
                 id: { type: 'String' },
                 email: { type: 'String' },
@@ -47,11 +50,12 @@ export const Schema = {
             fields: {
                 id: {
                     type: 'String',
+                    id: true,
                     generator: 'cuid',
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: call('now()'),
+                    default: { call: 'now()' },
                 },
                 updatedAt: {
                     type: 'DateTime',
@@ -81,6 +85,7 @@ export const Schema = {
                     foreignKeyFor: ['author'],
                 },
             },
+            idFields: ['id'],
             uniqueFields: {
                 id: { type: 'String' },
             },
@@ -90,6 +95,7 @@ export const Schema = {
                 id1: { type: 'Int' },
                 id2: { type: 'Int' },
             },
+            idFields: ['id1', 'id2'],
             uniqueFields: {
                 id1_id2: { id1: { type: 'Int' }, id2: { type: 'Int' } },
             },
@@ -102,3 +108,32 @@ export const Schema = {
         },
     },
 } as const satisfies SchemaDef;
+
+export async function pushSchema(db: Kysely<toKysely<typeof Schema>>) {
+    await db.schema
+        .createTable('user')
+        .addColumn('id', 'text', (col) => col.primaryKey())
+        .addColumn('createdAt', 'datetime', (col) =>
+            col.defaultTo(sql`CURRENT_TIMESTAMP`)
+        )
+        .addColumn('updatedAt', 'datetime', (col) => col.notNull())
+        .addColumn('email', 'varchar', (col) => col.unique().notNull())
+        .addColumn('name', 'varchar')
+        .addColumn('role', 'varchar', (col) => col.defaultTo('USER'))
+        .execute();
+
+    await db.schema
+        .createTable('post')
+        .addColumn('id', 'text', (col) => col.primaryKey())
+        .addColumn('createdAt', 'timestamp', (col) =>
+            col.defaultTo(sql`CURRENT_TIMESTAMP`)
+        )
+        .addColumn('updatedAt', 'timestamp', (col) => col.notNull())
+        .addColumn('title', 'varchar', (col) => col.notNull())
+        .addColumn('content', 'varchar')
+        .addColumn('published', 'boolean', (col) => col.defaultTo(false))
+        .addColumn('authorId', 'varchar', (col) =>
+            col.references('user.id').notNull()
+        )
+        .execute();
+}

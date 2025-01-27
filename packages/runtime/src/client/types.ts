@@ -27,6 +27,8 @@ import type {
     WrapType,
     XOR,
 } from '../type-utils';
+import type { Kysely } from 'kysely';
+import type { toKysely } from './query-builder';
 
 //#region Query results
 
@@ -456,7 +458,7 @@ export type CreateInput<
 
 //#region Client API
 
-type ModelOperations<
+export type ModelOperations<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = {
@@ -478,6 +480,8 @@ type ModelOperations<
 };
 
 export type DBClient<Schema extends SchemaDef> = {
+    $db: Kysely<toKysely<Schema>>;
+} & {
     [Key in GetModels<Schema> as Key extends string
         ? Uncapitalize<Key>
         : never]: ModelOperations<Schema, Key>;

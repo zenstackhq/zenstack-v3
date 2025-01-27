@@ -4,20 +4,25 @@
     "description": "ZenStack Runtime",
     "main": "index.js",
     "scripts": {
+        "build": "tsc",
         "test": "vitest"
     },
     "keywords": [],
     "author": "ZenStack Team",
     "license": "MIT",
     "dependencies": {
+        "@paralleldrive/cuid2": "^2.2.2",
         "decimal.js": "^10.4.3",
-        "utility-types": "^3.11.0"
+        "effect": "^3.12.7",
+        "nanoid": "^5.0.9",
+        "tiny-invariant": "^1.3.3",
+        "utility-types": "^3.11.0",
+        "uuid": "^11.0.5"
     },
     "peerDependencies": {
         "kysely": "^0.27.5"
     },
     "devDependencies": {
-        "@paralleldrive/cuid2": "^2.2.2",
         "@types/better-sqlite3": "^7.6.12",
         "better-sqlite3": "^11.8.1"
     }

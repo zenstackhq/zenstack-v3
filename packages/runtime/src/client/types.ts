@@ -470,9 +470,17 @@ export type ModelOperations<
         args?: SelectSubset<T, FindUniqueArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T> | null>;
 
+    findUniqueOrThrow<T extends FindUniqueArgs<Schema, Model>>(
+        args?: SelectSubset<T, FindUniqueArgs<Schema, Model>>
+    ): Promise<ModelResult<Schema, Model, T>>;
+
     findFirst<T extends FindArgs<Schema, Model>>(
         args?: SelectSubset<T, FindArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T> | null>;
+
+    findFirstOrThrow<T extends FindArgs<Schema, Model>>(
+        args?: SelectSubset<T, FindArgs<Schema, Model>>
+    ): Promise<ModelResult<Schema, Model, T>>;
 
     create<T extends CreateArgs<Schema, Model>>(
         args: SelectSubset<T, CreateArgs<Schema, Model>>

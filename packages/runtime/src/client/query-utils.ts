@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import type { ModelDef, SchemaDef } from '../schema';
+import type { FieldDef, ModelDef, SchemaDef } from '../schema';
 import { InternalError, QueryError } from './errors';
 
 export function hasModel(schema: SchemaDef, model: string) {
@@ -100,4 +100,48 @@ export function getRelationForeignKeyFieldPairs(
             pk: oppositeField.relation!.references![i]!,
         }));
     }
+}
+
+export function isScalarField(
+    schema: SchemaDef,
+    model: string,
+    field: string
+): boolean {
+    const fieldDef = requireField(schema, model, field);
+    return !fieldDef.relation && !fieldDef.foreignKeyFor;
+}
+
+export function isForeignKeyField(
+    schema: SchemaDef,
+    model: string,
+    field: string
+): boolean {
+    const fieldDef = requireField(schema, model, field);
+    return !!fieldDef.foreignKeyFor;
+}
+
+export function getUniqueFields(schema: SchemaDef, model: string) {
+    const modelDef = requireModel(schema, model);
+    const result: Array<{ name: string; def: FieldDef }[]> = [];
+    for (const [key, value] of Object.entries(modelDef.uniqueFields)) {
+        if (typeof value !== 'object') {
+            throw new InternalError(
+                `Invalid unique field definition for "${key}"`
+            );
+        }
+
+        if (typeof value.type === 'string') {
+            // singular unique field
+            result.push([{ name: key, def: requireField(schema, model, key) }]);
+        } else {
+            // compound unique field
+            result.push(
+                Object.keys(value).map((k) => ({
+                    name: k,
+                    def: requireField(schema, model, k),
+                }))
+            );
+        }
+    }
+    return result;
 }

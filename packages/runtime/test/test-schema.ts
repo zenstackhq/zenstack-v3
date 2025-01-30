@@ -6,6 +6,7 @@ export const Schema = {
     provider: 'sqlite',
     models: {
         User: {
+            dbTable: 'User',
             fields: {
                 id: {
                     type: 'String',
@@ -47,6 +48,7 @@ export const Schema = {
             },
         },
         Post: {
+            dbTable: 'Post',
             fields: {
                 id: {
                     type: 'String',
@@ -91,6 +93,7 @@ export const Schema = {
             },
         },
         Foo: {
+            dbTable: 'Foo',
             fields: {
                 id1: { type: 'Int' },
                 id2: { type: 'Int' },
@@ -111,7 +114,7 @@ export const Schema = {
 
 export async function pushSchema(db: Kysely<toKysely<typeof Schema>>) {
     await db.schema
-        .createTable('user')
+        .createTable('User')
         .addColumn('id', 'text', (col) => col.primaryKey())
         .addColumn('createdAt', 'datetime', (col) =>
             col.defaultTo(sql`CURRENT_TIMESTAMP`)
@@ -123,7 +126,7 @@ export async function pushSchema(db: Kysely<toKysely<typeof Schema>>) {
         .execute();
 
     await db.schema
-        .createTable('post')
+        .createTable('Post')
         .addColumn('id', 'text', (col) => col.primaryKey())
         .addColumn('createdAt', 'timestamp', (col) =>
             col.defaultTo(sql`CURRENT_TIMESTAMP`)

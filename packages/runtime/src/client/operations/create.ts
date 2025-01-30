@@ -1,38 +1,37 @@
 import { createId } from '@paralleldrive/cuid2';
-import { Console, Effect, Match, Schema } from 'effect';
+import { Console, Effect, Match } from 'effect';
 import type { Kysely } from 'kysely';
 import * as uuid from 'uuid';
-import { type FieldGenerators, type SchemaDef } from '../../schema';
+import { z } from 'zod';
+import {
+    type FieldGenerators,
+    type ModelDef,
+    type SchemaDef,
+} from '../../schema';
 import { clone } from '../../utils';
 import { InternalError, QueryError } from '../errors';
 import {
     getRelationForeignKeyFieldPairs,
+    isForeignKeyField,
+    isScalarField,
     requireField,
     requireModelEffect,
 } from '../query-utils';
 
-const CreateArgsSchema = Schema.Struct({
-    data: Schema.Object,
-    select: Schema.optionalWith(Schema.Object, { exact: true }),
-    include: Schema.optionalWith(Schema.Object, { exact: true }),
+const CreateArgsSchema = z.object({
+    data: z.record(z.string(), z.any()),
+    select: z.record(z.string(), z.any()).optional(),
+    include: z.record(z.string(), z.any()).optional(),
 });
 
-type CreateArgs = Schema.Schema.Type<typeof CreateArgsSchema>;
+type CreateArgs = z.infer<typeof CreateArgsSchema>;
 
-const RelationPayloadSchema = Schema.Union(
-    Schema.Struct({
-        create: Schema.Object,
-    }),
-    Schema.Struct({
-        connect: Schema.Object,
-    }),
-    Schema.Struct({
-        connectOrCreate: Schema.Object,
-    }),
-    Schema.Struct({
-        createMany: Schema.Object,
-    })
-);
+const RelationPayloadSchema = z.union([
+    z.object({ create: z.record(z.string(), z.any()) }),
+    z.object({ connect: z.record(z.string(), z.any()) }),
+    z.object({ connectOrCreate: z.record(z.string(), z.any()) }),
+    z.object({ createMany: z.record(z.string(), z.any()) }),
+]);
 
 export function runCreate(
     db: Kysely<any>,
@@ -42,19 +41,22 @@ export function runCreate(
 ) {
     return Effect.runPromise(
         Effect.gen(function* () {
-            // validate args
-            const validatedArgs = yield* validateArgs(args);
+            // parse args
+            const parsedArgs = yield* parseCreateArgs(args);
 
-            // build query
-            const result = yield* runQuery(db, schema, model, validatedArgs);
-            yield* Console.log('Create result:', result);
+            // run query
+            const result = yield* runQuery(db, schema, model, parsedArgs);
+            yield* Console.log('create result:', result);
             return result;
         })
     );
 }
 
-function validateArgs(args: unknown) {
-    return Schema.decodeUnknown(CreateArgsSchema)(args);
+function parseCreateArgs(args: unknown) {
+    return Effect.try({
+        try: () => CreateArgsSchema.parse(args),
+        catch: (e) => new QueryError(`Invalid create args: ${e}`),
+    });
 }
 
 function runQuery(
@@ -81,10 +83,7 @@ function runQuery(
                                 doCreate(trx, schema, model, args.data)
                             )
                         ),
-                catch: (e) => {
-                    console.error(`Error during create: ${e}`);
-                    return e;
-                },
+                catch: (e) => new QueryError(`Error during create: ${e}`),
             });
         } else {
             // simple create
@@ -102,6 +101,7 @@ function doCreate(
     payload: object
 ): Effect.Effect<any, QueryError, never> {
     return Effect.gen(function* () {
+        const modelDef = yield* requireModelEffect(schema, model);
         // separate args.data into scalar fields and relation fields
         const regularFields: any = {};
         const relationFields: any = {};
@@ -116,16 +116,17 @@ function doCreate(
             }
         }
 
-        const updatedData = yield* fillGeneratedValues(
-            schema,
-            model,
-            regularFields
-        );
-        const query = db.insertInto(model).values(updatedData).returningAll();
-        yield* Console.log('Create query:', query.compile());
-        const created = yield* Effect.tryPromise(() =>
-            query.execute().then((created) => created[0]!)
-        );
+        const updatedData = yield* fillGeneratedValues(modelDef, regularFields);
+        const query = db
+            .insertInto(modelDef.dbTable)
+            .values(updatedData)
+            .returningAll();
+        const compiled = query.compile();
+        yield* Console.log('Create query:', compiled.sql, compiled.parameters);
+        const created = yield* Effect.tryPromise({
+            try: () => query.execute().then((created) => created[0]!),
+            catch: (e) => new QueryError(`Error during create: ${e}`),
+        });
 
         if (Object.keys(relationFields).length === 0) {
             return created;
@@ -139,9 +140,7 @@ function doCreate(
                             );
                         }
 
-                        const subPayload = yield* Schema.decodeUnknown(
-                            RelationPayloadSchema
-                        )(payload);
+                        const subPayload = parseRelationPayload(payload, field);
 
                         const r = yield* Match.value(subPayload).pipe(
                             Match.when(
@@ -166,11 +165,17 @@ function doCreate(
                     })
             );
 
-            // const relationResults = yield* Effect.all(relationEffects);
-            // return assembleResult(created, relationResults);
             yield* Effect.all(relationEffects);
             return created;
         }
+    });
+}
+
+function parseRelationPayload(payload: {}, field: string) {
+    return Effect.try({
+        try: () => RelationPayloadSchema.parse(payload),
+        catch: (e) =>
+            new QueryError(`Invalid payload for relation "${field}": ${e}`),
     });
 }
 
@@ -198,9 +203,8 @@ function doNestedCreate(
     return doCreate(db, schema, fieldDef.type, subPayload);
 }
 
-function fillGeneratedValues(schema: SchemaDef, model: string, data: object) {
+function fillGeneratedValues(modelDef: ModelDef, data: object) {
     return Effect.gen(function* () {
-        const modelDef = yield* requireModelEffect(schema, model);
         const fields = modelDef.fields;
         const values: any = clone(data);
         for (const field in fields) {
@@ -227,24 +231,6 @@ function evalGenerator(generator: FieldGenerators) {
         Match.when('nanoid', () => uuid.v7()),
         Match.orElse(() => undefined)
     );
-}
-
-function isScalarField(
-    schema: SchemaDef,
-    model: string,
-    field: string
-): boolean {
-    const fieldDef = requireField(schema, model, field);
-    return !fieldDef.relation && !fieldDef.foreignKeyFor;
-}
-
-function isForeignKeyField(
-    schema: SchemaDef,
-    model: string,
-    field: string
-): boolean {
-    const fieldDef = requireField(schema, model, field);
-    return !!fieldDef.foreignKeyFor;
 }
 
 function assembleResult(primaryData: any, _args: CreateArgs) {

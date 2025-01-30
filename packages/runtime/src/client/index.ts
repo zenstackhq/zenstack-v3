@@ -5,6 +5,8 @@ import { runCreate } from './operations/create';
 import type { toKysely } from './query-builder';
 import { hasModel } from './query-utils';
 import type { DBClient, ModelOperations } from './types';
+import { runFind } from './operations/find';
+import { NotFoundError } from './errors';
 
 export function makeClient<Schema extends SchemaDef>(schema: Schema) {
     return new Client<Schema>(schema) as unknown as DBClient<Schema>;
@@ -59,14 +61,35 @@ function createModelProxy<
         create: async (args) => {
             return runCreate(db, schema, model, args);
         },
-        findUnique: async (_args) => {
-            throw new Error('Not implemented');
+
+        findUnique: async (args) => {
+            return runFind(db, schema, model, 'findUnique', args);
         },
-        findFirst: async (_args) => {
-            throw new Error('Not implemented');
+
+        findUniqueOrThrow: async (args) => {
+            const r = await runFind(db, schema, model, 'findUnique', args);
+            if (!r) {
+                throw new NotFoundError(`No "${model}" found`);
+            } else {
+                return r;
+            }
         },
-        findMany: async (_args) => {
-            throw new Error('Not implemented');
+
+        findFirst: async (args) => {
+            return runFind(db, schema, model, 'findFirst', args);
+        },
+
+        findFirstOrThrow: async (args) => {
+            const r = await runFind(db, schema, model, 'findFirst', args);
+            if (!r) {
+                throw new NotFoundError(`No "${model}" found`);
+            } else {
+                return r;
+            }
+        },
+
+        findMany: async (args) => {
+            return runFind(db, schema, model, 'findMany', args);
         },
     };
 }

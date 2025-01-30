@@ -9,6 +9,7 @@ export type SchemaDef = {
 };
 
 export type ModelDef = {
+    dbTable: string;
     fields: Record<string, FieldDef>;
     uniqueFields: Record<
         string,

@@ -1,6 +1,6 @@
 import { sql, type Kysely } from 'kysely';
 import type { toKysely } from '../src/client/query-builder';
-import type { SchemaDef } from '../src/schema';
+import type { SchemaDef } from '../src/schema/schema';
 
 export const Schema = {
     provider: 'sqlite',

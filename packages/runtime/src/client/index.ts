@@ -1,9 +1,8 @@
 import SQLite from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';
-import { type GetModels, type SchemaDef } from '../schema';
+import { type GetModels, type SchemaDef } from '../schema/schema';
 import { runCreate } from './operations/create';
 import type { toKysely } from './query-builder';
-import { hasModel } from './query-utils';
 import type { DBClient, ModelOperations } from './types';
 import { runFind } from './operations/find';
 import { NotFoundError } from './errors';
@@ -39,8 +38,13 @@ function createClientProxy<Schema extends SchemaDef>(
                 return Reflect.get(target, prop, receiver);
             }
 
-            if (typeof prop === 'string' && hasModel(schema, prop)) {
-                return createModelProxy(client, client.$db, schema, prop);
+            if (typeof prop === 'string') {
+                const model = Object.keys(schema.models).find(
+                    (m) => m.toLowerCase() === prop.toLowerCase()
+                );
+                if (model) {
+                    return createModelProxy(client, client.$db, schema, model);
+                }
             }
 
             return Reflect.get(target, prop, receiver);
@@ -63,7 +67,8 @@ function createModelProxy<
         },
 
         findUnique: async (args) => {
-            return runFind(db, schema, model, 'findUnique', args);
+            const r = await runFind(db, schema, model, 'findUnique', args);
+            return r ?? null;
         },
 
         findUniqueOrThrow: async (args) => {

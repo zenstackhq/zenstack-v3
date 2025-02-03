@@ -18,7 +18,7 @@ import type {
     RelationInfo,
     ScalarFields,
     SchemaDef,
-} from '../schema';
+} from '../schema/schema';
 import type {
     AtLeast,
     // FieldMappedType,
@@ -26,7 +26,7 @@ import type {
     OrArray,
     WrapType,
     XOR,
-} from '../type-utils';
+} from '../schema/type-utils';
 import type { Kysely } from 'kysely';
 import type { toKysely } from './query-builder';
 

@@ -9,7 +9,7 @@ import type {
     GetModels,
     ScalarFields,
     SchemaDef,
-} from '../schema';
+} from '../schema/schema';
 
 export type toKysely<Schema extends SchemaDef> = {
     [Model in GetModels<Schema> as Model extends string

@@ -7,8 +7,8 @@ import {
     type FieldGenerators,
     type ModelDef,
     type SchemaDef,
-} from '../../schema';
-import { clone } from '../../utils';
+} from '../../schema/schema';
+import { clone } from '../../utils/clone';
 import { InternalError, QueryError } from '../errors';
 import {
     getRelationForeignKeyFieldPairs,

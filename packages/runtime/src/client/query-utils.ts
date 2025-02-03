@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import type { FieldDef, ModelDef, SchemaDef } from '../schema';
+import type { FieldDef, ModelDef, SchemaDef } from '../schema/schema';
 import { InternalError, QueryError } from './errors';
 
 export function hasModel(schema: SchemaDef, model: string) {
@@ -22,12 +22,10 @@ export function requireModelEffect(
     schema: SchemaDef,
     model: string
 ): Effect.Effect<ModelDef, Error, never> {
-    const found = Object.entries(schema.models).find(
-        ([k]) => k.toLowerCase() === model.toLowerCase()
-    )?.[1];
-    return found
-        ? Effect.succeed(found)
-        : Effect.fail(new Error(`Model ${model} not found`));
+    return Effect.try({
+        try: () => requireModel(schema, model),
+        catch: () => new QueryError(`Model "${model}" not found`),
+    });
 }
 
 export function requireField(schema: SchemaDef, model: string, field: string) {
@@ -39,8 +37,17 @@ export function requireField(schema: SchemaDef, model: string, field: string) {
 }
 
 export function getIdFields(schema: SchemaDef, model: string) {
-    const modelDef = schema.models[model];
+    const modelDef = requireModel(schema, model);
     return modelDef?.idFields;
+}
+
+export function requireIdFields(schema: SchemaDef, model: string) {
+    const modelDef = requireModel(schema, model);
+    const result = modelDef?.idFields;
+    if (!result) {
+        throw new InternalError(`Model "${model}" does not have ID field(s)`);
+    }
+    return result;
 }
 
 export function getRelationForeignKeyFieldPairs(
@@ -144,4 +151,16 @@ export function getUniqueFields(schema: SchemaDef, model: string) {
         }
     }
     return result;
+}
+
+export function getIdValues(
+    schema: SchemaDef,
+    model: string,
+    data: any
+): Array<{ field: string; value: any }> {
+    const idFields = getIdFields(schema, model);
+    if (!idFields) {
+        throw new InternalError(`ID fields not defined for model "${model}"`);
+    }
+    return idFields.map((field) => ({ field, value: data[field] }));
 }

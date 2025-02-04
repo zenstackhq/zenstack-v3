@@ -67,13 +67,13 @@ export function getRelationForeignKeyFieldPairs(
                 `Relation references not defined for field "${relationField}"`
             );
         }
-        // the model owns the relation
+        // this model owns the fk
         return fieldDef.relation.fields.map((f, i) => ({
             fk: f,
             pk: fieldDef.relation!.references![i]!,
+            ownedByModel: true,
         }));
     } else {
-        // the opposite model owns the relation
         if (!fieldDef.relation.opposite) {
             throw new InternalError(
                 `Opposite relation not defined for field "${relationField}"`
@@ -102,9 +102,11 @@ export function getRelationForeignKeyFieldPairs(
             );
         }
 
+        // the opposite model owns the fk
         return oppositeField.relation.fields.map((f, i) => ({
             fk: f,
             pk: oppositeField.relation!.references![i]!,
+            ownedByModel: false,
         }));
     }
 }

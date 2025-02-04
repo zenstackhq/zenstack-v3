@@ -133,5 +133,14 @@ describe('Client API find tests', () => {
                 include: { posts: true },
             } as any)
         ).rejects.toThrow('cannot be used together');
+
+        const r1 = await client.user.findUnique({
+            where: { id: '1' },
+            include: { posts: { include: { author: true } } },
+        });
+        expect(r1!.posts[0]!.author).toMatchObject({
+            id: '1',
+            email: 'a@b.com',
+        });
     });
 });

@@ -26,6 +26,8 @@ export class PostgresQueryDialect implements QueryDialect {
 
         let result = query;
 
+        // TODO: nested include
+
         result = result.leftJoinLateral(
             (eb) => {
                 let tbl = eb.selectFrom(relationModel.dbTable);

@@ -104,7 +104,7 @@ export function runQuery(
                 modelDef.dbTable
             );
         } else {
-            query = buildSelectAllFields(schema, model, query);
+            query = buildSelectAllScalarFields(schema, model, query);
         }
 
         // include
@@ -206,7 +206,7 @@ function buildRelationSelection(
     );
 }
 
-function buildSelectAllFields(
+function buildSelectAllScalarFields(
     schema: SchemaDef,
     model: string,
     query: SelectQueryBuilder<any, any, {}>

@@ -157,10 +157,13 @@ export function getIdValues(
     schema: SchemaDef,
     model: string,
     data: any
-): Array<{ field: string; value: any }> {
+): Record<string, any> {
     const idFields = getIdFields(schema, model);
     if (!idFields) {
         throw new InternalError(`ID fields not defined for model "${model}"`);
     }
-    return idFields.map((field) => ({ field, value: data[field] }));
+    return idFields.reduce(
+        (acc, field) => ({ ...acc, [field]: data[field] }),
+        {}
+    );
 }

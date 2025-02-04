@@ -22,7 +22,20 @@ export type MapBaseType<T> = T extends 'String'
     ? Decimal
     : T extends 'DateTime'
     ? Date
+    : T extends 'Json'
+    ? JsonValue
     : unknown;
+
+export type JsonValue =
+    | string
+    | number
+    | boolean
+    | null
+    | JsonObject
+    | JsonArray;
+
+export type JsonObject = { [key: string]: JsonValue };
+export type JsonArray = Array<JsonValue>;
 
 export type Simplify<T> = { [Key in keyof T]: T[Key] } & {};
 

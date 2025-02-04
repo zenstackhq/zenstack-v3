@@ -1,14 +1,20 @@
+import Sqlite from 'better-sqlite3';
+import { SqliteDialect } from 'kysely';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { makeClient } from '../../src/client';
+import { NotFoundError } from '../../src/client/errors';
 import type { DBClient } from '../../src/client/types';
 import { pushSchema, Schema } from '../test-schema';
-import { NotFoundError } from '../../src/client/errors';
 
 describe('Client API find tests', () => {
     let client: DBClient<typeof Schema>;
 
     beforeEach(async () => {
-        client = makeClient(Schema);
+        client = makeClient(Schema, {
+            dialect: new SqliteDialect({
+                database: new Sqlite(':memory:'),
+            }),
+        });
         await pushSchema(client.$db);
     });
 
@@ -111,62 +117,21 @@ describe('Client API find tests', () => {
         const user = await createUser();
         await createPosts(user.id);
 
-        const q = client.$db
-            .selectFrom('user')
-            .where('user.id', 'in', (qb) =>
-                qb
-                    .selectFrom('user')
-                    .select('id')
-                    .orderBy('createdAt desc')
-                    .limit(1)
-            )
-            .leftJoin(
-                (eb) =>
-                    eb
-                        .selectFrom('post')
-                        .select([
-                            'post.id',
-                            'post.title',
-                            'post.authorId',
-                            'author.email as authorEmail',
-                        ])
-                        .where('post.published', '!=', 1 as any)
-                        .leftJoin(
-                            (eb1) =>
-                                eb1.selectFrom('user').selectAll().as('author'),
-                            (join) =>
-                                join.onRef('author.id', '=', 'post.authorId')
-                        )
-                        .as('post'),
-                (join) => join.onRef('post.authorId', '=', 'user.id')
-            )
-            .select([
-                'user.id as user.id',
-                'post.id as post.id',
-                'post.title as post.title',
-                'post.authorEmail',
-            ]);
-        const { sql, parameters } = q.compile();
-        console.log('SQL:', sql, 'PARAMS', parameters);
-        console.log(await q.execute());
+        let r = await client.user.findUnique({
+            where: { id: '1' },
+            select: { id: true, email: true, posts: true },
+        });
+        expect(r?.id).toBeTruthy();
+        expect(r?.email).toBeTruthy();
+        expect('name' in r!).toBeFalsy();
+        expect(r?.posts).toHaveLength(2);
 
-        // let r = await client.user.findUnique({
-        //     where: { id: '1' },
-        //     select: { id: true, email: true, posts: true },
-        // });
-        // expect(r?.id).toBeTruthy();
-        // expect(r?.email).toBeTruthy();
-        // expect('name' in r!).toBeFalsy();
-        // expect(r?.posts).toHaveLength(2);
-
-        // await expect(
-        //     client.user.findUnique({
-        //         where: { id: '1' },
-        //         select: { id: true, email: true },
-        //         include: { posts: true },
-        //     } as any)
-        // ).rejects.toThrow(
-        //     'Cannot use both "select" and "include" in find args'
-        // );
+        await expect(
+            client.user.findUnique({
+                where: { id: '1' },
+                select: { id: true, email: true },
+                include: { posts: true },
+            } as any)
+        ).rejects.toThrow('cannot be used together');
     });
 });

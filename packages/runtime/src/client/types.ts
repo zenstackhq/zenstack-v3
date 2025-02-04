@@ -204,14 +204,6 @@ export type MapFieldType<
     Field extends GetFields<Schema, Model>
 > = MapFieldDefType<Schema, GetField<Schema, Model, Field>>;
 
-// WrapType<
-//     GetFieldType<Schema, Model, Field> extends GetEnums<Schema>
-//         ? 'foo'
-//         : MapBaseType<GetField<Schema, Model, Field>>,
-//     FieldIsOptional<Schema, Model, Field>,
-//     FieldIsArray<Schema, Model, Field>
-// >;
-
 type MapFieldDefType<
     Schema extends SchemaDef,
     T extends Pick<FieldDef, 'type' | 'optional' | 'array'>
@@ -303,6 +295,8 @@ export type FindArgs<
     Model extends GetModels<Schema>
 > = {
     where?: Where<Schema, Model>;
+    skip?: number;
+    take?: number;
 } & SelectInclude<Schema, Model>;
 
 export type FindUniqueArgs<

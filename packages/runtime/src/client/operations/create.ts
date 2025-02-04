@@ -11,12 +11,15 @@ import {
 import { clone } from '../../utils/clone';
 import { InternalError, QueryError } from '../errors';
 import {
+    getIdValues,
     getRelationForeignKeyFieldPairs,
     isForeignKeyField,
     isScalarField,
     requireField,
     requireModelEffect,
 } from '../query-utils';
+import type { OperationContext } from './context';
+import { runQuery as runFindQuery } from './find';
 
 const CreateArgsSchema = z.object({
     data: z.record(z.string(), z.any()),
@@ -34,9 +37,7 @@ const RelationPayloadSchema = z.union([
 ]);
 
 export function runCreate(
-    db: Kysely<any>,
-    schema: SchemaDef,
-    model: string,
+    { db, schema, model }: OperationContext,
     args: unknown
 ) {
     return Effect.runPromise(
@@ -44,7 +45,6 @@ export function runCreate(
             // parse args
             const parsedArgs = yield* parseCreateArgs(args);
 
-            // run query
             const result = yield* runQuery(db, schema, model, parsedArgs);
             yield* Console.log('create result:', result);
             return result;
@@ -66,12 +66,14 @@ function runQuery(
     args: CreateArgs
 ) {
     return Effect.gen(function* () {
-        const hasRelation = Object.keys(args.data).some(
+        const hasRelationCreate = Object.keys(args.data).some(
             (f) => !!requireField(schema, model, f).relation
         );
 
+        const returnRelations = needReturnRelations(schema, model, args);
+
         let result: any;
-        if (hasRelation) {
+        if (hasRelationCreate || returnRelations) {
             // employ a transaction
             result = yield* Effect.tryPromise({
                 try: () =>
@@ -80,17 +82,32 @@ function runQuery(
                         .setIsolationLevel('repeatable read')
                         .execute(async (trx) =>
                             Effect.runPromise(
-                                doCreate(trx, schema, model, args.data)
+                                Effect.gen(function* () {
+                                    const createResult = yield* doCreate(
+                                        trx,
+                                        schema,
+                                        model,
+                                        args.data
+                                    );
+                                    return yield* readBackResult(
+                                        trx,
+                                        schema,
+                                        model,
+                                        createResult,
+                                        args
+                                    );
+                                })
                             )
                         ),
                 catch: (e) => new QueryError(`Error during create: ${e}`),
             });
         } else {
             // simple create
-            result = yield* doCreate(db, schema, model, args.data);
+            const createResult = yield* doCreate(db, schema, model, args.data);
+            result = trimResult(createResult, args);
         }
 
-        return assembleResult(result, args);
+        return result;
     });
 }
 
@@ -140,7 +157,10 @@ function doCreate(
                             );
                         }
 
-                        const subPayload = parseRelationPayload(payload, field);
+                        const subPayload = yield* parseRelationPayload(
+                            payload,
+                            field
+                        );
 
                         const r = yield* Match.value(subPayload).pipe(
                             Match.when(
@@ -233,6 +253,48 @@ function evalGenerator(generator: FieldGenerators) {
     );
 }
 
-function assembleResult(primaryData: any, _args: CreateArgs) {
-    return primaryData;
+function trimResult(data: any, args: CreateArgs) {
+    if (!args.select) {
+        return data;
+    }
+    return Object.keys(args.select).reduce((acc, field) => {
+        acc[field] = data[field];
+        return acc;
+    }, {} as any);
+}
+
+function readBackResult(
+    db: Kysely<any>,
+    schema: SchemaDef,
+    model: string,
+    primaryData: any,
+    args: CreateArgs
+) {
+    return Effect.gen(function* () {
+        // fetch relations based on include or select
+        const read = yield* runFindQuery(db, schema, model, 'findUnique', {
+            where: getIdValues(schema, model, primaryData),
+            select: args.select,
+            include: args.include,
+        });
+        return read[0] ?? null;
+    });
+}
+
+function needReturnRelations(
+    schema: SchemaDef,
+    model: string,
+    args: CreateArgs
+) {
+    let returnRelation = false;
+
+    if (args.include) {
+        returnRelation = Object.keys(args.include).length > 0;
+    } else if (args.select) {
+        returnRelation = Object.entries(args.select).some(([K, v]) => {
+            const fieldDef = requireField(schema, model, K);
+            return fieldDef.relation && v;
+        });
+    }
+    return returnRelation;
 }

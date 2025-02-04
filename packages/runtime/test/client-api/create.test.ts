@@ -1,3 +1,5 @@
+import Sqlite from 'better-sqlite3';
+import { SqliteDialect } from 'kysely';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { makeClient } from '../../src/client';
 import type { DBClient } from '../../src/client/types';
@@ -7,7 +9,11 @@ describe('Client API create tests', () => {
     let client: DBClient<typeof Schema>;
 
     beforeEach(async () => {
-        client = makeClient(Schema);
+        client = makeClient(Schema, {
+            dialect: new SqliteDialect({
+                database: new Sqlite(':memory:'),
+            }),
+        });
         await pushSchema(client.$db);
     });
 

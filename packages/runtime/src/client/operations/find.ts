@@ -1,29 +1,20 @@
 import { Console, Effect } from 'effect';
 import type { Kysely, SelectQueryBuilder } from 'kysely';
-import { z, ZodSchema } from 'zod';
 import type { SchemaDef } from '../../schema/schema';
-import { InternalError, QueryError } from '../errors';
+import { QueryError } from '../errors';
 import {
-    getRelationForeignKeyFieldPairs,
-    getUniqueFields,
     isScalarField,
     requireField,
     requireModel,
     requireModelEffect,
 } from '../query-utils';
 import type { FindArgs } from '../types';
-import { assembleResult } from './common';
-import { makeIncludeSchema, makeSelectSchema, makeWhereSchema } from './parse';
-
-type FindOperation = 'findMany' | 'findUnique' | 'findFirst';
-
-const ROOT_ALIAS = '$';
+import type { OperationContext, Operations } from './context';
+import { getQueryDialect } from './dialect';
+import { makeFindSchema } from './parse';
 
 export function runFind(
-    db: Kysely<any>,
-    schema: SchemaDef,
-    model: string,
-    operation: FindOperation,
+    { db, schema, model, operation }: OperationContext,
     args: unknown
 ) {
     return Effect.runPromise(
@@ -45,7 +36,8 @@ export function runFind(
                 parsedArgs
             );
 
-            const finalResult = operation === 'findMany' ? result : result[0];
+            const finalResult =
+                operation === 'findMany' ? result : result[0] ?? null;
             yield* Console.log(`${operation} result:`, finalResult);
             return finalResult;
         })
@@ -55,67 +47,14 @@ export function runFind(
 function parseFindArgs(
     schema: SchemaDef,
     model: string,
-    operation: FindOperation,
+    operation: Operations,
     args: unknown
 ) {
-    if (!args || typeof args !== 'object') {
-        if (operation === 'findUnique') {
-            // args is required for findUnique
-            return Effect.fail(new QueryError(`Missing query args`));
-        } else {
-            return Effect.succeed(undefined);
-        }
-    }
-
-    const baseWhere = makeWhereSchema(schema, model);
-    let where: ZodSchema = baseWhere;
-
-    if (operation === 'findUnique') {
-        // findUnique requires at least one unique field (field set) is required
-
-        const uniqueFields = getUniqueFields(schema, model);
-        if (uniqueFields.length === 0) {
-            return Effect.fail(
-                new InternalError(`Model "${model}" has no unique fields`)
-            );
-        }
-
-        if (uniqueFields.length === 1) {
-            // only one unique field (set), mark the field(s) required
-            where = baseWhere.required(
-                uniqueFields[0]!.reduce(
-                    (acc, k) => ({
-                        ...acc,
-                        [k.name]: true,
-                    }),
-                    {}
-                )
-            );
-        } else {
-            where = baseWhere.refine((value) => {
-                // check that at least one unique field is set
-                return uniqueFields.some((fields) =>
-                    fields.every(({ name }) => value[name] !== undefined)
-                );
-            }, `At least one unique field or field set must be set`);
-        }
-    } else {
-        // where clause is optional
-        where = where.optional();
-    }
-
-    const select = makeSelectSchema(schema, model).optional();
-    const include = makeIncludeSchema(schema, model).optional();
-
-    if ('select' in args && 'include' in args) {
-        return Effect.fail(
-            new QueryError(
-                'Cannot use both "select" and "include" in find args'
-            )
-        );
-    }
-
-    const findSchema = z.object({ where, select, include });
+    const findSchema = makeFindSchema(
+        schema,
+        model,
+        operation === 'findUnique'
+    );
 
     return Effect.try({
         try: () => findSchema.parse(args),
@@ -123,18 +62,18 @@ function parseFindArgs(
     });
 }
 
-function runQuery(
+export function runQuery(
     db: Kysely<any>,
     schema: SchemaDef,
     model: string,
     operation: string,
     args: FindArgs<SchemaDef, string> | undefined
-): Effect.Effect<any, QueryError, never> {
+): Effect.Effect<any[], QueryError, never> {
     return Effect.gen(function* () {
         const modelDef = yield* requireModelEffect(schema, model);
 
         // table
-        let query = db.selectFrom(`${modelDef.dbTable} as ${ROOT_ALIAS}`);
+        let query = db.selectFrom(`${modelDef.dbTable}`);
 
         if (operation !== 'findMany') {
             query = query.limit(1);
@@ -145,16 +84,38 @@ function runQuery(
             query = buildWhere(query, args.where);
         }
 
+        // skip
+        if (args?.skip) {
+            query = query.offset(args.skip);
+        }
+
+        // take
+        if (args?.take) {
+            query = query.limit(args.take);
+        }
+
         // select
         if (args?.select) {
-            query = buildFieldSelection(schema, model, query, args?.select);
+            query = buildFieldSelection(
+                schema,
+                model,
+                query,
+                args?.select,
+                modelDef.dbTable
+            );
         } else {
             query = buildSelectAllFields(schema, model, query);
         }
 
         // include
         if (args?.include) {
-            query = buildFieldSelection(schema, model, query, args?.include);
+            query = buildFieldSelection(
+                schema,
+                model,
+                query,
+                args?.include,
+                modelDef.dbTable
+            );
         }
 
         const compiled = query.compile();
@@ -170,15 +131,13 @@ function runQuery(
         });
 
         yield* Console.log(`Raw results:`, rows);
-        const assembled = assembleResult(schema, model, rows, args);
-        return assembled;
+        return rows;
     });
 }
 
 function buildWhere(
-    query: SelectQueryBuilder<any, string, {}>,
-    where: Record<string, any> | undefined,
-    tableAlias = ROOT_ALIAS
+    query: SelectQueryBuilder<any, any, {}>,
+    where: Record<string, any> | undefined
 ) {
     let result = query;
     if (!where) {
@@ -186,12 +145,7 @@ function buildWhere(
     }
 
     result = Object.entries(where).reduce(
-        (acc, [field, value]) =>
-            acc.where(
-                tableAlias ? `${tableAlias}.${field}` : field,
-                '=',
-                value
-            ),
+        (acc, [field, value]) => acc.where(field, '=', value),
         result
     );
 
@@ -201,9 +155,9 @@ function buildWhere(
 function buildFieldSelection(
     schema: SchemaDef,
     model: string,
-    query: SelectQueryBuilder<any, string, {}>,
+    query: SelectQueryBuilder<any, any, {}>,
     selectOrInclude: Record<string, any>,
-    tableAlias = ROOT_ALIAS
+    parentName: string
 ) {
     let result = query;
 
@@ -213,15 +167,15 @@ function buildFieldSelection(
         }
         const fieldDef = requireField(schema, model, field);
         if (!fieldDef.relation) {
-            result = result.select(selectField(tableAlias, field));
+            result = result.select(field);
         } else {
             result = buildRelationSelection(
+                result,
                 schema,
                 model,
                 field,
-                result,
-                payload,
-                tableAlias
+                parentName,
+                payload
             );
         }
     }
@@ -230,77 +184,36 @@ function buildFieldSelection(
 }
 
 function buildRelationSelection(
+    query: SelectQueryBuilder<any, any, {}>,
     schema: SchemaDef,
     model: string,
     relationField: string,
-    query: SelectQueryBuilder<any, string, {}>,
-    payload: any,
-    tableAlias = ROOT_ALIAS
+    parentName: string,
+    payload: any
 ) {
-    const relationFieldDef = requireField(schema, model, relationField);
-    const relationModel = requireModel(schema, relationFieldDef.type);
-    const keyPairs = getRelationForeignKeyFieldPairs(
-        schema,
-        model,
-        relationField
-    );
-
-    let result = query;
-
-    const nextAlias = joinAlias(tableAlias, relationField);
-    result = result.leftJoin(
-        `${relationModel.dbTable} as ${nextAlias}`,
-        (join) =>
-            keyPairs.reduce(
-                (acc, { fk, pk }) =>
-                    acc.onRef(
-                        `${nextAlias}.${fk}`,
-                        '=',
-                        tableAlias ? `${tableAlias}.${pk}` : pk
-                    ),
-                join
-            )
-    );
-
-    if (payload === true) {
-        result = buildSelectAllFields(
-            schema,
-            relationFieldDef.type,
-            result,
-            nextAlias
-        );
-    } else {
-        result = buildFieldSelection(
-            schema,
-            relationFieldDef.type,
-            result,
-            payload,
-            nextAlias
-        );
+    const queryDialect = getQueryDialect(schema.provider);
+    if (!queryDialect) {
+        throw new QueryError(`Unsupported provider: ${schema.provider}`);
     }
 
-    return result;
+    return queryDialect.buildRelationSelection(
+        query,
+        schema,
+        model,
+        relationField,
+        parentName,
+        payload
+    );
 }
 
 function buildSelectAllFields(
     schema: SchemaDef,
     model: string,
-    query: SelectQueryBuilder<any, string, {}>,
-    tableAlias = ROOT_ALIAS
+    query: SelectQueryBuilder<any, any, {}>
 ) {
     let result = query;
     const modelDef = requireModel(schema, model);
     return Object.keys(modelDef.fields)
         .filter((f) => isScalarField(schema, model, f))
-        .reduce((acc, f) => acc.select(selectField(tableAlias, f)), result);
-}
-
-function joinAlias(tableAlias: string, field: string) {
-    return `${tableAlias}>${field}`;
-}
-
-function selectField(tableAlias: string, field: string) {
-    return tableAlias
-        ? `${tableAlias}.${field} as ${joinAlias(tableAlias, field)}`
-        : `${field} as ${field}`;
+        .reduce((acc, f) => acc.select(f), result);
 }

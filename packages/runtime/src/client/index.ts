@@ -1,30 +1,33 @@
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
+import { Kysely, ParseJSONResultsPlugin, type KyselyConfig } from 'kysely';
 import { type GetModels, type SchemaDef } from '../schema/schema';
+import { NotFoundError } from './errors';
 import { runCreate } from './operations/create';
+import { runFind } from './operations/find';
 import type { toKysely } from './query-builder';
 import type { DBClient, ModelOperations } from './types';
-import { runFind } from './operations/find';
-import { NotFoundError } from './errors';
 
-export function makeClient<Schema extends SchemaDef>(schema: Schema) {
-    return new Client<Schema>(schema) as unknown as DBClient<Schema>;
+export type ClientOptions = {
+    dialect: KyselyConfig['dialect'];
+    plugins?: KyselyConfig['plugins'];
+    log?: KyselyConfig['log'];
+};
+
+export function makeClient<Schema extends SchemaDef>(
+    schema: Schema,
+    options: ClientOptions
+) {
+    return new Client<Schema>(schema, options) as unknown as DBClient<Schema>;
 }
 
-class Client<Schema extends SchemaDef> {
+export class Client<Schema extends SchemaDef> {
     public readonly $db: Kysely<toKysely<Schema>>;
 
-    constructor(schema: Schema) {
-        this.$db = this.createKysely(schema);
-        return createClientProxy(this, schema);
-    }
-
-    private createKysely<Schema extends SchemaDef>(
-        _schema: Schema
-    ): Kysely<toKysely<Schema>> {
-        return new Kysely({
-            dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
+    constructor(schema: Schema, options: ClientOptions) {
+        this.$db = new Kysely({
+            ...options,
+            plugins: [...(options.plugins ?? []), new ParseJSONResultsPlugin()],
         });
+        return createClientProxy(this, schema);
     }
 }
 
@@ -63,16 +66,26 @@ function createModelProxy<
 ): ModelOperations<Schema, Model> {
     return {
         create: async (args) => {
-            return runCreate(db, schema, model, args);
+            const r = await runCreate(
+                { db, schema, model, operation: 'create' },
+                args
+            );
+            return r;
         },
 
         findUnique: async (args) => {
-            const r = await runFind(db, schema, model, 'findUnique', args);
+            const r = await runFind(
+                { db, schema, model, operation: 'findUnique' },
+                args
+            );
             return r ?? null;
         },
 
         findUniqueOrThrow: async (args) => {
-            const r = await runFind(db, schema, model, 'findUnique', args);
+            const r = await runFind(
+                { db, schema, model, operation: 'findUnique' },
+                args
+            );
             if (!r) {
                 throw new NotFoundError(`No "${model}" found`);
             } else {
@@ -81,11 +94,14 @@ function createModelProxy<
         },
 
         findFirst: async (args) => {
-            return runFind(db, schema, model, 'findFirst', args);
+            return runFind({ db, schema, model, operation: 'findFirst' }, args);
         },
 
         findFirstOrThrow: async (args) => {
-            const r = await runFind(db, schema, model, 'findFirst', args);
+            const r = await runFind(
+                { db, schema, model, operation: 'findFirst' },
+                args
+            );
             if (!r) {
                 throw new NotFoundError(`No "${model}" found`);
             } else {
@@ -94,7 +110,7 @@ function createModelProxy<
         },
 
         findMany: async (args) => {
-            return runFind(db, schema, model, 'findMany', args);
+            return runFind({ db, schema, model, operation: 'findMany' }, args);
         },
     };
 }

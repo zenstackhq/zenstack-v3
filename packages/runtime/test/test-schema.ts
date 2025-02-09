@@ -1,8 +1,8 @@
 import { sql, type Kysely } from 'kysely';
 import type { toKysely } from '../src/client/query-builder';
-import type { SchemaDef } from '../src/schema/schema';
+import type { SchemaDef, SupportedProviders } from '../src/schema/schema';
 
-export const Schema = {
+const schema = {
     provider: 'sqlite',
     models: {
         User: {
@@ -112,14 +112,26 @@ export const Schema = {
     },
 } as const satisfies SchemaDef;
 
-export async function pushSchema(db: Kysely<toKysely<typeof Schema>>) {
+// function dateTimeType(provider: SupportedProviders) {
+//     return Match.value(provider).pipe(
+//         Match.when('sqlite', () => 'datetime' as const),
+//         Match.when('postgresql', () => 'timestamp(3)' as const),
+//         Match.exhaustive
+//     );
+// }
+
+export function getSchema(provider: SupportedProviders) {
+    return { ...schema, provider };
+}
+
+export async function pushSchema(db: Kysely<toKysely<typeof schema>>) {
     await db.schema
         .createTable('User')
         .addColumn('id', 'text', (col) => col.primaryKey())
-        .addColumn('createdAt', 'datetime', (col) =>
+        .addColumn('createdAt', 'timestamp', (col) =>
             col.defaultTo(sql`CURRENT_TIMESTAMP`)
         )
-        .addColumn('updatedAt', 'datetime', (col) => col.notNull())
+        .addColumn('updatedAt', 'timestamp', (col) => col.notNull())
         .addColumn('email', 'varchar', (col) => col.unique().notNull())
         .addColumn('name', 'varchar')
         .addColumn('role', 'varchar', (col) => col.defaultTo('USER'))
@@ -136,7 +148,7 @@ export async function pushSchema(db: Kysely<toKysely<typeof Schema>>) {
         .addColumn('content', 'varchar')
         .addColumn('published', 'boolean', (col) => col.defaultTo(false))
         .addColumn('authorId', 'varchar', (col) =>
-            col.references('user.id').notNull()
+            col.references('User.id').notNull()
         )
         .execute();
 }

@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { Console, Effect, Match } from 'effect';
+import { Effect, Match } from 'effect';
 import type { Kysely } from 'kysely';
 import * as uuid from 'uuid';
 import { z } from 'zod';
@@ -46,7 +46,6 @@ export function runCreate(
             const parsedArgs = yield* parseCreateArgs(args);
 
             const result = yield* runQuery(db, schema, model, parsedArgs);
-            yield* Console.log('create result:', result);
             return result;
         })
     );
@@ -138,8 +137,6 @@ function doCreate(
             .insertInto(modelDef.dbTable)
             .values(updatedData)
             .returningAll();
-        const compiled = query.compile();
-        yield* Console.log('Create query:', compiled.sql, compiled.parameters);
         const created = yield* Effect.tryPromise({
             try: () => query.execute().then((created) => created[0]!),
             catch: (e) => new QueryError(`Error during create: ${e}`),

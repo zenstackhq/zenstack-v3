@@ -483,6 +483,7 @@ export type ModelOperations<
 
 export type DBClient<Schema extends SchemaDef> = {
     $db: Kysely<toKysely<Schema>>;
+    $disconnect(): Promise<void>;
 } & {
     [Key in GetModels<Schema> as Key extends string
         ? Uncapitalize<Key>

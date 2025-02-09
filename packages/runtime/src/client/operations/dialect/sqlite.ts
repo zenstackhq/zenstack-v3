@@ -1,4 +1,4 @@
-import type { ExpressionBuilder } from 'kysely';
+import type { ExpressionBuilder, RawBuilder } from 'kysely';
 import { ExpressionWrapper, sql, type SelectQueryBuilder } from 'kysely';
 import type { QueryDialect } from '.';
 import type { SchemaDef } from '../../../schema/schema';
@@ -61,6 +61,7 @@ export class SqliteQueryDialect implements QueryDialect {
                 const objArgs: Array<
                     | string
                     | ExpressionWrapper<any, any, any>
+                    | RawBuilder<any>
                     | SelectQueryBuilder<any, any, {}>
                 > = [];
 
@@ -69,7 +70,7 @@ export class SqliteQueryDialect implements QueryDialect {
                     objArgs.push(
                         ...Object.entries(relationModelDef.fields)
                             .filter(([, value]) => !value.relation)
-                            .map(([field]) => [field, eb1.ref(field)])
+                            .map(([field]) => [sql.lit(field), eb1.ref(field)])
                             .flatMap((v) => v)
                     );
                 } else if (payload.select) {
@@ -77,7 +78,7 @@ export class SqliteQueryDialect implements QueryDialect {
                     objArgs.push(
                         ...Object.entries(payload.select)
                             .filter(([, value]) => value)
-                            .map(([field]) => [field, eb1.ref(field)])
+                            .map(([field]) => [sql.lit(field), eb1.ref(field)])
                             .flatMap((v) => v)
                     );
                 }
@@ -100,7 +101,7 @@ export class SqliteQueryDialect implements QueryDialect {
                                     `${parentName}$${relationField}`,
                                     value
                                 );
-                                return [field, subJson];
+                                return [sql.lit(field), subJson];
                             })
                             .flatMap((v) => v)
                     );

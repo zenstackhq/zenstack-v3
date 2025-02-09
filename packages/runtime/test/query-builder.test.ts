@@ -3,10 +3,11 @@ import SQLite from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import type { toKysely } from '../src/client/query-builder';
-import { pushSchema, Schema } from './test-schema';
+import { getSchema, pushSchema } from './test-schema';
 
 describe('Client API tests', () => {
-    type KyselyTable = toKysely<typeof Schema>;
+    const schema = getSchema('sqlite');
+    type KyselyTable = toKysely<typeof schema>;
 
     it('works with queries', async () => {
         const dialect = new SqliteDialect({ database: new SQLite(':memory:') });
@@ -15,7 +16,7 @@ describe('Client API tests', () => {
 
         const uid = createId();
         await db
-            .insertInto('user')
+            .insertInto('User')
             .values({
                 id: uid,
                 email: 'a@b.com',
@@ -24,14 +25,14 @@ describe('Client API tests', () => {
             .execute();
 
         const u1 = await db
-            .selectFrom('user')
+            .selectFrom('User')
             .select('email')
             .where('id', '=', uid)
             .executeTakeFirst();
         expect(u1).toBeTruthy();
 
         await db
-            .insertInto('post')
+            .insertInto('Post')
             .values({
                 id: createId(),
                 authorId: uid,
@@ -42,15 +43,15 @@ describe('Client API tests', () => {
             .execute();
 
         const u2 = await db
-            .selectFrom('user')
-            .innerJoin('post', 'user.id', 'post.authorId')
-            .select(['user.email', 'post.title'])
+            .selectFrom('User')
+            .innerJoin('Post', 'User.id', 'Post.authorId')
+            .select(['User.email', 'Post.title'])
             .executeTakeFirstOrThrow();
         console.log(u2);
         expect(u2).toMatchObject({ title: 'Post1', email: 'a@b.com' });
 
         const u3 = await db
-            .selectFrom('user')
+            .selectFrom('User')
             .selectAll()
             .executeTakeFirstOrThrow();
         console.log(u3);

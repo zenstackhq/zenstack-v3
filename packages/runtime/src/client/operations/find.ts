@@ -1,4 +1,4 @@
-import { Console, Effect } from 'effect';
+import { Effect } from 'effect';
 import type { Kysely, SelectQueryBuilder } from 'kysely';
 import type { SchemaDef } from '../../schema/schema';
 import { QueryError } from '../errors';
@@ -38,7 +38,6 @@ export function runFind(
 
             const finalResult =
                 operation === 'findMany' ? result : result[0] ?? null;
-            yield* Console.log(`${operation} result:`, finalResult);
             return finalResult;
         })
     );
@@ -118,19 +117,14 @@ export function runQuery(
             );
         }
 
-        const compiled = query.compile();
-        yield* Console.log(
-            `${operation} query:`,
-            compiled.sql,
-            compiled.parameters
-        );
+        // const compiled = query.compile();
+        // yield* Console.log(compiled.sql, compiled.parameters);
 
         const rows = yield* Effect.tryPromise({
             try: () => query.execute(),
             catch: (e) => new QueryError(`Failed to execute query: ${e}`),
         });
 
-        yield* Console.log(`Raw results:`, rows);
         return rows;
     });
 }

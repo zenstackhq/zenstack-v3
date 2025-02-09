@@ -13,7 +13,7 @@ import type {
 
 export type toKysely<Schema extends SchemaDef> = {
     [Model in GetModels<Schema> as Model extends string
-        ? Uncapitalize<Model>
+        ? Model
         : never]: toKyselyTable<Schema, Model>;
 };
 

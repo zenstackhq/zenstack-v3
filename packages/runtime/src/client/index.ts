@@ -29,6 +29,10 @@ export class Client<Schema extends SchemaDef> {
         });
         return createClientProxy(this, schema);
     }
+
+    async $disconnect() {
+        await this.$db.destroy();
+    }
 }
 
 function createClientProxy<Schema extends SchemaDef>(

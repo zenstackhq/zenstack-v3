@@ -21,6 +21,12 @@ export type ModelDef = {
     idFields: string[];
 };
 
+export type PolicyOperations = 'create' | 'read' | 'update' | 'delete' | 'all';
+
+export type Policy = {
+    operation: PolicyOperations;
+};
+
 export type RelationInfo = {
     fields?: string[];
     references?: string[];

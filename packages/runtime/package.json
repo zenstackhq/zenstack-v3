@@ -3,14 +3,27 @@
     "version": "3.0.0-alpha.1",
     "description": "ZenStack Runtime",
     "main": "index.js",
+    "type": "module",
     "scripts": {
-        "build": "tsc",
-        "watch": "tsc -w",
+        "build": "tsup-node",
+        "watch": "tsup-node --watch",
         "test": "vitest"
     },
     "keywords": [],
     "author": "ZenStack Team",
     "license": "MIT",
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        }
+    },
     "dependencies": {
         "@paralleldrive/cuid2": "^2.2.2",
         "decimal.js": "^10.4.3",
@@ -19,9 +32,7 @@
         "tiny-invariant": "^1.3.3",
         "utility-types": "^3.11.0",
         "uuid": "^11.0.5",
-        "zod": "^3.24.1"
-    },
-    "peerDependencies": {
+        "zod": "^3.24.1",
         "kysely": "^0.27.5"
     },
     "devDependencies": {

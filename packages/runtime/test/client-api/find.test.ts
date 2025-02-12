@@ -14,7 +14,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
 
         beforeEach(async () => {
             client = await makeClient();
-            await pushSchema(client.$db);
+            await pushSchema(client);
         });
 
         afterEach(async () => {
@@ -22,7 +22,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
         });
 
         async function createUser() {
-            return await client.$db
+            return await client.$qb
                 .insertInto('User')
                 .values({
                     id: '1',
@@ -35,7 +35,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
         }
 
         async function createPosts(authorId: string) {
-            await client.$db
+            await client.$qb
                 .insertInto('Post')
                 .values({
                     id: '1',
@@ -44,7 +44,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                     authorId,
                 })
                 .execute();
-            await client.$db
+            await client.$qb
                 .insertInto('Post')
                 .values({
                     id: '2',

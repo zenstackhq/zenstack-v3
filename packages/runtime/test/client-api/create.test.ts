@@ -13,7 +13,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
 
         beforeEach(async () => {
             client = await makeClient();
-            await pushSchema(client.$db);
+            await pushSchema(client);
         });
 
         afterEach(async () => {

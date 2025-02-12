@@ -1,3 +1,4 @@
+import type { Kysely } from 'kysely';
 import type { Optional } from 'utility-types';
 import type {
     FieldDef,
@@ -27,7 +28,6 @@ import type {
     WrapType,
     XOR,
 } from '../schema/type-utils';
-import type { Kysely } from 'kysely';
 import type { toKysely } from './query-builder';
 
 //#region Query results
@@ -482,7 +482,7 @@ export type ModelOperations<
 };
 
 export type DBClient<Schema extends SchemaDef> = {
-    $db: Kysely<toKysely<Schema>>;
+    $qb: Kysely<toKysely<Schema>>;
     $disconnect(): Promise<void>;
 } & {
     [Key in GetModels<Schema> as Key extends string

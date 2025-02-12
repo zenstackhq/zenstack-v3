@@ -1,8 +1,7 @@
+import type { DBClient, SchemaDef } from '@zenstackhq/runtime';
 import { sql } from 'kysely';
-import type { DBClient } from '../src';
-import type { SchemaDef, SupportedProviders } from '../src/schema/schema';
 
-const schema = {
+export const Schema = {
     provider: 'sqlite',
     models: {
         User: {
@@ -112,13 +111,7 @@ const schema = {
     },
 } as const satisfies SchemaDef;
 
-export function getSchema<Provider extends SupportedProviders>(
-    provider: Provider
-) {
-    return { ...schema, provider };
-}
-
-export async function pushSchema(db: DBClient<typeof schema>) {
+export async function pushSchema(db: DBClient<typeof Schema>) {
     await db.$qb.schema
         .createTable('User')
         .addColumn('id', 'text', (col) => col.primaryKey())

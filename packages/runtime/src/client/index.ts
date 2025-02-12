@@ -1,37 +1,74 @@
-import { Kysely, ParseJSONResultsPlugin, type KyselyConfig } from 'kysely';
-import { type GetModels, type SchemaDef } from '../schema/schema';
+import { Match } from 'effect';
+import {
+    Kysely,
+    ParseJSONResultsPlugin,
+    PostgresDialect,
+    SqliteDialect,
+    type Dialect,
+    type KyselyConfig,
+    type PostgresDialectConfig,
+    type SqliteDialectConfig,
+} from 'kysely';
+import {
+    type GetModels,
+    type SchemaDef,
+    type SupportedProviders,
+} from '../schema/schema';
 import { NotFoundError } from './errors';
 import { runCreate } from './operations/create';
 import { runFind } from './operations/find';
 import type { toKysely } from './query-builder';
 import type { DBClient, ModelOperations } from './types';
 
-export type ClientOptions = {
-    dialect: KyselyConfig['dialect'];
+export type ClientOptions<Provider extends SupportedProviders> = {
+    // dialect: KyselyConfig['dialect'];
     plugins?: KyselyConfig['plugins'];
     log?: KyselyConfig['log'];
+    dialectConfig: Provider extends 'sqlite'
+        ? SqliteDialectConfig
+        : Provider extends 'postgresql'
+        ? PostgresDialectConfig
+        : never;
 };
 
 export function makeClient<Schema extends SchemaDef>(
     schema: Schema,
-    options: ClientOptions
+    options: ClientOptions<Schema['provider']>
 ) {
     return new Client<Schema>(schema, options) as unknown as DBClient<Schema>;
 }
 
 export class Client<Schema extends SchemaDef> {
-    public readonly $db: Kysely<toKysely<Schema>>;
+    public readonly $qb: Kysely<toKysely<Schema>>;
 
-    constructor(schema: Schema, options: ClientOptions) {
-        this.$db = new Kysely({
-            ...options,
+    constructor(schema: Schema, options: ClientOptions<Schema['provider']>) {
+        const dialect: Dialect = Match.value(schema.provider).pipe(
+            Match.when(
+                'sqlite',
+                () =>
+                    new SqliteDialect(
+                        options.dialectConfig as SqliteDialectConfig
+                    )
+            ),
+            Match.when(
+                'postgresql',
+                () =>
+                    new PostgresDialect(
+                        options.dialectConfig as PostgresDialectConfig
+                    )
+            ),
+            Match.exhaustive
+        );
+        this.$qb = new Kysely({
+            dialect,
+            log: options.log,
             plugins: [...(options.plugins ?? []), new ParseJSONResultsPlugin()],
         });
         return createClientProxy(this, schema);
     }
 
     async $disconnect() {
-        await this.$db.destroy();
+        await this.$qb.destroy();
     }
 }
 
@@ -50,7 +87,7 @@ function createClientProxy<Schema extends SchemaDef>(
                     (m) => m.toLowerCase() === prop.toLowerCase()
                 );
                 if (model) {
-                    return createModelProxy(client, client.$db, schema, model);
+                    return createModelProxy(client, client.$qb, schema, model);
                 }
             }
 
@@ -118,3 +155,5 @@ function createModelProxy<
         },
     };
 }
+
+export type { DBClient, toKysely };

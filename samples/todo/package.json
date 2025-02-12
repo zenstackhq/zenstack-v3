@@ -1,0 +1,21 @@
+{
+    "name": "sample-todo",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "build": "tsc --noEmit",
+        "dev": "tsx main.ts"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "@zenstackhq/runtime": "workspace:*",
+        "better-sqlite3": "^11.8.1",
+        "kysely": "^0.27.5"
+    },
+    "devDependencies": {
+        "@types/better-sqlite3": "^7.6.12"
+    }
+}

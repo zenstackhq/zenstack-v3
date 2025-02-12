@@ -1,21 +1,24 @@
 import { createId } from '@paralleldrive/cuid2';
 import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
 import { describe, expect, it } from 'vitest';
-import type { toKysely } from '../src/client/query-builder';
+import { makeClient } from '../src';
 import { getSchema, pushSchema } from './test-schema';
 
 describe('Client API tests', () => {
     const schema = getSchema('sqlite');
-    type KyselyTable = toKysely<typeof schema>;
 
     it('works with queries', async () => {
-        const dialect = new SqliteDialect({ database: new SQLite(':memory:') });
-        const db = new Kysely<KyselyTable>({ dialect });
-        await pushSchema(db);
+        const client = makeClient(schema, {
+            dialectConfig: {
+                database: new SQLite(':memory:'),
+            },
+        });
+        await pushSchema(client);
+
+        const kysely = client.$qb;
 
         const uid = createId();
-        await db
+        await kysely
             .insertInto('User')
             .values({
                 id: uid,
@@ -24,14 +27,14 @@ describe('Client API tests', () => {
             })
             .execute();
 
-        const u1 = await db
+        const u1 = await kysely
             .selectFrom('User')
             .select('email')
             .where('id', '=', uid)
             .executeTakeFirst();
         expect(u1).toBeTruthy();
 
-        await db
+        await kysely
             .insertInto('Post')
             .values({
                 id: createId(),
@@ -42,7 +45,7 @@ describe('Client API tests', () => {
             })
             .execute();
 
-        const u2 = await db
+        const u2 = await kysely
             .selectFrom('User')
             .innerJoin('Post', 'User.id', 'Post.authorId')
             .select(['User.email', 'Post.title'])
@@ -50,7 +53,7 @@ describe('Client API tests', () => {
         console.log(u2);
         expect(u2).toMatchObject({ title: 'Post1', email: 'a@b.com' });
 
-        const u3 = await db
+        const u3 = await kysely
             .selectFrom('User')
             .selectAll()
             .executeTakeFirstOrThrow();

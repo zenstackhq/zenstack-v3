@@ -7,6 +7,7 @@ async function main() {
         dialectConfig: {
             database: new Sqlite(':memory:'),
         },
+        log: ['query'],
     });
 
     // push schema to DB (this will be handled by migration in the future)

@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import type { Kysely, SelectQueryBuilder } from 'kysely';
+import type { SelectQueryBuilder } from 'kysely';
 import type { SchemaDef } from '../../schema/schema';
 import { QueryError } from '../errors';
 import {
@@ -9,44 +9,26 @@ import {
     requireModelEffect,
 } from '../query-utils';
 import type { FindArgs } from '../types';
-import type { OperationContext, Operations } from './context';
+import type { OperationContext } from './context';
 import { getQueryDialect } from './dialect';
 import { makeFindSchema } from './parse';
 
-export function runFind(
-    { db, schema, model, operation }: OperationContext,
-    args: unknown
-) {
-    return Effect.runPromise(
-        Effect.gen(function* () {
-            // parse args
-            const parsedArgs = yield* parseFindArgs(
-                schema,
-                model,
-                operation,
-                args
-            );
+export function runFind(context: OperationContext, args: unknown) {
+    return Effect.gen(function* () {
+        // parse args
+        const parsedArgs = yield* parseFindArgs(context, args);
 
-            // run query
-            const result = yield* runQuery(
-                db,
-                schema,
-                model,
-                operation,
-                parsedArgs
-            );
+        // run query
+        const result = yield* runQuery(context, parsedArgs);
 
-            const finalResult =
-                operation === 'findMany' ? result : result[0] ?? null;
-            return finalResult;
-        })
-    );
+        const finalResult =
+            context.operation === 'findMany' ? result : result[0] ?? null;
+        return finalResult;
+    });
 }
 
 function parseFindArgs(
-    schema: SchemaDef,
-    model: string,
-    operation: Operations,
+    { schema, model, operation }: OperationContext,
     args: unknown
 ) {
     const findSchema = makeFindSchema(
@@ -62,17 +44,14 @@ function parseFindArgs(
 }
 
 export function runQuery(
-    db: Kysely<any>,
-    schema: SchemaDef,
-    model: string,
-    operation: string,
+    { kysely, schema, model, operation }: OperationContext,
     args: FindArgs<SchemaDef, string> | undefined
 ): Effect.Effect<any[], QueryError, never> {
     return Effect.gen(function* () {
         const modelDef = yield* requireModelEffect(schema, model);
 
         // table
-        let query = db.selectFrom(`${modelDef.dbTable}`);
+        let query = kysely.selectFrom(`${modelDef.dbTable}`);
 
         if (operation !== 'findMany') {
             query = query.limit(1);
@@ -117,12 +96,14 @@ export function runQuery(
             );
         }
 
-        // const compiled = query.compile();
-        // yield* Console.log(compiled.sql, compiled.parameters);
-
         const rows = yield* Effect.tryPromise({
             try: () => query.execute(),
-            catch: (e) => new QueryError(`Failed to execute query: ${e}`),
+            catch: (e) => {
+                const { sql, parameters } = query.compile();
+                return new QueryError(
+                    `Failed to execute query: ${e}, sql: ${sql}, parameters: ${parameters}`
+                );
+            },
         });
 
         return rows;

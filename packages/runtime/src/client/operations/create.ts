@@ -1,9 +1,9 @@
 import { createId } from '@paralleldrive/cuid2';
 import { Effect, Match } from 'effect';
-import type { Kysely } from 'kysely';
 import * as uuid from 'uuid';
 import { z } from 'zod';
 import {
+    type BuiltinType,
     type FieldGenerators,
     type ModelDef,
     type SchemaDef,
@@ -19,6 +19,7 @@ import {
     requireModelEffect,
 } from '../query-utils';
 import type { OperationContext } from './context';
+import { getQueryDialect } from './dialect';
 import { runQuery as runFindQuery } from './find';
 
 const CreateArgsSchema = z.object({
@@ -36,19 +37,14 @@ const RelationPayloadSchema = z.union([
     z.object({ createMany: z.record(z.string(), z.any()) }),
 ]);
 
-export function runCreate(
-    { db, schema, model }: OperationContext,
-    args: unknown
-) {
-    return Effect.runPromise(
-        Effect.gen(function* () {
-            // parse args
-            const parsedArgs = yield* parseCreateArgs(args);
+export function runCreate(context: OperationContext, args: unknown) {
+    return Effect.gen(function* () {
+        // parse args
+        const parsedArgs = yield* parseCreateArgs(args);
 
-            const result = yield* runQuery(db, schema, model, parsedArgs);
-            return result;
-        })
-    );
+        const result = yield* runQuery(context, parsedArgs);
+        return result;
+    });
 }
 
 function parseCreateArgs(args: unknown) {
@@ -58,40 +54,35 @@ function parseCreateArgs(args: unknown) {
     });
 }
 
-function runQuery(
-    db: Kysely<any>,
-    schema: SchemaDef,
-    model: string,
-    args: CreateArgs
-) {
+function runQuery(context: OperationContext, args: CreateArgs) {
     return Effect.gen(function* () {
         const hasRelationCreate = Object.keys(args.data).some(
-            (f) => !!requireField(schema, model, f).relation
+            (f) => !!requireField(context.schema, context.model, f).relation
         );
 
-        const returnRelations = needReturnRelations(schema, model, args);
+        const returnRelations = needReturnRelations(
+            context.schema,
+            context.model,
+            args
+        );
 
         let result: any;
         if (hasRelationCreate || returnRelations) {
             // employ a transaction
             result = yield* Effect.tryPromise({
                 try: () =>
-                    db
+                    context.kysely
                         .transaction()
                         .setIsolationLevel('repeatable read')
                         .execute(async (trx) =>
                             Effect.runPromise(
                                 Effect.gen(function* () {
                                     const createResult = yield* doCreate(
-                                        trx,
-                                        schema,
-                                        model,
+                                        { ...context, kysely: trx },
                                         args.data
                                     );
                                     return yield* readBackResult(
-                                        trx,
-                                        schema,
-                                        model,
+                                        { ...context, kysely: trx },
                                         createResult,
                                         args
                                     );
@@ -102,7 +93,7 @@ function runQuery(
             });
         } else {
             // simple create
-            const createResult = yield* doCreate(db, schema, model, args.data);
+            const createResult = yield* doCreate(context, args.data);
             result = trimResult(createResult, args);
         }
 
@@ -111,29 +102,40 @@ function runQuery(
 }
 
 function doCreate(
-    db: Kysely<any>,
-    schema: SchemaDef,
-    model: string,
+    context: OperationContext,
     payload: object
 ): Effect.Effect<any, QueryError, never> {
     return Effect.gen(function* () {
-        const modelDef = yield* requireModelEffect(schema, model);
+        const queryDialect = getQueryDialect(context.schema.provider);
+
+        const modelDef = yield* requireModelEffect(
+            context.schema,
+            context.model
+        );
         // separate args.data into scalar fields and relation fields
         const regularFields: any = {};
         const relationFields: any = {};
         for (const field in payload) {
             if (
-                isScalarField(schema, model, field) ||
-                isForeignKeyField(schema, model, field)
+                isScalarField(context.schema, context.model, field) ||
+                isForeignKeyField(context.schema, context.model, field)
             ) {
-                regularFields[field] = (payload as any)[field];
+                const fieldDef = requireField(
+                    context.schema,
+                    context.model,
+                    field
+                );
+                regularFields[field] = queryDialect.transformPrimitive(
+                    (payload as any)[field],
+                    fieldDef.type as BuiltinType
+                );
             } else {
                 relationFields[field] = (payload as any)[field];
             }
         }
 
         const updatedData = yield* fillGeneratedValues(modelDef, regularFields);
-        const query = db
+        const query = context.kysely
             .insertInto(modelDef.dbTable)
             .values(updatedData)
             .returningAll();
@@ -164,9 +166,7 @@ function doCreate(
                                 (v) => 'create' in v,
                                 (v) =>
                                     doNestedCreate(
-                                        db,
-                                        schema,
-                                        model,
+                                        context,
                                         field,
                                         created,
                                         v.create
@@ -197,17 +197,19 @@ function parseRelationPayload(payload: {}, field: string) {
 }
 
 function doNestedCreate(
-    db: Kysely<any>,
-    schema: SchemaDef,
-    model: string,
+    context: OperationContext,
     field: string,
     parentEntity: { [x: string]: any },
     subPayload: any
 ) {
-    const fieldDef = requireField(schema, model, field);
-    const fieldPairs = getRelationForeignKeyFieldPairs(schema, model, field);
+    const fieldDef = requireField(context.schema, context.model, field);
+    const { keyPairs } = getRelationForeignKeyFieldPairs(
+        context.schema,
+        context.model,
+        field
+    );
 
-    for (const pair of fieldPairs) {
+    for (const pair of keyPairs) {
         if (!(pair.pk in parentEntity)) {
             throw new QueryError(
                 `Field "${pair.pk}" not found in parent created data`
@@ -217,7 +219,7 @@ function doNestedCreate(
             [pair.fk]: (parentEntity as any)[pair.pk],
         });
     }
-    return doCreate(db, schema, fieldDef.type, subPayload);
+    return doCreate({ ...context, model: fieldDef.type }, subPayload);
 }
 
 function fillGeneratedValues(modelDef: ModelDef, data: object) {
@@ -261,16 +263,14 @@ function trimResult(data: any, args: CreateArgs) {
 }
 
 function readBackResult(
-    db: Kysely<any>,
-    schema: SchemaDef,
-    model: string,
+    context: OperationContext,
     primaryData: any,
     args: CreateArgs
 ) {
     return Effect.gen(function* () {
         // fetch relations based on include or select
-        const read = yield* runFindQuery(db, schema, model, 'findUnique', {
-            where: getIdValues(schema, model, primaryData),
+        const read = yield* runFindQuery(context, {
+            where: getIdValues(context.schema, context.model, primaryData),
             select: args.select,
             include: args.include,
         });

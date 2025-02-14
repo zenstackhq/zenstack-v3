@@ -1,6 +1,7 @@
 import { sql } from 'kysely';
 import type { DBClient } from '../src';
-import type { SchemaDef, SupportedProviders } from '../src/schema/schema';
+import { Expression } from '../src/schema/expression';
+import type { DataSourceProvider, SchemaDef } from '../src/schema/schema';
 
 const schema = {
     provider: 'sqlite',
@@ -46,6 +47,26 @@ const schema = {
                 id: { type: 'String' },
                 email: { type: 'String' },
             },
+            policies: [
+                {
+                    kind: 'allow',
+                    operations: ['all'],
+                    expression: Expression.binary(
+                        Expression.call('auth'),
+                        '==',
+                        Expression._this()
+                    ),
+                },
+                {
+                    kind: 'allow',
+                    operations: ['read'],
+                    expression: Expression.binary(
+                        Expression.call('auth'),
+                        '!=',
+                        Expression._null()
+                    ),
+                },
+            ],
         },
         Post: {
             dbTable: 'Post',
@@ -91,6 +112,31 @@ const schema = {
             uniqueFields: {
                 id: { type: 'String' },
             },
+            policies: [
+                {
+                    kind: 'deny',
+                    operations: ['all'],
+                    expression: Expression.binary(
+                        Expression.call('auth'),
+                        '==',
+                        Expression._null()
+                    ),
+                },
+                {
+                    kind: 'allow',
+                    operations: ['all'],
+                    expression: Expression.binary(
+                        Expression.call('auth'),
+                        '==',
+                        Expression.ref('Post', 'author')
+                    ),
+                },
+                {
+                    kind: 'allow',
+                    operations: ['read'],
+                    expression: Expression.ref('Post', 'published'),
+                },
+            ],
         },
         Foo: {
             dbTable: 'Foo',
@@ -110,9 +156,10 @@ const schema = {
             USER: 'USER',
         },
     },
+    authModel: 'User',
 } as const satisfies SchemaDef;
 
-export function getSchema<Provider extends SupportedProviders>(
+export function getSchema<Provider extends DataSourceProvider>(
     provider: Provider
 ) {
     return { ...schema, provider };

@@ -1,11 +1,13 @@
 import type Decimal from 'decimal.js';
+import type { Expression } from './expression';
 
-export type SupportedProviders = 'sqlite' | 'postgresql';
+export type DataSourceProvider = 'sqlite' | 'postgresql';
 
 export type SchemaDef = {
-    provider: SupportedProviders;
+    provider: DataSourceProvider;
     models: Record<string, ModelDef>;
     enums?: Record<string, EnumDef>;
+    authModel: string;
 };
 
 export type ModelDef = {
@@ -19,12 +21,23 @@ export type ModelDef = {
         | Record<string, Pick<FieldDef, 'type'>>
     >;
     idFields: string[];
+    policies?: Policy[];
 };
 
-export type PolicyOperations = 'create' | 'read' | 'update' | 'delete' | 'all';
+export type PolicyKind = 'allow' | 'deny';
+
+export type PolicyOperation =
+    | 'create'
+    | 'read'
+    | 'update'
+    | 'post-update'
+    | 'delete'
+    | 'all';
 
 export type Policy = {
-    operation: PolicyOperations;
+    kind: PolicyKind;
+    operations: PolicyOperation[];
+    expression: Expression;
 };
 
 export type RelationInfo = {
@@ -49,13 +62,13 @@ export type FieldDef = {
     optional?: boolean;
     unique?: boolean;
     updatedAt?: boolean;
-    default?: MappedBuiltinTypes | { call: string };
+    default?: MappedBuiltinType | { call: string };
     generator?: FieldGenerators;
     relation?: RelationInfo;
     foreignKeyFor?: string[];
 };
 
-export type BuiltinTypes =
+export type BuiltinType =
     | 'String'
     | 'Boolean'
     | 'Int'
@@ -64,7 +77,7 @@ export type BuiltinTypes =
     | 'Decimal'
     | 'DateTime';
 
-export type MappedBuiltinTypes =
+export type MappedBuiltinType =
     | string
     | boolean
     | number

@@ -481,9 +481,18 @@ export type ModelOperations<
     ): Promise<ModelResult<Schema, Model, T>>;
 };
 
+export type FeatureSettings = {
+    policy?: PolicyFeatureSettings;
+};
+
+export type PolicyFeatureSettings = {
+    auth?: Record<string, any>;
+};
+
 export type DBClient<Schema extends SchemaDef> = {
     $qb: Kysely<toKysely<Schema>>;
     $disconnect(): Promise<void>;
+    $withFeatures(features: FeatureSettings): DBClient<Schema>;
 } & {
     [Key in GetModels<Schema> as Key extends string
         ? Uncapitalize<Key>

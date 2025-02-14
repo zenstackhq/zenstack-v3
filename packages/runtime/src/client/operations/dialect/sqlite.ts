@@ -1,7 +1,7 @@
 import type { ExpressionBuilder, RawBuilder } from 'kysely';
 import { ExpressionWrapper, sql, type SelectQueryBuilder } from 'kysely';
 import type { QueryDialect } from '.';
-import type { SchemaDef } from '../../../schema/schema';
+import type { BuiltinType, SchemaDef } from '../../../schema/schema';
 import {
     getRelationForeignKeyFieldPairs,
     requireField,
@@ -10,6 +10,17 @@ import {
 import type { SelectInclude } from '../../types';
 
 export class SqliteQueryDialect implements QueryDialect {
+    transformPrimitive(value: unknown, type: BuiltinType) {
+        if (value === undefined) {
+            return value;
+        }
+        if (type === 'Boolean') {
+            return value ? 1 : 0;
+        } else {
+            return value;
+        }
+    }
+
     buildRelationSelection(
         query: SelectQueryBuilder<any, any, {}>,
         schema: SchemaDef,
@@ -47,7 +58,7 @@ export class SqliteQueryDialect implements QueryDialect {
         const relationModel = relationFieldDef.type;
         const relationModelDef = requireModel(schema, relationModel);
 
-        const keyPairs = getRelationForeignKeyFieldPairs(
+        const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
             schema,
             model,
             relationField
@@ -122,7 +133,7 @@ export class SqliteQueryDialect implements QueryDialect {
             });
 
         // join conditions
-        keyPairs.forEach(({ fk, pk, ownedByModel }) => {
+        keyPairs.forEach(({ fk, pk }) => {
             if (ownedByModel) {
                 // the parent model owns the fk
                 tbl = tbl.whereRef(

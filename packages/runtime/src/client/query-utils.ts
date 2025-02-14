@@ -68,11 +68,13 @@ export function getRelationForeignKeyFieldPairs(
             );
         }
         // this model owns the fk
-        return fieldDef.relation.fields.map((f, i) => ({
-            fk: f,
-            pk: fieldDef.relation!.references![i]!,
+        return {
+            keyPairs: fieldDef.relation.fields.map((f, i) => ({
+                fk: f,
+                pk: fieldDef.relation!.references![i]!,
+            })),
             ownedByModel: true,
-        }));
+        };
     } else {
         if (!fieldDef.relation.opposite) {
             throw new InternalError(
@@ -103,11 +105,13 @@ export function getRelationForeignKeyFieldPairs(
         }
 
         // the opposite model owns the fk
-        return oppositeField.relation.fields.map((f, i) => ({
-            fk: f,
-            pk: oppositeField.relation!.references![i]!,
+        return {
+            keyPairs: oppositeField.relation.fields.map((f, i) => ({
+                fk: f,
+                pk: oppositeField.relation!.references![i]!,
+            })),
             ownedByModel: false,
-        }));
+        };
     }
 }
 

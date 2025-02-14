@@ -1,4 +1,4 @@
-import { Match } from 'effect';
+import { Effect, Match } from 'effect';
 import {
     Kysely,
     ParseJSONResultsPlugin,
@@ -10,26 +10,48 @@ import {
     type SqliteDialectConfig,
 } from 'kysely';
 import {
+    type DataSourceProvider,
     type GetModels,
     type SchemaDef,
-    type SupportedProviders,
 } from '../schema/schema';
 import { NotFoundError } from './errors';
+import { PolicyPlugin } from './features/policy';
 import { runCreate } from './operations/create';
+import { getQueryDialect } from './operations/dialect';
 import { runFind } from './operations/find';
 import type { toKysely } from './query-builder';
-import type { DBClient, ModelOperations } from './types';
+import type { DBClient, FeatureSettings, ModelOperations } from './types';
 
-export type ClientOptions<Provider extends SupportedProviders> = {
-    // dialect: KyselyConfig['dialect'];
-    plugins?: KyselyConfig['plugins'];
-    log?: KyselyConfig['log'];
-    dialectConfig: Provider extends 'sqlite'
+type DialectConfig<Provider extends DataSourceProvider> =
+    Provider extends 'sqlite'
         ? SqliteDialectConfig
         : Provider extends 'postgresql'
         ? PostgresDialectConfig
         : never;
+
+export type ClientOptions<Provider extends DataSourceProvider> = {
+    /**
+     * Database dialect configuration.
+     */
+    dialectConfig: DialectConfig<Provider>;
+
+    /**
+     * Kysely plugins.
+     */
+    plugins?: KyselyConfig['plugins'];
+
+    /**
+     * Logging configuration.
+     */
+    log?: KyselyConfig['log'];
+
+    /**
+     * Feature enablement and configuration.
+     */
+    features?: FeatureSettings;
 };
+
+export type PolicySettings = {};
 
 export function makeClient<Schema extends SchemaDef>(
     schema: Schema,
@@ -41,7 +63,10 @@ export function makeClient<Schema extends SchemaDef>(
 export class Client<Schema extends SchemaDef> {
     public readonly $qb: Kysely<toKysely<Schema>>;
 
-    constructor(schema: Schema, options: ClientOptions<Schema['provider']>) {
+    constructor(
+        private readonly schema: Schema,
+        private readonly options: ClientOptions<Schema['provider']>
+    ) {
         const dialect: Dialect = Match.value(schema.provider).pipe(
             Match.when(
                 'sqlite',
@@ -59,22 +84,48 @@ export class Client<Schema extends SchemaDef> {
             ),
             Match.exhaustive
         );
+
+        const plugins = [
+            ...(options.plugins ?? []),
+            new ParseJSONResultsPlugin(),
+        ];
+        if (options.features?.policy) {
+            plugins.push(
+                new PolicyPlugin(
+                    schema,
+                    getQueryDialect(schema.provider),
+                    options.features.policy
+                )
+            );
+        }
+
         this.$qb = new Kysely({
             dialect,
             log: options.log,
-            plugins: [...(options.plugins ?? []), new ParseJSONResultsPlugin()],
+            plugins,
         });
-        return createClientProxy(this, schema);
+        return createClientProxy(this, schema, options);
     }
 
     async $disconnect() {
         await this.$qb.destroy();
     }
+
+    $withFeatures(features: FeatureSettings) {
+        return makeClient(this.schema, {
+            ...this.options,
+            features: {
+                ...this.options.features,
+                ...features,
+            },
+        });
+    }
 }
 
 function createClientProxy<Schema extends SchemaDef>(
     client: Client<Schema>,
-    schema: Schema
+    schema: Schema,
+    options: ClientOptions<Schema['provider']>
 ): Client<Schema> {
     return new Proxy(client, {
         get: (target, prop, receiver) => {
@@ -87,7 +138,13 @@ function createClientProxy<Schema extends SchemaDef>(
                     (m) => m.toLowerCase() === prop.toLowerCase()
                 );
                 if (model) {
-                    return createModelProxy(client, client.$qb, schema, model);
+                    return createModelProxy(
+                        client,
+                        client.$qb,
+                        schema,
+                        options,
+                        model
+                    );
                 }
             }
 
@@ -101,31 +158,48 @@ function createModelProxy<
     Model extends GetModels<Schema>
 >(
     _client: Client<Schema>,
-    db: Kysely<toKysely<Schema>>,
+    kysely: Kysely<toKysely<Schema>>,
     schema: Schema,
+    options: ClientOptions<Schema['provider']>,
     model: string
 ): ModelOperations<Schema, Model> {
+    const baseContext = { kysely, schema, model, clientOptions: options };
     return {
         create: async (args) => {
-            const r = await runCreate(
-                { db, schema, model, operation: 'create' },
-                args
+            const r = await Effect.runPromise(
+                runCreate(
+                    {
+                        ...baseContext,
+                        operation: 'create',
+                    },
+                    args
+                )
             );
             return r;
         },
 
         findUnique: async (args) => {
-            const r = await runFind(
-                { db, schema, model, operation: 'findUnique' },
-                args
+            const r = await Effect.runPromise(
+                runFind(
+                    {
+                        ...baseContext,
+                        operation: 'findUnique',
+                    },
+                    args
+                )
             );
             return r ?? null;
         },
 
         findUniqueOrThrow: async (args) => {
-            const r = await runFind(
-                { db, schema, model, operation: 'findUnique' },
-                args
+            const r = await Effect.runPromise(
+                runFind(
+                    {
+                        ...baseContext,
+                        operation: 'findUnique',
+                    },
+                    args
+                )
             );
             if (!r) {
                 throw new NotFoundError(`No "${model}" found`);
@@ -135,13 +209,26 @@ function createModelProxy<
         },
 
         findFirst: async (args) => {
-            return runFind({ db, schema, model, operation: 'findFirst' }, args);
+            return Effect.runPromise(
+                runFind(
+                    {
+                        ...baseContext,
+                        operation: 'findFirst',
+                    },
+                    args
+                )
+            );
         },
 
         findFirstOrThrow: async (args) => {
-            const r = await runFind(
-                { db, schema, model, operation: 'findFirst' },
-                args
+            const r = await Effect.runPromise(
+                runFind(
+                    {
+                        ...baseContext,
+                        operation: 'findFirst',
+                    },
+                    args
+                )
             );
             if (!r) {
                 throw new NotFoundError(`No "${model}" found`);
@@ -151,7 +238,15 @@ function createModelProxy<
         },
 
         findMany: async (args) => {
-            return runFind({ db, schema, model, operation: 'findMany' }, args);
+            return Effect.runPromise(
+                runFind(
+                    {
+                        ...baseContext,
+                        operation: 'findMany',
+                    },
+                    args
+                )
+            );
         },
     };
 }

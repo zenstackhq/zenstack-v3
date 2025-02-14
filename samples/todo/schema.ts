@@ -91,17 +91,6 @@ export const Schema = {
                 id: { type: 'String' },
             },
         },
-        Foo: {
-            dbTable: 'Foo',
-            fields: {
-                id1: { type: 'Int' },
-                id2: { type: 'Int' },
-            },
-            idFields: ['id1', 'id2'],
-            uniqueFields: {
-                id1_id2: { id1: { type: 'Int' }, id2: { type: 'Int' } },
-            },
-        },
     },
     enums: {
         Role: {
@@ -109,6 +98,7 @@ export const Schema = {
             USER: 'USER',
         },
     },
+    authModel: 'User',
 } as const satisfies SchemaDef;
 
 export async function pushSchema(db: DBClient<typeof Schema>) {

@@ -18,7 +18,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
         });
 
         afterEach(async () => {
-            await client.$disconnect();
+            await client?.$disconnect();
         });
 
         async function createUser() {

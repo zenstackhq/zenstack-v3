@@ -6,7 +6,12 @@ import {
     type SelectQueryBuilder,
 } from 'kysely';
 import type { QueryDialect } from '.';
-import type { FieldDef, ModelDef, SchemaDef } from '../../../schema/schema';
+import type {
+    BuiltinType,
+    FieldDef,
+    ModelDef,
+    SchemaDef,
+} from '../../../schema/schema';
 import {
     getRelationForeignKeyFieldPairs,
     requireField,
@@ -15,6 +20,10 @@ import {
 import type { SelectInclude } from '../../types';
 
 export class PostgresQueryDialect implements QueryDialect {
+    transformPrimitive(value: unknown, _type: BuiltinType) {
+        return value;
+    }
+
     buildRelationSelection(
         query: SelectQueryBuilder<any, any, {}>,
         schema: SchemaDef,
@@ -221,13 +230,13 @@ export class PostgresQueryDialect implements QueryDialect {
         qb: SelectQueryBuilder<any, any, any>,
         parentName: string
     ) {
-        const keyPairs = getRelationForeignKeyFieldPairs(
+        const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
             schema,
             model,
             relationField
         );
 
-        keyPairs.forEach(({ fk, pk, ownedByModel }) => {
+        keyPairs.forEach(({ fk, pk }) => {
             if (ownedByModel) {
                 // the parent model owns the fk
                 qb = qb.whereRef(

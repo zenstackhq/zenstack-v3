@@ -1,5 +1,5 @@
 import { sql } from 'kysely';
-import type { DBClient } from '../src';
+import type { DBClient } from '../src/client';
 import { Expression } from '../src/schema/expression';
 import type { DataSourceProvider, SchemaDef } from '../src/schema/schema';
 
@@ -48,6 +48,7 @@ const schema = {
                 email: { type: 'String' },
             },
             policies: [
+                // @@allow('all', auth() == this)
                 {
                     kind: 'allow',
                     operations: ['all'],
@@ -57,6 +58,7 @@ const schema = {
                         Expression._this()
                     ),
                 },
+                // @@allow('read', auth() != null)
                 {
                     kind: 'allow',
                     operations: ['read'],
@@ -113,6 +115,7 @@ const schema = {
                 id: { type: 'String' },
             },
             policies: [
+                // @@deny('all', auth() == null)
                 {
                     kind: 'deny',
                     operations: ['all'],
@@ -122,6 +125,7 @@ const schema = {
                         Expression._null()
                     ),
                 },
+                // @@allow('all', auth() == author)
                 {
                     kind: 'allow',
                     operations: ['all'],

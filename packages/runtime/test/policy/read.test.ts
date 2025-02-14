@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type DBClient } from '../../src';
+import { type DBClient } from '../../src/client';
 import { createClientSpecs } from '../client-api/client-specs';
 import { getSchema, pushSchema } from '../test-schema';
 

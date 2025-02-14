@@ -60,7 +60,7 @@ export function makeClient<Schema extends SchemaDef>(
     return new Client<Schema>(schema, options) as unknown as DBClient<Schema>;
 }
 
-export class Client<Schema extends SchemaDef> {
+class Client<Schema extends SchemaDef> {
     public readonly $qb: Kysely<toKysely<Schema>>;
 
     constructor(

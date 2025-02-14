@@ -1,4 +1,5 @@
-import type { DBClient, SchemaDef } from '@zenstackhq/runtime';
+import type { DBClient } from '@zenstackhq/runtime/client';
+import { Expression, type SchemaDef } from '@zenstackhq/runtime/schema';
 import { sql } from 'kysely';
 
 export const Schema = {
@@ -45,6 +46,29 @@ export const Schema = {
                 id: { type: 'String' },
                 email: { type: 'String' },
             },
+
+            policies: [
+                // @@allow('all', auth() == this)
+                {
+                    kind: 'allow',
+                    operations: ['all'],
+                    expression: Expression.binary(
+                        Expression.call('auth'),
+                        '==',
+                        Expression._this()
+                    ),
+                },
+                // @@allow('read', auth() != null)
+                {
+                    kind: 'allow',
+                    operations: ['read'],
+                    expression: Expression.binary(
+                        Expression.call('auth'),
+                        '!=',
+                        Expression._null()
+                    ),
+                },
+            ],
         },
         Post: {
             dbTable: 'Post',
@@ -90,6 +114,34 @@ export const Schema = {
             uniqueFields: {
                 id: { type: 'String' },
             },
+
+            policies: [
+                // @@deny('all', auth() == null)
+                {
+                    kind: 'deny',
+                    operations: ['all'],
+                    expression: Expression.binary(
+                        Expression.call('auth'),
+                        '==',
+                        Expression._null()
+                    ),
+                },
+                // @@allow('all', auth() == author)
+                {
+                    kind: 'allow',
+                    operations: ['all'],
+                    expression: Expression.binary(
+                        Expression.call('auth'),
+                        '==',
+                        Expression.ref('Post', 'author')
+                    ),
+                },
+                {
+                    kind: 'allow',
+                    operations: ['read'],
+                    expression: Expression.ref('Post', 'published'),
+                },
+            ],
         },
     },
     enums: {

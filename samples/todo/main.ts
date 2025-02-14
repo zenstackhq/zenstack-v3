@@ -20,7 +20,8 @@ async function main() {
             posts: {
                 create: {
                     title: 'Post1',
-                    content: 'My post',
+                    content: 'An unpublished post',
+                    published: false,
                 },
             },
         },
@@ -55,6 +56,28 @@ async function main() {
         .select(['Post.id', 'Post.title', 'Post.content', 'User.email'])
         .executeTakeFirst();
     console.log('Post found with query-builder API:', foundPost1);
+
+    // Opt-in to access policy, and access user with different contexts
+
+    const anonDb = db.$withFeatures({ policy: {} });
+    const foundUserWithAnon = await anonDb.user.findFirst();
+    console.log('User found with anonymous client:', foundUserWithAnon);
+
+    // both the user and posts can be read
+    const user1Db = db.$withFeatures({ policy: { auth: { id: '1' } } });
+    const foundUserWithUser1 = await user1Db.user.findUnique({
+        where: { id: '1' },
+        include: { posts: true },
+    });
+    console.log('User found with user1 client:', foundUserWithUser1);
+
+    // user can be read but posts are filtered
+    const user2Db = db.$withFeatures({ policy: { auth: { id: '2' } } });
+    const foundUserWithUser2 = await user2Db.user.findUnique({
+        where: { id: '1' },
+        include: { posts: true },
+    });
+    console.log('User found with user2 client:', foundUserWithUser2);
 }
 
 main();

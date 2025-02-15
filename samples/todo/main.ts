@@ -18,6 +18,7 @@ async function main() {
         data: {
             id: '1',
             email: 'yiming@zenstack.dev',
+            role: 'ADMIN',
             posts: {
                 create: {
                     title: 'Post1',
@@ -79,6 +80,18 @@ async function main() {
         include: { posts: true },
     });
     console.log('User found with user2 client:', foundUserWithUser2);
+
+    // find with mixed field filter and kysely expression builder
+    const foundUserWithExpressionBuilder = await db.user.findFirst({
+        where: {
+            role: 'ADMIN',
+            $expr: (eb) => eb('email', 'like', '%@zenstack.dev'),
+        },
+    });
+    console.log(
+        'User found with kysely expression builder:',
+        foundUserWithExpressionBuilder
+    );
 }
 
 main();

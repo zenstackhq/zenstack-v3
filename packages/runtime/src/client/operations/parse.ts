@@ -46,6 +46,7 @@ export function makeWhereSchema(
         }
     }
 
+    fields['$expr'] = z.function().optional();
     const baseWhere = z.object(fields);
     result = baseWhere;
 

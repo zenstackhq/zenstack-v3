@@ -21,13 +21,14 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             await client?.$disconnect();
         });
 
-        async function createUser() {
+        async function createUser(email = 'a@b.com') {
             return await client.$qb
                 .insertInto('User')
                 .values({
-                    id: '1',
-                    email: 'a@b.com',
+                    id: crypto.randomUUID(),
+                    email,
                     name: 'User1',
+                    role: 'ADMIN',
                     updatedAt: new Date().toISOString(),
                 })
                 .returningAll()
@@ -38,7 +39,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             await client.$qb
                 .insertInto('Post')
                 .values({
-                    id: '1',
+                    id: crypto.randomUUID(),
                     title: 'Post1',
                     updatedAt: new Date().toISOString(),
                     authorId,
@@ -47,7 +48,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             await client.$qb
                 .insertInto('Post')
                 .values({
-                    id: '2',
+                    id: crypto.randomUUID(),
                     title: 'Post2',
                     updatedAt: new Date().toISOString(),
                     authorId,
@@ -59,32 +60,32 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             let r = await client.user.findMany();
             expect(r).toHaveLength(0);
 
-            await createUser();
+            const user = await createUser();
 
             r = await client.user.findMany();
             expect(r).toHaveLength(1);
-            r = await client.user.findMany({ where: { id: '1' } });
+            r = await client.user.findMany({ where: { id: user.id } });
             expect(r).toHaveLength(1);
 
-            r = await client.user.findMany({ where: { id: '2' } });
+            r = await client.user.findMany({ where: { id: 'none' } });
             expect(r).toHaveLength(0);
         });
 
         it('works with simple findUnique', async () => {
-            let r = await client.user.findUnique({ where: { id: '1' } });
+            let r = await client.user.findUnique({ where: { id: 'none' } });
             expect(r).toBeNull();
 
-            await createUser();
+            const user = await createUser();
 
-            r = await client.user.findUnique({ where: { id: '1' } });
-            expect(r).toMatchObject({ id: '1', email: 'a@b.com' });
+            r = await client.user.findUnique({ where: { id: user.id } });
+            expect(r).toMatchObject({ id: user.id, email: 'a@b.com' });
             r = await client.user.findUnique({ where: { email: 'a@b.com' } });
-            expect(r).toMatchObject({ id: '1', email: 'a@b.com' });
+            expect(r).toMatchObject({ id: user.id, email: 'a@b.com' });
 
-            r = await client.user.findUnique({ where: { id: '2' } });
+            r = await client.user.findUnique({ where: { id: 'none' } });
             expect(r).toBeNull();
             await expect(
-                client.user.findUniqueOrThrow({ where: { id: '2' } })
+                client.user.findUniqueOrThrow({ where: { id: 'none' } })
             ).rejects.toThrow(NotFoundError);
         });
 
@@ -92,10 +93,10 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             let r = await client.user.findFirst({ where: { name: 'User1' } });
             expect(r).toBeNull();
 
-            await createUser();
+            const user = await createUser();
 
             r = await client.user.findFirst({ where: { name: 'User1' } });
-            expect(r).toMatchObject({ id: '1', email: 'a@b.com' });
+            expect(r).toMatchObject({ id: user.id, email: 'a@b.com' });
 
             r = await client.user.findFirst({ where: { name: 'User2' } });
             expect(r).toBeNull();
@@ -108,10 +109,10 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             let r = await client.user.findFirst({ where: { name: 'User1' } });
             expect(r).toBeNull();
 
-            await createUser();
+            const user = await createUser();
 
             r = await client.user.findFirst({ where: { name: 'User1' } });
-            expect(r).toMatchObject({ id: '1', email: 'a@b.com' });
+            expect(r).toMatchObject({ id: user.id, email: 'a@b.com' });
             r = await client.user.findFirst({ where: { name: 'User2' } });
             expect(r).toBeNull();
         });
@@ -121,7 +122,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             await createPosts(user.id);
 
             let r = await client.user.findUnique({
-                where: { id: '1' },
+                where: { id: user.id },
                 select: { id: true, email: true, posts: true },
             });
             expect(r?.id).toBeTruthy();
@@ -131,20 +132,43 @@ describe.each(createClientSpecs(PG_DB_NAME))(
 
             await expect(
                 client.user.findUnique({
-                    where: { id: '1' },
+                    where: { id: user.id },
                     select: { id: true, email: true },
                     include: { posts: true },
                 } as any)
             ).rejects.toThrow('cannot be used together');
 
             const r1 = await client.user.findUnique({
-                where: { id: '1' },
+                where: { id: user.id },
                 include: { posts: { include: { author: true } } },
             });
             expect(r1!.posts[0]!.author).toMatchObject({
-                id: '1',
+                id: user.id,
                 email: 'a@b.com',
             });
+        });
+
+        it('supports kysely expression builder', async () => {
+            await createUser('yiming@gmail.com');
+            await createUser('yiming@zenstack.dev');
+
+            await expect(
+                client.user.findMany({
+                    where: {
+                        role: 'ADMIN',
+                        $expr: (eb) => eb('email', 'like', '%@zenstack.dev'),
+                    },
+                })
+            ).resolves.toHaveLength(1);
+
+            await expect(
+                client.user.findMany({
+                    where: {
+                        role: 'USER',
+                        $expr: (eb) => eb('email', 'like', '%@zenstack.dev'),
+                    },
+                })
+            ).resolves.toHaveLength(0);
         });
     }
 );

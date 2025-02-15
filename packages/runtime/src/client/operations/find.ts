@@ -119,10 +119,20 @@ function buildWhere(
         return result;
     }
 
-    result = Object.entries(where).reduce(
+    const regularFields = Object.entries(where).filter(
+        ([field]) => !field.startsWith('$')
+    );
+
+    // build regular field filters
+    result = regularFields.reduce(
         (acc, [field, value]) => acc.where(field, '=', value),
         result
     );
+
+    // call expression builder and combine the results
+    if ('$expr' in where && typeof where['$expr'] === 'function') {
+        result = result.where((eb) => where['$expr'](eb));
+    }
 
     return result;
 }

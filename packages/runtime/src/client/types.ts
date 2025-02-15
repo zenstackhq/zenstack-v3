@@ -1,4 +1,9 @@
-import type { Kysely } from 'kysely';
+import type {
+    ExpressionBuilder,
+    Kysely,
+    OperandExpression,
+    SqlBool,
+} from 'kysely';
 import type { Optional } from 'utility-types';
 import type {
     FieldDef,
@@ -125,6 +130,13 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     >
         ? RelationFilter<Schema, Model, Key>
         : MapFieldType<Schema, Model, Key>;
+} & {
+    $expr?: (
+        eb: ExpressionBuilder<
+            toKysely<Schema>,
+            Model extends keyof toKysely<Schema> ? Model : never
+        >
+    ) => OperandExpression<SqlBool>;
 };
 
 export type WhereUnique<

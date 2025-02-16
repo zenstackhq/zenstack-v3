@@ -236,4 +236,5 @@ function createModelProxy<
 }
 
 export type { FeatureSettings, PolicySettings } from './options';
+export type * from './types';
 export type { ClientOptions, toKysely };

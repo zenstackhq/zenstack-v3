@@ -1,5 +1,6 @@
 import { makeClient } from '@zenstackhq/runtime';
 import type { PolicySettings } from '@zenstackhq/runtime/client';
+import { toHooks } from '@zenstackhq/tanstack-query/react';
 import Sqlite from 'better-sqlite3';
 import { pushSchema, Schema } from './schema';
 
@@ -119,6 +120,13 @@ async function main() {
         updatedAt: new Date().toISOString(),
     });
     console.log('Zod validated user:', parsedUser);
+
+    // react-query hooks
+    const hooks = toHooks(Schema);
+    const { data } = hooks.user.findFirst({
+        where: { role: 'ADMIN' },
+    });
+    console.log(data?.email);
 }
 
 main();

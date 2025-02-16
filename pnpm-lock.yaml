@@ -107,11 +107,23 @@ importers:
         specifier: ^8.13.1
         version: 8.13.1
 
+  packages/tanstack-query:
+    dependencies:
+      '@tanstack/react-query':
+        specifier: ^5.0.0
+        version: 5.66.3(react@19.0.0)
+      '@zenstackhq/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
   samples/todo:
     dependencies:
       '@zenstackhq/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
+      '@zenstackhq/tanstack-query':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-query
       better-sqlite3:
         specifier: ^11.8.1
         version: 11.8.1
@@ -824,6 +836,14 @@ packages:
 
   '@swc/types@0.1.17':
     resolution: {integrity: sha512-V5gRru+aD8YVyCOMAjMpWR1Ui577DD5KSJsHP8RAxopAH22jFz6GZd/qxqjO6MJHQhcsjvjOFXyDhyLQUnMveQ==}
+
+  '@tanstack/query-core@5.66.3':
+    resolution: {integrity: sha512-+2iDxH7UFdtwcry766aJszGmbByQDIzTltJ3oQAZF9bhCxHCIN3yDwHa6qDCZxcpMGvUphCRx/RYJvLbM8mucQ==}
+
+  '@tanstack/react-query@5.66.3':
+    resolution: {integrity: sha512-sWMvxZ5VugPDgD1CzP7f0s9yFvjcXP3FXO5IVV2ndXlYqUCwykU8U69Kk05Qn5UvGRqB/gtj4J7vcTC6vtLHtQ==}
+    peerDependencies:
+      react: ^18 || ^19
 
   '@types/better-sqlite3@7.6.12':
     resolution: {integrity: sha512-fnQmj8lELIj7BSrZQAdBMHEHX8OZLYIHXqAKT1O7tDfLxaINzf00PMjw22r3N/xXh0w/sGHlO6SVaCQ2mj78lg==}
@@ -1818,6 +1838,10 @@ packages:
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
+  react@19.0.0:
+    resolution: {integrity: sha512-V8AVnmPIICiWpGfm6GLzCR/W5FXLchHop40W4nXBmdlEceh16rCN8O8LNWm5bh5XUX91fh7KpA+W0TgMKmgTpQ==}
+    engines: {node: '>=0.10.0'}
+
   readable-stream@3.6.2:
     resolution: {integrity: sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==}
     engines: {node: '>= 6'}
@@ -2716,6 +2740,13 @@ snapshots:
   '@swc/types@0.1.17':
     dependencies:
       '@swc/counter': 0.1.3
+
+  '@tanstack/query-core@5.66.3': {}
+
+  '@tanstack/react-query@5.66.3(react@19.0.0)':
+    dependencies:
+      '@tanstack/query-core': 5.66.3
+      react: 19.0.0
 
   '@types/better-sqlite3@7.6.12':
     dependencies:
@@ -3796,6 +3827,8 @@ snapshots:
       strip-json-comments: 2.0.1
 
   react-is@18.3.1: {}
+
+  react@19.0.0: {}
 
   readable-stream@3.6.2:
     dependencies:

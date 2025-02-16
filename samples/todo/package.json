@@ -12,6 +12,7 @@
     "license": "MIT",
     "dependencies": {
         "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/tanstack-query": "workspace:*",
         "better-sqlite3": "^11.8.1",
         "kysely": "^0.27.5"
     },

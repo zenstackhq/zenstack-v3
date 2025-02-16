@@ -13,15 +13,17 @@ import {
 import type { SchemaDef } from '../../../schema';
 import type { Policy } from '../../../schema/schema';
 import type { QueryDialect } from '../../operations/dialect';
+import type { PolicyFeatureSettings } from '../../options';
 import { requireModel } from '../../query-utils';
-import type { PolicyFeatureSettings } from '../../types';
 import { ExpressionTransformer } from './expression-transformer';
 
-export class PolicyTransformer extends OperationNodeTransformer {
+export class PolicyTransformer<
+    Schema extends SchemaDef
+> extends OperationNodeTransformer {
     constructor(
-        private readonly schema: SchemaDef,
+        private readonly schema: Schema,
         private readonly queryDialect: QueryDialect,
-        private readonly policySettings: PolicyFeatureSettings
+        private readonly policySettings: PolicyFeatureSettings<Schema>
     ) {
         super();
     }
@@ -33,7 +35,10 @@ export class PolicyTransformer extends OperationNodeTransformer {
             let modelName = this.extractTableName(from);
             const policies = this.getModelPolicies(modelName);
             if (policies && policies.length > 0) {
-                const combinedPolicy = this.buildPolicyFilterNode(policies);
+                const combinedPolicy = this.buildPolicyFilterNode(
+                    modelName,
+                    policies
+                );
                 whereNode = WhereNode.create(
                     whereNode?.where
                         ? AndNode.create(whereNode.where, combinedPolicy)
@@ -53,14 +58,14 @@ export class PolicyTransformer extends OperationNodeTransformer {
         };
     }
 
-    private buildPolicyFilterNode(policies: Policy[]) {
+    private buildPolicyFilterNode(model: string, policies: Policy[]) {
         const allows = policies
             .filter((policy) => policy.kind === 'allow')
-            .map((policy) => this.buildPolicyWhere(policy));
+            .map((policy) => this.buildPolicyWhere(model, policy));
 
         const denies = policies
             .filter((policy) => policy.kind === 'deny')
-            .map((policy) => this.buildPolicyWhere(policy));
+            .map((policy) => this.buildPolicyWhere(model, policy));
 
         let combinedPolicy: OperationNode;
 
@@ -107,12 +112,12 @@ export class PolicyTransformer extends OperationNodeTransformer {
         }
     }
 
-    private buildPolicyWhere(policy: Policy) {
+    private buildPolicyWhere(model: string, policy: Policy) {
         return new ExpressionTransformer(
             this.schema,
             this.queryDialect,
             this.policySettings
-        ).transform(policy.expression);
+        ).transform(policy.expression, { model });
     }
 
     private getModelPolicies(modelName: string) {

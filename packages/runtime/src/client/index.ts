@@ -5,57 +5,33 @@ import {
     PostgresDialect,
     SqliteDialect,
     type Dialect,
-    type KyselyConfig,
     type PostgresDialectConfig,
     type SqliteDialectConfig,
 } from 'kysely';
-import {
-    type DataSourceProvider,
-    type GetModels,
-    type SchemaDef,
-} from '../schema/schema';
+import { type GetModels, type SchemaDef } from '../schema/schema';
 import { NotFoundError } from './errors';
 import { PolicyPlugin } from './features/policy';
+import type { OperationContext } from './operations/context';
 import { runCreate } from './operations/create';
 import { getQueryDialect } from './operations/dialect';
 import { runFind } from './operations/find';
+import type { ClientOptions, FeatureSettings } from './options';
 import type { toKysely } from './query-builder';
-import type { DBClient, FeatureSettings, ModelOperations } from './types';
+import type { ModelOperations } from './types';
 
-type DialectConfig<Provider extends DataSourceProvider> =
-    Provider extends 'sqlite'
-        ? SqliteDialectConfig
-        : Provider extends 'postgresql'
-        ? PostgresDialectConfig
-        : never;
-
-export type ClientOptions<Provider extends DataSourceProvider> = {
-    /**
-     * Database dialect configuration.
-     */
-    dialectConfig: DialectConfig<Provider>;
-
-    /**
-     * Kysely plugins.
-     */
-    plugins?: KyselyConfig['plugins'];
-
-    /**
-     * Logging configuration.
-     */
-    log?: KyselyConfig['log'];
-
-    /**
-     * Feature enablement and configuration.
-     */
-    features?: FeatureSettings;
+export type DBClient<Schema extends SchemaDef> = {
+    $qb: Kysely<toKysely<Schema>>;
+    $disconnect(): Promise<void>;
+    $withFeatures(features: FeatureSettings<Schema>): DBClient<Schema>;
+} & {
+    [Key in GetModels<Schema> as Key extends string
+        ? Uncapitalize<Key>
+        : never]: ModelOperations<Schema, Key>;
 };
-
-export type PolicySettings = {};
 
 export function makeClient<Schema extends SchemaDef>(
     schema: Schema,
-    options: ClientOptions<Schema['provider']>
+    options: ClientOptions<Schema>
 ) {
     return new Client<Schema>(schema, options) as unknown as DBClient<Schema>;
 }
@@ -65,7 +41,7 @@ class Client<Schema extends SchemaDef> {
 
     constructor(
         private readonly schema: Schema,
-        private readonly options: ClientOptions<Schema['provider']>
+        private readonly options: ClientOptions<Schema>
     ) {
         const dialect: Dialect = Match.value(schema.provider).pipe(
             Match.when(
@@ -111,7 +87,7 @@ class Client<Schema extends SchemaDef> {
         await this.$qb.destroy();
     }
 
-    $withFeatures(features: FeatureSettings) {
+    $withFeatures(features: FeatureSettings<Schema>) {
         return makeClient(this.schema, {
             ...this.options,
             features: {
@@ -125,7 +101,7 @@ class Client<Schema extends SchemaDef> {
 function createClientProxy<Schema extends SchemaDef>(
     client: Client<Schema>,
     schema: Schema,
-    options: ClientOptions<Schema['provider']>
+    options: ClientOptions<Schema>
 ): Client<Schema> {
     return new Proxy(client, {
         get: (target, prop, receiver) => {
@@ -160,10 +136,15 @@ function createModelProxy<
     _client: Client<Schema>,
     kysely: Kysely<toKysely<Schema>>,
     schema: Schema,
-    options: ClientOptions<Schema['provider']>,
+    options: ClientOptions<Schema>,
     model: string
 ): ModelOperations<Schema, Model> {
-    const baseContext = { kysely, schema, model, clientOptions: options };
+    const baseContext: Omit<OperationContext<Schema>, 'operation'> = {
+        kysely,
+        schema,
+        model,
+        clientOptions: options,
+    };
     return {
         create: async (args) => {
             const r = await Effect.runPromise(
@@ -251,4 +232,5 @@ function createModelProxy<
     };
 }
 
-export type { DBClient, toKysely };
+export type { FeatureSettings, PolicyFeatureSettings } from './options';
+export type { ClientOptions, toKysely };

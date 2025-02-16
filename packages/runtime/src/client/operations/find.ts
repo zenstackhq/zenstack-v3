@@ -13,7 +13,10 @@ import type { OperationContext } from './context';
 import { getQueryDialect } from './dialect';
 import { makeFindSchema } from './parse';
 
-export function runFind(context: OperationContext, args: unknown) {
+export function runFind<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
+    args: unknown
+) {
     return Effect.gen(function* () {
         // parse args
         const parsedArgs = yield* parseFindArgs(context, args);
@@ -27,8 +30,8 @@ export function runFind(context: OperationContext, args: unknown) {
     });
 }
 
-function parseFindArgs(
-    { schema, model, operation }: OperationContext,
+function parseFindArgs<Schema extends SchemaDef>(
+    { schema, model, operation }: OperationContext<Schema>,
     args: unknown
 ) {
     const findSchema = makeFindSchema(
@@ -43,15 +46,15 @@ function parseFindArgs(
     });
 }
 
-export function runQuery(
-    { kysely, schema, model, operation }: OperationContext,
-    args: FindArgs<SchemaDef, string> | undefined
+export function runQuery<Schema extends SchemaDef>(
+    { kysely, schema, model, operation }: OperationContext<Schema>,
+    args: FindArgs<Schema, string> | undefined
 ): Effect.Effect<any[], QueryError, never> {
     return Effect.gen(function* () {
         const modelDef = yield* requireModelEffect(schema, model);
 
         // table
-        let query = kysely.selectFrom(`${modelDef.dbTable}`);
+        let query = kysely.selectFrom(`${modelDef.dbTable}` as any);
 
         if (operation !== 'findMany') {
             query = query.limit(1);

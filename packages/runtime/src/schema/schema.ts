@@ -22,6 +22,7 @@ export type ModelDef = {
     >;
     idFields: string[];
     policies?: Policy[];
+    externalRules?: Record<string, Function>;
 };
 
 export type PolicyKind = 'allow' | 'deny';

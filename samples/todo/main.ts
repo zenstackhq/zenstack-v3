@@ -1,4 +1,5 @@
 import { makeClient } from '@zenstackhq/runtime';
+import type { PolicyFeatureSettings } from '@zenstackhq/runtime/client';
 import Sqlite from 'better-sqlite3';
 import { pushSchema, Schema } from './schema';
 
@@ -17,7 +18,7 @@ async function main() {
     const user1 = await db.user.create({
         data: {
             id: '1',
-            email: 'yiming@zenstack.dev',
+            email: 'yiming@gmail.com',
             role: 'ADMIN',
             posts: {
                 create: {
@@ -37,6 +38,7 @@ async function main() {
         .values({
             id: '2',
             email: 'jiasheng@zenstack.dev',
+            role: 'USER',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         })
@@ -51,6 +53,18 @@ async function main() {
     });
     console.log('Post found with high-level API:', foundPost);
 
+    // find with mixed field filter and kysely expression builder
+    const foundUserWithExpressionBuilder = await db.user.findFirst({
+        where: {
+            role: 'USER',
+            $expr: (eb) => eb('email', 'like', '%@zenstack.dev'),
+        },
+    });
+    console.log(
+        'User found with kysely expression builder:',
+        foundUserWithExpressionBuilder
+    );
+
     // find with query-builder API
     const foundPost1 = await db.$qb
         .selectFrom('Post')
@@ -61,12 +75,24 @@ async function main() {
 
     // Opt-in to access policy, and access user with different contexts
 
-    const anonDb = db.$withFeatures({ policy: {} });
+    // base settings that include implementation of external rules
+    const basePolicySettings: PolicyFeatureSettings<typeof Schema> = {
+        externalRules: {
+            User: {
+                emailFromDomain: (eb, domain) =>
+                    eb('email', 'like', `%@${domain}`),
+            },
+        },
+    };
+
+    const anonDb = db.$withFeatures({ policy: basePolicySettings });
     const foundUserWithAnon = await anonDb.user.findFirst();
     console.log('User found with anonymous client:', foundUserWithAnon);
 
     // both the user and posts can be read
-    const user1Db = db.$withFeatures({ policy: { auth: { id: '1' } } });
+    const user1Db = db.$withFeatures({
+        policy: { ...basePolicySettings, auth: { id: '1' } },
+    });
     const foundUserWithUser1 = await user1Db.user.findUnique({
         where: { id: '1' },
         include: { posts: true },
@@ -74,24 +100,14 @@ async function main() {
     console.log('User found with user1 client:', foundUserWithUser1);
 
     // user can be read but posts are filtered
-    const user2Db = db.$withFeatures({ policy: { auth: { id: '2' } } });
+    const user2Db = db.$withFeatures({
+        policy: { ...basePolicySettings, auth: { id: '2' } },
+    });
     const foundUserWithUser2 = await user2Db.user.findUnique({
         where: { id: '1' },
         include: { posts: true },
     });
     console.log('User found with user2 client:', foundUserWithUser2);
-
-    // find with mixed field filter and kysely expression builder
-    const foundUserWithExpressionBuilder = await db.user.findFirst({
-        where: {
-            role: 'ADMIN',
-            $expr: (eb) => eb('email', 'like', '%@zenstack.dev'),
-        },
-    });
-    console.log(
-        'User found with kysely expression builder:',
-        foundUserWithExpressionBuilder
-    );
 }
 
 main();

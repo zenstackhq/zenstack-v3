@@ -37,7 +37,10 @@ const RelationPayloadSchema = z.union([
     z.object({ createMany: z.record(z.string(), z.any()) }),
 ]);
 
-export function runCreate(context: OperationContext, args: unknown) {
+export function runCreate<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
+    args: unknown
+) {
     return Effect.gen(function* () {
         // parse args
         const parsedArgs = yield* parseCreateArgs(args);
@@ -54,7 +57,10 @@ function parseCreateArgs(args: unknown) {
     });
 }
 
-function runQuery(context: OperationContext, args: CreateArgs) {
+function runQuery<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
+    args: CreateArgs
+) {
     return Effect.gen(function* () {
         const hasRelationCreate = Object.keys(args.data).some(
             (f) => !!requireField(context.schema, context.model, f).relation
@@ -101,8 +107,8 @@ function runQuery(context: OperationContext, args: CreateArgs) {
     });
 }
 
-function doCreate(
-    context: OperationContext,
+function doCreate<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
     payload: object
 ): Effect.Effect<any, QueryError, never> {
     return Effect.gen(function* () {
@@ -136,7 +142,7 @@ function doCreate(
 
         const updatedData = yield* fillGeneratedValues(modelDef, regularFields);
         const query = context.kysely
-            .insertInto(modelDef.dbTable)
+            .insertInto(modelDef.dbTable as any)
             .values(updatedData)
             .returningAll();
         const created = yield* Effect.tryPromise({
@@ -196,8 +202,8 @@ function parseRelationPayload(payload: {}, field: string) {
     });
 }
 
-function doNestedCreate(
-    context: OperationContext,
+function doNestedCreate<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
     field: string,
     parentEntity: { [x: string]: any },
     subPayload: any
@@ -262,8 +268,8 @@ function trimResult(data: any, args: CreateArgs) {
     }, {} as any);
 }
 
-function readBackResult(
-    context: OperationContext,
+function readBackResult<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
     primaryData: any,
     args: CreateArgs
 ) {

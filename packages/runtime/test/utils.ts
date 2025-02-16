@@ -1,7 +1,7 @@
 import Sqlite from 'better-sqlite3';
 import { Client, Pool } from 'pg';
-import { makeClient, type ClientOptions } from '../src/client';
-import type { DBClient } from '../src/client/types';
+import { makeClient, type DBClient } from '../src/client';
+import type { ClientOptions } from '../src/client/options';
 import type { SchemaDef } from '../src/schema/schema';
 
 type SqliteSchema = SchemaDef & { provider: 'sqlite' };
@@ -9,7 +9,7 @@ type PostgresSchema = SchemaDef & { provider: 'postgresql' };
 
 export async function makeSqliteClient<Schema extends SqliteSchema>(
     schema: Schema,
-    extraOptions?: Partial<ClientOptions<'sqlite'>>
+    extraOptions?: Partial<ClientOptions<SqliteSchema>>
 ) {
     return makeClient<SqliteSchema>(schema, {
         ...extraOptions,
@@ -20,7 +20,7 @@ export async function makeSqliteClient<Schema extends SqliteSchema>(
 export async function makePostgresClient<Schema extends PostgresSchema>(
     schema: Schema,
     dbName: string,
-    extraOptions?: Partial<ClientOptions<'sqlite'>>
+    extraOptions?: Partial<ClientOptions<PostgresSchema>>
 ) {
     const pgConfig = {
         host: 'localhost',

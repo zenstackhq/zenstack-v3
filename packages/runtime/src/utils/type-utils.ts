@@ -64,3 +64,7 @@ export type XOR<T, U> = T extends object
         ? (Without<T, U> & U) | (Without<U, T> & T)
         : U
     : T;
+
+export type MergeIf<T, U, Condition extends boolean> = Condition extends true
+    ? T & U
+    : T;

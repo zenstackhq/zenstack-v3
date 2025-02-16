@@ -1,9 +1,4 @@
-import type {
-    ExpressionBuilder,
-    Kysely,
-    OperandExpression,
-    SqlBool,
-} from 'kysely';
+import type { ExpressionBuilder, OperandExpression, SqlBool } from 'kysely';
 import type { Optional } from 'utility-types';
 import type {
     FieldDef,
@@ -32,7 +27,7 @@ import type {
     OrArray,
     WrapType,
     XOR,
-} from '../schema/type-utils';
+} from '../utils/type-utils';
 import type { toKysely } from './query-builder';
 
 //#region Query results
@@ -491,24 +486,6 @@ export type ModelOperations<
     create<T extends CreateArgs<Schema, Model>>(
         args: SelectSubset<T, CreateArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T>>;
-};
-
-export type FeatureSettings = {
-    policy?: PolicyFeatureSettings;
-};
-
-export type PolicyFeatureSettings = {
-    auth?: Record<string, any>;
-};
-
-export type DBClient<Schema extends SchemaDef> = {
-    $qb: Kysely<toKysely<Schema>>;
-    $disconnect(): Promise<void>;
-    $withFeatures(features: FeatureSettings): DBClient<Schema>;
-} & {
-    [Key in GetModels<Schema> as Key extends string
-        ? Uncapitalize<Key>
-        : never]: ModelOperations<Schema, Key>;
 };
 
 //#endregion

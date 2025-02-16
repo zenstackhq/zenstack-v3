@@ -1,15 +1,17 @@
 import { Match } from 'effect';
+import type { OperandExpression, SqlBool } from 'kysely';
 import {
     AndNode,
     BinaryOperationNode,
     ColumnNode,
+    expressionBuilder,
     OperatorNode,
     OrNode,
     ReferenceNode,
     ValueNode,
     type OperationNode,
 } from 'kysely';
-import type { SchemaDef } from '../../../schema';
+import type { CallExpression, SchemaDef } from '../../../schema';
 import {
     Expression,
     type BinaryExpression,
@@ -18,14 +20,19 @@ import {
     type LiteralExpression,
     type UnaryExpression,
 } from '../../../schema/expression';
-import type { BuiltinType } from '../../../schema/schema';
+import type { BuiltinType, GetModels } from '../../../schema/schema';
+import { QueryError } from '../../errors';
 import type { QueryDialect } from '../../operations/dialect';
+import type { PolicyFeatureSettings } from '../../options';
 import {
     getIdFields,
     getRelationForeignKeyFieldPairs,
     requireField,
 } from '../../query-utils';
-import type { PolicyFeatureSettings } from '../../types';
+
+export type ExpressionTransformerContext<Schema extends SchemaDef> = {
+    model: GetModels<Schema>;
+};
 
 // a registry of expression handlers marked with @expr
 const expressionHandlers = new Map<string, PropertyDescriptor>();
@@ -44,20 +51,23 @@ function expr(kind: Expression['kind']) {
     };
 }
 
-export class ExpressionTransformer {
+export class ExpressionTransformer<Schema extends SchemaDef> {
     constructor(
-        private readonly schema: SchemaDef,
+        private readonly schema: Schema,
         private readonly queryDialect: QueryDialect,
-        private readonly policySettings: PolicyFeatureSettings
+        private readonly policySettings: PolicyFeatureSettings<Schema>
     ) {}
 
-    transform(expression: Expression): OperationNode {
+    transform(
+        expression: Expression,
+        context: ExpressionTransformerContext<Schema>
+    ): OperationNode {
         const handler = expressionHandlers.get(expression.kind);
         if (!handler) {
             throw new Error(`Unsupported expression kind: ${expression.kind}`);
         }
 
-        return handler.value.call(this, expression);
+        return handler.value.call(this, expression, context);
     }
 
     @expr('literal')
@@ -76,7 +86,10 @@ export class ExpressionTransformer {
     }
 
     @expr('binary')
-    private _binary(expr: BinaryExpression) {
+    private _binary(
+        expr: BinaryExpression,
+        context: ExpressionTransformerContext<Schema>
+    ) {
         if (
             Expression.isAuthCall(expr.left) ||
             Expression.isAuthCall(expr.right)
@@ -85,9 +98,9 @@ export class ExpressionTransformer {
         }
 
         return BinaryOperationNode.create(
-            this.transform(expr.left),
+            this.transform(expr.left, context),
             this.transformOperator(expr.op),
-            this.transform(expr.right)
+            this.transform(expr.right, context)
         );
     }
 
@@ -205,9 +218,12 @@ export class ExpressionTransformer {
     }
 
     @expr('unary')
-    private _unary(expr: UnaryExpression) {
+    private _unary(
+        expr: UnaryExpression,
+        context: ExpressionTransformerContext<Schema>
+    ) {
         return BinaryOperationNode.create(
-            this.transform(expr.operand),
+            this.transform(expr.operand, context),
             this.transformOperator('!='),
             ValueNode.create(true)
         );
@@ -221,10 +237,36 @@ export class ExpressionTransformer {
         return OperatorNode.create(mappedOp);
     }
 
-    // @expr('call')
-    // private _call(expr: CallExpression) {
-    //     return Match.value(expr.function).pipe(
-    //         Match.when('auth', () => this.policySettings.auth)
-    //     );
-    // }
+    @expr('call')
+    private _call(
+        expr: CallExpression,
+        context: ExpressionTransformerContext<Schema>
+    ) {
+        let rule: Function | undefined;
+        if ('externalRules' in this.policySettings) {
+            const externalRules = this.policySettings.externalRules;
+            if (externalRules) {
+                const modelRules =
+                    externalRules[context.model as keyof typeof externalRules];
+                if (modelRules) {
+                    rule = modelRules[expr.function as keyof typeof modelRules];
+                }
+            }
+        }
+
+        if (rule && typeof rule === 'function') {
+            const eb = expressionBuilder();
+            const literalArgs = (expr.args ?? []).map((arg) => {
+                if (Expression.isLiteral(arg)) {
+                    return arg.value;
+                } else {
+                    throw new QueryError('Expected literal argument');
+                }
+            });
+            const builtExpr: OperandExpression<SqlBool> = rule(eb, literalArgs);
+            return builtExpr.toOperationNode();
+        } else {
+            throw new QueryError(`Unknown function: ${expr.function}`);
+        }
+    }
 }

@@ -1,6 +1,6 @@
 import type { DBClient } from '@zenstackhq/runtime/client';
 import { Expression, type SchemaDef } from '@zenstackhq/runtime/schema';
-import { sql } from 'kysely';
+import { sql, type OperandExpression, type SqlBool } from 'kysely';
 
 export const Schema = {
     provider: 'sqlite',
@@ -68,7 +68,21 @@ export const Schema = {
                         Expression._null()
                     ),
                 },
+                // @@allow('read', emailFromDomain('zenstack.dev'))
+                {
+                    kind: 'allow',
+                    operations: ['read'],
+                    expression: Expression.call('emailFromDomain', [
+                        Expression.literal('zenstack.dev'),
+                    ]),
+                },
             ],
+
+            externalRules: {
+                emailFromDomain(_domain: string): OperandExpression<SqlBool> {
+                    throw new Error('Not implemented');
+                },
+            },
         },
         Post: {
             dbTable: 'Post',

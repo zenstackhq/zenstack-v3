@@ -1,3 +1,4 @@
+import type { OperandExpression, SqlBool } from 'kysely';
 import { sql } from 'kysely';
 import type { DBClient } from '../src/client';
 import { Expression } from '../src/schema/expression';
@@ -69,6 +70,11 @@ const schema = {
                     ),
                 },
             ],
+            externalRules: {
+                emailFromDomain(_domain: string): OperandExpression<SqlBool> {
+                    throw new Error('Not implemented');
+                },
+            },
         },
         Post: {
             dbTable: 'Post',

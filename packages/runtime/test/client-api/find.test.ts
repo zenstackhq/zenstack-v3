@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { DBClient } from '../../src/client';
 import { NotFoundError } from '../../src/client/errors';
-import type { DBClient } from '../../src/client/types';
 import { getSchema, pushSchema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 

@@ -8,7 +8,7 @@ import {
 } from 'kysely';
 import type { SchemaDef } from '../../../schema';
 import type { QueryDialect } from '../../operations/dialect';
-import type { PolicyFeatureSettings } from '../../options';
+import type { PolicySettings } from '../../options';
 import { PolicyTransformer } from './policy-transformer';
 
 export class PolicyPlugin<Schema extends SchemaDef> implements KyselyPlugin {
@@ -16,7 +16,7 @@ export class PolicyPlugin<Schema extends SchemaDef> implements KyselyPlugin {
     constructor(
         schema: Schema,
         queryDialect: QueryDialect,
-        policySettings: PolicyFeatureSettings<Schema>
+        policySettings: PolicySettings<Schema>
     ) {
         this.transformer = new PolicyTransformer(
             schema,

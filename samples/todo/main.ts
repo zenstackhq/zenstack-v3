@@ -1,5 +1,5 @@
 import { makeClient } from '@zenstackhq/runtime';
-import type { PolicyFeatureSettings } from '@zenstackhq/runtime/client';
+import type { PolicySettings } from '@zenstackhq/runtime/client';
 import Sqlite from 'better-sqlite3';
 import { pushSchema, Schema } from './schema';
 
@@ -76,7 +76,7 @@ async function main() {
     // Opt-in to access policy, and access user with different contexts
 
     // base settings that include implementation of external rules
-    const basePolicySettings: PolicyFeatureSettings<typeof Schema> = {
+    const basePolicySettings: PolicySettings<typeof Schema> = {
         externalRules: {
             User: {
                 emailFromDomain: (eb, domain) =>
@@ -108,6 +108,17 @@ async function main() {
         include: { posts: true },
     });
     console.log('User found with user2 client:', foundUserWithUser2);
+
+    // zod schemas
+    const userSelectSchema = db.user.$validation.select();
+    const parsedUser = userSelectSchema.parse({
+        id: '1',
+        email: 'a@b.com',
+        name: 'Name',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+    console.log('Zod validated user:', parsedUser);
 }
 
 main();

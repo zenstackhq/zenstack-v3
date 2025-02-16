@@ -1,6 +1,6 @@
 import type { OperandExpression, SqlBool } from 'kysely';
 import { sql } from 'kysely';
-import type { DBClient } from '../src/client';
+import type { Client } from '../src/client';
 import { Expression } from '../src/schema/expression';
 import type { DataSourceProvider, SchemaDef } from '../src/schema/schema';
 
@@ -175,7 +175,7 @@ export function getSchema<Provider extends DataSourceProvider>(
     return { ...schema, provider };
 }
 
-export async function pushSchema(db: DBClient<typeof schema>) {
+export async function pushSchema(db: Client<typeof schema>) {
     await db.$qb.schema
         .createTable('User')
         .addColumn('id', 'text', (col) => col.primaryKey())

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { DBClient } from '../../src/client';
+import type { Client } from '../../src/client';
 import { getSchema, pushSchema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 
@@ -9,7 +9,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
     'Client create tests',
     ({ makeClient, provider }) => {
         const schema = getSchema(provider);
-        let client: DBClient<typeof schema>;
+        let client: Client<typeof schema>;
 
         beforeEach(async () => {
             client = await makeClient();

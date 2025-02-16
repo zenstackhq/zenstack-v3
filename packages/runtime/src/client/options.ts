@@ -38,10 +38,10 @@ export type ClientOptions<Schema extends SchemaDef> = {
 };
 
 export type FeatureSettings<Schema extends SchemaDef> = {
-    policy?: PolicyFeatureSettings<Schema>;
+    policy?: PolicySettings<Schema>;
 };
 
-export type PolicyFeatureSettings<Schema extends SchemaDef> = MergeIf<
+export type PolicySettings<Schema extends SchemaDef> = MergeIf<
     {
         auth?: Record<string, any>;
     },

@@ -16,6 +16,7 @@ import type {
     GetModel,
     GetModels,
     RelationFields,
+    RelationFieldType,
     RelationInfo,
     ScalarFields,
     SchemaDef,
@@ -28,6 +29,7 @@ import type {
     WrapType,
     XOR,
 } from '../utils/type-utils';
+import type { ZodSchemas } from '../zod';
 import type { toKysely } from './query-builder';
 
 //#region Query results
@@ -56,20 +58,22 @@ type ModelSelectResult<
         ? never
         : Key]: Key extends ScalarFields<Schema, Model>
         ? MapFieldType<Schema, Model, Key>
-        : S[Key] extends FindArgs<Schema, FieldType<Schema, Model, Key>>
-        ? ModelResult<
-              Schema,
-              FieldType<Schema, Model, Key>,
-              S[Key],
-              FieldIsOptional<Schema, Model, Key>,
-              FieldIsArray<Schema, Model, Key>
-          >
-        : DefaultModelResult<
-              Schema,
-              FieldType<Schema, Model, Key>,
-              FieldIsOptional<Schema, Model, Key>,
-              FieldIsArray<Schema, Model, Key>
-          >;
+        : Key extends RelationFields<Schema, Model>
+        ? S[Key] extends FindArgs<Schema, RelationFieldType<Schema, Model, Key>>
+            ? ModelResult<
+                  Schema,
+                  RelationFieldType<Schema, Model, Key>,
+                  S[Key],
+                  FieldIsOptional<Schema, Model, Key>,
+                  FieldIsArray<Schema, Model, Key>
+              >
+            : DefaultModelResult<
+                  Schema,
+                  RelationFieldType<Schema, Model, Key>,
+                  FieldIsOptional<Schema, Model, Key>,
+                  FieldIsArray<Schema, Model, Key>
+              >
+        : never;
 };
 
 export type ModelResult<
@@ -93,18 +97,18 @@ export type ModelResult<
                   ? never
                   : Key]: I[Key] extends FindArgs<
                   Schema,
-                  FieldType<Schema, Model, Key>
+                  RelationFieldType<Schema, Model, Key>
               >
                   ? ModelResult<
                         Schema,
-                        FieldType<Schema, Model, Key>,
+                        RelationFieldType<Schema, Model, Key>,
                         I[Key],
                         FieldIsOptional<Schema, Model, Key>,
                         FieldIsArray<Schema, Model, Key>
                     >
                   : DefaultModelResult<
                         Schema,
-                        FieldType<Schema, Model, Key>,
+                        RelationFieldType<Schema, Model, Key>,
                         FieldIsOptional<Schema, Model, Key>,
                         FieldIsArray<Schema, Model, Key>
                     >;
@@ -180,7 +184,7 @@ type Select<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
 type Include<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in RelationFields<Schema, Model>]?:
         | boolean
-        | FindArgs<Schema, FieldType<Schema, Model, Key>>;
+        | FindArgs<Schema, RelationFieldType<Schema, Model, Key>>;
 };
 
 export type SelectSubset<T, U> = {
@@ -192,14 +196,14 @@ export type SelectSubset<T, U> = {
 type RelationFilter<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>
+    Field extends RelationFields<Schema, Model>
 > = FieldIsArray<Schema, Model, Field> extends true
     ? {
-          every?: Where<Schema, FieldType<Schema, Model, Field>>;
-          some?: Where<Schema, FieldType<Schema, Model, Field>>;
-          none?: Where<Schema, FieldType<Schema, Model, Field>>;
+          every?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
+          some?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
+          none?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
       }
-    : Where<Schema, FieldType<Schema, Model, Field>>;
+    : Where<Schema, RelationFieldType<Schema, Model, Field>>;
 
 //#endregion
 
@@ -368,34 +372,39 @@ type CreateRelationFieldPayload<
             ? OrArray<
                   CreateInput<
                       Schema,
-                      FieldType<Schema, Model, Field>,
+                      RelationFieldType<Schema, Model, Field>,
                       OppositeRelationAndFK<Schema, Model, Field>
                   >
               >
             : CreateInput<
                   Schema,
-                  FieldType<Schema, Model, Field>,
+                  RelationFieldType<Schema, Model, Field>,
                   OppositeRelationAndFK<Schema, Model, Field>
               >;
 
         createMany?: CreateManyPayload<
             Schema,
-            FieldType<Schema, Model, Field>,
+            RelationFieldType<Schema, Model, Field>,
             OppositeRelationAndFK<Schema, Model, Field>
         >;
 
         connect?: FieldIsArray<Schema, Model, Field> extends true
-            ? OrArray<WhereUnique<Schema, FieldType<Schema, Model, Field>>>
-            : WhereUnique<Schema, FieldType<Schema, Model, Field>>;
+            ? OrArray<
+                  WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>
+              >
+            : WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>;
 
         connectOrCreate?: FieldIsArray<Schema, Model, Field> extends true
             ? OrArray<
                   ConnectOrCreatePayload<
                       Schema,
-                      FieldType<Schema, Model, Field>
+                      RelationFieldType<Schema, Model, Field>
                   >
               >
-            : ConnectOrCreatePayload<Schema, FieldType<Schema, Model, Field>>;
+            : ConnectOrCreatePayload<
+                  Schema,
+                  RelationFieldType<Schema, Model, Field>
+              >;
     },
     // no "createMany" for non-array fields
     FieldIsArray<Schema, Model, Field> extends true ? never : 'createMany'
@@ -486,6 +495,8 @@ export type ModelOperations<
     create<T extends CreateArgs<Schema, Model>>(
         args: SelectSubset<T, CreateArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T>>;
+
+    $validation: ZodSchemas<Schema, Model>;
 };
 
 //#endregion

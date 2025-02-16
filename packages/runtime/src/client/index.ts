@@ -9,6 +9,7 @@ import {
     type SqliteDialectConfig,
 } from 'kysely';
 import { type GetModels, type SchemaDef } from '../schema/schema';
+import { makeZodSchemas } from '../zod/runtime';
 import { NotFoundError } from './errors';
 import { PolicyPlugin } from './features/policy';
 import type { OperationContext } from './operations/context';
@@ -19,10 +20,10 @@ import type { ClientOptions, FeatureSettings } from './options';
 import type { toKysely } from './query-builder';
 import type { ModelOperations } from './types';
 
-export type DBClient<Schema extends SchemaDef> = {
+export type Client<Schema extends SchemaDef> = {
     $qb: Kysely<toKysely<Schema>>;
     $disconnect(): Promise<void>;
-    $withFeatures(features: FeatureSettings<Schema>): DBClient<Schema>;
+    $withFeatures(features: FeatureSettings<Schema>): Client<Schema>;
 } & {
     [Key in GetModels<Schema> as Key extends string
         ? Uncapitalize<Key>
@@ -33,10 +34,10 @@ export function makeClient<Schema extends SchemaDef>(
     schema: Schema,
     options: ClientOptions<Schema>
 ) {
-    return new Client<Schema>(schema, options) as unknown as DBClient<Schema>;
+    return new ClientImpl<Schema>(schema, options) as unknown as Client<Schema>;
 }
 
-class Client<Schema extends SchemaDef> {
+class ClientImpl<Schema extends SchemaDef> {
     public readonly $qb: Kysely<toKysely<Schema>>;
 
     constructor(
@@ -99,10 +100,10 @@ class Client<Schema extends SchemaDef> {
 }
 
 function createClientProxy<Schema extends SchemaDef>(
-    client: Client<Schema>,
+    client: ClientImpl<Schema>,
     schema: Schema,
     options: ClientOptions<Schema>
-): Client<Schema> {
+): ClientImpl<Schema> {
     return new Proxy(client, {
         get: (target, prop, receiver) => {
             if (typeof prop === 'string' && prop.startsWith('$')) {
@@ -119,7 +120,7 @@ function createClientProxy<Schema extends SchemaDef>(
                         client.$qb,
                         schema,
                         options,
-                        model
+                        model as GetModels<Schema>
                     );
                 }
             }
@@ -133,11 +134,11 @@ function createModelProxy<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 >(
-    _client: Client<Schema>,
+    _client: ClientImpl<Schema>,
     kysely: Kysely<toKysely<Schema>>,
     schema: Schema,
     options: ClientOptions<Schema>,
-    model: string
+    model: Model
 ): ModelOperations<Schema, Model> {
     const baseContext: Omit<OperationContext<Schema>, 'operation'> = {
         kysely,
@@ -229,8 +230,10 @@ function createModelProxy<
                 )
             );
         },
+
+        $validation: makeZodSchemas(schema, model),
     };
 }
 
-export type { FeatureSettings, PolicyFeatureSettings } from './options';
+export type { FeatureSettings, PolicySettings } from './options';
 export type { ClientOptions, toKysely };

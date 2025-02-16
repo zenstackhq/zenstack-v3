@@ -1,4 +1,4 @@
-import type { DBClient } from '@zenstackhq/runtime/client';
+import type { Client } from '@zenstackhq/runtime/client';
 import { Expression, type SchemaDef } from '@zenstackhq/runtime/schema';
 import { sql, type OperandExpression, type SqlBool } from 'kysely';
 
@@ -167,7 +167,7 @@ export const Schema = {
     authModel: 'User',
 } as const satisfies SchemaDef;
 
-export async function pushSchema(db: DBClient<typeof Schema>) {
+export async function pushSchema(db: Client<typeof Schema>) {
     await db.$qb.schema
         .createTable('User')
         .addColumn('id', 'text', (col) => col.primaryKey())

@@ -1,6 +1,6 @@
 import Sqlite from 'better-sqlite3';
-import { Client, Pool } from 'pg';
-import { makeClient, type DBClient } from '../src/client';
+import { Client as PGClient, Pool } from 'pg';
+import { makeClient, type Client } from '../src/client';
 import type { ClientOptions } from '../src/client/options';
 import type { SchemaDef } from '../src/schema/schema';
 
@@ -14,7 +14,7 @@ export async function makeSqliteClient<Schema extends SqliteSchema>(
     return makeClient<SqliteSchema>(schema, {
         ...extraOptions,
         dialectConfig: { database: new Sqlite(':memory:') },
-    }) as unknown as DBClient<Schema>;
+    }) as unknown as Client<Schema>;
 }
 
 export async function makePostgresClient<Schema extends PostgresSchema>(
@@ -29,7 +29,7 @@ export async function makePostgresClient<Schema extends PostgresSchema>(
         password: 'abc123',
     };
 
-    const pgClient = new Client(pgConfig);
+    const pgClient = new PGClient(pgConfig);
     await pgClient.connect();
     await pgClient.query(`DROP DATABASE IF EXISTS "${dbName}"`);
     await pgClient.query(`CREATE DATABASE "${dbName}"`);
@@ -44,5 +44,5 @@ export async function makePostgresClient<Schema extends PostgresSchema>(
         },
     });
 
-    return client as unknown as DBClient<Schema>;
+    return client as unknown as Client<Schema>;
 }

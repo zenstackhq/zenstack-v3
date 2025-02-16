@@ -90,7 +90,10 @@ export type EnumDef = Record<string, string>;
 
 //#region Extraction
 
-export type GetModels<Schema extends SchemaDef> = keyof Schema['models'];
+export type GetModels<Schema extends SchemaDef> = Extract<
+    keyof Schema['models'],
+    string
+>;
 
 export type GetModel<
     Schema extends SchemaDef,
@@ -106,24 +109,24 @@ export type GetEnum<
 
 export type GetFields<
     Schema extends SchemaDef,
-    Model extends keyof Schema['models']
+    Model extends GetModels<Schema>
 > = keyof Schema['models'][Model]['fields'];
 
 export type GetField<
     Schema extends SchemaDef,
-    Model extends keyof Schema['models'],
+    Model extends GetModels<Schema>,
     Field extends GetFields<Schema, Model>
 > = Schema['models'][Model]['fields'][Field];
 
 export type GetFieldType<
     Schema extends SchemaDef,
-    Model extends keyof Schema['models'],
+    Model extends GetModels<Schema>,
     Field extends GetFields<Schema, Model>
 > = Schema['models'][Model]['fields'][Field]['type'];
 
 export type ScalarFields<
     Schema extends SchemaDef,
-    Model extends keyof Schema['models']
+    Model extends GetModels<Schema>
 > = keyof {
     [Key in GetFields<Schema, Model> as GetField<
         Schema,
@@ -138,7 +141,7 @@ export type ScalarFields<
 
 export type ForeignKeyFields<
     Schema extends SchemaDef,
-    Model extends keyof Schema['models']
+    Model extends GetModels<Schema>
 > = keyof {
     [Key in GetFields<Schema, Model> as GetField<
         Schema,
@@ -170,6 +173,14 @@ export type FieldType<
     Model extends GetModels<Schema>,
     Field extends GetFields<Schema, Model>
 > = GetField<Schema, Model, Field>['type'];
+
+export type RelationFieldType<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = GetField<Schema, Model, Field>['type'] extends GetModels<Schema>
+    ? GetField<Schema, Model, Field>['type']
+    : never;
 
 export type FieldIsOptional<
     Schema extends SchemaDef,

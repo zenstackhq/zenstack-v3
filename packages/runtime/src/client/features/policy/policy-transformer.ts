@@ -13,7 +13,7 @@ import {
 import type { SchemaDef } from '../../../schema';
 import type { Policy } from '../../../schema/schema';
 import type { QueryDialect } from '../../operations/dialect';
-import type { PolicyFeatureSettings } from '../../options';
+import type { PolicySettings } from '../../options';
 import { requireModel } from '../../query-utils';
 import { ExpressionTransformer } from './expression-transformer';
 
@@ -23,7 +23,7 @@ export class PolicyTransformer<
     constructor(
         private readonly schema: Schema,
         private readonly queryDialect: QueryDialect,
-        private readonly policySettings: PolicyFeatureSettings<Schema>
+        private readonly policySettings: PolicySettings<Schema>
     ) {
         super();
     }

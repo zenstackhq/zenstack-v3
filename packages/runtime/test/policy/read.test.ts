@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type DBClient } from '../../src/client';
+import { type Client, type PolicySettings } from '../../src/client';
 import { createClientSpecs } from '../client-api/client-specs';
 import { getSchema, pushSchema } from '../test-schema';
 
@@ -9,7 +9,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
     'Read policy tests',
     ({ makeClient, provider }) => {
         const schema = getSchema(provider);
-        let client: DBClient<typeof schema>;
+        let client: Client<typeof schema>;
 
         beforeEach(async () => {
             client = await makeClient();
@@ -20,6 +20,15 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             await client?.$disconnect();
         });
 
+        const policySettings: PolicySettings<typeof schema> = {
+            externalRules: {
+                User: {
+                    emailFromDomain: (eb, domain) =>
+                        eb('email', 'like', `%@${domain}`),
+                },
+            },
+        };
+
         it('works with ORM API top-level', async () => {
             const user = await client.user.create({
                 data: {
@@ -27,11 +36,13 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 },
             });
 
-            const anonClient = client.$withFeatures({ policy: {} });
+            const anonClient = client.$withFeatures({
+                policy: policySettings,
+            });
             await expect(anonClient.user.findFirst()).resolves.toBeNull();
 
             const authClient = client.$withFeatures({
-                policy: { auth: { id: user.id } },
+                policy: { ...policySettings, auth: { id: user.id } },
             });
             await expect(authClient.user.findFirst()).resolves.toEqual(user);
         });
@@ -52,7 +63,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             });
 
             const otherUserClient = client.$withFeatures({
-                policy: { auth: { id: '2' } },
+                policy: { ...policySettings, auth: { id: '2' } },
             });
             const r = await otherUserClient.user.findFirst({
                 include: { posts: true },
@@ -60,7 +71,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             expect(r?.posts).toHaveLength(0);
 
             const authClient = client.$withFeatures({
-                policy: { auth: { id: '1' } },
+                policy: { ...policySettings, auth: { id: '1' } },
             });
             const r1 = await authClient.user.findFirst({
                 include: { posts: true },
@@ -75,13 +86,15 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 },
             });
 
-            const anonClient = client.$withFeatures({ policy: {} });
+            const anonClient = client.$withFeatures({
+                policy: policySettings,
+            });
             await expect(
                 anonClient.$qb.selectFrom('User').selectAll().executeTakeFirst()
             ).resolves.toBeUndefined();
 
             const authClient = client.$withFeatures({
-                policy: { auth: { id: user.id } },
+                policy: { ...policySettings, auth: { id: user.id } },
             });
             await expect(
                 authClient.$qb.selectFrom('User').selectAll().executeTakeFirst()

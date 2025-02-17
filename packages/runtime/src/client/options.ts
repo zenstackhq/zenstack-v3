@@ -15,26 +15,49 @@ type DialectConfig<Provider extends DataSourceProvider> =
         ? PostgresDialectConfig
         : never;
 
-export type ClientOptions<Schema extends SchemaDef> = {
-    /**
-     * Database dialect configuration.
-     */
-    dialectConfig: DialectConfig<Schema['provider']>;
+export type ClientOptions<Schema extends SchemaDef> = MergeIf<
+    {
+        /**
+         * Database dialect configuration.
+         */
+        dialectConfig: DialectConfig<Schema['provider']>;
 
-    /**
-     * Kysely plugins.
-     */
-    plugins?: KyselyConfig['plugins'];
+        /**
+         * Kysely plugins.
+         */
+        plugins?: KyselyConfig['plugins'];
 
-    /**
-     * Logging configuration.
-     */
-    log?: KyselyConfig['log'];
+        /**
+         * Logging configuration.
+         */
+        log?: KyselyConfig['log'];
 
-    /**
-     * Feature enablement and configuration.
-     */
-    features?: FeatureSettings<Schema>;
+        /**
+         * Feature enablement and configuration.
+         */
+        features?: FeatureSettings<Schema>;
+    },
+    {
+        computedFields: ComputedFields<Schema>;
+    },
+    keyof ComputedFields<Schema> extends never ? false : true
+>;
+
+export type ComputedFields<
+    Schema extends SchemaDef,
+    KyselyDB = toKysely<Schema>
+> = {
+    [Model in keyof Schema['models'] as 'computedFields' extends keyof Schema['models'][Model]
+        ? Model
+        : never]: {
+        [Field in keyof Schema['models'][Model]['computedFields']]: PrependParameter<
+            ExpressionBuilder<
+                KyselyDB,
+                Model extends keyof KyselyDB ? Model : never
+            >,
+            Schema['models'][Model]['computedFields'][Field]
+        >;
+    };
 };
 
 export type FeatureSettings<Schema extends SchemaDef> = {

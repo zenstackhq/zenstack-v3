@@ -1,9 +1,10 @@
 import { makeClient } from '@zenstackhq/runtime';
 import type { PolicySettings } from '@zenstackhq/runtime/client';
 import { toHooks } from '@zenstackhq/tanstack-query/react';
-import Sqlite from 'better-sqlite3';
-import { pushSchema, Schema } from './schema';
 import { makeSelectSchema } from '@zenstackhq/zod';
+import Sqlite from 'better-sqlite3';
+import { sql } from 'kysely';
+import { pushSchema, Schema } from './schema';
 
 async function main() {
     const db = makeClient(Schema, {
@@ -11,6 +12,12 @@ async function main() {
             database: new Sqlite(':memory:'),
         },
         log: ['query'],
+        computedFields: {
+            User: {
+                emailDomain: () =>
+                    sql<string>`substr(email, instr(email, '@') + 1)`,
+            },
+        },
     });
 
     // push schema to DB (this will be handled by migration in the future)
@@ -119,6 +126,7 @@ async function main() {
         name: 'Name',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        emailDomain: 'b.com',
     });
     console.log('Zod validated user:', parsedUser);
 
@@ -128,6 +136,10 @@ async function main() {
         where: { role: 'ADMIN' },
     });
     console.log(data?.email);
+
+    // TODO: computed fields
+
+    // TODO: lifecycle hooks
 }
 
 main();

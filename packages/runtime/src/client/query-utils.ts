@@ -1,6 +1,8 @@
 import { Effect } from 'effect';
+import type { ExpressionBuilder, ExpressionWrapper } from 'kysely';
 import type { FieldDef, ModelDef, SchemaDef } from '../schema/schema';
 import { InternalError, QueryError } from './errors';
+import type { ClientOptions } from './options';
 
 export function hasModel(schema: SchemaDef, model: string) {
     return Object.keys(schema.models)
@@ -172,4 +174,32 @@ export function getIdValues(
         (acc, field) => ({ ...acc, [field]: data[field] }),
         {}
     );
+}
+
+export function buildFieldRef<Schema extends SchemaDef>(
+    schema: Schema,
+    model: string,
+    field: string,
+    options: ClientOptions<Schema>,
+    eb: ExpressionBuilder<any, any>
+): ExpressionWrapper<any, any, unknown> {
+    const fieldDef = requireField(schema, model, field);
+    if (!fieldDef.computed) {
+        return eb.ref(field);
+    } else {
+        let computer: Function | undefined;
+        if ('computedFields' in options) {
+            const computedFields = options.computedFields as Record<
+                string,
+                any
+            >;
+            computer = computedFields?.[model]?.[field];
+        }
+        if (!computer) {
+            throw new QueryError(
+                `Computed field "${field}" implementation not provided`
+            );
+        }
+        return computer(eb);
+    }
 }

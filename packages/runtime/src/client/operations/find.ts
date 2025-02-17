@@ -3,6 +3,7 @@ import type { SelectQueryBuilder } from 'kysely';
 import type { GetModels, SchemaDef } from '../../schema/schema';
 import { QueryError } from '../errors';
 import {
+    buildFieldRef,
     isScalarField,
     requireField,
     requireModel,
@@ -47,16 +48,19 @@ function parseFindArgs<Schema extends SchemaDef>(
 }
 
 export function runQuery<Schema extends SchemaDef>(
-    { kysely, schema, model, operation }: OperationContext<Schema>,
+    context: OperationContext<Schema>,
     args: FindArgs<Schema, GetModels<Schema>> | undefined
 ): Effect.Effect<any[], QueryError, never> {
     return Effect.gen(function* () {
-        const modelDef = yield* requireModelEffect(schema, model);
+        const modelDef = yield* requireModelEffect(
+            context.schema,
+            context.model
+        );
 
         // table
-        let query = kysely.selectFrom(`${modelDef.dbTable}` as any);
+        let query = context.kysely.selectFrom(`${modelDef.dbTable}` as any);
 
-        if (operation !== 'findMany') {
+        if (context.operation !== 'findMany') {
             query = query.limit(1);
         }
 
@@ -78,21 +82,19 @@ export function runQuery<Schema extends SchemaDef>(
         // select
         if (args?.select) {
             query = buildFieldSelection(
-                schema,
-                model,
+                context,
                 query,
                 args?.select,
                 modelDef.dbTable
             );
         } else {
-            query = buildSelectAllScalarFields(schema, model, query);
+            query = buildSelectAllScalarFields(context, query);
         }
 
         // include
         if (args?.include) {
             query = buildFieldSelection(
-                schema,
-                model,
+                context,
                 query,
                 args?.include,
                 modelDef.dbTable
@@ -140,9 +142,8 @@ function buildWhere(
     return result;
 }
 
-function buildFieldSelection(
-    schema: SchemaDef,
-    model: string,
+function buildFieldSelection<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
     query: SelectQueryBuilder<any, any, {}>,
     selectOrInclude: Record<string, any>,
     parentName: string
@@ -153,14 +154,13 @@ function buildFieldSelection(
         if (!payload) {
             continue;
         }
-        const fieldDef = requireField(schema, model, field);
+        const fieldDef = requireField(context.schema, context.model, field);
         if (!fieldDef.relation) {
             result = result.select(field);
         } else {
             result = buildRelationSelection(
+                context,
                 result,
-                schema,
-                model,
                 field,
                 parentName,
                 payload
@@ -171,37 +171,57 @@ function buildFieldSelection(
     return result;
 }
 
-function buildRelationSelection(
+function buildRelationSelection<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
     query: SelectQueryBuilder<any, any, {}>,
-    schema: SchemaDef,
-    model: string,
     relationField: string,
     parentName: string,
     payload: any
 ) {
-    const queryDialect = getQueryDialect(schema.provider);
+    const queryDialect = getQueryDialect(context.schema.provider);
     if (!queryDialect) {
-        throw new QueryError(`Unsupported provider: ${schema.provider}`);
+        throw new QueryError(
+            `Unsupported provider: ${context.schema.provider}`
+        );
     }
 
     return queryDialect.buildRelationSelection(
+        context,
         query,
-        schema,
-        model,
         relationField,
         parentName,
         payload
     );
 }
 
-function buildSelectAllScalarFields(
-    schema: SchemaDef,
-    model: string,
+function buildSelectAllScalarFields<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
     query: SelectQueryBuilder<any, any, {}>
 ) {
     let result = query;
-    const modelDef = requireModel(schema, model);
+    const modelDef = requireModel(context.schema, context.model);
     return Object.keys(modelDef.fields)
-        .filter((f) => isScalarField(schema, model, f))
-        .reduce((acc, f) => acc.select(f), result);
+        .filter((f) => isScalarField(context.schema, context.model, f))
+        .reduce((acc, f) => selectScalarField(context, f, acc), result);
+}
+
+function selectScalarField<Schema extends SchemaDef>(
+    context: OperationContext<Schema>,
+    field: string,
+    qb: SelectQueryBuilder<any, any, {}>
+) {
+    const fieldDef = requireField(context.schema, context.model, field);
+    if (!fieldDef.computed) {
+        return qb.select(field);
+    } else {
+        return qb.select((eb) =>
+            buildFieldRef(
+                context.schema,
+                context.model,
+                field,
+                context.clientOptions,
+                eb
+            ).as(field)
+        );
+    }
 }

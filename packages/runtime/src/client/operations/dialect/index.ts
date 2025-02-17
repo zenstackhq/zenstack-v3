@@ -4,16 +4,16 @@ import type {
     DataSourceProvider,
     SchemaDef,
 } from '../../../schema/schema';
+import type { OperationContext } from '../context';
 import { PostgresQueryDialect } from './postgres';
 import { SqliteQueryDialect } from './sqlite';
 
 export interface QueryDialect {
     transformPrimitive(value: unknown, type: BuiltinType): any;
 
-    buildRelationSelection(
+    buildRelationSelection<Schema extends SchemaDef>(
+        context: OperationContext<Schema>,
         query: SelectQueryBuilder<any, any, {}>,
-        schema: SchemaDef,
-        model: string,
         relationField: string,
         parentName: string,
         payload: any

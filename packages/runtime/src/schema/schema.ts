@@ -22,6 +22,7 @@ export type ModelDef = {
     >;
     idFields: string[];
     policies?: Policy[];
+    computedFields?: Record<string, Function>;
     externalRules?: Record<string, Function>;
 };
 
@@ -67,6 +68,7 @@ export type FieldDef = {
     generator?: FieldGenerators;
     relation?: RelationInfo;
     foreignKeyFor?: string[];
+    computed?: boolean;
 };
 
 export type BuiltinType =

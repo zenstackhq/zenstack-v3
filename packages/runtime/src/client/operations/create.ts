@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
     type BuiltinType,
     type FieldGenerators,
+    type GetModels,
     type ModelDef,
     type SchemaDef,
 } from '../../schema/schema';
@@ -225,7 +226,10 @@ function doNestedCreate<Schema extends SchemaDef>(
             [pair.fk]: (parentEntity as any)[pair.pk],
         });
     }
-    return doCreate({ ...context, model: fieldDef.type }, subPayload);
+    return doCreate(
+        { ...context, model: fieldDef.type as GetModels<Schema> },
+        subPayload
+    );
 }
 
 function fillGeneratedValues(modelDef: ModelDef, data: object) {

@@ -40,6 +40,11 @@ export const Schema = {
                         opposite: 'author',
                     },
                 },
+                emailDomain: {
+                    type: 'String',
+                    optional: true,
+                    computed: true,
+                },
             },
             idFields: ['id'],
             uniqueFields: {
@@ -68,7 +73,11 @@ export const Schema = {
                         Expression._null()
                     ),
                 },
-                // @@allow('read', emailFromDomain('zenstack.dev'))
+                // model User {
+                //   ...
+                //   rule emailFromDomain(domain: String)
+                //   @@allow('read', emailFromDomain('zenstack.dev'))
+                // }
                 {
                     kind: 'allow',
                     operations: ['read'],
@@ -77,6 +86,12 @@ export const Schema = {
                     ]),
                 },
             ],
+
+            computedFields: {
+                emailDomain: (): OperandExpression<string> => {
+                    throw new Error('Not implemented');
+                },
+            },
 
             externalRules: {
                 emailFromDomain(_domain: string): OperandExpression<SqlBool> {

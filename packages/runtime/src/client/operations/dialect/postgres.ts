@@ -9,28 +9,29 @@ import type { QueryDialect } from '.';
 import type {
     BuiltinType,
     FieldDef,
-    ModelDef,
+    GetModels,
     SchemaDef,
 } from '../../../schema/schema';
 import {
+    buildFieldRef,
     getRelationForeignKeyFieldPairs,
     requireField,
     requireModel,
 } from '../../query-utils';
 import type { SelectInclude } from '../../types';
+import type { OperationContext } from '../context';
 
 export class PostgresQueryDialect implements QueryDialect {
     transformPrimitive(value: unknown, _type: BuiltinType) {
         return value;
     }
 
-    buildRelationSelection(
+    buildRelationSelection<Schema extends SchemaDef>(
+        context: OperationContext<Schema>,
         query: SelectQueryBuilder<any, any, {}>,
-        schema: SchemaDef,
-        model: string,
         relationField: string,
         parentName: string,
-        payload: boolean | SelectInclude<SchemaDef, string>
+        payload: boolean | SelectInclude<Schema, GetModels<Schema>>
     ): SelectQueryBuilder<any, any, {}> {
         if (payload === false) {
             // not selected
@@ -38,9 +39,8 @@ export class PostgresQueryDialect implements QueryDialect {
         }
 
         const joinedQuery = this.buildRelationJSON(
+            context,
             query,
-            schema,
-            model,
             relationField,
             parentName,
             payload
@@ -51,17 +51,20 @@ export class PostgresQueryDialect implements QueryDialect {
         );
     }
 
-    private buildRelationJSON(
+    private buildRelationJSON<Schema extends SchemaDef>(
+        context: OperationContext<Schema>,
         qb: SelectQueryBuilder<any, any, any>,
-        schema: SchemaDef,
-        model: string,
         relationField: string,
         parentName: string,
-        payload: true | SelectInclude<SchemaDef, string>
+        payload: true | SelectInclude<Schema, GetModels<Schema>>
     ) {
-        const relationFieldDef = requireField(schema, model, relationField);
+        const relationFieldDef = requireField(
+            context.schema,
+            context.model,
+            relationField
+        );
         const relationModel = relationFieldDef.type;
-        const relationModelDef = requireModel(schema, relationModel);
+        const relationModelDef = requireModel(context.schema, relationModel);
 
         return (
             qb
@@ -73,7 +76,8 @@ export class PostgresQueryDialect implements QueryDialect {
                         );
 
                         result = this.buildRelationObjectSelect(
-                            relationModelDef,
+                            context,
+                            relationModel,
                             relationField,
                             relationFieldDef,
                             result,
@@ -83,8 +87,8 @@ export class PostgresQueryDialect implements QueryDialect {
 
                         // create join conditions
                         result = this.buildJoinConditions(
-                            schema,
-                            model,
+                            context.schema,
+                            context.model,
                             relationField,
                             result,
                             parentName
@@ -92,8 +96,10 @@ export class PostgresQueryDialect implements QueryDialect {
 
                         // create nested joins for each relation
                         result = this.buildRelationJoins(
-                            schema,
-                            relationModel,
+                            {
+                                ...context,
+                                model: relationModel as GetModels<Schema>,
+                            },
                             relationField,
                             result,
                             payload,
@@ -108,17 +114,18 @@ export class PostgresQueryDialect implements QueryDialect {
         );
     }
 
-    private buildRelationObjectSelect(
-        relationModelDef: ModelDef,
+    private buildRelationObjectSelect<Schema extends SchemaDef>(
+        context: OperationContext<Schema>,
+        relationModel: string,
         relationField: string,
         relationFieldDef: FieldDef,
         qb: SelectQueryBuilder<any, any, any>,
-        payload: true | SelectInclude<SchemaDef, string>,
+        payload: true | SelectInclude<Schema, GetModels<Schema>>,
         parentName: string
     ) {
         qb = qb.select((eb) => {
             const objArgs = this.buildRelationObjectArgs(
-                relationModelDef,
+                { ...context, model: relationModel as GetModels<Schema> },
                 relationField,
                 eb,
                 payload,
@@ -142,13 +149,14 @@ export class PostgresQueryDialect implements QueryDialect {
         return qb;
     }
 
-    private buildRelationObjectArgs(
-        relationModelDef: ModelDef,
+    private buildRelationObjectArgs<Schema extends SchemaDef>(
+        context: OperationContext<Schema>,
         relationField: string,
         eb: ExpressionBuilder<any, any>,
         payload: true | SelectInclude<SchemaDef, string>,
         parentName: string
     ) {
+        const relationModelDef = requireModel(context.schema, context.model);
         const objArgs: Array<
             | string
             | ExpressionWrapper<any, any, any>
@@ -161,7 +169,16 @@ export class PostgresQueryDialect implements QueryDialect {
             objArgs.push(
                 ...Object.entries(relationModelDef.fields)
                     .filter(([, value]) => !value.relation)
-                    .map(([field]) => [sql.lit(field), eb.ref(field)])
+                    .map(([field]) => [
+                        sql.lit(field),
+                        buildFieldRef(
+                            context.schema,
+                            context.model,
+                            field,
+                            context.clientOptions,
+                            eb
+                        ),
+                    ])
                     .flatMap((v) => v)
             );
         } else if (payload.select) {
@@ -169,7 +186,16 @@ export class PostgresQueryDialect implements QueryDialect {
             objArgs.push(
                 ...Object.entries(payload.select)
                     .filter(([, value]) => value)
-                    .map(([field]) => [sql.lit(field), eb.ref(field)])
+                    .map(([field]) => [
+                        sql.lit(field),
+                        buildFieldRef(
+                            context.schema,
+                            context.model,
+                            field,
+                            context.clientOptions,
+                            eb
+                        ),
+                    ])
                     .flatMap((v) => v)
             );
         }
@@ -193,9 +219,8 @@ export class PostgresQueryDialect implements QueryDialect {
         return objArgs;
     }
 
-    private buildRelationJoins(
-        schema: SchemaDef,
-        relationModel: string,
+    private buildRelationJoins<Schema extends SchemaDef>(
+        context: OperationContext<Schema>,
         relationField: string,
         qb: SelectQueryBuilder<any, any, any>,
         payload: boolean | SelectInclude<SchemaDef, string>,
@@ -211,9 +236,8 @@ export class PostgresQueryDialect implements QueryDialect {
                 .filter(([, value]) => value)
                 .forEach(([field, value]) => {
                     result = this.buildRelationJSON(
+                        context,
                         result,
-                        schema,
-                        relationModel,
                         field,
                         `${parentName}$${relationField}`,
                         value
@@ -223,8 +247,8 @@ export class PostgresQueryDialect implements QueryDialect {
         return result;
     }
 
-    private buildJoinConditions(
-        schema: SchemaDef,
+    private buildJoinConditions<Schema extends SchemaDef>(
+        schema: Schema,
         model: string,
         relationField: string,
         qb: SelectQueryBuilder<any, any, any>,

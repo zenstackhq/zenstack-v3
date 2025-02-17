@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import type { SelectQueryBuilder } from 'kysely';
-import type { SchemaDef } from '../../schema/schema';
+import type { GetModels, SchemaDef } from '../../schema/schema';
 import { QueryError } from '../errors';
 import {
     isScalarField,
@@ -48,7 +48,7 @@ function parseFindArgs<Schema extends SchemaDef>(
 
 export function runQuery<Schema extends SchemaDef>(
     { kysely, schema, model, operation }: OperationContext<Schema>,
-    args: FindArgs<Schema, string> | undefined
+    args: FindArgs<Schema, GetModels<Schema>> | undefined
 ): Effect.Effect<any[], QueryError, never> {
     return Effect.gen(function* () {
         const modelDef = yield* requireModelEffect(schema, model);

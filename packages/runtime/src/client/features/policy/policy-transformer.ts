@@ -11,7 +11,7 @@ import {
     type OperationNode,
 } from 'kysely';
 import type { SchemaDef } from '../../../schema';
-import type { Policy } from '../../../schema/schema';
+import type { GetModels, Policy } from '../../../schema/schema';
 import type { QueryDialect } from '../../operations/dialect';
 import type { PolicySettings } from '../../options';
 import { requireModel } from '../../query-utils';
@@ -36,7 +36,7 @@ export class PolicyTransformer<
             const policies = this.getModelPolicies(modelName);
             if (policies && policies.length > 0) {
                 const combinedPolicy = this.buildPolicyFilterNode(
-                    modelName,
+                    modelName as GetModels<Schema>,
                     policies
                 );
                 whereNode = WhereNode.create(
@@ -58,7 +58,10 @@ export class PolicyTransformer<
         };
     }
 
-    private buildPolicyFilterNode(model: string, policies: Policy[]) {
+    private buildPolicyFilterNode(
+        model: GetModels<Schema>,
+        policies: Policy[]
+    ) {
         const allows = policies
             .filter((policy) => policy.kind === 'allow')
             .map((policy) => this.buildPolicyWhere(model, policy));
@@ -112,7 +115,7 @@ export class PolicyTransformer<
         }
     }
 
-    private buildPolicyWhere(model: string, policy: Policy) {
+    private buildPolicyWhere(model: GetModels<Schema>, policy: Policy) {
         return new ExpressionTransformer(
             this.schema,
             this.queryDialect,

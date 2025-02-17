@@ -247,7 +247,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             const externalRules = this.policySettings.externalRules;
             if (externalRules) {
                 const modelRules =
-                    externalRules[context.model as keyof typeof externalRules];
+                    externalRules[
+                        context.model as unknown as keyof typeof externalRules
+                    ];
                 if (modelRules) {
                     rule = modelRules[expr.function as keyof typeof modelRules];
                 }

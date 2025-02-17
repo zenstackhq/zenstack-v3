@@ -91,7 +91,7 @@ importers:
         specifier: ^11.0.5
         version: 11.0.5
       zod:
-        specifier: ^3.24.1
+        specifier: ^3.0.0
         version: 3.24.1
     devDependencies:
       '@types/better-sqlite3':
@@ -116,6 +116,18 @@ importers:
         specifier: workspace:*
         version: link:../runtime
 
+  packages/zod:
+    dependencies:
+      '@zenstackhq/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      ts-pattern:
+        specifier: ^5.6.0
+        version: 5.6.0
+      zod:
+        specifier: ^3.0.0
+        version: 3.24.1
+
   samples/todo:
     dependencies:
       '@zenstackhq/runtime':
@@ -124,6 +136,9 @@ importers:
       '@zenstackhq/tanstack-query':
         specifier: workspace:*
         version: link:../../packages/tanstack-query
+      '@zenstackhq/zod':
+        specifier: workspace:*
+        version: link:../../packages/zod
       better-sqlite3:
         specifier: ^11.8.1
         version: 11.8.1

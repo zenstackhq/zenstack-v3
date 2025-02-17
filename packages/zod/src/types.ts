@@ -1,19 +1,16 @@
 import type {
+    FieldType,
+    GetModels,
+    ScalarFields,
+    SchemaDef,
+} from '@zenstackhq/runtime/schema';
+import type {
     ZodBoolean,
     ZodNumber,
     ZodObject,
     ZodString,
     ZodUnknown,
 } from 'zod';
-import type { FieldType, SchemaDef } from '../schema';
-import type { GetModels, ScalarFields } from '../schema/schema';
-
-export interface ZodSchemas<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>
-> {
-    select(): SelectSchema<Schema, Model>;
-}
 
 export type SelectSchema<
     Schema extends SchemaDef,

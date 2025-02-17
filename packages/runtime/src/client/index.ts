@@ -9,7 +9,6 @@ import {
     type SqliteDialectConfig,
 } from 'kysely';
 import { type GetModels, type SchemaDef } from '../schema/schema';
-import { makeZodSchemas } from '../zod/runtime';
 import { NotFoundError } from './errors';
 import { PolicyPlugin } from './features/policy';
 import type { OperationContext } from './operations/context';
@@ -230,8 +229,6 @@ function createModelProxy<
                 )
             );
         },
-
-        $validation: makeZodSchemas(schema, model),
     };
 }
 

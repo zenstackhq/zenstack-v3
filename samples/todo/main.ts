@@ -3,6 +3,7 @@ import type { PolicySettings } from '@zenstackhq/runtime/client';
 import { toHooks } from '@zenstackhq/tanstack-query/react';
 import Sqlite from 'better-sqlite3';
 import { pushSchema, Schema } from './schema';
+import { makeSelectSchema } from '@zenstackhq/zod';
 
 async function main() {
     const db = makeClient(Schema, {
@@ -111,7 +112,7 @@ async function main() {
     console.log('User found with user2 client:', foundUserWithUser2);
 
     // zod schemas
-    const userSelectSchema = db.user.$validation.select();
+    const userSelectSchema = makeSelectSchema(Schema, 'User');
     const parsedUser = userSelectSchema.parse({
         id: '1',
         email: 'a@b.com',

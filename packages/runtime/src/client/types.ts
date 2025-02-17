@@ -23,13 +23,11 @@ import type {
 } from '../schema/schema';
 import type {
     AtLeast,
-    // FieldMappedType,
     MapBaseType,
     OrArray,
     WrapType,
     XOR,
 } from '../utils/type-utils';
-import type { ZodSchemas } from '../zod';
 import type { toKysely } from './query-builder';
 
 //#region Query results
@@ -495,8 +493,6 @@ export type ModelOperations<
     create<T extends CreateArgs<Schema, Model>>(
         args: SelectSubset<T, CreateArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T>>;
-
-    $validation: ZodSchemas<Schema, Model>;
 };
 
 //#endregion

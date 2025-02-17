@@ -4,6 +4,8 @@ export type {
     FieldType,
     GetModels,
     ModelDef,
+    RelationFields,
     RelationInfo,
+    ScalarFields,
     SchemaDef,
 } from './schema';

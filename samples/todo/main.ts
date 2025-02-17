@@ -62,6 +62,12 @@ async function main() {
     });
     console.log('Post found with high-level API:', foundPost);
 
+    // find with computed field
+    const foundUserWithComputedField = await db.user.findFirst({
+        where: { emailDomain: 'zenstack.dev' },
+    });
+    console.log('User found with computed field:', foundUserWithComputedField);
+
     // find with mixed field filter and kysely expression builder
     const foundUserWithExpressionBuilder = await db.user.findFirst({
         where: {

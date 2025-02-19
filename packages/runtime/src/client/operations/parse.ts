@@ -1,4 +1,4 @@
-import { Match } from 'effect';
+import { match } from 'ts-pattern';
 import { z, ZodSchema } from 'zod';
 import type { SchemaDef } from '../../schema/schema';
 import { InternalError } from '../errors';
@@ -189,14 +189,13 @@ export function makeFindSchema(
 }
 
 function makePrimitiveSchema(type: string) {
-    return Match.value(type).pipe(
-        Match.when('String', () => z.string()),
-        Match.when('Int', () => z.number()),
-        Match.when('Float', () => z.number()),
-        Match.when('Boolean', () => z.boolean()),
-        Match.when('BigInt', () => z.string()),
-        Match.when('Decimal', () => z.string()),
-        Match.when('DateTime', () => z.string()),
-        Match.orElse(() => z.unknown())
-    );
+    return match(type)
+        .with('String', () => z.string())
+        .with('Int', () => z.number())
+        .with('Float', () => z.number())
+        .with('Boolean', () => z.boolean())
+        .with('BigInt', () => z.string())
+        .with('Decimal', () => z.string())
+        .with('DateTime', () => z.string())
+        .otherwise(() => z.unknown());
 }

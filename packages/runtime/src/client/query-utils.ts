@@ -1,6 +1,5 @@
-import { Effect } from 'effect';
 import type { ExpressionBuilder, ExpressionWrapper } from 'kysely';
-import type { FieldDef, ModelDef, SchemaDef } from '../schema/schema';
+import type { FieldDef, SchemaDef } from '../schema/schema';
 import { InternalError, QueryError } from './errors';
 import type { ClientOptions } from './options';
 
@@ -22,16 +21,6 @@ export function requireModel(schema: SchemaDef, model: string) {
         throw new QueryError(`Model "${model}" not found`);
     }
     return schema.models[matchedName]!;
-}
-
-export function requireModelEffect(
-    schema: SchemaDef,
-    model: string
-): Effect.Effect<ModelDef, Error, never> {
-    return Effect.try({
-        try: () => requireModel(schema, model),
-        catch: () => new QueryError(`Model "${model}" not found`),
-    });
 }
 
 export function getField(schema: SchemaDef, model: string, field: string) {

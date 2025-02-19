@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { Effect, Match } from 'effect';
+import { match } from 'ts-pattern';
 import * as uuid from 'uuid';
 import { z } from 'zod';
 import {
@@ -17,7 +17,7 @@ import {
     isForeignKeyField,
     isScalarField,
     requireField,
-    requireModelEffect,
+    requireModel,
 } from '../query-utils';
 import type { OperationContext } from './context';
 import { getQueryDialect } from './dialect';
@@ -38,172 +38,155 @@ const RelationPayloadSchema = z.union([
     z.object({ createMany: z.record(z.string(), z.any()) }),
 ]);
 
-export function runCreate<Schema extends SchemaDef>(
+export async function runCreate<Schema extends SchemaDef>(
     context: OperationContext<Schema>,
     args: unknown
 ) {
-    return Effect.gen(function* () {
-        // parse args
-        const parsedArgs = yield* parseCreateArgs(args);
-
-        const result = yield* runQuery(context, parsedArgs);
-        return result;
-    });
+    // parse args
+    const parsedArgs = parseCreateArgs(args);
+    return runQuery(context, parsedArgs);
 }
 
 function parseCreateArgs(args: unknown) {
-    return Effect.try({
-        try: () => CreateArgsSchema.parse(args),
-        catch: (e) => new QueryError(`Invalid create args: ${e}`),
-    });
+    const { data, error } = CreateArgsSchema.safeParse(args);
+    if (error) {
+        throw new QueryError(`Invalid create args: ${error}`);
+    } else {
+        return data;
+    }
 }
 
-function runQuery<Schema extends SchemaDef>(
+async function runQuery<Schema extends SchemaDef>(
     context: OperationContext<Schema>,
     args: CreateArgs
 ) {
-    return Effect.gen(function* () {
-        const hasRelationCreate = Object.keys(args.data).some(
-            (f) => !!requireField(context.schema, context.model, f).relation
-        );
+    const hasRelationCreate = Object.keys(args.data).some(
+        (f) => !!requireField(context.schema, context.model, f).relation
+    );
 
-        const returnRelations = needReturnRelations(
-            context.schema,
-            context.model,
-            args
-        );
+    const returnRelations = needReturnRelations(
+        context.schema,
+        context.model,
+        args
+    );
 
-        let result: any;
-        if (hasRelationCreate || returnRelations) {
-            // employ a transaction
-            result = yield* Effect.tryPromise({
-                try: () =>
-                    context.kysely
-                        .transaction()
-                        .setIsolationLevel('repeatable read')
-                        .execute(async (trx) =>
-                            Effect.runPromise(
-                                Effect.gen(function* () {
-                                    const createResult = yield* doCreate(
-                                        { ...context, kysely: trx },
-                                        args.data
-                                    );
-                                    return yield* readBackResult(
-                                        { ...context, kysely: trx },
-                                        createResult,
-                                        args
-                                    );
-                                })
-                            )
-                        ),
-                catch: (e) => new QueryError(`Error during create: ${e}`),
-            });
-        } else {
-            // simple create
-            const createResult = yield* doCreate(context, args.data);
-            result = trimResult(createResult, args);
+    let result: any;
+    if (hasRelationCreate || returnRelations) {
+        // employ a transaction
+        try {
+            result = await context.kysely
+                .transaction()
+                .setIsolationLevel('repeatable read')
+                .execute(async (trx) => {
+                    const createResult = await doCreate(
+                        { ...context, kysely: trx },
+                        args.data
+                    );
+                    return readBackResult(
+                        { ...context, kysely: trx },
+                        createResult,
+                        args
+                    );
+                });
+        } catch (err) {
+            throw new QueryError(`Error during create: ${err}`);
         }
+    } else {
+        // simple create
+        const createResult = await doCreate(context, args.data);
+        result = trimResult(createResult, args);
+    }
 
-        return result;
-    });
+    return result;
 }
 
-function doCreate<Schema extends SchemaDef>(
+async function doCreate<Schema extends SchemaDef>(
     context: OperationContext<Schema>,
     payload: object
-): Effect.Effect<any, QueryError, never> {
-    return Effect.gen(function* () {
-        const queryDialect = getQueryDialect(context.schema.provider);
+) {
+    const queryDialect = getQueryDialect(context.schema.provider);
+    const modelDef = requireModel(context.schema, context.model);
 
-        const modelDef = yield* requireModelEffect(
-            context.schema,
-            context.model
-        );
-        // separate args.data into scalar fields and relation fields
-        const regularFields: any = {};
-        const relationFields: any = {};
-        for (const field in payload) {
-            if (
-                isScalarField(context.schema, context.model, field) ||
-                isForeignKeyField(context.schema, context.model, field)
-            ) {
-                const fieldDef = requireField(
-                    context.schema,
-                    context.model,
-                    field
-                );
-                regularFields[field] = queryDialect.transformPrimitive(
-                    (payload as any)[field],
-                    fieldDef.type as BuiltinType
-                );
-            } else {
-                relationFields[field] = (payload as any)[field];
-            }
-        }
-
-        const updatedData = yield* fillGeneratedValues(modelDef, regularFields);
-        const query = context.kysely
-            .insertInto(modelDef.dbTable as any)
-            .values(updatedData)
-            .returningAll();
-        const created = yield* Effect.tryPromise({
-            try: () => query.execute().then((created) => created[0]!),
-            catch: (e) => new QueryError(`Error during create: ${e}`),
-        });
-
-        if (Object.keys(relationFields).length === 0) {
-            return created;
-        } else {
-            const relationEffects = Object.entries(relationFields).map(
-                ([field, payload]) =>
-                    Effect.gen(function* () {
-                        if (!payload) {
-                            throw new QueryError(
-                                `Invalid payload for relation "${field}"`
-                            );
-                        }
-
-                        const subPayload = yield* parseRelationPayload(
-                            payload,
-                            field
-                        );
-
-                        const r = yield* Match.value(subPayload).pipe(
-                            Match.when(
-                                (v) => 'create' in v,
-                                (v) =>
-                                    doNestedCreate(
-                                        context,
-                                        field,
-                                        created,
-                                        v.create
-                                    )
-                            ),
-                            Match.orElse(() =>
-                                Effect.fail(
-                                    new InternalError('Not implemented')
-                                )
-                            )
-                        );
-                        return { [field]: r };
-                    })
+    // separate args.data into scalar fields and relation fields
+    const regularFields: any = {};
+    const relationFields: any = {};
+    for (const field in payload) {
+        if (
+            isScalarField(context.schema, context.model, field) ||
+            isForeignKeyField(context.schema, context.model, field)
+        ) {
+            const fieldDef = requireField(context.schema, context.model, field);
+            regularFields[field] = queryDialect.transformPrimitive(
+                (payload as any)[field],
+                fieldDef.type as BuiltinType
             );
-
-            yield* Effect.all(relationEffects);
-            return created;
+        } else {
+            relationFields[field] = (payload as any)[field];
         }
-    });
+    }
+
+    const updatedData = fillGeneratedValues(modelDef, regularFields);
+    const query = context.kysely
+        .insertInto(modelDef.dbTable as any)
+        .values(updatedData)
+        .returningAll();
+
+    let created: any;
+
+    try {
+        created = await query.execute().then((created) => created[0]!);
+    } catch (err) {
+        const { sql, parameters } = query.compile();
+        throw new QueryError(
+            `Error during create: ${err}, sql: ${sql}, parameters: ${parameters}`
+        );
+    }
+
+    if (Object.keys(relationFields).length === 0) {
+        return created;
+    } else {
+        const relationPromises = Object.entries(relationFields).map(
+            ([field, payload]) => {
+                if (!payload) {
+                    throw new QueryError(
+                        `Invalid payload for relation "${field}"`
+                    );
+                }
+
+                const subPayload = parseRelationPayload(payload, field);
+
+                if ('create' in subPayload) {
+                    return doNestedCreate(
+                        context,
+                        field,
+                        created,
+                        subPayload.create
+                    );
+                } else {
+                    throw new InternalError('Not implemented');
+                }
+            }
+        );
+
+        // await relation creation
+        await Promise.all(relationPromises);
+
+        return created;
+    }
 }
 
 function parseRelationPayload(payload: {}, field: string) {
-    return Effect.try({
-        try: () => RelationPayloadSchema.parse(payload),
-        catch: (e) =>
-            new QueryError(`Invalid payload for relation "${field}": ${e}`),
-    });
+    const { data, error } = RelationPayloadSchema.safeParse(payload);
+    if (error) {
+        throw new QueryError(
+            `Invalid payload for relation "${field}": ${error}`
+        );
+    } else {
+        return data;
+    }
 }
 
-function doNestedCreate<Schema extends SchemaDef>(
+async function doNestedCreate<Schema extends SchemaDef>(
     context: OperationContext<Schema>,
     field: string,
     parentEntity: { [x: string]: any },
@@ -233,33 +216,30 @@ function doNestedCreate<Schema extends SchemaDef>(
 }
 
 function fillGeneratedValues(modelDef: ModelDef, data: object) {
-    return Effect.gen(function* () {
-        const fields = modelDef.fields;
-        const values: any = clone(data);
-        for (const field in fields) {
-            if (!(field in data)) {
-                if (fields[field]?.generator !== undefined) {
-                    const generated = evalGenerator(fields[field].generator);
-                    if (generated) {
-                        values[field] = generated;
-                    }
-                } else if (fields[field]?.updatedAt) {
-                    values[field] = new Date().toISOString();
+    const fields = modelDef.fields;
+    const values: any = clone(data);
+    for (const field in fields) {
+        if (!(field in data)) {
+            if (fields[field]?.generator !== undefined) {
+                const generated = evalGenerator(fields[field].generator);
+                if (generated) {
+                    values[field] = generated;
                 }
+            } else if (fields[field]?.updatedAt) {
+                values[field] = new Date().toISOString();
             }
         }
-        return values;
-    });
+    }
+    return values;
 }
 
 function evalGenerator(generator: FieldGenerators) {
-    return Match.value(generator).pipe(
-        Match.whenOr('cuid', 'cuid2', () => createId()),
-        Match.when('uuid4', () => uuid.v4()),
-        Match.when('uuid7', () => uuid.v7()),
-        Match.when('nanoid', () => uuid.v7()),
-        Match.orElse(() => undefined)
-    );
+    return match(generator)
+        .with('cuid', 'cuid2', () => createId())
+        .with('uuid4', () => uuid.v4())
+        .with('uuid7', () => uuid.v7())
+        .with('nanoid', () => uuid.v7())
+        .otherwise(() => undefined);
 }
 
 function trimResult(data: any, args: CreateArgs) {
@@ -272,20 +252,18 @@ function trimResult(data: any, args: CreateArgs) {
     }, {} as any);
 }
 
-function readBackResult<Schema extends SchemaDef>(
+async function readBackResult<Schema extends SchemaDef>(
     context: OperationContext<Schema>,
     primaryData: any,
     args: CreateArgs
 ) {
-    return Effect.gen(function* () {
-        // fetch relations based on include or select
-        const read = yield* runFindQuery(context, {
-            where: getIdValues(context.schema, context.model, primaryData),
-            select: args.select,
-            include: args.include,
-        });
-        return read[0] ?? null;
+    // fetch relations based on include or select
+    const read = await runFindQuery(context, {
+        where: getIdValues(context.schema, context.model, primaryData),
+        select: args.select,
+        include: args.include,
     });
+    return read[0] ?? null;
 }
 
 function needReturnRelations(

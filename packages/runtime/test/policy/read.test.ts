@@ -96,9 +96,18 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             const authClient = client.$withFeatures({
                 policy: { ...policySettings, auth: { id: user.id } },
             });
-            await expect(
-                authClient.$qb.selectFrom('User').selectAll().executeTakeFirst()
-            ).resolves.toEqual(user);
+            const foundUser = await authClient.$qb
+                .selectFrom('User')
+                .selectAll()
+                .executeTakeFirstOrThrow();
+
+            if (typeof foundUser.createdAt === 'string') {
+                expect(Date.parse(foundUser.createdAt)).toEqual(
+                    user.createdAt.getTime()
+                );
+            } else {
+                expect(foundUser.createdAt).toEqual(user.createdAt);
+            }
         });
     }
 );

@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import type { SelectQueryBuilder } from 'kysely';
 import type { GetModels, SchemaDef } from '../../schema/schema';
 import { QueryError } from '../errors';
@@ -7,28 +6,25 @@ import {
     isScalarField,
     requireField,
     requireModel,
-    requireModelEffect,
 } from '../query-utils';
 import type { FindArgs } from '../types';
 import type { OperationContext } from './context';
 import { getQueryDialect } from './dialect';
 import { makeFindSchema } from './parse';
 
-export function runFind<Schema extends SchemaDef>(
+export async function runFind<Schema extends SchemaDef>(
     context: OperationContext<Schema>,
     args: unknown
 ) {
-    return Effect.gen(function* () {
-        // parse args
-        const parsedArgs = yield* parseFindArgs(context, args);
+    // parse args
+    const parsedArgs = parseFindArgs(context, args);
 
-        // run query
-        const result = yield* runQuery(context, parsedArgs);
+    // run query
+    const result = await runQuery(context, parsedArgs);
 
-        const finalResult =
-            context.operation === 'findMany' ? result : result[0] ?? null;
-        return finalResult;
-    });
+    const finalResult =
+        context.operation === 'findMany' ? result : result[0] ?? null;
+    return finalResult;
 }
 
 function parseFindArgs<Schema extends SchemaDef>(
@@ -41,78 +37,72 @@ function parseFindArgs<Schema extends SchemaDef>(
         operation === 'findUnique'
     );
 
-    return Effect.try({
-        try: () => findSchema.parse(args),
-        catch: (e) => new QueryError(`Invalid find args: ${e}`),
-    });
+    const { data, error } = findSchema.safeParse(args);
+    if (error) {
+        throw new QueryError(`Invalid find args: ${error.message}`);
+    } else {
+        return data;
+    }
 }
 
-export function runQuery<Schema extends SchemaDef>(
+export async function runQuery<Schema extends SchemaDef>(
     context: OperationContext<Schema>,
     args: FindArgs<Schema, GetModels<Schema>> | undefined
-): Effect.Effect<any[], QueryError, never> {
-    return Effect.gen(function* () {
-        const modelDef = yield* requireModelEffect(
-            context.schema,
-            context.model
+) {
+    const modelDef = requireModel(context.schema, context.model);
+
+    // table
+    let query = context.kysely.selectFrom(`${modelDef.dbTable}` as any);
+
+    if (context.operation !== 'findMany') {
+        query = query.limit(1);
+    }
+
+    // where
+    if (args?.where) {
+        query = buildWhere(query, args.where);
+    }
+
+    // skip
+    if (args?.skip) {
+        query = query.offset(args.skip);
+    }
+
+    // take
+    if (args?.take) {
+        query = query.limit(args.take);
+    }
+
+    // select
+    if (args?.select) {
+        query = buildFieldSelection(
+            context,
+            query,
+            args?.select,
+            modelDef.dbTable
         );
+    } else {
+        query = buildSelectAllScalarFields(context, query);
+    }
 
-        // table
-        let query = context.kysely.selectFrom(`${modelDef.dbTable}` as any);
+    // include
+    if (args?.include) {
+        query = buildFieldSelection(
+            context,
+            query,
+            args?.include,
+            modelDef.dbTable
+        );
+    }
 
-        if (context.operation !== 'findMany') {
-            query = query.limit(1);
-        }
-
-        // where
-        if (args?.where) {
-            query = buildWhere(query, args.where);
-        }
-
-        // skip
-        if (args?.skip) {
-            query = query.offset(args.skip);
-        }
-
-        // take
-        if (args?.take) {
-            query = query.limit(args.take);
-        }
-
-        // select
-        if (args?.select) {
-            query = buildFieldSelection(
-                context,
-                query,
-                args?.select,
-                modelDef.dbTable
-            );
-        } else {
-            query = buildSelectAllScalarFields(context, query);
-        }
-
-        // include
-        if (args?.include) {
-            query = buildFieldSelection(
-                context,
-                query,
-                args?.include,
-                modelDef.dbTable
-            );
-        }
-
-        const rows = yield* Effect.tryPromise({
-            try: () => query.execute(),
-            catch: (e) => {
-                const { sql, parameters } = query.compile();
-                return new QueryError(
-                    `Failed to execute query: ${e}, sql: ${sql}, parameters: ${parameters}`
-                );
-            },
-        });
-
-        return rows;
-    });
+    try {
+        return await query.execute();
+    } catch (err) {
+        const { sql, parameters } = query.compile();
+        throw new QueryError(
+            `Failed to execute query: ${err}, sql: ${sql}, parameters: ${parameters}`
+        );
+    }
 }
 
 function buildWhere(

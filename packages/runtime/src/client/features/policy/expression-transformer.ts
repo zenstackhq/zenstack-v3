@@ -1,4 +1,3 @@
-import { Match } from 'effect';
 import type { OperandExpression, SqlBool } from 'kysely';
 import {
     AndNode,
@@ -11,6 +10,7 @@ import {
     ValueNode,
     type OperationNode,
 } from 'kysely';
+import { match } from 'ts-pattern';
 import type { CallExpression, SchemaDef } from '../../../schema';
 import {
     Expression,
@@ -230,10 +230,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private transformOperator(op: BinaryOperator) {
-        const mappedOp = Match.value(op).pipe(
-            Match.when('==', () => '=' as const),
-            Match.orElse(() => op)
-        );
+        const mappedOp = match(op)
+            .with('==', () => '=' as const)
+            .otherwise(() => op);
         return OperatorNode.create(mappedOp);
     }
 

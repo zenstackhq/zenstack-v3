@@ -1,4 +1,3 @@
-import { Effect, Match } from 'effect';
 import {
     Kysely,
     PostgresDialect,
@@ -7,6 +6,7 @@ import {
     type PostgresDialectConfig,
     type SqliteDialectConfig,
 } from 'kysely';
+import { match } from 'ts-pattern';
 import { type GetModels, type SchemaDef } from '../schema/schema';
 import { NotFoundError } from './errors';
 import { PolicyPlugin } from './features/policy';
@@ -43,23 +43,22 @@ class ClientImpl<Schema extends SchemaDef> {
         private readonly schema: Schema,
         private readonly options: ClientOptions<Schema>
     ) {
-        const dialect: Dialect = Match.value(schema.provider).pipe(
-            Match.when(
+        const dialect: Dialect = match(schema.provider)
+            .with(
                 'sqlite',
                 () =>
                     new SqliteDialect(
                         options.dialectConfig as SqliteDialectConfig
                     )
-            ),
-            Match.when(
+            )
+            .with(
                 'postgresql',
                 () =>
                     new PostgresDialect(
                         options.dialectConfig as PostgresDialectConfig
                     )
-            ),
-            Match.exhaustive
-        );
+            )
+            .exhaustive();
 
         const plugins = [...(options.plugins ?? [])];
         if (options.features?.policy) {
@@ -145,40 +144,34 @@ function createModelProxy<
     const resultProcessor = new ResultProcessor(schema);
     return {
         create: async (args) => {
-            const r = await Effect.runPromise(
-                runCreate(
-                    {
-                        ...baseContext,
-                        operation: 'create',
-                    },
-                    args
-                )
+            const r = await runCreate(
+                {
+                    ...baseContext,
+                    operation: 'create',
+                },
+                args
             );
             return resultProcessor.processResult(r, model);
         },
 
         findUnique: async (args) => {
-            const r = await Effect.runPromise(
-                runFind(
-                    {
-                        ...baseContext,
-                        operation: 'findUnique',
-                    },
-                    args
-                )
+            const r = await runFind(
+                {
+                    ...baseContext,
+                    operation: 'findUnique',
+                },
+                args
             );
             return resultProcessor.processResult(r, model) ?? null;
         },
 
         findUniqueOrThrow: async (args) => {
-            const r = await Effect.runPromise(
-                runFind(
-                    {
-                        ...baseContext,
-                        operation: 'findUnique',
-                    },
-                    args
-                )
+            const r = await runFind(
+                {
+                    ...baseContext,
+                    operation: 'findUnique',
+                },
+                args
             );
             if (!r) {
                 throw new NotFoundError(`No "${model}" found`);
@@ -188,27 +181,23 @@ function createModelProxy<
         },
 
         findFirst: async (args) => {
-            const r = await Effect.runPromise(
-                runFind(
-                    {
-                        ...baseContext,
-                        operation: 'findFirst',
-                    },
-                    args
-                )
+            const r = await runFind(
+                {
+                    ...baseContext,
+                    operation: 'findFirst',
+                },
+                args
             );
             return resultProcessor.processResult(r, model);
         },
 
         findFirstOrThrow: async (args) => {
-            const r = await Effect.runPromise(
-                runFind(
-                    {
-                        ...baseContext,
-                        operation: 'findFirst',
-                    },
-                    args
-                )
+            const r = await runFind(
+                {
+                    ...baseContext,
+                    operation: 'findFirst',
+                },
+                args
             );
             if (!r) {
                 throw new NotFoundError(`No "${model}" found`);
@@ -218,14 +207,12 @@ function createModelProxy<
         },
 
         findMany: async (args) => {
-            const r = await Effect.runPromise(
-                runFind(
-                    {
-                        ...baseContext,
-                        operation: 'findMany',
-                    },
-                    args
-                )
+            const r = await runFind(
+                {
+                    ...baseContext,
+                    operation: 'findMany',
+                },
+                args
             );
             return resultProcessor.processResult(r, model);
         },

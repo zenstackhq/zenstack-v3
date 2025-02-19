@@ -10,6 +10,10 @@ export function hasModel(schema: SchemaDef, model: string) {
         .includes(model.toLowerCase());
 }
 
+export function getModel(schema: SchemaDef, model: string) {
+    return schema.models[model];
+}
+
 export function requireModel(schema: SchemaDef, model: string) {
     const matchedName = Object.keys(schema.models).find(
         (k) => k.toLowerCase() === model.toLowerCase()
@@ -28,6 +32,11 @@ export function requireModelEffect(
         try: () => requireModel(schema, model),
         catch: () => new QueryError(`Model "${model}" not found`),
     });
+}
+
+export function getField(schema: SchemaDef, model: string, field: string) {
+    const modelDef = getModel(schema, model);
+    return modelDef?.fields[field];
 }
 
 export function requireField(schema: SchemaDef, model: string, field: string) {

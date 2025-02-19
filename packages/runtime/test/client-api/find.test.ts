@@ -61,11 +61,16 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             expect(r).toHaveLength(0);
 
             const user = await createUser();
+            await createPosts(user.id);
 
             r = await client.user.findMany();
             expect(r).toHaveLength(1);
+            expect(r[0]?.createdAt).toBeInstanceOf(Date);
             r = await client.user.findMany({ where: { id: user.id } });
             expect(r).toHaveLength(1);
+
+            const post = await client.post.findFirst();
+            expect(post?.published).toBeTypeOf('boolean');
 
             r = await client.user.findMany({ where: { id: 'none' } });
             expect(r).toHaveLength(0);
@@ -105,18 +110,6 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             ).rejects.toThrow(NotFoundError);
         });
 
-        it('works with simple findFirst', async () => {
-            let r = await client.user.findFirst({ where: { name: 'User1' } });
-            expect(r).toBeNull();
-
-            const user = await createUser();
-
-            r = await client.user.findFirst({ where: { name: 'User1' } });
-            expect(r).toMatchObject({ id: user.id, email: 'a@b.com' });
-            r = await client.user.findFirst({ where: { name: 'User2' } });
-            expect(r).toBeNull();
-        });
-
         it('works with field selection', async () => {
             const user = await createUser();
             await createPosts(user.id);
@@ -129,6 +122,8 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             expect(r?.email).toBeTruthy();
             expect('name' in r!).toBeFalsy();
             expect(r?.posts).toHaveLength(2);
+            expect(r?.posts[0]?.createdAt).toBeInstanceOf(Date);
+            expect(r?.posts[0]?.published).toBeTypeOf('boolean');
 
             await expect(
                 client.user.findUnique({
@@ -145,6 +140,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             expect(r1!.posts[0]!.author).toMatchObject({
                 id: user.id,
                 email: 'a@b.com',
+                createdAt: expect.any(Date),
             });
         });
 

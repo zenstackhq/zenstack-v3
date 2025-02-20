@@ -42,6 +42,13 @@ const schema = {
                         opposite: 'author',
                     },
                 },
+                profile: {
+                    type: 'Profile',
+                    relation: {
+                        opposite: 'user',
+                    },
+                    optional: true,
+                },
             },
             idFields: ['id'],
             uniqueFields: {
@@ -148,6 +155,35 @@ const schema = {
                 },
             ],
         },
+        Profile: {
+            dbTable: 'Profile',
+            fields: {
+                id: {
+                    type: 'String',
+                    id: true,
+                    generator: 'cuid',
+                },
+                bio: { type: 'String' },
+                user: {
+                    type: 'User',
+                    relation: {
+                        fields: ['userId'],
+                        references: ['id'],
+                        opposite: 'profile',
+                    },
+                },
+                userId: {
+                    type: 'String',
+                    foreignKeyFor: ['user'],
+                    unique: true,
+                },
+            },
+            idFields: ['id'],
+            uniqueFields: {
+                id: { type: 'String' },
+                userId: { type: 'String' },
+            },
+        },
         Foo: {
             dbTable: 'Foo',
             fields: {
@@ -199,6 +235,15 @@ export async function pushSchema(db: Client<typeof schema>) {
         .addColumn('content', 'varchar')
         .addColumn('published', 'boolean', (col) => col.defaultTo(false))
         .addColumn('authorId', 'varchar', (col) =>
+            col.references('User.id').notNull()
+        )
+        .execute();
+
+    await db.$qb.schema
+        .createTable('Profile')
+        .addColumn('id', 'text', (col) => col.primaryKey())
+        .addColumn('bio', 'varchar', (col) => col.notNull())
+        .addColumn('userId', 'varchar', (col) =>
             col.references('User.id').notNull()
         )
         .execute();

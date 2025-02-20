@@ -6,7 +6,7 @@ import { createClientSpecs } from './client-specs';
 
 const PG_DB_NAME = 'client-api-find-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME))(
+describe.each(createClientSpecs(PG_DB_NAME, true))(
     'Client find tests for $provider',
     ({ makeClient, provider }) => {
         const schema = getSchema(provider);
@@ -22,38 +22,25 @@ describe.each(createClientSpecs(PG_DB_NAME))(
         });
 
         async function createUser(email = 'a@b.com') {
-            return await client.$qb
-                .insertInto('User')
-                .values({
-                    id: crypto.randomUUID(),
+            return client.user.create({
+                data: {
                     email,
                     name: 'User1',
                     role: 'ADMIN',
-                    updatedAt: new Date().toISOString(),
-                })
-                .returningAll()
-                .executeTakeFirstOrThrow();
+                    profile: {
+                        create: { bio: 'My bio' },
+                    },
+                },
+            });
         }
 
         async function createPosts(authorId: string) {
-            await client.$qb
-                .insertInto('Post')
-                .values({
-                    id: crypto.randomUUID(),
-                    title: 'Post1',
-                    updatedAt: new Date().toISOString(),
-                    authorId,
-                })
-                .execute();
-            await client.$qb
-                .insertInto('Post')
-                .values({
-                    id: crypto.randomUUID(),
-                    title: 'Post2',
-                    updatedAt: new Date().toISOString(),
-                    authorId,
-                })
-                .execute();
+            await client.post.create({
+                data: { title: 'Post1', published: true, authorId },
+            });
+            await client.post.create({
+                data: { title: 'Post2', published: false, authorId },
+            });
         }
 
         it('works with simple findMany', async () => {
@@ -76,7 +63,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             expect(r).toHaveLength(0);
         });
 
-        it('works with simple findUnique', async () => {
+        it('works with simple unique filter', async () => {
             let r = await client.user.findUnique({ where: { id: 'none' } });
             expect(r).toBeNull();
 
@@ -94,7 +81,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             ).rejects.toThrow(NotFoundError);
         });
 
-        it('works with simple findFirst', async () => {
+        it('works with simple generic filter', async () => {
             let r = await client.user.findFirst({ where: { name: 'User1' } });
             expect(r).toBeNull();
 
@@ -144,7 +131,60 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             });
         });
 
-        it('supports kysely expression builder', async () => {
+        it('works with including filtered relation', async () => {
+            const user = await createUser();
+            await createPosts(user.id);
+
+            let r = await client.user.findUniqueOrThrow({
+                where: { id: user.id },
+                include: { posts: { where: { title: 'Post1' } } },
+            });
+            expect(r.posts).toHaveLength(1);
+            expect(r.posts[0]?.title).toBe('Post1');
+
+            r = await client.user.findUniqueOrThrow({
+                where: { id: user.id },
+                include: { posts: { where: { published: true } } },
+            });
+            expect(r.posts).toHaveLength(1);
+
+            r = await client.user.findUniqueOrThrow({
+                where: { id: user.id },
+                include: { posts: { where: { title: 'Post3' } } },
+            });
+            expect(r.posts).toHaveLength(0);
+
+            const r1 = await client.post.findFirstOrThrow({
+                include: {
+                    author: {
+                        include: { posts: { where: { title: 'Post1' } } },
+                    },
+                },
+            });
+            expect(r1.author.posts).toHaveLength(1);
+
+            let r2 = await client.user.findFirstOrThrow({
+                include: {
+                    profile: { where: { bio: 'My bio' } },
+                },
+            });
+            expect(r2.profile).toBeTruthy();
+            r2 = await client.user.findFirstOrThrow({
+                include: {
+                    profile: { where: { bio: 'Some bio' } },
+                },
+            });
+            expect(r2.profile).toBeNull();
+
+            await expect(
+                client.post.findFirstOrThrow({
+                    // @ts-expect-error
+                    include: { author: { where: { email: user.email } } },
+                })
+            ).rejects.toThrow(`Field "author" doesn't support filtering`);
+        });
+
+        it('supports $expr', async () => {
             await createUser('yiming@gmail.com');
             await createUser('yiming@zenstack.dev');
 

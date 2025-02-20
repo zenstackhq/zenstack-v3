@@ -8,8 +8,9 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { SelectInclude } from '../../types';
+import type { FindArgs, SelectInclude } from '../../types';
 import type { OperationContext } from '../context';
+import { buildWhere } from '../find';
 
 export class SqliteQueryDialect implements QueryDialect {
     transformPrimitive(value: unknown, type: BuiltinType) {
@@ -51,14 +52,14 @@ export class SqliteQueryDialect implements QueryDialect {
         eb: ExpressionBuilder<any, any>,
         relationField: string,
         parentName: string,
-        payload: true | SelectInclude<Schema, GetModels<Schema>>
+        payload: true | FindArgs<Schema, GetModels<Schema>>
     ) {
         const relationFieldDef = requireField(
             context.schema,
             context.model,
             relationField
         );
-        const relationModel = relationFieldDef.type;
+        const relationModel = relationFieldDef.type as GetModels<Schema>;
         const relationModelDef = requireModel(context.schema, relationModel);
 
         const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
@@ -67,7 +68,7 @@ export class SqliteQueryDialect implements QueryDialect {
             relationField
         );
 
-        let tbl = eb
+        let tbl: SelectQueryBuilder<any, any, any> = eb
             .selectFrom(
                 `${relationModelDef.dbTable} as ${parentName}$${relationField}`
             )
@@ -153,6 +154,13 @@ export class SqliteQueryDialect implements QueryDialect {
                     return sql`json_object(${sql.join(objArgs)})`.as('data');
                 }
             });
+
+        if (typeof payload === 'object' && payload.where) {
+            tbl = buildWhere(tbl, payload.where, {
+                ...context,
+                model: relationModel,
+            });
+        }
 
         // join conditions
         keyPairs.forEach(({ fk, pk }) => {

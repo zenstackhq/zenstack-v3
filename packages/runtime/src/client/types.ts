@@ -46,22 +46,26 @@ type DefaultModelResult<
 >;
 
 type ModelSelectResult<
-    S,
+    Select,
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = {
-    [Key in keyof S & GetFields<Schema, Model> as S[Key] extends
+    [Key in keyof Select & GetFields<Schema, Model> as Select[Key] extends
         | false
         | undefined
         ? never
         : Key]: Key extends ScalarFields<Schema, Model>
         ? MapFieldType<Schema, Model, Key>
         : Key extends RelationFields<Schema, Model>
-        ? S[Key] extends FindArgs<Schema, RelationFieldType<Schema, Model, Key>>
+        ? Select[Key] extends FindArgs<
+              Schema,
+              RelationFieldType<Schema, Model, Key>,
+              FieldIsArray<Schema, Model, Key>
+          >
             ? ModelResult<
                   Schema,
                   RelationFieldType<Schema, Model, Key>,
-                  S[Key],
+                  Select[Key],
                   FieldIsOptional<Schema, Model, Key>,
                   FieldIsArray<Schema, Model, Key>
               >
@@ -95,7 +99,8 @@ export type ModelResult<
                   ? never
                   : Key]: I[Key] extends FindArgs<
                   Schema,
-                  RelationFieldType<Schema, Model, Key>
+                  RelationFieldType<Schema, Model, Key>,
+                  FieldIsArray<Schema, Model, Key>
               >
                   ? ModelResult<
                         Schema,
@@ -182,7 +187,17 @@ type Select<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
 type Include<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in RelationFields<Schema, Model>]?:
         | boolean
-        | FindArgs<Schema, RelationFieldType<Schema, Model, Key>>;
+        | FindArgs<
+              Schema,
+              RelationFieldType<Schema, Model, Key>,
+              FieldIsArray<Schema, Model, Key>,
+              // where clause is allowed only if the relation is array or optional
+              FieldIsArray<Schema, Model, Key> extends true
+                  ? true
+                  : FieldIsOptional<Schema, Model, Key> extends true
+                  ? true
+                  : false
+          >;
 };
 
 export type SelectSubset<T, U> = {
@@ -301,12 +316,21 @@ export type OppositeRelationAndFK<
 
 export type FindArgs<
     Schema extends SchemaDef,
-    Model extends GetModels<Schema>
-> = {
-    where?: Where<Schema, Model>;
-    skip?: number;
-    take?: number;
-} & SelectInclude<Schema, Model>;
+    Model extends GetModels<Schema>,
+    Collection extends boolean,
+    AllowFilter extends boolean = true
+> = (Collection extends true
+    ? {
+          skip?: number;
+          take?: number;
+      }
+    : {}) &
+    (AllowFilter extends true
+        ? {
+              where?: Where<Schema, Model>;
+          }
+        : {}) &
+    SelectInclude<Schema, Model>;
 
 export type FindUniqueArgs<
     Schema extends SchemaDef,
@@ -470,8 +494,8 @@ export type ModelOperations<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = {
-    findMany<T extends FindArgs<Schema, Model>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model>>
+    findMany<T extends FindArgs<Schema, Model, true>>(
+        args?: SelectSubset<T, FindArgs<Schema, Model, true>>
     ): Promise<ModelResult<Schema, Model, T>[]>;
 
     findUnique<T extends FindUniqueArgs<Schema, Model>>(
@@ -482,12 +506,12 @@ export type ModelOperations<
         args?: SelectSubset<T, FindUniqueArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T>>;
 
-    findFirst<T extends FindArgs<Schema, Model>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model>>
+    findFirst<T extends FindArgs<Schema, Model, true>>(
+        args?: SelectSubset<T, FindArgs<Schema, Model, true>>
     ): Promise<ModelResult<Schema, Model, T> | null>;
 
-    findFirstOrThrow<T extends FindArgs<Schema, Model>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model>>
+    findFirstOrThrow<T extends FindArgs<Schema, Model, true>>(
+        args?: SelectSubset<T, FindArgs<Schema, Model, true>>
     ): Promise<ModelResult<Schema, Model, T>>;
 
     create<T extends CreateArgs<Schema, Model>>(

@@ -1,5 +1,5 @@
 import type { SelectQueryBuilder } from 'kysely';
-import type { GetModels, SchemaDef } from '../../schema/schema';
+import type { BuiltinType, GetModels, SchemaDef } from '../../schema/schema';
 import { QueryError } from '../errors';
 import {
     buildFieldRef,
@@ -47,7 +47,7 @@ function parseFindArgs<Schema extends SchemaDef>(
 
 export async function runQuery<Schema extends SchemaDef>(
     context: OperationContext<Schema>,
-    args: FindArgs<Schema, GetModels<Schema>> | undefined
+    args: FindArgs<Schema, GetModels<Schema>, true> | undefined
 ) {
     const modelDef = requireModel(context.schema, context.model);
 
@@ -60,7 +60,7 @@ export async function runQuery<Schema extends SchemaDef>(
 
     // where
     if (args?.where) {
-        query = buildWhere(query, args.where);
+        query = buildWhere(query, args.where, context);
     }
 
     // skip
@@ -105,9 +105,10 @@ export async function runQuery<Schema extends SchemaDef>(
     }
 }
 
-function buildWhere(
+export function buildWhere<Schema extends SchemaDef>(
     query: SelectQueryBuilder<any, any, {}>,
-    where: Record<string, any> | undefined
+    where: Record<string, any> | undefined,
+    context: OperationContext<Schema>
 ) {
     let result = query;
     if (!where) {
@@ -119,10 +120,15 @@ function buildWhere(
     );
 
     // build regular field filters
-    result = regularFields.reduce(
-        (acc, [field, value]) => acc.where(field, '=', value),
-        result
-    );
+    const queryDialect = getQueryDialect(context.schema.provider);
+    result = regularFields.reduce((acc, [field, value]) => {
+        const fieldDef = requireField(context.schema, context.model, field);
+        return acc.where(
+            field,
+            '=',
+            queryDialect.transformPrimitive(value, fieldDef.type as BuiltinType)
+        );
+    }, result);
 
     // call expression builder and combine the results
     if ('$expr' in where && typeof where['$expr'] === 'function') {
@@ -148,6 +154,11 @@ function buildFieldSelection<Schema extends SchemaDef>(
         if (!fieldDef.relation) {
             result = result.select(field);
         } else {
+            if (!fieldDef.array && !fieldDef.optional && payload.where) {
+                throw new QueryError(
+                    `Field "${field}" doesn't support filtering`
+                );
+            }
             result = buildRelationSelection(
                 context,
                 result,

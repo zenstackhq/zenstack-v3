@@ -142,6 +142,11 @@ export function makeIncludeSchema(schema: SchemaDef, model: string) {
                                 makeIncludeSchema(schema, fieldDef.type)
                             )
                             .optional(),
+                        where: z
+                            .lazy(() =>
+                                makeWhereSchema(schema, fieldDef.type, false)
+                            )
+                            .optional(),
                     }),
                 ])
                 .optional();
@@ -175,6 +180,7 @@ export function makeFindSchema(
             skip: z.number().int().nonnegative().optional(),
             take: z.number().int().nonnegative().optional(),
         })
+        .strict()
         .refine(
             (value) => !value.select || !value.include,
             '"select" and "include" cannot be used together'

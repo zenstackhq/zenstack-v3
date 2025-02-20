@@ -18,8 +18,9 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { SelectInclude } from '../../types';
+import type { FindArgs, SelectInclude } from '../../types';
 import type { OperationContext } from '../context';
+import { buildWhere } from '../find';
 
 export class PostgresQueryDialect implements QueryDialect {
     transformPrimitive(value: unknown, _type: BuiltinType) {
@@ -56,14 +57,14 @@ export class PostgresQueryDialect implements QueryDialect {
         qb: SelectQueryBuilder<any, any, any>,
         relationField: string,
         parentName: string,
-        payload: true | SelectInclude<Schema, GetModels<Schema>>
+        payload: true | FindArgs<Schema, GetModels<Schema>>
     ) {
         const relationFieldDef = requireField(
             context.schema,
             context.model,
             relationField
         );
-        const relationModel = relationFieldDef.type;
+        const relationModel = relationFieldDef.type as GetModels<Schema>;
         const relationModelDef = requireModel(context.schema, relationModel);
 
         return (
@@ -74,6 +75,13 @@ export class PostgresQueryDialect implements QueryDialect {
                         let result = eb.selectFrom(
                             `${relationModelDef.dbTable} as ${parentName}$${relationField}`
                         );
+
+                        if (typeof payload === 'object' && payload.where) {
+                            result = buildWhere(result, payload.where, {
+                                ...context,
+                                model: relationModel,
+                            });
+                        }
 
                         result = this.buildRelationObjectSelect(
                             context,

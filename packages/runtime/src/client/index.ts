@@ -15,12 +15,12 @@ import { runCreate } from './operations/create';
 import { getQueryDialect } from './operations/dialect';
 import { runFind } from './operations/find';
 import type { ClientOptions, FeatureSettings } from './options';
-import type { toKysely } from './query-builder';
+import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
 import type { ModelOperations } from './types';
 
 export type Client<Schema extends SchemaDef> = {
-    $qb: Kysely<toKysely<Schema>>;
+    $qb: Kysely<ToKysely<Schema>>;
     $disconnect(): Promise<void>;
     $withFeatures(features: FeatureSettings<Schema>): Client<Schema>;
 } & {
@@ -37,7 +37,7 @@ export function makeClient<Schema extends SchemaDef>(
 }
 
 class ClientImpl<Schema extends SchemaDef> {
-    public readonly $qb: Kysely<toKysely<Schema>>;
+    public readonly $qb: Kysely<ToKysely<Schema>>;
 
     constructor(
         private readonly schema: Schema,
@@ -130,7 +130,7 @@ function createModelProxy<
     Model extends GetModels<Schema>
 >(
     _client: ClientImpl<Schema>,
-    kysely: Kysely<toKysely<Schema>>,
+    kysely: Kysely<ToKysely<Schema>>,
     schema: Schema,
     options: ClientOptions<Schema>,
     model: Model
@@ -221,4 +221,4 @@ function createModelProxy<
 
 export type { FeatureSettings, PolicySettings } from './options';
 export type * from './types';
-export type { ClientOptions, toKysely };
+export type { ClientOptions, ToKysely };

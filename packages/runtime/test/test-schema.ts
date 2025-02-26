@@ -166,6 +166,7 @@ const schema = {
                 bio: { type: 'String' },
                 user: {
                     type: 'User',
+                    optional: true,
                     relation: {
                         fields: ['userId'],
                         references: ['id'],
@@ -174,8 +175,9 @@ const schema = {
                 },
                 userId: {
                     type: 'String',
-                    foreignKeyFor: ['user'],
+                    optional: true,
                     unique: true,
+                    foreignKeyFor: ['user'],
                 },
             },
             idFields: ['id'],
@@ -243,8 +245,6 @@ export async function pushSchema(db: Client<typeof schema>) {
         .createTable('Profile')
         .addColumn('id', 'text', (col) => col.primaryKey())
         .addColumn('bio', 'varchar', (col) => col.notNull())
-        .addColumn('userId', 'varchar', (col) =>
-            col.references('User.id').notNull()
-        )
+        .addColumn('userId', 'varchar', (col) => col.references('User.id'))
         .execute();
 }

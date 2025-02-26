@@ -6,7 +6,7 @@ import type {
 } from 'kysely';
 import type { DataSourceProvider, SchemaDef } from '../schema/schema';
 import type { MergeIf } from '../utils/type-utils';
-import type { toKysely } from './query-builder';
+import type { ToKysely } from './query-builder';
 
 type DialectConfig<Provider extends DataSourceProvider> =
     Provider extends 'sqlite'
@@ -45,7 +45,7 @@ export type ClientOptions<Schema extends SchemaDef> = MergeIf<
 
 export type ComputedFields<
     Schema extends SchemaDef,
-    KyselyDB = toKysely<Schema>
+    KyselyDB = ToKysely<Schema>
 > = {
     [Model in keyof Schema['models'] as 'computedFields' extends keyof Schema['models'][Model]
         ? Model
@@ -74,7 +74,7 @@ export type PolicySettings<Schema extends SchemaDef> = MergeIf<
     keyof ExternalRules<Schema> extends never ? false : true
 >;
 
-type ExternalRules<Schema extends SchemaDef, KyselyDB = toKysely<Schema>> = {
+type ExternalRules<Schema extends SchemaDef, KyselyDB = ToKysely<Schema>> = {
     [Model in keyof Schema['models'] as 'externalRules' extends keyof Schema['models'][Model]
         ? Model
         : never]: {

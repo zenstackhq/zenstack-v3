@@ -3,7 +3,7 @@ import type { BuiltinType, GetModels, SchemaDef } from '../../schema/schema';
 import { QueryError } from '../errors';
 import {
     buildFieldRef,
-    isScalarField,
+    isRelationField,
     requireField,
     requireModel,
 } from '../query-utils';
@@ -202,11 +202,11 @@ function buildSelectAllScalarFields<Schema extends SchemaDef>(
     let result = query;
     const modelDef = requireModel(context.schema, context.model);
     return Object.keys(modelDef.fields)
-        .filter((f) => isScalarField(context.schema, context.model, f))
-        .reduce((acc, f) => selectScalarField(context, f, acc), result);
+        .filter((f) => !isRelationField(context.schema, context.model, f))
+        .reduce((acc, f) => selectField(context, f, acc), result);
 }
 
-function selectScalarField<Schema extends SchemaDef>(
+function selectField<Schema extends SchemaDef>(
     context: OperationContext<Schema>,
     field: string,
     qb: SelectQueryBuilder<any, any, {}>

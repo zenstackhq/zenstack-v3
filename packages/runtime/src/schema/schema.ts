@@ -154,6 +154,19 @@ export type ForeignKeyFields<
         : never]: Key;
 };
 
+export type NonRelationFields<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = keyof {
+    [Key in GetFields<Schema, Model> as GetField<
+        Schema,
+        Model,
+        Key
+    >['relation'] extends object
+        ? never
+        : Key]: Key;
+};
+
 export type RelationFields<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>

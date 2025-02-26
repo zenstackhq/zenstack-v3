@@ -133,6 +133,15 @@ export function isForeignKeyField(
     return !!fieldDef.foreignKeyFor;
 }
 
+export function isRelationField(
+    schema: SchemaDef,
+    model: string,
+    field: string
+): boolean {
+    const fieldDef = requireField(schema, model, field);
+    return !!fieldDef.relation;
+}
+
 export function getUniqueFields(schema: SchemaDef, model: string) {
     const modelDef = requireModel(schema, model);
     const result: Array<{ name: string; def: FieldDef }[]> = [];
@@ -200,4 +209,12 @@ export function buildFieldRef<Schema extends SchemaDef>(
         }
         return computer(eb);
     }
+}
+
+export function fieldHasDefaultValue(fieldDef: FieldDef) {
+    return (
+        fieldDef.default !== undefined ||
+        fieldDef.generator !== undefined ||
+        fieldDef.updatedAt
+    );
 }

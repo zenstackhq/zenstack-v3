@@ -194,7 +194,7 @@ export function makeFindSchema(
     return result;
 }
 
-function makePrimitiveSchema(type: string) {
+export function makePrimitiveSchema(type: string) {
     return match(type)
         .with('String', () => z.string())
         .with('Int', () => z.number())
@@ -204,4 +204,8 @@ function makePrimitiveSchema(type: string) {
         .with('Decimal', () => z.string())
         .with('DateTime', () => z.string())
         .otherwise(() => z.unknown());
+}
+
+export function orArray(schema: ZodSchema, canBeArray: boolean) {
+    return canBeArray ? z.union([schema, z.array(schema)]) : schema;
 }

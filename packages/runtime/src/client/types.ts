@@ -15,6 +15,7 @@ import type {
     GetFields,
     GetModel,
     GetModels,
+    NonRelationFields,
     RelationFields,
     RelationFieldType,
     RelationInfo,
@@ -28,7 +29,7 @@ import type {
     WrapType,
     XOR,
 } from '../utils/type-utils';
-import type { toKysely } from './query-builder';
+import type { ToKysely } from './query-builder';
 
 //#region Query results
 
@@ -39,7 +40,11 @@ type DefaultModelResult<
     Array = false
 > = WrapType<
     {
-        [Key in ScalarFields<Schema, Model>]: MapFieldType<Schema, Model, Key>;
+        [Key in NonRelationFields<Schema, Model>]: MapFieldType<
+            Schema,
+            Model,
+            Key
+        >;
     },
     Optional,
     Array
@@ -135,8 +140,8 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
 } & {
     $expr?: (
         eb: ExpressionBuilder<
-            toKysely<Schema>,
-            Model extends keyof toKysely<Schema> ? Model : never
+            ToKysely<Schema>,
+            Model extends keyof ToKysely<Schema> ? Model : never
         >
     ) => OperandExpression<SqlBool>;
 };

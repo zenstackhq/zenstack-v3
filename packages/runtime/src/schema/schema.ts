@@ -48,7 +48,7 @@ export type RelationInfo = {
     opposite?: string;
 };
 
-export type FieldGenerators =
+export type FieldGenerator =
     | 'autoincrement'
     | 'uuid4'
     | 'uuid7'
@@ -65,7 +65,7 @@ export type FieldDef = {
     unique?: boolean;
     updatedAt?: boolean;
     default?: MappedBuiltinType | { call: string };
-    generator?: FieldGenerators;
+    generator?: FieldGenerator;
     relation?: RelationInfo;
     foreignKeyFor?: string[];
     computed?: boolean;

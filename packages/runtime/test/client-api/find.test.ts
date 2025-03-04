@@ -21,15 +21,18 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             await client?.$disconnect();
         });
 
-        async function createUser(email = 'a@b.com') {
+        async function createUser(
+            email = 'u1@test.com',
+            restFields: any = {
+                name: 'User1',
+                role: 'ADMIN',
+                profile: { create: { bio: 'My bio' } },
+            }
+        ) {
             return client.user.create({
                 data: {
+                    ...restFields,
                     email,
-                    name: 'User1',
-                    role: 'ADMIN',
-                    profile: {
-                        create: { bio: 'My bio' },
-                    },
                 },
             });
         }
@@ -43,11 +46,11 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             });
         }
 
-        it('works with simple findMany', async () => {
+        it('works with findMany', async () => {
             let r = await client.user.findMany();
             expect(r).toHaveLength(0);
 
-            const user = await createUser();
+            const user = await createUser('u1@test.com');
             await createPosts(user.id);
 
             r = await client.user.findMany();
@@ -61,18 +64,105 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
 
             r = await client.user.findMany({ where: { id: 'none' } });
             expect(r).toHaveLength(0);
+
+            await createUser('u2@test.com');
+
+            await expect(client.user.findMany()).resolves.toHaveLength(2);
+            await expect(
+                client.user.findMany({ where: { email: 'u2@test.com' } })
+            ).resolves.toHaveLength(1);
         });
 
-        it('works with simple unique filter', async () => {
+        it('works with take and skip', async () => {
+            await createUser('u1@test.com');
+            await createUser('u2@test.com');
+            await createUser('u3@test.com');
+
+            // take
+            await expect(
+                client.user.findMany({ take: 1 })
+            ).resolves.toHaveLength(1);
+            await expect(
+                client.user.findMany({ take: 2 })
+            ).resolves.toHaveLength(2);
+            await expect(
+                client.user.findMany({ take: 4 })
+            ).resolves.toHaveLength(3);
+
+            // skip
+            await expect(
+                client.user.findMany({ skip: 1 })
+            ).resolves.toHaveLength(2);
+            await expect(
+                client.user.findMany({ skip: 2 })
+            ).resolves.toHaveLength(1);
+
+            // take + skip
+            await expect(
+                client.user.findMany({ take: 1, skip: 1 })
+            ).resolves.toHaveLength(1);
+            await expect(
+                client.user.findMany({ take: 3, skip: 2 })
+            ).resolves.toHaveLength(1);
+        });
+
+        it('works with orderBy', async () => {
+            await createUser('u1@test.com', { role: 'USER', name: null });
+            await createUser('u2@test.com', { role: 'ADMIN', name: 'User2' });
+
+            await expect(
+                client.user.findFirst({ orderBy: { email: 'asc' } })
+            ).resolves.toMatchObject({ email: 'u1@test.com' });
+
+            await expect(
+                client.user.findFirst({ orderBy: { email: 'desc' } })
+            ).resolves.toMatchObject({ email: 'u2@test.com' });
+
+            // multiple sorting conditions in one object
+            await expect(
+                client.user.findFirst({
+                    orderBy: { role: 'asc', email: 'desc' },
+                })
+            ).resolves.toMatchObject({ email: 'u2@test.com' });
+
+            // multiple sorting conditions in array
+            await expect(
+                client.user.findFirst({
+                    orderBy: [{ role: 'asc' }, { email: 'desc' }],
+                })
+            ).resolves.toMatchObject({ email: 'u2@test.com' });
+
+            // null first
+            await expect(
+                client.user.findFirst({
+                    orderBy: { name: { sort: 'asc', nulls: 'first' } },
+                })
+            ).resolves.toMatchObject({ email: 'u1@test.com' });
+
+            // null last
+            await expect(
+                client.user.findFirst({
+                    orderBy: { name: { sort: 'asc', nulls: 'last' } },
+                })
+            ).resolves.toMatchObject({ email: 'u2@test.com' });
+
+            // TODO: nested sorting
+
+            // TODO: relation sorting
+        });
+
+        it('works with unique filters', async () => {
             let r = await client.user.findUnique({ where: { id: 'none' } });
             expect(r).toBeNull();
 
             const user = await createUser();
 
             r = await client.user.findUnique({ where: { id: user.id } });
-            expect(r).toMatchObject({ id: user.id, email: 'a@b.com' });
-            r = await client.user.findUnique({ where: { email: 'a@b.com' } });
-            expect(r).toMatchObject({ id: user.id, email: 'a@b.com' });
+            expect(r).toMatchObject({ id: user.id, email: 'u1@test.com' });
+            r = await client.user.findUnique({
+                where: { email: 'u1@test.com' },
+            });
+            expect(r).toMatchObject({ id: user.id, email: 'u1@test.com' });
 
             r = await client.user.findUnique({ where: { id: 'none' } });
             expect(r).toBeNull();
@@ -81,20 +171,57 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             ).rejects.toThrow(NotFoundError);
         });
 
-        it('works with simple generic filter', async () => {
+        it('works with generic filters', async () => {
             let r = await client.user.findFirst({ where: { name: 'User1' } });
             expect(r).toBeNull();
 
             const user = await createUser();
 
             r = await client.user.findFirst({ where: { name: 'User1' } });
-            expect(r).toMatchObject({ id: user.id, email: 'a@b.com' });
+            expect(r).toMatchObject({ id: user.id, email: 'u1@test.com' });
 
             r = await client.user.findFirst({ where: { name: 'User2' } });
             expect(r).toBeNull();
             await expect(
                 client.user.findFirstOrThrow({ where: { name: 'User2' } })
             ).rejects.toThrow(NotFoundError);
+        });
+
+        it('works with to-many relation filters', async () => {
+            const user = await createUser();
+            await createPosts(user.id);
+
+            // some
+            await expect(
+                client.user.findFirst({
+                    where: { posts: { some: { title: 'Post1' } } },
+                })
+            ).resolves.toBeTruthy();
+
+            // every
+            await expect(
+                client.user.findFirst({
+                    where: { posts: { every: { authorId: user.id } } },
+                })
+            ).resolves.toBeTruthy();
+
+            await expect(
+                client.user.findFirst({
+                    where: { posts: { every: { published: true } } },
+                })
+            ).resolves.toBeFalsy();
+
+            // none
+            await expect(
+                client.user.findFirst({
+                    where: { posts: { none: { title: 'Post1' } } },
+                })
+            ).resolves.toBeFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: { posts: { none: { title: 'Post3' } } },
+                })
+            ).resolves.toBeTruthy();
         });
 
         it('works with field selection', async () => {
@@ -126,7 +253,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             });
             expect(r1!.posts[0]!.author).toMatchObject({
                 id: user.id,
-                email: 'a@b.com',
+                email: 'u1@test.com',
                 createdAt: expect.any(Date),
             });
         });

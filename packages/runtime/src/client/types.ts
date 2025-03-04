@@ -146,6 +146,25 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     ) => OperandExpression<SqlBool>;
 };
 
+export type SortOrder = 'asc' | 'desc';
+export type NullsOrder = 'first' | 'last';
+
+export type OrderBy<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    [Key in NonRelationFields<Schema, Model>]?: FieldIsOptional<
+        Schema,
+        Model,
+        Key
+    > extends true
+        ? {
+              sort: SortOrder;
+              nulls?: NullsOrder;
+          }
+        : SortOrder;
+};
+
 export type WhereUnique<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
@@ -328,6 +347,7 @@ export type FindArgs<
     ? {
           skip?: number;
           take?: number;
+          orderBy?: OrArray<OrderBy<Schema, Model>>;
       }
     : {}) &
     (AllowFilter extends true

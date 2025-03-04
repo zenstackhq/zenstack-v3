@@ -1,5 +1,5 @@
 import type Decimal from 'decimal.js';
-import type { Generated } from 'kysely';
+import type { Generated, Kysely } from 'kysely';
 import type {
     FieldHasDefault,
     FieldIsOptional,
@@ -11,12 +11,12 @@ import type {
     SchemaDef,
 } from '../schema/schema';
 
-export type ToKysely<Schema extends SchemaDef> = {
+export type ToKysely<Schema extends SchemaDef> = Kysely<{
     [Model in GetModels<Schema> as Schema['models'][Model]['dbTable']]: ToKyselyTable<
         Schema,
         Model
     >;
-};
+}>;
 
 type ToKyselyTable<
     Schema extends SchemaDef,

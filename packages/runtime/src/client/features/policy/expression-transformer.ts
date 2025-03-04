@@ -21,9 +21,9 @@ import {
     type UnaryExpression,
 } from '../../../schema/expression';
 import type { BuiltinType, GetModels } from '../../../schema/schema';
+import { BaseCrudDialect, getCrudDialect } from '../../crud/dialects';
 import { QueryError } from '../../errors';
-import type { QueryDialect } from '../../operations/dialect';
-import type { PolicySettings } from '../../options';
+import type { ClientOptions, PolicySettings } from '../../options';
 import {
     getIdFields,
     getRelationForeignKeyFieldPairs,
@@ -52,11 +52,19 @@ function expr(kind: Expression['kind']) {
 }
 
 export class ExpressionTransformer<Schema extends SchemaDef> {
+    private readonly policySettings: PolicySettings<Schema>;
+    private readonly dialect: BaseCrudDialect<Schema>;
+
     constructor(
         private readonly schema: Schema,
-        private readonly queryDialect: QueryDialect,
-        private readonly policySettings: PolicySettings<Schema>
-    ) {}
+        options: ClientOptions<Schema>
+    ) {
+        if (!options.features?.policy) {
+            throw new QueryError(`Policy feature setting is required`);
+        }
+        this.policySettings = options.features.policy;
+        this.dialect = getCrudDialect(schema, options);
+    }
 
     transform(
         expression: Expression,
@@ -188,7 +196,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     private transformValue(value: unknown, type: BuiltinType): OperationNode {
         return ValueNode.create(
-            this.queryDialect.transformPrimitive(value, type) ?? null
+            this.dialect.transformPrimitive(value, type) ?? null
         );
     }
 

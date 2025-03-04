@@ -2,25 +2,21 @@ import {
     Kysely,
     PostgresDialect,
     SqliteDialect,
-    type Dialect,
     type PostgresDialectConfig,
     type SqliteDialectConfig,
 } from 'kysely';
 import { match } from 'ts-pattern';
 import { type GetModels, type SchemaDef } from '../schema/schema';
+import { CrudHandler } from './crud/crud-handler';
 import { NotFoundError } from './errors';
 import { PolicyPlugin } from './features/policy';
-import type { OperationContext } from './operations/context';
-import { runCreate } from './operations/create';
-import { getQueryDialect } from './operations/dialect';
-import { runFind } from './operations/find';
 import type { ClientOptions, FeatureSettings } from './options';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
 import type { ModelOperations } from './types';
 
 export type Client<Schema extends SchemaDef> = {
-    $qb: Kysely<ToKysely<Schema>>;
+    $qb: ToKysely<Schema>;
     $disconnect(): Promise<void>;
     $withFeatures(features: FeatureSettings<Schema>): Client<Schema>;
 } & {
@@ -37,46 +33,42 @@ export function makeClient<Schema extends SchemaDef>(
 }
 
 class ClientImpl<Schema extends SchemaDef> {
-    public readonly $qb: Kysely<ToKysely<Schema>>;
+    public readonly $qb: ToKysely<Schema>;
 
     constructor(
         private readonly schema: Schema,
         private readonly options: ClientOptions<Schema>
     ) {
-        const dialect: Dialect = match(schema.provider)
+        const plugins = [...(options.plugins ?? [])];
+        if (options.features?.policy) {
+            plugins.push(new PolicyPlugin(schema, options));
+        }
+
+        this.$qb = new Kysely({
+            dialect: this.getKyselyDialect(),
+            log: options.log,
+            plugins,
+        });
+        return createClientProxy(this, schema, options);
+    }
+
+    private getKyselyDialect() {
+        return match(this.schema.provider)
             .with(
                 'sqlite',
                 () =>
                     new SqliteDialect(
-                        options.dialectConfig as SqliteDialectConfig
+                        this.options.dialectConfig as SqliteDialectConfig
                     )
             )
             .with(
                 'postgresql',
                 () =>
                     new PostgresDialect(
-                        options.dialectConfig as PostgresDialectConfig
+                        this.options.dialectConfig as PostgresDialectConfig
                     )
             )
             .exhaustive();
-
-        const plugins = [...(options.plugins ?? [])];
-        if (options.features?.policy) {
-            plugins.push(
-                new PolicyPlugin(
-                    schema,
-                    getQueryDialect(schema.provider),
-                    options.features.policy
-                )
-            );
-        }
-
-        this.$qb = new Kysely({
-            dialect,
-            log: options.log,
-            plugins,
-        });
-        return createClientProxy(this, schema, options);
     }
 
     async $disconnect() {
@@ -130,49 +122,26 @@ function createModelProxy<
     Model extends GetModels<Schema>
 >(
     _client: ClientImpl<Schema>,
-    kysely: Kysely<ToKysely<Schema>>,
+    kysely: ToKysely<Schema>,
     schema: Schema,
     options: ClientOptions<Schema>,
     model: Model
 ): ModelOperations<Schema, Model> {
-    const baseContext: Omit<OperationContext<Schema>, 'operation'> = {
-        kysely,
-        schema,
-        model,
-        clientOptions: options,
-    };
+    const handler = new CrudHandler(schema, kysely, options, model);
     const resultProcessor = new ResultProcessor(schema);
     return {
         create: async (args) => {
-            const r = await runCreate(
-                {
-                    ...baseContext,
-                    operation: 'create',
-                },
-                args
-            );
+            const r = await handler.create(args);
             return resultProcessor.processResult(r, model);
         },
 
         findUnique: async (args) => {
-            const r = await runFind(
-                {
-                    ...baseContext,
-                    operation: 'findUnique',
-                },
-                args
-            );
+            const r = await handler.findUnique(args);
             return resultProcessor.processResult(r, model) ?? null;
         },
 
         findUniqueOrThrow: async (args) => {
-            const r = await runFind(
-                {
-                    ...baseContext,
-                    operation: 'findUnique',
-                },
-                args
-            );
+            const r = await handler.findUnique(args);
             if (!r) {
                 throw new NotFoundError(`No "${model}" found`);
             } else {
@@ -181,24 +150,12 @@ function createModelProxy<
         },
 
         findFirst: async (args) => {
-            const r = await runFind(
-                {
-                    ...baseContext,
-                    operation: 'findFirst',
-                },
-                args
-            );
+            const r = await handler.findFirst(args);
             return resultProcessor.processResult(r, model);
         },
 
         findFirstOrThrow: async (args) => {
-            const r = await runFind(
-                {
-                    ...baseContext,
-                    operation: 'findFirst',
-                },
-                args
-            );
+            const r = await handler.findFirst(args);
             if (!r) {
                 throw new NotFoundError(`No "${model}" found`);
             } else {
@@ -207,13 +164,7 @@ function createModelProxy<
         },
 
         findMany: async (args) => {
-            const r = await runFind(
-                {
-                    ...baseContext,
-                    operation: 'findMany',
-                },
-                args
-            );
+            const r = await handler.findMany(args);
             return resultProcessor.processResult(r, model);
         },
     };

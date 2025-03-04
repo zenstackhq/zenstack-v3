@@ -1,19 +1,26 @@
-import type { Expression, ExpressionBuilder, RawBuilder } from 'kysely';
-import { sql, type SelectQueryBuilder } from 'kysely';
-import type { QueryDialect } from '.';
-import type { BuiltinType, GetModels, SchemaDef } from '../../../schema/schema';
+import {
+    sql,
+    type Expression,
+    type ExpressionBuilder,
+    type RawBuilder,
+    type SelectQueryBuilder,
+} from 'kysely';
+import type { SchemaDef } from '../../../schema';
+import type { BuiltinType, GetModels } from '../../../schema/schema';
 import {
     buildFieldRef,
     getRelationForeignKeyFieldPairs,
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { FindArgs, SelectInclude } from '../../types';
-import type { OperationContext } from '../context';
-import { buildWhere } from '../find';
+import type { FindArgs } from '../../types';
+import type { CrudOperation } from '../crud-handler';
+import { BaseCrudDialect } from './base';
 
-export class SqliteQueryDialect implements QueryDialect {
-    transformPrimitive(value: unknown, type: BuiltinType) {
+export class SqliteCrudDialect<
+    Schema extends SchemaDef
+> extends BaseCrudDialect<Schema> {
+    override transformPrimitive(value: unknown, type: BuiltinType) {
         if (value === undefined) {
             return value;
         }
@@ -24,54 +31,51 @@ export class SqliteQueryDialect implements QueryDialect {
         }
     }
 
-    buildRelationSelection<Schema extends SchemaDef>(
-        context: OperationContext<Schema>,
+    override buildRelationSelection(
         query: SelectQueryBuilder<any, any, {}>,
+        model: string,
+        operation: CrudOperation,
         relationField: string,
-        parentName: string,
-        payload: boolean | SelectInclude<Schema, GetModels<Schema>>
+        parentAlias: string,
+        payload: true | FindArgs<Schema, GetModels<Schema>, true>
     ): SelectQueryBuilder<any, any, {}> {
-        if (payload === false) {
-            // not selected
-            return query;
-        }
-
         return query.select((eb) =>
             this.buildRelationJSON(
-                context,
+                model,
+                operation,
                 eb,
                 relationField,
-                parentName,
+                parentAlias,
                 payload
             ).as(relationField)
         );
     }
 
-    private buildRelationJSON<Schema extends SchemaDef>(
-        context: OperationContext<Schema>,
+    private buildRelationJSON(
+        model: string,
+        operation: CrudOperation,
         eb: ExpressionBuilder<any, any>,
         relationField: string,
         parentName: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>>
+        payload: true | FindArgs<Schema, GetModels<Schema>, true>
     ) {
         const relationFieldDef = requireField(
-            context.schema,
-            context.model,
+            this.schema,
+            model,
             relationField
         );
         const relationModel = relationFieldDef.type as GetModels<Schema>;
-        const relationModelDef = requireModel(context.schema, relationModel);
+        const relationModelDef = requireModel(this.schema, relationModel);
 
         const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
-            context.schema,
-            context.model,
+            this.schema,
+            model,
             relationField
         );
 
+        const subQueryName = `${parentName}$${relationField}`;
         let tbl: SelectQueryBuilder<any, any, any> = eb
-            .selectFrom(
-                `${relationModelDef.dbTable} as ${parentName}$${relationField}`
-            )
+            .selectFrom(`${relationModelDef.dbTable} as ${subQueryName}`)
             .select((eb1) => {
                 const objArgs: Array<
                     | Expression<any>
@@ -87,10 +91,10 @@ export class SqliteQueryDialect implements QueryDialect {
                             .map(([field]) => [
                                 sql.lit(field),
                                 buildFieldRef(
-                                    context.schema,
+                                    this.schema,
                                     relationModel,
                                     field,
-                                    context.clientOptions,
+                                    this.options,
                                     eb1
                                 ),
                             ])
@@ -104,10 +108,10 @@ export class SqliteQueryDialect implements QueryDialect {
                             .map(([field]) => [
                                 sql.lit(field),
                                 buildFieldRef(
-                                    context.schema,
+                                    this.schema,
                                     relationModel,
                                     field,
-                                    context.clientOptions,
+                                    this.options,
                                     eb1
                                 ),
                             ])
@@ -126,10 +130,8 @@ export class SqliteQueryDialect implements QueryDialect {
                             .filter(([, value]) => value)
                             .map(([field, value]) => {
                                 const subJson = this.buildRelationJSON(
-                                    {
-                                        ...context,
-                                        model: relationModel as GetModels<Schema>,
-                                    },
+                                    relationModel as GetModels<Schema>,
+                                    operation,
                                     eb1,
                                     field,
                                     `${parentName}$${relationField}`,
@@ -155,11 +157,21 @@ export class SqliteQueryDialect implements QueryDialect {
                 }
             });
 
-        if (typeof payload === 'object' && payload.where) {
-            tbl = buildWhere(tbl, payload.where, {
-                ...context,
-                model: relationModel,
-            });
+        if (typeof payload === 'object') {
+            if (payload.where) {
+                tbl = this.buildWhere(
+                    tbl,
+                    relationModel,
+                    subQueryName,
+                    payload.where
+                );
+            }
+            if (payload.skip) {
+                tbl = tbl.offset(payload.skip);
+            }
+            if (payload.take) {
+                tbl = tbl.limit(payload.take);
+            }
         }
 
         // join conditions
@@ -181,5 +193,23 @@ export class SqliteQueryDialect implements QueryDialect {
             }
         });
         return tbl;
+    }
+
+    override buildSkipTake(
+        query: SelectQueryBuilder<any, any, {}>,
+        skip: number | undefined,
+        take: number | undefined
+    ): SelectQueryBuilder<any, any, {}> {
+        if (take !== undefined) {
+            query = query.limit(take);
+        }
+        if (skip !== undefined) {
+            query = query.offset(skip);
+            if (take === undefined) {
+                // SQLite requires offset to be used with limit
+                query = query.limit(-1);
+            }
+        }
+        return query;
     }
 }

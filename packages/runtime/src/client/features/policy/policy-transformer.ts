@@ -12,20 +12,22 @@ import {
 } from 'kysely';
 import type { SchemaDef } from '../../../schema';
 import type { GetModels, Policy } from '../../../schema/schema';
-import type { QueryDialect } from '../../operations/dialect';
-import type { PolicySettings } from '../../options';
+import { BaseCrudDialect, getCrudDialect } from '../../crud/dialects';
+import type { ClientOptions } from '../../options';
 import { requireModel } from '../../query-utils';
 import { ExpressionTransformer } from './expression-transformer';
 
 export class PolicyTransformer<
     Schema extends SchemaDef
 > extends OperationNodeTransformer {
+    private readonly dialect: BaseCrudDialect<Schema>;
+
     constructor(
         private readonly schema: Schema,
-        private readonly queryDialect: QueryDialect,
-        private readonly policySettings: PolicySettings<Schema>
+        private readonly options: ClientOptions<Schema>
     ) {
         super();
+        this.dialect = getCrudDialect(schema, options);
     }
 
     protected override transformSelectQuery(node: SelectQueryNode) {
@@ -75,7 +77,7 @@ export class PolicyTransformer<
         if (allows.length === 0) {
             // constant false
             combinedPolicy = ValueNode.create(
-                this.queryDialect.transformPrimitive(false, 'Boolean')
+                this.dialect.transformPrimitive(false, 'Boolean')
             );
         } else {
             // or(...allows)
@@ -116,11 +118,10 @@ export class PolicyTransformer<
     }
 
     private buildPolicyWhere(model: GetModels<Schema>, policy: Policy) {
-        return new ExpressionTransformer(
-            this.schema,
-            this.queryDialect,
-            this.policySettings
-        ).transform(policy.expression, { model });
+        return new ExpressionTransformer(this.schema, this.options).transform(
+            policy.expression,
+            { model }
+        );
     }
 
     private getModelPolicies(modelName: string) {

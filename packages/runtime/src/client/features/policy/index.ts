@@ -7,22 +7,14 @@ import {
     type UnknownRow,
 } from 'kysely';
 import type { SchemaDef } from '../../../schema';
-import type { QueryDialect } from '../../operations/dialect';
-import type { PolicySettings } from '../../options';
+import type { ClientOptions } from '../../options';
 import { PolicyTransformer } from './policy-transformer';
 
 export class PolicyPlugin<Schema extends SchemaDef> implements KyselyPlugin {
     private readonly transformer: PolicyTransformer<Schema>;
-    constructor(
-        schema: Schema,
-        queryDialect: QueryDialect,
-        policySettings: PolicySettings<Schema>
-    ) {
-        this.transformer = new PolicyTransformer(
-            schema,
-            queryDialect,
-            policySettings
-        );
+
+    constructor(schema: Schema, options: ClientOptions<Schema>) {
+        this.transformer = new PolicyTransformer(schema, options);
     }
 
     transformQuery({ node }: PluginTransformQueryArgs): RootOperationNode {

@@ -134,6 +134,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             const user2 = await client.user.create({
                 data: {
                     email: 'u2@test.com',
+                    name: null, // explicit null
                     profile: { connect: { id: profile.id } },
                 },
                 include: { profile: true },

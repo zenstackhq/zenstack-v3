@@ -197,6 +197,11 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     where: { posts: { some: { title: 'Post1' } } },
                 })
             ).resolves.toBeTruthy();
+            await expect(
+                client.user.findFirst({
+                    where: { posts: { some: { title: 'Post3' } } },
+                })
+            ).resolves.toBeFalsy();
 
             // every
             await expect(
@@ -204,7 +209,6 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     where: { posts: { every: { authorId: user.id } } },
                 })
             ).resolves.toBeTruthy();
-
             await expect(
                 client.user.findFirst({
                     where: { posts: { every: { published: true } } },

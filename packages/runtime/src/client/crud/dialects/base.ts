@@ -1,9 +1,9 @@
+import type { Expression, ExpressionBuilder, SqlBool, ValueNode } from 'kysely';
 import { sql, type SelectQueryBuilder } from 'kysely';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef } from '../../../schema/schema';
 import type { ClientOptions } from '../../options';
 import {
-    getIdFields,
     getRelationForeignKeyFieldPairs,
     requireField,
     requireModel,
@@ -36,19 +36,18 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         take: number | undefined
     ): SelectQueryBuilder<any, any, {}>;
 
-    buildWhere(
-        query: SelectQueryBuilder<any, any, {}>,
+    buildFilter(
+        // query: SelectQueryBuilder<any, any, {}>,
+        eb: ExpressionBuilder<any, any>,
         model: string,
         table: string,
         where: Record<string, any> | undefined
     ) {
-        let result = query;
+        let result = this.true(eb);
         if (!where) {
             return result;
         }
 
-        const modelDef = requireModel(this.schema, model);
-        let hasRelationFilter = false;
         for (const [field, payload] of Object.entries(where)) {
             if (field.startsWith('$')) {
                 continue;
@@ -56,50 +55,81 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
             const fieldDef = requireField(this.schema, model, field);
             if (fieldDef.relation) {
-                result = this.buildRelationFilter(
+                result = this.and(
+                    eb,
                     result,
-                    model,
-                    field,
-                    fieldDef,
-                    payload
+                    this.buildRelationFilter(
+                        eb,
+                        model,
+                        table,
+                        field,
+                        fieldDef,
+                        payload
+                    )
                 );
-                hasRelationFilter = true;
             } else {
-                result = this.buildPrimitiveFilter(
+                result = this.and(
+                    eb,
                     result,
-                    table,
-                    field,
-                    fieldDef,
-                    payload
+                    this.buildPrimitiveFilter(
+                        eb,
+                        table,
+                        field,
+                        fieldDef,
+                        payload
+                    )
                 );
             }
         }
 
-        if (hasRelationFilter) {
-            // group by id fields
-            const idFields = getIdFields(this.schema, model);
-            result = result.groupBy(
-                idFields.map((field) => sql.ref(`${modelDef.dbTable}.${field}`))
-            );
-        }
-
         // call expression builder and combine the results
         if ('$expr' in where && typeof where['$expr'] === 'function') {
-            result = result.where((eb) => where['$expr'](eb));
+            result = this.and(eb, result, where['$expr'](eb));
         }
 
         return result;
     }
 
+    protected true(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
+        return eb.lit<SqlBool>(
+            this.transformPrimitive(true, 'Boolean') as boolean
+        );
+    }
+
+    protected isTrue(expression: Expression<SqlBool>) {
+        const node = expression.toOperationNode();
+        if (node.kind !== 'ValueNode') {
+            return false;
+        }
+        return (
+            (node as ValueNode).value === true ||
+            (node as ValueNode).value === 1
+        );
+    }
+
+    protected and(
+        eb: ExpressionBuilder<any, any>,
+        ...args: Expression<SqlBool>[]
+    ) {
+        const nonTrueArgs = args.filter((arg) => !this.isTrue(arg));
+        if (nonTrueArgs.length === 0) {
+            return this.true(eb);
+        } else if (nonTrueArgs.length === 1) {
+            return nonTrueArgs[0]!;
+        } else {
+            return eb.and(nonTrueArgs);
+        }
+    }
+
     buildRelationFilter(
-        query: SelectQueryBuilder<any, any, {}>,
+        eb: ExpressionBuilder<any, any>,
         model: string,
+        table: string,
         field: string,
         fieldDef: FieldDef,
         payload: any
     ) {
         const fieldModelDef = requireModel(this.schema, fieldDef.type);
-        const fieldModelIdFields = getIdFields(this.schema, fieldDef.type);
 
         const relationKeyPairs = getRelationForeignKeyFieldPairs(
             this.schema,
@@ -107,51 +137,121 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             field
         );
 
-        let result = query;
-
-        result = result.leftJoin(fieldModelDef.dbTable, (join) => {
+        const buildPkFkWhereRefs = (eb: ExpressionBuilder<any, any>) => {
+            let r = this.true(eb);
             for (const { fk, pk } of relationKeyPairs.keyPairs) {
                 if (relationKeyPairs.ownedByModel) {
-                    join = join.onRef(
-                        sql.ref(`${model}.${fk}`),
-                        '=',
-                        sql.ref(`${fieldModelDef.dbTable}.${pk}`)
+                    r = this.and(
+                        eb,
+                        r,
+                        eb(
+                            sql.ref(`${table}.${fk}`),
+                            '=',
+                            sql.ref(`${fieldModelDef.dbTable}.${pk}`)
+                        )
                     );
                 } else {
-                    join = join.onRef(
-                        sql.ref(`${model}.${pk}`),
-                        '=',
-                        sql.ref(`${fieldModelDef.dbTable}.${fk}`)
+                    r = this.and(
+                        eb,
+                        r,
+                        eb(
+                            sql.ref(`${table}.${pk}`),
+                            '=',
+                            sql.ref(`${fieldModelDef.dbTable}.${fk}`)
+                        )
                     );
                 }
             }
-            return join;
-        });
+            return r;
+        };
+
+        let result = this.true(eb);
 
         for (const [key, subPayload] of Object.entries(payload)) {
             if (!subPayload) {
                 continue;
             }
 
-            if (key === 'some') {
-                result = this.buildWhere(
-                    result,
-                    fieldDef.type,
-                    fieldModelDef.dbTable,
-                    subPayload
-                );
-                result = result.having(
-                    (eb) =>
-                        eb.fn.count(
-                            sql.ref(
-                                `${
-                                    fieldModelDef.dbTable
-                                }.${fieldModelIdFields[0]!}`
-                            )
-                        ),
-                    '>',
-                    0
-                );
+            switch (key) {
+                case 'some': {
+                    result = this.and(
+                        eb,
+                        result,
+                        eb(
+                            eb
+                                .selectFrom(fieldModelDef.dbTable)
+                                .select((eb1) =>
+                                    eb1.fn.count(eb1.lit(1)).as('count')
+                                )
+                                .where(buildPkFkWhereRefs(eb))
+                                .where((eb1) =>
+                                    this.buildFilter(
+                                        eb1,
+                                        fieldDef.type,
+                                        fieldModelDef.dbTable,
+                                        subPayload
+                                    )
+                                ),
+                            '>',
+                            0
+                        )
+                    );
+                    break;
+                }
+
+                case 'every': {
+                    result = this.and(
+                        eb,
+                        result,
+                        eb(
+                            eb
+                                .selectFrom(fieldModelDef.dbTable)
+                                .select((eb1) =>
+                                    eb1.fn.count(eb1.lit(1)).as('count')
+                                )
+                                .where(buildPkFkWhereRefs(eb))
+                                .where((eb1) =>
+                                    eb1.not(
+                                        this.buildFilter(
+                                            eb1,
+                                            fieldDef.type,
+                                            fieldModelDef.dbTable,
+                                            subPayload
+                                        )
+                                    )
+                                ),
+                            '=',
+                            0
+                        )
+                    );
+                    break;
+                }
+
+                case 'none': {
+                    result = this.and(
+                        eb,
+                        result,
+                        eb(
+                            eb
+                                .selectFrom(fieldModelDef.dbTable)
+                                .select((eb1) =>
+                                    eb1.fn.count(eb1.lit(1)).as('count')
+                                )
+                                .where(buildPkFkWhereRefs(eb))
+                                .where((eb1) =>
+                                    this.buildFilter(
+                                        eb1,
+                                        fieldDef.type,
+                                        fieldModelDef.dbTable,
+                                        subPayload
+                                    )
+                                ),
+                            '=',
+                            0
+                        )
+                    );
+                    break;
+                }
             }
         }
 
@@ -159,14 +259,14 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     buildPrimitiveFilter(
-        query: SelectQueryBuilder<any, any, {}>,
+        eb: ExpressionBuilder<any, any>,
         table: string,
         field: string,
         fieldDef: FieldDef,
         payload: any
     ) {
         // TODO: non-equality filters
-        return query.where(
+        return eb(
             sql.ref(`${table}.${field}`),
             '=',
             this.transformPrimitive(payload, fieldDef.type as BuiltinType)

@@ -55,11 +55,8 @@ export class FindOperationHandler<
 
         // where
         if (args?.where) {
-            query = dialect.buildWhere(
-                query,
-                model,
-                modelDef.dbTable,
-                args.where
+            query = query.where((eb) =>
+                dialect.buildFilter(eb, model, modelDef.dbTable, args.where)
             );
         }
 

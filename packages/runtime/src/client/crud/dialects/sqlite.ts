@@ -159,11 +159,13 @@ export class SqliteCrudDialect<
 
         if (typeof payload === 'object') {
             if (payload.where) {
-                tbl = this.buildWhere(
-                    tbl,
-                    relationModel,
-                    subQueryName,
-                    payload.where
+                tbl = tbl.where((eb) =>
+                    this.buildFilter(
+                        eb,
+                        relationModel,
+                        subQueryName,
+                        payload.where
+                    )
                 );
             }
             if (payload.skip) {

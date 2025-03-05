@@ -63,11 +63,13 @@ export class PostgresCrudDialect<
                 );
 
                 if (typeof payload === 'object' && payload.where) {
-                    result = this.buildWhere(
-                        result,
-                        relationModel,
-                        joinTableName,
-                        payload.where
+                    result = result.where((eb) =>
+                        this.buildFilter(
+                            eb,
+                            relationModel,
+                            joinTableName,
+                            payload.where
+                        )
                     );
                 }
 
@@ -236,39 +238,6 @@ export class PostgresCrudDialect<
         }
         return result;
     }
-
-    // private buildJoinConditions(
-    //     schema: Schema,
-    //     model: string,
-    //     relationField: string,
-    //     qb: SelectQueryBuilder<any, any, any>,
-    //     parentName: string
-    // ) {
-    //     const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
-    //         schema,
-    //         model,
-    //         relationField
-    //     );
-
-    //     keyPairs.forEach(({ fk, pk }) => {
-    //         if (ownedByModel) {
-    //             // the parent model owns the fk
-    //             qb = qb.whereRef(
-    //                 `${parentName}$${relationField}.${pk}`,
-    //                 '=',
-    //                 `${parentName}.${fk}`
-    //             );
-    //         } else {
-    //             // the relation side owns the fk
-    //             qb = qb.whereRef(
-    //                 `${parentName}$${relationField}.${fk}`,
-    //                 '=',
-    //                 `${parentName}.${pk}`
-    //             );
-    //         }
-    //     });
-    //     return qb;
-    // }
 
     override buildSkipTake(
         query: SelectQueryBuilder<any, any, {}>,

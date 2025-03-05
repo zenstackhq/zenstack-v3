@@ -46,7 +46,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             });
         }
 
-        it('works with findMany', async () => {
+        it('returns correct data rows', async () => {
             let r = await client.user.findMany();
             expect(r).toHaveLength(0);
 
@@ -151,7 +151,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             // TODO: relation sorting
         });
 
-        it('works with unique filters', async () => {
+        it('works with unique finds', async () => {
             let r = await client.user.findUnique({ where: { id: 'none' } });
             expect(r).toBeNull();
 
@@ -171,7 +171,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             ).rejects.toThrow(NotFoundError);
         });
 
-        it('works with generic filters', async () => {
+        it('works with non-unique finds', async () => {
             let r = await client.user.findFirst({ where: { name: 'User1' } });
             expect(r).toBeNull();
 
@@ -185,6 +185,164 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             await expect(
                 client.user.findFirstOrThrow({ where: { name: 'User2' } })
             ).rejects.toThrow(NotFoundError);
+        });
+
+        it('works with boolean composition', async () => {
+            const user1 = await createUser('u1@test.com');
+            const user2 = await createUser('u2@test.com');
+
+            // AND
+            await expect(
+                client.user.findMany({ where: { AND: [] } })
+            ).resolves.toHaveLength(2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        AND: { id: user1.id },
+                    },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        AND: [{ id: user1.id }],
+                    },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        AND: [{ id: user1.id, email: 'u1@test.com' }],
+                    },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        AND: [{ id: user1.id }, { email: 'u1@test.com' }],
+                    },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        AND: [{ id: user1.id, email: 'u2@test.com' }],
+                    },
+                })
+            ).resolves.toBeFalsy();
+
+            // OR
+            await expect(
+                client.user.findMany({ where: { OR: [] } })
+            ).resolves.toHaveLength(0);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        OR: [{ id: user1.id }],
+                    },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        OR: [{ id: user1.id, email: 'u2@test.com' }],
+                    },
+                })
+            ).resolves.toBeFalsy();
+            await expect(
+                client.user.findMany({
+                    where: {
+                        OR: [{ id: user1.id }, { email: 'u2@test.com' }],
+                    },
+                })
+            ).resolves.toHaveLength(2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        OR: [{ id: 'foo', email: 'bar' }],
+                    },
+                })
+            ).resolves.toBeFalsy();
+
+            // NOT
+            await expect(
+                client.user.findMany({ where: { NOT: [] } })
+            ).resolves.toHaveLength(0);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        NOT: { id: user1.id },
+                    },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        NOT: [{ id: user1.id }],
+                    },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        NOT: [{ id: user1.id, email: 'u1@test.com' }],
+                    },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        NOT: [{ id: user1.id }, { email: 'u1@test.com' }],
+                    },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findMany({
+                    where: {
+                        NOT: [{ id: user1.id }, { email: 'foo' }],
+                    },
+                })
+            ).resolves.toHaveLength(2);
+
+            // unique filter
+            await expect(
+                client.user.findUnique({
+                    where: {
+                        id: user1.id,
+                        AND: [{ email: user1.email }],
+                    },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findUnique({
+                    where: {
+                        id: user1.id,
+                        AND: [{ email: user2.email }],
+                    },
+                })
+            ).resolves.toBeFalsy();
+
+            // nesting
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        AND: {
+                            id: user1.id,
+                            OR: [{ email: 'foo' }, { email: 'bar' }],
+                        },
+                    },
+                })
+            ).resolves.toBeFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        AND: {
+                            id: user1.id,
+                            NOT: { OR: [{ email: 'foo' }, { email: 'bar' }] },
+                        },
+                    },
+                })
+            ).resolves.toMatchObject(user1);
         });
 
         it('works with to-many relation filters', async () => {

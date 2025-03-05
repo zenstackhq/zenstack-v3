@@ -144,6 +144,10 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
             Model extends keyof ToKysely<Schema> ? Model : never
         >
     ) => OperandExpression<SqlBool>;
+} & {
+    AND?: OrArray<Where<Schema, Model>>;
+    OR?: Where<Schema, Model>[];
+    NOT?: OrArray<Where<Schema, Model>>;
 };
 
 export type SortOrder = 'asc' | 'desc';

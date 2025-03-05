@@ -1,11 +1,13 @@
 import { match } from 'ts-pattern';
 import { z, type ZodSchema } from 'zod';
 import type { GetModels, SchemaDef } from '../../../schema';
-import { InternalError } from '../../errors';
+import { InternalError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
 import {
+    getField,
     getIdFields,
+    getModel,
     getUniqueFields,
     requireField,
     requireModel,
@@ -27,15 +29,31 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return requireModel(this.schema, model);
     }
 
+    protected getModel(model: string) {
+        return getModel(this.schema, model);
+    }
+
     protected requireField(model: string, field: string) {
         return requireField(this.schema, model, field);
     }
 
+    protected getField(model: string, field: string) {
+        return getField(this.schema, model, field);
+    }
+
     protected makeWhereSchema(model: string, unique: boolean): ZodSchema {
-        const modelDef = this.requireModel(model);
+        const modelDef = this.getModel(model);
+        if (!modelDef) {
+            throw new QueryError(`Model "${model}" not found`);
+        }
         const fields: Record<string, any> = {};
         for (const field of Object.keys(modelDef.fields)) {
-            const fieldDef = this.requireField(model, field);
+            const fieldDef = this.getField(model, field);
+            if (!fieldDef) {
+                throw new QueryError(
+                    `Field "${field}" not found in model "${model}"`
+                );
+            }
             if (fieldDef.relation) {
                 fields[field] = z.lazy(() =>
                     this.makeWhereSchema(fieldDef.type, false).optional()
@@ -47,8 +65,24 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
 
+        // expression builder
         fields['$expr'] = z.function().optional();
-        const baseWhere = z.object(fields);
+
+        // logical operators
+        fields['AND'] = orArray(
+            z.lazy(() => this.makeWhereSchema(model, false)),
+            true
+        ).optional();
+        fields['OR'] = z
+            .lazy(() => this.makeWhereSchema(model, false))
+            .array()
+            .optional();
+        fields['NOT'] = orArray(
+            z.lazy(() => this.makeWhereSchema(model, false)),
+            true
+        ).optional();
+
+        const baseWhere = z.object(fields).strict();
         let result: ZodSchema = baseWhere;
 
         if (unique) {

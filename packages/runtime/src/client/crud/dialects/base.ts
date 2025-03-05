@@ -1,7 +1,9 @@
 import type { Expression, ExpressionBuilder, SqlBool, ValueNode } from 'kysely';
 import { sql, type SelectQueryBuilder } from 'kysely';
+import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef } from '../../../schema/schema';
+import { enumerate } from '../../../utils/enumerate';
 import type { ClientOptions } from '../../options';
 import {
     getRelationForeignKeyFieldPairs,
@@ -48,12 +50,25 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             return result;
         }
 
-        for (const [field, payload] of Object.entries(where)) {
-            if (field.startsWith('$')) {
+        for (const [key, payload] of Object.entries(where)) {
+            if (payload === undefined) {
                 continue;
             }
 
-            const fieldDef = requireField(this.schema, model, field);
+            if (key.startsWith('$')) {
+                continue;
+            }
+
+            if (key === 'AND' || key === 'OR' || key === 'NOT') {
+                result = this.and(
+                    eb,
+                    result,
+                    this.buildComposedFilter(eb, model, table, key, payload)
+                );
+                continue;
+            }
+
+            const fieldDef = requireField(this.schema, model, key);
             if (fieldDef.relation) {
                 result = this.and(
                     eb,
@@ -62,7 +77,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         eb,
                         model,
                         table,
-                        field,
+                        key,
                         fieldDef,
                         payload
                     )
@@ -71,13 +86,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 result = this.and(
                     eb,
                     result,
-                    this.buildPrimitiveFilter(
-                        eb,
-                        table,
-                        field,
-                        fieldDef,
-                        payload
-                    )
+                    this.buildPrimitiveFilter(eb, table, key, fieldDef, payload)
                 );
             }
         }
@@ -90,35 +99,36 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
-    protected true(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
-        return eb.lit<SqlBool>(
-            this.transformPrimitive(true, 'Boolean') as boolean
-        );
-    }
-
-    protected isTrue(expression: Expression<SqlBool>) {
-        const node = expression.toOperationNode();
-        if (node.kind !== 'ValueNode') {
-            return false;
-        }
-        return (
-            (node as ValueNode).value === true ||
-            (node as ValueNode).value === 1
-        );
-    }
-
-    protected and(
+    protected buildComposedFilter(
         eb: ExpressionBuilder<any, any>,
-        ...args: Expression<SqlBool>[]
-    ) {
-        const nonTrueArgs = args.filter((arg) => !this.isTrue(arg));
-        if (nonTrueArgs.length === 0) {
-            return this.true(eb);
-        } else if (nonTrueArgs.length === 1) {
-            return nonTrueArgs[0]!;
-        } else {
-            return eb.and(nonTrueArgs);
-        }
+        model: string,
+        table: string,
+        key: 'AND' | 'OR' | 'NOT',
+        payload: any
+    ): Expression<SqlBool> {
+        return match(key)
+            .with('AND', () =>
+                this.and(
+                    eb,
+                    ...enumerate(payload).map((subPayload) =>
+                        this.buildFilter(eb, model, table, subPayload)
+                    )
+                )
+            )
+            .with('OR', () =>
+                this.or(
+                    eb,
+                    ...enumerate(payload).map((subPayload) =>
+                        this.buildFilter(eb, model, table, subPayload)
+                    )
+                )
+            )
+            .with('NOT', () =>
+                eb.not(
+                    this.buildComposedFilter(eb, model, table, 'AND', payload)
+                )
+            )
+            .exhaustive();
     }
 
     buildRelationFilter(
@@ -304,5 +314,74 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             }
         });
         return qb;
+    }
+
+    protected true(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
+        return eb.lit<SqlBool>(
+            this.transformPrimitive(true, 'Boolean') as boolean
+        );
+    }
+
+    protected false(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
+        return eb.lit<SqlBool>(
+            this.transformPrimitive(false, 'Boolean') as boolean
+        );
+    }
+
+    protected isTrue(expression: Expression<SqlBool>) {
+        const node = expression.toOperationNode();
+        if (node.kind !== 'ValueNode') {
+            return false;
+        }
+        return (
+            (node as ValueNode).value === true ||
+            (node as ValueNode).value === 1
+        );
+    }
+
+    protected isFalse(expression: Expression<SqlBool>) {
+        const node = expression.toOperationNode();
+        if (node.kind !== 'ValueNode') {
+            return false;
+        }
+        return (
+            (node as ValueNode).value === false ||
+            (node as ValueNode).value === 0
+        );
+    }
+
+    protected and(
+        eb: ExpressionBuilder<any, any>,
+        ...args: Expression<SqlBool>[]
+    ) {
+        const nonTrueArgs = args.filter((arg) => !this.isTrue(arg));
+        if (nonTrueArgs.length === 0) {
+            return this.true(eb);
+        } else if (nonTrueArgs.length === 1) {
+            return nonTrueArgs[0]!;
+        } else {
+            return eb.and(nonTrueArgs);
+        }
+    }
+
+    protected or(
+        eb: ExpressionBuilder<any, any>,
+        ...args: Expression<SqlBool>[]
+    ) {
+        const nonFalseArgs = args.filter((arg) => !this.isFalse(arg));
+        if (nonFalseArgs.length === 0) {
+            return this.false(eb);
+        } else if (nonFalseArgs.length === 1) {
+            return nonFalseArgs[0]!;
+        } else {
+            return eb.or(nonFalseArgs);
+        }
+    }
+
+    protected not(
+        eb: ExpressionBuilder<any, any>,
+        ...args: Expression<SqlBool>[]
+    ) {
+        return eb.not(this.and(eb, ...args));
     }
 }

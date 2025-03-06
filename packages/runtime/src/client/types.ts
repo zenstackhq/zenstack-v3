@@ -25,6 +25,7 @@ import type {
 import type {
     AtLeast,
     MapBaseType,
+    NullableIf,
     OrArray,
     WrapType,
     XOR,
@@ -234,17 +235,41 @@ export type SelectSubset<T, U> = {
     ? 'Please either choose `select` or `include`.'
     : {});
 
+type ToManyRelationFilter<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = {
+    every?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
+    some?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
+    none?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
+};
+
+type ToOneRelationFilter<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = NullableIf<
+    Where<Schema, RelationFieldType<Schema, Model, Field>> & {
+        is?: NullableIf<
+            Where<Schema, RelationFieldType<Schema, Model, Field>>,
+            FieldIsOptional<Schema, Model, Field>
+        >;
+        isNot?: NullableIf<
+            Where<Schema, RelationFieldType<Schema, Model, Field>>,
+            FieldIsOptional<Schema, Model, Field>
+        >;
+    },
+    FieldIsOptional<Schema, Model, Field>
+>;
+
 type RelationFilter<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
 > = FieldIsArray<Schema, Model, Field> extends true
-    ? {
-          every?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
-          some?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
-          none?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
-      }
-    : Where<Schema, RelationFieldType<Schema, Model, Field>>;
+    ? ToManyRelationFilter<Schema, Model, Field>
+    : ToOneRelationFilter<Schema, Model, Field>;
 
 //#endregion
 

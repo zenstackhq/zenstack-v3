@@ -46,18 +46,40 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (!modelDef) {
             throw new QueryError(`Model "${model}" not found`);
         }
+
         const fields: Record<string, any> = {};
         for (const field of Object.keys(modelDef.fields)) {
-            const fieldDef = this.getField(model, field);
-            if (!fieldDef) {
-                throw new QueryError(
-                    `Field "${field}" not found in model "${model}"`
-                );
-            }
+            const fieldDef = this.requireField(model, field);
+
             if (fieldDef.relation) {
-                fields[field] = z.lazy(() =>
+                let fieldSchema: ZodSchema = z.lazy(() =>
                     this.makeWhereSchema(fieldDef.type, false).optional()
                 );
+                if (!fieldDef.array && fieldDef.optional) {
+                    // optional to-one relation allows null
+                    fieldSchema = fieldSchema.nullable();
+                }
+
+                if (fieldDef.array) {
+                    // to-many relation
+                    fields[field] = z.union([
+                        fieldSchema,
+                        z.object({
+                            some: fieldSchema.optional(),
+                            every: fieldSchema.optional(),
+                            none: fieldSchema.optional(),
+                        }),
+                    ]);
+                } else {
+                    // to-one relation
+                    fields[field] = z.union([
+                        fieldSchema,
+                        z.object({
+                            is: fieldSchema.optional(),
+                            isNot: fieldSchema.optional(),
+                        }),
+                    ]);
+                }
             } else {
                 fields[field] = this.makePrimitiveSchema(
                     fieldDef.type

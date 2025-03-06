@@ -1,5 +1,9 @@
 import type Decimal from 'decimal.js';
 
+export type NullableIf<T, Condition extends boolean> = Condition extends true
+    ? T | null
+    : T;
+
 export type PartialRecord<K extends string | number | symbol, T> = Partial<
     Record<K, T>
 >;

@@ -12,9 +12,15 @@ import { BaseOperationHandler } from './base';
 export class FindOperationHandler<
     Schema extends SchemaDef
 > extends BaseOperationHandler<Schema> {
-    async handle(operation: CrudOperation, args: unknown): Promise<unknown> {
+    async handle(
+        operation: CrudOperation,
+        args: unknown,
+        validateArgs = true
+    ): Promise<unknown> {
         // parse args
-        const parsedArgs = this.parseFindArgs(operation, args);
+        const parsedArgs = validateArgs
+            ? this.parseFindArgs(operation, args)
+            : args;
 
         // run query
         const result = await this.runQuery(this.model, operation, parsedArgs);
@@ -67,30 +73,7 @@ export class FindOperationHandler<
 
         // orderBy
         if (args?.orderBy) {
-            enumerate(args.orderBy).forEach((orderBy) => {
-                for (const [field, value] of Object.entries(orderBy)) {
-                    if (value === 'asc' || value === 'desc') {
-                        query = query.orderBy(
-                            this.kysely.dynamic.ref(field),
-                            value
-                        );
-                    } else if (
-                        value &&
-                        typeof value === 'object' &&
-                        'nulls' in value &&
-                        'sort' in value &&
-                        (value.sort === 'asc' || value.sort === 'desc') &&
-                        (value.nulls === 'first' || value.nulls === 'last')
-                    ) {
-                        query = query.orderBy(
-                            this.kysely.dynamic.ref(field),
-                            sql.raw(`${value.sort} nulls ${value.nulls}`)
-                        );
-                    } else {
-                        throw new QueryError(`Invalid orderBy value: ${value}`);
-                    }
-                }
-            });
+            query = this.buildOrderBy(query, modelDef.dbTable, args.orderBy);
         }
 
         // select
@@ -125,6 +108,41 @@ export class FindOperationHandler<
                 `Failed to execute query: ${err}, sql: ${sql}, parameters: ${parameters}`
             );
         }
+    }
+
+    private buildOrderBy(
+        query: SelectQueryBuilder<any, any, {}>,
+        table: string,
+        orderBy: NonNullable<
+            FindArgs<Schema, GetModels<Schema>, true>['orderBy']
+        >
+    ) {
+        let result = query;
+        enumerate(orderBy).forEach((orderBy) => {
+            for (const [field, value] of Object.entries(orderBy)) {
+                if (value === 'asc' || value === 'desc') {
+                    result = result.orderBy(
+                        sql.ref(`${table}.${field}`),
+                        value
+                    );
+                } else if (
+                    value &&
+                    typeof value === 'object' &&
+                    'nulls' in value &&
+                    'sort' in value &&
+                    (value.sort === 'asc' || value.sort === 'desc') &&
+                    (value.nulls === 'first' || value.nulls === 'last')
+                ) {
+                    result = result.orderBy(
+                        sql.ref(`${table}.${field}`),
+                        sql.raw(`${value.sort} nulls ${value.nulls}`)
+                    );
+                } else {
+                    throw new QueryError(`Invalid orderBy value: ${value}`);
+                }
+            }
+        });
+        return result;
     }
 
     private buildFieldSelection(

@@ -386,6 +386,69 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             ).resolves.toBeTruthy();
         });
 
+        it('works with to-one relation filters', async () => {
+            const user1 = await createUser('u1@test.com');
+            await createPosts(user1.id);
+            const user2 = await createUser('u2@test.com', { profile: null });
+
+            // null check from non-owner side
+            await expect(
+                client.user.findFirst({
+                    where: { profile: null },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: { profile: { is: null } },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: { profile: { isNot: null } },
+                })
+            ).resolves.toMatchObject(user1);
+
+            // null check from owner side
+            await expect(
+                client.profile.findFirst({ where: { user: null } })
+            ).resolves.toBeFalsy();
+            await expect(
+                client.profile.findFirst({ where: { user: { is: null } } })
+            ).resolves.toBeFalsy();
+            await expect(
+                client.profile.findFirst({ where: { user: { isNot: null } } })
+            ).resolves.toBeTruthy();
+
+            // field checks
+            await expect(
+                client.user.findFirst({
+                    where: { profile: { bio: 'My bio' } },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    where: { profile: { bio: 'My other bio' } },
+                })
+            ).resolves.toBeFalsy();
+
+            // is/isNot
+            await expect(
+                client.user.findFirst({
+                    where: { profile: { is: { bio: 'My bio' } } },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    where: { profile: { isNot: { bio: 'My bio' } } },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findMany({
+                    where: { profile: { isNot: { bio: 'My other bio' } } },
+                })
+            ).resolves.toHaveLength(2);
+        });
+
         it('works with field selection', async () => {
             const user = await createUser();
             await createPosts(user.id);

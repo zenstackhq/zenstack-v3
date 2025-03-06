@@ -103,11 +103,19 @@ export class CreateOperationHandler<
                         excludeFields.push(...oppositeFieldDef.relation.fields);
                     }
                 }
+
                 let fieldSchema: ZodSchema = z.lazy(() =>
                     this.makeRelationSchema(fieldDef, excludeFields)
                 );
+
+                // optional or array relations are optional
                 if (fieldDef.optional || fieldDef.array) {
                     fieldSchema = fieldSchema.optional();
+                }
+
+                // optional to-one relation can be null
+                if (fieldDef.optional && !fieldDef.array) {
+                    fieldSchema = fieldSchema.nullable();
                 }
                 regularAndRelationFields[field] = fieldSchema;
             } else {
@@ -645,11 +653,15 @@ export class CreateOperationHandler<
             model,
             this.options
         );
-        const read = await findHandler.handle('findUnique', {
-            where: getIdValues(this.schema, model, primaryData),
-            select: args.select,
-            include: args.include,
-        });
+        const read = await findHandler.handle(
+            'findUnique',
+            {
+                where: getIdValues(this.schema, model, primaryData),
+                select: args.select,
+                include: args.include,
+            },
+            false
+        );
         return read ?? null;
     }
 

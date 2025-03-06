@@ -82,16 +82,23 @@ export class PostgresCrudDialect<
                     parentName
                 );
 
-                // create join conditions
-                result = this.buildJoinConditions(
-                    this.schema,
+                // add join conditions
+                const joinPairs = this.buildJoinPairs(
                     model,
+                    parentName,
                     relationField,
-                    result,
-                    parentName
+                    joinTableName
+                );
+                result = result.where((eb) =>
+                    this.and(
+                        eb,
+                        ...joinPairs.map(([left, right]) =>
+                            eb(sql.ref(left), '=', sql.ref(right))
+                        )
+                    )
                 );
 
-                // create nested joins for each relation
+                // add nested joins for each relation
                 result = this.buildRelationJoins(
                     relationModel,
                     relationField,
@@ -101,7 +108,7 @@ export class PostgresCrudDialect<
                 );
 
                 // alias the join table
-                return result.as(`${parentName}$${relationField}`);
+                return result.as(joinTableName);
             },
             (join) => join.onTrue()
         );

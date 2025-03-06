@@ -4,6 +4,7 @@ import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef } from '../../../schema/schema';
 import { enumerate } from '../../../utils/enumerate';
+import { InternalError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
     getRelationForeignKeyFieldPairs,
@@ -39,15 +40,19 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     ): SelectQueryBuilder<any, any, {}>;
 
     buildFilter(
-        // query: SelectQueryBuilder<any, any, {}>,
         eb: ExpressionBuilder<any, any>,
         model: string,
         table: string,
         where: Record<string, any> | undefined
     ) {
         let result = this.true(eb);
-        if (!where) {
+
+        if (where === undefined) {
             return result;
+        }
+
+        if (where === null) {
+            throw new InternalError('impossible null as filter');
         }
 
         for (const [key, payload] of Object.entries(where)) {
@@ -139,6 +144,155 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         fieldDef: FieldDef,
         payload: any
     ) {
+        if (!fieldDef.array) {
+            return this.buildToOneRelationFilter(
+                eb,
+                model,
+                table,
+                field,
+                fieldDef,
+                payload
+            );
+        } else {
+            return this.buildToManyRelationFilter(
+                eb,
+                model,
+                table,
+                field,
+                fieldDef,
+                payload
+            );
+        }
+    }
+
+    private buildToOneRelationFilter(
+        eb: ExpressionBuilder<any, any>,
+        model: string,
+        table: string,
+        field: string,
+        fieldDef: FieldDef,
+        payload: any
+    ): Expression<SqlBool> {
+        if (payload === null) {
+            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                this.schema,
+                model,
+                field
+            );
+
+            if (ownedByModel) {
+                // can be short-circuited to FK null check
+                return this.and(
+                    eb,
+                    ...keyPairs.map(({ fk }) =>
+                        eb(sql.ref(`${table}.${fk}`), 'is', null)
+                    )
+                );
+            } else {
+                // translate it to `{ is: null }` filter
+                return this.buildToOneRelationFilter(
+                    eb,
+                    model,
+                    table,
+                    field,
+                    fieldDef,
+                    { is: null }
+                );
+            }
+        }
+
+        const joinAlias = `${table}$${field}`;
+        const joinPairs = this.buildJoinPairs(model, table, field, joinAlias);
+        const filterResultField = `${field}$filter`;
+
+        const joinSelect = eb
+            .selectFrom(`${fieldDef.type} as ${joinAlias}`)
+            .where(() =>
+                this.and(
+                    eb,
+                    ...joinPairs.map(([left, right]) =>
+                        eb(sql.ref(left), '=', sql.ref(right))
+                    )
+                )
+            )
+            .select(() => eb.fn.count(eb.lit(1)).as(filterResultField));
+
+        let conditions: Expression<SqlBool>[] = [];
+
+        if ('is' in payload || 'isNot' in payload) {
+            if ('is' in payload) {
+                if (payload.is === null) {
+                    // check if not found
+                    conditions.push(eb(joinSelect, '=', 0));
+                } else {
+                    // check if found
+                    conditions.push(
+                        eb(
+                            joinSelect.where(() =>
+                                this.buildFilter(
+                                    eb,
+                                    fieldDef.type,
+                                    joinAlias,
+                                    payload.is
+                                )
+                            ),
+                            '>',
+                            0
+                        )
+                    );
+                }
+            }
+
+            if ('isNot' in payload) {
+                if (payload.isNot === null) {
+                    // check if found
+                    conditions.push(eb(joinSelect, '>', 0));
+                } else {
+                    conditions.push(
+                        this.or(
+                            eb,
+                            // is null
+                            eb(joinSelect, '=', 0),
+                            // found one that matches the filter
+                            eb(
+                                joinSelect.where(() =>
+                                    this.buildFilter(
+                                        eb,
+                                        fieldDef.type,
+                                        joinAlias,
+                                        payload.isNot
+                                    )
+                                ),
+                                '=',
+                                0
+                            )
+                        )
+                    );
+                }
+            }
+        } else {
+            conditions.push(
+                eb(
+                    joinSelect.where(() =>
+                        this.buildFilter(eb, fieldDef.type, joinAlias, payload)
+                    ),
+                    '>',
+                    0
+                )
+            );
+        }
+
+        return this.and(eb, ...conditions);
+    }
+
+    private buildToManyRelationFilter(
+        eb: ExpressionBuilder<any, any>,
+        model: string,
+        table: string,
+        field: string,
+        fieldDef: FieldDef,
+        payload: any
+    ) {
         const fieldModelDef = requireModel(this.schema, fieldDef.type);
 
         const relationKeyPairs = getRelationForeignKeyFieldPairs(
@@ -146,6 +300,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             model,
             field
         );
+
+        // null check needs to be converted to fk "is null" checks
+        if (payload === null) {
+            return eb(sql.ref(`${table}.${field}`), 'is', null);
+        }
 
         const buildPkFkWhereRefs = (eb: ExpressionBuilder<any, any>) => {
             let r = this.true(eb);
@@ -283,37 +442,27 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         );
     }
 
-    protected buildJoinConditions(
-        schema: Schema,
+    protected buildJoinPairs(
         model: string,
+        modelAlias: string,
         relationField: string,
-        qb: SelectQueryBuilder<any, any, any>,
-        parentName: string
-    ) {
+        relationAlias: string
+    ): [string, string][] {
         const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
-            schema,
+            this.schema,
             model,
             relationField
         );
 
-        keyPairs.forEach(({ fk, pk }) => {
+        return keyPairs.map(({ fk, pk }) => {
             if (ownedByModel) {
                 // the parent model owns the fk
-                qb = qb.whereRef(
-                    `${parentName}$${relationField}.${pk}`,
-                    '=',
-                    `${parentName}.${fk}`
-                );
+                return [`${relationAlias}.${pk}`, `${modelAlias}.${fk}`];
             } else {
                 // the relation side owns the fk
-                qb = qb.whereRef(
-                    `${parentName}$${relationField}.${fk}`,
-                    '=',
-                    `${parentName}.${pk}`
-                );
+                return [`${relationAlias}.${fk}`, `${modelAlias}.${pk}`];
             }
         });
-        return qb;
     }
 
     protected true(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {

@@ -36,26 +36,33 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             });
         }
 
-        async function createPosts(authorId: string) {
-            await client.post.create({
-                data: { title: 'Post1', published: true, authorId },
-            });
-            await client.post.create({
-                data: { title: 'Post2', published: false, authorId },
-            });
-        }
-
-        it('string filters', async () => {
-            const user = await createUser('u1@test.com');
-            await createUser('u2@test.com');
+        it('supports string filters', async () => {
+            const user1 = await createUser('u1@test.com');
+            const user2 = await createUser('u2@test.com', { name: null });
 
             // equals
             await expect(
-                client.user.findFirst({ where: { id: { equals: user.id } } })
+                client.user.findFirst({ where: { id: { equals: user1.id } } })
             ).toResolveTruthy();
             await expect(
                 client.user.findFirst({ where: { id: { equals: '1' } } })
             ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        id: user1.id,
+                        name: { equals: null },
+                    },
+                })
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        id: user2.id,
+                        name: { equals: null },
+                    },
+                })
+            ).toResolveTruthy();
 
             // case-insensitive
             await expect(
@@ -194,6 +201,10 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     where: { email: { not: { not: { contains: 'test' } } } },
                 })
             ).toResolveTruthy();
+        });
+
+        it('supports number filters', async () => {
+            await createUser('u1@test.com');
         });
     }
 );

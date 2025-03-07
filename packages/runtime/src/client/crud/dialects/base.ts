@@ -503,7 +503,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             const rhs = this.prepStringCasing(eb, value, insensitive);
 
             const condition = match(key)
-                .with('equals', () => eb(fieldRef, '=', rhs))
+                .with('equals', () =>
+                    value === null
+                        ? eb(fieldRef, 'is', null)
+                        : eb(fieldRef, '=', rhs)
+                )
                 .with('in', () => {
                     invariant(Array.isArray(value));
                     if (value.length === 0) {

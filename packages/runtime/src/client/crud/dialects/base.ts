@@ -13,7 +13,7 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { FindArgs, StringFilter } from '../../types';
+import type { BooleanFilter, FindArgs, StringFilter } from '../../types';
 import type { CrudOperation } from '../crud-handler';
 
 export abstract class BaseCrudDialect<Schema extends SchemaDef> {
@@ -602,7 +602,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 .with('equals', () =>
                     value === null
                         ? eb(fieldRef, 'is', null)
-                        : eb(fieldRef, '=', value)
+                        : eb(
+                              fieldRef,
+                              '=',
+                              this.transformPrimitive(value, type)
+                          )
                 )
                 .with('in', () => {
                     invariant(Array.isArray(value));
@@ -661,7 +665,41 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 payload
             );
         }
-        throw new Error('Method not implemented.');
+
+        const conditions: Expression<SqlBool>[] = [];
+        let fieldRef: Expression<any> = sql.ref(`${table}.${field}`);
+
+        for (const [key, value] of Object.entries(payload)) {
+            const condition = match(key)
+                .with('equals', () =>
+                    value === null
+                        ? eb(fieldRef, 'is', null)
+                        : eb(
+                              fieldRef,
+                              '=',
+                              this.transformPrimitive(value, 'Boolean')
+                          )
+                )
+                .with('not', () =>
+                    eb.not(
+                        this.buildBooleanFilter(
+                            eb,
+                            table,
+                            field,
+                            value as BooleanFilter<true>
+                        )
+                    )
+                )
+                .otherwise(() => {
+                    throw new Error(`Invalid boolean filter key: ${key}`);
+                });
+
+            if (condition) {
+                conditions.push(condition);
+            }
+        }
+
+        return this.and(eb, ...conditions);
     }
 
     private buildDateTimeFilter(

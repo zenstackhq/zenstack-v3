@@ -230,7 +230,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.union([
             this.nullableIf(z.boolean(), optional),
             z.object({
-                equals: this.nullableIf(z.boolean(), optional),
+                equals: this.nullableIf(z.boolean(), optional).optional(),
                 not: z
                     .lazy(() => this.makeBooleanFilterSchema(optional))
                     .optional(),

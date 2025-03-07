@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Client } from '../../src/client';
+import type { Client, ModelResult } from '../../src/client';
 import { getSchema, pushSchema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 
@@ -34,6 +34,24 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     email,
                 },
             });
+        }
+
+        async function createPosts(
+            authorId: string
+        ): Promise<
+            [
+                ModelResult<typeof schema, 'Post'>,
+                ModelResult<typeof schema, 'Post'>
+            ]
+        > {
+            return [
+                await client.post.create({
+                    data: { title: 'Post1', published: true, authorId },
+                }),
+                await client.post.create({
+                    data: { title: 'Post2', published: false, authorId },
+                }),
+            ];
         }
 
         it('supports string filters', async () => {
@@ -214,7 +232,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             ).toResolveTruthy();
         });
 
-        it('supports number filters', async () => {
+        it('supports numeric filters', async () => {
             await createUser('u1@test.com', {
                 profile: { create: { id: '1', age: 20, bio: 'My bio' } },
             });
@@ -310,6 +328,35 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     where: { age: { not: { not: { equals: null } } } },
                 })
             ).toResolveTruthy();
+        });
+
+        it('supports boolean filters', async () => {
+            const user = await createUser('u1@test.com', {
+                profile: { create: { id: '1', age: 20, bio: 'My bio' } },
+            });
+            const [post1, post2] = await createPosts(user.id);
+
+            // equals
+            await expect(
+                client.post.findFirst({ where: { published: true } })
+            ).resolves.toMatchObject(post1);
+            await expect(
+                client.post.findFirst({
+                    where: { published: { equals: false } },
+                })
+            ).resolves.toMatchObject(post2);
+
+            // not
+            await expect(
+                client.post.findFirst({
+                    where: { published: { not: { equals: true } } },
+                })
+            ).resolves.toMatchObject(post2);
+            await expect(
+                client.post.findFirst({
+                    where: { published: { not: { not: { equals: true } } } },
+                })
+            ).resolves.toMatchObject(post1);
         });
     }
 );

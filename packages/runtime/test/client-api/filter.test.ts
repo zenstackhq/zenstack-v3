@@ -3,7 +3,7 @@ import type { Client } from '../../src/client';
 import { getSchema, pushSchema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 
-const PG_DB_NAME = 'client-api-find-tests';
+const PG_DB_NAME = 'client-api-filter-tests';
 
 describe.each(createClientSpecs(PG_DB_NAME, true))(
     'Client filter tests for $provider',

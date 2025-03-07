@@ -5,6 +5,7 @@ import {
     type RawBuilder,
     type SelectQueryBuilder,
 } from 'kysely';
+import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { BuiltinType, GetModels } from '../../../schema/schema';
 import {
@@ -24,11 +25,13 @@ export class SqliteCrudDialect<
         if (value === undefined) {
             return value;
         }
-        if (type === 'Boolean') {
-            return value ? 1 : 0;
-        } else {
-            return value;
-        }
+
+        return match(type)
+            .with('Boolean', () => (value ? 1 : 0))
+            .with('DateTime', () =>
+                value instanceof Date ? value.toISOString() : value
+            )
+            .otherwise(() => value);
     }
 
     override buildRelationSelection(

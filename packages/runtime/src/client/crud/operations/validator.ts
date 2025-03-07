@@ -82,7 +82,7 @@ export class InputValidator<Schema extends SchemaDef> {
             .with('Boolean', () => z.boolean())
             .with('BigInt', () => z.string())
             .with('Decimal', () => z.string())
-            .with('DateTime', () => z.string())
+            .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
             .otherwise(() => z.unknown());
     }
 
@@ -220,7 +220,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeDateTimeFilterSchema(optional: boolean): ZodSchema {
         return this.makeCommonPrimitiveFilterSchema(
-            z.union([z.string().date(), z.date()]),
+            z.union([z.string().datetime(), z.date()]),
             optional,
             () => z.lazy(() => this.makeDateTimeFilterSchema(optional))
         );

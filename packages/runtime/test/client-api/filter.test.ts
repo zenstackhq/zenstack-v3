@@ -358,5 +358,144 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 })
             ).resolves.toMatchObject(post1);
         });
+
+        it('supports date filters', async () => {
+            const user1 = await createUser('u1@test.com', {
+                createdAt: new Date(),
+            });
+            const user2 = await createUser('u2@test.com', {
+                createdAt: new Date(Date.now() + 1000),
+            });
+
+            // equals
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: user2.createdAt },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: user2.createdAt.toISOString() },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { equals: user2.createdAt } },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        createdAt: { equals: user2.createdAt.toISOString() },
+                    },
+                })
+            ).resolves.toMatchObject(user2);
+
+            // in
+            await expect(
+                client.user.findFirst({ where: { createdAt: { in: [] } } })
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { in: [user2.createdAt] } },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        createdAt: { in: [user2.createdAt.toISOString()] },
+                    },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { in: [new Date()] } },
+                })
+            ).toResolveFalsy();
+
+            // notIn
+            await expect(
+                client.user.findFirst({ where: { createdAt: { notIn: [] } } })
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { notIn: [user1.createdAt] } },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        createdAt: { notIn: [user1.createdAt.toISOString()] },
+                    },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        createdAt: {
+                            notIn: [user1.createdAt, user2.createdAt],
+                        },
+                    },
+                })
+            ).toResolveFalsy();
+
+            // lt/gt/lte/gte
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { lt: user1.createdAt } },
+                })
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { lt: user2.createdAt } },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { lte: user1.createdAt } },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findMany({
+                    where: { createdAt: { lte: user2.createdAt } },
+                })
+            ).toResolveWithLength(2);
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { gt: user2.createdAt } },
+                })
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { gt: user1.createdAt } },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findMany({
+                    where: { createdAt: { gte: user1.createdAt } },
+                })
+            ).toResolveWithLength(2);
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { gte: user2.createdAt } },
+                })
+            ).resolves.toMatchObject(user2);
+
+            // not
+            await expect(
+                client.user.findFirst({
+                    where: { createdAt: { not: { equals: user1.createdAt } } },
+                })
+            ).resolves.toMatchObject(user2);
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        createdAt: {
+                            not: { not: { equals: user1.createdAt } },
+                        },
+                    },
+                })
+            ).resolves.toMatchObject(user1);
+        });
     }
 );

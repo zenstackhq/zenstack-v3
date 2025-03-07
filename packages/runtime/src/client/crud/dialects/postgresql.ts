@@ -5,6 +5,7 @@ import {
     type RawBuilder,
     type SelectQueryBuilder,
 } from 'kysely';
+import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef, GetModels } from '../../../schema/schema';
 import { buildFieldRef, requireField, requireModel } from '../../query-utils';
@@ -15,8 +16,16 @@ import { BaseCrudDialect } from './base';
 export class PostgresCrudDialect<
     Schema extends SchemaDef
 > extends BaseCrudDialect<Schema> {
-    override transformPrimitive(value: unknown, _type: BuiltinType) {
-        return value;
+    override transformPrimitive(value: unknown, type: BuiltinType) {
+        return match(type)
+            .with('DateTime', () =>
+                value instanceof Date
+                    ? value
+                    : typeof value === 'string'
+                    ? new Date(value)
+                    : value
+            )
+            .otherwise(() => value);
     }
 
     override buildRelationSelection(

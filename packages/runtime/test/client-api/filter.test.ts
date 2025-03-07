@@ -42,10 +42,21 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
 
             // equals
             await expect(
+                client.user.findFirst({ where: { id: user1.id } })
+            ).toResolveTruthy();
+            await expect(
                 client.user.findFirst({ where: { id: { equals: user1.id } } })
             ).toResolveTruthy();
             await expect(
                 client.user.findFirst({ where: { id: { equals: '1' } } })
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        id: user1.id,
+                        name: null,
+                    },
+                })
             ).toResolveFalsy();
             await expect(
                 client.user.findFirst({
@@ -204,7 +215,101 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('supports number filters', async () => {
-            await createUser('u1@test.com');
+            await createUser('u1@test.com', {
+                profile: { create: { id: '1', age: 20, bio: 'My bio' } },
+            });
+            await createUser('u2@test.com', {
+                profile: { create: { id: '2', bio: 'My bio' } },
+            });
+
+            // equals
+            await expect(
+                client.profile.findFirst({ where: { age: 20 } })
+            ).resolves.toMatchObject({ id: '1' });
+            await expect(
+                client.profile.findFirst({ where: { age: { equals: 20 } } })
+            ).resolves.toMatchObject({ id: '1' });
+            await expect(
+                client.profile.findFirst({ where: { age: { equals: 10 } } })
+            ).toResolveFalsy();
+            await expect(
+                client.profile.findFirst({ where: { age: null } })
+            ).resolves.toMatchObject({ id: '2' });
+            await expect(
+                client.profile.findFirst({ where: { age: { equals: null } } })
+            ).resolves.toMatchObject({ id: '2' });
+
+            // in
+            await expect(
+                client.profile.findFirst({ where: { age: { in: [] } } })
+            ).toResolveFalsy();
+            await expect(
+                client.profile.findFirst({ where: { age: { in: [20, 21] } } })
+            ).resolves.toMatchObject({ id: '1' });
+            await expect(
+                client.profile.findFirst({ where: { age: { in: [21] } } })
+            ).toResolveFalsy();
+
+            // notIn
+            await expect(
+                client.profile.findFirst({ where: { age: { notIn: [] } } })
+            ).toResolveTruthy();
+            await expect(
+                client.profile.findFirst({
+                    where: { age: { notIn: [20, 21] } },
+                })
+            ).toResolveFalsy();
+            await expect(
+                client.profile.findFirst({ where: { age: { notIn: [21] } } })
+            ).toResolveTruthy();
+
+            // lt/gt/lte/gte
+            await expect(
+                client.profile.findMany({ where: { age: { lt: 20 } } })
+            ).toResolveWithLength(0);
+            await expect(
+                client.profile.findMany({ where: { age: { lt: 21 } } })
+            ).toResolveWithLength(1);
+            await expect(
+                client.profile.findMany({ where: { age: { lte: 20 } } })
+            ).toResolveWithLength(1);
+            await expect(
+                client.profile.findMany({ where: { age: { lte: 19 } } })
+            ).toResolveWithLength(0);
+            await expect(
+                client.profile.findMany({ where: { age: { gt: 20 } } })
+            ).toResolveWithLength(0);
+            await expect(
+                client.profile.findMany({ where: { age: { gt: 19 } } })
+            ).toResolveWithLength(1);
+            await expect(
+                client.profile.findMany({ where: { age: { gte: 20 } } })
+            ).toResolveWithLength(1);
+            await expect(
+                client.profile.findMany({ where: { age: { gte: 21 } } })
+            ).toResolveWithLength(0);
+
+            // not
+            await expect(
+                client.profile.findFirst({
+                    where: { age: { not: { equals: 20 } } },
+                })
+            ).toResolveFalsy();
+            await expect(
+                client.profile.findFirst({
+                    where: { age: { not: { not: { equals: 20 } } } },
+                })
+            ).toResolveTruthy();
+            await expect(
+                client.profile.findFirst({
+                    where: { age: { not: { equals: null } } },
+                })
+            ).toResolveTruthy();
+            await expect(
+                client.profile.findFirst({
+                    where: { age: { not: { not: { equals: null } } } },
+                })
+            ).toResolveTruthy();
         });
     }
 );

@@ -164,6 +164,7 @@ const schema = {
                     generator: 'cuid',
                 },
                 bio: { type: 'String' },
+                age: { type: 'Int', optional: true },
                 user: {
                     type: 'User',
                     optional: true,
@@ -245,6 +246,7 @@ export async function pushSchema(db: Client<typeof schema>) {
         .createTable('Profile')
         .addColumn('id', 'text', (col) => col.primaryKey())
         .addColumn('bio', 'varchar', (col) => col.notNull())
+        .addColumn('age', 'integer')
         .addColumn('userId', 'varchar', (col) => col.references('User.id'))
         .execute();
 }

@@ -593,7 +593,57 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         ) {
             return this.buildLiteralFilter(eb, table, field, type, payload);
         }
-        throw new Error('Method not implemented.');
+
+        const conditions: Expression<SqlBool>[] = [];
+        let fieldRef: Expression<any> = sql.ref(`${table}.${field}`);
+
+        for (const [key, value] of Object.entries(payload)) {
+            const condition = match(key)
+                .with('equals', () =>
+                    value === null
+                        ? eb(fieldRef, 'is', null)
+                        : eb(fieldRef, '=', value)
+                )
+                .with('in', () => {
+                    invariant(Array.isArray(value));
+                    if (value.length === 0) {
+                        return this.false(eb);
+                    } else {
+                        return eb(fieldRef, 'in', value);
+                    }
+                })
+                .with('notIn', () => {
+                    invariant(Array.isArray(value));
+                    if (value.length === 0) {
+                        return this.true(eb);
+                    } else {
+                        return eb.not(eb(fieldRef, 'in', value));
+                    }
+                })
+                .with('lt', () => eb(fieldRef, '<', value))
+                .with('lte', () => eb(fieldRef, '<=', value))
+                .with('gt', () => eb(fieldRef, '>', value))
+                .with('gte', () => eb(fieldRef, '>=', value))
+                .with('not', () =>
+                    eb.not(
+                        this.buildStringFilter(
+                            eb,
+                            table,
+                            field,
+                            value as StringFilter<true>
+                        )
+                    )
+                )
+                .otherwise(() => {
+                    throw new Error(`Invalid number filter key: ${key}`);
+                });
+
+            if (condition) {
+                conditions.push(condition);
+            }
+        }
+
+        return this.and(eb, ...conditions);
     }
 
     private buildBooleanFilter(

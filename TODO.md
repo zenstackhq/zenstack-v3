@@ -10,4 +10,5 @@
     -   [ ] Update
     -   [ ] Delete
     -   [ ] Aggregation
+    -   [ ] Cross field comparison
 -   [ ] Access Policy

@@ -218,3 +218,11 @@ export function fieldHasDefaultValue(fieldDef: FieldDef) {
         fieldDef.updatedAt
     );
 }
+
+export function isEnum(schema: SchemaDef, type: string) {
+    return !!schema.enums?.[type];
+}
+
+export function getEnum(schema: SchemaDef, type: string) {
+    return schema.enums?.[type];
+}

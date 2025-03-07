@@ -6,6 +6,7 @@ export default defineConfig({
             interopDefault: true,
         },
         include: ['**/*.test.ts'],
+        setupFiles: ['./test/vitest-ext.ts'],
         testTimeout: 100000,
     },
 });

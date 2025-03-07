@@ -1,17 +1,31 @@
 import { sql, type SelectQueryBuilder } from 'kysely';
-import type { z } from 'zod';
 import type { GetModels, SchemaDef } from '../../../schema';
 import { enumerate } from '../../../utils/enumerate';
 import { QueryError } from '../../errors';
+import type { ClientOptions } from '../../options';
+import type { ToKysely } from '../../query-builder';
 import { buildFieldRef, isRelationField } from '../../query-utils';
 import type { FindArgs } from '../../types';
 import type { CrudOperation } from '../crud-handler';
 import { getCrudDialect } from '../dialects';
 import { BaseOperationHandler } from './base';
+import { InputValidator } from './validator';
 
 export class FindOperationHandler<
     Schema extends SchemaDef
 > extends BaseOperationHandler<Schema> {
+    private readonly inputValidator: InputValidator<Schema>;
+
+    constructor(
+        schema: Schema,
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        options: ClientOptions<Schema>
+    ) {
+        super(schema, kysely, model, options);
+        this.inputValidator = new InputValidator(this.schema);
+    }
+
     async handle(
         operation: CrudOperation,
         args: unknown,
@@ -19,8 +33,12 @@ export class FindOperationHandler<
     ): Promise<unknown> {
         // parse args
         const parsedArgs = validateArgs
-            ? this.parseFindArgs(operation, args)
-            : args;
+            ? this.inputValidator.validateFindArgs(
+                  this.model,
+                  operation === 'findUnique',
+                  args
+              )
+            : (args as FindArgs<Schema, GetModels<Schema>, true>);
 
         // run query
         const result = await this.runQuery(this.model, operation, parsedArgs);
@@ -28,24 +46,6 @@ export class FindOperationHandler<
         const finalResult =
             operation === 'findMany' ? result : result[0] ?? null;
         return finalResult;
-    }
-
-    private parseFindArgs(operation: CrudOperation, args: unknown) {
-        const findSchema = this.makeFindSchema(
-            this.model,
-            operation === 'findUnique',
-            true
-        );
-
-        const { error } = findSchema.safeParse(args);
-        if (error) {
-            throw new QueryError(`Invalid find args: ${error.message}`);
-        } else {
-            // need to return the original args as zod may change the order
-            // of fields during parse, and order is critical for query parts
-            // like `orderBy`
-            return args as z.infer<typeof findSchema>;
-        }
     }
 
     async runQuery(

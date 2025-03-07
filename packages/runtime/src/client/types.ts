@@ -1,6 +1,7 @@
 import type { ExpressionBuilder, OperandExpression, SqlBool } from 'kysely';
 import type { Optional } from 'utility-types';
 import type {
+    BuiltinType,
     FieldDef,
     FieldHasDefault,
     FieldHasGenerator,
@@ -13,6 +14,7 @@ import type {
     GetEnums,
     GetField,
     GetFields,
+    GetFieldType,
     GetModel,
     GetModels,
     NonRelationFields,
@@ -136,8 +138,16 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
         Schema,
         Model
     >
-        ? RelationFilter<Schema, Model, Key>
-        : MapFieldType<Schema, Model, Key>;
+        ? // relation
+          RelationFilter<Schema, Model, Key>
+        : // enum
+        GetFieldType<Schema, Model, Key> extends GetEnums<Schema>
+        ? string
+        : // primitive
+          PrimitiveFilter<
+              GetFieldType<Schema, Model, Key>,
+              FieldIsOptional<Schema, Model, Key>
+          >;
 } & {
     $expr?: (
         eb: ExpressionBuilder<
@@ -150,6 +160,63 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     OR?: Where<Schema, Model>[];
     NOT?: OrArray<Where<Schema, Model>>;
 };
+
+export type PrimitiveFilter<
+    T extends string,
+    Nullable extends boolean
+> = T extends 'String'
+    ? StringFilter<Nullable>
+    : T extends 'Int' | 'Float' | 'Decimal' | 'BigInt'
+    ? NumberFilter<T, Nullable>
+    : T extends 'Boolean'
+    ? BooleanFilter<Nullable>
+    : T extends 'DateTime'
+    ? DateTimeFilter<Nullable>
+    : T extends 'Json'
+    ? 'Not implemented yet' // TODO: Json filter
+    : never;
+
+export type CommonPrimitiveFilter<
+    DataType,
+    T extends BuiltinType,
+    Nullable extends boolean
+> = {
+    equals?: NullableIf<DataType, Nullable>;
+    in?: DataType[];
+    notIn?: DataType[];
+    lt?: DataType;
+    lte?: DataType;
+    gt?: DataType;
+    gte?: DataType;
+    not?: PrimitiveFilter<T, Nullable>;
+};
+
+export type StringFilter<Nullable extends boolean> =
+    | NullableIf<string, Nullable>
+    | (CommonPrimitiveFilter<string, 'String', Nullable> & {
+          contains?: string;
+          startsWith?: string;
+          endsWith?: string;
+          mode?: 'default' | 'insensitive';
+      });
+
+export type NumberFilter<
+    T extends 'Int' | 'Float' | 'Decimal' | 'BigInt',
+    Nullable extends boolean
+> =
+    | NullableIf<number | bigint, Nullable>
+    | CommonPrimitiveFilter<number, T, Nullable>;
+
+export type DateTimeFilter<Nullable extends boolean> =
+    | NullableIf<Date | string, Nullable>
+    | CommonPrimitiveFilter<Date | string, 'DateTime', Nullable>;
+
+export type BooleanFilter<Nullable extends boolean> =
+    | NullableIf<boolean, Nullable>
+    | {
+          equals?: NullableIf<boolean, Nullable>;
+          not?: BooleanFilter<Nullable>;
+      };
 
 export type SortOrder = 'asc' | 'desc';
 export type NullsOrder = 'first' | 'last';

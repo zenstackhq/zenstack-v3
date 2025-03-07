@@ -2,7 +2,6 @@ import { createId } from '@paralleldrive/cuid2';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import * as uuid from 'uuid';
-import { z, ZodSchema } from 'zod';
 import type { FieldDef, GetModels, ModelDef, SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldGenerator } from '../../../schema/schema';
 import { clone } from '../../../utils/clone';
@@ -11,27 +10,23 @@ import { QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
 import {
-    fieldHasDefaultValue,
     getIdValues,
     getRelationForeignKeyFieldPairs,
     isForeignKeyField,
     isScalarField,
     requireField,
 } from '../../query-utils';
+import type { CreateArgs } from '../../types';
 import type { CrudOperation } from '../crud-handler';
 import { getCrudDialect } from '../dialects';
 import { BaseOperationHandler } from './base';
-import { orArray } from './common';
 import { FindOperationHandler } from './find';
-
-type CreateArgs<Schema extends SchemaDef> = z.infer<
-    ReturnType<CreateOperationHandler<Schema>['makeCreateSchema']>
->;
+import { InputValidator } from './validator';
 
 export class CreateOperationHandler<
     Schema extends SchemaDef
 > extends BaseOperationHandler<Schema> {
-    private readonly argsValidationSchema: ZodSchema;
+    private readonly inputValidator: InputValidator<Schema>;
 
     constructor(
         schema: Schema,
@@ -40,195 +35,23 @@ export class CreateOperationHandler<
         options: ClientOptions<Schema>
     ) {
         super(schema, kysely, model, options);
-        this.argsValidationSchema = this.makeCreateSchema();
+        this.inputValidator = new InputValidator(this.schema);
     }
 
     async handle(_operation: CrudOperation, args: unknown) {
         // parse args
-        const { error } = this.argsValidationSchema.safeParse(args);
-        if (error) {
-            throw new QueryError(`Invalid create args: ${error}`);
-        }
+        const parsedArgs = this.inputValidator.validateCreateArgs(
+            this.model,
+            args
+        );
 
         // need to use the original args as zod may change the order
         // of fields during parse, and order is critical for query parts
         // like `orderBy`
-        return this.runQuery(args as CreateArgs<Schema>);
+        return this.runQuery(parsedArgs);
     }
 
-    private makeCreateSchema() {
-        const dataSchema = this.makeCreateDataSchema(this.model, false);
-        return z
-            .object({
-                data: dataSchema,
-                select: z.record(z.string(), z.any()).optional(),
-                include: z.record(z.string(), z.any()).optional(),
-            })
-            .strict();
-    }
-
-    private makeCreateDataSchema(
-        model: string,
-        canBeArray: boolean,
-        withoutFields: string[] = [],
-        withoutRelationFields = false
-    ) {
-        const regularAndFkFields: any = {};
-        const regularAndRelationFields: any = {};
-        const modelDef = this.requireModel(model);
-        const hasRelation = Object.values(modelDef.fields).some(
-            (f) => f.relation
-        );
-
-        Object.keys(modelDef.fields).forEach((field) => {
-            if (withoutFields.includes(field)) {
-                return;
-            }
-            const fieldDef = requireField(this.schema, model, field);
-
-            if (fieldDef.relation) {
-                if (withoutRelationFields) {
-                    return;
-                }
-                const excludeFields: string[] = [];
-                const oppositeField = fieldDef.relation.opposite;
-                if (oppositeField) {
-                    excludeFields.push(oppositeField);
-                    const oppositeFieldDef = requireField(
-                        this.schema,
-                        fieldDef.type,
-                        oppositeField
-                    );
-                    if (oppositeFieldDef.relation?.fields) {
-                        excludeFields.push(...oppositeFieldDef.relation.fields);
-                    }
-                }
-
-                let fieldSchema: ZodSchema = z.lazy(() =>
-                    this.makeRelationSchema(fieldDef, excludeFields)
-                );
-
-                // optional or array relations are optional
-                if (fieldDef.optional || fieldDef.array) {
-                    fieldSchema = fieldSchema.optional();
-                }
-
-                // optional to-one relation can be null
-                if (fieldDef.optional && !fieldDef.array) {
-                    fieldSchema = fieldSchema.nullable();
-                }
-                regularAndRelationFields[field] = fieldSchema;
-            } else {
-                let fieldSchema: ZodSchema = this.makePrimitiveSchema(
-                    fieldDef.type
-                );
-                if (fieldDef.optional || fieldHasDefaultValue(fieldDef)) {
-                    fieldSchema = fieldSchema.optional();
-                }
-
-                if (fieldDef.optional) {
-                    fieldSchema = fieldSchema.nullable();
-                }
-
-                regularAndFkFields[field] = fieldSchema;
-                if (!fieldDef.foreignKeyFor) {
-                    regularAndRelationFields[field] = fieldSchema;
-                }
-            }
-        });
-
-        if (!hasRelation) {
-            return orArray(z.object(regularAndFkFields).strict(), canBeArray);
-        } else {
-            return z.union([
-                z.object(regularAndFkFields).strict(),
-                z.object(regularAndRelationFields).strict(),
-                ...(canBeArray
-                    ? [z.array(z.object(regularAndFkFields).strict())]
-                    : []),
-                ...(canBeArray
-                    ? [z.array(z.object(regularAndRelationFields).strict())]
-                    : []),
-            ]);
-        }
-    }
-
-    private makeRelationSchema(fieldDef: FieldDef, withoutFields: string[]) {
-        return z
-            .object({
-                create: this.makeCreateDataSchema(
-                    fieldDef.type,
-                    !!fieldDef.array,
-                    withoutFields
-                ).optional(),
-
-                connect: this.makeConnectDataSchema(
-                    fieldDef.type,
-                    !!fieldDef.array
-                ).optional(),
-
-                connectOrCreate: this.makeConnectOrCreateDataSchema(
-                    fieldDef.type,
-                    !!fieldDef.array,
-                    withoutFields
-                ).optional(),
-
-                createMany: this.makeCreateManyDataSchema(
-                    fieldDef,
-                    []
-                ).optional(),
-            })
-            .strict()
-            .refine(
-                (v) => Object.keys(v).length > 0,
-                'At least one action is required'
-            );
-    }
-
-    private makeConnectDataSchema(model: string, canBeArray: boolean) {
-        return orArray(this.makeWhereSchema(model, true), canBeArray);
-    }
-
-    private makeConnectOrCreateDataSchema(
-        model: string,
-        canBeArray: boolean,
-        withoutFields: string[]
-    ) {
-        const whereSchema = this.makeWhereSchema(model, true);
-        const createSchema = this.makeCreateDataSchema(
-            model,
-            false,
-            withoutFields
-        );
-        return orArray(
-            z
-                .object({
-                    where: whereSchema,
-                    create: createSchema,
-                })
-                .strict(),
-            canBeArray
-        );
-    }
-
-    private makeCreateManyDataSchema(
-        fieldDef: FieldDef,
-        withoutFields: string[]
-    ) {
-        return z
-            .object({
-                data: this.makeCreateDataSchema(
-                    fieldDef.type,
-                    false,
-                    withoutFields,
-                    true
-                ),
-                skipDuplicates: z.boolean().optional(),
-            })
-            .strict();
-    }
-
-    private async runQuery(args: CreateArgs<Schema>) {
+    private async runQuery(args: CreateArgs<Schema, GetModels<Schema>>) {
         const hasRelationCreate = Object.keys(args.data).some(
             (f) => !!requireField(this.schema, this.model, f).relation
         );
@@ -630,7 +453,7 @@ export class CreateOperationHandler<
             .otherwise(() => undefined);
     }
 
-    private trimResult(data: any, args: CreateArgs<Schema>) {
+    private trimResult(data: any, args: CreateArgs<Schema, GetModels<Schema>>) {
         if (!args.select) {
             return data;
         }
@@ -644,7 +467,7 @@ export class CreateOperationHandler<
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         primaryData: unknown,
-        args: CreateArgs<Schema>
+        args: CreateArgs<Schema, GetModels<Schema>>
     ) {
         // fetch relations based on include or select
         const findHandler = new FindOperationHandler(
@@ -665,7 +488,10 @@ export class CreateOperationHandler<
         return read ?? null;
     }
 
-    private needReturnRelations(model: string, args: CreateArgs<Schema>) {
+    private needReturnRelations(
+        model: string,
+        args: CreateArgs<Schema, GetModels<Schema>>
+    ) {
         let returnRelation = false;
 
         if (args.include) {

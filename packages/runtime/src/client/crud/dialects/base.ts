@@ -1,6 +1,7 @@
 import type { Expression, ExpressionBuilder, SqlBool, ValueNode } from 'kysely';
 import { sql, type SelectQueryBuilder } from 'kysely';
-import { match } from 'ts-pattern';
+import invariant from 'tiny-invariant';
+import { match, P } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef } from '../../../schema/schema';
 import { enumerate } from '../../../utils/enumerate';
@@ -8,10 +9,11 @@ import { InternalError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
     getRelationForeignKeyFieldPairs,
+    isEnum,
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { FindArgs } from '../../types';
+import type { FindArgs, StringFilter } from '../../types';
 import type { CrudOperation } from '../crud-handler';
 
 export abstract class BaseCrudDialect<Schema extends SchemaDef> {
@@ -68,7 +70,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 result = this.and(
                     eb,
                     result,
-                    this.buildComposedFilter(eb, model, table, key, payload)
+                    this.buildCompositeFilter(eb, model, table, key, payload)
                 );
                 continue;
             }
@@ -104,7 +106,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
-    protected buildComposedFilter(
+    protected buildCompositeFilter(
         eb: ExpressionBuilder<any, any>,
         model: string,
         table: string,
@@ -130,7 +132,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             )
             .with('NOT', () =>
                 eb.not(
-                    this.buildComposedFilter(eb, model, table, 'AND', payload)
+                    this.buildCompositeFilter(eb, model, table, 'AND', payload)
                 )
             )
             .exhaustive();
@@ -434,12 +436,213 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         fieldDef: FieldDef,
         payload: any
     ) {
-        // TODO: non-equality filters
+        if (payload === null) {
+            return eb(sql.ref(`${table}.${field}`), 'is', null);
+        }
+
+        if (isEnum(this.schema, fieldDef.type)) {
+            return this.buildEnumFilter(eb, table, field, fieldDef, payload);
+        }
+
+        return match(fieldDef.type as BuiltinType)
+            .with('String', () =>
+                this.buildStringFilter(eb, table, field, payload)
+            )
+            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
+                this.buildNumberFilter(eb, table, field, type, payload)
+            )
+            .with('Boolean', () =>
+                this.buildBooleanFilter(eb, table, field, payload)
+            )
+            .with('DateTime', () =>
+                this.buildDateTimeFilter(eb, table, field, payload)
+            )
+            .exhaustive();
+    }
+
+    private buildLiteralFilter(
+        eb: ExpressionBuilder<any, any>,
+        table: string,
+        field: string,
+        type: BuiltinType,
+        value: unknown
+    ) {
         return eb(
             sql.ref(`${table}.${field}`),
             '=',
-            this.transformPrimitive(payload, fieldDef.type as BuiltinType)
+            value !== null && value !== undefined
+                ? this.transformPrimitive(value, type)
+                : value
         );
+    }
+
+    private buildStringFilter(
+        eb: ExpressionBuilder<any, any>,
+        table: string,
+        field: string,
+        payload: StringFilter<true>
+    ) {
+        if (typeof payload === 'string' || payload === null) {
+            return this.buildLiteralFilter(eb, table, field, 'String', payload);
+        }
+
+        const conditions: Expression<SqlBool>[] = [];
+        let fieldRef: Expression<any> = sql.ref(`${table}.${field}`);
+
+        let insensitive = false;
+        if ('mode' in payload && payload.mode === 'insensitive') {
+            insensitive = true;
+            fieldRef = eb.fn('lower', [fieldRef]);
+        }
+
+        for (const [key, value] of Object.entries(payload)) {
+            if (key === 'mode') {
+                continue;
+            }
+
+            const rhs = this.prepStringCasing(eb, value, insensitive);
+
+            const condition = match(key)
+                .with('equals', () => eb(fieldRef, '=', rhs))
+                .with('in', () => {
+                    invariant(Array.isArray(value));
+                    if (value.length === 0) {
+                        return this.false(eb);
+                    } else {
+                        return eb(fieldRef, 'in', rhs);
+                    }
+                })
+                .with('notIn', () => {
+                    invariant(Array.isArray(value));
+                    if (value.length === 0) {
+                        return this.true(eb);
+                    } else {
+                        return eb.not(eb(fieldRef, 'in', rhs));
+                    }
+                })
+                .with('lt', () => eb(fieldRef, '<', rhs))
+                .with('lte', () => eb(fieldRef, '<=', rhs))
+                .with('gt', () => eb(fieldRef, '>', rhs))
+                .with('gte', () => eb(fieldRef, '>=', rhs))
+                .with('contains', () =>
+                    insensitive
+                        ? eb(fieldRef, 'ilike', sql.lit(`%${value}%`))
+                        : eb(fieldRef, 'like', sql.lit(`%${value}%`))
+                )
+                .with('startsWith', () =>
+                    insensitive
+                        ? eb(fieldRef, 'ilike', sql.lit(`${value}%`))
+                        : eb(fieldRef, 'like', sql.lit(`${value}%`))
+                )
+                .with('endsWith', () =>
+                    insensitive
+                        ? eb(fieldRef, 'ilike', sql.lit(`%${value}`))
+                        : eb(fieldRef, 'like', sql.lit(`%${value}`))
+                )
+                .with('not', () =>
+                    eb.not(
+                        this.buildStringFilter(
+                            eb,
+                            table,
+                            field,
+                            value as StringFilter<true>
+                        )
+                    )
+                )
+                .otherwise(() => {
+                    throw new Error(`Invalid string filter key: ${key}`);
+                });
+
+            if (condition) {
+                conditions.push(condition);
+            }
+        }
+
+        return this.and(eb, ...conditions);
+    }
+
+    private prepStringCasing(
+        eb: ExpressionBuilder<any, any>,
+        value: unknown,
+        toLower: boolean = true
+    ): any {
+        if (typeof value === 'string') {
+            return toLower ? eb.fn('lower', [sql.lit(value)]) : sql.lit(value);
+        } else if (Array.isArray(value)) {
+            return value.map((v) => this.prepStringCasing(eb, v, toLower));
+        } else {
+            return sql.lit(value);
+        }
+    }
+
+    private buildNumberFilter(
+        eb: ExpressionBuilder<any, any>,
+        table: string,
+        field: string,
+        type: BuiltinType,
+        payload: any
+    ) {
+        if (
+            typeof payload === 'number' ||
+            typeof payload === 'bigint' ||
+            payload === null
+        ) {
+            return this.buildLiteralFilter(eb, table, field, type, payload);
+        }
+        throw new Error('Method not implemented.');
+    }
+
+    private buildBooleanFilter(
+        eb: ExpressionBuilder<any, any>,
+        table: string,
+        field: string,
+        payload: any
+    ) {
+        if (typeof payload === 'boolean' || payload === null) {
+            return this.buildLiteralFilter(
+                eb,
+                table,
+                field,
+                'Boolean',
+                payload
+            );
+        }
+        throw new Error('Method not implemented.');
+    }
+
+    private buildDateTimeFilter(
+        eb: ExpressionBuilder<any, any>,
+        table: string,
+        field: string,
+        payload: any
+    ) {
+        if (
+            typeof payload === 'string' ||
+            payload instanceof Date ||
+            payload === null
+        ) {
+            return this.buildLiteralFilter(
+                eb,
+                table,
+                field,
+                'Boolean',
+                payload
+            );
+        }
+        throw new Error('Method not implemented.');
+    }
+
+    private buildEnumFilter(
+        eb: ExpressionBuilder<any, any>,
+        table: string,
+        field: string,
+        _fieldDef: FieldDef,
+        payload: any
+    ) {
+        if (typeof payload === 'string' || payload === null) {
+            return eb(sql.ref(`${table}.${field}`), '=', payload);
+        }
+        throw new Error('Method not implemented.');
     }
 
     protected buildJoinPairs(

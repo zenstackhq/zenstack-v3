@@ -229,7 +229,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                         AND: [{ id: user1.id, email: 'u2@test.com' }],
                     },
                 })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
 
             // OR
             await expect(
@@ -248,7 +248,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                         OR: [{ id: user1.id, email: 'u2@test.com' }],
                     },
                 })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
             await expect(
                 client.user.findMany({
                     where: {
@@ -262,7 +262,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                         OR: [{ id: 'foo', email: 'bar' }],
                     },
                 })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
 
             // NOT
             await expect(
@@ -320,7 +320,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                         AND: [{ email: user2.email }],
                     },
                 })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
 
             // nesting
             await expect(
@@ -332,7 +332,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                         },
                     },
                 })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
             await expect(
                 client.user.findFirst({
                     where: {
@@ -354,36 +354,36 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 client.user.findFirst({
                     where: { posts: { some: { title: 'Post1' } } },
                 })
-            ).resolves.toBeTruthy();
+            ).toResolveTruthy();
             await expect(
                 client.user.findFirst({
                     where: { posts: { some: { title: 'Post3' } } },
                 })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
 
             // every
             await expect(
                 client.user.findFirst({
                     where: { posts: { every: { authorId: user.id } } },
                 })
-            ).resolves.toBeTruthy();
+            ).toResolveTruthy();
             await expect(
                 client.user.findFirst({
                     where: { posts: { every: { published: true } } },
                 })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
 
             // none
             await expect(
                 client.user.findFirst({
                     where: { posts: { none: { title: 'Post1' } } },
                 })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
             await expect(
                 client.user.findFirst({
                     where: { posts: { none: { title: 'Post3' } } },
                 })
-            ).resolves.toBeTruthy();
+            ).toResolveTruthy();
         });
 
         it('works with to-one relation filters', async () => {
@@ -411,13 +411,13 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             // null check from owner side
             await expect(
                 client.profile.findFirst({ where: { user: null } })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
             await expect(
                 client.profile.findFirst({ where: { user: { is: null } } })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
             await expect(
                 client.profile.findFirst({ where: { user: { isNot: null } } })
-            ).resolves.toBeTruthy();
+            ).toResolveTruthy();
 
             // field checks
             await expect(
@@ -429,7 +429,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 client.user.findFirst({
                     where: { profile: { bio: 'My other bio' } },
                 })
-            ).resolves.toBeFalsy();
+            ).toResolveFalsy();
 
             // is/isNot
             await expect(

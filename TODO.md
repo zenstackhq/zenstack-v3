@@ -23,7 +23,7 @@
             -   [x] Relation fields
         -   [x] Sort
             -   [x] Scalar fields
-            -   [ ] Relation fields
+            -   [x] Relation fields
         -   [x] Relation inclusion
             -   [x] Filtering
             -   [x] Sorting

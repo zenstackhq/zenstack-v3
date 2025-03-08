@@ -1,14 +1,44 @@
 ## V3 Alpha Todo
 
--   [ ] ZModel Compiler
--   [ ] Basic CRUD
+-   [ ] Infra
+    -   [ ] Dependency injection
+-   [ ] CLI
+-   [ ] ORM
     -   [ ] Create
-        -   [ ] ID generation from db schema
-        -   [ ] Zod schema caching
-        -   [ ] Zod parsed args typing
-    -   [ ] Read
+        -   [x] Input validation
+        -   [x] Simple create
+        -   [x] Nested create
+        -   [x] Relation connection
+        -   [ ] ID generation
+    -   [ ] Find
+        -   [x] Input validation
+        -   [x] Field selection
+        -   [x] Pagination
+            -   [x] Skip and limit
+            -   [ ] Cursor
+        -   [x] Filtering
+            -   [x] Unique fields
+            -   [x] Scalar fields
+            -   [x] Relation fields
+        -   [x] Sort
+            -   [x] Scalar fields
+            -   [ ] Relation fields
+        -   [x] Relation inclusion
+            -   [ ] Relation filtering
     -   [ ] Update
     -   [ ] Delete
     -   [ ] Aggregation
-    -   [ ] Cross field comparison
+    -   [ ] Extensions
+        -   [x] Query builder API
+        -   [x] Computed fields
+    -   [ ] Misc
+        -   [ ] Compound ID
+        -   [ ] Cross field comparison
+        -   [ ] Many-to-many relation
+        -   [ ] Logging
 -   [ ] Access Policy
+-   [ ] Migration
+-   [ ] Databases
+    -   [x] SQLite
+    -   [x] PostgreSQL
+    -   [ ] MySQL

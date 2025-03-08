@@ -9,6 +9,7 @@
         -   [x] Simple create
         -   [x] Nested create
         -   [x] Relation connection
+        -   [ ] Create many
         -   [ ] ID generation
     -   [ ] Find
         -   [x] Input validation
@@ -24,7 +25,9 @@
             -   [x] Scalar fields
             -   [ ] Relation fields
         -   [x] Relation inclusion
-            -   [ ] Relation filtering
+            -   [x] Filtering
+            -   [x] Sorting
+            -   [x] Pagination
     -   [ ] Update
     -   [ ] Delete
     -   [ ] Aggregation

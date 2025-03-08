@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Client, ModelResult } from '../../src/client';
+import type { Client } from '../../src/client';
 import { getSchema, pushSchema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 
@@ -36,14 +36,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             });
         }
 
-        async function createPosts(
-            authorId: string
-        ): Promise<
-            [
-                ModelResult<typeof schema, 'Post'>,
-                ModelResult<typeof schema, 'Post'>
-            ]
-        > {
+        async function createPosts(authorId: string) {
             return [
                 await client.post.create({
                     data: { title: 'Post1', published: true, authorId },
@@ -51,7 +44,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 await client.post.create({
                     data: { title: 'Post2', published: false, authorId },
                 }),
-            ];
+            ] as const;
         }
 
         it('supports string filters', async () => {

@@ -38,12 +38,14 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         }
 
         async function createPosts(authorId: string) {
-            await client.post.create({
-                data: { title: 'Post1', published: true, authorId },
-            });
-            await client.post.create({
-                data: { title: 'Post2', published: false, authorId },
-            });
+            return [
+                await client.post.create({
+                    data: { title: 'Post1', published: true, authorId },
+                }),
+                await client.post.create({
+                    data: { title: 'Post2', published: false, authorId },
+                }),
+            ] as const;
         }
 
         it('returns correct data rows', async () => {
@@ -107,7 +109,10 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('works with orderBy', async () => {
-            await createUser('u1@test.com', { role: 'USER', name: null });
+            await createUser('u1@test.com', {
+                role: 'USER',
+                name: null,
+            });
             await createUser('u2@test.com', { role: 'ADMIN', name: 'User2' });
 
             await expect(
@@ -145,10 +150,6 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     orderBy: { name: { sort: 'asc', nulls: 'last' } },
                 })
             ).resolves.toMatchObject({ email: 'u2@test.com' });
-
-            // TODO: nested sorting
-
-            // TODO: relation sorting
         });
 
         it('works with unique finds', async () => {
@@ -345,7 +346,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             ).resolves.toMatchObject(user1);
         });
 
-        it('works with to-many relation filters', async () => {
+        it('allows filtering by to-many relations', async () => {
             const user = await createUser();
             await createPosts(user.id);
 
@@ -386,7 +387,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             ).toResolveTruthy();
         });
 
-        it('works with to-one relation filters', async () => {
+        it('allows filtering by to-one relations', async () => {
             const user1 = await createUser('u1@test.com');
             await createPosts(user1.id);
             const user2 = await createUser('u2@test.com', { profile: null });
@@ -449,7 +450,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             ).resolves.toHaveLength(2);
         });
 
-        it('works with field selection', async () => {
+        it('allows field selection', async () => {
             const user = await createUser();
             await createPosts(user.id);
 
@@ -483,9 +484,9 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             });
         });
 
-        it('works with including filtered relation', async () => {
+        it('allows including relation', async () => {
             const user = await createUser();
-            await createPosts(user.id);
+            const [post1, post2] = await createPosts(user.id);
 
             let r = await client.user.findUniqueOrThrow({
                 where: { id: user.id },
@@ -534,6 +535,51 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     include: { author: { where: { email: user.email } } },
                 })
             ).rejects.toThrow(`Field "author" doesn't support filtering`);
+
+            // sorting
+            let u = await client.user.findUniqueOrThrow({
+                where: { id: user.id },
+                include: {
+                    posts: {
+                        orderBy: {
+                            published: 'asc',
+                        },
+                    },
+                },
+            });
+            expect(u.posts[0]).toMatchObject(post2);
+            u = await client.user.findUniqueOrThrow({
+                where: { id: user.id },
+                include: {
+                    posts: {
+                        orderBy: {
+                            published: 'desc',
+                        },
+                    },
+                },
+            });
+            expect(u.posts[0]).toMatchObject(post1);
+
+            // skip and take
+            u = await client.user.findUniqueOrThrow({
+                where: { id: user.id },
+                include: {
+                    posts: {
+                        take: 1,
+                        skip: 1,
+                    },
+                },
+            });
+            expect(u.posts).toHaveLength(1);
+            u = await client.user.findUniqueOrThrow({
+                where: { id: user.id },
+                include: {
+                    posts: {
+                        skip: 2,
+                    },
+                },
+            });
+            expect(u.posts).toHaveLength(0);
         });
 
         it('supports $expr', async () => {

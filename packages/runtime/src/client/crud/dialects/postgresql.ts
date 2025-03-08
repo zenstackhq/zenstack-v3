@@ -67,19 +67,46 @@ export class PostgresCrudDialect<
         return qb.leftJoinLateral(
             (eb) => {
                 const joinTableName = `${parentName}$${relationField}`;
+
+                // simple select by default
                 let result = eb.selectFrom(
                     `${relationModelDef.dbTable} as ${joinTableName}`
                 );
 
-                if (typeof payload === 'object' && payload.where) {
-                    result = result.where((eb) =>
-                        this.buildFilter(
-                            eb,
-                            relationModel,
-                            joinTableName,
-                            payload.where
-                        )
-                    );
+                // however if there're filter/orderBy/take/skip,
+                // we need to build a subquery to handle them before aggregation
+                if (payload && typeof payload === 'object') {
+                    result = eb.selectFrom(() => {
+                        let subQuery = eb
+                            .selectFrom(`${relationModelDef.dbTable}`)
+                            .selectAll();
+
+                        if (payload.where) {
+                            subQuery = subQuery.where((eb) =>
+                                this.buildFilter(
+                                    eb,
+                                    relationModel,
+                                    relationModelDef.dbTable,
+                                    payload.where
+                                )
+                            );
+                        }
+
+                        subQuery = this.buildSkipTake(
+                            subQuery,
+                            payload.skip,
+                            payload.take
+                        );
+
+                        if (payload.orderBy) {
+                            subQuery = this.buildOrderBy(
+                                subQuery,
+                                relationModelDef.dbTable,
+                                payload.orderBy
+                            );
+                        }
+                        return subQuery.as(joinTableName);
+                    });
                 }
 
                 result = this.buildRelationObjectSelect(

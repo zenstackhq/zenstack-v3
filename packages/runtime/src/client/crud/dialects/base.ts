@@ -749,6 +749,41 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         });
     }
 
+    buildOrderBy(
+        query: SelectQueryBuilder<any, any, any>,
+        table: string | undefined,
+        orderBy: NonNullable<
+            FindArgs<Schema, GetModels<Schema>, true>['orderBy']
+        >
+    ) {
+        let result = query;
+        enumerate(orderBy).forEach((orderBy) => {
+            for (const [field, value] of Object.entries(orderBy)) {
+                if (value === 'asc' || value === 'desc') {
+                    result = result.orderBy(
+                        table ? sql.ref(`${table}.${field}`) : sql.ref(field),
+                        value
+                    );
+                } else if (
+                    value &&
+                    typeof value === 'object' &&
+                    'nulls' in value &&
+                    'sort' in value &&
+                    (value.sort === 'asc' || value.sort === 'desc') &&
+                    (value.nulls === 'first' || value.nulls === 'last')
+                ) {
+                    result = result.orderBy(
+                        sql.ref(`${table}.${field}`),
+                        sql.raw(`${value.sort} nulls ${value.nulls}`)
+                    );
+                } else {
+                    throw new QueryError(`Invalid orderBy value: ${value}`);
+                }
+            }
+        });
+        return result;
+    }
+
     protected true(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
         return eb.lit<SqlBool>(
             this.transformPrimitive(true, 'Boolean') as boolean

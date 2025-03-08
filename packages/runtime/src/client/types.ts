@@ -32,7 +32,7 @@ import type {
     WrapType,
     XOR,
 } from '../utils/type-utils';
-import type { ToKysely } from './query-builder';
+import type { ToKyselySchema } from './query-builder';
 
 //#region Query results
 
@@ -155,8 +155,8 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
 } & {
     $expr?: (
         eb: ExpressionBuilder<
-            ToKysely<Schema>,
-            Model extends keyof ToKysely<Schema> ? Model : never
+            ToKyselySchema<Schema>,
+            GetModel<Schema, Model>['dbTable']
         >
     ) => OperandExpression<SqlBool>;
 } & {

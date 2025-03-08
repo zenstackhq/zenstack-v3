@@ -11,12 +11,14 @@ import type {
     SchemaDef,
 } from '../schema/schema';
 
-export type ToKysely<Schema extends SchemaDef> = Kysely<{
+export type ToKyselySchema<Schema extends SchemaDef> = {
     [Model in GetModels<Schema> as Schema['models'][Model]['dbTable']]: ToKyselyTable<
         Schema,
         Model
     >;
-}>;
+};
+
+export type ToKysely<Schema extends SchemaDef> = Kysely<ToKyselySchema<Schema>>;
 
 type ToKyselyTable<
     Schema extends SchemaDef,

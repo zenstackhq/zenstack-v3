@@ -4,9 +4,14 @@ import type {
     PostgresDialectConfig,
     SqliteDialectConfig,
 } from 'kysely';
-import type { DataSourceProvider, SchemaDef } from '../schema/schema';
+import type {
+    DataSourceProvider,
+    GetModel,
+    GetModels,
+    SchemaDef,
+} from '../schema/schema';
 import type { MergeIf } from '../utils/type-utils';
-import type { ToKysely } from './query-builder';
+import type { ToKyselySchema } from './query-builder';
 
 type DialectConfig<Provider extends DataSourceProvider> =
     Provider extends 'sqlite'
@@ -43,17 +48,17 @@ export type ClientOptions<Schema extends SchemaDef> = MergeIf<
     keyof ComputedFields<Schema> extends never ? false : true
 >;
 
-export type ComputedFields<
-    Schema extends SchemaDef,
-    KyselyDB = ToKysely<Schema>
-> = {
-    [Model in keyof Schema['models'] as 'computedFields' extends keyof Schema['models'][Model]
+export type ComputedFields<Schema extends SchemaDef> = {
+    [Model in GetModels<Schema> as 'computedFields' extends keyof GetModel<
+        Schema,
+        Model
+    >
         ? Model
         : never]: {
         [Field in keyof Schema['models'][Model]['computedFields']]: PrependParameter<
             ExpressionBuilder<
-                KyselyDB,
-                Model extends keyof KyselyDB ? Model : never
+                ToKyselySchema<Schema>,
+                GetModel<Schema, Model>['dbTable']
             >,
             Schema['models'][Model]['computedFields'][Field]
         >;
@@ -74,14 +79,17 @@ export type PolicySettings<Schema extends SchemaDef> = MergeIf<
     keyof ExternalRules<Schema> extends never ? false : true
 >;
 
-type ExternalRules<Schema extends SchemaDef, KyselyDB = ToKysely<Schema>> = {
-    [Model in keyof Schema['models'] as 'externalRules' extends keyof Schema['models'][Model]
+type ExternalRules<Schema extends SchemaDef> = {
+    [Model in GetModels<Schema> as 'externalRules' extends keyof GetModel<
+        Schema,
+        Model
+    >
         ? Model
         : never]: {
         [Rule in keyof Schema['models'][Model]['externalRules']]: PrependParameter<
             ExpressionBuilder<
-                KyselyDB,
-                Model extends keyof KyselyDB ? Model : never
+                ToKyselySchema<Schema>,
+                GetModel<Schema, Model>['dbTable']
             >,
             Schema['models'][Model]['externalRules'][Rule]
         >;

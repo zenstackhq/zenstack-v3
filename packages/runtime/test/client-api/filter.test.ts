@@ -497,5 +497,65 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 })
             ).resolves.toMatchObject(user1);
         });
+
+        it('supports enum filters', async () => {
+            await createUser();
+
+            // equals
+            await expect(
+                client.user.findFirst({ where: { role: 'ADMIN' } })
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({ where: { role: 'USER' } })
+            ).toResolveFalsy();
+
+            // in
+            await expect(
+                client.user.findFirst({ where: { role: { in: [] } } })
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({ where: { role: { in: ['ADMIN'] } } })
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({ where: { role: { in: ['USER'] } } })
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: { role: { in: ['ADMIN', 'USER'] } },
+                })
+            ).toResolveTruthy();
+
+            // notIn
+            await expect(
+                client.user.findFirst({ where: { role: { notIn: [] } } })
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({
+                    where: { role: { notIn: ['ADMIN'] } },
+                })
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: { role: { notIn: ['USER'] } },
+                })
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({
+                    where: { role: { notIn: ['ADMIN', 'USER'] } },
+                })
+            ).toResolveFalsy();
+
+            // not
+            await expect(
+                client.user.findFirst({
+                    where: { role: { not: { equals: 'ADMIN' } } },
+                })
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: { role: { not: { not: { equals: 'ADMIN' } } } },
+                })
+            ).toResolveTruthy();
+        });
     }
 );

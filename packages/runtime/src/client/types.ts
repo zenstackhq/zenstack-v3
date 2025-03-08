@@ -142,7 +142,11 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
           RelationFilter<Schema, Model, Key>
         : // enum
         GetFieldType<Schema, Model, Key> extends GetEnums<Schema>
-        ? string
+        ? EnumFilter<
+              Schema,
+              GetFieldType<Schema, Model, Key>,
+              FieldIsOptional<Schema, Model, Key>
+          >
         : // primitive
           PrimitiveFilter<
               GetFieldType<Schema, Model, Key>,
@@ -160,6 +164,19 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     OR?: Where<Schema, Model>[];
     NOT?: OrArray<Where<Schema, Model>>;
 };
+
+export type EnumFilter<
+    Schema extends SchemaDef,
+    T extends GetEnums<Schema>,
+    Nullable extends boolean
+> =
+    | NullableIf<keyof GetEnum<Schema, T>, Nullable>
+    | {
+          equals?: NullableIf<keyof GetEnum<Schema, T>, Nullable>;
+          in?: (keyof GetEnum<Schema, T>)[];
+          notIn?: (keyof GetEnum<Schema, T>)[];
+          not?: EnumFilter<Schema, T, Nullable>;
+      };
 
 export type PrimitiveFilter<
     T extends string,

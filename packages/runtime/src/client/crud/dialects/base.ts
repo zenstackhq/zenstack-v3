@@ -710,13 +710,20 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         eb: ExpressionBuilder<any, any>,
         table: string,
         field: string,
-        _fieldDef: FieldDef,
+        fieldDef: FieldDef,
         payload: any
     ) {
-        if (typeof payload === 'string' || payload === null) {
-            return eb(sql.ref(`${table}.${field}`), '=', payload);
-        }
-        throw new Error('Method not implemented.');
+        const conditions = this.buildStandardFilter(
+            eb,
+            'String',
+            payload,
+            sql.ref(`${table}.${field}`),
+            (value) => value,
+            (value) => this.buildEnumFilter(eb, table, field, fieldDef, value),
+            true,
+            ['equals', 'in', 'notIn', 'not']
+        );
+        return this.and(eb, ...conditions.conditions);
     }
 
     protected buildJoinPairs(

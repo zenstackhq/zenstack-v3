@@ -1,7 +1,7 @@
 import { match, P } from 'ts-pattern';
 import { z, ZodSchema } from 'zod';
 import type { GetModels, SchemaDef } from '../../../schema';
-import type { BuiltinType, FieldDef } from '../../../schema/schema';
+import type { BuiltinType, EnumDef, FieldDef } from '../../../schema/schema';
 import { InternalError, QueryError } from '../../errors';
 import {
     fieldHasDefaultValue,
@@ -133,10 +133,8 @@ export class InputValidator<Schema extends SchemaDef> {
                 if (enumDef) {
                     // enum
                     if (Object.keys(enumDef).length > 0) {
-                        fieldSchema = this.nullableIf(
-                            z.enum(
-                                Object.keys(enumDef) as [string, ...string[]]
-                            ),
+                        fieldSchema = this.makeEnumFilterSchema(
+                            enumDef,
                             !!fieldDef.optional
                         );
                     }
@@ -205,6 +203,26 @@ export class InputValidator<Schema extends SchemaDef> {
         }
 
         return result;
+    }
+
+    private makeEnumFilterSchema(enumDef: EnumDef, optional: boolean) {
+        const baseSchema = z.enum(
+            Object.keys(enumDef) as [string, ...string[]]
+        );
+        const components = this.makeCommonPrimitiveFilterComponents(
+            baseSchema,
+            optional,
+            () => z.lazy(() => this.makeEnumFilterSchema(enumDef, optional))
+        );
+        return z.union([
+            this.nullableIf(baseSchema, optional),
+            z.object({
+                equals: components.equals,
+                in: components.in,
+                notIn: components.notIn,
+                not: components.not,
+            }),
+        ]);
     }
 
     protected makePrimitiveFilterSchema(type: BuiltinType, optional: boolean) {

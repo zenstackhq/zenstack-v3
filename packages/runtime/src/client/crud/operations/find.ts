@@ -72,7 +72,12 @@ export class FindOperationHandler<
 
         // orderBy
         if (args?.orderBy) {
-            query = dialect.buildOrderBy(query, modelDef.dbTable, args.orderBy);
+            query = dialect.buildOrderBy(
+                query,
+                model,
+                modelDef.dbTable,
+                args.orderBy
+            );
         }
 
         // select

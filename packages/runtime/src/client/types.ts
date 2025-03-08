@@ -252,6 +252,16 @@ export type OrderBy<
               nulls?: NullsOrder;
           }
         : SortOrder;
+} & {
+    [Key in RelationFields<Schema, Model>]?: FieldIsArray<
+        Schema,
+        Model,
+        Key
+    > extends true
+        ? {
+              _count?: SortOrder;
+          }
+        : OrderBy<Schema, RelationFieldType<Schema, Model, Key>>;
 };
 
 export type WhereUnique<

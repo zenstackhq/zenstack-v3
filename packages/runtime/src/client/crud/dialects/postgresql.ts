@@ -101,6 +101,7 @@ export class PostgresCrudDialect<
                         if (payload.orderBy) {
                             subQuery = this.buildOrderBy(
                                 subQuery,
+                                relationModel,
                                 relationModelDef.dbTable,
                                 payload.orderBy
                             );

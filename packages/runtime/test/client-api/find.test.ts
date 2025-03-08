@@ -109,11 +109,17 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('works with orderBy', async () => {
-            await createUser('u1@test.com', {
+            const user1 = await createUser('u1@test.com', {
                 role: 'USER',
                 name: null,
+                profile: { create: { bio: 'My bio' } },
             });
-            await createUser('u2@test.com', { role: 'ADMIN', name: 'User2' });
+            const user2 = await createUser('u2@test.com', {
+                role: 'ADMIN',
+                name: 'User2',
+                profile: { create: { bio: 'My other bio' } },
+            });
+            await createPosts(user1.id);
 
             await expect(
                 client.user.findFirst({ orderBy: { email: 'asc' } })
@@ -150,6 +156,30 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     orderBy: { name: { sort: 'asc', nulls: 'last' } },
                 })
             ).resolves.toMatchObject({ email: 'u2@test.com' });
+
+            // by to-many relation
+            await expect(
+                client.user.findFirst({
+                    orderBy: { posts: { _count: 'desc' } },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    orderBy: { posts: { _count: 'asc' } },
+                })
+            ).resolves.toMatchObject(user2);
+
+            // by to-one relation
+            await expect(
+                client.user.findFirst({
+                    orderBy: { profile: { bio: 'asc' } },
+                })
+            ).resolves.toMatchObject(user1);
+            await expect(
+                client.user.findFirst({
+                    orderBy: { profile: { bio: 'desc' } },
+                })
+            ).resolves.toMatchObject(user2);
         });
 
         it('works with unique finds', async () => {

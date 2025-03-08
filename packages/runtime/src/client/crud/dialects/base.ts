@@ -18,6 +18,7 @@ import type {
     BooleanFilter,
     DateTimeFilter,
     FindArgs,
+    SortOrder,
     StringFilter,
 } from '../../types';
 import type { CrudOperation } from '../crud-handler';
@@ -751,7 +752,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     buildOrderBy(
         query: SelectQueryBuilder<any, any, any>,
-        table: string | undefined,
+        model: string,
+        table: string,
         orderBy: NonNullable<
             FindArgs<Schema, GetModels<Schema>, true>['orderBy']
         >
@@ -759,28 +761,111 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         let result = query;
         enumerate(orderBy).forEach((orderBy) => {
             for (const [field, value] of Object.entries(orderBy)) {
-                if (value === 'asc' || value === 'desc') {
-                    result = result.orderBy(
-                        table ? sql.ref(`${table}.${field}`) : sql.ref(field),
-                        value
-                    );
-                } else if (
-                    value &&
-                    typeof value === 'object' &&
-                    'nulls' in value &&
-                    'sort' in value &&
-                    (value.sort === 'asc' || value.sort === 'desc') &&
-                    (value.nulls === 'first' || value.nulls === 'last')
-                ) {
-                    result = result.orderBy(
-                        sql.ref(`${table}.${field}`),
-                        sql.raw(`${value.sort} nulls ${value.nulls}`)
-                    );
+                if (!value) {
+                    continue;
+                }
+
+                const fieldDef = requireField(this.schema, model, field);
+
+                if (!fieldDef.relation) {
+                    if (value === 'asc' || value === 'desc') {
+                        result = result.orderBy(
+                            sql.ref(`${table}.${field}`),
+                            value
+                        );
+                    } else if (
+                        value &&
+                        typeof value === 'object' &&
+                        'nulls' in value &&
+                        'sort' in value &&
+                        (value.sort === 'asc' || value.sort === 'desc') &&
+                        (value.nulls === 'first' || value.nulls === 'last')
+                    ) {
+                        result = result.orderBy(
+                            sql.ref(`${table}.${field}`),
+                            sql.raw(`${value.sort} nulls ${value.nulls}`)
+                        );
+                    }
                 } else {
-                    throw new QueryError(`Invalid orderBy value: ${value}`);
+                    // order by relation
+                    const relationModelDef = requireModel(
+                        this.schema,
+                        fieldDef.type
+                    );
+
+                    if (fieldDef.array) {
+                        // order by to-many relation
+                        if (typeof value !== 'object') {
+                            throw new QueryError(
+                                `invalid orderBy value for field "${field}"`
+                            );
+                        }
+                        if ('_count' in value) {
+                            const sort = value._count;
+                            result = result.orderBy((eb) => {
+                                let subQuery = eb.selectFrom(
+                                    relationModelDef.dbTable
+                                );
+                                const joinPairs = this.buildJoinPairs(
+                                    model,
+                                    table,
+                                    field,
+                                    relationModelDef.dbTable
+                                );
+                                subQuery = subQuery.where(() =>
+                                    this.and(
+                                        eb,
+                                        ...joinPairs.map(([left, right]) =>
+                                            eb(
+                                                sql.ref(left),
+                                                '=',
+                                                sql.ref(right)
+                                            )
+                                        )
+                                    )
+                                );
+                                subQuery = subQuery.select(() =>
+                                    eb.fn.count(eb.lit(1)).as('_count')
+                                );
+                                return subQuery;
+                            }, sort as SortOrder);
+                        }
+                    } else {
+                        // order by to-one relation
+                        result = result.leftJoin(
+                            relationModelDef.dbTable,
+                            (join) => {
+                                const joinPairs = this.buildJoinPairs(
+                                    model,
+                                    table,
+                                    field,
+                                    relationModelDef.dbTable
+                                );
+                                return join.on((eb) =>
+                                    this.and(
+                                        eb,
+                                        ...joinPairs.map(([left, right]) =>
+                                            eb(
+                                                sql.ref(left),
+                                                '=',
+                                                sql.ref(right)
+                                            )
+                                        )
+                                    )
+                                );
+                            }
+                        );
+                        result = this.buildOrderBy(
+                            result,
+                            fieldDef.type,
+                            relationModelDef.dbTable,
+                            value
+                        );
+                    }
                 }
             }
         });
+
         return result;
     }
 

@@ -30,7 +30,6 @@
         "noPropertyAccessFromIndexSignature": true,
         "allowUnusedLabels": false,
         "allowUnreachableCode": false,
-        "noErrorTruncation": true,
         "skipLibCheck": true,
         "declaration": true
     },

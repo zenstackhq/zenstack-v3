@@ -11,7 +11,7 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { CreateArgs, FindArgs } from '../../types';
+import type { CreateArgs, FindArgs, UpdateArgs } from '../../types';
 
 export class InputValidator<Schema extends SchemaDef> {
     constructor(private readonly schema: Schema) {}
@@ -34,7 +34,17 @@ export class InputValidator<Schema extends SchemaDef> {
         return args as CreateArgs<Schema, GetModels<Schema>>;
     }
 
-    // #region find
+    validateUpdateArgs(model: string, args: unknown) {
+        const schema = this.makeUpdateSchema(model);
+        const { error } = schema.safeParse(args);
+        if (error) {
+            throw new QueryError(`Invalid update args: ${error}`);
+        }
+        return args as UpdateArgs<Schema, GetModels<Schema>>;
+    }
+
+    // #region Find
+
     private makeFindSchema(
         model: string,
         unique: boolean,
@@ -400,9 +410,11 @@ export class InputValidator<Schema extends SchemaDef> {
 
         return z.object(fields);
     }
+
     // #endregion
 
-    // #region create
+    // #region Create
+
     private makeCreateSchema(model: string) {
         const dataSchema = this.makeCreateDataSchema(model, false);
         return z
@@ -452,7 +464,11 @@ export class InputValidator<Schema extends SchemaDef> {
                 }
 
                 let fieldSchema: ZodSchema = z.lazy(() =>
-                    this.makeRelationSchema(fieldDef, excludeFields)
+                    this.makeManipulationRelationSchema(
+                        fieldDef,
+                        excludeFields,
+                        'create'
+                    )
                 );
 
                 // optional or array relations are optional
@@ -503,31 +519,51 @@ export class InputValidator<Schema extends SchemaDef> {
         }
     }
 
-    private makeRelationSchema(fieldDef: FieldDef, withoutFields: string[]) {
+    private makeManipulationRelationSchema(
+        fieldDef: FieldDef,
+        withoutFields: string[],
+        mode: 'create' | 'update'
+    ) {
+        let fields: Record<string, ZodSchema> = {
+            create: this.makeCreateDataSchema(
+                fieldDef.type,
+                !!fieldDef.array,
+                withoutFields
+            ).optional(),
+
+            connect: this.makeConnectDisconnectDataSchema(
+                fieldDef.type,
+                !!fieldDef.array
+            ).optional(),
+
+            connectOrCreate: this.makeConnectOrCreateDataSchema(
+                fieldDef.type,
+                !!fieldDef.array,
+                withoutFields
+            ).optional(),
+
+            disconnect: this.makeConnectDisconnectDataSchema(
+                fieldDef.type,
+                !!fieldDef.array
+            ).optional(),
+        };
+
+        if (fieldDef.array) {
+            fields['createMany'] = this.makeCreateManyDataSchema(
+                fieldDef,
+                []
+            ).optional();
+
+            if (mode === 'update') {
+                fields['set'] = this.makeConnectDisconnectDataSchema(
+                    fieldDef.type,
+                    true
+                ).optional();
+            }
+        }
+
         return z
-            .object({
-                create: this.makeCreateDataSchema(
-                    fieldDef.type,
-                    !!fieldDef.array,
-                    withoutFields
-                ).optional(),
-
-                connect: this.makeConnectDataSchema(
-                    fieldDef.type,
-                    !!fieldDef.array
-                ).optional(),
-
-                connectOrCreate: this.makeConnectOrCreateDataSchema(
-                    fieldDef.type,
-                    !!fieldDef.array,
-                    withoutFields
-                ).optional(),
-
-                createMany: this.makeCreateManyDataSchema(
-                    fieldDef,
-                    []
-                ).optional(),
-            })
+            .object(fields)
             .strict()
             .refine(
                 (v) => Object.keys(v).length > 0,
@@ -535,7 +571,10 @@ export class InputValidator<Schema extends SchemaDef> {
             );
     }
 
-    private makeConnectDataSchema(model: string, canBeArray: boolean) {
+    private makeConnectDisconnectDataSchema(
+        model: string,
+        canBeArray: boolean
+    ) {
         return this.orArray(this.makeWhereSchema(model, true), canBeArray);
     }
 
@@ -577,9 +616,101 @@ export class InputValidator<Schema extends SchemaDef> {
             })
             .strict();
     }
+
     // #endregion
 
-    // #region helpers
+    // #region Update
+
+    private makeUpdateSchema(model: string) {
+        return z
+            .object({
+                where: this.makeWhereSchema(model, true),
+                data: this.makeUpdateDataSchema(model),
+                select: z.record(z.string(), z.any()).optional(),
+                include: z.record(z.string(), z.any()).optional(),
+            })
+            .strict()
+            .refine(
+                (value) => !value['select'] || !value['include'],
+                '"select" and "include" cannot be used together'
+            );
+    }
+
+    private makeUpdateDataSchema(model: string) {
+        const regularAndFkFields: any = {};
+        const regularAndRelationFields: any = {};
+        const modelDef = requireModel(this.schema, model);
+        const hasRelation = Object.values(modelDef.fields).some(
+            (f) => f.relation
+        );
+
+        Object.keys(modelDef.fields).forEach((field) => {
+            // if (withoutFields.includes(field)) {
+            //     return;
+            // }
+            const fieldDef = requireField(this.schema, model, field);
+
+            if (fieldDef.relation) {
+                // if (withoutRelationFields) {
+                //     return;
+                // }
+                const excludeFields: string[] = [];
+                const oppositeField = fieldDef.relation.opposite;
+                if (oppositeField) {
+                    excludeFields.push(oppositeField);
+                    const oppositeFieldDef = requireField(
+                        this.schema,
+                        fieldDef.type,
+                        oppositeField
+                    );
+                    if (oppositeFieldDef.relation?.fields) {
+                        excludeFields.push(...oppositeFieldDef.relation.fields);
+                    }
+                }
+                let fieldSchema: ZodSchema = z
+                    .lazy(() =>
+                        this.makeManipulationRelationSchema(
+                            fieldDef,
+                            excludeFields,
+                            'update'
+                        )
+                    )
+                    .optional();
+                // optional to-one relation can be null
+                if (fieldDef.optional && !fieldDef.array) {
+                    fieldSchema = fieldSchema.nullable();
+                }
+                regularAndRelationFields[field] = fieldSchema;
+            } else {
+                let fieldSchema: ZodSchema = this.makePrimitiveSchema(
+                    fieldDef.type
+                ).optional();
+
+                if (fieldDef.optional) {
+                    fieldSchema = fieldSchema.nullable();
+                }
+
+                regularAndFkFields[field] = fieldSchema;
+                if (!fieldDef.foreignKeyFor) {
+                    regularAndRelationFields[field] = fieldSchema;
+                }
+            }
+        });
+
+        if (!hasRelation) {
+            return z.object(regularAndFkFields).strict();
+        } else {
+            return z.union([
+                z.object(regularAndFkFields).strict(),
+                z.object(regularAndRelationFields).strict(),
+            ]);
+        }
+    }
+
+    // #endregion
+
+    // #region Helpers
+
     private nullableIf(schema: ZodSchema, nullable: boolean) {
         return nullable ? schema.nullable() : schema;
     }

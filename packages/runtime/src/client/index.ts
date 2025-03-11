@@ -11,6 +11,7 @@ import { CrudHandler } from './crud/crud-handler';
 import { NotFoundError } from './errors';
 import { PolicyPlugin } from './features/policy';
 import type { ClientOptions, FeatureSettings } from './options';
+import { createDeferredPromise } from './promise';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
 import type { ModelOperations } from './types';
@@ -130,43 +131,59 @@ function createModelProxy<
     const handler = new CrudHandler(schema, kysely, options, model);
     const resultProcessor = new ResultProcessor(schema);
     return {
-        create: async (args) => {
-            const r = await handler.create(args);
-            return resultProcessor.processResult(r, model);
-        },
+        findUnique: (args) =>
+            createDeferredPromise(async () => {
+                const r = await handler.findUnique(args);
+                return resultProcessor.processResult(r, model) ?? null;
+            }),
 
-        findUnique: async (args) => {
-            const r = await handler.findUnique(args);
-            return resultProcessor.processResult(r, model) ?? null;
-        },
+        findUniqueOrThrow: (args) =>
+            createDeferredPromise(async () => {
+                const r = await handler.findUnique(args);
+                if (!r) {
+                    throw new NotFoundError(model);
+                } else {
+                    return resultProcessor.processResult(r, model);
+                }
+            }),
 
-        findUniqueOrThrow: async (args) => {
-            const r = await handler.findUnique(args);
-            if (!r) {
-                throw new NotFoundError(`No "${model}" found`);
-            } else {
+        findFirst: (args) =>
+            createDeferredPromise(async () => {
+                const r = await handler.findFirst(args);
                 return resultProcessor.processResult(r, model);
-            }
-        },
+            }),
 
-        findFirst: async (args) => {
-            const r = await handler.findFirst(args);
-            return resultProcessor.processResult(r, model);
-        },
+        findFirstOrThrow: (args) =>
+            createDeferredPromise(async () => {
+                const r = await handler.findFirst(args);
+                if (!r) {
+                    throw new NotFoundError(model);
+                } else {
+                    return resultProcessor.processResult(r, model);
+                }
+            }),
 
-        findFirstOrThrow: async (args) => {
-            const r = await handler.findFirst(args);
-            if (!r) {
-                throw new NotFoundError(`No "${model}" found`);
-            } else {
+        findMany: (args) =>
+            createDeferredPromise(async () => {
+                const r = await handler.findMany(args);
                 return resultProcessor.processResult(r, model);
-            }
+            }),
+
+        create: (args) =>
+            createDeferredPromise(async () => {
+                const r = await handler.create(args);
+                return resultProcessor.processResult(r, model);
+            }),
+
+        createMany: (_args) => {
+            throw new Error('Not implemented');
         },
 
-        findMany: async (args) => {
-            const r = await handler.findMany(args);
-            return resultProcessor.processResult(r, model);
-        },
+        update: (args) =>
+            createDeferredPromise(async () => {
+                const r = await handler.update(args);
+                return resultProcessor.processResult(r, model);
+            }),
     };
 }
 

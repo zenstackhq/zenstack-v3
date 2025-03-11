@@ -538,43 +538,10 @@ type CreateRelationFieldPayload<
     Field extends RelationFields<Schema, Model>
 > = Omit<
     {
-        create?: FieldIsArray<Schema, Model, Field> extends true
-            ? OrArray<
-                  CreateInput<
-                      Schema,
-                      RelationFieldType<Schema, Model, Field>,
-                      OppositeRelationAndFK<Schema, Model, Field>
-                  >
-              >
-            : CreateInput<
-                  Schema,
-                  RelationFieldType<Schema, Model, Field>,
-                  OppositeRelationAndFK<Schema, Model, Field>
-              >;
-
-        createMany?: CreateManyPayload<
-            Schema,
-            RelationFieldType<Schema, Model, Field>,
-            OppositeRelationAndFK<Schema, Model, Field>
-        >;
-
-        connect?: FieldIsArray<Schema, Model, Field> extends true
-            ? OrArray<
-                  WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>
-              >
-            : WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>;
-
-        connectOrCreate?: FieldIsArray<Schema, Model, Field> extends true
-            ? OrArray<
-                  ConnectOrCreatePayload<
-                      Schema,
-                      RelationFieldType<Schema, Model, Field>
-                  >
-              >
-            : ConnectOrCreatePayload<
-                  Schema,
-                  RelationFieldType<Schema, Model, Field>
-              >;
+        create?: NestedCreateInput<Schema, Model, Field>;
+        createMany?: NestedCreateManyInput<Schema, Model, Field>;
+        connect?: ConnectInput<Schema, Model, Field>;
+        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
     },
     // no "createMany" for non-array fields
     FieldIsArray<Schema, Model, Field> extends true ? never : 'createMany'
@@ -636,6 +603,123 @@ export type CreateInput<
 
 //#endregion
 
+// #region Update args
+
+export type UpdateArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    data: UpdateInput<Schema, Model>;
+    where: WhereUnique<Schema, Model>;
+    select?: Select<Schema, Model>;
+    include?: Include<Schema, Model>;
+};
+
+export type UpdateInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    [Key in NonRelationFields<Schema, Model>]?: MapFieldType<
+        Schema,
+        Model,
+        Key
+    >;
+} & {
+    [Key in RelationFields<Schema, Model>]?: UpdateRelationFieldPayload<
+        Schema,
+        Model,
+        Key
+    >;
+};
+
+type UpdateRelationFieldPayload<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = Omit<
+    {
+        create?: NestedCreateInput<Schema, Model, Field>;
+        createMany?: NestedCreateManyInput<Schema, Model, Field>;
+        connect?: ConnectInput<Schema, Model, Field>;
+        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+        disconnect?: DisconnectInput<Schema, Model, Field>;
+        set?: SetInput<Schema, Model, Field>;
+    },
+    // no "createMany" for non-array fields
+    FieldIsArray<Schema, Model, Field> extends true
+        ? never
+        : 'createMany' | 'set'
+>;
+
+// #endregion
+
+// #region Relation manipulation
+
+type NestedCreateInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = FieldIsArray<Schema, Model, Field> extends true
+    ? OrArray<
+          CreateInput<
+              Schema,
+              RelationFieldType<Schema, Model, Field>,
+              OppositeRelationAndFK<Schema, Model, Field>
+          >
+      >
+    : CreateInput<
+          Schema,
+          RelationFieldType<Schema, Model, Field>,
+          OppositeRelationAndFK<Schema, Model, Field>
+      >;
+
+type NestedCreateManyInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = CreateManyPayload<
+    Schema,
+    RelationFieldType<Schema, Model, Field>,
+    OppositeRelationAndFK<Schema, Model, Field>
+>;
+
+type ConnectInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = FieldIsArray<Schema, Model, Field> extends true
+    ? OrArray<WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>>
+    : WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>;
+
+type ConnectOrCreateInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = FieldIsArray<Schema, Model, Field> extends true
+    ? OrArray<
+          ConnectOrCreatePayload<
+              Schema,
+              RelationFieldType<Schema, Model, Field>
+          >
+      >
+    : ConnectOrCreatePayload<Schema, RelationFieldType<Schema, Model, Field>>;
+
+type DisconnectInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = FieldIsArray<Schema, Model, Field> extends true
+    ? OrArray<WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>>
+    : WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>;
+
+type SetInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = OrArray<WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>>;
+
+// #endregion
+
 //#region Client API
 
 export type ModelOperations<
@@ -664,6 +748,14 @@ export type ModelOperations<
 
     create<T extends CreateArgs<Schema, Model>>(
         args: SelectSubset<T, CreateArgs<Schema, Model>>
+    ): Promise<ModelResult<Schema, Model, T>>;
+
+    createMany<T extends CreateManyPayload<Schema, Model>>(
+        args: SelectSubset<T, CreateManyPayload<Schema, Model>>
+    ): Promise<{ count: number }>;
+
+    update<T extends UpdateArgs<Schema, Model>>(
+        args: SelectSubset<T, UpdateArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T>>;
 };
 

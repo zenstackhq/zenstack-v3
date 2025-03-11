@@ -11,7 +11,7 @@ export class InternalError extends Error {
 }
 
 export class NotFoundError extends Error {
-    constructor(message: string) {
-        super(message);
+    constructor(model: string) {
+        super(`Entity not found for model "${model}"`);
     }
 }

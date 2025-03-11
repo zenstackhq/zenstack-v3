@@ -21,7 +21,6 @@ import type {
     SortOrder,
     StringFilter,
 } from '../../types';
-import type { CrudOperation } from '../crud-handler';
 
 export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     constructor(
@@ -36,7 +35,6 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     abstract buildRelationSelection(
         query: SelectQueryBuilder<any, any, {}>,
         model: string,
-        operation: CrudOperation,
         relationField: string,
         parentAlias: string,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>

@@ -4,12 +4,21 @@ import type { ToKysely } from '../query-builder';
 import type { BaseOperationHandler } from './operations/base';
 import { CreateOperationHandler } from './operations/create';
 import { FindOperationHandler } from './operations/find';
+import { UpdateOperationHandler } from './operations/update';
 
-export type CrudOperation = 'findMany' | 'findUnique' | 'findFirst' | 'create';
+export type CrudOperation =
+    | 'findMany'
+    | 'findUnique'
+    | 'findFirst'
+    | 'create'
+    | 'createMany'
+    | 'update'
+    | 'updateMany';
 
 export class CrudHandler<Schema extends SchemaDef> {
-    private readonly createOperation: BaseOperationHandler<Schema>;
     private readonly findHandler: BaseOperationHandler<Schema>;
+    private readonly createOperation: BaseOperationHandler<Schema>;
+    private readonly updateOperation: BaseOperationHandler<Schema>;
 
     constructor(
         protected readonly schema: Schema,
@@ -17,22 +26,24 @@ export class CrudHandler<Schema extends SchemaDef> {
         public readonly options: ClientOptions<Schema>,
         protected readonly model: GetModels<Schema>
     ) {
-        this.createOperation = new CreateOperationHandler(
-            schema,
-            kysely,
-            model,
-            this.options
-        );
         this.findHandler = new FindOperationHandler(
             schema,
             kysely,
             model,
             this.options
         );
-    }
-
-    create(args: unknown) {
-        return this.createOperation.handle('create', args);
+        this.createOperation = new CreateOperationHandler(
+            schema,
+            kysely,
+            model,
+            this.options
+        );
+        this.updateOperation = new UpdateOperationHandler(
+            schema,
+            kysely,
+            model,
+            this.options
+        );
     }
 
     findUnique(args: unknown) {
@@ -45,5 +56,13 @@ export class CrudHandler<Schema extends SchemaDef> {
 
     findMany(args: unknown) {
         return this.findHandler.handle('findMany', args);
+    }
+
+    create(args: unknown) {
+        return this.createOperation.handle('create', args);
+    }
+
+    update(args: unknown) {
+        return this.updateOperation.handle('update', args);
     }
 }

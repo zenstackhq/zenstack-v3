@@ -3,10 +3,11 @@ import type { Client } from '../../src/client';
 import { NotFoundError } from '../../src/client/errors';
 import { getSchema, pushSchema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
+import { createPosts, createUser } from './utils';
 
 const PG_DB_NAME = 'client-api-find-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME, true))(
+describe.each(createClientSpecs(PG_DB_NAME))(
     'Client find tests for $provider',
     ({ makeClient, provider }) => {
         const schema = getSchema(provider);
@@ -20,40 +21,12 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         afterEach(async () => {
             await client?.$disconnect();
         });
-
-        async function createUser(
-            email = 'u1@test.com',
-            restFields: any = {
-                name: 'User1',
-                role: 'ADMIN',
-                profile: { create: { bio: 'My bio' } },
-            }
-        ) {
-            return client.user.create({
-                data: {
-                    ...restFields,
-                    email,
-                },
-            });
-        }
-
-        async function createPosts(authorId: string) {
-            return [
-                await client.post.create({
-                    data: { title: 'Post1', published: true, authorId },
-                }),
-                await client.post.create({
-                    data: { title: 'Post2', published: false, authorId },
-                }),
-            ] as const;
-        }
-
         it('returns correct data rows', async () => {
             let r = await client.user.findMany();
             expect(r).toHaveLength(0);
 
-            const user = await createUser('u1@test.com');
-            await createPosts(user.id);
+            const user = await createUser(client, 'u1@test.com');
+            await createPosts(client, user.id);
 
             r = await client.user.findMany();
             expect(r).toHaveLength(1);
@@ -67,7 +40,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             r = await client.user.findMany({ where: { id: 'none' } });
             expect(r).toHaveLength(0);
 
-            await createUser('u2@test.com');
+            await createUser(client, 'u2@test.com');
 
             await expect(client.user.findMany()).resolves.toHaveLength(2);
             await expect(
@@ -76,9 +49,9 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('works with take and skip', async () => {
-            await createUser('u1@test.com');
-            await createUser('u2@test.com');
-            await createUser('u3@test.com');
+            await createUser(client, 'u1@test.com');
+            await createUser(client, 'u2@test.com');
+            await createUser(client, 'u3@test.com');
 
             // take
             await expect(
@@ -109,17 +82,17 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('works with orderBy', async () => {
-            const user1 = await createUser('u1@test.com', {
+            const user1 = await createUser(client, 'u1@test.com', {
                 role: 'USER',
                 name: null,
                 profile: { create: { bio: 'My bio' } },
             });
-            const user2 = await createUser('u2@test.com', {
+            const user2 = await createUser(client, 'u2@test.com', {
                 role: 'ADMIN',
                 name: 'User2',
                 profile: { create: { bio: 'My other bio' } },
             });
-            await createPosts(user1.id);
+            await createPosts(client, user1.id);
 
             await expect(
                 client.user.findFirst({ orderBy: { email: 'asc' } })
@@ -186,7 +159,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             let r = await client.user.findUnique({ where: { id: 'none' } });
             expect(r).toBeNull();
 
-            const user = await createUser();
+            const user = await createUser(client);
 
             r = await client.user.findUnique({ where: { id: user.id } });
             expect(r).toMatchObject({ id: user.id, email: 'u1@test.com' });
@@ -206,7 +179,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             let r = await client.user.findFirst({ where: { name: 'User1' } });
             expect(r).toBeNull();
 
-            const user = await createUser();
+            const user = await createUser(client);
 
             r = await client.user.findFirst({ where: { name: 'User1' } });
             expect(r).toMatchObject({ id: user.id, email: 'u1@test.com' });
@@ -219,8 +192,8 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('works with boolean composition', async () => {
-            const user1 = await createUser('u1@test.com');
-            const user2 = await createUser('u2@test.com');
+            const user1 = await createUser(client, 'u1@test.com');
+            const user2 = await createUser(client, 'u2@test.com');
 
             // AND
             await expect(
@@ -377,8 +350,8 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('allows filtering by to-many relations', async () => {
-            const user = await createUser();
-            await createPosts(user.id);
+            const user = await createUser(client);
+            await createPosts(client, user.id);
 
             // some
             await expect(
@@ -418,9 +391,11 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('allows filtering by to-one relations', async () => {
-            const user1 = await createUser('u1@test.com');
-            await createPosts(user1.id);
-            const user2 = await createUser('u2@test.com', { profile: null });
+            const user1 = await createUser(client, 'u1@test.com');
+            await createPosts(client, user1.id);
+            const user2 = await createUser(client, 'u2@test.com', {
+                profile: null,
+            });
 
             // null check from non-owner side
             await expect(
@@ -481,8 +456,8 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('allows field selection', async () => {
-            const user = await createUser();
-            await createPosts(user.id);
+            const user = await createUser(client);
+            await createPosts(client, user.id);
 
             let r = await client.user.findUnique({
                 where: { id: user.id },
@@ -515,8 +490,8 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('allows including relation', async () => {
-            const user = await createUser();
-            const [post1, post2] = await createPosts(user.id);
+            const user = await createUser(client);
+            const [post1, post2] = await createPosts(client, user.id);
 
             let r = await client.user.findUniqueOrThrow({
                 where: { id: user.id },
@@ -613,8 +588,8 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
         });
 
         it('supports $expr', async () => {
-            await createUser('yiming@gmail.com');
-            await createUser('yiming@zenstack.dev');
+            await createUser(client, 'yiming@gmail.com');
+            await createUser(client, 'yiming@zenstack.dev');
 
             await expect(
                 client.user.findMany({

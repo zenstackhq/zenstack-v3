@@ -10,7 +10,6 @@ import type { SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef, GetModels } from '../../../schema/schema';
 import { buildFieldRef, requireField, requireModel } from '../../query-utils';
 import type { FindArgs } from '../../types';
-import { type CrudOperation } from '../crud-handler';
 import { BaseCrudDialect } from './base';
 
 export class PostgresCrudDialect<
@@ -31,7 +30,6 @@ export class PostgresCrudDialect<
     override buildRelationSelection(
         query: SelectQueryBuilder<any, any, {}>,
         model: string,
-        _operation: CrudOperation,
         relationField: string,
         parentAlias: string,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>

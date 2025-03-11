@@ -18,9 +18,7 @@ import {
 } from '../../query-utils';
 import type { CreateArgs } from '../../types';
 import type { CrudOperation } from '../crud-handler';
-import { getCrudDialect } from '../dialects';
 import { BaseOperationHandler } from './base';
-import { FindOperationHandler } from './find';
 import { InputValidator } from './validator';
 
 export class CreateOperationHandler<
@@ -59,7 +57,7 @@ export class CreateOperationHandler<
         const returnRelations = this.needReturnRelations(this.model, args);
 
         let result: any;
-        if (hasRelationCreate || returnRelations) {
+        if (hasRelationCreate) {
             // employ a transaction
             try {
                 result = await this.kysely
@@ -71,12 +69,15 @@ export class CreateOperationHandler<
                             this.model,
                             args.data
                         );
-                        return this.readBackResult(
-                            trx,
-                            this.model,
-                            createResult,
-                            args
-                        );
+                        return this.readUnique(trx, this.model, {
+                            select: args.select,
+                            include: args.include,
+                            where: getIdValues(
+                                this.schema,
+                                this.model,
+                                createResult
+                            ),
+                        });
                     });
             } catch (err) {
                 throw new QueryError(`Error during create: ${err}`);
@@ -88,7 +89,15 @@ export class CreateOperationHandler<
                 this.model,
                 args.data
             );
-            result = this.trimResult(createResult, args);
+            if (returnRelations) {
+                result = this.readUnique(this.kysely, this.model, {
+                    select: args.select,
+                    include: args.include,
+                    where: getIdValues(this.schema, this.model, createResult),
+                });
+            } else {
+                result = this.trimResult(createResult, args);
+            }
         }
 
         return result;
@@ -97,7 +106,7 @@ export class CreateOperationHandler<
     private async doCreate(
         kysely: ToKysely<Schema>,
         model: string,
-        payload: object,
+        args: object,
         parentModel?: string,
         parentField?: string,
         parentEntity?: any
@@ -114,9 +123,7 @@ export class CreateOperationHandler<
             );
         }
 
-        const dialect = getCrudDialect(this.schema, this.options);
-
-        for (const item of enumerate(payload)) {
+        for (const item of enumerate(args)) {
             const createFields: any = { ...parentFkFields };
             const postCreateRelations: Record<string, object> = {};
             for (const field in item) {
@@ -125,7 +132,7 @@ export class CreateOperationHandler<
                     isScalarField(this.schema, model, field) ||
                     isForeignKeyField(this.schema, model, field)
                 ) {
-                    createFields[field] = dialect.transformPrimitive(
+                    createFields[field] = this.dialect.transformPrimitive(
                         (item as any)[field],
                         fieldDef.type as BuiltinType
                     );
@@ -161,7 +168,7 @@ export class CreateOperationHandler<
                 createFields
             );
             const query = kysely
-                .insertInto(modelDef.dbTable as any)
+                .insertInto(modelDef.dbTable)
                 .values(updatedData)
                 .returningAll();
 
@@ -200,7 +207,7 @@ export class CreateOperationHandler<
             }
         }
 
-        if (Array.isArray(payload)) {
+        if (Array.isArray(args)) {
             return result;
         } else {
             return result[0];
@@ -461,31 +468,6 @@ export class CreateOperationHandler<
             acc[field] = data[field];
             return acc;
         }, {} as any);
-    }
-
-    private async readBackResult(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        primaryData: unknown,
-        args: CreateArgs<Schema, GetModels<Schema>>
-    ) {
-        // fetch relations based on include or select
-        const findHandler = new FindOperationHandler(
-            this.schema,
-            kysely,
-            model,
-            this.options
-        );
-        const read = await findHandler.handle(
-            'findUnique',
-            {
-                where: getIdValues(this.schema, model, primaryData),
-                select: args.select,
-                include: args.include,
-            },
-            false
-        );
-        return read ?? null;
     }
 
     private needReturnRelations(

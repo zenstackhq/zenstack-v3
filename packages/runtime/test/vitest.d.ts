@@ -3,7 +3,9 @@ import 'vitest';
 interface CustomMatchers<R = unknown> {
     toResolveTruthy: () => Promise<R>;
     toResolveFalsy: () => Promise<R>;
+    toResolveNull: () => Promise<R>;
     toResolveWithLength: (length: number) => Promise<R>;
+    toResolveNotFound: () => Promise<R>;
 }
 
 declare module 'vitest' {

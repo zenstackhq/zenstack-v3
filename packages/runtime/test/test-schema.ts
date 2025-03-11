@@ -122,6 +122,13 @@ const schema = {
                     type: 'String',
                     foreignKeyFor: ['author'],
                 },
+                comments: {
+                    type: 'Comment',
+                    array: true,
+                    relation: {
+                        opposite: 'post',
+                    },
+                },
             },
             idFields: ['id'],
             uniqueFields: {
@@ -155,6 +162,45 @@ const schema = {
                 },
             ],
         },
+        Comment: {
+            dbTable: 'Comment',
+            fields: {
+                id: {
+                    type: 'String',
+                    id: true,
+                    generator: 'cuid',
+                },
+                createdAt: {
+                    type: 'DateTime',
+                    default: { call: 'now()' },
+                },
+                updatedAt: {
+                    type: 'DateTime',
+                    updatedAt: true,
+                },
+                content: {
+                    type: 'String',
+                },
+                post: {
+                    type: 'Post',
+                    optional: true,
+                    relation: {
+                        fields: ['postId'],
+                        references: ['id'],
+                        opposite: 'comments',
+                    },
+                },
+                postId: {
+                    type: 'String',
+                    foreignKeyFor: ['post'],
+                    optional: true,
+                },
+            },
+            idFields: ['id'],
+            uniqueFields: {
+                id: { type: 'String' },
+            },
+        },
         Profile: {
             dbTable: 'Profile',
             fields: {
@@ -187,17 +233,6 @@ const schema = {
                 userId: { type: 'String' },
             },
         },
-        Foo: {
-            dbTable: 'Foo',
-            fields: {
-                id1: { type: 'Int' },
-                id2: { type: 'Int' },
-            },
-            idFields: ['id1', 'id2'],
-            uniqueFields: {
-                id1_id2: { id1: { type: 'Int' }, id2: { type: 'Int' } },
-            },
-        },
     },
     enums: {
         Role: {
@@ -225,6 +260,7 @@ export async function pushSchema(db: Client<typeof schema>) {
         .addColumn('email', 'varchar', (col) => col.unique().notNull())
         .addColumn('name', 'varchar')
         .addColumn('role', 'varchar', (col) => col.defaultTo('USER'))
+        .addUniqueConstraint('email_unique', ['email'])
         .execute();
 
     await db.$qb.schema
@@ -243,10 +279,28 @@ export async function pushSchema(db: Client<typeof schema>) {
         .execute();
 
     await db.$qb.schema
+        .createTable('Comment')
+        .addColumn('id', 'text', (col) => col.primaryKey())
+        .addColumn('createdAt', 'timestamp', (col) =>
+            col.defaultTo(sql`CURRENT_TIMESTAMP`)
+        )
+        .addColumn('updatedAt', 'timestamp', (col) => col.notNull())
+        .addColumn('content', 'varchar', (col) => col.notNull())
+        .addColumn('postId', 'varchar', (col) => col.references('Post.id'))
+        .execute();
+
+    await db.$qb.schema
         .createTable('Profile')
         .addColumn('id', 'text', (col) => col.primaryKey())
         .addColumn('bio', 'varchar', (col) => col.notNull())
         .addColumn('age', 'integer')
-        .addColumn('userId', 'varchar', (col) => col.references('User.id'))
+        .addColumn('userId', 'varchar', (col) => col.notNull())
+        .addForeignKeyConstraint(
+            'fk_profile_user',
+            ['userId'],
+            'User',
+            ['id'],
+            (cb) => cb.onDelete('cascade').onUpdate('cascade')
+        )
         .execute();
 }

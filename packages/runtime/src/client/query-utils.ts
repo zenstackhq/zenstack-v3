@@ -1,5 +1,5 @@
 import type { ExpressionBuilder, ExpressionWrapper } from 'kysely';
-import type { FieldDef, SchemaDef } from '../schema/schema';
+import type { FieldDef, GetModels, SchemaDef } from '../schema/schema';
 import { InternalError, QueryError } from './errors';
 import type { ClientOptions } from './options';
 
@@ -36,7 +36,10 @@ export function requireField(schema: SchemaDef, model: string, field: string) {
     return modelDef.fields[field];
 }
 
-export function getIdFields(schema: SchemaDef, model: string) {
+export function getIdFields<Schema extends SchemaDef>(
+    schema: SchemaDef,
+    model: GetModels<Schema>
+) {
     const modelDef = requireModel(schema, model);
     return modelDef?.idFields;
 }

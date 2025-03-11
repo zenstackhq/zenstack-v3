@@ -15,7 +15,6 @@ import {
     requireModel,
 } from '../../query-utils';
 import type { FindArgs } from '../../types';
-import type { CrudOperation } from '../crud-handler';
 import { BaseCrudDialect } from './base';
 
 export class SqliteCrudDialect<
@@ -37,7 +36,6 @@ export class SqliteCrudDialect<
     override buildRelationSelection(
         query: SelectQueryBuilder<any, any, {}>,
         model: string,
-        operation: CrudOperation,
         relationField: string,
         parentAlias: string,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>
@@ -45,7 +43,6 @@ export class SqliteCrudDialect<
         return query.select((eb) =>
             this.buildRelationJSON(
                 model,
-                operation,
                 eb,
                 relationField,
                 parentAlias,
@@ -56,7 +53,6 @@ export class SqliteCrudDialect<
 
     private buildRelationJSON(
         model: string,
-        operation: CrudOperation,
         eb: ExpressionBuilder<any, any>,
         relationField: string,
         parentName: string,
@@ -175,7 +171,6 @@ export class SqliteCrudDialect<
                         .map(([field, value]) => {
                             const subJson = this.buildRelationJSON(
                                 relationModel as GetModels<Schema>,
-                                operation,
                                 eb1,
                                 field,
                                 `${parentName}$${relationField}`,

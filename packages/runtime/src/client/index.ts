@@ -7,6 +7,7 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import { type GetModels, type SchemaDef } from '../schema/schema';
+import type { ModelOperations } from './client-types';
 import { CrudHandler } from './crud/crud-handler';
 import { NotFoundError } from './errors';
 import { PolicyPlugin } from './features/policy';
@@ -14,7 +15,6 @@ import type { ClientOptions, FeatureSettings } from './options';
 import { createDeferredPromise } from './promise';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
-import type { ModelOperations } from './types';
 
 export type Client<Schema extends SchemaDef> = {
     $qb: ToKysely<Schema>;
@@ -187,6 +187,6 @@ function createModelProxy<
     };
 }
 
+export type * from './client-types';
 export type { FeatureSettings, PolicySettings } from './options';
-export type * from './types';
 export type { ClientOptions, ToKysely };

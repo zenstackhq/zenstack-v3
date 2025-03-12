@@ -1,7 +1,7 @@
 import type { GetModels, SchemaDef } from '../../../schema';
+import type { FindArgs } from '../../client-types';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
-import type { FindArgs } from '../../types';
 import type { CrudOperation } from '../crud-handler';
 import { BaseOperationHandler } from './base';
 import { InputValidator } from './validator';

@@ -6,6 +6,7 @@ import type { FieldDef, GetModels, ModelDef, SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldGenerator } from '../../../schema/schema';
 import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
+import type { CreateArgs } from '../../client-types';
 import { QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
@@ -16,7 +17,6 @@ import {
     isScalarField,
     requireField,
 } from '../../query-utils';
-import type { CreateArgs } from '../../types';
 import type { CrudOperation } from '../crud-handler';
 import { BaseOperationHandler } from './base';
 import { InputValidator } from './validator';
@@ -80,7 +80,8 @@ export class CreateOperationHandler<
                         });
                     });
             } catch (err) {
-                throw new QueryError(`Error during create: ${err}`);
+                // console.error(err);
+                throw err;
             }
         } else {
             // simple create

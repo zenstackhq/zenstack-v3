@@ -133,11 +133,16 @@ export type ModelResult<
 
 //#region Common structures
 
-export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in GetFields<Schema, Model>]?: Key extends RelationFields<
-        Schema,
-        Model
-    >
+export type Where<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    ScalarOnly extends boolean = false
+> = {
+    [Key in GetFields<Schema, Model> as ScalarOnly extends true
+        ? Key extends RelationFields<Schema, Model>
+            ? never
+            : Key
+        : Key]?: Key extends RelationFields<Schema, Model>
         ? // relation
           RelationFilter<Schema, Model, Key>
         : // enum
@@ -160,9 +165,9 @@ export type Where<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
         >
     ) => OperandExpression<SqlBool>;
 } & {
-    AND?: OrArray<Where<Schema, Model>>;
-    OR?: Where<Schema, Model>[];
-    NOT?: OrArray<Where<Schema, Model>>;
+    AND?: OrArray<Where<Schema, Model, ScalarOnly>>;
+    OR?: Where<Schema, Model, ScalarOnly>[];
+    NOT?: OrArray<Where<Schema, Model, ScalarOnly>>;
 };
 
 export type EnumFilter<
@@ -615,22 +620,42 @@ export type UpdateArgs<
     include?: Include<Schema, Model>;
 };
 
+export type UpdateScalarInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Without extends string = never
+> = Omit<
+    {
+        [Key in NonRelationFields<Schema, Model>]?: MapFieldType<
+            Schema,
+            Model,
+            Key
+        >;
+    },
+    Without
+>;
+
+export type UpdateRelationInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Without extends string = never
+> = Omit<
+    {
+        [Key in RelationFields<Schema, Model>]?: UpdateRelationFieldPayload<
+            Schema,
+            Model,
+            Key
+        >;
+    },
+    Without
+>;
+
 export type UpdateInput<
     Schema extends SchemaDef,
-    Model extends GetModels<Schema>
-> = {
-    [Key in NonRelationFields<Schema, Model>]?: MapFieldType<
-        Schema,
-        Model,
-        Key
-    >;
-} & {
-    [Key in RelationFields<Schema, Model>]?: UpdateRelationFieldPayload<
-        Schema,
-        Model,
-        Key
-    >;
-};
+    Model extends GetModels<Schema>,
+    Without extends string = never
+> = UpdateScalarInput<Schema, Model, Without> &
+    UpdateRelationInput<Schema, Model, Without>;
 
 type UpdateRelationFieldPayload<
     Schema extends SchemaDef,
@@ -644,6 +669,10 @@ type UpdateRelationFieldPayload<
         connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
         disconnect?: DisconnectInput<Schema, Model, Field>;
         set?: SetInput<Schema, Model, Field>;
+        update?: NestedUpdateInput<Schema, Model, Field>;
+        updateMany?: NestedUpdateManyInput<Schema, Model, Field>;
+        delete?: NestedDeleteInput<Schema, Model, Field>;
+        deleteMany?: NestedDeleteManyInput<Schema, Model, Field>;
     },
     // no "createMany" for non-array fields
     FieldIsArray<Schema, Model, Field> extends true
@@ -708,15 +737,63 @@ type DisconnectInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
-> = FieldIsArray<Schema, Model, Field> extends true
-    ? OrArray<WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>>
-    : WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>;
+> = OrArray<
+    WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
+    FieldIsArray<Schema, Model, Field>
+>;
 
 type SetInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
 > = OrArray<WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>>;
+
+type NestedUpdateInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = OrArray<
+    {
+        where: WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>;
+        data: UpdateInput<
+            Schema,
+            RelationFieldType<Schema, Model, Field>,
+            OppositeRelationAndFK<Schema, Model, Field>
+        >;
+    },
+    FieldIsArray<Schema, Model, Field>
+>;
+
+type NestedUpdateManyInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = OrArray<
+    {
+        where: Where<Schema, RelationFieldType<Schema, Model, Field>>;
+        data: UpdateInput<
+            Schema,
+            RelationFieldType<Schema, Model, Field>,
+            OppositeRelationAndFK<Schema, Model, Field>
+        >;
+    },
+    true
+>;
+
+type NestedDeleteInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = OrArray<
+    WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
+    FieldIsArray<Schema, Model, Field>
+>;
+
+type NestedDeleteManyInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = OrArray<Where<Schema, RelationFieldType<Schema, Model, Field>, true>>;
 
 // #endregion
 

@@ -67,7 +67,7 @@ expect.extend({
         };
     },
 
-    async toResolveNotFound(received: Promise<unknown>) {
+    async toRejectNotFound(received: Promise<unknown>) {
         if (!isPromise(received)) {
             return { message: () => 'a promise is expected', pass: false };
         }

@@ -1,11 +1,18 @@
 import { createId } from '@paralleldrive/cuid2';
 import { sql, type SelectQueryBuilder } from 'kysely';
+import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import * as uuid from 'uuid';
 import type { GetModels, ModelDef, SchemaDef } from '../../../schema';
-import type { FieldGenerator } from '../../../schema/schema';
+import type {
+    BuiltinType,
+    FieldDef,
+    FieldGenerator,
+} from '../../../schema/schema';
 import { clone } from '../../../utils/clone';
-import { InternalError, QueryError } from '../../errors';
+import { enumerate } from '../../../utils/enumerate';
+import type { FindArgs } from '../../client-types';
+import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
 import {
@@ -14,14 +21,21 @@ import {
     getIdFields,
     getModel,
     getRelationForeignKeyFieldPairs,
+    isForeignKeyField,
     isRelationField,
+    isScalarField,
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { FindArgs } from '../../types';
 import type { CrudOperation } from '../crud-handler';
 import { getCrudDialect } from '../dialects';
 import type { BaseCrudDialect } from '../dialects/base';
+
+export type FromRelationContext = {
+    model: string;
+    field: string;
+    ids: any;
+};
 
 export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected readonly dialect: BaseCrudDialect<Schema>;
@@ -214,11 +228,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         data: any,
-        fromRelation?: {
-            model: string;
-            field: string;
-            ids: any;
-        }
+        fromRelation?: FromRelationContext
     ): Promise<unknown> {
         if (!data || typeof data !== 'object') {
             throw new InternalError('data must be an object');
@@ -292,6 +302,48 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return result[0];
     }
 
+    protected async createMany(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        input: { data: any; skipDuplicates: boolean },
+        fromRelation?: FromRelationContext
+    ): Promise<unknown> {
+        const modelDef = this.requireModel(model);
+
+        let relationKeyPairs: { fk: string; pk: string }[] = [];
+        if (fromRelation) {
+            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                this.schema,
+                fromRelation.model,
+                fromRelation.field
+            );
+            if (ownedByModel) {
+                throw new QueryError(
+                    'incorrect relation hierarchy for createMany'
+                );
+            }
+            relationKeyPairs = keyPairs;
+        }
+
+        const createData = enumerate(input.data).map((item) => {
+            if (fromRelation) {
+                item = { ...item };
+                for (const { fk, pk } of relationKeyPairs) {
+                    item[fk] = fromRelation.ids[pk];
+                }
+            }
+            return this.fillGeneratedValues(modelDef, item);
+        });
+
+        return kysely
+            .insertInto(modelDef.dbTable)
+            .values(createData)
+            .$if(input.skipDuplicates, (qb) =>
+                qb.onConflict((oc) => oc.doNothing())
+            )
+            .execute();
+    }
+
     private fillGeneratedValues(modelDef: ModelDef, data: object) {
         const fields = modelDef.fields;
         const values: any = clone(data);
@@ -319,6 +371,310 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             .with('uuid7', () => uuid.v7())
             .with('nanoid', () => uuid.v7())
             .otherwise(() => undefined);
+    }
+
+    protected async update(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        where: any,
+        data: any,
+        fromRelation?: FromRelationContext,
+        allowRelationUpdate = true,
+        throwIfNotFound = true
+    ) {
+        if (!data || typeof data !== 'object') {
+            throw new InternalError('data must be an object');
+        }
+
+        const mergedWhere = clone(where);
+        if (fromRelation) {
+            // merge foreign key conditions from the relation
+            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                this.schema,
+                fromRelation.model,
+                fromRelation.field
+            );
+            if (!ownedByModel) {
+                for (const { fk, pk } of keyPairs) {
+                    mergedWhere[fk] = fromRelation.ids[pk];
+                }
+            }
+        }
+
+        if (Object.keys(data).length === 0) {
+            // update without data, simply return
+            const r = await this.readUnique(kysely, model, {
+                where: mergedWhere,
+            });
+            if (!r && throwIfNotFound) {
+                throw new NotFoundError(model);
+            }
+            return r;
+        }
+
+        const modelDef = this.requireModel(model);
+
+        const updateFields: any = {};
+        let thisEntity: any = undefined;
+
+        for (const field in data) {
+            const fieldDef = this.requireField(model, field);
+            if (
+                isScalarField(this.schema, model, field) ||
+                isForeignKeyField(this.schema, model, field)
+            ) {
+                updateFields[field] = this.dialect.transformPrimitive(
+                    data[field],
+                    fieldDef.type as BuiltinType
+                );
+            } else {
+                if (!allowRelationUpdate) {
+                    throw new QueryError(
+                        `Relation update not allowed for field "${field}"`
+                    );
+                }
+                if (!thisEntity) {
+                    thisEntity = await this.readUnique(kysely, model, {
+                        where: mergedWhere,
+                        select: this.makeIdSelect(model),
+                    });
+                    if (!thisEntity) {
+                        if (throwIfNotFound) {
+                            throw new NotFoundError(model);
+                        } else {
+                            return null;
+                        }
+                    }
+                }
+                await this.processRelationUpdates(
+                    kysely,
+                    model,
+                    field,
+                    fieldDef,
+                    thisEntity,
+                    data[field],
+                    throwIfNotFound
+                );
+            }
+        }
+
+        if (Object.keys(updateFields).length === 0) {
+            // nothing to update, simply read back
+            return (
+                thisEntity ??
+                (await this.readUnique(kysely, model, { where: mergedWhere }))
+            );
+        } else {
+            const query = kysely
+                .updateTable(modelDef.dbTable)
+                .where((eb) =>
+                    this.dialect.buildFilter(
+                        eb,
+                        model,
+                        modelDef.dbTable,
+                        mergedWhere
+                    )
+                )
+                .set(updateFields)
+                .returningAll();
+
+            let updatedEntity: any;
+
+            try {
+                updatedEntity = await query.execute();
+            } catch (err) {
+                const { sql, parameters } = query.compile();
+                throw new QueryError(
+                    `Error during update: ${err}, sql: ${sql}, parameters: ${parameters}`
+                );
+            }
+
+            if (updatedEntity.length === 0) {
+                if (throwIfNotFound) {
+                    throw new NotFoundError(model);
+                } else {
+                    return null;
+                }
+            }
+
+            return updatedEntity[0];
+        }
+    }
+
+    private async processRelationUpdates(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        field: string,
+        fieldDef: FieldDef,
+        parentIds: any,
+        args: any,
+        throwIfNotFound: boolean
+    ) {
+        const tasks: Promise<unknown>[] = [];
+        const fieldModel = fieldDef.type as GetModels<Schema>;
+        const fromRelationContext = {
+            model,
+            field,
+            ids: parentIds,
+        };
+
+        for (const [key, value] of Object.entries(args)) {
+            switch (key) {
+                case 'create': {
+                    invariant(
+                        !Array.isArray(value) || fieldDef.array,
+                        'relation must be an array if create is an array'
+                    );
+                    tasks.push(
+                        ...enumerate(value).map((item) =>
+                            this.create(
+                                kysely,
+                                fieldModel,
+                                item,
+                                fromRelationContext
+                            )
+                        )
+                    );
+                    break;
+                }
+
+                case 'createMany': {
+                    invariant(
+                        fieldDef.array,
+                        'relation must be an array for createMany'
+                    );
+                    tasks.push(
+                        this.createMany(
+                            kysely,
+                            fieldModel,
+                            value as { data: any; skipDuplicates: boolean },
+                            fromRelationContext
+                        )
+                    );
+                    break;
+                }
+
+                case 'connect': {
+                    tasks.push(
+                        this.connectRelation(
+                            kysely,
+                            fieldModel,
+                            enumerate(value),
+                            fromRelationContext
+                        )
+                    );
+                    break;
+                }
+
+                case 'connectOrCreate': {
+                    tasks.push(
+                        this.connectOrCreateRelation(
+                            kysely,
+                            fieldModel,
+                            enumerate(value) as Array<{
+                                where: any;
+                                create: any;
+                            }>,
+                            fromRelationContext
+                        )
+                    );
+                    break;
+                }
+
+                case 'disconnect': {
+                    tasks.push(
+                        this.disconnectRelation(
+                            kysely,
+                            fieldModel,
+                            enumerate(value),
+                            fromRelationContext
+                        )
+                    );
+                    break;
+                }
+
+                case 'set': {
+                    invariant(fieldDef.array, 'relation must be an array');
+                    tasks.push(
+                        this.setRelation(
+                            kysely,
+                            fieldModel,
+                            enumerate(value),
+                            fromRelationContext
+                        )
+                    );
+                    break;
+                }
+
+                case 'update': {
+                    tasks.push(
+                        ...(
+                            enumerate(value) as { where: any; data: any }[]
+                        ).map((item) =>
+                            this.update(
+                                kysely,
+                                fieldModel,
+                                item.where,
+                                item.data,
+                                fromRelationContext,
+                                true,
+                                throwIfNotFound
+                            )
+                        )
+                    );
+                    break;
+                }
+
+                case 'updateMany': {
+                    tasks.push(
+                        ...(
+                            enumerate(value) as { where: any; data: any }[]
+                        ).map((item) =>
+                            this.update(
+                                kysely,
+                                fieldModel,
+                                item.where,
+                                item.data,
+                                fromRelationContext,
+                                false,
+                                false
+                            )
+                        )
+                    );
+                    break;
+                }
+
+                case 'delete': {
+                    tasks.push(
+                        this.deleteRelation(
+                            kysely,
+                            fieldModel,
+                            enumerate(value),
+                            fromRelationContext
+                        )
+                    );
+                    break;
+                }
+
+                case 'deleteMany': {
+                    tasks.push(
+                        this.deleteRelation(
+                            kysely,
+                            fieldModel,
+                            enumerate(value),
+                            fromRelationContext
+                        )
+                    );
+                    break;
+                }
+
+                default: {
+                    throw new Error('Not implemented yet');
+                }
+            }
+        }
+
+        await Promise.all(tasks);
     }
 
     protected async connectRelation(
@@ -453,11 +809,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         data: any[],
-        fromRelation: {
-            model: string;
-            field: string;
-            ids: any;
-        }
+        fromRelation: FromRelationContext
     ) {
         const modelDef = this.requireModel(model);
         const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
@@ -517,15 +869,49 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
+    protected async deleteRelation(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        data: any[],
+        fromRelation: FromRelationContext
+    ) {
+        if (data.length === 0) {
+            return;
+        }
+
+        const modelDef = this.requireModel(model);
+        const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+            this.schema,
+            fromRelation.model,
+            fromRelation.field
+        );
+
+        if (ownedByModel) {
+            throw new InternalError(
+                'relation can only be deleted from the non-owning side'
+            );
+        }
+
+        return kysely
+            .deleteFrom(modelDef.dbTable)
+            .where((eb) =>
+                eb.and([
+                    eb.and(
+                        keyPairs.map(({ fk, pk }) =>
+                            eb(sql.ref(fk), '=', fromRelation.ids[pk])
+                        )
+                    ),
+                    eb.or(data.map((d) => eb.and(d))),
+                ])
+            )
+            .execute();
+    }
+
     protected makeIdSelect(model: string) {
         const modelDef = this.requireModel(model);
         return modelDef.idFields.reduce((acc, f) => {
             acc[f] = true;
             return acc;
         }, {} as any);
-    }
-
-    protected fieldEquals(x: any, y: any, fields: string[]) {
-        return fields.every((f) => x[f] === y[f]);
     }
 }

@@ -8,13 +8,13 @@ import {
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { BuiltinType, GetModels } from '../../../schema/schema';
+import type { FindArgs } from '../../client-types';
 import {
     buildFieldRef,
     getRelationForeignKeyFieldPairs,
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { FindArgs } from '../../types';
 import { BaseCrudDialect } from './base';
 
 export class SqliteCrudDialect<

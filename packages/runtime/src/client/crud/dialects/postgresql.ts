@@ -8,8 +8,8 @@ import {
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef, GetModels } from '../../../schema/schema';
+import type { FindArgs } from '../../client-types';
 import { buildFieldRef, requireField, requireModel } from '../../query-utils';
-import type { FindArgs } from '../../types';
 import { BaseCrudDialect } from './base';
 
 export class PostgresCrudDialect<

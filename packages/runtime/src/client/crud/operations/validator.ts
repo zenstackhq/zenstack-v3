@@ -2,6 +2,7 @@ import { match, P } from 'ts-pattern';
 import { z, ZodSchema } from 'zod';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, EnumDef, FieldDef } from '../../../schema/schema';
+import type { CreateArgs, FindArgs, UpdateArgs } from '../../client-types';
 import { InternalError, QueryError } from '../../errors';
 import {
     fieldHasDefaultValue,
@@ -11,7 +12,6 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { CreateArgs, FindArgs, UpdateArgs } from '../../types';
 
 export class InputValidator<Schema extends SchemaDef> {
     constructor(private readonly schema: Schema) {}
@@ -96,7 +96,11 @@ export class InputValidator<Schema extends SchemaDef> {
             .otherwise(() => z.unknown());
     }
 
-    protected makeWhereSchema(model: string, unique: boolean): ZodSchema {
+    protected makeWhereSchema(
+        model: string,
+        unique: boolean,
+        withoutRelationFields = false
+    ): ZodSchema {
         const modelDef = getModel(this.schema, model);
         if (!modelDef) {
             throw new QueryError(`Model "${model}" not found`);
@@ -108,6 +112,9 @@ export class InputValidator<Schema extends SchemaDef> {
             let fieldSchema: ZodSchema | undefined;
 
             if (fieldDef.relation) {
+                if (withoutRelationFields) {
+                    continue;
+                }
                 fieldSchema = z.lazy(() =>
                     this.makeWhereSchema(fieldDef.type, false).optional()
                 );
@@ -167,15 +174,21 @@ export class InputValidator<Schema extends SchemaDef> {
 
         // logical operators
         fields['AND'] = this.orArray(
-            z.lazy(() => this.makeWhereSchema(model, false)),
+            z.lazy(() =>
+                this.makeWhereSchema(model, false, withoutRelationFields)
+            ),
             true
         ).optional();
         fields['OR'] = z
-            .lazy(() => this.makeWhereSchema(model, false))
+            .lazy(() =>
+                this.makeWhereSchema(model, false, withoutRelationFields)
+            )
             .array()
             .optional();
         fields['NOT'] = this.orArray(
-            z.lazy(() => this.makeWhereSchema(model, false)),
+            z.lazy(() =>
+                this.makeWhereSchema(model, false, withoutRelationFields)
+            ),
             true
         ).optional();
 
@@ -435,9 +448,9 @@ export class InputValidator<Schema extends SchemaDef> {
         const regularAndFkFields: any = {};
         const regularAndRelationFields: any = {};
         const modelDef = requireModel(this.schema, model);
-        const hasRelation = Object.values(modelDef.fields).some(
-            (f) => f.relation
-        );
+        const hasRelation =
+            !withoutRelationFields &&
+            Object.values(modelDef.fields).some((f) => f.relation);
 
         Object.keys(modelDef.fields).forEach((field) => {
             if (withoutFields.includes(field)) {
@@ -464,7 +477,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 }
 
                 let fieldSchema: ZodSchema = z.lazy(() =>
-                    this.makeManipulationRelationSchema(
+                    this.makeRelationManipulationSchema(
                         fieldDef,
                         excludeFields,
                         'create'
@@ -519,11 +532,13 @@ export class InputValidator<Schema extends SchemaDef> {
         }
     }
 
-    private makeManipulationRelationSchema(
+    private makeRelationManipulationSchema(
         fieldDef: FieldDef,
         withoutFields: string[],
         mode: 'create' | 'update'
     ) {
+        const fieldType = fieldDef.type;
+        const array = !!fieldDef.array;
         let fields: Record<string, ZodSchema> = {
             create: this.makeCreateDataSchema(
                 fieldDef.type,
@@ -532,32 +547,66 @@ export class InputValidator<Schema extends SchemaDef> {
             ).optional(),
 
             connect: this.makeConnectDisconnectDataSchema(
-                fieldDef.type,
-                !!fieldDef.array
+                fieldType,
+                array
             ).optional(),
 
             connectOrCreate: this.makeConnectOrCreateDataSchema(
-                fieldDef.type,
-                !!fieldDef.array,
+                fieldType,
+                array,
                 withoutFields
             ).optional(),
 
             disconnect: this.makeConnectDisconnectDataSchema(
-                fieldDef.type,
-                !!fieldDef.array
+                fieldType,
+                array
+            ).optional(),
+
+            delete: this.makeDeleteRelationDataSchema(
+                fieldType,
+                array,
+                true
             ).optional(),
         };
 
-        if (fieldDef.array) {
+        if (array) {
             fields['createMany'] = this.makeCreateManyDataSchema(
-                fieldDef,
-                []
+                fieldType,
+                withoutFields
             ).optional();
 
             if (mode === 'update') {
                 fields['set'] = this.makeConnectDisconnectDataSchema(
-                    fieldDef.type,
+                    fieldType,
                     true
+                ).optional();
+
+                fields['update'] = this.orArray(
+                    z.object({
+                        where: this.makeWhereSchema(fieldType, true),
+                        data: this.makeUpdateDataSchema(
+                            fieldType,
+                            withoutFields
+                        ),
+                    }),
+                    true
+                ).optional();
+
+                fields['updateMany'] = this.orArray(
+                    z.object({
+                        where: this.makeWhereSchema(fieldType, false, true),
+                        data: this.makeUpdateDataSchema(
+                            fieldType,
+                            withoutFields
+                        ),
+                    }),
+                    true
+                ).optional();
+
+                fields['deleteMany'] = this.makeDeleteRelationDataSchema(
+                    fieldType,
+                    true,
+                    false
                 ).optional();
             }
         }
@@ -576,6 +625,16 @@ export class InputValidator<Schema extends SchemaDef> {
         canBeArray: boolean
     ) {
         return this.orArray(this.makeWhereSchema(model, true), canBeArray);
+    }
+
+    private makeDeleteRelationDataSchema(
+        model: string,
+        toManyRelation: boolean,
+        uniqueFilter: boolean
+    ) {
+        return toManyRelation
+            ? this.orArray(this.makeWhereSchema(model, uniqueFilter), true)
+            : z.union([z.boolean(), this.makeWhereSchema(model, uniqueFilter)]);
     }
 
     private makeConnectOrCreateDataSchema(
@@ -600,15 +659,12 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    private makeCreateManyDataSchema(
-        fieldDef: FieldDef,
-        withoutFields: string[]
-    ) {
+    private makeCreateManyDataSchema(model: string, withoutFields: string[]) {
         return z
             .object({
                 data: this.makeCreateDataSchema(
-                    fieldDef.type,
-                    false,
+                    model,
+                    true,
                     withoutFields,
                     true
                 ),
@@ -636,18 +692,18 @@ export class InputValidator<Schema extends SchemaDef> {
             );
     }
 
-    private makeUpdateDataSchema(model: string) {
+    private makeUpdateDataSchema(model: string, withoutFields: string[] = []) {
         const regularAndFkFields: any = {};
         const regularAndRelationFields: any = {};
         const modelDef = requireModel(this.schema, model);
-        const hasRelation = Object.values(modelDef.fields).some(
-            (f) => f.relation
+        const hasRelation = Object.entries(modelDef.fields).some(
+            ([key, value]) => value.relation && !withoutFields.includes(key)
         );
 
         Object.keys(modelDef.fields).forEach((field) => {
-            // if (withoutFields.includes(field)) {
-            //     return;
-            // }
+            if (withoutFields.includes(field)) {
+                return;
+            }
             const fieldDef = requireField(this.schema, model, field);
 
             if (fieldDef.relation) {
@@ -669,7 +725,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 }
                 let fieldSchema: ZodSchema = z
                     .lazy(() =>
-                        this.makeManipulationRelationSchema(
+                        this.makeRelationManipulationSchema(
                             fieldDef,
                             excludeFields,
                             'update'

@@ -6,6 +6,13 @@ import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef } from '../../../schema/schema';
 import { enumerate } from '../../../utils/enumerate';
 import { isPlainObject } from '../../../utils/is-plain-object';
+import type {
+    BooleanFilter,
+    DateTimeFilter,
+    FindArgs,
+    SortOrder,
+    StringFilter,
+} from '../../client-types';
 import { InternalError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
@@ -14,13 +21,6 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import type {
-    BooleanFilter,
-    DateTimeFilter,
-    FindArgs,
-    SortOrder,
-    StringFilter,
-} from '../../types';
 
 export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     constructor(

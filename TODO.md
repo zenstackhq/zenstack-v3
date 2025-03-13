@@ -29,6 +29,11 @@
             -   [x] Sorting
             -   [x] Pagination
     -   [ ] Update
+        -   [x] Input validation
+        -   [x] Top-level
+        -   [x] Nested to-many
+        -   [ ] Nested to-one
+        -   [ ] Delta update
     -   [ ] Delete
     -   [ ] Aggregation
     -   [ ] Extensions
@@ -39,6 +44,7 @@
         -   [ ] Cross field comparison
         -   [ ] Many-to-many relation
         -   [ ] Logging
+        -   [ ] Error system
 -   [ ] Access Policy
 -   [ ] Migration
 -   [ ] Databases

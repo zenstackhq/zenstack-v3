@@ -11,7 +11,7 @@ import type {
 } from '../../../schema/schema';
 import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
-import type { FindArgs } from '../../client-types';
+import type { FindArgs, SelectInclude } from '../../client-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
@@ -19,6 +19,7 @@ import {
     buildFieldRef,
     getField,
     getIdFields,
+    getIdValues,
     getModel,
     getRelationForeignKeyFieldPairs,
     isForeignKeyField,
@@ -230,76 +231,289 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         data: any,
         fromRelation?: FromRelationContext
     ): Promise<unknown> {
-        if (!data || typeof data !== 'object') {
-            throw new InternalError('data must be an object');
+        const modelDef = this.requireModel(model);
+        const result: unknown[] = [];
+
+        let parentFkFields: any = {};
+        if (fromRelation) {
+            parentFkFields = this.buildFkAssignments(
+                fromRelation.model,
+                fromRelation.field,
+                fromRelation.ids
+            );
         }
 
-        const modelDef = this.requireModel(model);
-        const nonRelationFields: any = {};
-        const relationFields: any = {};
-
+        const createFields: any = { ...parentFkFields };
+        const postCreateRelations: Record<string, object> = {};
         for (const [field, value] of Object.entries(data)) {
             const fieldDef = this.requireField(model, field);
-            if (fieldDef.relation) {
-                relationFields[field] = value;
+            if (
+                isScalarField(this.schema, model, field) ||
+                isForeignKeyField(this.schema, model, field)
+            ) {
+                createFields[field] = this.dialect.transformPrimitive(
+                    value,
+                    fieldDef.type as BuiltinType
+                );
             } else {
-                nonRelationFields[field] = value;
+                if (
+                    fieldDef.relation?.fields &&
+                    fieldDef.relation?.references
+                ) {
+                    const fkValues = await this.processOwnedRelation(
+                        kysely,
+                        fieldDef,
+                        value
+                    );
+                    for (let i = 0; i < fieldDef.relation.fields.length; i++) {
+                        createFields[fieldDef.relation.fields[i]!] =
+                            fkValues[fieldDef.relation.references[i]!];
+                    }
+                } else {
+                    const subPayload = value;
+                    if (subPayload && typeof subPayload === 'object') {
+                        postCreateRelations[field] = subPayload;
+                    }
+                }
             }
         }
 
-        const createData = this.fillGeneratedValues(
-            modelDef,
-            nonRelationFields
-        );
+        const updatedData = this.fillGeneratedValues(modelDef, createFields);
+        const query = kysely
+            .insertInto(modelDef.dbTable)
+            .values(updatedData)
+            .returningAll();
 
-        let postCreateTask:
-            | ((createdEntity: any) => Promise<unknown>)
-            | undefined;
-        if (fromRelation) {
-            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
-                this.schema,
-                fromRelation.model,
-                fromRelation.field
+        let createdEntity: any;
+
+        try {
+            createdEntity = await query
+                .execute()
+                .then((created) => created[0]!);
+        } catch (err) {
+            const { sql, parameters } = query.compile();
+            throw new QueryError(
+                `Error during create: ${err}, sql: ${sql}, parameters: ${parameters}`
+            );
+        }
+
+        if (Object.keys(postCreateRelations).length === 0) {
+            result.push(createdEntity);
+        } else {
+            const relationPromises = Object.entries(postCreateRelations).map(
+                ([field, subPayload]) => {
+                    return this.processNoneOwnedRelation(
+                        kysely,
+                        model,
+                        field,
+                        subPayload,
+                        createdEntity
+                    );
+                }
             );
 
-            if (!ownedByModel) {
-                for (const { fk, pk } of keyPairs) {
-                    createData[fk] = fromRelation.ids[pk];
-                }
-            } else {
-                postCreateTask = async (createdEntity) => {
-                    const updateData = keyPairs.reduce(
-                        (acc, { fk, pk }) => ({
-                            ...acc,
-                            [fk]: createdEntity[pk],
-                        }),
-                        {} as any
-                    );
+            // await relation creation
+            await Promise.all(relationPromises);
 
-                    const fromRelationModelDef = this.requireModel(
-                        fromRelation.model
-                    );
-                    return kysely
-                        .updateTable(fromRelationModelDef.dbTable)
-                        .where((eb) => eb.and(fromRelation.ids))
-                        .set(updateData)
-                        .execute();
-                };
-            }
-        }
-
-        // create
-        const result = await kysely
-            .insertInto(modelDef.dbTable)
-            .values(createData)
-            .returningAll()
-            .execute();
-
-        if (postCreateTask) {
-            await postCreateTask(result[0]);
+            result.push(createdEntity);
         }
 
         return result[0];
+    }
+
+    private buildFkAssignments(
+        model: string,
+        relationField: string,
+        entity: any
+    ) {
+        const parentFkFields: any = {};
+
+        invariant(
+            relationField,
+            'parentField must be defined if parentModel is defined'
+        );
+        invariant(
+            entity,
+            'parentEntity must be defined if parentModel is defined'
+        );
+
+        const { keyPairs } = getRelationForeignKeyFieldPairs(
+            this.schema,
+            model,
+            relationField
+        );
+
+        for (const pair of keyPairs) {
+            if (!(pair.pk in entity)) {
+                throw new QueryError(
+                    `Field "${pair.pk}" not found in parent created data`
+                );
+            }
+            Object.assign(parentFkFields, {
+                [pair.fk]: (entity as any)[pair.pk],
+            });
+        }
+        return parentFkFields;
+    }
+
+    private async processOwnedRelation(
+        kysely: ToKysely<Schema>,
+        relationField: FieldDef,
+        payload: any
+    ) {
+        if (!payload) {
+            return;
+        }
+
+        let result: any;
+        const relationModel = relationField.type as GetModels<Schema>;
+
+        for (const [action, subPayload] of Object.entries<any>(payload)) {
+            if (!subPayload) {
+                continue;
+            }
+            switch (action) {
+                case 'create': {
+                    const created = await this.create(
+                        kysely,
+                        relationModel,
+                        subPayload
+                    );
+                    // extract id fields and return as foreign key values
+                    result = getIdValues(
+                        this.schema,
+                        relationField.type,
+                        created
+                    );
+                    break;
+                }
+
+                case 'connect': {
+                    // directly return the payload as foreign key values
+                    result = subPayload;
+                    break;
+                }
+
+                case 'connectOrCreate': {
+                    const found = await this.exists(
+                        kysely,
+                        relationModel,
+                        subPayload.where
+                    );
+                    if (!found) {
+                        // create
+                        const created = await this.create(
+                            kysely,
+                            relationModel,
+                            subPayload.create
+                        );
+                        result = getIdValues(
+                            this.schema,
+                            relationField.type,
+                            created
+                        );
+                    } else {
+                        // connect
+                        result = found;
+                    }
+                    break;
+                }
+
+                default:
+                    throw new QueryError(`Invalid relation action: ${action}`);
+            }
+        }
+
+        return result;
+    }
+
+    private processNoneOwnedRelation(
+        kysely: ToKysely<Schema>,
+        contextModel: string,
+        relationFieldName: string,
+        payload: any,
+        parentEntity: any
+    ) {
+        const relationFieldDef = this.requireField(
+            contextModel,
+            relationFieldName
+        );
+        const relationModel = relationFieldDef.type as GetModels<Schema>;
+        const tasks: Promise<unknown>[] = [];
+
+        for (const [action, subPayload] of Object.entries<any>(payload)) {
+            if (!subPayload) {
+                continue;
+            }
+            switch (action) {
+                case 'create': {
+                    // create with a parent entity
+                    tasks.push(
+                        ...enumerate(subPayload).map((item) =>
+                            this.create(kysely, relationModel, item, {
+                                model: contextModel,
+                                field: relationFieldName,
+                                ids: parentEntity,
+                            })
+                        )
+                    );
+                    break;
+                }
+
+                case 'connect': {
+                    tasks.push(
+                        this.connectRelation(
+                            kysely,
+                            relationModel,
+                            subPayload,
+                            {
+                                model: contextModel,
+                                field: relationFieldName,
+                                ids: parentEntity,
+                            }
+                        )
+                    );
+                    break;
+                }
+
+                case 'connectOrCreate': {
+                    tasks.push(
+                        ...enumerate(subPayload).map((item) =>
+                            this.exists(kysely, relationModel, item.where).then(
+                                (found) =>
+                                    !found
+                                        ? this.create(
+                                              kysely,
+                                              relationModel,
+                                              item.create,
+                                              {
+                                                  model: contextModel,
+                                                  field: relationFieldName,
+                                                  ids: parentEntity,
+                                              }
+                                          )
+                                        : this.connectRelation(
+                                              kysely,
+                                              relationModel,
+                                              found,
+                                              {
+                                                  model: contextModel,
+                                                  field: relationFieldName,
+                                                  ids: parentEntity,
+                                              }
+                                          )
+                            )
+                        )
+                    );
+                    break;
+                }
+
+                default:
+                    throw new QueryError(`Invalid relation action: ${action}`);
+            }
+        }
+
+        return Promise.all(tasks);
     }
 
     protected async createMany(
@@ -559,7 +773,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         this.connectRelation(
                             kysely,
                             fieldModel,
-                            enumerate(value),
+                            value,
                             fromRelationContext
                         )
                     );
@@ -571,10 +785,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         this.connectOrCreateRelation(
                             kysely,
                             fieldModel,
-                            enumerate(value) as Array<{
-                                where: any;
-                                create: any;
-                            }>,
+                            value,
                             fromRelationContext
                         )
                     );
@@ -586,7 +797,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         this.disconnectRelation(
                             kysely,
                             fieldModel,
-                            enumerate(value),
+                            value,
                             fromRelationContext
                         )
                     );
@@ -599,7 +810,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         this.setRelation(
                             kysely,
                             fieldModel,
-                            enumerate(value),
+                            value,
                             fromRelationContext
                         )
                     );
@@ -621,6 +832,39 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                                 throwIfNotFound
                             )
                         )
+                    );
+                    break;
+                }
+
+                case 'upsert': {
+                    tasks.push(
+                        ...(
+                            enumerate(value) as {
+                                where: any;
+                                create: any;
+                                update: any;
+                            }[]
+                        ).map(async (item) => {
+                            const updated = await this.update(
+                                kysely,
+                                fieldModel,
+                                item.where,
+                                item.update,
+                                fromRelationContext,
+                                true,
+                                false
+                            );
+                            if (updated) {
+                                return updated;
+                            } else {
+                                return this.create(
+                                    kysely,
+                                    fieldModel,
+                                    item.create,
+                                    fromRelationContext
+                                );
+                            }
+                        })
                     );
                     break;
                 }
@@ -649,7 +893,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         this.deleteRelation(
                             kysely,
                             fieldModel,
-                            enumerate(value),
+                            value,
                             fromRelationContext
                         )
                     );
@@ -661,7 +905,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         this.deleteRelation(
                             kysely,
                             fieldModel,
-                            enumerate(value),
+                            value,
                             fromRelationContext
                         )
                     );
@@ -680,14 +924,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected async connectRelation(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
-        data: any[],
+        data: any,
         fromRelation: {
             model: string;
             field: string;
             ids: any;
         }
     ) {
-        if (data.length === 0) {
+        const _data = enumerate(data);
+        if (_data.length === 0) {
             return;
         }
 
@@ -708,7 +953,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // connect
         await kysely
             .updateTable(modelDef.dbTable)
-            .where((eb) => eb.or(data.map((d) => eb.and(d))))
+            .where((eb) => eb.or(_data.map((d) => eb.and(d))))
             .set(
                 keyPairs.reduce(
                     (acc, { fk, pk }) => ({
@@ -724,14 +969,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected async connectOrCreateRelation(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
-        data: Array<{ where: any; create: any }>,
+        data: any,
         fromRelation: {
             model: string;
             field: string;
             ids: any;
         }
     ) {
-        if (data.length === 0) {
+        const _data = enumerate(data);
+        if (_data.length === 0) {
             return;
         }
 
@@ -749,7 +995,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         return Promise.all(
-            data.map(async ({ where, create }) => {
+            _data.map(async ({ where, create }) => {
                 const existing = await this.exists(kysely, model, where);
                 if (existing) {
                     return this.connectRelation(
@@ -768,14 +1014,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected async disconnectRelation(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
-        data: any[],
+        data: any,
         fromRelation: {
             model: string;
             field: string;
             ids: any;
         }
     ) {
-        if (data.length === 0) {
+        const _data = enumerate(data);
+        if (_data.length === 0) {
             return;
         }
 
@@ -795,7 +1042,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // disconnect
         await kysely
             .updateTable(modelDef.dbTable)
-            .where((eb) => eb.or(data.map((d) => eb.and(d))))
+            .where((eb) => eb.or(_data.map((d) => eb.and(d))))
             .set(
                 keyPairs.reduce(
                     (acc, { fk }) => ({ ...acc, [fk]: null }),
@@ -808,9 +1055,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected async setRelation(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
-        data: any[],
+        data: any,
         fromRelation: FromRelationContext
     ) {
+        const _data = enumerate(data);
         const modelDef = this.requireModel(model);
         const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
             this.schema,
@@ -840,7 +1088,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     // match parent
                     eb.and(fkConditions),
                     // exclude entities to be connected
-                    eb.not(eb.or(data.map((d) => eb.and(d)))),
+                    eb.not(eb.or(_data.map((d) => eb.and(d)))),
                 ])
             )
             .set(
@@ -852,10 +1100,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             .execute();
 
         // connect
-        if (data.length > 0) {
+        if (_data.length > 0) {
             await kysely
                 .updateTable(modelDef.dbTable)
-                .where((eb) => eb.or(data.map((d) => eb.and(d))))
+                .where((eb) => eb.or(_data.map((d) => eb.and(d))))
                 .set(
                     keyPairs.reduce(
                         (acc, { fk, pk }) => ({
@@ -872,10 +1120,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected async deleteRelation(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
-        data: any[],
+        data: any,
         fromRelation: FromRelationContext
     ) {
-        if (data.length === 0) {
+        const _data = enumerate(data);
+        if (_data.length === 0) {
             return;
         }
 
@@ -901,7 +1150,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             eb(sql.ref(fk), '=', fromRelation.ids[pk])
                         )
                     ),
-                    eb.or(data.map((d) => eb.and(d))),
+                    eb.or(_data.map((d) => eb.and(d))),
                 ])
             )
             .execute();
@@ -911,6 +1160,19 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const modelDef = this.requireModel(model);
         return modelDef.idFields.reduce((acc, f) => {
             acc[f] = true;
+            return acc;
+        }, {} as any);
+    }
+
+    protected trimResult(
+        data: any,
+        args: SelectInclude<Schema, GetModels<Schema>>
+    ) {
+        if (!args.select) {
+            return data;
+        }
+        return Object.keys(args.select).reduce((acc, field) => {
+            acc[field] = data[field];
             return acc;
         }, {} as any);
     }

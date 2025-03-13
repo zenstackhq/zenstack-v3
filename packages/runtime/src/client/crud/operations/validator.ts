@@ -592,6 +592,22 @@ export class InputValidator<Schema extends SchemaDef> {
                     true
                 ).optional();
 
+                fields['upsert'] = this.orArray(
+                    z.object({
+                        where: this.makeWhereSchema(fieldType, true),
+                        create: this.makeCreateDataSchema(
+                            fieldType,
+                            false,
+                            withoutFields
+                        ),
+                        update: this.makeUpdateDataSchema(
+                            fieldType,
+                            withoutFields
+                        ),
+                    }),
+                    true
+                ).optional();
+
                 fields['updateMany'] = this.orArray(
                     z.object({
                         where: this.makeWhereSchema(fieldType, false, true),

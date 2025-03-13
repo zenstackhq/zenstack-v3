@@ -670,6 +670,7 @@ type UpdateRelationFieldPayload<
         disconnect?: DisconnectInput<Schema, Model, Field>;
         set?: SetInput<Schema, Model, Field>;
         update?: NestedUpdateInput<Schema, Model, Field>;
+        upsert?: NestedUpsertInput<Schema, Model, Field>;
         updateMany?: NestedUpdateManyInput<Schema, Model, Field>;
         delete?: NestedDeleteInput<Schema, Model, Field>;
         deleteMany?: NestedDeleteManyInput<Schema, Model, Field>;
@@ -688,19 +689,14 @@ type NestedCreateInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
-> = FieldIsArray<Schema, Model, Field> extends true
-    ? OrArray<
-          CreateInput<
-              Schema,
-              RelationFieldType<Schema, Model, Field>,
-              OppositeRelationAndFK<Schema, Model, Field>
-          >
-      >
-    : CreateInput<
-          Schema,
-          RelationFieldType<Schema, Model, Field>,
-          OppositeRelationAndFK<Schema, Model, Field>
-      >;
+> = OrArray<
+    CreateInput<
+        Schema,
+        RelationFieldType<Schema, Model, Field>,
+        OppositeRelationAndFK<Schema, Model, Field>
+    >,
+    FieldIsArray<Schema, Model, Field>
+>;
 
 type NestedCreateManyInput<
     Schema extends SchemaDef,
@@ -756,6 +752,27 @@ type NestedUpdateInput<
     {
         where: WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>;
         data: UpdateInput<
+            Schema,
+            RelationFieldType<Schema, Model, Field>,
+            OppositeRelationAndFK<Schema, Model, Field>
+        >;
+    },
+    FieldIsArray<Schema, Model, Field>
+>;
+
+type NestedUpsertInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = OrArray<
+    {
+        where: WhereUnique<Schema, Model>;
+        create: CreateInput<
+            Schema,
+            RelationFieldType<Schema, Model, Field>,
+            OppositeRelationAndFK<Schema, Model, Field>
+        >;
+        update: UpdateInput<
             Schema,
             RelationFieldType<Schema, Model, Field>,
             OppositeRelationAndFK<Schema, Model, Field>

@@ -294,7 +294,7 @@ export async function pushSchema(db: Client<typeof schema>) {
         .addColumn('id', 'text', (col) => col.primaryKey())
         .addColumn('bio', 'varchar', (col) => col.notNull())
         .addColumn('age', 'integer')
-        .addColumn('userId', 'varchar', (col) => col.notNull())
+        .addColumn('userId', 'varchar')
         .addForeignKeyConstraint(
             'fk_profile_user',
             ['userId'],

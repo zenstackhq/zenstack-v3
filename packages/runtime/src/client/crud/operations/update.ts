@@ -1,5 +1,5 @@
 import type { GetModels, SchemaDef } from '../../../schema';
-import type { CreateArgs, SelectInclude, UpdateArgs } from '../../client-types';
+import type { CreateArgs, UpdateArgs } from '../../client-types';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
 import { getIdValues, requireField } from '../../query-utils';
@@ -99,19 +99,6 @@ export class UpdateOperationHandler<
         args: UpdateArgs<Schema, GetModels<Schema>>
     ) {
         return this.update(kysely, model, args.where, args.data);
-    }
-
-    private trimResult(
-        data: any,
-        args: SelectInclude<Schema, GetModels<Schema>>
-    ) {
-        if (!args.select) {
-            return data;
-        }
-        return Object.keys(args.select).reduce((acc, field) => {
-            acc[field] = data[field];
-            return acc;
-        }, {} as any);
     }
 
     private needReturnRelations(

@@ -793,6 +793,173 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             });
         });
 
+        it('works with nested to-many relation upsert', async () => {
+            const user = await createUser(client, 'u1@test.com');
+            const post = await client.post.create({
+                data: {
+                    title: 'Post1',
+                    author: { connect: { id: user.id } },
+                },
+            });
+            await client.comment.create({
+                data: { id: '3', content: 'Comment3' },
+            });
+
+            // create, single
+            await expect(
+                client.post.update({
+                    where: { id: post.id },
+                    data: {
+                        comments: {
+                            upsert: {
+                                where: { id: '1' },
+                                create: { id: '1', content: 'Comment1' },
+                                update: { content: 'Comment1-1' },
+                            },
+                        },
+                    },
+                    include: { comments: true },
+                })
+            ).resolves.toMatchObject({
+                comments: expect.arrayContaining([
+                    expect.objectContaining({ content: 'Comment1' }),
+                ]),
+            });
+
+            // update, single
+            await expect(
+                client.post.update({
+                    where: { id: post.id },
+                    data: {
+                        comments: {
+                            upsert: {
+                                where: { id: '1' },
+                                create: { content: 'Comment1' },
+                                update: { content: 'Comment1-1' },
+                            },
+                        },
+                    },
+                    include: { comments: true },
+                })
+            ).resolves.toMatchObject({
+                comments: expect.arrayContaining([
+                    expect.objectContaining({ content: 'Comment1-1' }),
+                ]),
+            });
+
+            // update, multiple
+            await expect(
+                client.post.update({
+                    where: { id: post.id },
+                    data: {
+                        comments: {
+                            upsert: [
+                                {
+                                    where: { id: '1' },
+                                    create: { content: 'Comment1' },
+                                    update: { content: 'Comment1-2' },
+                                },
+                                {
+                                    where: { id: '2' },
+                                    create: { content: 'Comment2' },
+                                    update: { content: 'Comment2-2' },
+                                },
+                            ],
+                        },
+                    },
+                    include: { comments: true },
+                })
+            ).resolves.toMatchObject({
+                comments: expect.arrayContaining([
+                    expect.objectContaining({ content: 'Comment1-2' }),
+                    expect.objectContaining({ content: 'Comment2' }),
+                ]),
+            });
+
+            // not connected
+            await expect(
+                client.post.update({
+                    where: { id: post.id },
+                    data: {
+                        comments: {
+                            upsert: {
+                                where: { id: '3' },
+                                create: { id: '3', content: 'Comment3' },
+                                update: { content: 'Comment3-1' },
+                            },
+                        },
+                    },
+                })
+            ).rejects.toThrow('constraint');
+            //  transaction fails as a whole
+            await expect(
+                client.comment.findUnique({ where: { id: '3' } })
+            ).resolves.toMatchObject({
+                content: 'Comment3',
+            });
+
+            // not found
+            await expect(
+                client.post.update({
+                    where: { id: post.id },
+                    data: {
+                        comments: {
+                            upsert: [
+                                {
+                                    where: { id: '1' },
+                                    create: { content: 'Comment1' },
+                                    update: { content: 'Comment1-2' },
+                                },
+                                {
+                                    where: { id: '4' },
+                                    create: { id: '4', content: 'Comment4' },
+                                    update: { content: 'Comment4-1' },
+                                },
+                            ],
+                        },
+                    },
+                })
+            ).toResolveTruthy();
+            await expect(
+                client.comment.findUnique({ where: { id: '1' } })
+            ).resolves.toMatchObject({
+                content: 'Comment1-2',
+            });
+            await expect(
+                client.comment.findUnique({ where: { id: '4' } })
+            ).resolves.toMatchObject({ content: 'Comment4' });
+
+            // nested
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        posts: {
+                            upsert: {
+                                where: { id: '2' },
+                                create: {
+                                    title: 'Post2',
+                                    comments: {
+                                        create: [
+                                            { id: '5', content: 'Comment5' },
+                                        ],
+                                    },
+                                },
+                                update: {
+                                    title: 'Post2-1',
+                                },
+                            },
+                        },
+                    },
+                })
+            ).toResolveTruthy();
+            await expect(
+                client.comment.findUnique({ where: { id: '5' } })
+            ).resolves.toMatchObject({
+                content: 'Comment5',
+            });
+        });
+
         it('works with nested to-many relation updateMany', async () => {
             const user = await createUser(client, 'u1@test.com');
             const post = await client.post.create({

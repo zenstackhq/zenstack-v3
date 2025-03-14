@@ -546,10 +546,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 withoutFields
             ).optional(),
 
-            connect: this.makeConnectDisconnectDataSchema(
-                fieldType,
-                array
-            ).optional(),
+            connect: this.makeConnectDataSchema(fieldType, array).optional(),
 
             connectOrCreate: this.makeConnectOrCreateDataSchema(
                 fieldType,
@@ -557,7 +554,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 withoutFields
             ).optional(),
 
-            disconnect: this.makeConnectDisconnectDataSchema(
+            disconnect: this.makeDisconnectDataSchema(
                 fieldType,
                 array
             ).optional(),
@@ -615,7 +612,7 @@ export class InputValidator<Schema extends SchemaDef> {
             ).optional();
 
             if (array) {
-                fields['set'] = this.makeConnectDisconnectDataSchema(
+                fields['set'] = this.makeSetDataSchema(
                     fieldType,
                     true
                 ).optional();
@@ -648,11 +645,20 @@ export class InputValidator<Schema extends SchemaDef> {
             );
     }
 
-    private makeConnectDisconnectDataSchema(
-        model: string,
-        canBeArray: boolean
-    ) {
+    private makeSetDataSchema(model: string, canBeArray: boolean) {
         return this.orArray(this.makeWhereSchema(model, true), canBeArray);
+    }
+
+    private makeConnectDataSchema(model: string, canBeArray: boolean) {
+        return this.orArray(this.makeWhereSchema(model, true), canBeArray);
+    }
+
+    private makeDisconnectDataSchema(model: string, canBeArray: boolean) {
+        if (canBeArray) {
+            return this.orArray(this.makeWhereSchema(model, true), canBeArray);
+        } else {
+            return z.union([z.boolean(), this.makeWhereSchema(model, true)]);
+        }
     }
 
     private makeDeleteRelationDataSchema(

@@ -1,5 +1,10 @@
 import { createId } from '@paralleldrive/cuid2';
-import { sql, type SelectQueryBuilder } from 'kysely';
+import {
+    DeleteResult,
+    sql,
+    UpdateResult,
+    type SelectQueryBuilder,
+} from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import * as uuid from 'uuid';
@@ -11,7 +16,7 @@ import type {
 } from '../../../schema/schema';
 import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
-import type { FindArgs, SelectInclude } from '../../client-types';
+import type { FindArgs, SelectInclude, Where } from '../../client-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
@@ -232,18 +237,48 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fromRelation?: FromRelationContext
     ): Promise<unknown> {
         const modelDef = this.requireModel(model);
-        const result: unknown[] = [];
+        const createFields: any = {};
+        let parentUpdateTask: ((entity: any) => Promise<unknown>) | undefined =
+            undefined;
 
-        let parentFkFields: any = {};
         if (fromRelation) {
-            parentFkFields = this.buildFkAssignments(
-                fromRelation.model,
-                fromRelation.field,
-                fromRelation.ids
+            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                this.schema,
+                fromRelation?.model ?? '',
+                fromRelation?.field ?? ''
             );
+
+            if (!ownedByModel) {
+                // assign fks from parent
+                const parentFkFields = this.buildFkAssignments(
+                    fromRelation.model,
+                    fromRelation.field,
+                    fromRelation.ids
+                );
+                Object.assign(createFields, parentFkFields);
+            } else {
+                const fromRelationModelDef = this.requireModel(
+                    fromRelation.model
+                );
+                parentUpdateTask = (entity) => {
+                    return kysely
+                        .updateTable(fromRelationModelDef.dbTable)
+                        .set(
+                            keyPairs.reduce(
+                                (acc, { fk, pk }) => ({
+                                    ...acc,
+                                    [fk]: entity[pk],
+                                }),
+                                {} as any
+                            )
+                        )
+                        .where((eb) => eb.and(fromRelation.ids))
+                        .execute();
+                };
+            }
         }
 
-        const createFields: any = { ...parentFkFields };
+        // process the create and handle relations
         const postCreateRelations: Record<string, object> = {};
         for (const [field, value] of Object.entries(data)) {
             const fieldDef = this.requireField(model, field);
@@ -297,9 +332,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
         }
 
-        if (Object.keys(postCreateRelations).length === 0) {
-            result.push(createdEntity);
-        } else {
+        if (Object.keys(postCreateRelations).length > 0) {
+            // process nested creates that need to happen after the current entity is created
             const relationPromises = Object.entries(postCreateRelations).map(
                 ([field, subPayload]) => {
                     return this.processNoneOwnedRelation(
@@ -314,11 +348,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             // await relation creation
             await Promise.all(relationPromises);
-
-            result.push(createdEntity);
         }
 
-        return result[0];
+        // finally update parent if needed
+        if (parentUpdateTask) {
+            await parentUpdateTask(createdEntity);
+        }
+
+        return createdEntity;
     }
 
     private buildFkAssignments(
@@ -600,7 +637,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             throw new InternalError('data must be an object');
         }
 
-        const mergedWhere = clone(where ?? {});
+        const parentWhere: any = {}; //clone(where ?? {});
         if (fromRelation) {
             // merge foreign key conditions from the relation
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
@@ -608,18 +645,38 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 fromRelation.model,
                 fromRelation.field
             );
-            if (!ownedByModel) {
+            if (ownedByModel) {
+                const fromEntity = await this.readUnique(
+                    kysely,
+                    fromRelation.model as GetModels<Schema>,
+                    {
+                        where: fromRelation.ids,
+                    }
+                );
                 for (const { fk, pk } of keyPairs) {
-                    mergedWhere[fk] = fromRelation.ids[pk];
+                    parentWhere[pk] = fromEntity[fk];
+                }
+            } else {
+                for (const { fk, pk } of keyPairs) {
+                    parentWhere[fk] = fromRelation.ids[pk];
                 }
             }
+        }
+
+        let combinedWhere: Where<Schema, GetModels<Schema>, false> = where ??
+        {};
+        if (Object.keys(parentWhere).length > 0) {
+            combinedWhere =
+                Object.keys(combinedWhere).length > 0
+                    ? { AND: [parentWhere, combinedWhere] }
+                    : parentWhere;
         }
 
         if (Object.keys(data).length === 0) {
             // update without data, simply return
             const r = await this.readUnique(kysely, model, {
-                where: mergedWhere,
-            });
+                where: combinedWhere,
+            } as FindArgs<Schema, GetModels<Schema>, true>);
             if (!r && throwIfNotFound) {
                 throw new NotFoundError(model);
             }
@@ -649,7 +706,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
                 if (!thisEntity) {
                     thisEntity = await this.readUnique(kysely, model, {
-                        where: mergedWhere,
+                        where: combinedWhere,
                         select: this.makeIdSelect(model),
                     });
                     if (!thisEntity) {
@@ -676,7 +733,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             // nothing to update, simply read back
             return (
                 thisEntity ??
-                (await this.readUnique(kysely, model, { where: mergedWhere }))
+                (await this.readUnique(kysely, model, { where: combinedWhere }))
             );
         } else {
             const query = kysely
@@ -686,7 +743,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         eb,
                         model,
                         modelDef.dbTable,
-                        mergedWhere
+                        combinedWhere
                     )
                 )
                 .set(updateFields)
@@ -947,62 +1004,82 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return;
         }
 
-        const modelDef = this.requireModel(model);
         const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
             this.schema,
             fromRelation.model,
             fromRelation.field
         );
+        let updateResult: UpdateResult[];
 
-        // TODO: handle to-one relations
         if (ownedByModel) {
-            throw new InternalError(
-                'relation can only be set from the non-owning side'
-            );
-        }
-
-        // disconnect current if it's a one-one relation
-        const relationFieldDef = this.requireField(
-            fromRelation.model,
-            fromRelation.field
-        );
-
-        if (!relationFieldDef.array) {
-            await kysely
-                .updateTable(modelDef.dbTable)
-                .where((eb) =>
-                    eb.and(
-                        keyPairs.map(({ fk, pk }) =>
-                            eb(sql.ref(fk), '=', fromRelation.ids[pk])
-                        )
-                    )
-                )
+            // set parent fk directly
+            invariant(_data.length === 1, 'only one entity can be connected');
+            const target = await this.readUnique(kysely, model, {
+                where: _data[0],
+            });
+            if (!target) {
+                throw new NotFoundError(model);
+            }
+            const fromRelationModelDef = this.requireModel(fromRelation.model);
+            updateResult = await kysely
+                .updateTable(fromRelationModelDef.dbTable)
+                .where((eb) => eb.and(fromRelation.ids))
                 .set(
                     keyPairs.reduce(
-                        (acc, { fk }) => ({ ...acc, [fk]: null }),
+                        (acc, { fk, pk }) => ({
+                            ...acc,
+                            [fk]: target[pk],
+                        }),
+                        {} as any
+                    )
+                )
+                .execute();
+        } else {
+            const modelDef = this.requireModel(model);
+
+            // disconnect current if it's a one-one relation
+            const relationFieldDef = this.requireField(
+                fromRelation.model,
+                fromRelation.field
+            );
+
+            if (!relationFieldDef.array) {
+                await kysely
+                    .updateTable(modelDef.dbTable)
+                    .where((eb) =>
+                        eb.and(
+                            keyPairs.map(({ fk, pk }) =>
+                                eb(sql.ref(fk), '=', fromRelation.ids[pk])
+                            )
+                        )
+                    )
+                    .set(
+                        keyPairs.reduce(
+                            (acc, { fk }) => ({ ...acc, [fk]: null }),
+                            {} as any
+                        )
+                    )
+                    .execute();
+            }
+
+            // connect
+            updateResult = await kysely
+                .updateTable(modelDef.dbTable)
+                .where((eb) => eb.or(_data.map((d) => eb.and(d))))
+                .set(
+                    keyPairs.reduce(
+                        (acc, { fk, pk }) => ({
+                            ...acc,
+                            [fk]: fromRelation.ids[pk],
+                        }),
                         {} as any
                     )
                 )
                 .execute();
         }
 
-        // connect
-        const r = await kysely
-            .updateTable(modelDef.dbTable)
-            .where((eb) => eb.or(_data.map((d) => eb.and(d))))
-            .set(
-                keyPairs.reduce(
-                    (acc, { fk, pk }) => ({
-                        ...acc,
-                        [fk]: fromRelation.ids[pk],
-                    }),
-                    {} as any
-                )
-            )
-            .execute();
-
         // validate connect result
-        if (_data.length > r[0]!.numUpdatedRows) {
+        if (_data.length > updateResult[0]!.numUpdatedRows) {
             // some entities were not connected
             throw new NotFoundError(model);
         }
@@ -1021,19 +1098,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const _data = enumerate(data);
         if (_data.length === 0) {
             return;
-        }
-
-        const { ownedByModel } = getRelationForeignKeyFieldPairs(
-            this.schema,
-            fromRelation.model,
-            fromRelation.field
-        );
-
-        // TODO: handle to-one relations
-        if (ownedByModel) {
-            throw new InternalError(
-                'relation can only be set from the non-owning side'
-            );
         }
 
         return Promise.all(
@@ -1063,8 +1127,24 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             ids: any;
         }
     ) {
-        const _data = enumerate(data);
-        if (_data.length === 0) {
+        let disconnectConditions: any[] = [];
+        let expectedUpdateCount: number;
+        if (typeof data === 'boolean') {
+            if (data === false) {
+                return;
+            } else {
+                disconnectConditions = [true];
+                expectedUpdateCount = 1;
+            }
+        } else {
+            disconnectConditions = enumerate(data);
+            if (disconnectConditions.length === 0) {
+                return;
+            }
+            expectedUpdateCount = disconnectConditions.length;
+        }
+
+        if (disconnectConditions.length === 0) {
             return;
         }
 
@@ -1075,26 +1155,52 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             fromRelation.field
         );
 
+        let updateResult: UpdateResult[];
+
         if (ownedByModel) {
-            throw new InternalError(
-                'relation can only be set from the non-owning side'
+            // set parent fk directly
+            invariant(
+                disconnectConditions.length === 1,
+                'only one entity can be disconnected'
             );
+            const target = await this.readUnique(kysely, model, {
+                where:
+                    disconnectConditions[0] === true
+                        ? {}
+                        : disconnectConditions[0],
+            });
+            if (!target) {
+                throw new NotFoundError(model);
+            }
+            const fromRelationModelDef = this.requireModel(fromRelation.model);
+            updateResult = await kysely
+                .updateTable(fromRelationModelDef.dbTable)
+                .where((eb) => eb.and(fromRelation.ids))
+                .set(
+                    keyPairs.reduce(
+                        (acc, { fk }) => ({ ...acc, [fk]: null }),
+                        {} as any
+                    )
+                )
+                .execute();
+        } else {
+            // disconnect
+            updateResult = await kysely
+                .updateTable(modelDef.dbTable)
+                .where((eb) =>
+                    eb.or(disconnectConditions.map((d) => eb.and(d)))
+                )
+                .set(
+                    keyPairs.reduce(
+                        (acc, { fk }) => ({ ...acc, [fk]: null }),
+                        {} as any
+                    )
+                )
+                .execute();
         }
 
-        // disconnect
-        const r = await kysely
-            .updateTable(modelDef.dbTable)
-            .where((eb) => eb.or(_data.map((d) => eb.and(d))))
-            .set(
-                keyPairs.reduce(
-                    (acc, { fk }) => ({ ...acc, [fk]: null }),
-                    {} as any
-                )
-            )
-            .execute();
-
         // validate connect result
-        if (_data.length > r[0]!.numUpdatedRows) {
+        if (expectedUpdateCount > updateResult[0]!.numUpdatedRows) {
             // some entities were not connected
             throw new NotFoundError(model);
         }
@@ -1202,28 +1308,52 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             fromRelation.field
         );
 
+        let deleteResult: DeleteResult[];
         if (ownedByModel) {
-            throw new InternalError(
-                'relation can only be deleted from the non-owning side'
+            const fromEntity = await this.readUnique(
+                kysely,
+                fromRelation.model as GetModels<Schema>,
+                {
+                    where: fromRelation.ids,
+                }
             );
+            if (!fromEntity) {
+                throw new NotFoundError(model);
+            }
+            deleteResult = await kysely
+                .deleteFrom(modelDef.dbTable)
+                .where((eb) =>
+                    eb.and([
+                        eb.and(
+                            keyPairs.map(({ fk, pk }) =>
+                                eb(sql.ref(pk), '=', fromEntity[fk])
+                            )
+                        ),
+                        eb.or(deleteConditions.map((d) => eb.and(d))),
+                    ])
+                )
+                .execute();
+        } else {
+            deleteResult = await kysely
+                .deleteFrom(modelDef.dbTable)
+                .where((eb) =>
+                    eb.and([
+                        eb.and(
+                            keyPairs.map(({ fk, pk }) =>
+                                eb(sql.ref(fk), '=', fromRelation.ids[pk])
+                            )
+                        ),
+                        eb.or(deleteConditions.map((d) => eb.and(d))),
+                    ])
+                )
+                .execute();
         }
 
-        const r = await kysely
-            .deleteFrom(modelDef.dbTable)
-            .where((eb) =>
-                eb.and([
-                    eb.and(
-                        keyPairs.map(({ fk, pk }) =>
-                            eb(sql.ref(fk), '=', fromRelation.ids[pk])
-                        )
-                    ),
-                    eb.or(deleteConditions.map((d) => eb.and(d))),
-                ])
-            )
-            .execute();
-
         // validate result
-        if (throwForNotFound && expectedDeleteCount > r[0]!.numDeletedRows) {
+        if (
+            throwForNotFound &&
+            expectedDeleteCount > deleteResult[0]!.numDeletedRows
+        ) {
             // some entities were not deleted
             throw new NotFoundError(model);
         }

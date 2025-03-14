@@ -58,7 +58,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             return result;
         }
 
-        if (where === null) {
+        if (where === null || typeof where !== 'object') {
             throw new InternalError('impossible null as filter');
         }
 

@@ -733,10 +733,12 @@ type DisconnectInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
-> = OrArray<
-    WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
-    FieldIsArray<Schema, Model, Field>
->;
+> = FieldIsArray<Schema, Model, Field> extends true
+    ? OrArray<
+          WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
+          true
+      >
+    : boolean | Where<Schema, RelationFieldType<Schema, Model, Field>>;
 
 type SetInput<
     Schema extends SchemaDef,

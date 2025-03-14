@@ -32,7 +32,7 @@
         -   [x] Input validation
         -   [x] Top-level
         -   [x] Nested to-many
-        -   [ ] Nested to-one
+        -   [x] Nested to-one
         -   [ ] Delta update
     -   [ ] Delete
     -   [ ] Aggregation
@@ -45,6 +45,8 @@
         -   [ ] Many-to-many relation
         -   [ ] Logging
         -   [ ] Error system
+        -   [ ] Custom table name
+        -   [ ] Custom field name
 -   [ ] Access Policy
 -   [ ] Migration
 -   [ ] Databases

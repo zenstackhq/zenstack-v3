@@ -294,4 +294,8 @@ export class PostgresCrudDialect<
         }
         return query;
     }
+
+    override get supportsUpdateWithLimit(): boolean {
+        return false;
+    }
 }

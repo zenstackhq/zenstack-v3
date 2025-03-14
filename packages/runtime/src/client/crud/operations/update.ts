@@ -1,9 +1,13 @@
+import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
-import type { CreateArgs, UpdateArgs } from '../../client-types';
+import type {
+    CreateArgs,
+    UpdateArgs,
+    UpdateManyArgs,
+} from '../../client-types';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
 import { getIdValues, requireField } from '../../query-utils';
-import type { CrudOperation } from '../crud-handler';
 import { BaseOperationHandler } from './base';
 import { InputValidator } from './validator';
 
@@ -22,23 +26,22 @@ export class UpdateOperationHandler<
         this.inputValidator = new InputValidator(this.schema);
     }
 
-    async handle(operation: CrudOperation, args: unknown) {
-        // parse args
-        const parsedArgs = this.inputValidator.validateUpdateArgs(
-            this.model,
-            args
-        );
-
-        // need to use the original args as zod may change the order
-        // of fields during parse, and order is critical for query parts
-        // like `orderBy`
-        return this.runQuery(parsedArgs, operation);
+    async handle(operation: 'update' | 'updateMany', args: unknown) {
+        return match(operation)
+            .with('update', () =>
+                this.runUpdate(
+                    this.inputValidator.validateUpdateArgs(this.model, args)
+                )
+            )
+            .with('updateMany', () =>
+                this.runUpdateMany(
+                    this.inputValidator.validateUpdateManyArgs(this.model, args)
+                )
+            )
+            .exhaustive();
     }
 
-    private async runQuery(
-        args: UpdateArgs<Schema, GetModels<Schema>>,
-        _operation: CrudOperation
-    ) {
+    private async runUpdate(args: UpdateArgs<Schema, GetModels<Schema>>) {
         const hasRelationUpdate = Object.keys(args.data).some(
             (f) => !!requireField(this.schema, this.model, f).relation
         );
@@ -53,10 +56,11 @@ export class UpdateOperationHandler<
                     .transaction()
                     .setIsolationLevel('repeatable read')
                     .execute(async (trx) => {
-                        const updateResult = await this.doUpdate(
+                        const updateResult = await this.update(
                             trx,
                             this.model,
-                            args
+                            args.where,
+                            args.data
                         );
                         return this.readUnique(trx, this.model, {
                             select: args.select,
@@ -73,11 +77,12 @@ export class UpdateOperationHandler<
                 throw err;
             }
         } else {
-            // simple create
-            const updateResult = await this.doUpdate(
+            // simple update
+            const updateResult = await this.update(
                 this.kysely,
                 this.model,
-                args
+                args.where,
+                args.data
             );
             if (returnRelations) {
                 result = await this.readUnique(this.kysely, this.model, {
@@ -93,12 +98,16 @@ export class UpdateOperationHandler<
         return result;
     }
 
-    private doUpdate(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        args: UpdateArgs<Schema, GetModels<Schema>>
+    private async runUpdateMany(
+        args: UpdateManyArgs<Schema, GetModels<Schema>>
     ) {
-        return this.update(kysely, model, args.where, args.data);
+        return this.updateMany(
+            this.kysely,
+            this.model,
+            args.where,
+            args.data,
+            args.limit
+        );
     }
 
     private needReturnRelations(

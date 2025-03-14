@@ -57,6 +57,15 @@ export class InputValidator<Schema extends SchemaDef> {
         return args as UpdateArgs<Schema, GetModels<Schema>>;
     }
 
+    validateUpdateManyArgs(model: string, args: unknown) {
+        const schema = this.makeUpdateManySchema(model);
+        const { error } = schema.safeParse(args);
+        if (error) {
+            throw new QueryError(`Invalid update args: ${error}`);
+        }
+        return args as UpdateArgs<Schema, GetModels<Schema>>;
+    }
+
     // #region Find
 
     private makeFindSchema(
@@ -744,7 +753,21 @@ export class InputValidator<Schema extends SchemaDef> {
             );
     }
 
-    private makeUpdateDataSchema(model: string, withoutFields: string[] = []) {
+    private makeUpdateManySchema(model: string) {
+        return z
+            .object({
+                where: this.makeWhereSchema(model, false).optional(),
+                data: this.makeUpdateDataSchema(model, [], true),
+                limit: z.number().int().nonnegative().optional(),
+            })
+            .strict();
+    }
+
+    private makeUpdateDataSchema(
+        model: string,
+        withoutFields: string[] = [],
+        withoutRelationFields = false
+    ) {
         const regularAndFkFields: any = {};
         const regularAndRelationFields: any = {};
         const modelDef = requireModel(this.schema, model);
@@ -759,9 +782,9 @@ export class InputValidator<Schema extends SchemaDef> {
             const fieldDef = requireField(this.schema, model, field);
 
             if (fieldDef.relation) {
-                // if (withoutRelationFields) {
-                //     return;
-                // }
+                if (withoutRelationFields) {
+                    return;
+                }
                 const excludeFields: string[] = [];
                 const oppositeField = fieldDef.relation.opposite;
                 if (oppositeField) {

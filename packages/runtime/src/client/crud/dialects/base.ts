@@ -935,4 +935,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     ) {
         return eb.not(this.and(eb, ...args));
     }
+
+    get supportsUpdateWithLimit() {
+        return true;
+    }
 }

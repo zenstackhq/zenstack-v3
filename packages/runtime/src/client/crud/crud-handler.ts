@@ -73,4 +73,11 @@ export class CrudHandler<Schema extends SchemaDef> {
     update(args: unknown) {
         return this.updateOperation.handle('update', args);
     }
+
+    updateMany(args: unknown) {
+        return this.updateOperation.handle(
+            'updateMany',
+            args
+        ) as Promise<BatchResult>;
+    }
 }

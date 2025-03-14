@@ -627,6 +627,15 @@ export type UpdateArgs<
     include?: Include<Schema, Model>;
 };
 
+export type UpdateManyArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    data: OrArray<UpdateScalarInput<Schema, Model>>;
+    where?: Where<Schema, Model>;
+    limit?: number;
+};
+
 export type UpdateScalarInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
@@ -877,13 +886,13 @@ export type ModelOperations<
         args: SelectSubset<T, CreateArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T>>;
 
-    createMany<T extends CreateManyPayload<Schema, Model>>(
-        args?: SelectSubset<T, CreateManyPayload<Schema, Model>>
-    ): Promise<BatchResult>;
+    createMany(args?: CreateManyPayload<Schema, Model>): Promise<BatchResult>;
 
     update<T extends UpdateArgs<Schema, Model>>(
         args: SelectSubset<T, UpdateArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T>>;
+
+    updateMany(args: UpdateManyArgs<Schema, Model>): Promise<BatchResult>;
 };
 
 //#endregion

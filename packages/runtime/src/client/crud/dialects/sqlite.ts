@@ -234,4 +234,8 @@ export class SqliteCrudDialect<
         }
         return query;
     }
+
+    override get supportsUpdateWithLimit() {
+        return false;
+    }
 }

@@ -183,6 +183,9 @@ function createModelProxy<
                 const r = await handler.update(args);
                 return resultProcessor.processResult(r, model);
             }),
+
+        updateMany: (args) =>
+            createDeferredPromise(() => handler.updateMany(args)),
     };
 }
 

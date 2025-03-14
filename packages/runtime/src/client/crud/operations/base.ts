@@ -638,7 +638,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             throw new InternalError('data must be an object');
         }
 
-        const parentWhere: any = {}; //clone(where ?? {});
+        const parentWhere: any = {};
         if (fromRelation) {
             // merge foreign key conditions from the relation
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
@@ -771,6 +771,97 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             return updatedEntity[0];
         }
+    }
+
+    protected async updateMany(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        where: any,
+        data: any,
+        limit?: number
+    ) {
+        if (typeof data !== 'object') {
+            throw new InternalError('data must be an object');
+        }
+
+        if (Object.keys(data).length === 0) {
+            return { count: 0 };
+        }
+
+        const modelDef = this.requireModel(model);
+        const updateFields: any = {};
+
+        for (const field in data) {
+            const fieldDef = this.requireField(model, field);
+            if (isRelationField(this.schema, model, field)) {
+                continue;
+            }
+            updateFields[field] = this.dialect.transformPrimitive(
+                data[field],
+                fieldDef.type as BuiltinType
+            );
+        }
+
+        let query = kysely.updateTable(modelDef.dbTable).set(updateFields);
+
+        if (limit === undefined) {
+            query = query.where((eb) =>
+                this.dialect.buildFilter(eb, model, modelDef.dbTable, where)
+            );
+        } else {
+            if (this.dialect.supportsUpdateWithLimit) {
+                query = query
+                    .where((eb) =>
+                        this.dialect.buildFilter(
+                            eb,
+                            model,
+                            modelDef.dbTable,
+                            where
+                        )
+                    )
+                    .limit(limit!);
+            } else {
+                query = query.where((eb) =>
+                    eb(
+                        eb.refTuple(
+                            // @ts-expect-error
+                            ...this.buildIdFieldRefs(kysely, model)
+                        ),
+                        'in',
+                        kysely
+                            .selectFrom(modelDef.dbTable)
+                            .where((eb) =>
+                                this.dialect.buildFilter(
+                                    eb,
+                                    model,
+                                    modelDef.dbTable,
+                                    where
+                                )
+                            )
+                            .select(this.buildIdFieldRefs(kysely, model))
+                            .limit(limit!)
+                    )
+                );
+            }
+        }
+
+        try {
+            const result = await query.execute();
+            return { count: Number(result[0]?.numUpdatedRows!) };
+        } catch (err) {
+            const { sql, parameters } = query.compile();
+            throw new QueryError(
+                `Error during updateMany: ${err}, sql: ${sql}, parameters: ${parameters}`
+            );
+        }
+    }
+
+    private buildIdFieldRefs(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>
+    ) {
+        const idFields = getIdFields(this.schema, model);
+        return idFields.map((f) => kysely.dynamic.ref(f));
     }
 
     private async processRelationUpdates(

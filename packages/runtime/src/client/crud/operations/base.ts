@@ -600,7 +600,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             throw new InternalError('data must be an object');
         }
 
-        const mergedWhere = clone(where);
+        const mergedWhere = clone(where ?? {});
         if (fromRelation) {
             // merge foreign key conditions from the relation
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
@@ -821,17 +821,26 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     tasks.push(
                         ...(
                             enumerate(value) as { where: any; data: any }[]
-                        ).map((item) =>
-                            this.update(
+                        ).map((item) => {
+                            let where;
+                            let data;
+                            if ('where' in item) {
+                                where = item.where;
+                                data = item.data;
+                            } else {
+                                where = undefined;
+                                data = item;
+                            }
+                            return this.update(
                                 kysely,
                                 fieldModel,
-                                item.where,
-                                item.data,
+                                where,
+                                data,
                                 fromRelationContext,
                                 true,
                                 throwIfNotFound
-                            )
-                        )
+                            );
+                        })
                     );
                     break;
                 }
@@ -894,7 +903,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             kysely,
                             fieldModel,
                             value,
-                            fromRelationContext
+                            fromRelationContext,
+                            true
                         )
                     );
                     break;
@@ -906,7 +916,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             kysely,
                             fieldModel,
                             value,
-                            fromRelationContext
+                            fromRelationContext,
+                            false
                         )
                     );
                     break;
@@ -950,8 +961,33 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
         }
 
+        // disconnect current if it's a one-one relation
+        const relationFieldDef = this.requireField(
+            fromRelation.model,
+            fromRelation.field
+        );
+
+        if (!relationFieldDef.array) {
+            await kysely
+                .updateTable(modelDef.dbTable)
+                .where((eb) =>
+                    eb.and(
+                        keyPairs.map(({ fk, pk }) =>
+                            eb(sql.ref(fk), '=', fromRelation.ids[pk])
+                        )
+                    )
+                )
+                .set(
+                    keyPairs.reduce(
+                        (acc, { fk }) => ({ ...acc, [fk]: null }),
+                        {} as any
+                    )
+                )
+                .execute();
+        }
+
         // connect
-        await kysely
+        const r = await kysely
             .updateTable(modelDef.dbTable)
             .where((eb) => eb.or(_data.map((d) => eb.and(d))))
             .set(
@@ -964,6 +1000,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 )
             )
             .execute();
+
+        // validate connect result
+        if (_data.length > r[0]!.numUpdatedRows) {
+            // some entities were not connected
+            throw new NotFoundError(model);
+        }
     }
 
     protected async connectOrCreateRelation(
@@ -1040,7 +1082,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // disconnect
-        await kysely
+        const r = await kysely
             .updateTable(modelDef.dbTable)
             .where((eb) => eb.or(_data.map((d) => eb.and(d))))
             .set(
@@ -1050,6 +1092,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 )
             )
             .execute();
+
+        // validate connect result
+        if (_data.length > r[0]!.numUpdatedRows) {
+            // some entities were not connected
+            throw new NotFoundError(model);
+        }
     }
 
     protected async setRelation(
@@ -1101,7 +1149,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         // connect
         if (_data.length > 0) {
-            await kysely
+            const r = await kysely
                 .updateTable(modelDef.dbTable)
                 .where((eb) => eb.or(_data.map((d) => eb.and(d))))
                 .set(
@@ -1114,6 +1162,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     )
                 )
                 .execute();
+
+            // validate result
+            if (_data.length > r[0]!.numUpdatedRows) {
+                // some entities were not connected
+                throw new NotFoundError(model);
+            }
         }
     }
 
@@ -1121,11 +1175,24 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         data: any,
-        fromRelation: FromRelationContext
+        fromRelation: FromRelationContext,
+        throwForNotFound: boolean
     ) {
-        const _data = enumerate(data);
-        if (_data.length === 0) {
-            return;
+        let deleteConditions: any[] = [];
+        let expectedDeleteCount: number;
+        if (typeof data === 'boolean') {
+            if (data === false) {
+                return;
+            } else {
+                deleteConditions = [true];
+                expectedDeleteCount = 1;
+            }
+        } else {
+            deleteConditions = enumerate(data);
+            if (deleteConditions.length === 0) {
+                return;
+            }
+            expectedDeleteCount = deleteConditions.length;
         }
 
         const modelDef = this.requireModel(model);
@@ -1141,7 +1208,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
         }
 
-        return kysely
+        const r = await kysely
             .deleteFrom(modelDef.dbTable)
             .where((eb) =>
                 eb.and([
@@ -1150,10 +1217,16 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             eb(sql.ref(fk), '=', fromRelation.ids[pk])
                         )
                     ),
-                    eb.or(_data.map((d) => eb.and(d))),
+                    eb.or(deleteConditions.map((d) => eb.and(d))),
                 ])
             )
             .execute();
+
+        // validate result
+        if (throwForNotFound && expectedDeleteCount > r[0]!.numDeletedRows) {
+            // some entities were not deleted
+            throw new NotFoundError(model);
+        }
     }
 
     protected makeIdSelect(model: string) {

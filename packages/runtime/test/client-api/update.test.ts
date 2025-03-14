@@ -253,7 +253,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 data: { comments: { set: [] } },
             });
 
-            // set multiple
+            // non-existing
             await expect(
                 client.post.update({
                     where: { id: post.id },
@@ -264,6 +264,19 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                                 { id: '2' },
                                 { id: '3' }, // non-existing
                             ],
+                        },
+                    },
+                    include: { comments: true },
+                })
+            ).toRejectNotFound();
+
+            // set multiple
+            await expect(
+                client.post.update({
+                    where: { id: post.id },
+                    data: {
+                        comments: {
+                            set: [{ id: '1' }, { id: '2' }],
                         },
                     },
                     include: { comments: true },
@@ -302,7 +315,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 comments: [expect.objectContaining({ id: comment1.id })],
             });
 
-            // already  connected
+            // already connected
             await expect(
                 client.post.update({
                     where: { id: post.id },
@@ -313,7 +326,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 comments: [expect.objectContaining({ id: comment1.id })],
             });
 
-            // connect multiple
+            // connect non existing
             await expect(
                 client.post.update({
                     where: { id: post.id },
@@ -324,6 +337,19 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                                 { id: comment2.id },
                                 { id: '3' }, // non-existing
                             ],
+                        },
+                    },
+                    include: { comments: true },
+                })
+            ).toRejectNotFound();
+
+            // connect multiple
+            await expect(
+                client.post.update({
+                    where: { id: post.id },
+                    data: {
+                        comments: {
+                            connect: [{ id: comment1.id }, { id: comment2.id }],
                         },
                     },
                     include: { comments: true },
@@ -451,7 +477,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 ],
             });
 
-            // multiple
+            // non-existing
             await expect(
                 client.post.update({
                     where: { id: post.id },
@@ -462,6 +488,19 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                                 { id: '3' },
                                 { id: '4' }, // non-existing
                             ],
+                        },
+                    },
+                    include: { comments: true },
+                })
+            ).toRejectNotFound();
+
+            // multiple
+            await expect(
+                client.post.update({
+                    where: { id: post.id },
+                    data: {
+                        comments: {
+                            disconnect: [{ id: '2' }, { id: '3' }],
                         },
                     },
                     include: { comments: true },
@@ -511,12 +550,17 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     data: { comments: { delete: { id: '4' } } },
                     include: { comments: true },
                 })
-            ).resolves.toMatchObject({
-                comments: [
-                    expect.objectContaining({ id: '2' }),
-                    expect.objectContaining({ id: '3' }),
-                ],
-            });
+            ).toRejectNotFound();
+            await expect(client.comment.findMany()).toResolveWithLength(3);
+
+            // non-existing
+            await expect(
+                client.post.update({
+                    where: { id: post.id },
+                    data: { comments: { delete: { id: '5' } } },
+                    include: { comments: true },
+                })
+            ).toRejectNotFound();
             await expect(client.comment.findMany()).toResolveWithLength(3);
 
             // multiple
@@ -525,11 +569,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     where: { id: post.id },
                     data: {
                         comments: {
-                            delete: [
-                                { id: '2' },
-                                { id: '3' },
-                                { id: '5' }, // non-existing
-                            ],
+                            delete: [{ id: '2' }, { id: '3' }],
                         },
                     },
                     include: { comments: true },
@@ -1081,6 +1121,399 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                     },
                 })
             ).resolves.toMatchObject(post);
+        });
+
+        it('works with nested to-one relation simple create', async () => {
+            const user = await createUser(client, 'u1@test.com', {});
+
+            // create
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: { profile: { create: { id: '1', bio: 'Bio' } } },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ id: '1', bio: 'Bio' }),
+            });
+        });
+
+        it('works with nested to-one relation simple connect', async () => {
+            const user = await createUser(client, 'u1@test.com', {});
+            const profile1 = await client.profile.create({
+                data: { id: '1', bio: 'Bio' },
+            });
+
+            // connect without a current connection
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            connect: { id: profile1.id },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ id: '1', bio: 'Bio' }),
+            });
+
+            // connect with a current connection
+            const profile2 = await client.profile.create({
+                data: { id: '2', bio: 'Bio2' },
+            });
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            connect: { id: profile2.id },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ id: '2', bio: 'Bio2' }),
+            });
+            // old profile is disconnected
+            await expect(
+                client.profile.findUnique({ where: { id: '1' } })
+            ).resolves.toMatchObject({ userId: null });
+            // new profile is connected
+            await expect(
+                client.profile.findUnique({ where: { id: '2' } })
+            ).resolves.toMatchObject({ userId: user.id });
+
+            // connect to a non-existing entity
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            connect: { id: '3' },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).toRejectNotFound();
+        });
+
+        it('works with nested to-one relation connectOrCreate', async () => {
+            const user = await createUser(client, 'u1@test.com', {});
+
+            // create
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            connectOrCreate: {
+                                where: { id: '1' },
+                                create: { id: '1', bio: 'Bio' },
+                            },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ id: '1', bio: 'Bio' }),
+            });
+
+            // connect
+            const profile2 = await client.profile.create({
+                data: { id: '2', bio: 'Bio2' },
+            });
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            connectOrCreate: {
+                                where: { id: profile2.id },
+                                create: { id: '3', bio: 'Bio3' },
+                            },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ id: '2', bio: 'Bio2' }),
+            });
+            // old profile is disconnected
+            await expect(
+                client.profile.findUnique({ where: { id: '1' } })
+            ).resolves.toMatchObject({ userId: null });
+            // new profile is connected
+            await expect(
+                client.profile.findUnique({ where: { id: '2' } })
+            ).resolves.toMatchObject({ userId: user.id });
+        });
+
+        it('works with nested to-one relation disconnect', async () => {
+            const user = await createUser(client, 'u1@test.com', {
+                profile: { create: { id: '1', bio: 'Bio' } },
+            });
+
+            // disconnect
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            disconnect: { id: '1' },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: null,
+            });
+
+            await expect(
+                client.profile.findUnique({ where: { id: '1' } })
+            ).resolves.toMatchObject({
+                userId: null,
+            });
+
+            // disconnect non-existing
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            disconnect: { id: '2' },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).toRejectNotFound();
+        });
+
+        it('works with nested to-one relation update', async () => {
+            const user = await createUser(client, 'u1@test.com', {
+                profile: { create: { id: '1', bio: 'Bio' } },
+            });
+
+            // without where
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            update: {
+                                bio: 'Bio1',
+                            },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ bio: 'Bio1' }),
+            });
+
+            // with where
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            update: {
+                                where: { id: '1' },
+                                data: { bio: 'Bio2' },
+                            },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ bio: 'Bio2' }),
+            });
+
+            // non-existing
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            update: {
+                                where: { id: '2' },
+                                data: { bio: 'Bio3' },
+                            },
+                        },
+                    },
+                })
+            ).toRejectNotFound();
+
+            // not connected
+            const user2 = await createUser(client, 'u2@example.com', {});
+            await expect(
+                client.user.update({
+                    where: { id: user2.id },
+                    data: {
+                        profile: {
+                            update: { bio: 'Bio4' },
+                        },
+                    },
+                })
+            ).toRejectNotFound();
+        });
+
+        it('works with nested to-one relation upsert', async () => {
+            const user = await createUser(client, 'u1@test.com', {});
+
+            // create
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            upsert: {
+                                where: { id: '1' },
+                                create: { id: '1', bio: 'Bio' },
+                                update: { bio: 'Bio1' },
+                            },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ bio: 'Bio' }),
+            });
+
+            // update
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            upsert: {
+                                where: { id: '1' },
+                                create: { id: '1', bio: 'Bio' },
+                                update: { bio: 'Bio1' },
+                            },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ bio: 'Bio1' }),
+            });
+        });
+
+        it('works with nested to-one relation delete', async () => {
+            const user = await createUser(client, 'u1@test.com', {
+                profile: { create: { id: '1', bio: 'Bio' } },
+            });
+
+            // false
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            delete: false,
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: expect.objectContaining({ id: '1' }),
+            });
+            await expect(
+                client.profile.findUnique({ where: { id: '1' } })
+            ).toResolveTruthy();
+
+            // true
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            delete: true,
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: null,
+            });
+            await expect(
+                client.profile.findUnique({ where: { id: '1' } })
+            ).toResolveNull();
+
+            // with filter
+            await client.user.update({
+                where: { id: user.id },
+                data: {
+                    profile: {
+                        create: { id: '1', bio: 'Bio' },
+                    },
+                },
+            });
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            delete: { id: '1' },
+                        },
+                    },
+                    include: { profile: true },
+                })
+            ).resolves.toMatchObject({
+                profile: null,
+            });
+            await expect(
+                client.profile.findUnique({ where: { id: '1' } })
+            ).toResolveNull();
+
+            // null relation
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            delete: true,
+                        },
+                    },
+                })
+            ).toRejectNotFound();
+
+            // not connected
+            await client.profile.create({
+                data: { id: '2', bio: 'Bio2' },
+            });
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            delete: { id: '2' },
+                        },
+                    },
+                })
+            ).toRejectNotFound();
+
+            // non-existing
+            await client.user.update({
+                where: { id: user.id },
+                data: {
+                    profile: {
+                        create: { id: '1', bio: 'Bio' },
+                    },
+                },
+            });
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        profile: {
+                            delete: { id: '3' },
+                        },
+                    },
+                })
+            ).toRejectNotFound();
         });
     }
 );

@@ -867,19 +867,19 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
-    protected true(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
+    public true(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
         return eb.lit<SqlBool>(
             this.transformPrimitive(true, 'Boolean') as boolean
         );
     }
 
-    protected false(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
+    public false(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
         return eb.lit<SqlBool>(
             this.transformPrimitive(false, 'Boolean') as boolean
         );
     }
 
-    protected isTrue(expression: Expression<SqlBool>) {
+    public isTrue(expression: Expression<SqlBool>) {
         const node = expression.toOperationNode();
         if (node.kind !== 'ValueNode') {
             return false;
@@ -890,7 +890,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         );
     }
 
-    protected isFalse(expression: Expression<SqlBool>) {
+    public isFalse(expression: Expression<SqlBool>) {
         const node = expression.toOperationNode();
         if (node.kind !== 'ValueNode') {
             return false;

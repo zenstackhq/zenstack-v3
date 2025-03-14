@@ -574,37 +574,49 @@ export class InputValidator<Schema extends SchemaDef> {
                 fieldType,
                 withoutFields
             ).optional();
+        }
 
-            if (mode === 'update') {
+        if (mode === 'update') {
+            fields['update'] = array
+                ? this.orArray(
+                      z.object({
+                          where: this.makeWhereSchema(fieldType, true),
+                          data: this.makeUpdateDataSchema(
+                              fieldType,
+                              withoutFields
+                          ),
+                      }),
+                      true
+                  ).optional()
+                : z
+                      .union([
+                          z.object({
+                              where: this.makeWhereSchema(fieldType, true),
+                              data: this.makeUpdateDataSchema(
+                                  fieldType,
+                                  withoutFields
+                              ),
+                          }),
+                          this.makeUpdateDataSchema(fieldType, withoutFields),
+                      ])
+                      .optional();
+
+            fields['upsert'] = this.orArray(
+                z.object({
+                    where: this.makeWhereSchema(fieldType, true),
+                    create: this.makeCreateDataSchema(
+                        fieldType,
+                        false,
+                        withoutFields
+                    ),
+                    update: this.makeUpdateDataSchema(fieldType, withoutFields),
+                }),
+                true
+            ).optional();
+
+            if (array) {
                 fields['set'] = this.makeConnectDisconnectDataSchema(
                     fieldType,
-                    true
-                ).optional();
-
-                fields['update'] = this.orArray(
-                    z.object({
-                        where: this.makeWhereSchema(fieldType, true),
-                        data: this.makeUpdateDataSchema(
-                            fieldType,
-                            withoutFields
-                        ),
-                    }),
-                    true
-                ).optional();
-
-                fields['upsert'] = this.orArray(
-                    z.object({
-                        where: this.makeWhereSchema(fieldType, true),
-                        create: this.makeCreateDataSchema(
-                            fieldType,
-                            false,
-                            withoutFields
-                        ),
-                        update: this.makeUpdateDataSchema(
-                            fieldType,
-                            withoutFields
-                        ),
-                    }),
                     true
                 ).optional();
 

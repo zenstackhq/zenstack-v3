@@ -748,17 +748,39 @@ type NestedUpdateInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
-> = OrArray<
-    {
-        where: WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>;
-        data: UpdateInput<
-            Schema,
-            RelationFieldType<Schema, Model, Field>,
-            OppositeRelationAndFK<Schema, Model, Field>
-        >;
-    },
-    FieldIsArray<Schema, Model, Field>
->;
+> = FieldIsArray<Schema, Model, Field> extends true
+    ? OrArray<
+          {
+              where: WhereUnique<
+                  Schema,
+                  RelationFieldType<Schema, Model, Field>
+              >;
+              data: UpdateInput<
+                  Schema,
+                  RelationFieldType<Schema, Model, Field>,
+                  OppositeRelationAndFK<Schema, Model, Field>
+              >;
+          },
+          true
+      >
+    : XOR<
+          {
+              where: WhereUnique<
+                  Schema,
+                  RelationFieldType<Schema, Model, Field>
+              >;
+              data: UpdateInput<
+                  Schema,
+                  RelationFieldType<Schema, Model, Field>,
+                  OppositeRelationAndFK<Schema, Model, Field>
+              >;
+          },
+          UpdateInput<
+              Schema,
+              RelationFieldType<Schema, Model, Field>,
+              OppositeRelationAndFK<Schema, Model, Field>
+          >
+      >;
 
 type NestedUpsertInput<
     Schema extends SchemaDef,
@@ -801,10 +823,12 @@ type NestedDeleteInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
-> = OrArray<
-    WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
-    FieldIsArray<Schema, Model, Field>
->;
+> = FieldIsArray<Schema, Model, Field> extends true
+    ? OrArray<
+          WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
+          true
+      >
+    : boolean | Where<Schema, RelationFieldType<Schema, Model, Field>>;
 
 type NestedDeleteManyInput<
     Schema extends SchemaDef,

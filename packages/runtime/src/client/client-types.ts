@@ -129,6 +129,8 @@ export type ModelResult<
     Array
 >;
 
+export type BatchResult = { count: number };
+
 //#endregion
 
 //#region Common structures
@@ -505,6 +507,11 @@ export type CreateArgs<
     include?: Include<Schema, Model>;
 };
 
+export type CreateManyArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = CreateManyPayload<Schema, Model>;
+
 type OptionalWrap<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
@@ -871,8 +878,8 @@ export type ModelOperations<
     ): Promise<ModelResult<Schema, Model, T>>;
 
     createMany<T extends CreateManyPayload<Schema, Model>>(
-        args: SelectSubset<T, CreateManyPayload<Schema, Model>>
-    ): Promise<{ count: number }>;
+        args?: SelectSubset<T, CreateManyPayload<Schema, Model>>
+    ): Promise<BatchResult>;
 
     update<T extends UpdateArgs<Schema, Model>>(
         args: SelectSubset<T, UpdateArgs<Schema, Model>>

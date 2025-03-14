@@ -1,9 +1,9 @@
+import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
-import type { CreateArgs } from '../../client-types';
+import type { CreateArgs, CreateManyArgs } from '../../client-types';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
 import { getIdValues, requireField } from '../../query-utils';
-import type { CrudOperation } from '../crud-handler';
 import { BaseOperationHandler } from './base';
 import { InputValidator } from './validator';
 
@@ -22,20 +22,28 @@ export class CreateOperationHandler<
         this.inputValidator = new InputValidator(this.schema);
     }
 
-    async handle(_operation: CrudOperation, args: unknown) {
-        // parse args
-        const parsedArgs = this.inputValidator.validateCreateArgs(
-            this.model,
-            args
-        );
-
-        // need to use the original args as zod may change the order
-        // of fields during parse, and order is critical for query parts
-        // like `orderBy`
-        return this.runQuery(parsedArgs);
+    async handle(
+        operation: 'create' | 'createMany',
+        args: unknown | undefined
+    ) {
+        return match(operation)
+            .with('create', () =>
+                this.runCreate(
+                    this.inputValidator.validateCreateArgs(this.model, args)
+                )
+            )
+            .with('createMany', () => {
+                if (args === undefined) {
+                    return { count: 0 };
+                }
+                return this.runCreateMany(
+                    this.inputValidator.validateCreateManyArgs(this.model, args)
+                );
+            })
+            .exhaustive();
     }
 
-    private async runQuery(args: CreateArgs<Schema, GetModels<Schema>>) {
+    private async runCreate(args: CreateArgs<Schema, GetModels<Schema>>) {
         const hasRelationCreate = Object.keys(args.data).some(
             (f) => !!requireField(this.schema, this.model, f).relation
         );
@@ -88,6 +96,12 @@ export class CreateOperationHandler<
         }
 
         return result;
+    }
+
+    private runCreateMany(
+        parsedArgs: CreateManyArgs<Schema, GetModels<Schema>>
+    ) {
+        return this.createMany(this.kysely, this.model, parsedArgs);
     }
 
     private needReturnRelations(

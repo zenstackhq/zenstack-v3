@@ -556,9 +556,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected async createMany(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
-        input: { data: any; skipDuplicates: boolean },
+        input: { data: any; skipDuplicates?: boolean },
         fromRelation?: FromRelationContext
-    ): Promise<unknown> {
+    ) {
         const modelDef = this.requireModel(model);
 
         let relationKeyPairs: { fk: string; pk: string }[] = [];
@@ -586,13 +586,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return this.fillGeneratedValues(modelDef, item);
         });
 
-        return kysely
+        const result = await kysely
             .insertInto(modelDef.dbTable)
             .values(createData)
-            .$if(input.skipDuplicates, (qb) =>
+            .$if(!!input.skipDuplicates, (qb) =>
                 qb.onConflict((oc) => oc.doNothing())
             )
             .execute();
+        return { count: Number(result[0]!.numInsertedOrUpdatedRows!) };
     }
 
     private fillGeneratedValues(modelDef: ModelDef, data: object) {

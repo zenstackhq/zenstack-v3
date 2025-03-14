@@ -2,7 +2,12 @@ import { match, P } from 'ts-pattern';
 import { z, ZodSchema } from 'zod';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, EnumDef, FieldDef } from '../../../schema/schema';
-import type { CreateArgs, FindArgs, UpdateArgs } from '../../client-types';
+import type {
+    CreateArgs,
+    CreateManyArgs,
+    FindArgs,
+    UpdateArgs,
+} from '../../client-types';
 import { InternalError, QueryError } from '../../errors';
 import {
     fieldHasDefaultValue,
@@ -32,6 +37,15 @@ export class InputValidator<Schema extends SchemaDef> {
             throw new QueryError(`Invalid create args: ${error}`);
         }
         return args as CreateArgs<Schema, GetModels<Schema>>;
+    }
+
+    validateCreateManyArgs(model: string, args: unknown) {
+        const schema = this.makeCreateManySchema(model);
+        const { error } = schema.safeParse(args);
+        if (error) {
+            throw new QueryError(`Invalid createMany args: ${error}`);
+        }
+        return args as CreateManyArgs<Schema, GetModels<Schema>>;
     }
 
     validateUpdateArgs(model: string, args: unknown) {
@@ -437,6 +451,10 @@ export class InputValidator<Schema extends SchemaDef> {
                 include: z.record(z.string(), z.any()).optional(),
             })
             .strict();
+    }
+
+    private makeCreateManySchema(model: string) {
+        return this.makeCreateManyDataSchema(model, []);
     }
 
     private makeCreateDataSchema(

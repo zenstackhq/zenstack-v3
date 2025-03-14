@@ -175,9 +175,8 @@ function createModelProxy<
                 return resultProcessor.processResult(r, model);
             }),
 
-        createMany: (_args) => {
-            throw new Error('Not implemented');
-        },
+        createMany: (args) =>
+            createDeferredPromise(() => handler.createMany(args)),
 
         update: (args) =>
             createDeferredPromise(async () => {

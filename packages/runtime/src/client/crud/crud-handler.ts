@@ -1,4 +1,5 @@
 import type { GetModels, SchemaDef } from '../../schema';
+import type { BatchResult } from '../client-types';
 import type { ClientOptions } from '../options';
 import type { ToKysely } from '../query-builder';
 import type { BaseOperationHandler } from './operations/base';
@@ -60,6 +61,13 @@ export class CrudHandler<Schema extends SchemaDef> {
 
     create(args: unknown) {
         return this.createOperation.handle('create', args);
+    }
+
+    createMany(args: unknown) {
+        return this.createOperation.handle(
+            'createMany',
+            args
+        ) as Promise<BatchResult>;
     }
 
     update(args: unknown) {

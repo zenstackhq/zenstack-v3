@@ -51,7 +51,7 @@ export class CreateOperationHandler<
         const returnRelations = this.needReturnRelations(this.model, args);
 
         let result: any;
-        if (hasRelationCreate) {
+        if (hasRelationCreate || returnRelations) {
             // employ a transaction
             try {
                 result = await this.kysely
@@ -84,15 +84,7 @@ export class CreateOperationHandler<
                 this.model,
                 args.data
             );
-            if (returnRelations) {
-                result = this.readUnique(this.kysely, this.model, {
-                    select: args.select,
-                    include: args.include,
-                    where: getIdValues(this.schema, this.model, createResult),
-                });
-            } else {
-                result = this.trimResult(createResult, args);
-            }
+            result = this.trimResult(createResult, args);
         }
 
         return result;
@@ -102,22 +94,5 @@ export class CreateOperationHandler<
         parsedArgs: CreateManyArgs<Schema, GetModels<Schema>>
     ) {
         return this.createMany(this.kysely, this.model, parsedArgs);
-    }
-
-    private needReturnRelations(
-        model: string,
-        args: CreateArgs<Schema, GetModels<Schema>>
-    ) {
-        let returnRelation = false;
-
-        if (args.include) {
-            returnRelation = Object.keys(args.include).length > 0;
-        } else if (args.select) {
-            returnRelation = Object.entries(args.select).some(([K, v]) => {
-                const fieldDef = this.requireField(model, K);
-                return fieldDef.relation && v;
-            });
-        }
-        return returnRelation;
     }
 }

@@ -6,7 +6,7 @@ import { createUser } from './utils';
 
 const PG_DB_NAME = 'client-api-update-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME, true))(
+describe.each(createClientSpecs(PG_DB_NAME))(
     'Client update tests',
     ({ makeClient, provider }) => {
         const schema = getSchema(provider);

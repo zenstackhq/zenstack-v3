@@ -2,11 +2,14 @@ import { match, P } from 'ts-pattern';
 import { z, ZodSchema } from 'zod';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, EnumDef, FieldDef } from '../../../schema/schema';
-import type {
-    CreateArgs,
-    CreateManyArgs,
-    FindArgs,
-    UpdateArgs,
+import {
+    type CreateArgs,
+    type CreateManyArgs,
+    type DeleteArgs,
+    type DeleteManyArgs,
+    type FindArgs,
+    type UpdateArgs,
+    type UpdateManyArgs,
 } from '../../client-types';
 import { InternalError, QueryError } from '../../errors';
 import {
@@ -22,48 +25,67 @@ export class InputValidator<Schema extends SchemaDef> {
     constructor(private readonly schema: Schema) {}
 
     validateFindArgs(model: string, unique: boolean, args: unknown) {
-        const schema = this.makeFindSchema(model, unique, true);
-        const { error } = schema.safeParse(args);
-        if (error) {
-            throw new QueryError(`Invalid find args: ${error.message}`);
-        }
-        return args as FindArgs<Schema, GetModels<Schema>, true>;
+        return this.validate<FindArgs<Schema, GetModels<Schema>, true>>(
+            this.makeFindSchema(model, unique, true),
+            'find',
+            args
+        );
     }
 
     validateCreateArgs(model: string, args: unknown) {
-        const schema = this.makeCreateSchema(model);
-        const { error } = schema.safeParse(args);
-        if (error) {
-            throw new QueryError(`Invalid create args: ${error}`);
-        }
-        return args as CreateArgs<Schema, GetModels<Schema>>;
+        return this.validate<CreateArgs<Schema, GetModels<Schema>>>(
+            this.makeCreateSchema(model),
+            'create',
+            args
+        );
     }
 
     validateCreateManyArgs(model: string, args: unknown) {
-        const schema = this.makeCreateManySchema(model);
-        const { error } = schema.safeParse(args);
-        if (error) {
-            throw new QueryError(`Invalid createMany args: ${error}`);
-        }
-        return args as CreateManyArgs<Schema, GetModels<Schema>>;
+        return this.validate<CreateManyArgs<Schema, GetModels<Schema>>>(
+            this.makeCreateManySchema(model),
+            'createMany',
+            args
+        );
     }
 
     validateUpdateArgs(model: string, args: unknown) {
-        const schema = this.makeUpdateSchema(model);
-        const { error } = schema.safeParse(args);
-        if (error) {
-            throw new QueryError(`Invalid update args: ${error}`);
-        }
-        return args as UpdateArgs<Schema, GetModels<Schema>>;
+        return this.validate<UpdateArgs<Schema, GetModels<Schema>>>(
+            this.makeUpdateSchema(model),
+            'update',
+            args
+        );
     }
 
     validateUpdateManyArgs(model: string, args: unknown) {
-        const schema = this.makeUpdateManySchema(model);
+        return this.validate<UpdateManyArgs<Schema, GetModels<Schema>>>(
+            this.makeUpdateManySchema(model),
+            'updateMany',
+            args
+        );
+    }
+
+    validateDeleteArgs(model: GetModels<Schema>, args: unknown) {
+        return this.validate<DeleteArgs<Schema, GetModels<Schema>>>(
+            this.makeDeleteSchema(model),
+            'delete',
+            args
+        );
+    }
+
+    validateDeleteManyArgs(model: GetModels<Schema>, args: unknown) {
+        return this.validate<DeleteManyArgs<Schema, GetModels<Schema>>>(
+            this.makeDeleteManySchema(model),
+            'deleteMany',
+            args
+        );
+    }
+
+    private validate<T>(schema: ZodSchema, operation: string, args: unknown) {
         const { error } = schema.safeParse(args);
         if (error) {
-            throw new QueryError(`Invalid update args: ${error}`);
+            throw new QueryError(`Invalid ${operation} args: ${error.message}`);
         }
-        return args as UpdateArgs<Schema, GetModels<Schema>>;
+        return args as T;
     }
 
     // #region Find
@@ -93,13 +115,8 @@ export class InputValidator<Schema extends SchemaDef> {
             ).optional();
         }
 
-        let result: ZodSchema = z
-            .object(fields)
-            .strict()
-            .refine(
-                (value) => !value['select'] || !value['include'],
-                '"select" and "include" cannot be used together'
-            );
+        let result: ZodSchema = z.object(fields).strict();
+        result = this.refineForSelectIncludeMutuallyExclusive(result);
 
         if (!unique) {
             result = result.optional();
@@ -739,18 +756,16 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Update
 
     private makeUpdateSchema(model: string) {
-        return z
+        const schema = z
             .object({
                 where: this.makeWhereSchema(model, true),
                 data: this.makeUpdateDataSchema(model),
                 select: z.record(z.string(), z.any()).optional(),
                 include: z.record(z.string(), z.any()).optional(),
             })
-            .strict()
-            .refine(
-                (value) => !value['select'] || !value['include'],
-                '"select" and "include" cannot be used together'
-            );
+            .strict();
+
+        return this.refineForSelectIncludeMutuallyExclusive(schema);
     }
 
     private makeUpdateManySchema(model: string) {
@@ -840,7 +855,38 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #endregion
 
+    // #region Delete
+
+    private makeDeleteSchema(model: GetModels<Schema>) {
+        const schema = z
+            .object({
+                where: this.makeWhereSchema(model, true),
+                select: this.makeSelectSchema(model).optional(),
+                include: this.makeIncludeSchema(model).optional(),
+            })
+            .strict();
+        return this.refineForSelectIncludeMutuallyExclusive(schema);
+    }
+
+    private makeDeleteManySchema(model: GetModels<Schema>) {
+        return z
+            .object({
+                where: this.makeWhereSchema(model, false).optional(),
+                limit: z.number().int().nonnegative().optional(),
+            })
+            .strict();
+    }
+
+    // #endregion
+
     // #region Helpers
+
+    private refineForSelectIncludeMutuallyExclusive(schema: ZodSchema) {
+        return schema.refine(
+            (value) => !(value['select'] && value['include']),
+            '"select" and "include" cannot be used together'
+        );
+    }
 
     private nullableIf(schema: ZodSchema, nullable: boolean) {
         return nullable ? schema.nullable() : schema;

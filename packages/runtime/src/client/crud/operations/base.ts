@@ -1451,6 +1451,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
+    protected async delete(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        where: any,
+        returnData: boolean
+    ): Promise<DeleteResult[] | unknown[]> {
+        const modelDef = this.requireModel(model);
+        return kysely
+            .deleteFrom(modelDef.dbTable)
+            .where((eb) =>
+                this.dialect.buildFilter(eb, model, modelDef.dbTable, where)
+            )
+            .$if(returnData, (qb) => qb.returningAll())
+            .execute();
+    }
+
     protected makeIdSelect(model: string) {
         const modelDef = this.requireModel(model);
         return modelDef.idFields.reduce((acc, f) => {
@@ -1470,5 +1486,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             acc[field] = data[field];
             return acc;
         }, {} as any);
+    }
+
+    protected needReturnRelations(
+        model: string,
+        args: SelectInclude<Schema, GetModels<Schema>>
+    ) {
+        let returnRelation = false;
+
+        if (args.include) {
+            returnRelation = Object.keys(args.include).length > 0;
+        } else if (args.select) {
+            returnRelation = Object.entries(args.select).some(([K, v]) => {
+                const fieldDef = this.requireField(model, K);
+                return fieldDef.relation && v;
+            });
+        }
+        return returnRelation;
     }
 }

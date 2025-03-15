@@ -699,6 +699,27 @@ type UpdateRelationFieldPayload<
 
 // #endregion
 
+// #region Delete args
+
+export type DeleteArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    where: WhereUnique<Schema, Model>;
+    select?: Select<Schema, Model>;
+    include?: Include<Schema, Model>;
+};
+
+export type DeleteManyArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    where?: Where<Schema, Model>;
+    limit?: number;
+};
+
+// #endregion
+
 // #region Relation manipulation
 
 type NestedCreateInput<
@@ -893,6 +914,12 @@ export type ModelOperations<
     ): Promise<ModelResult<Schema, Model, T>>;
 
     updateMany(args: UpdateManyArgs<Schema, Model>): Promise<BatchResult>;
+
+    delete<T extends DeleteArgs<Schema, Model>>(
+        args: SelectSubset<T, DeleteArgs<Schema, Model>>
+    ): Promise<ModelResult<Schema, Model>>;
+
+    deleteMany(args?: DeleteManyArgs<Schema, Model>): Promise<BatchResult>;
 };
 
 //#endregion

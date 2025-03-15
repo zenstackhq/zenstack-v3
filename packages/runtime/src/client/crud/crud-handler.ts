@@ -4,6 +4,7 @@ import type { ClientOptions } from '../options';
 import type { ToKysely } from '../query-builder';
 import type { BaseOperationHandler } from './operations/base';
 import { CreateOperationHandler } from './operations/create';
+import { DeleteOperationHandler } from './operations/delete';
 import { FindOperationHandler } from './operations/find';
 import { UpdateOperationHandler } from './operations/update';
 
@@ -14,12 +15,15 @@ export type CrudOperation =
     | 'create'
     | 'createMany'
     | 'update'
-    | 'updateMany';
+    | 'updateMany'
+    | 'delete'
+    | 'deleteMany';
 
 export class CrudHandler<Schema extends SchemaDef> {
     private readonly findHandler: BaseOperationHandler<Schema>;
     private readonly createOperation: BaseOperationHandler<Schema>;
     private readonly updateOperation: BaseOperationHandler<Schema>;
+    private readonly deleteOperation: BaseOperationHandler<Schema>;
 
     constructor(
         protected readonly schema: Schema,
@@ -40,6 +44,12 @@ export class CrudHandler<Schema extends SchemaDef> {
             this.options
         );
         this.updateOperation = new UpdateOperationHandler(
+            schema,
+            kysely,
+            model,
+            this.options
+        );
+        this.deleteOperation = new DeleteOperationHandler(
             schema,
             kysely,
             model,
@@ -77,6 +87,17 @@ export class CrudHandler<Schema extends SchemaDef> {
     updateMany(args: unknown) {
         return this.updateOperation.handle(
             'updateMany',
+            args
+        ) as Promise<BatchResult>;
+    }
+
+    delete(args: unknown) {
+        return this.deleteOperation.handle('delete', args);
+    }
+
+    deleteMany(args: unknown) {
+        return this.deleteOperation.handle(
+            'deleteMany',
             args
         ) as Promise<BatchResult>;
     }

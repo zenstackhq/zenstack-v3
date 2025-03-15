@@ -1,10 +1,6 @@
 import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
-import type {
-    CreateArgs,
-    UpdateArgs,
-    UpdateManyArgs,
-} from '../../client-types';
+import type { UpdateArgs, UpdateManyArgs } from '../../client-types';
 import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
 import { getIdValues, requireField } from '../../query-utils';
@@ -108,24 +104,5 @@ export class UpdateOperationHandler<
             args.data,
             args.limit
         );
-    }
-
-    private needReturnRelations(
-        model: string,
-        args:
-            | CreateArgs<Schema, GetModels<Schema>>
-            | UpdateArgs<Schema, GetModels<Schema>>
-    ) {
-        let returnRelation = false;
-
-        if (args.include) {
-            returnRelation = Object.keys(args.include).length > 0;
-        } else if (args.select) {
-            returnRelation = Object.entries(args.select).some(([K, v]) => {
-                const fieldDef = this.requireField(model, K);
-                return fieldDef.relation && v;
-            });
-        }
-        return returnRelation;
     }
 }

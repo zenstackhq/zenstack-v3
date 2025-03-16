@@ -3,6 +3,7 @@ import { z, ZodSchema } from 'zod';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, EnumDef, FieldDef } from '../../../schema/schema';
 import {
+    type CountArgs,
     type CreateArgs,
     type CreateManyArgs,
     type DeleteArgs,
@@ -41,11 +42,9 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     validateCreateManyArgs(model: string, args: unknown) {
-        return this.validate<CreateManyArgs<Schema, GetModels<Schema>>>(
-            this.makeCreateManySchema(model),
-            'createMany',
-            args
-        );
+        return this.validate<
+            CreateManyArgs<Schema, GetModels<Schema>> | undefined
+        >(this.makeCreateManySchema(model), 'createMany', args);
     }
 
     validateUpdateArgs(model: string, args: unknown) {
@@ -73,9 +72,15 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     validateDeleteManyArgs(model: GetModels<Schema>, args: unknown) {
-        return this.validate<DeleteManyArgs<Schema, GetModels<Schema>>>(
-            this.makeDeleteManySchema(model),
-            'deleteMany',
+        return this.validate<
+            DeleteManyArgs<Schema, GetModels<Schema>> | undefined
+        >(this.makeDeleteManySchema(model), 'deleteMany', args);
+    }
+
+    validateCountArgs(model: GetModels<Schema>, args: unknown) {
+        return this.validate<CountArgs<Schema, GetModels<Schema>> | undefined>(
+            this.makeCountSchema(model),
+            'count',
             args
         );
     }
@@ -480,7 +485,7 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeCreateManySchema(model: string) {
-        return this.makeCreateManyDataSchema(model, []);
+        return this.makeCreateManyDataSchema(model, []).optional();
     }
 
     private makeCreateDataSchema(
@@ -874,7 +879,44 @@ export class InputValidator<Schema extends SchemaDef> {
                 where: this.makeWhereSchema(model, false).optional(),
                 limit: z.number().int().nonnegative().optional(),
             })
-            .strict();
+            .strict()
+            .optional();
+    }
+
+    // #endregion
+
+    // #region Count
+
+    makeCountSchema(model: GetModels<Schema>) {
+        return z
+            .object({
+                where: this.makeWhereSchema(model, false).optional(),
+                skip: z.number().int().nonnegative().optional(),
+                take: z.number().int().nonnegative().optional(),
+                orderBy: this.orArray(
+                    this.makeOrderBySchema(model),
+                    true
+                ).optional(),
+                select: this.makeCountAggregateInputSchema(model).optional(),
+            })
+            .strict()
+            .optional();
+    }
+
+    private makeCountAggregateInputSchema(model: GetModels<Schema>) {
+        const modelDef = requireModel(this.schema, model);
+        return z.union([
+            z.literal(true),
+            z
+                .object({
+                    _all: z.literal(true).optional(),
+                    ...Object.keys(modelDef.fields).reduce((acc, field) => {
+                        acc[field] = z.literal(true).optional();
+                        return acc;
+                    }, {} as Record<string, ZodSchema>),
+                })
+                .strict(),
+        ]);
     }
 
     // #endregion

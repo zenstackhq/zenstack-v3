@@ -41,10 +41,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     ): SelectQueryBuilder<any, any, {}>;
 
     abstract buildSkipTake(
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         skip: number | undefined,
         take: number | undefined
-    ): SelectQueryBuilder<any, any, {}>;
+    ): SelectQueryBuilder<any, any, any>;
 
     buildFilter(
         eb: ExpressionBuilder<any, any>,

@@ -330,6 +330,10 @@ type Include<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
           >;
 };
 
+export type Subset<T, U> = {
+    [key in keyof T]: key extends keyof U ? T[key] : never;
+};
+
 export type SelectSubset<T, U> = {
     [key in keyof T]: key extends keyof U ? T[key] : never;
 } & (T extends { select: any; include: any }
@@ -720,6 +724,33 @@ export type DeleteManyArgs<
 
 // #endregion
 
+// #region Count args
+
+export type CountArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = Omit<
+    FindArgs<Schema, Model, true>,
+    'select' | 'include' | 'distinct' | 'omit'
+> & {
+    select?: CountAggregateInput<Schema, Model> | true;
+};
+
+export type CountAggregateInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    [Key in NonRelationFields<Schema, Model>]?: true;
+} & { _all?: true };
+
+export type CountResult<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    _Args extends CountArgs<Schema, Model>
+> = number;
+
+// #endregion
+
 // #region Relation manipulation
 
 type NestedCreateInput<
@@ -913,13 +944,21 @@ export type ModelOperations<
         args: SelectSubset<T, UpdateArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model, T>>;
 
-    updateMany(args: UpdateManyArgs<Schema, Model>): Promise<BatchResult>;
+    updateMany<T extends UpdateManyArgs<Schema, Model>>(
+        args: Subset<T, UpdateManyArgs<Schema, Model>>
+    ): Promise<BatchResult>;
 
     delete<T extends DeleteArgs<Schema, Model>>(
         args: SelectSubset<T, DeleteArgs<Schema, Model>>
     ): Promise<ModelResult<Schema, Model>>;
 
-    deleteMany(args?: DeleteManyArgs<Schema, Model>): Promise<BatchResult>;
+    deleteMany<T extends DeleteManyArgs<Schema, Model>>(
+        args?: Subset<T, DeleteManyArgs<Schema, Model>>
+    ): Promise<BatchResult>;
+
+    count<T extends CountArgs<Schema, Model>>(
+        args?: Subset<T, CountArgs<Schema, Model>>
+    ): Promise<CountResult<Schema, Model, T>>;
 };
 
 //#endregion

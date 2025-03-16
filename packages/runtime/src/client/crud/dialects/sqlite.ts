@@ -218,10 +218,10 @@ export class SqliteCrudDialect<
     }
 
     override buildSkipTake(
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         skip: number | undefined,
         take: number | undefined
-    ): SelectQueryBuilder<any, any, {}> {
+    ) {
         if (take !== undefined) {
             query = query.limit(take);
         }

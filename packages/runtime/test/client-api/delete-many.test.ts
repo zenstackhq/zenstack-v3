@@ -51,7 +51,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             await expect(client.user.findMany()).toResolveWithLength(1);
 
             // delete all
-            await expect(client.user.deleteMany({})).resolves.toMatchObject({
+            await expect(client.user.deleteMany()).resolves.toMatchObject({
                 count: 1,
             });
             await expect(client.user.findMany()).toResolveWithLength(0);

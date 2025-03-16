@@ -75,12 +75,14 @@ export class DeleteOperationHandler<
     }
 
     async runDeleteMany(
-        args: DeleteManyArgs<Schema, Extract<keyof Schema['models'], string>>
+        args:
+            | DeleteManyArgs<Schema, Extract<keyof Schema['models'], string>>
+            | undefined
     ) {
         const result = await this.delete(
             this.kysely,
             this.model,
-            args.where,
+            args?.where,
             false
         );
         return { count: Number((result as DeleteResult[])[0]?.numDeletedRows) };

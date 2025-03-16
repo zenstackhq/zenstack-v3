@@ -3,6 +3,7 @@ import type { BatchResult } from '../client-types';
 import type { ClientOptions } from '../options';
 import type { ToKysely } from '../query-builder';
 import type { BaseOperationHandler } from './operations/base';
+import { CountOperationHandler } from './operations/count';
 import { CreateOperationHandler } from './operations/create';
 import { DeleteOperationHandler } from './operations/delete';
 import { FindOperationHandler } from './operations/find';
@@ -17,13 +18,17 @@ export type CrudOperation =
     | 'update'
     | 'updateMany'
     | 'delete'
-    | 'deleteMany';
+    | 'deleteMany'
+    | 'count'
+    | 'aggregate'
+    | 'groupBy';
 
 export class CrudHandler<Schema extends SchemaDef> {
-    private readonly findHandler: BaseOperationHandler<Schema>;
+    private readonly findOperation: BaseOperationHandler<Schema>;
     private readonly createOperation: BaseOperationHandler<Schema>;
     private readonly updateOperation: BaseOperationHandler<Schema>;
     private readonly deleteOperation: BaseOperationHandler<Schema>;
+    private readonly countOperation: BaseOperationHandler<Schema>;
 
     constructor(
         protected readonly schema: Schema,
@@ -31,7 +36,7 @@ export class CrudHandler<Schema extends SchemaDef> {
         public readonly options: ClientOptions<Schema>,
         protected readonly model: GetModels<Schema>
     ) {
-        this.findHandler = new FindOperationHandler(
+        this.findOperation = new FindOperationHandler(
             schema,
             kysely,
             model,
@@ -55,18 +60,24 @@ export class CrudHandler<Schema extends SchemaDef> {
             model,
             this.options
         );
+        this.countOperation = new CountOperationHandler(
+            schema,
+            kysely,
+            model,
+            this.options
+        );
     }
 
     findUnique(args: unknown) {
-        return this.findHandler.handle('findUnique', args);
+        return this.findOperation.handle('findUnique', args);
     }
 
     findFirst(args: unknown) {
-        return this.findHandler.handle('findFirst', args);
+        return this.findOperation.handle('findFirst', args);
     }
 
     findMany(args: unknown) {
-        return this.findHandler.handle('findMany', args);
+        return this.findOperation.handle('findMany', args);
     }
 
     create(args: unknown) {
@@ -100,5 +111,9 @@ export class CrudHandler<Schema extends SchemaDef> {
             'deleteMany',
             args
         ) as Promise<BatchResult>;
+    }
+
+    count(args: unknown) {
+        return this.countOperation.handle('count', args) as Promise<number>;
     }
 }

@@ -33,9 +33,6 @@ export class CreateOperationHandler<
                 )
             )
             .with('createMany', () => {
-                if (args === undefined) {
-                    return { count: 0 };
-                }
                 return this.runCreateMany(
                     this.inputValidator.validateCreateManyArgs(this.model, args)
                 );
@@ -90,9 +87,10 @@ export class CreateOperationHandler<
         return result;
     }
 
-    private runCreateMany(
-        parsedArgs: CreateManyArgs<Schema, GetModels<Schema>>
-    ) {
-        return this.createMany(this.kysely, this.model, parsedArgs);
+    private runCreateMany(args?: CreateManyArgs<Schema, GetModels<Schema>>) {
+        if (args === undefined) {
+            return { count: 0 };
+        }
+        return this.createMany(this.kysely, this.model, args);
     }
 }

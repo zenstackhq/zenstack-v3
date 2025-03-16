@@ -196,7 +196,11 @@ function createModelProxy<
         deleteMany: (args) =>
             createDeferredPromise(() => handler.deleteMany(args)),
 
-        count: (args) => createDeferredPromise(() => handler.count(args)),
+        count: (args) =>
+            createDeferredPromise(() => handler.count(args) as any),
+
+        aggregate: (args) =>
+            createDeferredPromise(async () => handler.aggregate(args) as any),
     };
 }
 

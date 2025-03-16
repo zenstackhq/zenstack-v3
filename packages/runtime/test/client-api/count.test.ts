@@ -36,8 +36,13 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             });
 
             // without filter
-            await expect(client.user.count()).resolves.toBe(2);
-            await expect(client.user.count({ select: true })).resolves.toBe(2);
+            let r = await client.user.count();
+            expect(r).toBe(2);
+            expect(r).toBeTypeOf('number');
+
+            r = await client.user.count({ select: true });
+            expect(r).toBe(2);
+            expect(r).toBeTypeOf('number');
 
             // with filter
             await expect(
@@ -81,11 +86,11 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 },
             });
 
-            await expect(
-                client.user.count({
-                    select: { _all: true, name: true },
-                })
-            ).resolves.toEqual({ _all: 2, name: 1 });
+            const r = await client.user.count({
+                select: { _all: true, name: true },
+            });
+            expect(r._all).toBe(2);
+            expect(r.name).toBe(1);
         });
     }
 );

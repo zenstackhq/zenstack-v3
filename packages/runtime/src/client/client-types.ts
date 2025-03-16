@@ -7,6 +7,7 @@ import type {
     FieldHasGenerator,
     FieldIsArray,
     FieldIsOptional,
+    FieldIsRelation,
     FieldIsRelationArray,
     FieldType,
     ForeignKeyFields,
@@ -746,8 +747,109 @@ export type CountAggregateInput<
 export type CountResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    _Args extends CountArgs<Schema, Model>
-> = number;
+    Args extends CountArgs<Schema, Model>
+> = Args extends { select: infer S }
+    ? S extends true
+        ? number
+        : {
+              [Key in keyof S]: number;
+          }
+    : number;
+
+// #endregion
+
+// #region Aggregate
+
+export type AggregateArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = Omit<
+    FindArgs<Schema, Model, true>,
+    'select' | 'include' | 'distinct' | 'omit'
+> & {
+    _count?: true | CountAggregateInput<Schema, Model>;
+    _avg?: SumAvgInput<Schema, Model>;
+    _sum?: SumAvgInput<Schema, Model>;
+    _min?: MinMaxInput<Schema, Model>;
+    _max?: MinMaxInput<Schema, Model>;
+};
+
+type NumericFields<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = keyof {
+    [Key in GetFields<Schema, Model> as GetFieldType<
+        Schema,
+        Model,
+        Key
+    > extends 'Int' | 'Float' | 'BigInt' | 'Decimal'
+        ? Key
+        : never]: GetField<Schema, Model, Key>;
+};
+
+export type SumAvgInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    [Key in NumericFields<Schema, Model>]?: true;
+};
+
+export type MinMaxInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    [Key in GetFields<Schema, Model> as FieldIsArray<
+        Schema,
+        Model,
+        Key
+    > extends true
+        ? never
+        : FieldIsRelation<Schema, Model, Key> extends true
+        ? never
+        : Key]?: true;
+};
+
+export type AggregateResult<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Args extends AggregateArgs<Schema, Model>
+> = (Args extends { _count: infer Count }
+    ? {
+          _count: Count extends true
+              ? number
+              : {
+                    [Key in keyof Count]: number;
+                };
+      }
+    : {}) &
+    (Args extends { _sum: infer Sum }
+        ? {
+              _sum: {
+                  [Key in keyof Sum]: number;
+              };
+          }
+        : {}) &
+    (Args extends { _avg: infer Avg }
+        ? {
+              _avg: {
+                  [Key in keyof Avg]: number;
+              };
+          }
+        : {}) &
+    (Args extends { _min: infer Min }
+        ? {
+              _min: {
+                  [Key in keyof Min]: number;
+              };
+          }
+        : {}) &
+    (Args extends { _max: infer Max }
+        ? {
+              _max: {
+                  [Key in keyof Max]: number;
+              };
+          }
+        : {});
 
 // #endregion
 
@@ -959,6 +1061,10 @@ export type ModelOperations<
     count<T extends CountArgs<Schema, Model>>(
         args?: Subset<T, CountArgs<Schema, Model>>
     ): Promise<CountResult<Schema, Model, T>>;
+
+    aggregate<T extends AggregateArgs<Schema, Model>>(
+        args: Subset<T, AggregateArgs<Schema, Model>>
+    ): Promise<AggregateResult<Schema, Model, T>>;
 };
 
 //#endregion

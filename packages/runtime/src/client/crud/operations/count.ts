@@ -54,26 +54,24 @@ export class CountOperationHandler<
             query = query.select((eb) =>
                 Object.keys(validatedArgs.select!).map((key) =>
                     key === '_all'
-                        ? eb.fn.countAll().as('_all')
-                        : eb.fn.count(sql.ref(`$sub.${key}`)).as(key)
+                        ? eb.cast(eb.fn.countAll(), 'integer').as('_all')
+                        : eb
+                              .cast(
+                                  eb.fn.count(sql.ref(`$sub.${key}`)),
+                                  'integer'
+                              )
+                              .as(key)
                 )
             );
-            const result = await query.executeTakeFirst();
-            // some db like sqlite returns count as strings so we need to make the conversion
-            // TODO: move this to post processing?
-            return Object.entries<string | number>(result!).reduce(
-                (acc, [key, value]) => {
-                    acc[key] =
-                        typeof value === 'string' ? parseInt(value) : value;
-                    return acc;
-                },
-                {} as Record<string, number>
-            );
+
+            return query.executeTakeFirstOrThrow();
         } else {
             // simple count all
-            query = query.select((eb) => eb.fn.countAll().as('count'));
-            const result = await query.executeTakeFirst();
-            return parseInt((result as any).count);
+            query = query.select((eb) =>
+                eb.cast(eb.fn.countAll(), 'integer').as('count')
+            );
+            const result = await query.executeTakeFirstOrThrow();
+            return (result as any).count as number;
         }
     }
 }

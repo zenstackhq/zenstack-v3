@@ -13,7 +13,9 @@
         -   [ ] ID generation
     -   [ ] Find
         -   [x] Input validation
-        -   [x] Field selection
+        -   [ ] Field selection
+            -   [ ] Omit
+            -   [ ] Counting relation
         -   [x] Pagination
             -   [x] Skip and limit
             -   [ ] Cursor
@@ -28,6 +30,7 @@
             -   [x] Filtering
             -   [x] Sorting
             -   [x] Pagination
+        -   [ ] Distinct
     -   [ ] Update
         -   [x] Input validation
         -   [x] Top-level

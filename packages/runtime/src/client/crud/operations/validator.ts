@@ -3,6 +3,7 @@ import { z, ZodSchema } from 'zod';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { BuiltinType, EnumDef, FieldDef } from '../../../schema/schema';
 import {
+    type AggregateArgs,
     type CountArgs,
     type CreateArgs,
     type CreateManyArgs,
@@ -23,6 +24,8 @@ import {
 } from '../../query-utils';
 
 export class InputValidator<Schema extends SchemaDef> {
+    private readonly numericTypes = ['Int', 'Float', 'BigInt', 'Decimal'];
+
     constructor(private readonly schema: Schema) {}
 
     validateFindArgs(model: string, unique: boolean, args: unknown) {
@@ -81,6 +84,14 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<CountArgs<Schema, GetModels<Schema>> | undefined>(
             this.makeCountSchema(model),
             'count',
+            args
+        );
+    }
+
+    validateAggregateArgs(model: GetModels<Schema>, args: unknown) {
+        return this.validate<AggregateArgs<Schema, GetModels<Schema>>>(
+            this.makeAggregateSchema(model),
+            'aggregate',
             args
         );
     }
@@ -917,6 +928,59 @@ export class InputValidator<Schema extends SchemaDef> {
                 })
                 .strict(),
         ]);
+    }
+
+    // #endregion
+
+    // #region Aggregate
+
+    makeAggregateSchema(model: GetModels<Schema>) {
+        return z
+            .object({
+                where: this.makeWhereSchema(model, false).optional(),
+                skip: z.number().int().nonnegative().optional(),
+                take: z.number().int().nonnegative().optional(),
+                orderBy: this.orArray(
+                    this.makeOrderBySchema(model),
+                    true
+                ).optional(),
+                _count: this.makeCountAggregateInputSchema(model).optional(),
+                _avg: this.makeSumAvgInputSchema(model).optional(),
+                _sum: this.makeSumAvgInputSchema(model).optional(),
+                _min: this.makeMinMaxInputSchema(model).optional(),
+                _max: this.makeMinMaxInputSchema(model).optional(),
+            })
+            .strict()
+            .optional();
+    }
+
+    makeSumAvgInputSchema(model: GetModels<Schema>) {
+        const modelDef = requireModel(this.schema, model);
+        return z.object(
+            Object.keys(modelDef.fields).reduce((acc, field) => {
+                const fieldDef = requireField(this.schema, model, field);
+                if (
+                    this.numericTypes.includes(fieldDef.type) &&
+                    !fieldDef.array
+                ) {
+                    acc[field] = z.literal(true).optional();
+                }
+                return acc;
+            }, {} as Record<string, ZodSchema>)
+        );
+    }
+
+    makeMinMaxInputSchema(model: GetModels<Schema>) {
+        const modelDef = requireModel(this.schema, model);
+        return z.object(
+            Object.keys(modelDef.fields).reduce((acc, field) => {
+                const fieldDef = requireField(this.schema, model, field);
+                if (!fieldDef.relation && !fieldDef.array) {
+                    acc[field] = z.literal(true).optional();
+                }
+                return acc;
+            }, {} as Record<string, ZodSchema>)
+        );
     }
 
     // #endregion

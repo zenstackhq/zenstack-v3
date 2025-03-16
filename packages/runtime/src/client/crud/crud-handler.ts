@@ -2,6 +2,7 @@ import type { GetModels, SchemaDef } from '../../schema';
 import type { BatchResult } from '../client-types';
 import type { ClientOptions } from '../options';
 import type { ToKysely } from '../query-builder';
+import { AggregateOperationHandler } from './operations/aggregate';
 import type { BaseOperationHandler } from './operations/base';
 import { CountOperationHandler } from './operations/count';
 import { CreateOperationHandler } from './operations/create';
@@ -29,6 +30,7 @@ export class CrudHandler<Schema extends SchemaDef> {
     private readonly updateOperation: BaseOperationHandler<Schema>;
     private readonly deleteOperation: BaseOperationHandler<Schema>;
     private readonly countOperation: BaseOperationHandler<Schema>;
+    private readonly aggregateOperation: BaseOperationHandler<Schema>;
 
     constructor(
         protected readonly schema: Schema,
@@ -61,6 +63,12 @@ export class CrudHandler<Schema extends SchemaDef> {
             this.options
         );
         this.countOperation = new CountOperationHandler(
+            schema,
+            kysely,
+            model,
+            this.options
+        );
+        this.aggregateOperation = new AggregateOperationHandler(
             schema,
             kysely,
             model,
@@ -114,6 +122,10 @@ export class CrudHandler<Schema extends SchemaDef> {
     }
 
     count(args: unknown) {
-        return this.countOperation.handle('count', args) as Promise<number>;
+        return this.countOperation.handle('count', args) as Promise<unknown>;
+    }
+
+    aggregate(args: unknown) {
+        return this.aggregateOperation.handle('count', args) as Promise<number>;
     }
 }

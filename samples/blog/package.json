@@ -4,6 +4,8 @@
     "description": "",
     "main": "index.js",
     "scripts": {
+        "generate": "zenstack generate",
+        "db:migrate": "zenstack migrate dev",
         "build": "tsc --noEmit",
         "dev": "tsx main.ts"
     },
@@ -11,9 +13,8 @@
     "author": "",
     "license": "MIT",
     "dependencies": {
+        "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
-        "@zenstackhq/tanstack-query": "workspace:*",
-        "@zenstackhq/zod": "workspace:*",
         "better-sqlite3": "^11.8.1",
         "kysely": "^0.27.5"
     },

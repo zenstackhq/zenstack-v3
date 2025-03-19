@@ -7,12 +7,12 @@ const PG_DB_NAME = 'client-api-update-many-tests';
 
 describe.each(createClientSpecs(PG_DB_NAME))(
     'Client updateMany tests',
-    ({ makeClient, provider }) => {
+    ({ createClient, provider }) => {
         const schema = getSchema(provider);
         let client: Client<typeof schema>;
 
         beforeEach(async () => {
-            client = await makeClient();
+            client = await createClient();
             await pushSchema(client);
         });
 

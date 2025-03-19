@@ -170,18 +170,15 @@ export type NonRelationFields<
 export type RelationFields<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
-> = Extract<
-    keyof {
-        [Key in GetFields<Schema, Model> as GetField<
-            Schema,
-            Model,
-            Key
-        >['relation'] extends object
-            ? Key
-            : never]: Key;
-    },
-    string
->;
+> = keyof {
+    [Key in GetFields<Schema, Model> as GetField<
+        Schema,
+        Model,
+        Key
+    >['relation'] extends object
+        ? Key
+        : never]: Key;
+};
 
 export type FieldType<
     Schema extends SchemaDef,

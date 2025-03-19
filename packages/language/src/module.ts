@@ -10,8 +10,12 @@ import {
 import {
     ZModelGeneratedModule,
     ZModelGeneratedSharedModule,
+    ZModelLanguageMetaData,
 } from './generated/module';
 import { ZModelValidator, registerValidationChecks } from './validator';
+import { ZModelScopeComputation, ZModelScopeProvider } from './zmodel-scope';
+import { ZModelLinker } from './zmodel-linker';
+export { ZModelLanguageMetaData };
 
 /**
  * Declaration of custom services - add your own service classes here.
@@ -37,6 +41,11 @@ export const ZModelLanguageModule: Module<
     ZModelServices,
     PartialLangiumServices & ZModelAddedServices
 > = {
+    references: {
+        ScopeComputation: (services) => new ZModelScopeComputation(services),
+        ScopeProvider: (services) => new ZModelScopeProvider(services),
+        Linker: (services) => new ZModelLinker(services),
+    },
     validation: {
         ZModelValidator: (services) => new ZModelValidator(services),
     },

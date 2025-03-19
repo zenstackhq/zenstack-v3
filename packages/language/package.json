@@ -9,18 +9,26 @@
     ],
     "type": "module",
     "scripts": {
-        "build": "tsc -b tsconfig.src.json",
-        "watch": "tsc -b tsconfig.src.json --watch",
+        "build": "tsup-node",
+        "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "langium:generate": "langium generate",
         "langium:generate:production": "langium generate --mode=production",
         "langium:watch": "langium generate --watch",
-        "test": "vitest run"
+        "pack": "pnpm pack"
     },
     "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        },
         "./ast": {
             "import": "./dist/ast.js",
             "types": "./dist/ast.d.ts"
+        },
+        "./package.json": {
+            "import": "./package.json",
+            "require": "./package.json"
         }
     },
     "dependencies": {

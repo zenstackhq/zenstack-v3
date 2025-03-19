@@ -1,1 +1,1 @@
-export { makeClient } from './client';
+export { createClient } from './client';

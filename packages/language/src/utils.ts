@@ -8,8 +8,10 @@ import {
 import path from 'path';
 import { STD_LIB_MODULE_NAME, type ExpressionContext } from './constants';
 import {
+    BinaryExpr,
     ConfigExpr,
     isArrayExpr,
+    isBinaryExpr,
     isConfigArrayExpr,
     isDataModel,
     isDataModelField,
@@ -42,6 +44,7 @@ import {
     type TypeDef,
     type TypeDefField,
 } from './generated/ast';
+import fs from 'node:fs';
 
 export type AttributeTarget =
     | DataModel
@@ -475,14 +478,14 @@ export function isCheckInvocation(node: AstNode) {
     );
 }
 
-export async function resolveTransitiveImports(
+export function resolveTransitiveImports(
     documents: LangiumDocuments,
     model: Model
-): Promise<Model[]> {
+) {
     return resolveTransitiveImportsInternal(documents, model);
 }
 
-async function resolveTransitiveImportsInternal(
+function resolveTransitiveImportsInternal(
     documents: LangiumDocuments,
     model: Model,
     initialModel = model,
@@ -500,7 +503,7 @@ async function resolveTransitiveImportsInternal(
     if (!visited.has(normalizedPath)) {
         visited.add(normalizedPath);
         for (const imp of model.imports) {
-            const importedModel = await resolveImport(documents, imp);
+            const importedModel = resolveImport(documents, imp);
             if (importedModel) {
                 resolveTransitiveImportsInternal(
                     documents,
@@ -515,16 +518,18 @@ async function resolveTransitiveImportsInternal(
     return Array.from(models);
 }
 
-export async function resolveImport(
-    documents: LangiumDocuments,
-    imp: ModelImport
-): Promise<Model | undefined> {
-    const resolvedUri = await resolveImportUri(imp);
+export function resolveImport(documents: LangiumDocuments, imp: ModelImport) {
+    const resolvedUri = resolveImportUri(imp);
     try {
         if (resolvedUri) {
-            const resolvedDocument = await documents.getOrCreateDocument(
-                resolvedUri
-            );
+            let resolvedDocument = documents.getDocument(resolvedUri);
+            if (!resolvedDocument) {
+                const content = fs.readFileSync(resolvedUri.fsPath, 'utf-8');
+                resolvedDocument = documents.createDocument(
+                    resolvedUri,
+                    content
+                );
+            }
             const node = resolvedDocument.parseResult.value;
             if (isModel(node)) {
                 return node;
@@ -536,7 +541,7 @@ export async function resolveImport(
     return undefined;
 }
 
-async function resolveImportUri(imp: ModelImport): Promise<URI | undefined> {
+export function resolveImportUri(imp: ModelImport) {
     if (!imp.path) return undefined; // This will return true if imp.path is undefined, null, or an empty string ("").
 
     if (!imp.path.endsWith('.zmodel')) {
@@ -554,7 +559,7 @@ async function resolveImportUri(imp: ModelImport): Promise<URI | undefined> {
         imp.path = findNodeModulesFile(imp.path, contextPath) ?? imp.path;
     }
 
-    const doc = await AstUtils.getDocument(imp);
+    const doc = AstUtils.getDocument(imp);
     const dir = path.dirname(doc.uri.fsPath);
     return URI.file(path.resolve(dir, imp.path));
 }
@@ -585,10 +590,95 @@ export function getDataModelAndTypeDefs(model: Model, includeIgnored = false) {
     }
 }
 
-export async function getAllDeclarationsIncludingImports(
+export function getAllDeclarationsIncludingImports(
     documents: LangiumDocuments,
     model: Model
 ) {
-    const imports = await resolveTransitiveImports(documents, model);
+    const imports = resolveTransitiveImports(documents, model);
     return model.declarations.concat(...imports.map((imp) => imp.declarations));
+}
+
+export function getAuthDecl(decls: (DataModel | TypeDef)[]) {
+    let authModel = decls.find((m) => hasAttribute(m, '@@auth'));
+    if (!authModel) {
+        authModel = decls.find((m) => m.name === 'User');
+    }
+    return authModel;
+}
+
+export function isFutureInvocation(node: AstNode) {
+    return (
+        isInvocationExpr(node) &&
+        node.function.ref?.name === 'future' &&
+        isFromStdlib(node.function.ref)
+    );
+}
+
+export function isCollectionPredicate(node: AstNode): node is BinaryExpr {
+    return isBinaryExpr(node) && ['?', '!', '^'].includes(node.operator);
+}
+
+export function getAllLoadedDataModelsAndTypeDefs(
+    langiumDocuments: LangiumDocuments
+) {
+    return langiumDocuments.all
+        .map((doc) => doc.parseResult.value as Model)
+        .flatMap((model) =>
+            model.declarations.filter(
+                (d): d is DataModel | TypeDef => isDataModel(d) || isTypeDef(d)
+            )
+        )
+        .toArray();
+}
+
+export function getAllDataModelsIncludingImports(
+    documents: LangiumDocuments,
+    model: Model
+) {
+    return getAllDeclarationsIncludingImports(documents, model).filter(
+        isDataModel
+    );
+}
+
+export function getAllLoadedAndReachableDataModelsAndTypeDefs(
+    langiumDocuments: LangiumDocuments,
+    fromModel?: DataModel
+) {
+    // get all data models from loaded documents
+    const allDataModels = getAllLoadedDataModelsAndTypeDefs(langiumDocuments);
+
+    if (fromModel) {
+        // merge data models transitively reached from the current model
+        const model = AstUtils.getContainerOfType(fromModel, isModel);
+        if (model) {
+            const transitiveDataModels = getAllDataModelsIncludingImports(
+                langiumDocuments,
+                model
+            );
+            transitiveDataModels.forEach((dm) => {
+                if (!allDataModels.includes(dm)) {
+                    allDataModels.push(dm);
+                }
+            });
+        }
+    }
+
+    return allDataModels;
+}
+
+export function getContainingDataModel(
+    node: Expression
+): DataModel | undefined {
+    let curr: AstNode | undefined = node.$container;
+    while (curr) {
+        if (isDataModel(curr)) {
+            return curr;
+        }
+        curr = curr.$container;
+    }
+    return undefined;
+}
+
+export function isMemberContainer(node: unknown): node is DataModel | TypeDef {
+    return isDataModel(node) || isTypeDef(node);
 }

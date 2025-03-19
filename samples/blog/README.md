@@ -1,0 +1,4 @@
+-   pnpm install
+-   pnpm generate
+-   pnpm db:migrate
+-   pnpm dev

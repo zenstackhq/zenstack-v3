@@ -1,14 +1,14 @@
 import { createId } from '@paralleldrive/cuid2';
 import SQLite from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { makeClient } from '../../src';
+import { createClient } from '../../src';
 import { getSchema, pushSchema } from '../test-schema';
 
 describe('Client API tests', () => {
     const schema = getSchema('sqlite');
 
     it('works with queries', async () => {
-        const client = makeClient(schema, {
+        const client = createClient(schema, {
             dialectConfig: {
                 database: new SQLite(':memory:'),
             },

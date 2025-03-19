@@ -7,12 +7,12 @@ const PG_DB_NAME = 'policy-read-tests';
 
 describe.each(createClientSpecs(PG_DB_NAME, true))(
     'Read policy tests',
-    ({ makeClient, provider }) => {
+    ({ createClient, provider }) => {
         const schema = getSchema(provider);
         let client: Client<typeof schema>;
 
         beforeEach(async () => {
-            client = await makeClient();
+            client = await createClient();
             await pushSchema(client);
         });
 

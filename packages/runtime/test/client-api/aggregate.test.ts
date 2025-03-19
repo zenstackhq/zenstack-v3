@@ -6,12 +6,12 @@ import { createUser } from './utils';
 
 describe.each(createClientSpecs(__filename, true))(
     'Client aggregate tests',
-    ({ makeClient, provider }) => {
+    ({ createClient, provider }) => {
         const schema = getSchema(provider);
         let client: Client<typeof schema>;
 
         beforeEach(async () => {
-            client = await makeClient();
+            client = await createClient();
             await pushSchema(client);
         });
 

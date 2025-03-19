@@ -8,12 +8,12 @@ const PG_DB_NAME = 'client-api-create-tests';
 
 describe.each(createClientSpecs(PG_DB_NAME))(
     'Client create tests',
-    ({ makeClient, provider }) => {
+    ({ createClient, provider }) => {
         const schema = getSchema(provider);
         let client: Client<typeof schema>;
 
         beforeEach(async () => {
-            client = await makeClient();
+            client = await createClient();
             await pushSchema(client);
         });
 

@@ -7,6 +7,7 @@ import {
 } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
+import { ulid } from 'ulid';
 import * as uuid from 'uuid';
 import type { GetModels, ModelDef, SchemaDef } from '../../../schema';
 import type {
@@ -617,12 +618,16 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private evalGenerator(generator: FieldGenerator) {
-        return match(generator)
-            .with('cuid', 'cuid2', () => createId())
-            .with('uuid4', () => uuid.v4())
-            .with('uuid7', () => uuid.v7())
-            .with('nanoid', () => uuid.v7())
-            .otherwise(() => undefined);
+        return (
+            match(generator)
+                .with('cuid', 'cuid2', () => createId())
+                .with('uuid4', () => uuid.v4())
+                .with('uuid7', () => uuid.v7())
+                // TODO: nanoid
+                // .with('nanoid', () => nanoid())
+                .with('ulid', () => ulid())
+                .otherwise(() => undefined)
+        );
     }
 
     protected async update(

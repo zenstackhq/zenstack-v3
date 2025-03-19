@@ -4,9 +4,10 @@
 export const SUPPORTED_PROVIDERS = [
     'sqlite',
     'postgresql',
-    'mysql',
-    'sqlserver',
-    'cockroachdb',
+    // TODO: other providers
+    // 'mysql',
+    // 'sqlserver',
+    // 'cockroachdb',
 ];
 
 /**

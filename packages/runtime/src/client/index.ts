@@ -26,7 +26,7 @@ export type Client<Schema extends SchemaDef> = {
         : never]: ModelOperations<Schema, Key>;
 };
 
-export function makeClient<Schema extends SchemaDef>(
+export function createClient<Schema extends SchemaDef>(
     schema: Schema,
     options: ClientOptions<Schema>
 ) {
@@ -77,7 +77,7 @@ class ClientImpl<Schema extends SchemaDef> {
     }
 
     $withFeatures(features: FeatureSettings<Schema>) {
-        return makeClient(this.schema, {
+        return createClient(this.schema, {
             ...this.options,
             features: {
                 ...this.options.features,

@@ -45,11 +45,12 @@ export const BinaryExprOperatorPriority: Record<
     '!': 5,
 };
 
-declare module './generated/ast' {
+declare module './ast' {
     interface AttributeArg {
         /**
          * Resolved attribute param declaration
          */
+        // @ts-ignore
         $resolvedParam?: AttributeParam;
     }
 

@@ -16,7 +16,7 @@ import type {
     TypeDef,
     ZModelAstType,
 } from './generated/ast';
-import type { ZModelServices } from './module.js';
+import type { ZModelServices } from './module';
 import AttributeValidator from './validators/attribute-validator';
 import DataModelValidator from './validators/datamodel-validator';
 import DataSourceValidator from './validators/datasource-validator';

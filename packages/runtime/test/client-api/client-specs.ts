@@ -15,14 +15,14 @@ export function createClientSpecs(dbName: string, logQueries = false) {
     return [
         {
             provider: 'sqlite' as const,
-            makeClient: async () =>
+            createClient: async () =>
                 makeSqliteClient(getSchema('sqlite'), {
                     log: logQueries ? logger('sqlite') : undefined,
                 }),
         },
         {
             provider: 'postgresql' as const,
-            makeClient: async () =>
+            createClient: async () =>
                 makePostgresClient(getSchema('postgresql'), dbName, {
                     log: logQueries ? logger('postgresql') : undefined,
                 }),

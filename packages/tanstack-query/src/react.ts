@@ -21,16 +21,16 @@ export type toHooks<Schema extends SchemaDef> = {
 };
 
 type ToModelHooks<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    findMany<T extends FindArgs<Schema, Model>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model>>,
+    findMany<T extends FindArgs<Schema, Model, true>>(
+        args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
         options?: Omit<
             UseQueryOptions<ModelResult<Schema, Model, T>[]>,
             'queryKey'
         >
     ): UseQueryResult<ModelResult<Schema, Model, T>[]>;
 
-    findFirst<T extends FindArgs<Schema, Model>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model>>,
+    findFirst<T extends FindArgs<Schema, Model, true>>(
+        args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
         options?: Omit<
             UseQueryOptions<ModelResult<Schema, Model, T>[]>,
             'queryKey'

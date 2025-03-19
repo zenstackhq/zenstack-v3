@@ -10,6 +10,10 @@ async function main() {
         log: ['query'],
     });
 
+    await db.post.deleteMany();
+    await db.profile.deleteMany();
+    await db.user.deleteMany();
+
     // create with high-level API
     const user1 = await db.user.create({
         data: {

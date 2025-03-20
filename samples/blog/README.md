@@ -55,7 +55,7 @@ db.user.findMany({
 });
 ```
 
-### 3. Server-side computed fields
+### 3. Database-server-side computed fields
 
 You can define computed fields in ZModel using the `@computed` attribute. E.g.:
 
@@ -67,7 +67,7 @@ model User {
 }
 ```
 
-When calling `createClient`, you need to provide implementation for the computed field, using Kysely expression builder. During query, the computed field will be evaluated and returned as part of the result.
+When calling `createClient`, you need to provide implementation for the computed field, using Kysely expression builder. During query, the computed field will be evaluated on the database server side and returned as part of the result.
 
 E.g.:
 

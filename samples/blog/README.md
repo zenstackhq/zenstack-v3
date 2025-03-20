@@ -32,7 +32,7 @@
 
 ### 1. CRUD API
 
-Replicating PrismaClient's CRUD API is around 80% done, including typing and runtime.
+Replicating PrismaClient's CRUD API is around 80% done, including typing and runtime. Database access is entirely through Kysely. At runtime there's no Prisma dependency.
 
 Not supported yet:
 

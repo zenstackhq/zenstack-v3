@@ -49,7 +49,7 @@ export async function generate(schemaFile: string, outputFile: string) {
 
     const statements: ts.Statement[] = [];
 
-    generateSchemaStatements(schemaFile, model, statements);
+    generateSchemaStatements(model, statements);
 
     generateBannerComments(statements);
 
@@ -71,11 +71,7 @@ export async function generate(schemaFile: string, outputFile: string) {
     fs.writeFileSync(outputFile, result);
 }
 
-function generateSchemaStatements(
-    schemaFile: string,
-    model: Model,
-    statements: ts.Statement[]
-) {
+function generateSchemaStatements(model: Model, statements: ts.Statement[]) {
     const hasComputedFields = model.declarations.some(
         (d) =>
             isDataModel(d) && d.fields.some((f) => hasAttribute(f, '@computed'))
@@ -106,6 +102,35 @@ function generateSchemaStatements(
         ts.factory.createStringLiteral('@zenstackhq/runtime/schema')
     );
     statements.push(runtimeImportDecl);
+
+    const { type: providerType } = getDataSourceProvider(model);
+    if (providerType === 'sqlite') {
+        // add imports for calculating the path of sqlite database file
+
+        // `import path from 'node:path';`
+        const pathImportDecl = ts.factory.createImportDeclaration(
+            undefined,
+            ts.factory.createImportClause(
+                false,
+                ts.factory.createIdentifier('path'),
+                undefined
+            ),
+            ts.factory.createStringLiteral('node:path')
+        );
+        statements.push(pathImportDecl);
+
+        // `import url from 'node:url';`
+        const urlImportDecl = ts.factory.createImportDeclaration(
+            undefined,
+            ts.factory.createImportClause(
+                false,
+                ts.factory.createIdentifier('url'),
+                undefined
+            ),
+            ts.factory.createStringLiteral('node:url')
+        );
+        statements.push(urlImportDecl);
+    }
 
     const { type: dsType } = getDataSourceProvider(model);
     const dbImportDecl = ts.factory.createImportDeclaration(
@@ -145,7 +170,7 @@ function generateSchemaStatements(
                     undefined,
                     ts.factory.createSatisfiesExpression(
                         ts.factory.createAsExpression(
-                            createSchemaObject(schemaFile, model),
+                            createSchemaObject(model),
                             ts.factory.createTypeReferenceNode('const')
                         ),
                         ts.factory.createTypeReferenceNode('SchemaDef')
@@ -167,12 +192,12 @@ function generateSchemaStatements(
     statements.push(typeDeclaration);
 }
 
-function createSchemaObject(schemaFile: string, model: Model) {
+function createSchemaObject(model: Model) {
     const properties: ts.PropertyAssignment[] = [
         // provider
         ts.factory.createPropertyAssignment(
             'provider',
-            createProviderObject(schemaFile, model)
+            createProviderObject(model)
         ),
 
         // models
@@ -222,7 +247,7 @@ function createSchemaObject(schemaFile: string, model: Model) {
     return ts.factory.createObjectLiteralExpression(properties, true);
 }
 
-function createProviderObject(schemaFile: string, model: Model): ts.Expression {
+function createProviderObject(model: Model): ts.Expression {
     const { type, url } = getDataSourceProvider(model);
     return ts.factory.createObjectLiteralExpression(
         [
@@ -232,7 +257,7 @@ function createProviderObject(schemaFile: string, model: Model): ts.Expression {
             ),
             ts.factory.createPropertyAssignment(
                 'dialectConfigProvider',
-                createDialectConfigProvider(type, url, path.dirname(schemaFile))
+                createDialectConfigProvider(type, url)
             ),
         ],
         true
@@ -343,7 +368,7 @@ function createComputedFieldsObject(fields: DataModelField[]) {
                                 undefined,
                                 [
                                     ts.factory.createStringLiteral(
-                                        'Not implemented'
+                                        'This is a stub for computed field'
                                     ),
                                 ]
                             )
@@ -777,11 +802,7 @@ function createLiteralNode(arg: string | number | boolean): any {
         : undefined;
 }
 
-function createDialectConfigProvider(
-    type: string,
-    url: string,
-    contextPath: string
-) {
+function createDialectConfigProvider(type: string, url: string) {
     return match(type)
         .with('sqlite', () => {
             let fsPath = url;
@@ -796,9 +817,7 @@ function createDialectConfigProvider(
                         'Invalid SQLite URL: only file protocol is supported'
                     );
                 }
-                fsPath = path.normalize(
-                    path.resolve(contextPath, url.replace(/^file:/, ''))
-                );
+                fsPath = url.replace(/^file:/, '');
             }
 
             return ts.factory.createFunctionExpression(
@@ -817,7 +836,24 @@ function createDialectConfigProvider(
                                     ts.factory.createNewExpression(
                                         ts.factory.createIdentifier('SQLite'),
                                         undefined,
-                                        [ts.factory.createStringLiteral(fsPath)]
+                                        [
+                                            ts.factory.createCallExpression(
+                                                ts.factory.createIdentifier(
+                                                    'path.resolve'
+                                                ),
+                                                undefined,
+                                                [
+                                                    // isomorphic __dirname for CJS and import.meta.url for ESM
+                                                    ts.factory
+                                                        .createIdentifier(`typeof __dirname !== 'undefined'
+        ? __dirname
+        : path.dirname(url.fileURLToPath(import.meta.url))`),
+                                                    ts.factory.createStringLiteral(
+                                                        fsPath
+                                                    ),
+                                                ]
+                                            ),
+                                        ]
                                     )
                                 ),
                             ])

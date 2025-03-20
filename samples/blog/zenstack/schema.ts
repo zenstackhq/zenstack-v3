@@ -4,12 +4,16 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 import { type SchemaDef, type OperandExpression } from "@zenstackhq/runtime/schema";
+import path from "node:path";
+import url from "node:url";
 import SQLite from "better-sqlite3";
 export const schema = {
     provider: {
         type: "sqlite",
         dialectConfigProvider: function (): any {
-            return { database: new SQLite("/Users/yiming/git/zenstack/zenstack-v3/samples/blog/zenstack/dev.db") };
+            return { database: new SQLite(path.resolve(typeof __dirname !== 'undefined'
+        ? __dirname
+        : path.dirname(url.fileURLToPath(import.meta.url)), "./dev.db")) };
         }
     },
     models: {
@@ -60,7 +64,7 @@ export const schema = {
             },
             computedFields: {
                 emailDomain(): OperandExpression<string> {
-                    throw new Error("Not implemented");
+                    throw new Error("This is a stub for computed field");
                 }
             }
         },

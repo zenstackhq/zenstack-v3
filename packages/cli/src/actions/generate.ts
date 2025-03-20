@@ -1,7 +1,7 @@
 import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PrismaSchemaGenerator } from '../prisma/schema-generator';
+import { PrismaSchemaGenerator } from '../prisma/prisma-schema-generator';
 import { generate as generateTSSchema } from '../zmodel/ts-schema-generator';
 import { getSchemaFile, loadSchemaDocument } from './action-utils';
 

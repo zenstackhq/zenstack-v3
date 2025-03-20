@@ -1,2 +1,1 @@
-zenstack/*
-!zenstack/schema.zmodel
+zenstack/migrations

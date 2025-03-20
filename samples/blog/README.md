@@ -16,8 +16,8 @@
 ## Overview
 
 -   ZModel is located in [zenstack/schema.zmodel](./zenstack/schema.zmodel).
--   When you run `zenstack generate`, a TypeScript version of the schema is generated to "zenstack/schema.ts".
--   A Prisma schema "zenstack/schema.prisma" is also generated. It's used for generating and running database migrations, and you can also use it for other purposes as needed.
+-   When you run `zenstack generate`, a TypeScript version of the schema is generated to [zenstack/schema.ts](./zenstack/schema.ts).
+-   A Prisma schema [zenstack/schema.prisma](./zenstack/schema.prisma) is also generated. It's used for generating and running database migrations, and you can also use it for other purposes as needed.
 -   You can create a database client with the TypeScript schema like:
     ```ts
     import { createClient } from '@zenstackhq/runtime';

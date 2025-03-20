@@ -21,7 +21,8 @@
 -   You can create a database client with the TypeScript schema like:
     ```ts
     import { createClient } from '@zenstackhq/runtime';
-    const db = createClient();
+    import { schema } from './zenstack/schema';
+    const db = createClient(schema);
     ```
 -   Run `zenstack migrate dev` to generate and apply database migrations. It internally calls `prisma migrate dev`. Same for `zenstack migrate deploy`.
 -   ZenStack v3 doesn't generate into "node_modules" anymore. The generated TypeScript schema file can be checked in to source control, and you decide how to build or bundle it with your application.

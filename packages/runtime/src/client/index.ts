@@ -11,7 +11,7 @@ import type { ModelOperations } from './client-types';
 import { CrudHandler } from './crud/crud-handler';
 import { NotFoundError } from './errors';
 import { PolicyPlugin } from './features/policy';
-import type { ClientOptions, FeatureSettings } from './options';
+import type { ClientOptions, HasComputedFields } from './options';
 import { createDeferredPromise } from './promise';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
@@ -19,7 +19,7 @@ import { ResultProcessor } from './result-processor';
 export type Client<Schema extends SchemaDef> = {
     $qb: ToKysely<Schema>;
     $disconnect(): Promise<void>;
-    $withFeatures(features: FeatureSettings<Schema>): Client<Schema>;
+    // $withFeatures(features: FeatureSettings<Schema>): Client<Schema>;
 } & {
     [Key in GetModels<Schema> as Key extends string
         ? Uncapitalize<Key>
@@ -27,8 +27,15 @@ export type Client<Schema extends SchemaDef> = {
 };
 
 export function createClient<Schema extends SchemaDef>(
+    schema: HasComputedFields<Schema> extends false ? Schema : never
+): Client<Schema>;
+export function createClient<Schema extends SchemaDef>(
     schema: Schema,
     options: ClientOptions<Schema>
+): Client<Schema>;
+export function createClient<Schema extends SchemaDef>(
+    schema: any,
+    options?: ClientOptions<Schema>
 ) {
     return new ClientImpl<Schema>(schema, options) as unknown as Client<Schema>;
 }
@@ -38,53 +45,63 @@ class ClientImpl<Schema extends SchemaDef> {
 
     constructor(
         private readonly schema: Schema,
-        private readonly options: ClientOptions<Schema>
+        private readonly options?: ClientOptions<Schema>
     ) {
-        const plugins = [...(options.plugins ?? [])];
-        if (options.features?.policy) {
+        const plugins = [...(this.options?.plugins ?? [])];
+        if (options?.features?.policy) {
             plugins.push(new PolicyPlugin(schema, options));
         }
 
         this.$qb = new Kysely({
             dialect: this.getKyselyDialect(),
-            log: options.log,
+            log: options?.log,
             plugins,
         });
-        return createClientProxy(this, schema, options);
+        return createClientProxy(
+            this,
+            schema,
+            (options ?? {}) as ClientOptions<Schema>
+        );
     }
 
     private getKyselyDialect() {
-        return match(this.schema.provider)
-            .with(
-                'sqlite',
-                () =>
-                    new SqliteDialect(
-                        this.options.dialectConfig as SqliteDialectConfig
-                    )
-            )
-            .with(
-                'postgresql',
-                () =>
-                    new PostgresDialect(
-                        this.options.dialectConfig as PostgresDialectConfig
-                    )
-            )
+        return match(this.schema.provider.type)
+            .with('sqlite', () => this.makeSqliteKyselyDialect())
+            .with('postgresql', () => this.makePostgresKyselyDialect())
             .exhaustive();
+    }
+
+    private makePostgresKyselyDialect(): PostgresDialect {
+        const { dialectConfigProvider } = this.schema.provider;
+        const mergedConfig = {
+            ...dialectConfigProvider(),
+            ...this.options?.dialectConfig,
+        } as PostgresDialectConfig;
+        return new PostgresDialect(mergedConfig);
+    }
+
+    private makeSqliteKyselyDialect(): SqliteDialect {
+        const { dialectConfigProvider } = this.schema.provider;
+        const mergedConfig = {
+            ...dialectConfigProvider(),
+            ...this.options?.dialectConfig,
+        } as SqliteDialectConfig;
+        return new SqliteDialect(mergedConfig);
     }
 
     async $disconnect() {
         await this.$qb.destroy();
     }
 
-    $withFeatures(features: FeatureSettings<Schema>) {
-        return createClient(this.schema, {
-            ...this.options,
-            features: {
-                ...this.options.features,
-                ...features,
-            },
-        });
-    }
+    // $withFeatures(features: FeatureSettings<Schema>) {
+    //     return createClient(this.schema, {
+    //         ...this.options,
+    //         features: {
+    //             ...this.options.features,
+    //             ...features,
+    //         },
+    //     });
+    // }
 }
 
 function createClientProxy<Schema extends SchemaDef>(
@@ -103,11 +120,13 @@ function createClientProxy<Schema extends SchemaDef>(
                     (m) => m.toLowerCase() === prop.toLowerCase()
                 );
                 if (model) {
+                    const _options: ClientOptions<Schema> = options ?? {};
+
                     return createModelProxy(
                         client,
                         client.$qb,
                         schema,
-                        options,
+                        _options,
                         model as GetModels<Schema>
                     );
                 }
@@ -128,7 +147,7 @@ function createModelProxy<
     options: ClientOptions<Schema>,
     model: Model
 ): ModelOperations<Schema, Model> {
-    const handler = new CrudHandler(schema, kysely, options, model);
+    const handler = new CrudHandler(schema, kysely, options ?? {}, model);
     const resultProcessor = new ResultProcessor(schema);
     return {
         findUnique: (args) =>

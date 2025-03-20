@@ -530,7 +530,11 @@ type CreateScalarPayload<
     Schema,
     Model,
     {
-        [Key in ScalarFields<Schema, Model>]: MapFieldType<Schema, Model, Key>;
+        [Key in ScalarFields<Schema, Model, false>]: MapFieldType<
+            Schema,
+            Model,
+            Key
+        >;
     }
 >;
 

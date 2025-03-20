@@ -8,6 +8,7 @@ import {
     isDataModel,
     isDataSource,
     isEnum,
+    isEnumField,
     isInvocationExpr,
     isLiteralExpr,
     isReferenceExpr,
@@ -19,6 +20,7 @@ import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
 import invariant from 'tiny-invariant';
+import { match } from 'ts-pattern';
 import * as ts from 'typescript';
 import {
     getAttribute,
@@ -26,7 +28,6 @@ import {
     isIdField,
     isUniqueField,
 } from './model-utils';
-import { isEnumField } from '@zenstackhq/language/ast';
 
 export async function generate(schemaFile: string, outputFile: string) {
     const loaded = await loadDocument(schemaFile);
@@ -48,7 +49,7 @@ export async function generate(schemaFile: string, outputFile: string) {
 
     const statements: ts.Statement[] = [];
 
-    generateSchemaStatements(model, statements);
+    generateSchemaStatements(schemaFile, model, statements);
 
     const sourceFile = ts.createSourceFile(
         outputFile,
@@ -68,8 +69,17 @@ export async function generate(schemaFile: string, outputFile: string) {
     fs.writeFileSync(outputFile, result);
 }
 
-function generateSchemaStatements(model: Model, statements: ts.Statement[]) {
-    const importDecl = ts.factory.createImportDeclaration(
+function generateSchemaStatements(
+    schemaFile: string,
+    model: Model,
+    statements: ts.Statement[]
+) {
+    const hasComputedFields = model.declarations.some(
+        (d) =>
+            isDataModel(d) && d.fields.some((f) => hasAttribute(f, '@computed'))
+    );
+
+    const runtimeImportDecl = ts.factory.createImportDeclaration(
         undefined,
         ts.factory.createImportClause(
             false,
@@ -80,11 +90,48 @@ function generateSchemaStatements(model: Model, statements: ts.Statement[]) {
                     undefined,
                     ts.factory.createIdentifier('SchemaDef')
                 ),
+                ...(hasComputedFields
+                    ? [
+                          ts.factory.createImportSpecifier(
+                              true,
+                              undefined,
+                              ts.factory.createIdentifier('OperandExpression')
+                          ),
+                      ]
+                    : []),
             ])
         ),
         ts.factory.createStringLiteral('@zenstackhq/runtime/schema')
     );
-    statements.push(importDecl);
+    statements.push(runtimeImportDecl);
+
+    const { type: dsType } = getDataSourceProvider(model);
+    const dbImportDecl = ts.factory.createImportDeclaration(
+        undefined,
+        dsType === 'sqlite'
+            ? // `import SQLite from 'better-sqlite3';`
+              ts.factory.createImportClause(
+                  false,
+                  ts.factory.createIdentifier('SQLite'),
+                  undefined
+              )
+            : // `import { Pool } from 'pg';`
+              ts.factory.createImportClause(
+                  false,
+                  undefined,
+                  ts.factory.createNamedImports([
+                      ts.factory.createImportSpecifier(
+                          false,
+                          undefined,
+                          ts.factory.createIdentifier('Pool')
+                      ),
+                  ])
+              ),
+        ts.factory.createStringLiteral(
+            dsType === 'sqlite' ? 'better-sqlite3' : 'pg'
+        )
+    );
+    statements.push(dbImportDecl);
 
     const declaration = ts.factory.createVariableStatement(
         [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -96,7 +143,7 @@ function generateSchemaStatements(model: Model, statements: ts.Statement[]) {
                     undefined,
                     ts.factory.createSatisfiesExpression(
                         ts.factory.createAsExpression(
-                            createSchemaObject(model),
+                            createSchemaObject(schemaFile, model),
                             ts.factory.createTypeReferenceNode('const')
                         ),
                         ts.factory.createTypeReferenceNode('SchemaDef')
@@ -118,12 +165,12 @@ function generateSchemaStatements(model: Model, statements: ts.Statement[]) {
     statements.push(typeDeclaration);
 }
 
-function createSchemaObject(model: Model) {
+function createSchemaObject(schemaFile: string, model: Model) {
     const properties: ts.PropertyAssignment[] = [
         // provider
         ts.factory.createPropertyAssignment(
             'provider',
-            ts.factory.createStringLiteral(getDataSourceProvider(model))
+            createProviderObject(schemaFile, model)
         ),
 
         // models
@@ -133,6 +180,7 @@ function createSchemaObject(model: Model) {
         ),
     ];
 
+    // enums
     const enums = model.declarations.filter(isEnum);
     if (enums.length > 0) {
         properties.push(
@@ -172,6 +220,23 @@ function createSchemaObject(model: Model) {
     return ts.factory.createObjectLiteralExpression(properties, true);
 }
 
+function createProviderObject(schemaFile: string, model: Model): ts.Expression {
+    const { type, url } = getDataSourceProvider(model);
+    return ts.factory.createObjectLiteralExpression(
+        [
+            ts.factory.createPropertyAssignment(
+                'type',
+                ts.factory.createStringLiteral(type)
+            ),
+            ts.factory.createPropertyAssignment(
+                'dialectConfigProvider',
+                createDialectConfigProvider(type, url, path.dirname(schemaFile))
+            ),
+        ],
+        true
+    );
+}
+
 function createModelsObject(model: Model) {
     return ts.factory.createObjectLiteralExpression(
         model.declarations
@@ -187,46 +252,118 @@ function createModelsObject(model: Model) {
 }
 
 function createDataModelObject(dm: DataModel) {
-    return ts.factory.createObjectLiteralExpression(
-        [
-            // table name
-            ts.factory.createPropertyAssignment(
-                'dbTable',
-                ts.factory.createStringLiteral(getTableName(dm))
-            ),
+    const fields: ts.PropertyAssignment[] = [
+        // table name
+        ts.factory.createPropertyAssignment(
+            'dbTable',
+            ts.factory.createStringLiteral(getTableName(dm))
+        ),
 
-            // datamodel fields
+        // datamodel fields
+        ts.factory.createPropertyAssignment(
+            'fields',
+            ts.factory.createObjectLiteralExpression(
+                dm.fields.map((field) =>
+                    ts.factory.createPropertyAssignment(
+                        field.name,
+                        createDataModelFieldObject(field)
+                    )
+                ),
+                true
+            )
+        ),
+
+        // idFields
+        ts.factory.createPropertyAssignment(
+            'idFields',
+            ts.factory.createArrayLiteralExpression(
+                getIdFields(dm).map((idField) =>
+                    ts.factory.createStringLiteral(idField)
+                )
+            )
+        ),
+
+        // uniqueFields
+        ts.factory.createPropertyAssignment(
+            'uniqueFields',
+            createUniqueFieldsObject(dm)
+        ),
+    ];
+
+    const computedFields = dm.fields.filter((f) =>
+        hasAttribute(f, '@computed')
+    );
+
+    if (computedFields.length > 0) {
+        fields.push(
             ts.factory.createPropertyAssignment(
-                'fields',
-                ts.factory.createObjectLiteralExpression(
-                    dm.fields.map((field) =>
-                        ts.factory.createPropertyAssignment(
-                            field.name,
-                            createDataModelFieldObject(field)
-                        )
+                'computedFields',
+                createComputedFieldsObject(computedFields)
+            )
+        );
+    }
+
+    return ts.factory.createObjectLiteralExpression(fields, true);
+}
+
+function createComputedFieldsObject(fields: DataModelField[]) {
+    return ts.factory.createObjectLiteralExpression(
+        fields.map((field) =>
+            // ts.factory.createPropertyAssignment(
+            //     field.name,
+            //     ts.factory.createFunctionExpression(
+            //         undefined,
+            //         undefined,
+            //         undefined,
+            //         undefined,
+            //         undefined,
+            //         undefined,
+            //         ts.factory.createBlock([], true)
+            //     )
+            // )
+            ts.factory.createMethodDeclaration(
+                undefined,
+                undefined,
+                field.name,
+                undefined,
+                undefined,
+                [],
+                ts.factory.createTypeReferenceNode('OperandExpression', [
+                    ts.factory.createKeywordTypeNode(
+                        mapTypeToTSSyntaxKeyword(field.type.type!)
                     ),
+                ]),
+                ts.factory.createBlock(
+                    [
+                        ts.factory.createThrowStatement(
+                            ts.factory.createNewExpression(
+                                ts.factory.createIdentifier('Error'),
+                                undefined,
+                                [
+                                    ts.factory.createStringLiteral(
+                                        'Not implemented'
+                                    ),
+                                ]
+                            )
+                        ),
+                    ],
                     true
                 )
-            ),
-
-            // idFields
-            ts.factory.createPropertyAssignment(
-                'idFields',
-                ts.factory.createArrayLiteralExpression(
-                    getIdFields(dm).map((idField) =>
-                        ts.factory.createStringLiteral(idField)
-                    )
-                )
-            ),
-
-            // uniqueFields
-            ts.factory.createPropertyAssignment(
-                'uniqueFields',
-                createUniqueFieldsObject(dm)
-            ),
-        ],
+            )
+        ),
         true
     );
+}
+
+function mapTypeToTSSyntaxKeyword(type: string) {
+    return match<string, ts.KeywordTypeSyntaxKind>(type)
+        .with('String', () => ts.SyntaxKind.StringKeyword)
+        .with('Boolean', () => ts.SyntaxKind.BooleanKeyword)
+        .with('Int', () => ts.SyntaxKind.NumberKeyword)
+        .with('Float', () => ts.SyntaxKind.NumberKeyword)
+        .with('BigInt', () => ts.SyntaxKind.BigIntKeyword)
+        .with('Decimal', () => ts.SyntaxKind.NumberKeyword)
+        .otherwise(() => ts.SyntaxKind.UnknownKeyword);
 }
 
 function createDataModelFieldObject(field: DataModelField) {
@@ -380,11 +517,38 @@ function getTableName(dm: DataModel) {
 }
 
 function getDataSourceProvider(model: Model) {
-    const providerExpr = model.declarations
-        .find(isDataSource)
-        ?.fields?.find((f) => f.name === 'provider')?.value;
+    const dataSource = model.declarations.find(isDataSource);
+    invariant(dataSource, 'No data source found in the model');
+
+    const providerExpr = dataSource.fields.find(
+        (f) => f.name === 'provider'
+    )?.value;
     invariant(isLiteralExpr(providerExpr), 'Provider must be a literal');
-    return providerExpr.value as string;
+    const type = providerExpr.value as string;
+
+    const urlExpr = dataSource.fields.find((f) => f.name === 'url')?.value;
+    invariant(
+        isLiteralExpr(urlExpr) || isInvocationExpr(urlExpr),
+        'URL must be a literal or env function'
+    );
+    let url: string;
+    if (isLiteralExpr(urlExpr)) {
+        url = urlExpr.value as string;
+    } else if (isInvocationExpr(urlExpr)) {
+        invariant(
+            urlExpr.function.$refText === 'env',
+            'only "env" function is supported'
+        );
+        invariant(
+            urlExpr.args.length === 1,
+            'env function must have one argument'
+        );
+        url = `env(${(urlExpr.args[0]!.value as LiteralExpr).value as string})`;
+    } else {
+        throw new Error('Unsupported URL type');
+    }
+
+    return { type, url };
 }
 
 function getMappedDefault(field: DataModelField) {
@@ -609,4 +773,86 @@ function createLiteralNode(arg: string | number | boolean): any {
         : arg === false
         ? ts.factory.createFalse()
         : undefined;
+}
+
+function createDialectConfigProvider(
+    type: string,
+    url: string,
+    contextPath: string
+) {
+    return match(type)
+        .with('sqlite', () => {
+            let fsPath = url;
+            let parsedUrl: URL | undefined;
+            try {
+                parsedUrl = new URL(url);
+            } catch {}
+
+            if (parsedUrl) {
+                if (parsedUrl.protocol !== 'file:') {
+                    throw new Error(
+                        'Invalid SQLite URL: only file protocol is supported'
+                    );
+                }
+                fsPath = path.normalize(
+                    path.resolve(contextPath, url.replace(/^file:/, ''))
+                );
+            }
+
+            return ts.factory.createFunctionExpression(
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                ts.factory.createTypeReferenceNode('any'),
+                ts.factory.createBlock(
+                    [
+                        ts.factory.createReturnStatement(
+                            ts.factory.createObjectLiteralExpression([
+                                ts.factory.createPropertyAssignment(
+                                    'database',
+                                    ts.factory.createNewExpression(
+                                        ts.factory.createIdentifier('SQLite'),
+                                        undefined,
+                                        [ts.factory.createStringLiteral(fsPath)]
+                                    )
+                                ),
+                            ])
+                        ),
+                    ],
+                    true
+                )
+            );
+        })
+        .with('postgresql', () => {
+            return ts.factory.createFunctionExpression(
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                ts.factory.createBlock(
+                    [
+                        ts.factory.createReturnStatement(
+                            ts.factory.createObjectLiteralExpression([
+                                ts.factory.createPropertyAssignment(
+                                    'database',
+                                    ts.factory.createNewExpression(
+                                        ts.factory.createIdentifier('Pool'),
+                                        undefined,
+                                        [ts.factory.createStringLiteral(url)]
+                                    )
+                                ),
+                            ])
+                        ),
+                    ],
+                    true
+                )
+            );
+        })
+        .otherwise(() => {
+            throw new Error(`Unsupported provider: ${type}`);
+        });
 }

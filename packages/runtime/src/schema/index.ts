@@ -10,3 +10,5 @@ export type {
     ScalarFields,
     SchemaDef,
 } from './schema';
+
+export type { OperandExpression } from 'kysely';

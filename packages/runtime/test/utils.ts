@@ -4,8 +4,8 @@ import { createClient } from '../src/client';
 import type { ClientOptions } from '../src/client/options';
 import type { SchemaDef } from '../src/schema/schema';
 
-type SqliteSchema = SchemaDef & { provider: 'sqlite' };
-type PostgresSchema = SchemaDef & { provider: 'postgresql' };
+type SqliteSchema = SchemaDef & { provider: { type: 'sqlite' } };
+type PostgresSchema = SchemaDef & { provider: { type: 'postgresql' } };
 
 export async function makeSqliteClient<Schema extends SqliteSchema>(
     schema: Schema,

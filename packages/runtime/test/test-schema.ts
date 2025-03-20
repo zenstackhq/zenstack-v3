@@ -2,10 +2,13 @@ import type { OperandExpression, SqlBool } from 'kysely';
 import { sql } from 'kysely';
 import type { Client } from '../src/client';
 import { Expression } from '../src/schema/expression';
-import type { DataSourceProvider, SchemaDef } from '../src/schema/schema';
+import type { DataSourceProviderType, SchemaDef } from '../src/schema/schema';
 
 const schema = {
-    provider: 'sqlite',
+    provider: {
+        type: 'sqlite',
+        dialectConfigProvider: () => ({}),
+    },
     models: {
         User: {
             dbTable: 'User',
@@ -243,10 +246,16 @@ const schema = {
     authModel: 'User',
 } as const satisfies SchemaDef;
 
-export function getSchema<Provider extends DataSourceProvider>(
-    provider: Provider
+export function getSchema<ProviderType extends DataSourceProviderType>(
+    type: ProviderType
 ) {
-    return { ...schema, provider };
+    return {
+        ...schema,
+        provider: {
+            type,
+            dialectConfigProvider: () => ({}),
+        },
+    };
 }
 
 export async function pushSchema(db: Client<typeof schema>) {

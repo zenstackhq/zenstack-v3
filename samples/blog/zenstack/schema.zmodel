@@ -9,13 +9,14 @@ enum Role {
 }
 
 model User {
-    id        String   @id @default(cuid())
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-    email     String   @unique
-    role      Role     @default(USER)
-    posts     Post[]
-    profile   Profile?
+    id          String   @id @default(cuid())
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+    email       String   @unique
+    emailDomain String   @computed
+    role        Role     @default(USER)
+    posts       Post[]
+    profile     Profile?
 }
 
 model Profile {

@@ -16,6 +16,7 @@ import type {
 import { InternalError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
+    getField,
     getRelationForeignKeyFieldPairs,
     isEnum,
     requireField,
@@ -555,12 +556,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         field: string,
         payload: StringFilter<true>
     ) {
-        // if (typeof payload === 'string' || payload === null) {
-        //     return this.buildLiteralFilter(eb, table, field, 'String', payload);
-        // }
-
-        // const conditions: Expression<SqlBool>[] = [];
-        let fieldRef: Expression<any> = sql.ref(`${table}.${field}`);
+        const fieldDef = getField(this.schema, table, field);
+        let fieldRef: Expression<any> = fieldDef?.computed
+            ? sql.ref(field)
+            : sql.ref(`${table}.${field}`);
 
         let insensitive = false;
         if (

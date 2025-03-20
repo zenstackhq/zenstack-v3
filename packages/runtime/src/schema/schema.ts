@@ -1,7 +1,12 @@
 import type Decimal from 'decimal.js';
 import type { Expression } from './expression';
 
-export type DataSourceProvider = 'sqlite' | 'postgresql';
+export type DataSourceProviderType = 'sqlite' | 'postgresql';
+
+export type DataSourceProvider = {
+    type: DataSourceProviderType;
+    dialectConfigProvider: () => object;
+};
 
 export type SchemaDef = {
     provider: DataSourceProvider;
@@ -128,7 +133,8 @@ export type GetFieldType<
 
 export type ScalarFields<
     Schema extends SchemaDef,
-    Model extends GetModels<Schema>
+    Model extends GetModels<Schema>,
+    IncludeComputed extends boolean = true
 > = keyof {
     [Key in GetFields<Schema, Model> as GetField<
         Schema,
@@ -137,6 +143,10 @@ export type ScalarFields<
     >['relation'] extends object
         ? never
         : GetField<Schema, Model, Key>['foreignKeyFor'] extends string[]
+        ? never
+        : IncludeComputed extends true
+        ? Key
+        : FieldIsComputed<Schema, Model, Key> extends true
         ? never
         : Key]: Key;
 };
@@ -211,6 +221,12 @@ export type FieldIsArray<
     Model extends GetModels<Schema>,
     Field extends GetFields<Schema, Model>
 > = GetField<Schema, Model, Field>['array'] extends true ? true : false;
+
+export type FieldIsComputed<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends GetFields<Schema, Model>
+> = GetField<Schema, Model, Field>['computed'] extends true ? true : false;
 
 export type FieldHasDefault<
     Schema extends SchemaDef,

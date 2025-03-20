@@ -12,12 +12,13 @@ import type {
 } from '../schema/schema';
 import type { MergeIf } from '../utils/type-utils';
 import type { ToKyselySchema } from './query-builder';
+import type { Optional } from 'utility-types';
 
 type DialectConfig<Provider extends DataSourceProvider> =
-    Provider extends 'sqlite'
-        ? SqliteDialectConfig
+    Provider['type'] extends 'sqlite'
+        ? Optional<SqliteDialectConfig, 'database'>
         : Provider extends 'postgresql'
-        ? PostgresDialectConfig
+        ? Optional<PostgresDialectConfig, 'pool'>
         : never;
 
 export type ClientOptions<Schema extends SchemaDef> = MergeIf<
@@ -25,7 +26,7 @@ export type ClientOptions<Schema extends SchemaDef> = MergeIf<
         /**
          * Database dialect configuration.
          */
-        dialectConfig: DialectConfig<Schema['provider']>;
+        dialectConfig?: DialectConfig<Schema['provider']>;
 
         /**
          * Kysely plugins.
@@ -45,7 +46,7 @@ export type ClientOptions<Schema extends SchemaDef> = MergeIf<
     {
         computedFields: ComputedFields<Schema>;
     },
-    keyof ComputedFields<Schema> extends never ? false : true
+    HasComputedFields<Schema>
 >;
 
 export type ComputedFields<Schema extends SchemaDef> = {
@@ -64,6 +65,9 @@ export type ComputedFields<Schema extends SchemaDef> = {
         >;
     };
 };
+
+export type HasComputedFields<Schema extends SchemaDef> =
+    keyof ComputedFields<Schema> extends never ? false : true;
 
 export type FeatureSettings<Schema extends SchemaDef> = {
     policy?: PolicySettings<Schema>;

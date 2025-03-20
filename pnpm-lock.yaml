@@ -191,13 +191,13 @@ importers:
       better-sqlite3:
         specifier: ^11.8.1
         version: 11.8.1
-      kysely:
-        specifier: ^0.27.5
-        version: 0.27.5
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.12
         version: 7.6.12
+      prisma:
+        specifier: ^6.0.0
+        version: 6.5.0(typescript@5.7.3)
 
 packages:
 

@@ -4,3 +4,5 @@ dist
 .env
 .env.local
 *.db
+*.db-journal
+*.tgz

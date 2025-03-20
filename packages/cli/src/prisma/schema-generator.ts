@@ -32,6 +32,7 @@ import { AstUtils } from 'langium';
 import { match, P } from 'ts-pattern';
 
 import {
+    hasAttribute,
     isAuthInvocation,
     isDelegateModel,
     isIdField,
@@ -164,6 +165,9 @@ export class PrismaSchemaGenerator {
             ? prisma.addView(decl.name)
             : prisma.addModel(decl.name);
         for (const field of decl.fields) {
+            if (hasAttribute(field, '@computed')) {
+                continue; // skip computed fields
+            }
             // TODO: exclude fields inherited from delegate
             this.generateModelField(model, field);
         }

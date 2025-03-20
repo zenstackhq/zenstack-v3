@@ -25,7 +25,7 @@ type ToKyselyTable<
     Model extends GetModels<Schema>
 > = {
     [Field in
-        | ScalarFields<Schema, Model>
+        | ScalarFields<Schema, Model, false>
         | ForeignKeyFields<Schema, Model>]: toKyselyFieldType<
         Schema,
         Model,

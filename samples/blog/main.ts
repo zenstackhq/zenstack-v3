@@ -1,77 +1,88 @@
 import { createClient } from '@zenstackhq/runtime';
-import Sqlite from 'better-sqlite3';
 import { schema } from './zenstack/schema';
 
 async function main() {
     const db = createClient(schema, {
-        dialectConfig: {
-            database: new Sqlite('./zenstack/dev.db'),
+        computedFields: {
+            User: {
+                // provide implementation of the "User.emailDomain" computed field
+                emailDomain: (eb) =>
+                    // build SQL expression: substr(email, instr(email, '@') + 1)
+                    eb.fn('substr', [
+                        eb.ref('email'),
+                        eb(
+                            eb.fn('instr', [eb.ref('email'), eb.val('@')]),
+                            '+',
+                            1
+                        ),
+                    ]),
+            },
         },
-        log: ['query'],
     });
 
+    // clean up existing data
     await db.post.deleteMany();
     await db.profile.deleteMany();
     await db.user.deleteMany();
 
-    // create with high-level API
+    // create users and some posts
+
     const user1 = await db.user.create({
         data: {
-            id: '1',
             email: 'yiming@gmail.com',
             role: 'ADMIN',
             posts: {
+                create: [
+                    {
+                        title: 'Post1',
+                        content: 'An unpublished post',
+                        published: false,
+                    },
+                    {
+                        title: 'Post2',
+                        content: 'A published post',
+                        published: true,
+                    },
+                ],
+            },
+        },
+        include: { posts: true },
+    });
+    console.log('User created:', user1);
+
+    const user2 = await db.user.create({
+        data: {
+            email: 'jiasheng@zenstack.dev',
+            role: 'USER',
+            posts: {
                 create: {
-                    title: 'Post1',
-                    content: 'An unpublished post',
+                    title: 'Post3',
+                    content: 'Another unpublished post',
                     published: false,
                 },
             },
         },
         include: { posts: true },
     });
-    console.log('User created with high-level API:', user1);
+    console.log('User created:', user2);
 
-    // create with query-builder API
-    const user2 = await db.$qb
-        .insertInto('User')
-        .values({
-            id: '2',
-            email: 'jiasheng@zenstack.dev',
-            role: 'USER',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-        })
-        .returningAll()
-        .executeTakeFirst();
-    console.log('User created with query-builder API', user2);
-
-    // find with high-level API
-    const foundPost = await db.post.findFirstOrThrow({
-        where: { title: 'Post1' },
-        include: { author: true },
-    });
-    console.log('Post found with high-level API:', foundPost);
-
-    // find with mixed field filter and kysely expression builder
-    const foundUserWithExpressionBuilder = await db.user.findFirst({
+    // find with where conditions mixed with low-level Kysely expression builder
+    const userWithProperDomain = await db.user.findMany({
         where: {
             role: 'USER',
             $expr: (eb) => eb('email', 'like', '%@zenstack.dev'),
         },
     });
-    console.log(
-        'User found with kysely expression builder:',
-        foundUserWithExpressionBuilder
-    );
+    console.log('User found with proper domain:', userWithProperDomain);
 
-    // find with query-builder API
-    const foundPost1 = await db.$qb
-        .selectFrom('Post')
-        .leftJoin('User', 'Post.authorId', 'User.id')
-        .select(['Post.id', 'Post.title', 'Post.content', 'User.email'])
-        .executeTakeFirst();
-    console.log('Post found with query-builder API:', foundPost1);
+    // filter with computed field
+    const userWithEmailDomain = await db.user.findMany({
+        where: {
+            role: 'USER',
+            emailDomain: { endsWith: 'zenstack.dev' },
+        },
+    });
+    console.log('User found with email domain:', userWithEmailDomain);
 }
 
 main();

@@ -748,3 +748,8 @@ function raw(value: String): Any {
  * Marks a field to be strong-typed JSON.
  */
 attribute @json() @@@targetField([TypeDefField])
+
+/**
+ * Marks a field to be computed.
+ */
+attribute @computed()

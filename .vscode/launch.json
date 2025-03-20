@@ -5,6 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug CLI",
+            "program": "${workspaceFolder}/packages/cli/dist/index.js",
+            "request": "launch",
+            "skipFiles": ["<node_internals>/**"],
+            "type": "node",
+            "args": [
+                "generate",
+                "--schema",
+                "${workspaceFolder}/samples/blog/zenstack/schema.zmodel"
+            ]
+        },
+        {
             "name": "Debug with TSX",
             "type": "node",
             "request": "launch",

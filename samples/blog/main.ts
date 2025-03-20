@@ -26,7 +26,6 @@ async function main() {
     await db.user.deleteMany();
 
     // create users and some posts
-
     const user1 = await db.user.create({
         data: {
             email: 'yiming@gmail.com',
@@ -73,7 +72,7 @@ async function main() {
             $expr: (eb) => eb('email', 'like', '%@zenstack.dev'),
         },
     });
-    console.log('User found with proper domain:', userWithProperDomain);
+    console.log('User found with mixed filter:', userWithProperDomain);
 
     // filter with computed field
     const userWithEmailDomain = await db.user.findMany({
@@ -82,7 +81,7 @@ async function main() {
             emailDomain: { endsWith: 'zenstack.dev' },
         },
     });
-    console.log('User found with email domain:', userWithEmailDomain);
+    console.log('User found with computed field:', userWithEmailDomain);
 }
 
 main();

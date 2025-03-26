@@ -23,8 +23,7 @@ export const schema = {
                 id: {
                     type: "String",
                     id: true,
-                    default: { call: "cuid" },
-                    generator: "cuid"
+                    default: { call: "cuid" }
                 },
                 createdAt: {
                     type: "DateTime",
@@ -74,8 +73,7 @@ export const schema = {
                 id: {
                     type: "String",
                     id: true,
-                    default: { call: "cuid" },
-                    generator: "cuid"
+                    default: { call: "cuid" }
                 },
                 bio: {
                     type: "String",
@@ -108,8 +106,7 @@ export const schema = {
                 id: {
                     type: "String",
                     id: true,
-                    default: { call: "cuid" },
-                    generator: "cuid"
+                    default: { call: "cuid" }
                 },
                 createdAt: {
                     type: "DateTime",

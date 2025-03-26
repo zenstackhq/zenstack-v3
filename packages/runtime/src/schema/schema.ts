@@ -12,7 +12,7 @@ export type SchemaDef = {
     provider: DataSourceProvider;
     models: Record<string, ModelDef>;
     enums?: Record<string, EnumDef>;
-    authModel: string;
+    authModel?: string;
 };
 
 export type ModelDef = {
@@ -47,20 +47,22 @@ export type Policy = {
     expression: Expression;
 };
 
+export type CascadeAction =
+    | 'SetNull'
+    | 'Cascade'
+    | 'Restrict'
+    | 'NoAction'
+    | 'SetDefault';
+
 export type RelationInfo = {
     fields?: string[];
     references?: string[];
     opposite?: string;
+    onDelete?: CascadeAction;
+    onUpdate?: CascadeAction;
 };
 
-export type FieldGenerator =
-    | 'autoincrement'
-    | 'uuid4'
-    | 'uuid7'
-    | 'cuid'
-    | 'cuid2'
-    | 'nanoid'
-    | 'ulid';
+export type FieldDefaultProvider = { call: string; args?: any[] };
 
 export type FieldDef = {
     type: string;
@@ -69,8 +71,7 @@ export type FieldDef = {
     optional?: boolean;
     unique?: boolean;
     updatedAt?: boolean;
-    default?: MappedBuiltinType | { call: string };
-    generator?: FieldGenerator;
+    default?: MappedBuiltinType | FieldDefaultProvider;
     relation?: RelationInfo;
     foreignKeyFor?: string[];
     computed?: boolean;
@@ -241,12 +242,6 @@ export type FieldHasDefault<
     : GetField<Schema, Model, Field>['updatedAt'] extends true
     ? true
     : false;
-
-export type FieldHasGenerator<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>
-> = GetField<Schema, Model, Field>['generator'] extends string ? true : false;
 
 export type FieldIsRelationArray<
     Schema extends SchemaDef,

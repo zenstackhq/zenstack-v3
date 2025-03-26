@@ -9,6 +9,7 @@ export type {
     RelationInfo,
     ScalarFields,
     SchemaDef,
+    CascadeAction,
 } from './schema';
 
 export type { OperandExpression } from 'kysely';

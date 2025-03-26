@@ -5,6 +5,7 @@ import {
     UpdateResult,
     type SelectQueryBuilder,
 } from 'kysely';
+import { nanoid } from 'nanoid';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
@@ -13,7 +14,7 @@ import type { GetModels, ModelDef, SchemaDef } from '../../../schema';
 import type {
     BuiltinType,
     FieldDef,
-    FieldGenerator,
+    FieldDefaultProvider,
 } from '../../../schema/schema';
 import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
@@ -602,10 +603,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const values: any = clone(data);
         for (const field in fields) {
             if (!(field in data)) {
-                if (fields[field]?.generator !== undefined) {
-                    const generated = this.evalGenerator(
-                        fields[field].generator
-                    );
+                if (
+                    typeof fields[field]?.default === 'object' &&
+                    'call' in fields[field].default
+                ) {
+                    const generated = this.evalGenerator(fields[field].default);
                     if (generated) {
                         values[field] = generated;
                     }
@@ -617,17 +619,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return values;
     }
 
-    private evalGenerator(generator: FieldGenerator) {
-        return (
-            match(generator)
-                .with('cuid', 'cuid2', () => createId())
-                .with('uuid4', () => uuid.v4())
-                .with('uuid7', () => uuid.v7())
-                // TODO: nanoid
-                // .with('nanoid', () => nanoid())
-                .with('ulid', () => ulid())
-                .otherwise(() => undefined)
-        );
+    private evalGenerator(defaultProvider: FieldDefaultProvider) {
+        return match(defaultProvider.call)
+            .with('cuid', () => createId())
+            .with('uuid', () =>
+                defaultProvider.args?.[0] === 7 ? uuid.v7() : uuid.v4()
+            )
+            .with('nanoid', () => nanoid(defaultProvider.args?.[0]))
+            .with('ulid', () => ulid())
+            .otherwise(() => undefined);
     }
 
     protected async update(

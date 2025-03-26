@@ -4,7 +4,6 @@ import type {
     BuiltinType,
     FieldDef,
     FieldHasDefault,
-    FieldHasGenerator,
     FieldIsArray,
     FieldIsOptional,
     FieldIsRelation,
@@ -409,8 +408,6 @@ export type OptionalFieldsForCreate<
     > extends true
         ? Key
         : FieldHasDefault<Schema, Model, Key> extends true
-        ? Key
-        : FieldHasGenerator<Schema, Model, Key> extends true
         ? Key
         : GetField<Schema, Model, Key>['updatedAt'] extends true
         ? Key

@@ -16,7 +16,7 @@ const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    generator: 'cuid',
+                    default: { call: 'cuid' },
                 },
                 email: {
                     type: 'String',
@@ -92,7 +92,7 @@ const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    generator: 'cuid',
+                    default: { call: 'cuid' },
                 },
                 createdAt: {
                     type: 'DateTime',
@@ -171,7 +171,7 @@ const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    generator: 'cuid',
+                    default: { call: 'cuid' },
                 },
                 createdAt: {
                     type: 'DateTime',
@@ -210,7 +210,7 @@ const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    generator: 'cuid',
+                    default: { call: 'cuid' },
                 },
                 bio: { type: 'String' },
                 age: { type: 'Int', optional: true },

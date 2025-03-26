@@ -336,18 +336,6 @@ function createDataModelObject(dm: DataModel) {
 function createComputedFieldsObject(fields: DataModelField[]) {
     return ts.factory.createObjectLiteralExpression(
         fields.map((field) =>
-            // ts.factory.createPropertyAssignment(
-            //     field.name,
-            //     ts.factory.createFunctionExpression(
-            //         undefined,
-            //         undefined,
-            //         undefined,
-            //         undefined,
-            //         undefined,
-            //         undefined,
-            //         ts.factory.createBlock([], true)
-            //     )
-            // )
             ts.factory.createMethodDeclaration(
                 undefined,
                 undefined,
@@ -471,19 +459,6 @@ function createDataModelFieldObject(field: DataModelField) {
                     ])
                 )
             );
-
-            const generator = getValueGenerator(
-                defaultValue.call,
-                defaultValue.args
-            );
-            if (generator) {
-                objectFields.push(
-                    ts.factory.createPropertyAssignment(
-                        'generator',
-                        ts.factory.createStringLiteral(generator)
-                    )
-                );
-            }
         } else {
             objectFields.push(
                 ts.factory.createPropertyAssignment(
@@ -641,6 +616,16 @@ function createRelationObject(field: DataModelField) {
                     );
                 }
             }
+
+            if (param === 'onDelete' || param === 'onUpdate') {
+                const action = (arg.value as ReferenceExpr).target.$refText;
+                relationFields.push(
+                    ts.factory.createPropertyAssignment(
+                        param,
+                        ts.factory.createStringLiteral(action)
+                    )
+                );
+            }
         }
     }
 
@@ -762,19 +747,6 @@ function createEnumObject(e: Enum) {
     );
 }
 
-function getValueGenerator(call: string, args: unknown[]) {
-    switch (call) {
-        case 'uuid':
-            return args[0] === 7 ? 'uuid7' : 'uuid4';
-        case 'cuid':
-            return args[0] === 2 ? 'cuid2' : 'cuid';
-        case 'ulid':
-            return 'ulid';
-        default:
-            return undefined;
-    }
-}
-
 function getLiteral(expr: Expression) {
     if (!isLiteralExpr(expr)) {
         throw new Error('Expected a literal expression');
@@ -805,7 +777,7 @@ function createLiteralNode(arg: string | number | boolean): any {
 function createDialectConfigProvider(type: string, url: string) {
     return match(type)
         .with('sqlite', () => {
-            let fsPath = url;
+            let dbPath = url;
             let parsedUrl: URL | undefined;
             try {
                 parsedUrl = new URL(url);
@@ -817,7 +789,7 @@ function createDialectConfigProvider(type: string, url: string) {
                         'Invalid SQLite URL: only file protocol is supported'
                     );
                 }
-                fsPath = url.replace(/^file:/, '');
+                dbPath = url.replace(/^file:/, '');
             }
 
             return ts.factory.createFunctionExpression(
@@ -849,7 +821,7 @@ function createDialectConfigProvider(type: string, url: string) {
         ? __dirname
         : path.dirname(url.fileURLToPath(import.meta.url))`),
                                                     ts.factory.createStringLiteral(
-                                                        fsPath
+                                                        dbPath
                                                     ),
                                                 ]
                                             ),

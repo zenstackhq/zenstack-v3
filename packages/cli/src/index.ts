@@ -4,21 +4,22 @@ import { Command, Option } from 'commander';
 import * as actions from './actions';
 import { getVersion } from './utils/version-utils';
 
-export const infoAction = async (projectPath: string): Promise<void> => {
+const infoAction = async (projectPath: string): Promise<void> => {
     await actions.info(projectPath);
 };
 
-export const generateAction = async (
+const generateAction = async (
     options: Parameters<typeof actions.generate>[0]
 ): Promise<void> => {
     await actions.generate(options);
 };
 
-export const migrateAction = async (
-    command: string,
-    options: any
-): Promise<void> => {
+const migrateAction = async (command: string, options: any): Promise<void> => {
     await actions.migrate(command, options);
+};
+
+const dbAction = async (command: string, options: any): Promise<void> => {
+    await actions.db(command, options);
 };
 
 export function createProgram() {
@@ -64,7 +65,7 @@ export function createProgram() {
 
     const migrateCommand = program
         .command('migrate')
-        .description('Run migration.');
+        .description('Update the database schema with migrations.');
 
     migrateCommand
         .command('dev')
@@ -91,7 +92,7 @@ export function createProgram() {
         .command('deploy')
         .addOption(schemaOption)
         .description(
-            'deploy your pending migrations to your production/staging database.'
+            'Deploy your pending migrations to your production/staging database.'
         )
         .action((options) => migrateAction('deploy', options));
 
@@ -100,6 +101,25 @@ export function createProgram() {
         .addOption(schemaOption)
         .description('check the status of your database migrations.')
         .action((options) => migrateAction('status', options));
+
+    const dbCommand = program
+        .command('db')
+        .description('Manage your database schema during development.');
+
+    dbCommand
+        .command('push')
+        .description('Push the state from your schema to your database')
+        .addOption(schemaOption)
+        .addOption(
+            new Option('--accept-data-loss', 'ignore data loss warnings')
+        )
+        .addOption(
+            new Option(
+                '--force-reset',
+                'force a reset of the database before push'
+            )
+        )
+        .action((options) => dbAction('push', options));
 
     return program;
 }

@@ -9,7 +9,7 @@ type CommonOptions = {
 };
 
 /**
- * CLI action for generating code from schema
+ * CLI action for migration-related commands
  */
 export async function run(command: string, options: CommonOptions) {
     const schemaFile = getSchemaFile(options.schema);
@@ -27,28 +27,24 @@ export async function run(command: string, options: CommonOptions) {
 
     switch (command) {
         case 'dev':
-            await runDev(schemaFile, prismaSchemaFile, options);
+            await runDev(prismaSchemaFile, options);
             break;
 
         case 'reset':
-            await runReset(schemaFile, prismaSchemaFile, options as any);
+            await runReset(prismaSchemaFile, options as any);
             break;
 
         case 'deploy':
-            await runDeploy(schemaFile, prismaSchemaFile, options);
+            await runDeploy(prismaSchemaFile, options);
             break;
 
         case 'status':
-            await runStatus(schemaFile, prismaSchemaFile, options);
+            await runStatus(prismaSchemaFile, options);
             break;
     }
 }
 
-async function runDev(
-    _schemaFile: string,
-    prismaSchemaFile: string,
-    _options: unknown
-) {
+async function runDev(prismaSchemaFile: string, _options: unknown) {
     try {
         await execPackage(
             `prisma migrate dev --schema "${prismaSchemaFile}" --skip-generate`,
@@ -61,11 +57,7 @@ async function runDev(
     }
 }
 
-async function runReset(
-    _schemaFile: string,
-    prismaSchemaFile: string,
-    options: { force: boolean }
-) {
+async function runReset(prismaSchemaFile: string, options: { force: boolean }) {
     try {
         await execPackage(
             `prisma migrate reset --schema "${prismaSchemaFile}"${
@@ -80,11 +72,7 @@ async function runReset(
     }
 }
 
-async function runDeploy(
-    _schemaFile: string,
-    prismaSchemaFile: string,
-    _options: unknown
-) {
+async function runDeploy(prismaSchemaFile: string, _options: unknown) {
     try {
         await execPackage(
             `prisma migrate deploy --schema "${prismaSchemaFile}"`,
@@ -97,11 +85,7 @@ async function runDeploy(
     }
 }
 
-async function runStatus(
-    _schemaFile: string,
-    prismaSchemaFile: string,
-    _options: unknown
-) {
+async function runStatus(prismaSchemaFile: string, _options: unknown) {
     try {
         await execPackage(
             `prisma migrate status --schema "${prismaSchemaFile}"`,

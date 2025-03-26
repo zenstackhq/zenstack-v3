@@ -15,10 +15,24 @@ import type { ClientOptions, HasComputedFields } from './options';
 import { createDeferredPromise } from './promise';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
+import { SchemaDbPusher } from './helpers/schema-db-pusher';
 
 export type Client<Schema extends SchemaDef> = {
-    $qb: ToKysely<Schema>;
+    /**
+     * The Kysely query builder instance.
+     */
+    readonly $qb: ToKysely<Schema>;
+
+    /**
+     * Disconnects the client from the database.
+     */
     $disconnect(): Promise<void>;
+
+    /**
+     * Pushes the schema to the database. For testing purposes only.
+     */
+    $pushSchema(): Promise<void>;
+
     // $withFeatures(features: FeatureSettings<Schema>): Client<Schema>;
 } & {
     [Key in GetModels<Schema> as Key extends string
@@ -52,11 +66,13 @@ class ClientImpl<Schema extends SchemaDef> {
             plugins.push(new PolicyPlugin(schema, options));
         }
 
-        this.$qb = new Kysely({
-            dialect: this.getKyselyDialect(),
-            log: options?.log,
-            plugins,
-        });
+        this.$qb =
+            options?.kysely ??
+            new Kysely({
+                dialect: this.getKyselyDialect(),
+                log: options?.log,
+                plugins,
+            });
         return createClientProxy(
             this,
             schema,
@@ -91,6 +107,10 @@ class ClientImpl<Schema extends SchemaDef> {
 
     async $disconnect() {
         await this.$qb.destroy();
+    }
+
+    async $pushSchema() {
+        await new SchemaDbPusher(this.schema, this.$qb).push();
     }
 
     // $withFeatures(features: FeatureSettings<Schema>) {

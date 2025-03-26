@@ -11,7 +11,7 @@ import type {
     SchemaDef,
 } from '../schema/schema';
 import type { MergeIf } from '../utils/type-utils';
-import type { ToKyselySchema } from './query-builder';
+import type { ToKysely, ToKyselySchema } from './query-builder';
 import type { Optional } from 'utility-types';
 
 type DialectConfig<Provider extends DataSourceProvider> =
@@ -27,6 +27,11 @@ export type ClientOptions<Schema extends SchemaDef> = MergeIf<
          * Database dialect configuration.
          */
         dialectConfig?: DialectConfig<Schema['provider']>;
+
+        /**
+         * Alternative way of constructing with a pre-configured Kysely instance.
+         */
+        kysely?: ToKysely<Schema>;
 
         /**
          * Kysely plugins.

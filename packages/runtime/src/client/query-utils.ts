@@ -215,11 +215,7 @@ export function buildFieldRef<Schema extends SchemaDef>(
 }
 
 export function fieldHasDefaultValue(fieldDef: FieldDef) {
-    return (
-        fieldDef.default !== undefined ||
-        fieldDef.generator !== undefined ||
-        fieldDef.updatedAt
-    );
+    return fieldDef.default !== undefined || fieldDef.updatedAt;
 }
 
 export function isEnum(schema: SchemaDef, type: string) {
@@ -228,4 +224,28 @@ export function isEnum(schema: SchemaDef, type: string) {
 
 export function getEnum(schema: SchemaDef, type: string) {
     return schema.enums?.[type];
+}
+
+export function buildJoinPairs(
+    schema: SchemaDef,
+    model: string,
+    modelAlias: string,
+    relationField: string,
+    relationAlias: string
+): [string, string][] {
+    const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
+        schema,
+        model,
+        relationField
+    );
+
+    return keyPairs.map(({ fk, pk }) => {
+        if (ownedByModel) {
+            // the parent model owns the fk
+            return [`${relationAlias}.${pk}`, `${modelAlias}.${fk}`];
+        } else {
+            // the relation side owns the fk
+            return [`${relationAlias}.${fk}`, `${modelAlias}.${pk}`];
+        }
+    });
 }

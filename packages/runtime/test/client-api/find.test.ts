@@ -587,6 +587,94 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             expect(u.posts).toHaveLength(0);
         });
 
+        it('support counting relations', async () => {
+            const user1 = await createUser(client, 'u1@test.com');
+            const user2 = await createUser(client, 'u2@test.com');
+            await createPosts(client, user1.id);
+
+            await expect(
+                client.user.findUnique({
+                    where: { id: user1.id },
+                    select: { _count: true },
+                })
+            ).resolves.toMatchObject({
+                _count: { posts: 2 },
+            });
+
+            await expect(
+                client.user.findUnique({
+                    where: { id: user2.id },
+                    select: { _count: true },
+                })
+            ).resolves.toMatchObject({
+                _count: { posts: 0 },
+            });
+
+            await expect(
+                client.user.findUnique({
+                    where: { id: user1.id },
+                    select: {
+                        _count: {
+                            select: {
+                                posts: true,
+                            },
+                        },
+                    },
+                })
+            ).resolves.toMatchObject({
+                _count: { posts: 2 },
+            });
+
+            await expect(
+                client.user.findUnique({
+                    where: { id: user1.id },
+                    select: {
+                        _count: {
+                            select: {
+                                posts: { where: { published: true } },
+                            },
+                        },
+                    },
+                })
+            ).resolves.toMatchObject({
+                _count: { posts: 1 },
+            });
+
+            await expect(
+                client.user.findUnique({
+                    where: { id: user1.id },
+                    select: {
+                        _count: {
+                            select: {
+                                posts: {
+                                    where: { author: { email: user1.email } },
+                                },
+                            },
+                        },
+                    },
+                })
+            ).resolves.toMatchObject({
+                _count: { posts: 2 },
+            });
+
+            await expect(
+                client.user.findUnique({
+                    where: { id: user1.id },
+                    select: {
+                        _count: {
+                            select: {
+                                posts: {
+                                    where: { author: { email: user2.email } },
+                                },
+                            },
+                        },
+                    },
+                })
+            ).resolves.toMatchObject({
+                _count: { posts: 0 },
+            });
+        });
+
         it('supports $expr', async () => {
             await createUser(client, 'yiming@gmail.com');
             await createUser(client, 'yiming@zenstack.dev');

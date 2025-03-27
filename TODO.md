@@ -3,19 +3,23 @@
 -   [ ] Infra
     -   [ ] Dependency injection
 -   [ ] CLI
+    -   [x] generate
+    -   [x] migrate
+    -   [x] info
+    -   [ ] init
 -   [ ] ORM
     -   [ ] Create
         -   [x] Input validation
         -   [x] Simple create
         -   [x] Nested create
         -   [x] Relation connection
-        -   [ ] Create many
-        -   [ ] ID generation
+        -   [x] Create many
+        -   [x] ID generation
     -   [ ] Find
         -   [x] Input validation
         -   [ ] Field selection
             -   [ ] Omit
-            -   [ ] Counting relation
+            -   [x] Counting relation
         -   [x] Pagination
             -   [x] Skip and limit
             -   [ ] Cursor
@@ -36,9 +40,13 @@
         -   [x] Top-level
         -   [x] Nested to-many
         -   [x] Nested to-one
-        -   [ ] Delta update
-    -   [ ] Delete
+        -   [ ] Delta update for numeric fields
+        -   [ ] Array update
+    -   [x] Delete
     -   [ ] Aggregation
+        -   [x] Count
+        -   [x] Aggregate
+        -   [ ] Group by
     -   [ ] Extensions
         -   [x] Query builder API
         -   [x] Computed fields
@@ -46,12 +54,13 @@
         -   [ ] Compound ID
         -   [ ] Cross field comparison
         -   [ ] Many-to-many relation
-        -   [ ] Logging
+        -   [ ] Cache validation schemas
+        -   [?] Logging
         -   [ ] Error system
-        -   [ ] Custom table name
+        -   [?] Custom table name
         -   [ ] Custom field name
 -   [ ] Access Policy
--   [ ] Migration
+-   [x] Migration
 -   [ ] Databases
     -   [x] SQLite
     -   [x] PostgreSQL

@@ -6,7 +6,7 @@ import { getSchema } from '../test-schema';
 const PG_DB_NAME = 'policy-read-tests';
 
 describe.skip(() => {
-    describe.each(createClientSpecs(PG_DB_NAME, true))(
+    describe.each(createClientSpecs(PG_DB_NAME))(
         'Read policy tests',
         ({ createClient, provider }) => {
             const schema = getSchema(provider);

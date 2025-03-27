@@ -89,7 +89,7 @@ type ModelSelectResult<
 export type ModelResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Args extends SelectInclude<Schema, Model> = {},
+    Args extends SelectInclude<Schema, Model, boolean> = {},
     Optional = false,
     Array = false
 > = WrapType<
@@ -304,15 +304,44 @@ export type WhereUnique<
 
 export type SelectInclude<
     Schema extends SchemaDef,
-    Model extends GetModels<Schema>
+    Model extends GetModels<Schema>,
+    AllowCount extends boolean
 > = {
-    select?: Select<Schema, Model>;
+    select?: Select<Schema, Model, AllowCount>;
     include?: Include<Schema, Model>;
 };
 
-type Select<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in ScalarFields<Schema, Model>]?: boolean;
-} & Include<Schema, Model>;
+type Select<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    AllowCount extends Boolean
+> = {
+    [Key in ScalarFields<Schema, Model>]?: true;
+} & Include<Schema, Model> &
+    // relation count
+    (AllowCount extends true ? { _count?: RelationCount<Schema, Model> } : {});
+
+type RelationCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
+    | true
+    | {
+          select: {
+              [Key in RelationFields<Schema, Model> as FieldIsArray<
+                  Schema,
+                  Model,
+                  Key
+              > extends true
+                  ? Key
+                  : never]:
+                  | true
+                  | {
+                        where: Where<
+                            Schema,
+                            RelationFieldType<Schema, Model, Key>,
+                            false
+                        >;
+                    };
+          };
+      };
 
 type Include<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in RelationFields<Schema, Model>]?:
@@ -487,14 +516,14 @@ export type FindArgs<
               where?: Where<Schema, Model>;
           }
         : {}) &
-    SelectInclude<Schema, Model>;
+    SelectInclude<Schema, Model, Collection>;
 
 export type FindUniqueArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = {
     where?: WhereUnique<Schema, Model>;
-} & SelectInclude<Schema, Model>;
+} & SelectInclude<Schema, Model, true>;
 
 //#endregion
 
@@ -505,7 +534,7 @@ export type CreateArgs<
     Model extends GetModels<Schema>
 > = {
     data: CreateInput<Schema, Model>;
-    select?: Select<Schema, Model>;
+    select?: Select<Schema, Model, true>;
     include?: Include<Schema, Model>;
 };
 
@@ -629,7 +658,7 @@ export type UpdateArgs<
 > = {
     data: UpdateInput<Schema, Model>;
     where: WhereUnique<Schema, Model>;
-    select?: Select<Schema, Model>;
+    select?: Select<Schema, Model, true>;
     include?: Include<Schema, Model>;
 };
 
@@ -712,7 +741,7 @@ export type DeleteArgs<
     Model extends GetModels<Schema>
 > = {
     where: WhereUnique<Schema, Model>;
-    select?: Select<Schema, Model>;
+    select?: Select<Schema, Model, true>;
     include?: Include<Schema, Model>;
 };
 

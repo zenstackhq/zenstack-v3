@@ -1,5 +1,6 @@
 import {
     sql,
+    type Expression,
     type ExpressionBuilder,
     type ExpressionWrapper,
     type RawBuilder,
@@ -9,7 +10,12 @@ import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef, GetModels } from '../../../schema/schema';
 import type { FindArgs } from '../../client-types';
-import { buildFieldRef, requireField, requireModel } from '../../query-utils';
+import {
+    buildFieldRef,
+    buildJoinPairs,
+    requireField,
+    requireModel,
+} from '../../query-utils';
 import { BaseCrudDialect } from './base';
 
 export class PostgresCrudDialect<
@@ -118,7 +124,8 @@ export class PostgresCrudDialect<
                 );
 
                 // add join conditions
-                const joinPairs = this.buildJoinPairs(
+                const joinPairs = buildJoinPairs(
+                    this.schema,
                     model,
                     parentName,
                     relationField,
@@ -293,6 +300,19 @@ export class PostgresCrudDialect<
             query = query.offset(skip);
         }
         return query;
+    }
+
+    override buildJsonObject(
+        eb: ExpressionBuilder<any, any>,
+        value: Record<string, Expression<unknown>>
+    ) {
+        return eb.fn(
+            'jsonb_build_object',
+            Object.entries(value).flatMap(([key, value]) => [
+                sql.lit(key),
+                value,
+            ])
+        );
     }
 
     override get supportsUpdateWithLimit(): boolean {

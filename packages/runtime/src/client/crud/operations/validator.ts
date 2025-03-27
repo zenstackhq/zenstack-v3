@@ -391,7 +391,7 @@ export class InputValidator<Schema extends SchemaDef> {
             if (fieldDef.relation) {
                 fields[field] = z
                     .union([
-                        z.boolean(),
+                        z.literal(true),
                         z.object({
                             select: z
                                 .lazy(() =>
@@ -411,7 +411,39 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         }
 
-        return z.object(fields);
+        const toManyRelations = Object.entries(modelDef.fields).filter(
+            ([, value]) => value.relation && value.array
+        );
+
+        if (toManyRelations.length > 0) {
+            fields['_count'] = z
+                .union([
+                    z.literal(true),
+                    z.object(
+                        toManyRelations.reduce(
+                            (acc, [name, fieldDef]) => ({
+                                ...acc,
+                                [name]: z
+                                    .union([
+                                        z.boolean(),
+                                        z.object({
+                                            where: this.makeWhereSchema(
+                                                fieldDef.type,
+                                                false,
+                                                false
+                                            ),
+                                        }),
+                                    ])
+                                    .optional(),
+                            }),
+                            {} as Record<string, ZodSchema>
+                        )
+                    ),
+                ])
+                .optional();
+        }
+
+        return z.object(fields).strict();
     }
 
     protected makeIncludeSchema(model: string) {
@@ -422,7 +454,7 @@ export class InputValidator<Schema extends SchemaDef> {
             if (fieldDef.relation) {
                 fields[field] = z
                     .union([
-                        z.boolean(),
+                        z.literal(true),
                         z.object({
                             select: z
                                 .lazy(() =>
@@ -445,7 +477,7 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         }
 
-        return z.object(fields);
+        return z.object(fields).strict();
     }
 
     protected makeOrderBySchema(model: string) {

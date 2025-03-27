@@ -29,14 +29,14 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                     const createEnum = trx.schema
                         .createType(name)
                         .asEnum(Object.values(enumDef));
-                    console.log('Creating enum:', createEnum.compile().sql);
+                    // console.log('Creating enum:', createEnum.compile().sql);
                     await createEnum.execute();
                 }
             }
 
             for (const modelDef of Object.values(this.schema.models)) {
                 const createTable = this.createModelTable(trx, modelDef);
-                console.log('Creating table:', createTable.compile().sql);
+                // console.log('Creating table:', createTable.compile().sql);
                 await createTable.execute();
             }
         });

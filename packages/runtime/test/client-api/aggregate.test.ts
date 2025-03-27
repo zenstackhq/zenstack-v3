@@ -4,7 +4,7 @@ import { getSchema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 import { createUser } from './utils';
 
-describe.each(createClientSpecs(__filename, true))(
+describe.each(createClientSpecs(__filename))(
     'Client aggregate tests',
     ({ createClient, provider }) => {
         const schema = getSchema(provider);

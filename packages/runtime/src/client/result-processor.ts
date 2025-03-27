@@ -19,10 +19,17 @@ export class ResultProcessor<Schema extends SchemaDef> {
         if (!data || typeof data !== 'object') {
             return data;
         }
-        for (const [key, value] of Object.entries(data)) {
+        for (const [key, value] of Object.entries<any>(data)) {
             if (value === undefined || value === null) {
                 continue;
             }
+
+            if (key === '_count') {
+                data[key] =
+                    typeof value === 'string' ? JSON.parse(value) : value;
+                continue;
+            }
+
             const fieldDef = getField(this.schema, model, key);
             if (!fieldDef) {
                 continue;

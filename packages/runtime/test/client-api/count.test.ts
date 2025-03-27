@@ -5,7 +5,7 @@ import { createClientSpecs } from './client-specs';
 
 const PG_DB_NAME = 'client-api-count-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME, true))(
+describe.each(createClientSpecs(PG_DB_NAME))(
     'Client count tests',
     ({ createClient, provider }) => {
         const schema = getSchema(provider);

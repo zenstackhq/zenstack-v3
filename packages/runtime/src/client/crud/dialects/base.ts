@@ -1,4 +1,10 @@
-import type { Expression, ExpressionBuilder, SqlBool, ValueNode } from 'kysely';
+import type {
+    Expression,
+    ExpressionBuilder,
+    ExpressionWrapper,
+    SqlBool,
+    ValueNode,
+} from 'kysely';
 import { sql, type SelectQueryBuilder } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match, P } from 'ts-pattern';
@@ -16,6 +22,7 @@ import type {
 import { InternalError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
+    buildJoinPairs,
     getField,
     getRelationForeignKeyFieldPairs,
     isEnum,
@@ -51,7 +58,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         eb: ExpressionBuilder<any, any>,
         model: string,
         table: string,
-        where: Record<string, any> | undefined
+        where: object | undefined
     ) {
         let result = this.true(eb);
 
@@ -210,7 +217,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         const joinAlias = `${table}$${field}`;
-        const joinPairs = this.buildJoinPairs(model, table, field, joinAlias);
+        const joinPairs = buildJoinPairs(
+            this.schema,
+            model,
+            table,
+            field,
+            joinAlias
+        );
         const filterResultField = `${field}$filter`;
 
         const joinSelect = eb
@@ -724,29 +737,6 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return this.and(eb, ...conditions.conditions);
     }
 
-    protected buildJoinPairs(
-        model: string,
-        modelAlias: string,
-        relationField: string,
-        relationAlias: string
-    ): [string, string][] {
-        const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
-            this.schema,
-            model,
-            relationField
-        );
-
-        return keyPairs.map(({ fk, pk }) => {
-            if (ownedByModel) {
-                // the parent model owns the fk
-                return [`${relationAlias}.${pk}`, `${modelAlias}.${fk}`];
-            } else {
-                // the relation side owns the fk
-                return [`${relationAlias}.${fk}`, `${modelAlias}.${pk}`];
-            }
-        });
-    }
-
     buildOrderBy(
         query: SelectQueryBuilder<any, any, any>,
         model: string,
@@ -803,7 +793,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                 let subQuery = eb.selectFrom(
                                     relationModelDef.dbTable
                                 );
-                                const joinPairs = this.buildJoinPairs(
+                                const joinPairs = buildJoinPairs(
+                                    this.schema,
                                     model,
                                     table,
                                     field,
@@ -832,7 +823,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         result = result.leftJoin(
                             relationModelDef.dbTable,
                             (join) => {
-                                const joinPairs = this.buildJoinPairs(
+                                const joinPairs = buildJoinPairs(
+                                    this.schema,
                                     model,
                                     table,
                                     field,
@@ -934,6 +926,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     ) {
         return eb.not(this.and(eb, ...args));
     }
+
+    abstract buildJsonObject(
+        eb: ExpressionBuilder<any, any>,
+        value: Record<string, Expression<unknown>>
+    ): ExpressionWrapper<any, any, unknown>;
 
     get supportsUpdateWithLimit() {
         return true;

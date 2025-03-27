@@ -5,7 +5,7 @@ import { createClientSpecs } from './client-specs';
 
 const PG_DB_NAME = 'client-api-filter-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME, true))(
+describe.each(createClientSpecs(PG_DB_NAME))(
     'Client filter tests for $provider',
     ({ createClient, provider }) => {
         const schema = getSchema(provider);

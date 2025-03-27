@@ -50,14 +50,12 @@ describe('Client API tests', () => {
             .innerJoin('Post', 'User.id', 'Post.authorId')
             .select(['User.email', 'Post.title'])
             .executeTakeFirstOrThrow();
-        console.log(u2);
         expect(u2).toMatchObject({ title: 'Post1', email: 'a@b.com' });
 
         const u3 = await kysely
             .selectFrom('User')
             .selectAll()
             .executeTakeFirstOrThrow();
-        console.log(u3);
         expect(u3).toMatchObject({ email: 'a@b.com', role: 'USER' });
     });
 });

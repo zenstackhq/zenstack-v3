@@ -64,8 +64,6 @@ describe('Default Value Providers', () => {
         await client.$pushSchema();
 
         const entity = await client.model.create({ data: {} });
-        console.log('entity', entity);
-
         expect(entity.uuid).toSatisfy(isValidUuid);
         expect(entity.uuid7).toSatisfy(isValidUuid);
         expect(entity.cuid).toSatisfy(isCuid);

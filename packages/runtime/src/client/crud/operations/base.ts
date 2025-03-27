@@ -1,8 +1,11 @@
 import { createId } from '@paralleldrive/cuid2';
 import {
     DeleteResult,
+    expressionBuilder,
     sql,
     UpdateResult,
+    type ExpressionBuilder,
+    type Expression as KyselyExpression,
     type SelectQueryBuilder,
 } from 'kysely';
 import { nanoid } from 'nanoid';
@@ -24,6 +27,7 @@ import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
 import {
     buildFieldRef,
+    buildJoinPairs,
     getField,
     getIdFields,
     getIdValues,
@@ -178,6 +182,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             if (!payload) {
                 continue;
             }
+
+            if (field === '_count') {
+                result = this.buildCountSelection(
+                    result,
+                    model,
+                    parentAlias,
+                    payload
+                );
+                continue;
+            }
+
             const fieldDef = this.requireField(model, field);
             if (!fieldDef.relation) {
                 result = this.selectField(result, model, parentAlias, field);
@@ -198,6 +213,97 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         return result;
+    }
+
+    private buildCountSelection(
+        query: SelectQueryBuilder<any, any, {}>,
+        model: string,
+        parentAlias: string,
+        payload: any
+    ) {
+        const modelDef = requireModel(this.schema, model);
+        const toManyRelations = Object.entries(modelDef.fields).filter(
+            ([, field]) => field.relation && field.array
+        );
+
+        let selections =
+            payload === true
+                ? {
+                      select: toManyRelations.reduce((acc, [field]) => {
+                          acc[field] = true;
+                          return acc;
+                      }, {} as Record<string, boolean>),
+                  }
+                : payload;
+
+        const eb = expressionBuilder<any, any>();
+        const jsonObject: Record<string, KyselyExpression<any>> = {};
+
+        for (const [field, value] of Object.entries(selections.select)) {
+            const fieldDef = requireField(this.schema, model, field);
+            const fieldModelDef = requireModel(this.schema, fieldDef.type);
+            const jointTable = `${parentAlias}$${field}$count`;
+            const joinPairs = buildJoinPairs(
+                this.schema,
+                model,
+                parentAlias,
+                field,
+                jointTable
+            );
+
+            query = query.leftJoin(
+                (eb) => {
+                    let result = eb
+                        .selectFrom(fieldModelDef.dbTable)
+                        .selectAll();
+                    if (
+                        value &&
+                        typeof value === 'object' &&
+                        'where' in value &&
+                        value.where &&
+                        typeof value.where === 'object'
+                    ) {
+                        const filter = this.dialect.buildFilter(
+                            eb,
+                            fieldDef.type,
+                            fieldModelDef.dbTable,
+                            value.where
+                        );
+                        result = result.where(filter);
+                    }
+                    return result.as(jointTable);
+                },
+                (join) => {
+                    for (const [left, right] of joinPairs) {
+                        join = join.onRef(left, '=', right);
+                    }
+                    return join;
+                }
+            );
+
+            jsonObject[field] = this.countIdDistinct(
+                eb,
+                fieldDef.type,
+                jointTable
+            );
+        }
+
+        query = query.select((eb) =>
+            this.dialect.buildJsonObject(eb, jsonObject).as('_count')
+        );
+
+        return query;
+    }
+
+    private countIdDistinct(
+        eb: ExpressionBuilder<any, any>,
+        model: string,
+        table: string
+    ) {
+        const idFields = getIdFields(this.schema, model);
+        return eb.fn
+            .count(sql.join(idFields.map((f) => sql.ref(`${table}.${f}`))))
+            .distinct();
     }
 
     private buildSelectAllScalarFields(
@@ -1482,7 +1588,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     protected trimResult(
         data: any,
-        args: SelectInclude<Schema, GetModels<Schema>>
+        args: SelectInclude<Schema, GetModels<Schema>, boolean>
     ) {
         if (!args.select) {
             return data;
@@ -1495,7 +1601,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     protected needReturnRelations(
         model: string,
-        args: SelectInclude<Schema, GetModels<Schema>>
+        args: SelectInclude<Schema, GetModels<Schema>, boolean>
     ) {
         let returnRelation = false;
 

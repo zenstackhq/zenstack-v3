@@ -235,6 +235,19 @@ export class SqliteCrudDialect<
         return query;
     }
 
+    override buildJsonObject(
+        eb: ExpressionBuilder<any, any>,
+        value: Record<string, Expression<unknown>>
+    ) {
+        return eb.fn(
+            'json_object',
+            Object.entries(value).flatMap(([key, value]) => [
+                sql.lit(key),
+                value,
+            ])
+        );
+    }
+
     override get supportsUpdateWithLimit() {
         return false;
     }

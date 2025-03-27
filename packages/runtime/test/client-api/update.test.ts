@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Client } from '../../src/client';
-import { getSchema, pushSchema } from '../test-schema';
+import { getSchema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 import { createUser } from './utils';
 
@@ -14,7 +14,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
 
         beforeEach(async () => {
             client = await createClient();
-            await pushSchema(client);
+            await client.$pushSchema();
         });
 
         afterEach(async () => {

@@ -1,6 +1,4 @@
 import type { OperandExpression, SqlBool } from 'kysely';
-import { sql } from 'kysely';
-import type { Client } from '../src/client';
 import { Expression } from '../src/schema/expression';
 import type { DataSourceProviderType, SchemaDef } from '../src/schema/schema';
 
@@ -28,7 +26,7 @@ const schema = {
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: { call: 'now()' },
+                    default: { call: 'now' },
                 },
                 updatedAt: {
                     type: 'DateTime',
@@ -96,7 +94,7 @@ const schema = {
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: { call: 'now()' },
+                    default: { call: 'now' },
                 },
                 updatedAt: {
                     type: 'DateTime',
@@ -119,6 +117,8 @@ const schema = {
                         fields: ['authorId'],
                         references: ['id'],
                         opposite: 'posts',
+                        onUpdate: 'Cascade',
+                        onDelete: 'Cascade',
                     },
                 },
                 authorId: {
@@ -175,7 +175,7 @@ const schema = {
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: { call: 'now()' },
+                    default: { call: 'now' },
                 },
                 updatedAt: {
                     type: 'DateTime',
@@ -191,6 +191,8 @@ const schema = {
                         fields: ['postId'],
                         references: ['id'],
                         opposite: 'comments',
+                        onUpdate: 'Cascade',
+                        onDelete: 'Cascade',
                     },
                 },
                 postId: {
@@ -221,6 +223,8 @@ const schema = {
                         fields: ['userId'],
                         references: ['id'],
                         opposite: 'profile',
+                        onUpdate: 'Cascade',
+                        onDelete: 'Cascade',
                     },
                 },
                 userId: {
@@ -256,60 +260,4 @@ export function getSchema<ProviderType extends DataSourceProviderType>(
             dialectConfigProvider: () => ({}),
         },
     };
-}
-
-export async function pushSchema(db: Client<typeof schema>) {
-    await db.$qb.schema
-        .createTable('User')
-        .addColumn('id', 'text', (col) => col.primaryKey())
-        .addColumn('createdAt', 'timestamp', (col) =>
-            col.defaultTo(sql`CURRENT_TIMESTAMP`)
-        )
-        .addColumn('updatedAt', 'timestamp', (col) => col.notNull())
-        .addColumn('email', 'varchar', (col) => col.unique().notNull())
-        .addColumn('name', 'varchar')
-        .addColumn('role', 'varchar', (col) => col.defaultTo('USER'))
-        .addUniqueConstraint('email_unique', ['email'])
-        .execute();
-
-    await db.$qb.schema
-        .createTable('Post')
-        .addColumn('id', 'text', (col) => col.primaryKey())
-        .addColumn('createdAt', 'timestamp', (col) =>
-            col.defaultTo(sql`CURRENT_TIMESTAMP`)
-        )
-        .addColumn('updatedAt', 'timestamp', (col) => col.notNull())
-        .addColumn('title', 'varchar', (col) => col.notNull())
-        .addColumn('content', 'varchar')
-        .addColumn('published', 'boolean', (col) => col.defaultTo(false))
-        .addColumn('authorId', 'varchar', (col) =>
-            col.references('User.id').notNull()
-        )
-        .execute();
-
-    await db.$qb.schema
-        .createTable('Comment')
-        .addColumn('id', 'text', (col) => col.primaryKey())
-        .addColumn('createdAt', 'timestamp', (col) =>
-            col.defaultTo(sql`CURRENT_TIMESTAMP`)
-        )
-        .addColumn('updatedAt', 'timestamp', (col) => col.notNull())
-        .addColumn('content', 'varchar', (col) => col.notNull())
-        .addColumn('postId', 'varchar', (col) => col.references('Post.id'))
-        .execute();
-
-    await db.$qb.schema
-        .createTable('Profile')
-        .addColumn('id', 'text', (col) => col.primaryKey())
-        .addColumn('bio', 'varchar', (col) => col.notNull())
-        .addColumn('age', 'integer')
-        .addColumn('userId', 'varchar', (col) => col.unique())
-        .addForeignKeyConstraint(
-            'fk_profile_user',
-            ['userId'],
-            'User',
-            ['id'],
-            (cb) => cb.onDelete('cascade').onUpdate('cascade')
-        )
-        .execute();
 }

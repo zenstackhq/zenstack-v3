@@ -2,7 +2,7 @@ import { createId } from '@paralleldrive/cuid2';
 import SQLite from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { createClient } from '../../src';
-import { getSchema, pushSchema } from '../test-schema';
+import { getSchema } from '../test-schema';
 
 describe('Client API tests', () => {
     const schema = getSchema('sqlite');
@@ -13,7 +13,7 @@ describe('Client API tests', () => {
                 database: new SQLite(':memory:'),
             },
         });
-        await pushSchema(client);
+        await client.$pushSchema();
 
         const kysely = client.$qb;
 

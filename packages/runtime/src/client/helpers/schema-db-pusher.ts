@@ -1,4 +1,9 @@
-import { CreateTableBuilder, sql, type OnModifyForeignAction } from 'kysely';
+import {
+    CreateTableBuilder,
+    sql,
+    type ColumnDataType,
+    type OnModifyForeignAction,
+} from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { FieldDef, ModelDef, SchemaDef } from '../../schema';
@@ -14,8 +19,24 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
     async push() {
         await this.kysely.transaction().execute(async (trx) => {
+            if (
+                this.schema.enums &&
+                this.schema.provider.type === 'postgresql'
+            ) {
+                for (const [name, enumDef] of Object.entries(
+                    this.schema.enums
+                )) {
+                    const createEnum = trx.schema
+                        .createType(name)
+                        .asEnum(Object.values(enumDef));
+                    console.log('Creating enum:', createEnum.compile().sql);
+                    await createEnum.execute();
+                }
+            }
+
             for (const modelDef of Object.values(this.schema.models)) {
                 const createTable = this.createModelTable(trx, modelDef);
+                console.log('Creating table:', createTable.compile().sql);
                 await createTable.execute();
             }
         });
@@ -32,8 +53,9 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                     fieldName,
                     fieldDef
                 );
+            } else {
+                table = this.createModelField(table, fieldName, fieldDef);
             }
-            table = this.createModelField(table, fieldName, fieldDef);
         }
 
         table = this.addPrimaryKeyConstraint(table, modelDef);
@@ -101,7 +123,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 }
 
                 // @default
-                if (fieldDef.default) {
+                if (fieldDef.default !== undefined) {
                     if (
                         typeof fieldDef.default === 'object' &&
                         'call' in fieldDef.default
@@ -130,6 +152,12 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
     }
 
     private mapFieldType(fieldDef: FieldDef) {
+        if (this.schema.enums?.[fieldDef.type]) {
+            return this.schema.provider.type === 'postgresql'
+                ? sql.ref(fieldDef.type)
+                : 'text';
+        }
+
         const type = fieldDef.type as BuiltinType;
         let result = match(type)
             .with('String', () => 'text')
@@ -145,8 +173,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         if (fieldDef.array) {
             result = `${result}[]`;
         }
-
-        return sql.lit(result);
+        return result as ColumnDataType;
     }
 
     private addForeignKeyConstraint(

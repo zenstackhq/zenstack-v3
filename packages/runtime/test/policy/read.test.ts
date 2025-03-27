@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type Client, type PolicySettings } from '../../src/client';
 import { createClientSpecs } from '../client-api/client-specs';
-import { getSchema, pushSchema } from '../test-schema';
+import { getSchema } from '../test-schema';
 
 const PG_DB_NAME = 'policy-read-tests';
 
@@ -14,7 +14,7 @@ describe.skip(() => {
 
             beforeEach(async () => {
                 client = await createClient();
-                await pushSchema(client);
+                await client.$pushSchema();
             });
 
             afterEach(async () => {

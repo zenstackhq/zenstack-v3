@@ -138,7 +138,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 modelDef.dbTable
             );
         } else {
-            query = this.buildSelectAllScalarFields(model, query);
+            query = this.buildSelectAllScalarFields(model, query, args?.omit);
         }
 
         // include
@@ -308,12 +308,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     private buildSelectAllScalarFields(
         model: string,
-        query: SelectQueryBuilder<any, any, {}>
+        query: SelectQueryBuilder<any, any, {}>,
+        omit?: Record<string, boolean | undefined>
     ) {
         let result = query;
         const modelDef = this.requireModel(model);
         return Object.keys(modelDef.fields)
             .filter((f) => !isRelationField(this.schema, model, f))
+            .filter((f) => omit?.[f] !== true)
             .reduce(
                 (acc, f) => this.selectField(acc, model, modelDef.dbTable, f),
                 result

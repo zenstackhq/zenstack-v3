@@ -33,10 +33,13 @@ export class FindOperationHandler<
                   operation === 'findUnique',
                   args
               )
-            : (args as FindArgs<Schema, GetModels<Schema>, true>);
+            : args;
 
         // run query
-        const result = await this.runQuery(this.model, parsedArgs);
+        const result = await this.runQuery(
+            this.model,
+            parsedArgs as FindArgs<Schema, GetModels<Schema>, true>
+        );
 
         const finalResult =
             operation === 'findMany' ? result : result[0] ?? null;

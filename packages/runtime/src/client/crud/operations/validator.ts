@@ -28,7 +28,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     constructor(private readonly schema: Schema) {}
 
-    validateFindArgs(model: string, unique: boolean, args: unknown) {
+    validateFindArgs(model: GetModels<Schema>, unique: boolean, args: unknown) {
         return this.validate<FindArgs<Schema, GetModels<Schema>, true>>(
             this.makeFindSchema(model, unique, true),
             'find',
@@ -36,7 +36,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateCreateArgs(model: string, args: unknown) {
+    validateCreateArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<CreateArgs<Schema, GetModels<Schema>>>(
             this.makeCreateSchema(model),
             'create',
@@ -44,13 +44,13 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateCreateManyArgs(model: string, args: unknown) {
+    validateCreateManyArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<
             CreateManyArgs<Schema, GetModels<Schema>> | undefined
         >(this.makeCreateManySchema(model), 'createMany', args);
     }
 
-    validateUpdateArgs(model: string, args: unknown) {
+    validateUpdateArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<UpdateArgs<Schema, GetModels<Schema>>>(
             this.makeUpdateSchema(model),
             'update',
@@ -58,7 +58,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateUpdateManyArgs(model: string, args: unknown) {
+    validateUpdateManyArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<UpdateManyArgs<Schema, GetModels<Schema>>>(
             this.makeUpdateManySchema(model),
             'updateMany',
@@ -121,6 +121,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
         fields['select'] = this.makeSelectSchema(model).optional();
         fields['include'] = this.makeIncludeSchema(model).optional();
+        fields['omit'] = this.makeOmitSchema(model).optional();
 
         if (collection) {
             fields['skip'] = z.number().int().nonnegative().optional();
@@ -133,6 +134,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
         let result: ZodSchema = z.object(fields).strict();
         result = this.refineForSelectIncludeMutuallyExclusive(result);
+        result = this.refineForSelectOmitMutuallyExclusive(result);
 
         if (!unique) {
             result = result.optional();
@@ -443,6 +445,18 @@ export class InputValidator<Schema extends SchemaDef> {
                 .optional();
         }
 
+        return z.object(fields).strict();
+    }
+
+    protected makeOmitSchema(model: string) {
+        const modelDef = requireModel(this.schema, model);
+        const fields: Record<string, ZodSchema> = {};
+        for (const field of Object.keys(modelDef.fields)) {
+            const fieldDef = requireField(this.schema, model, field);
+            if (!fieldDef.relation) {
+                fields[field] = z.boolean().optional();
+            }
+        }
         return z.object(fields).strict();
     }
 
@@ -1026,6 +1040,13 @@ export class InputValidator<Schema extends SchemaDef> {
         return schema.refine(
             (value) => !(value['select'] && value['include']),
             '"select" and "include" cannot be used together'
+        );
+    }
+
+    private refineForSelectOmitMutuallyExclusive(schema: ZodSchema) {
+        return schema.refine(
+            (value) => !(value['select'] && value['omit']),
+            '"select" and "omit" cannot be used together'
         );
     }
 

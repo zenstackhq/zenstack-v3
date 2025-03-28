@@ -309,6 +309,9 @@ export type SelectInclude<
 > = {
     select?: Select<Schema, Model, AllowCount>;
     include?: Include<Schema, Model>;
+    omit?: {
+        [Key in ScalarFields<Schema, Model>]?: true;
+    };
 };
 
 type Select<
@@ -367,6 +370,8 @@ export type SelectSubset<T, U> = {
     [key in keyof T]: key extends keyof U ? T[key] : never;
 } & (T extends { select: any; include: any }
     ? 'Please either choose `select` or `include`.'
+    : T extends { select: any; omit: any }
+    ? 'Please either choose `select` or `omit`.'
     : {});
 
 type ToManyRelationFilter<

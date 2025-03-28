@@ -8,7 +8,7 @@
     -   [x] info
     -   [ ] init
 -   [ ] ORM
-    -   [ ] Create
+    -   [x] Create
         -   [x] Input validation
         -   [x] Simple create
         -   [x] Nested create
@@ -18,7 +18,7 @@
     -   [ ] Find
         -   [x] Input validation
         -   [ ] Field selection
-            -   [ ] Omit
+            -   [x] Omit
             -   [x] Counting relation
         -   [x] Pagination
             -   [x] Skip and limit
@@ -50,6 +50,7 @@
     -   [ ] Extensions
         -   [x] Query builder API
         -   [x] Computed fields
+        -   [ ] Prisma client extension
     -   [ ] Misc
         -   [ ] Compound ID
         -   [ ] Cross field comparison

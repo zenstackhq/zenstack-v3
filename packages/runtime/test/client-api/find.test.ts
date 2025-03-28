@@ -489,6 +489,28 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             });
         });
 
+        it('allows field omission', async () => {
+            const user = await createUser(client);
+            await createPosts(client, user.id);
+
+            const r = await client.user.findFirstOrThrow({
+                omit: { name: true },
+            });
+            expect('name' in r).toBeFalsy();
+            expect(r.email).toBeTruthy();
+
+            // @ts-expect-error omit and select cannot be used together
+            client.user.findFirstOrThrow({
+                omit: { name: true },
+                select: { email: true },
+            });
+
+            const r1 = await client.user.findFirstOrThrow({
+                include: { posts: { omit: { published: true } } },
+            });
+            expect('published' in r1.posts[0]!).toBeFalsy();
+        });
+
         it('allows including relation', async () => {
             const user = await createUser(client);
             const [post1, post2] = await createPosts(client, user.id);

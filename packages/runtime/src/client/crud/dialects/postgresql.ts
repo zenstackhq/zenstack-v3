@@ -210,6 +210,13 @@ export class PostgresCrudDialect<
             objArgs.push(
                 ...Object.entries(relationModelDef.fields)
                     .filter(([, value]) => !value.relation)
+                    .filter(
+                        ([name]) =>
+                            !(
+                                typeof payload === 'object' &&
+                                (payload.omit as any)?.[name] === true
+                            )
+                    )
                     .map(([field]) => [
                         sql.lit(field),
                         buildFieldRef(

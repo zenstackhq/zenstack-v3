@@ -28,6 +28,7 @@
     "dependencies": {
         "@types/node": "^20.12.7",
         "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/runtime": "workspace:*",
         "async-exit-hook": "^2.0.1",
         "colors": "1.4.0",
         "commander": "^8.3.0",
@@ -43,7 +44,6 @@
     "devDependencies": {
         "@types/async-exit-hook": "^2.0.0",
         "@types/semver": "^7.3.13",
-        "@types/tmp": "^0.2.6",
-        "@zenstackhq/runtime": "workspace:*"
+        "@types/tmp": "^0.2.6"
     }
 }

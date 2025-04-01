@@ -1,27 +1,12 @@
 import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { CreateArgs, CreateManyArgs } from '../../client-types';
-import type { ClientOptions } from '../../options';
-import type { ToKysely } from '../../query-builder';
 import { getIdValues, requireField } from '../../query-utils';
 import { BaseOperationHandler } from './base';
-import { InputValidator } from './validator';
 
 export class CreateOperationHandler<
     Schema extends SchemaDef
 > extends BaseOperationHandler<Schema> {
-    private readonly inputValidator: InputValidator<Schema>;
-
-    constructor(
-        schema: Schema,
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        options: ClientOptions<Schema>
-    ) {
-        super(schema, kysely, model, options);
-        this.inputValidator = new InputValidator(this.schema);
-    }
-
     async handle(
         operation: 'create' | 'createMany',
         args: unknown | undefined

@@ -1,27 +1,12 @@
 import { sql } from 'kysely';
 import { match } from 'ts-pattern';
-import type { GetModels, SchemaDef } from '../../../schema';
-import type { ClientOptions } from '../../options';
-import type { ToKysely } from '../../query-builder';
+import type { SchemaDef } from '../../../schema';
 import { getField } from '../../query-utils';
 import { BaseOperationHandler } from './base';
-import { InputValidator } from './validator';
 
 export class AggregateOperationHandler<
     Schema extends SchemaDef
 > extends BaseOperationHandler<Schema> {
-    private readonly inputValidator: InputValidator<Schema>;
-
-    constructor(
-        schema: Schema,
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        options: ClientOptions<Schema>
-    ) {
-        super(schema, kysely, model, options);
-        this.inputValidator = new InputValidator(this.schema);
-    }
-
     async handle(_operation: 'aggregate', args: unknown | undefined) {
         const validatedArgs = this.inputValidator.validateAggregateArgs(
             this.model,
@@ -109,11 +94,14 @@ export class AggregateOperationHandler<
             }
         }
 
-        const result = await query.executeTakeFirstOrThrow();
+        const result = await this.queryExecutor.executeTakeFirstOrThrow(
+            this.kysely,
+            query
+        );
         const ret: any = {};
 
         // postprocess result to convert flat fields into nested objects
-        for (const [key, value] of Object.entries(result)) {
+        for (const [key, value] of Object.entries(result as object)) {
             if (key === '_count') {
                 ret[key] = value;
                 continue;

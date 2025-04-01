@@ -4,15 +4,16 @@ import type {
     PostgresDialectConfig,
     SqliteDialectConfig,
 } from 'kysely';
+import type { Optional } from 'utility-types';
 import type {
     DataSourceProvider,
     GetModel,
     GetModels,
     SchemaDef,
 } from '../schema/schema';
-import type { MergeIf } from '../utils/type-utils';
+import type { MergeIf, PrependParameter } from '../utils/type-utils';
 import type { ToKysely, ToKyselySchema } from './query-builder';
-import type { Optional } from 'utility-types';
+import type { RuntimePlugin } from './plugin';
 
 type DialectConfig<Provider extends DataSourceProvider> =
     Provider['type'] extends 'sqlite'
@@ -28,6 +29,8 @@ export type ClientOptions<Schema extends SchemaDef> = MergeIf<
          */
         dialectConfig?: DialectConfig<Schema['provider']>;
 
+        plugins?: RuntimePlugin<Schema>[];
+
         /**
          * Alternative way of constructing with a pre-configured Kysely instance.
          */
@@ -36,17 +39,12 @@ export type ClientOptions<Schema extends SchemaDef> = MergeIf<
         /**
          * Kysely plugins.
          */
-        plugins?: KyselyConfig['plugins'];
+        kyselyPlugins?: KyselyConfig['plugins'];
 
         /**
          * Logging configuration.
          */
         log?: KyselyConfig['log'];
-
-        /**
-         * Feature enablement and configuration.
-         */
-        features?: FeatureSettings<Schema>;
     },
     {
         computedFields: ComputedFields<Schema>;
@@ -74,37 +72,5 @@ export type ComputedFields<Schema extends SchemaDef> = {
 export type HasComputedFields<Schema extends SchemaDef> =
     keyof ComputedFields<Schema> extends never ? false : true;
 
-export type FeatureSettings<Schema extends SchemaDef> = {
-    policy?: PolicySettings<Schema>;
-};
-
-export type PolicySettings<Schema extends SchemaDef> = MergeIf<
-    {
-        auth?: Record<string, any>;
-    },
-    {
-        externalRules: ExternalRules<Schema>;
-    },
-    keyof ExternalRules<Schema> extends never ? false : true
->;
-
-type ExternalRules<Schema extends SchemaDef> = {
-    [Model in GetModels<Schema> as 'externalRules' extends keyof GetModel<
-        Schema,
-        Model
-    >
-        ? Model
-        : never]: {
-        [Rule in keyof Schema['models'][Model]['externalRules']]: PrependParameter<
-            ExpressionBuilder<
-                ToKyselySchema<Schema>,
-                GetModel<Schema, Model>['dbTable']
-            >,
-            Schema['models'][Model]['externalRules'][Rule]
-        >;
-    };
-};
-
-type PrependParameter<Param, Func> = Func extends (...args: any[]) => infer R
-    ? (p: Param, ...args: Parameters<Func>) => R
-    : never;
+// // @ts-ignore
+// export type FeatureSettings<Schema extends SchemaDef> = {};

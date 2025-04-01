@@ -1,6 +1,9 @@
+import { isPlugin, LiteralExpr, type Model } from '@zenstackhq/language/ast';
+import type { CliGenerator } from '@zenstackhq/runtime/client';
 import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
+import invariant from 'tiny-invariant';
 import { PrismaSchemaGenerator } from '../prisma/prisma-schema-generator';
 import { generate as generateTSSchema } from '../zmodel/ts-schema-generator';
 import { getSchemaFile, loadSchemaDocument } from './action-utils';
@@ -21,7 +24,10 @@ export async function run(options: Options) {
     const outputPath = options.output ?? path.dirname(schemaFile);
 
     // generate TS schema
-    await generateTSSchema(schemaFile, path.join(outputPath, 'schema.ts'));
+    const tsSchemaFile = path.join(outputPath, 'schema.ts');
+    await generateTSSchema(schemaFile, tsSchemaFile);
+
+    await runPlugins(model, outputPath, tsSchemaFile);
 
     // generate Prisma schema
     const prismaSchema = await new PrismaSchemaGenerator(model).generate();
@@ -34,16 +40,32 @@ export async function run(options: Options) {
 \`\`\`
 import { createClient } from '@zenstackhq/runtime';
 import { schema } from '${outputPath}/schema';
-import SQLite from 'better-sqlite3';
 
-const db = createClient(schema, {
-    // Kysely dialect configuration
-    dialectConfig: {
-        // e.g., for SQLite
-        database: new SQLite(':memory:'),
-    }
-});
+const db = createClient(schema);
 \`\`\`
 `);
+    }
+}
+
+async function runPlugins(
+    model: Model,
+    outputPath: string,
+    tsSchemaFile: string
+) {
+    const plugins = model.declarations.filter(isPlugin);
+    for (const plugin of plugins) {
+        const providerField = plugin.fields.find((f) => f.name === 'provider');
+        invariant(
+            providerField,
+            `Plugin ${plugin.name} does not have a provider field`
+        );
+        const provider = (providerField.value as LiteralExpr).value as string;
+        let useProvider = provider;
+        if (useProvider.startsWith('@core/')) {
+            useProvider = `@zenstackhq/runtime/plugins/${useProvider.slice(6)}`;
+        }
+        const generator = (await import(useProvider)).default as CliGenerator;
+        console.log('Running generator:', provider);
+        await generator({ model, outputPath, tsSchemaFile });
     }
 }

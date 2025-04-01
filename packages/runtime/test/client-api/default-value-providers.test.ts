@@ -56,6 +56,7 @@ const schema = {
             },
         },
     },
+    plugins: {},
 } as const satisfies SchemaDef;
 
 describe('Default Value Providers', () => {

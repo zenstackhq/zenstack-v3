@@ -48,17 +48,6 @@ export default class SchemaValidator implements AstValidator<Model> {
         ) {
             this.validateDataSources(model, accept);
         }
-
-        // at most one `@@auth` model
-        const decls = getDataModelAndTypeDefs(model, true);
-        const authModels = decls.filter(
-            (d) => isDataModel(d) && hasAttribute(d, '@@auth')
-        );
-        if (authModels.length > 1) {
-            accept('error', 'Multiple `@@auth` models are not allowed', {
-                node: authModels[1]!,
-            });
-        }
     }
 
     private async validateDataSources(

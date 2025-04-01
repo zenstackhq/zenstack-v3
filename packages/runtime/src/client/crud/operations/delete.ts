@@ -1,28 +1,12 @@
-import type { DeleteResult } from 'kysely';
 import { match } from 'ts-pattern';
-import type { GetModels, SchemaDef } from '../../../schema';
+import type { SchemaDef } from '../../../schema';
 import type { DeleteArgs, DeleteManyArgs } from '../../client-types';
 import { NotFoundError } from '../../errors';
-import type { ClientOptions } from '../../options';
-import type { ToKysely } from '../../query-builder';
 import { BaseOperationHandler } from './base';
-import { InputValidator } from './validator';
 
 export class DeleteOperationHandler<
     Schema extends SchemaDef
 > extends BaseOperationHandler<Schema> {
-    private readonly inputValidator: InputValidator<Schema>;
-
-    constructor(
-        schema: Schema,
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        options: ClientOptions<Schema>
-    ) {
-        super(schema, kysely, model, options);
-        this.inputValidator = new InputValidator(this.schema);
-    }
-
     async handle(
         operation: 'delete' | 'deleteMany',
         args: unknown | undefined
@@ -67,7 +51,7 @@ export class DeleteOperationHandler<
                 args.where,
                 true
             );
-            if (result.length < 1) {
+            if ((result as unknown[]).length < 1) {
                 throw new NotFoundError(this.model);
             }
             return this.trimResult(result[0], args);
@@ -85,6 +69,6 @@ export class DeleteOperationHandler<
             args?.where,
             false
         );
-        return { count: Number((result as DeleteResult[])[0]?.numDeletedRows) };
+        return result;
     }
 }

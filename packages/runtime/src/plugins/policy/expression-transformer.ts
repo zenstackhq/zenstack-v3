@@ -1,17 +1,25 @@
-import type { OperandExpression, SqlBool } from 'kysely';
 import {
     AndNode,
     BinaryOperationNode,
     ColumnNode,
-    expressionBuilder,
     OperatorNode,
     OrNode,
     ReferenceNode,
     ValueNode,
     type OperationNode,
 } from 'kysely';
+import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
-import type { CallExpression, SchemaDef } from '../../../schema';
+import type { Client } from '../../client';
+import { getCrudDialect } from '../../client/crud/dialects';
+import type { BaseCrudDialect } from '../../client/crud/dialects/base';
+import { QueryError } from '../../client/errors';
+import {
+    getIdFields,
+    getRelationForeignKeyFieldPairs,
+    requireField,
+} from '../../client/query-utils';
+import type { CallExpression, SchemaDef } from '../../schema';
 import {
     Expression,
     type BinaryExpression,
@@ -19,16 +27,10 @@ import {
     type FieldReferenceExpression,
     type LiteralExpression,
     type UnaryExpression,
-} from '../../../schema/expression';
-import type { BuiltinType, GetModels } from '../../../schema/schema';
-import { BaseCrudDialect, getCrudDialect } from '../../crud/dialects';
-import { QueryError } from '../../errors';
-import type { ClientOptions, PolicySettings } from '../../options';
-import {
-    getIdFields,
-    getRelationForeignKeyFieldPairs,
-    requireField,
-} from '../../query-utils';
+} from '../../schema/expression';
+import type { BuiltinType, GetModels } from '../../schema/schema';
+import type { PolicyOptions } from './options';
+import type { SchemaPolicy } from './types';
 
 export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
@@ -52,18 +54,24 @@ function expr(kind: Expression['kind']) {
 }
 
 export class ExpressionTransformer<Schema extends SchemaDef> {
-    private readonly policySettings: PolicySettings<Schema>;
+    private readonly options: PolicyOptions<Schema>;
     private readonly dialect: BaseCrudDialect<Schema>;
+    private readonly schemaPolicy: SchemaPolicy;
 
     constructor(
-        private readonly schema: Schema,
-        options: ClientOptions<Schema>
+        private readonly client: Client<Schema>,
+        options: PolicyOptions<Schema>
     ) {
-        if (!options.features?.policy) {
-            throw new QueryError(`Policy feature setting is required`);
-        }
-        this.policySettings = options.features.policy;
-        this.dialect = getCrudDialect(schema, options);
+        // if (!options.features?.policy) {
+        //     throw new QueryError(`Policy feature setting is required`);
+        // }
+        // this.policySettings = options.features.policy;
+        this.options = options;
+        this.dialect = getCrudDialect(client.$schema, client.$options);
+        invariant(this.client.$schema.plugins['policy']);
+        this.schemaPolicy = this.client.$schema.plugins[
+            'policy'
+        ] as SchemaPolicy;
     }
 
     transform(
@@ -98,10 +106,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         expr: BinaryExpression,
         context: ExpressionTransformerContext<Schema>
     ) {
-        if (
-            Expression.isAuthCall(expr.left) ||
-            Expression.isAuthCall(expr.right)
-        ) {
+        if (this.isAuthCall(expr.left) || this.isAuthCall(expr.right)) {
             return this.transformAuthBinary(expr);
         }
 
@@ -117,7 +122,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             throw new Error(`Unsupported operator for auth call: ${expr.op}`);
         }
         let other: Expression;
-        if (Expression.isAuthCall(expr.left)) {
+        if (this.isAuthCall(expr.left)) {
             other = expr.right;
         } else {
             other = expr.left;
@@ -125,20 +130,21 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
         if (Expression.isNull(other)) {
             return this.transformValue(
-                expr.op === '=='
-                    ? !this.policySettings.auth
-                    : !!this.policySettings.auth,
+                expr.op === '==' ? !this.options.auth : !!this.options.auth,
                 'Boolean'
             );
         } else if (Expression.isThis(other)) {
-            const idFields = getIdFields(this.schema, this.schema.authModel);
+            const idFields = getIdFields(
+                this.client.$schema,
+                this.schemaPolicy.authModel
+            );
             return this.buildAuthFieldComparison(
                 idFields.map((f) => ({ authField: f, tableField: f })),
                 expr.op
             );
         } else if (Expression.isRef(other)) {
             const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
-                this.schema,
+                this.client.$schema,
                 other.model,
                 other.field
             );
@@ -188,9 +194,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     private transformAuthFieldSelect(field: string): OperationNode {
         return this.transformValue(
-            this.policySettings.auth?.[field],
-            requireField(this.schema, this.schema.authModel, field)
-                .type as BuiltinType
+            this.options.auth?.[field as keyof typeof this.options.auth],
+            requireField(
+                this.client.$schema,
+                this.schemaPolicy.authModel!,
+                field
+            ).type as BuiltinType
         );
     }
 
@@ -249,33 +258,10 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         expr: CallExpression,
         context: ExpressionTransformerContext<Schema>
     ) {
-        let rule: Function | undefined;
-        if ('externalRules' in this.policySettings) {
-            const externalRules = this.policySettings.externalRules;
-            if (externalRules) {
-                const modelRules =
-                    externalRules[
-                        context.model as unknown as keyof typeof externalRules
-                    ];
-                if (modelRules) {
-                    rule = modelRules[expr.function as keyof typeof modelRules];
-                }
-            }
-        }
+        throw new QueryError(`Unknown function: ${expr.function}`);
+    }
 
-        if (rule && typeof rule === 'function') {
-            const eb = expressionBuilder();
-            const literalArgs = (expr.args ?? []).map((arg) => {
-                if (Expression.isLiteral(arg)) {
-                    return arg.value;
-                } else {
-                    throw new QueryError('Expected literal argument');
-                }
-            });
-            const builtExpr: OperandExpression<SqlBool> = rule(eb, literalArgs);
-            return builtExpr.toOperationNode();
-        } else {
-            throw new QueryError(`Unknown function: ${expr.function}`);
-        }
+    private isAuthCall(value: unknown): value is CallExpression {
+        return Expression.isCall(value) && value.function === 'auth';
     }
 }

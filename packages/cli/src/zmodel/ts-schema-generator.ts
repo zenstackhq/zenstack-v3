@@ -226,23 +226,13 @@ function createSchemaObject(model: Model) {
         );
     }
 
-    // authModel
-    let authModel = model.declarations.find(
-        (d) => isDataModel(d) && hasAttribute(d, '@auth')
+    // plugins
+    properties.push(
+        ts.factory.createPropertyAssignment(
+            'plugins',
+            ts.factory.createObjectLiteralExpression([], true)
+        )
     );
-    if (!authModel) {
-        authModel = model.declarations.find(
-            (d) => isDataModel(d) && d.name === 'User'
-        );
-    }
-    if (authModel) {
-        properties.push(
-            ts.factory.createPropertyAssignment(
-                'authModel',
-                ts.factory.createStringLiteral(authModel.name)
-            )
-        );
-    }
 
     return ts.factory.createObjectLiteralExpression(properties, true);
 }

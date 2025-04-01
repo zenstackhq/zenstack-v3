@@ -18,7 +18,6 @@ import {
     getFieldReference,
     getFunctionExpressionContext,
     getLiteral,
-    isAuthOrAuthMemberAccess,
     isCheckInvocation,
     isDataModelFieldReference,
     isEnumFieldReference,
@@ -155,16 +154,17 @@ export default class FunctionInvocationValidator
                     !isLiteralExpr(secondArg) &&
                     // enum field
                     !isEnumFieldReference(secondArg) &&
+                    // TODO: revisit this
                     // `auth()...` expression
-                    !isAuthOrAuthMemberAccess(secondArg) &&
+                    // !isAuthOrAuthMemberAccess(secondArg) &&
                     // array of literal/enum
                     !(
                         isArrayExpr(secondArg) &&
                         secondArg.items.every(
                             (item) =>
                                 isLiteralExpr(item) ||
-                                isEnumFieldReference(item) ||
-                                isAuthOrAuthMemberAccess(item)
+                                isEnumFieldReference(item)
+                            // || isAuthOrAuthMemberAccess(item)
                         )
                     )
                 ) {

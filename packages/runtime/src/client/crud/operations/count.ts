@@ -1,25 +1,10 @@
 import { sql } from 'kysely';
-import type { GetModels, SchemaDef } from '../../../schema';
-import type { ClientOptions } from '../../options';
-import type { ToKysely } from '../../query-builder';
+import type { SchemaDef } from '../../../schema';
 import { BaseOperationHandler } from './base';
-import { InputValidator } from './validator';
 
 export class CountOperationHandler<
     Schema extends SchemaDef
 > extends BaseOperationHandler<Schema> {
-    private readonly inputValidator: InputValidator<Schema>;
-
-    constructor(
-        schema: Schema,
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        options: ClientOptions<Schema>
-    ) {
-        super(schema, kysely, model, options);
-        this.inputValidator = new InputValidator(this.schema);
-    }
-
     async handle(_operation: 'count', args: unknown | undefined) {
         const validatedArgs = this.inputValidator.validateCountArgs(
             this.model,
@@ -64,13 +49,19 @@ export class CountOperationHandler<
                 )
             );
 
-            return query.executeTakeFirstOrThrow();
+            return this.queryExecutor.executeTakeFirstOrThrow(
+                this.kysely,
+                query
+            );
         } else {
             // simple count all
             query = query.select((eb) =>
                 eb.cast(eb.fn.countAll(), 'integer').as('count')
             );
-            const result = await query.executeTakeFirstOrThrow();
+            const result = await this.queryExecutor.executeTakeFirstOrThrow(
+                this.kysely,
+                query
+            );
             return (result as any).count as number;
         }
     }

@@ -12,7 +12,7 @@ export type SchemaDef = {
     provider: DataSourceProvider;
     models: Record<string, ModelDef>;
     enums?: Record<string, EnumDef>;
-    authModel?: string;
+    plugins: Record<string, unknown>;
 };
 
 export type ModelDef = {
@@ -28,7 +28,6 @@ export type ModelDef = {
     idFields: string[];
     policies?: Policy[];
     computedFields?: Record<string, Function>;
-    externalRules?: Record<string, Function>;
 };
 
 export type PolicyKind = 'allow' | 'deny';

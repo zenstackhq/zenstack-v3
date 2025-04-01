@@ -50,8 +50,9 @@
     -   [ ] Extensions
         -   [x] Query builder API
         -   [x] Computed fields
-        -   [ ] Prisma client extension
+        -   [?] Prisma client extension
     -   [ ] Misc
+        -   [ ] Rename AST Model to Schema
         -   [ ] Compound ID
         -   [ ] Cross field comparison
         -   [ ] Many-to-many relation

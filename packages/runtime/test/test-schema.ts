@@ -2,7 +2,7 @@ import type { OperandExpression, SqlBool } from 'kysely';
 import { Expression } from '../src/schema/expression';
 import type { DataSourceProviderType, SchemaDef } from '../src/schema/schema';
 
-const schema = {
+export const schema = {
     provider: {
         type: 'sqlite',
         dialectConfigProvider: () => ({}),
@@ -78,11 +78,6 @@ const schema = {
                     ),
                 },
             ],
-            externalRules: {
-                emailFromDomain(_domain: string): OperandExpression<SqlBool> {
-                    throw new Error('Not implemented');
-                },
-            },
         },
         Post: {
             dbTable: 'Post',
@@ -247,7 +242,11 @@ const schema = {
             USER: 'USER',
         },
     },
-    authModel: 'User',
+    plugins: {
+        policy: {
+            authModel: 'User',
+        },
+    },
 } as const satisfies SchemaDef;
 
 export function getSchema<ProviderType extends DataSourceProviderType>(

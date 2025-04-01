@@ -33,10 +33,7 @@ import {
 import { PLUGIN_MODULE_NAME, STD_LIB_MODULE_NAME } from './constants';
 import {
     getAllLoadedAndReachableDataModelsAndTypeDefs,
-    getAuthDecl,
     getModelFieldsWithBases,
-    isAuthInvocation,
-    isAuthOrAuthMemberAccess,
     isCollectionPredicate,
     isFutureInvocation,
     resolveImportUri,
@@ -174,7 +171,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         // typedef's fields are only added to the scope if the access starts with `auth().`
         // or the member access resides inside a typedef
         const allowTypeDefScope =
-            isAuthOrAuthMemberAccess(node.operand) ||
+            // isAuthOrAuthMemberAccess(node.operand) ||
             !!AstUtils.getContainerOfType(node, isTypeDef);
 
         return match(node.operand)
@@ -215,10 +212,13 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             })
             .when(isInvocationExpr, (operand) => {
                 // deal with member access from `auth()` and `future()
-                if (isAuthInvocation(operand)) {
-                    // resolve to `User` or `@@auth` decl
-                    return this.createScopeForAuth(node, globalScope);
-                }
+
+                // TODO: generalize it
+                // if (isAuthInvocation(operand)) {
+                //     // resolve to `User` or `@@auth` decl
+                //     return this.createScopeForAuth(node, globalScope);
+                // }
+
                 if (isFutureInvocation(operand)) {
                     // resolve `future()` to the containing model
                     return this.createScopeForContainingModel(
@@ -239,38 +239,56 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         const globalScope = this.getGlobalScope(referenceType, context);
         const collection = collectionPredicate.left;
 
-        // typedef's fields are only added to the scope if the access starts with `auth().`
-        const allowTypeDefScope = isAuthOrAuthMemberAccess(collection);
+        // TODO: generalize it
+        // // typedef's fields are only added to the scope if the access starts with `auth().`
+        // const allowTypeDefScope = isAuthOrAuthMemberAccess(collection);
+        const allowTypeDefScope = false;
 
-        return match(collection)
-            .when(isReferenceExpr, (expr) => {
-                // collection is a reference - model or typedef field
-                const ref = expr.target.ref;
-                if (isDataModelField(ref) || isTypeDefField(ref)) {
-                    return this.createScopeForContainer(
-                        ref.type.reference?.ref,
-                        globalScope,
-                        allowTypeDefScope
-                    );
-                }
-                return EMPTY_SCOPE;
-            })
-            .when(isMemberAccessExpr, (expr) => {
-                // collection is a member access, it can only be resolved to a model or typedef field
-                const ref = expr.member.ref;
-                if (isDataModelField(ref) || isTypeDefField(ref)) {
-                    return this.createScopeForContainer(
-                        ref.type.reference?.ref,
-                        globalScope,
-                        allowTypeDefScope
-                    );
-                }
-                return EMPTY_SCOPE;
-            })
-            .when(isAuthInvocation, (expr) => {
-                return this.createScopeForAuth(expr, globalScope);
-            })
-            .otherwise(() => EMPTY_SCOPE);
+        return (
+            match(collection)
+                .when(isReferenceExpr, (expr) => {
+                    // collection is a reference - model or typedef field
+                    const ref = expr.target.ref;
+                    if (isDataModelField(ref) || isTypeDefField(ref)) {
+                        return this.createScopeForContainer(
+                            ref.type.reference?.ref,
+                            globalScope,
+                            allowTypeDefScope
+                        );
+                    }
+                    return EMPTY_SCOPE;
+                })
+                .when(isMemberAccessExpr, (expr) => {
+                    // collection is a member access, it can only be resolved to a model or typedef field
+                    const ref = expr.member.ref;
+                    if (isDataModelField(ref) || isTypeDefField(ref)) {
+                        return this.createScopeForContainer(
+                            ref.type.reference?.ref,
+                            globalScope,
+                            allowTypeDefScope
+                        );
+                    }
+                    return EMPTY_SCOPE;
+                })
+                .when(isInvocationExpr, (expr) => {
+                    const returnTypeDecl =
+                        expr.function.ref?.returnType.reference?.ref;
+                    if (isDataModel(returnTypeDecl)) {
+                        return this.createScopeForContainer(
+                            returnTypeDecl,
+                            globalScope,
+                            allowTypeDefScope
+                        );
+                    } else {
+                        return EMPTY_SCOPE;
+                    }
+                })
+                // TODO: generalize it
+                // .when(isAuthInvocation, (expr) => {
+                //     return this.createScopeForAuth(expr, globalScope);
+                // })
+                .otherwise(() => EMPTY_SCOPE)
+        );
     }
 
     private createScopeForContainingModel(node: AstNode, globalScope: Scope) {
@@ -299,20 +317,21 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         }
     }
 
-    private createScopeForAuth(node: AstNode, globalScope: Scope) {
-        // get all data models and type defs from loaded and reachable documents
-        const decls = getAllLoadedAndReachableDataModelsAndTypeDefs(
-            this.services.shared.workspace.LangiumDocuments,
-            AstUtils.getContainerOfType(node, isDataModel)
-        );
+    // TODO: revisit this
+    // private createScopeForAuth(node: AstNode, globalScope: Scope) {
+    //     // get all data models and type defs from loaded and reachable documents
+    //     const decls = getAllLoadedAndReachableDataModelsAndTypeDefs(
+    //         this.services.shared.workspace.LangiumDocuments,
+    //         AstUtils.getContainerOfType(node, isDataModel)
+    //     );
 
-        const authDecl = getAuthDecl(decls);
-        if (authDecl) {
-            return this.createScopeForContainer(authDecl, globalScope, true);
-        } else {
-            return EMPTY_SCOPE;
-        }
-    }
+    //     const authDecl = getAuthDecl(decls);
+    //     if (authDecl) {
+    //         return this.createScopeForContainer(authDecl, globalScope, true);
+    //     } else {
+    //         return EMPTY_SCOPE;
+    //     }
+    // }
 }
 
 function getCollectionPredicateContext(node: AstNode) {

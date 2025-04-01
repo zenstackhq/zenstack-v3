@@ -5,6 +5,7 @@ export default defineConfig({
         index: 'src/index.ts',
         client: 'src/client/index.ts',
         schema: 'src/schema/index.ts',
+        'plugins/policy': 'src/plugins/policy/index.ts',
     },
     outDir: 'dist',
     splitting: false,

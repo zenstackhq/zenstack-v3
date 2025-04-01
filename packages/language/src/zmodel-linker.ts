@@ -55,10 +55,8 @@ import {
 } from './ast';
 import {
     getAllLoadedAndReachableDataModelsAndTypeDefs,
-    getAuthDecl,
     getContainingDataModel,
     getModelFieldsWithBases,
-    isAuthInvocation,
     isFutureExpr,
     isMemberContainer,
     mapBuiltinTypeToExpressionType,
@@ -361,20 +359,24 @@ export class ZModelLinker extends DefaultLinker {
         if (node.function.ref) {
             // eslint-disable-next-line @typescript-eslint/ban-types
             const funcDecl = node.function.ref as FunctionDecl;
-            if (isAuthInvocation(node)) {
-                // auth() function is resolved against all loaded and reachable documents
 
-                // get all data models from loaded and reachable documents
-                const allDecls = getAllLoadedAndReachableDataModelsAndTypeDefs(
-                    this.langiumDocuments(),
-                    AstUtils.getContainerOfType(node, isDataModel)
-                );
+            // TODO: revisit this
+            // if (isAuthInvocation(node)) {
+            //     // auth() function is resolved against all loaded and reachable documents
 
-                const authDecl = getAuthDecl(allDecls);
-                if (authDecl) {
-                    node.$resolvedType = { decl: authDecl, nullable: true };
-                }
-            } else if (isFutureExpr(node)) {
+            //     // get all data models from loaded and reachable documents
+            //     const allDecls = getAllLoadedAndReachableDataModelsAndTypeDefs(
+            //         this.langiumDocuments(),
+            //         AstUtils.getContainerOfType(node, isDataModel)
+            //     );
+
+            //     const authDecl = getAuthDecl(allDecls);
+            //     if (authDecl) {
+            //         node.$resolvedType = { decl: authDecl, nullable: true };
+            //     }
+            // } else
+
+            if (isFutureExpr(node)) {
                 // future() function is resolved to current model
                 node.$resolvedType = { decl: getContainingDataModel(node) };
             } else {
@@ -412,11 +414,12 @@ export class ZModelLinker extends DefaultLinker {
             if (node.member.ref) {
                 this.resolveToDeclaredType(node, node.member.ref.type);
 
-                if (node.$resolvedType && isAuthInvocation(node.operand)) {
-                    // member access on auth() function is nullable
-                    // because user may not have provided all fields
-                    node.$resolvedType.nullable = true;
-                }
+                // TODO: revisit this
+                // if (node.$resolvedType && isAuthInvocation(node.operand)) {
+                //     // member access on auth() function is nullable
+                //     // because user may not have provided all fields
+                //     node.$resolvedType.nullable = true;
+                // }
             }
         }
     }

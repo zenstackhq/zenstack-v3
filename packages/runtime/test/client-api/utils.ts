@@ -1,8 +1,7 @@
 import type { Client } from '../../src/client';
-import type { getSchema } from '../test-schema';
+import type { schema } from '../test-schema';
 
-type SchemaType = ReturnType<typeof getSchema>;
-type ClientType = Client<SchemaType>;
+type ClientType = Client<typeof schema>;
 
 export async function createUser(
     client: ClientType,

@@ -1,13 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Client } from '../../src/client';
-import { getSchema } from '../test-schema';
+import { schema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 import { createUser } from './utils';
 
 describe.each(createClientSpecs(__filename))(
     'Client aggregate tests',
-    ({ createClient, provider }) => {
-        const schema = getSchema(provider);
+    ({ createClient }) => {
         let client: Client<typeof schema>;
 
         beforeEach(async () => {

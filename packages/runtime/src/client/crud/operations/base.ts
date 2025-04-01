@@ -1,11 +1,10 @@
 import { createId } from '@paralleldrive/cuid2';
 import {
-    DeleteResult,
     expressionBuilder,
     sql,
-    UpdateResult,
     type ExpressionBuilder,
     type Expression as KyselyExpression,
+    type QueryResult,
     type SelectQueryBuilder,
 } from 'kysely';
 import { nanoid } from 'nanoid';
@@ -13,6 +12,7 @@ import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
+import type { Client } from '../..';
 import type { GetModels, ModelDef, SchemaDef } from '../../../schema';
 import type {
     BuiltinType,
@@ -23,8 +23,8 @@ import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
 import type { FindArgs, SelectInclude, Where } from '../../client-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
-import type { ClientOptions } from '../../options';
 import type { ToKysely } from '../../query-builder';
+import { QueryExecutor, type QueryContext } from '../../query-executor';
 import {
     buildFieldRef,
     buildJoinPairs,
@@ -42,6 +42,7 @@ import {
 import type { CrudOperation } from '../crud-handler';
 import { getCrudDialect } from '../dialects';
 import type { BaseCrudDialect } from '../dialects/base';
+import { InputValidator } from './validator';
 
 export type FromRelationContext = {
     model: string;
@@ -51,14 +52,28 @@ export type FromRelationContext = {
 
 export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected readonly dialect: BaseCrudDialect<Schema>;
+    protected readonly queryExecutor: QueryExecutor<Schema>;
 
     constructor(
-        protected readonly schema: Schema,
-        protected readonly kysely: ToKysely<Schema>,
+        protected readonly client: Client<Schema>,
         protected readonly model: GetModels<Schema>,
-        protected readonly options: ClientOptions<Schema>
+        protected readonly inputValidator: InputValidator<Schema>,
+        protected readonly queryContext: QueryContext<Schema>
     ) {
-        this.dialect = getCrudDialect(this.schema, this.options);
+        this.dialect = getCrudDialect(this.schema, this.client.$options);
+        this.queryExecutor = new QueryExecutor<Schema>(queryContext);
+    }
+
+    protected get schema() {
+        return this.client.$schema;
+    }
+
+    protected get options() {
+        return this.client.$options;
+    }
+
+    protected get kysely() {
+        return this.client.$qb;
     }
 
     abstract handle(operation: CrudOperation, args: any): Promise<unknown>;
@@ -83,15 +98,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         filter: any
-    ): Promise<Partial<Record<string, any>> | undefined> {
+    ): Promise<unknown | undefined> {
         const modelDef = this.requireModel(model);
         const idFields = getIdFields(this.schema, model);
-        return kysely
+        const query = kysely
             .selectFrom(modelDef.dbTable)
             .where((eb) => eb.and(filter))
             .select(idFields.map((f) => kysely.dynamic.ref(f)))
-            .limit(1)
-            .executeTakeFirst();
+            .limit(1);
+        return this.queryExecutor.executeTakeFirst(kysely, query);
     }
 
     protected async read(
@@ -152,7 +167,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         try {
-            return await query.execute();
+            return await this.queryExecutor.executeGetRows(kysely, query);
         } catch (err) {
             const { sql, parameters } = query.compile();
             throw new QueryError(
@@ -371,7 +386,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     fromRelation.model
                 );
                 parentUpdateTask = (entity) => {
-                    return kysely
+                    const query = kysely
                         .updateTable(fromRelationModelDef.dbTable)
                         .set(
                             keyPairs.reduce(
@@ -382,8 +397,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                                 {} as any
                             )
                         )
-                        .where((eb) => eb.and(fromRelation.ids))
-                        .execute();
+                        .where((eb) => eb.and(fromRelation.ids));
+                    return this.queryExecutor.execute(kysely, query);
                 };
             }
         }
@@ -432,9 +447,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         let createdEntity: any;
 
         try {
-            createdEntity = await query
-                .execute()
-                .then((created) => created[0]!);
+            createdEntity = await this.queryExecutor.executeTakeFirst(
+                kysely,
+                query
+            );
         } catch (err) {
             const { sql, parameters } = query.compile();
             throw new QueryError(
@@ -696,14 +712,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return this.fillGeneratedValues(modelDef, item);
         });
 
-        const result = await kysely
+        const query = kysely
             .insertInto(modelDef.dbTable)
             .values(createData)
             .$if(!!input.skipDuplicates, (qb) =>
                 qb.onConflict((oc) => oc.doNothing())
-            )
-            .execute();
-        return { count: Number(result[0]!.numInsertedOrUpdatedRows!) };
+            );
+        const result = await this.queryExecutor.execute(kysely, query);
+        return { count: Number(result.numAffectedRows) };
     }
 
     private fillGeneratedValues(modelDef: ModelDef, data: object) {
@@ -866,7 +882,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             let updatedEntity: any;
 
             try {
-                updatedEntity = await query.execute();
+                updatedEntity = await this.queryExecutor.executeTakeFirst(
+                    kysely,
+                    query
+                );
             } catch (err) {
                 const { sql, parameters } = query.compile();
                 throw new QueryError(
@@ -874,7 +893,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 );
             }
 
-            if (updatedEntity.length === 0) {
+            if (!updatedEntity) {
                 if (throwIfNotFound) {
                     throw new NotFoundError(model);
                 } else {
@@ -882,7 +901,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
             }
 
-            return updatedEntity[0];
+            return updatedEntity;
         }
     }
 
@@ -959,8 +978,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         try {
-            const result = await query.execute();
-            return { count: Number(result[0]?.numUpdatedRows!) };
+            const result = await this.queryExecutor.execute(kysely, query);
+            return { count: Number(result.numAffectedRows) };
         } catch (err) {
             const { sql, parameters } = query.compile();
             throw new QueryError(
@@ -1214,7 +1233,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             fromRelation.model,
             fromRelation.field
         );
-        let updateResult: UpdateResult[];
+        let updateResult: QueryResult<unknown>;
 
         if (ownedByModel) {
             // set parent fk directly
@@ -1226,7 +1245,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 throw new NotFoundError(model);
             }
             const fromRelationModelDef = this.requireModel(fromRelation.model);
-            updateResult = await kysely
+            const query = kysely
                 .updateTable(fromRelationModelDef.dbTable)
                 .where((eb) => eb.and(fromRelation.ids))
                 .set(
@@ -1237,8 +1256,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         }),
                         {} as any
                     )
-                )
-                .execute();
+                );
+            updateResult = await this.queryExecutor.execute(kysely, query);
         } else {
             const modelDef = this.requireModel(model);
 
@@ -1249,7 +1268,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
 
             if (!relationFieldDef.array) {
-                await kysely
+                const query = kysely
                     .updateTable(modelDef.dbTable)
                     .where((eb) =>
                         eb.and(
@@ -1263,12 +1282,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             (acc, { fk }) => ({ ...acc, [fk]: null }),
                             {} as any
                         )
-                    )
-                    .execute();
+                    );
+                await this.queryExecutor.execute(kysely, query);
             }
 
             // connect
-            updateResult = await kysely
+            const query = kysely
                 .updateTable(modelDef.dbTable)
                 .where((eb) => eb.or(_data.map((d) => eb.and(d))))
                 .set(
@@ -1279,12 +1298,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         }),
                         {} as any
                     )
-                )
-                .execute();
+                );
+            updateResult = await this.queryExecutor.execute(kysely, query);
         }
 
         // validate connect result
-        if (_data.length > updateResult[0]!.numUpdatedRows) {
+        if (_data.length > updateResult.numAffectedRows!) {
             // some entities were not connected
             throw new NotFoundError(model);
         }
@@ -1360,7 +1379,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             fromRelation.field
         );
 
-        let updateResult: UpdateResult[];
+        let updateResult: QueryResult<unknown>;
 
         if (ownedByModel) {
             // set parent fk directly
@@ -1378,7 +1397,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 throw new NotFoundError(model);
             }
             const fromRelationModelDef = this.requireModel(fromRelation.model);
-            updateResult = await kysely
+            const query = kysely
                 .updateTable(fromRelationModelDef.dbTable)
                 .where((eb) => eb.and(fromRelation.ids))
                 .set(
@@ -1386,11 +1405,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         (acc, { fk }) => ({ ...acc, [fk]: null }),
                         {} as any
                     )
-                )
-                .execute();
+                );
+            updateResult = await this.queryExecutor.execute(kysely, query);
         } else {
             // disconnect
-            updateResult = await kysely
+            const query = kysely
                 .updateTable(modelDef.dbTable)
                 .where((eb) =>
                     eb.or(disconnectConditions.map((d) => eb.and(d)))
@@ -1400,12 +1419,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         (acc, { fk }) => ({ ...acc, [fk]: null }),
                         {} as any
                     )
-                )
-                .execute();
+                );
+            updateResult = await this.queryExecutor.execute(kysely, query);
         }
 
         // validate connect result
-        if (expectedUpdateCount > updateResult[0]!.numUpdatedRows) {
+        if (expectedUpdateCount > updateResult.numAffectedRows!) {
             // some entities were not connected
             throw new NotFoundError(model);
         }
@@ -1440,7 +1459,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         );
 
         // disconnect
-        await kysely
+        const query = kysely
             .updateTable(modelDef.dbTable)
             .where((eb) =>
                 eb.and([
@@ -1455,12 +1474,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     (acc, { fk }) => ({ ...acc, [fk]: null }),
                     {} as any
                 )
-            )
-            .execute();
+            );
+        await this.queryExecutor.execute(kysely, query);
 
         // connect
         if (_data.length > 0) {
-            const r = await kysely
+            const query = kysely
                 .updateTable(modelDef.dbTable)
                 .where((eb) => eb.or(_data.map((d) => eb.and(d))))
                 .set(
@@ -1471,11 +1490,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         }),
                         {} as any
                     )
-                )
-                .execute();
+                );
+            const r = await this.queryExecutor.execute(kysely, query);
 
             // validate result
-            if (_data.length > r[0]!.numUpdatedRows) {
+            if (_data.length > r.numAffectedRows!) {
                 // some entities were not connected
                 throw new NotFoundError(model);
             }
@@ -1513,7 +1532,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             fromRelation.field
         );
 
-        let deleteResult: DeleteResult[];
+        let deleteResult: QueryResult<unknown>;
         if (ownedByModel) {
             const fromEntity = await this.readUnique(
                 kysely,
@@ -1525,7 +1544,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             if (!fromEntity) {
                 throw new NotFoundError(model);
             }
-            deleteResult = await kysely
+            const query = kysely
                 .deleteFrom(modelDef.dbTable)
                 .where((eb) =>
                     eb.and([
@@ -1536,10 +1555,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ),
                         eb.or(deleteConditions.map((d) => eb.and(d))),
                     ])
-                )
-                .execute();
+                );
+            deleteResult = await this.queryExecutor.execute(kysely, query);
         } else {
-            deleteResult = await kysely
+            const query = kysely
                 .deleteFrom(modelDef.dbTable)
                 .where((eb) =>
                     eb.and([
@@ -1550,34 +1569,45 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ),
                         eb.or(deleteConditions.map((d) => eb.and(d))),
                     ])
-                )
-                .execute();
+                );
+            deleteResult = await this.queryExecutor.execute(kysely, query);
         }
 
         // validate result
         if (
             throwForNotFound &&
-            expectedDeleteCount > deleteResult[0]!.numDeletedRows
+            expectedDeleteCount > deleteResult.numAffectedRows!
         ) {
             // some entities were not deleted
             throw new NotFoundError(model);
         }
     }
 
-    protected async delete(
+    protected async delete<
+        ReturnData extends boolean,
+        Result = ReturnData extends true ? unknown[] : { count: number }
+    >(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         where: any,
-        returnData: boolean
-    ): Promise<DeleteResult[] | unknown[]> {
+        returnData: ReturnData
+    ): Promise<Result> {
         const modelDef = this.requireModel(model);
-        return kysely
+        const query = kysely
             .deleteFrom(modelDef.dbTable)
             .where((eb) =>
                 this.dialect.buildFilter(eb, model, modelDef.dbTable, where)
             )
-            .$if(returnData, (qb) => qb.returningAll())
-            .execute();
+            .$if(returnData, (qb) => qb.returningAll());
+
+        const result = await this.queryExecutor.execute(kysely, query);
+        if (returnData) {
+            return result.rows as Result;
+        } else {
+            return {
+                count: Number(result.numAffectedRows!),
+            } as Result;
+        }
     }
 
     protected makeIdSelect(model: string) {

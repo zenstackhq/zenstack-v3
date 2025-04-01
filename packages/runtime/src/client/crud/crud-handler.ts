@@ -1,14 +1,14 @@
+import type { Client } from '..';
 import type { GetModels, SchemaDef } from '../../schema';
 import type { BatchResult } from '../client-types';
-import type { ClientOptions } from '../options';
-import type { ToKysely } from '../query-builder';
+import type { QueryContext } from '../query-executor';
 import { AggregateOperationHandler } from './operations/aggregate';
-import type { BaseOperationHandler } from './operations/base';
 import { CountOperationHandler } from './operations/count';
 import { CreateOperationHandler } from './operations/create';
 import { DeleteOperationHandler } from './operations/delete';
 import { FindOperationHandler } from './operations/find';
 import { UpdateOperationHandler } from './operations/update';
+import type { InputValidator } from './operations/validator';
 
 export type CrudOperation =
     | 'findMany'
@@ -24,108 +24,121 @@ export type CrudOperation =
     | 'aggregate'
     | 'groupBy';
 
+// TODO: remove this class
 export class CrudHandler<Schema extends SchemaDef> {
-    private readonly findOperation: BaseOperationHandler<Schema>;
-    private readonly createOperation: BaseOperationHandler<Schema>;
-    private readonly updateOperation: BaseOperationHandler<Schema>;
-    private readonly deleteOperation: BaseOperationHandler<Schema>;
-    private readonly countOperation: BaseOperationHandler<Schema>;
-    private readonly aggregateOperation: BaseOperationHandler<Schema>;
+    protected readonly queryContext: QueryContext<Schema>;
 
     constructor(
-        protected readonly schema: Schema,
-        protected readonly kysely: ToKysely<Schema>,
-        public readonly options: ClientOptions<Schema>,
-        protected readonly model: GetModels<Schema>
+        protected readonly client: Client<Schema>,
+        protected readonly inputValidator: InputValidator<Schema>,
+        protected readonly model: GetModels<Schema>,
+        operation: CrudOperation,
+        args: unknown
     ) {
-        this.findOperation = new FindOperationHandler(
-            schema,
-            kysely,
-            model,
-            this.options
-        );
-        this.createOperation = new CreateOperationHandler(
-            schema,
-            kysely,
-            model,
-            this.options
-        );
-        this.updateOperation = new UpdateOperationHandler(
-            schema,
-            kysely,
-            model,
-            this.options
-        );
-        this.deleteOperation = new DeleteOperationHandler(
-            schema,
-            kysely,
-            model,
-            this.options
-        );
-        this.countOperation = new CountOperationHandler(
-            schema,
-            kysely,
-            model,
-            this.options
-        );
-        this.aggregateOperation = new AggregateOperationHandler(
-            schema,
-            kysely,
-            model,
-            this.options
-        );
+        this.queryContext = {
+            client: this.client,
+            model: this.model,
+            operation,
+            args,
+        };
     }
 
     findUnique(args: unknown) {
-        return this.findOperation.handle('findUnique', args);
+        return new FindOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('findUnique', args);
     }
 
     findFirst(args: unknown) {
-        return this.findOperation.handle('findFirst', args);
+        return new FindOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('findFirst', args);
     }
 
     findMany(args: unknown) {
-        return this.findOperation.handle('findMany', args);
+        return new FindOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('findMany', args);
     }
 
     create(args: unknown) {
-        return this.createOperation.handle('create', args);
+        return new CreateOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('create', args);
     }
 
     createMany(args: unknown) {
-        return this.createOperation.handle(
-            'createMany',
-            args
-        ) as Promise<BatchResult>;
+        return new CreateOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('createMany', args) as Promise<BatchResult>;
     }
 
     update(args: unknown) {
-        return this.updateOperation.handle('update', args);
+        return new UpdateOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('update', args);
     }
 
     updateMany(args: unknown) {
-        return this.updateOperation.handle(
-            'updateMany',
-            args
-        ) as Promise<BatchResult>;
+        return new UpdateOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('updateMany', args) as Promise<BatchResult>;
     }
 
     delete(args: unknown) {
-        return this.deleteOperation.handle('delete', args);
+        return new DeleteOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('delete', args);
     }
 
     deleteMany(args: unknown) {
-        return this.deleteOperation.handle(
-            'deleteMany',
-            args
-        ) as Promise<BatchResult>;
+        return new DeleteOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('deleteMany', args) as Promise<BatchResult>;
     }
 
     count(args: unknown) {
-        return this.countOperation.handle('count', args) as Promise<unknown>;
+        return new CountOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('count', args) as Promise<unknown>;
     }
 
     aggregate(args: unknown) {
-        return this.aggregateOperation.handle('count', args) as Promise<number>;
+        return new AggregateOperationHandler(
+            this.client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        ).handle('aggregate', args) as Promise<number>;
     }
 }

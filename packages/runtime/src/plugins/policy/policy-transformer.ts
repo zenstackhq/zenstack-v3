@@ -10,12 +10,14 @@ import {
     WhereNode,
     type OperationNode,
 } from 'kysely';
-import type { SchemaDef } from '../../../schema';
-import type { GetModels, Policy } from '../../../schema/schema';
-import { BaseCrudDialect, getCrudDialect } from '../../crud/dialects';
-import type { ClientOptions } from '../../options';
-import { requireModel } from '../../query-utils';
+import type { Client } from '../../client';
+import { getCrudDialect } from '../../client/crud/dialects';
+import type { BaseCrudDialect } from '../../client/crud/dialects/base';
+import { requireModel } from '../../client/query-utils';
+import type { GetModels, SchemaDef } from '../../schema';
+import type { Policy } from '../../schema/schema';
 import { ExpressionTransformer } from './expression-transformer';
+import type { PolicyOptions } from './options';
 
 export class PolicyTransformer<
     Schema extends SchemaDef
@@ -23,11 +25,11 @@ export class PolicyTransformer<
     private readonly dialect: BaseCrudDialect<Schema>;
 
     constructor(
-        private readonly schema: Schema,
-        private readonly options: ClientOptions<Schema>
+        private readonly client: Client<Schema>,
+        private readonly options: PolicyOptions<Schema>
     ) {
         super();
-        this.dialect = getCrudDialect(schema, options);
+        this.dialect = getCrudDialect(client.$schema, client.$options);
     }
 
     protected override transformSelectQuery(node: SelectQueryNode) {
@@ -118,13 +120,13 @@ export class PolicyTransformer<
     }
 
     private buildPolicyWhere(model: GetModels<Schema>, policy: Policy) {
-        return new ExpressionTransformer(this.schema, this.options).transform(
+        return new ExpressionTransformer(this.client, this.options).transform(
             policy.expression,
             { model }
         );
     }
 
     private getModelPolicies(modelName: string) {
-        return requireModel(this.schema, modelName).policies;
+        return requireModel(this.client.$schema, modelName).policies;
     }
 }

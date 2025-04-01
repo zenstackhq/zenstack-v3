@@ -74,12 +74,6 @@ function env(name: String): String {
 }
 
 /**
- * Gets the current login user.
- */
-function auth(): Any {
-} @@@expressionContext([DefaultValue, AccessPolicy])
-
-/**
  * Gets current date-time (as DateTime type).
  */
 function now(): DateTime {
@@ -526,46 +520,6 @@ attribute @db.Image() @@@targetField([BytesField]) @@@prisma
  * @param: The name of the database schema.
  */
 attribute @@schema(_ name: String) @@@prisma
-
-/**
- * Defines an access policy that allows a set of operations when the given condition is true.
- * 
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
- * @param condition: a boolean expression that controls if the operation should be allowed.
- */
-attribute @@allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
-
-/**
- * Defines an access policy that allows the annotated field to be read or updated.
- * You can pass a thrid argument as `true` to make it override the model-level policies. 
- * 
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
- * @param condition: a boolean expression that controls if the operation should be allowed.
- * @param override: a boolean value that controls if the field-level policy should override the model-level policy.
- */
-attribute @allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean, _ override: Boolean?)
-
-/**
- * Defines an access policy that denies a set of operations when the given condition is true.
- * 
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
- * @param condition: a boolean expression that controls if the operation should be denied.
- */
-attribute @@deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
-
-/**
- * Defines an access policy that denies the annotated field to be read or updated.
- *
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
- * @param condition: a boolean expression that controls if the operation should be denied.
- */
-attribute @deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
-
-/**
- * Used to specify the model for resolving `auth()` function call in access policies. A Zmodel
- * can have at most one model with this attribute. By default, the model named "User" is used.
- */
-attribute @@auth() @@@supportTypeDef
 
 /**
  * Indicates that the field is a password field and needs to be hashed before persistence.

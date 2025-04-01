@@ -200,13 +200,13 @@ export function isUniqueField(field: DataModelField) {
     return false;
 }
 
-export function isAuthInvocation(node: AstNode) {
-    return (
-        isInvocationExpr(node) &&
-        node.function.ref?.name === 'auth' &&
-        isFromStdlib(node.function.ref)
-    );
-}
+// export function isAuthInvocation(node: AstNode) {
+//     return (
+//         isInvocationExpr(node) &&
+//         node.function.ref?.name === 'auth' &&
+//         isFromStdlib(node.function.ref)
+//     );
+// }
 
 export function isFromStdlib(node: AstNode) {
     const model = getContainingModel(node);

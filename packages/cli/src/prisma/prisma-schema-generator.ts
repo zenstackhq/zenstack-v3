@@ -18,6 +18,7 @@ import {
     isArrayExpr,
     isInvocationExpr,
     isLiteralExpr,
+    isModel,
     isNullExpr,
     isReferenceExpr,
     isStringLiteral,
@@ -33,7 +34,6 @@ import { match, P } from 'ts-pattern';
 
 import {
     hasAttribute,
-    isAuthInvocation,
     isDelegateModel,
     isIdField,
 } from '../zmodel/model-utils';
@@ -268,8 +268,8 @@ export class PrismaSchemaGenerator {
 
         const attributes = field.attributes
             .filter((attr) => this.isPrismaAttribute(attr))
-            // `@default` with `auth()` is handled outside Prisma
-            .filter((attr) => !this.isDefaultWithAuth(attr))
+            // `@default` with calling functions from plugin is handled outside Prisma
+            .filter((attr) => !this.isDefaultWithPluginInvocation(attr))
             .filter(
                 (attr) =>
                     // when building physical schema, exclude `@default` for id fields inherited from delegate base
@@ -290,16 +290,20 @@ export class PrismaSchemaGenerator {
             addToFront
         );
 
-        if (field.attributes.some((attr) => this.isDefaultWithAuth(attr))) {
-            // field has `@default` with `auth()`, turn it into a dummy default value, and the
-            // real default value setting is handled outside Prisma
-            this.setDummyDefault(result, field);
-        }
+        // if (
+        //     field.attributes.some((attr) =>
+        //         this.isDefaultWithPluginInvocation(attr)
+        //     )
+        // ) {
+        //     // field has `@default` from a plugin function call, turn it into a dummy default value, and the
+        //     // real default value setting is handled outside Prisma
+        //     this.setDummyDefault(result, field);
+        // }
 
         return result;
     }
 
-    private isDefaultWithAuth(attr: DataModelFieldAttribute) {
+    private isDefaultWithPluginInvocation(attr: DataModelFieldAttribute) {
         if (attr.decl.ref?.name !== '@default') {
             return false;
         }
@@ -309,8 +313,19 @@ export class PrismaSchemaGenerator {
             return false;
         }
 
-        // find `auth()` in default value expression
-        return AstUtils.streamAst(expr).some(isAuthInvocation);
+        return AstUtils.streamAst(expr).some(
+            (node) =>
+                isInvocationExpr(node) && this.isFromPlugin(node.function.ref)
+        );
+    }
+
+    private isFromPlugin(node: AstNode | undefined) {
+        const model = AstUtils.getContainerOfType(node, isModel);
+        return (
+            !!model &&
+            !!model.$document &&
+            model.$document.uri.path.endsWith('plugin.zmodel')
+        );
     }
 
     private setDummyDefault(result: ModelField, field: DataModelField) {

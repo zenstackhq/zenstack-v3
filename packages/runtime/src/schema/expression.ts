@@ -152,9 +152,6 @@ export const Expression = {
     isCall: (value: unknown): value is CallExpression =>
         Expression.is(value, 'call'),
 
-    isAuthCall: (value: unknown): value is CallExpression =>
-        Expression.isCall(value) && value.function === 'auth',
-
     isNull: (value: unknown): value is NullExpression =>
         Expression.is(value, 'null'),
 

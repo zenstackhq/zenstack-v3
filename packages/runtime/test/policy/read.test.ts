@@ -27,12 +27,14 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
                 },
             });
 
+            // anonymous auth context by default
             const policyPlugin = new PolicyPlugin<typeof schema>();
 
             const anonClient = client.$use(policyPlugin);
             await expect(anonClient.user.findFirst()).toResolveNull();
 
             const authClient = client.$use(
+                // switch auth context
                 policyPlugin.setAuth({
                     id: user.id,
                 })
@@ -40,6 +42,7 @@ describe.each(createClientSpecs(PG_DB_NAME, true))(
             await expect(authClient.user.findFirst()).resolves.toEqual(user);
 
             const authClient1 = client.$use(
+                // set auth context when creating the plugin
                 new PolicyPlugin({ auth: { id: user.id } })
             );
             await expect(authClient1.user.findFirst()).resolves.toEqual(user);

@@ -18,6 +18,20 @@ async function main() {
                     ]),
             },
         },
+    }).$use({
+        id: 'logging',
+        beforeQuery(args) {
+            console.log('Before query:', args.model, args.operation, args.args);
+        },
+        afterQuery(args) {
+            console.log(
+                'After query:',
+                args.model,
+                args.operation,
+                args.result,
+                args.error
+            );
+        },
     });
 
     // clean up existing data

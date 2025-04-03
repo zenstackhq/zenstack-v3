@@ -39,10 +39,23 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { CrudOperation } from '../crud-handler';
 import { getCrudDialect } from '../dialects';
 import type { BaseCrudDialect } from '../dialects/base';
 import { InputValidator } from './validator';
+
+export type CrudOperation =
+    | 'findMany'
+    | 'findUnique'
+    | 'findFirst'
+    | 'create'
+    | 'createMany'
+    | 'update'
+    | 'updateMany'
+    | 'delete'
+    | 'deleteMany'
+    | 'count'
+    | 'aggregate'
+    | 'groupBy';
 
 export type FromRelationContext = {
     model: string;

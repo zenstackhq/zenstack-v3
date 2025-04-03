@@ -9,7 +9,16 @@ import {
 import { match } from 'ts-pattern';
 import { type GetModels, type SchemaDef } from '../schema/schema';
 import type { ModelOperations } from './client-types';
-import { CrudHandler, type CrudOperation } from './crud/crud-handler';
+import { AggregateOperationHandler } from './crud/operations/aggregate';
+import type {
+    BaseOperationHandler,
+    CrudOperation,
+} from './crud/operations/base';
+import { CountOperationHandler } from './crud/operations/count';
+import { CreateOperationHandler } from './crud/operations/create';
+import { DeleteOperationHandler } from './crud/operations/delete';
+import { FindOperationHandler } from './crud/operations/find';
+import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/operations/validator';
 import { NotFoundError } from './errors';
 import { SchemaDbPusher } from './helpers/schema-db-pusher';
@@ -199,7 +208,10 @@ function createClientProxy<Schema extends SchemaDef>(
                     (m) => m.toLowerCase() === prop.toLowerCase()
                 );
                 if (model) {
-                    return createModelProxy(client, model as GetModels<Schema>);
+                    return createModelCrudHandler(
+                        client,
+                        model as GetModels<Schema>
+                    );
                 }
             }
 
@@ -208,7 +220,7 @@ function createClientProxy<Schema extends SchemaDef>(
     }) as ClientImpl<Schema>;
 }
 
-function createModelProxy<
+function createModelCrudHandler<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 >(
@@ -218,102 +230,284 @@ function createModelProxy<
     const inputValidator = new InputValidator(client.$schema);
     const resultProcessor = new ResultProcessor(client.$schema);
 
-    const makeHandler = (operation: CrudOperation, args: unknown) => {
-        return new CrudHandler(client, inputValidator, model, operation, args);
+    async function callBeforeQueryLifecycleHooks(
+        operation: CrudOperation,
+        args: unknown
+    ) {
+        const plugins = client.$options.plugins?.filter(
+            (p) => typeof p.beforeQuery === 'function'
+        );
+        if (plugins && plugins.length > 0) {
+            await Promise.all(
+                plugins.map((plugin) => {
+                    plugin.beforeQuery!({
+                        client,
+                        model,
+                        operation,
+                        args,
+                    });
+                })
+            );
+        }
+    }
+
+    async function callAfterQueryLifecycleHooks(
+        operation: CrudOperation,
+        args: unknown,
+        result: unknown | undefined,
+        error: unknown | undefined
+    ) {
+        const plugins = client.$options.plugins?.filter(
+            (p) => typeof p.afterQuery === 'function'
+        );
+        if (plugins && plugins.length > 0) {
+            await Promise.all(
+                plugins.map((plugin) => {
+                    plugin.afterQuery!({
+                        client,
+                        model,
+                        operation,
+                        args,
+                        result,
+                        error,
+                    });
+                })
+            );
+        }
+    }
+
+    const createPromise = (
+        operation: CrudOperation,
+        args: unknown,
+        handler: BaseOperationHandler<Schema>,
+        postProcess = false,
+        throwIfNotFound = false
+    ) => {
+        return createDeferredPromise(async () => {
+            // call beforeQuery lifecycle hooks
+            await callBeforeQueryLifecycleHooks(operation, args);
+
+            return handler
+                .handle(operation, args)
+                .then((r) => {
+                    if (!r && throwIfNotFound) {
+                        throw new NotFoundError(model);
+                    }
+                    let result: unknown;
+                    if (r && postProcess) {
+                        result = resultProcessor.processResult(r, model);
+                    } else {
+                        result = r ?? null;
+                    }
+
+                    // call afterQuery lifecycle hooks with result
+                    callAfterQueryLifecycleHooks(
+                        operation,
+                        args,
+                        result,
+                        undefined
+                    );
+
+                    return result;
+                })
+                .catch((err) => {
+                    // call afterQuery lifecycle hooks with error
+                    callAfterQueryLifecycleHooks(
+                        operation,
+                        args,
+                        undefined,
+                        err
+                    );
+                    throw err;
+                });
+        });
     };
 
     return {
-        findUnique: (args) =>
-            createDeferredPromise(async () => {
-                const handler = makeHandler('findUnique', args);
-                const r = await handler.findUnique(args);
-                return resultProcessor.processResult(r, model) ?? null;
-            }),
-
-        findUniqueOrThrow: (args) =>
-            createDeferredPromise(async () => {
-                const handler = makeHandler('findUnique', args);
-                const r = await handler.findUnique(args);
-                if (!r) {
-                    throw new NotFoundError(model);
-                } else {
-                    return resultProcessor.processResult(r, model);
-                }
-            }),
-
-        findFirst: (args) =>
-            createDeferredPromise(async () => {
-                const handler = makeHandler('findFirst', args);
-                const r = await handler.findFirst(args);
-                return resultProcessor.processResult(r, model);
-            }),
-
-        findFirstOrThrow: (args) =>
-            createDeferredPromise(async () => {
-                const handler = makeHandler('findFirst', args);
-                const r = await handler.findFirst(args);
-                if (!r) {
-                    throw new NotFoundError(model);
-                } else {
-                    return resultProcessor.processResult(r, model);
-                }
-            }),
-
-        findMany: (args) =>
-            createDeferredPromise(async () => {
-                const handler = makeHandler('findMany', args);
-                const r = await handler.findMany(args);
-                return resultProcessor.processResult(r, model);
-            }),
-
-        create: (args) =>
-            createDeferredPromise(async () => {
-                const handler = makeHandler('create', args);
-                const r = await handler.create(args);
-                return resultProcessor.processResult(r, model);
-            }),
-
-        createMany: (args) => {
-            const handler = makeHandler('createMany', args);
-            return createDeferredPromise(() => handler.createMany(args));
-        },
-
-        update: (args) =>
-            createDeferredPromise(async () => {
-                const handler = makeHandler('update', args);
-                const r = await handler.update(args);
-                return resultProcessor.processResult(r, model);
-            }),
-
-        updateMany: (args) => {
-            const handler = makeHandler('updateMany', args);
-            return createDeferredPromise(() => handler.updateMany(args));
-        },
-
-        delete: (args) =>
-            createDeferredPromise(async () => {
-                const handler = makeHandler('delete', args);
-                const r = await handler.delete(args);
-                return resultProcessor.processResult(r, model);
-            }),
-
-        deleteMany: (args) => {
-            const handler = makeHandler('deleteMany', args);
-            return createDeferredPromise(() => handler.deleteMany(args));
-        },
-
-        count: (args) => {
-            const handler = makeHandler('count', args);
-            return createDeferredPromise(() => handler.count(args) as any);
-        },
-
-        aggregate: (args) => {
-            const handler = makeHandler('aggregate', args);
-            return createDeferredPromise(
-                async () => handler.aggregate(args) as any
+        findUnique: (args: unknown) => {
+            return createPromise(
+                'findUnique',
+                args,
+                new FindOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'findUnique',
+                    args,
+                }),
+                true
             );
         },
-    };
+
+        findUniqueOrThrow: (args: unknown) => {
+            return createPromise(
+                'findUnique',
+                args,
+                new FindOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'findUnique',
+                    args,
+                }),
+                true,
+                true
+            );
+        },
+
+        findFirst: (args: unknown) => {
+            return createPromise(
+                'findFirst',
+                args,
+                new FindOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'findFirst',
+                    args,
+                }),
+                true
+            );
+        },
+
+        findFirstOrThrow: (args: unknown) => {
+            return createPromise(
+                'findFirst',
+                args,
+                new FindOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'findFirst',
+                    args,
+                }),
+                true,
+                true
+            );
+        },
+
+        findMany: (args: unknown) => {
+            return createPromise(
+                'findMany',
+                args,
+                new FindOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'findMany',
+                    args,
+                }),
+                true
+            );
+        },
+
+        create: (args: unknown) => {
+            return createPromise(
+                'create',
+                args,
+                new CreateOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'create',
+                    args,
+                }),
+                true
+            );
+        },
+
+        createMany: (args: unknown) => {
+            return createPromise(
+                'createMany',
+                args,
+                new CreateOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'createMany',
+                    args,
+                }),
+                false
+            );
+        },
+
+        update: (args: unknown) => {
+            return createPromise(
+                'update',
+                args,
+                new UpdateOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'update',
+                    args,
+                }),
+                true
+            );
+        },
+
+        updateMany: (args: unknown) => {
+            return createPromise(
+                'updateMany',
+                args,
+                new UpdateOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'updateMany',
+                    args,
+                }),
+                false
+            );
+        },
+
+        delete: (args: unknown) => {
+            return createPromise(
+                'delete',
+                args,
+                new DeleteOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'delete',
+                    args,
+                }),
+                true
+            );
+        },
+
+        deleteMany: (args: unknown) => {
+            return createPromise(
+                'deleteMany',
+                args,
+                new DeleteOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'deleteMany',
+                    args,
+                }),
+                false
+            );
+        },
+
+        count: (args: unknown) => {
+            return createPromise(
+                'count',
+                args,
+                new CountOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'count',
+                    args,
+                }),
+                false
+            );
+        },
+
+        aggregate: (args: unknown) => {
+            return createPromise(
+                'aggregate',
+                args,
+                new AggregateOperationHandler(client, model, inputValidator, {
+                    client,
+                    model,
+                    operation: 'aggregate',
+                    args,
+                }),
+                false
+            );
+        },
+    } as ModelOperations<Schema, Model>;
 }
 
 export type * from './client-types';

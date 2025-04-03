@@ -6,7 +6,7 @@ import { PolicyPlugin } from '../../src/plugins/policy/plugin';
 
 const PG_DB_NAME = 'policy-read-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME, true))(
+describe.each(createClientSpecs(PG_DB_NAME))(
     'Read policy tests',
     ({ createClient }) => {
         let client: ClientContract<typeof schema>;

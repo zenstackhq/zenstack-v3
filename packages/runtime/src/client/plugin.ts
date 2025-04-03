@@ -79,12 +79,12 @@ export interface PluginInfo {
     /**
      * Plugin name.
      */
-    name: string;
+    name?: string;
 
     /**
      * Plugin description.
      */
-    description: string;
+    description?: string;
 }
 
 /**
@@ -116,7 +116,10 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef>
      * Called after an ORM is executed.
      */
     afterQuery?: (
-        args: { result: unknown } & PluginContext<Schema>
+        args: {
+            result: unknown | undefined;
+            error: unknown | undefined;
+        } & PluginContext<Schema>
     ) => MaybePromise<void>;
 
     /**
@@ -157,3 +160,5 @@ export type CliGeneratorContext = {
 
 // TODO: move to SDK
 export type CliGenerator = (context: CliGeneratorContext) => MaybePromise<void>;
+
+export { type CrudOperation } from './crud/operations/base';

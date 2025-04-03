@@ -7,7 +7,7 @@ import type {
 } from 'kysely';
 import type { ClientContract } from '.';
 import type { GetModels, SchemaDef } from '../schema';
-import type { CrudOperation } from './crud/crud-handler';
+import type { CrudOperation } from './crud/operations/base';
 import { InternalError } from './errors';
 
 export type QueryContext<Schema extends SchemaDef> = {
@@ -33,37 +33,6 @@ export class QueryExecutor<Schema extends SchemaDef> {
     constructor(protected readonly queryContext: QueryContext<Schema>) {}
 
     async execute(kysely: Kysely<any>, query: ExecutableQueries) {
-        // if (this.queryContext.client.$options.plugins) {
-        //     for (const plugin of this.queryContext.client.$options.plugins) {
-        //         if (
-        //             plugin.transformKyselyQuery ||
-        //             plugin.transformKyselyResult
-        //         ) {
-        //             const context = this.queryContext;
-        //             const kyselyPlugin: KyselyPlugin = {
-        //                 transformQuery(args) {
-        //                     return plugin.transformKyselyQuery
-        //                         ? plugin.transformKyselyQuery({
-        //                               node: args.node,
-        //                               ...context,
-        //                           })
-        //                         : args.node;
-        //                 },
-        //                 transformResult(args) {
-        //                     return plugin.transformKyselyResult
-        //                         ? plugin.transformKyselyResult({
-        //                               ...args,
-        //                               ...context,
-        //                           })
-        //                         : Promise.resolve(args.result);
-        //                 },
-        //             };
-        //             kysely = kysely.withPlugin(kyselyPlugin);
-        //             query = query.withPlugin(kyselyPlugin);
-        //         }
-        //     }
-        // }
-
         return kysely.executeQuery(query.compile());
     }
 

@@ -1,10 +1,14 @@
+import Sqlite from 'better-sqlite3';
 import { Expression } from '../src/schema/expression';
 import type { DataSourceProviderType, SchemaDef } from '../src/schema/schema';
 
 export const schema = {
     provider: {
         type: 'sqlite',
-        dialectConfigProvider: () => ({}),
+        dialectConfigProvider: () =>
+            ({
+                database: new Sqlite(':memory:'),
+            } as object),
     },
     models: {
         User: {

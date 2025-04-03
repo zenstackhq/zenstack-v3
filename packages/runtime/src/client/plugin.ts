@@ -35,7 +35,7 @@ export type MutationInterceptionFilterResult = {
     loadAfterMutationEntity?: boolean;
 };
 
-type MutationLifecycleEventArgs = {
+type MutationLifecycleEventArgs<Schema extends SchemaDef> = {
     /**
      * The mutation action that is being performed.
      */
@@ -45,7 +45,7 @@ type MutationLifecycleEventArgs = {
      * The mutation data. Only available for create and update actions.
      */
     data: unknown | undefined;
-};
+} & PluginContext<Schema>;
 
 export type PluginContext<Schema extends SchemaDef> = QueryContext<Schema>;
 
@@ -58,6 +58,17 @@ export type PluginTransformKyselyResultArgs<Schema extends SchemaDef> = {
     client: ClientContract<Schema>;
     result: QueryResult<UnknownRow>;
 };
+
+export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> =
+    MutationLifecycleEventArgs<Schema> & {
+        entity: unknown | undefined;
+    };
+
+export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> =
+    MutationLifecycleEventArgs<Schema> & {
+        beforeMutationEntity: unknown | undefined;
+        afterMutationEntity: unknown | undefined;
+    };
 
 export interface PluginInfo {
     /**
@@ -99,13 +110,13 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef>
     /**
      * Called before an ORM query is executed.
      */
-    beforeQuery?: (_args: PluginContext<Schema>) => MaybePromise<void>;
+    beforeQuery?: (args: PluginContext<Schema>) => MaybePromise<void>;
 
     /**
      * Called after an ORM is executed.
      */
     afterQuery?: (
-        _args: { result: unknown } & PluginContext<Schema>
+        args: { result: unknown } & PluginContext<Schema>
     ) => MaybePromise<void>;
 
     /**
@@ -113,7 +124,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef>
      * what data should be loaded before and after the mutation.
      */
     mutationInterceptionFilter?: (
-        _args: MutationLifecycleEventArgs & PluginContext<Schema>
+        args: MutationLifecycleEventArgs<Schema>
     ) => MaybePromise<MutationInterceptionFilterResult>;
 
     /**
@@ -122,9 +133,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef>
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
     beforeEntityMutation?: (
-        _args: MutationLifecycleEventArgs & {
-            entity: unknown | undefined;
-        } & PluginContext<Schema>
+        args: PluginBeforeEntityMutationArgs<Schema>
     ) => MaybePromise<void>;
 
     /**
@@ -135,10 +144,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef>
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
     afterEntityMutation?: (
-        _args: MutationLifecycleEventArgs & {
-            beforeMutationEntity: unknown | undefined;
-            afterMutationEntity: unknown | undefined;
-        } & PluginContext<Schema>
+        args: PluginAfterEntityMutationArgs<Schema>
     ) => MaybePromise<void>;
 }
 

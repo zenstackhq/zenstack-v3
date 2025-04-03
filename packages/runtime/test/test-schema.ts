@@ -1,4 +1,3 @@
-import type { OperandExpression, SqlBool } from 'kysely';
 import { Expression } from '../src/schema/expression';
 import type { DataSourceProviderType, SchemaDef } from '../src/schema/schema';
 

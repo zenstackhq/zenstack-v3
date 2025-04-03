@@ -1,8 +1,8 @@
-import { createClient } from '@zenstackhq/runtime';
+import { ZenStackClient } from '@zenstackhq/runtime/client';
 import { schema } from './zenstack/schema';
 
 async function main() {
-    const db = createClient(schema, {
+    const db = new ZenStackClient(schema, {
         computedFields: {
             User: {
                 // provide implementation of the "User.emailDomain" computed field

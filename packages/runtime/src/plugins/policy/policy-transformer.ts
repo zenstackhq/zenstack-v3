@@ -10,7 +10,7 @@ import {
     WhereNode,
     type OperationNode,
 } from 'kysely';
-import type { Client } from '../../client';
+import type { ClientContract } from '../../client';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base';
 import { requireModel } from '../../client/query-utils';
@@ -25,7 +25,7 @@ export class PolicyTransformer<
     private readonly dialect: BaseCrudDialect<Schema>;
 
     constructor(
-        private readonly client: Client<Schema>,
+        private readonly client: ClientContract<Schema>,
         private readonly options: PolicyOptions<Schema>
     ) {
         super();

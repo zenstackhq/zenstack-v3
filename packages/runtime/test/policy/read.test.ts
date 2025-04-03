@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Client } from '../../src/client';
+import { type ClientContract } from '../../src/client';
 import { createClientSpecs } from '../client-api/client-specs';
 import { schema } from '../test-schema';
 import { PolicyPlugin } from '../../src/plugins/policy/plugin';
@@ -9,7 +9,7 @@ const PG_DB_NAME = 'policy-read-tests';
 describe.each(createClientSpecs(PG_DB_NAME, true))(
     'Read policy tests',
     ({ createClient }) => {
-        let client: Client<typeof schema>;
+        let client: ClientContract<typeof schema>;
 
         beforeEach(async () => {
             client = await createClient();

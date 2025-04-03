@@ -3,7 +3,7 @@ import SQLite from 'better-sqlite3';
 import { isValid as isValidUlid } from 'ulid';
 import { validate as isValidUuid } from 'uuid';
 import { describe, expect, it } from 'vitest';
-import { createClient } from '../../src/client';
+import { ZenStackClient } from '../../src';
 import type { SchemaDef } from '../../src/schema';
 
 const schema = {
@@ -61,7 +61,7 @@ const schema = {
 
 describe('Default Value Providers', () => {
     it('supports generators', async () => {
-        const client = createClient(schema);
+        const client = new ZenStackClient(schema);
         await client.$pushSchema();
 
         const entity = await client.model.create({ data: {} });

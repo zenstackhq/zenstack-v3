@@ -12,7 +12,7 @@ import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
-import type { Client } from '../..';
+import type { ClientContract } from '../..';
 import type { GetModels, ModelDef, SchemaDef } from '../../../schema';
 import type {
     BuiltinType,
@@ -55,7 +55,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected readonly queryExecutor: QueryExecutor<Schema>;
 
     constructor(
-        protected readonly client: Client<Schema>,
+        protected readonly client: ClientContract<Schema>,
         protected readonly model: GetModels<Schema>,
         protected readonly inputValidator: InputValidator<Schema>,
         protected readonly queryContext: QueryContext<Schema>

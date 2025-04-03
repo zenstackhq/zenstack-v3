@@ -1,4 +1,4 @@
-import type { Client } from '..';
+import type { ClientContract } from '..';
 import type { GetModels, SchemaDef } from '../../schema';
 import type { BatchResult } from '../client-types';
 import type { QueryContext } from '../query-executor';
@@ -29,7 +29,7 @@ export class CrudHandler<Schema extends SchemaDef> {
     protected readonly queryContext: QueryContext<Schema>;
 
     constructor(
-        protected readonly client: Client<Schema>,
+        protected readonly client: ClientContract<Schema>,
         protected readonly inputValidator: InputValidator<Schema>,
         protected readonly model: GetModels<Schema>,
         operation: CrudOperation,

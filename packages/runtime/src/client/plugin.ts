@@ -5,7 +5,7 @@ import type {
     RootOperationNode,
     UnknownRow,
 } from 'kysely';
-import type { Client } from '.';
+import type { ClientContract } from '.';
 import type { SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
 import type { QueryContext } from './query-executor';
@@ -50,18 +50,14 @@ type MutationLifecycleEventArgs = {
 export type PluginContext<Schema extends SchemaDef> = QueryContext<Schema>;
 
 export type PluginTransformKyselyQueryArgs<Schema extends SchemaDef> = {
-    client: Client<Schema>;
+    client: ClientContract<Schema>;
     node: RootOperationNode;
 };
 
 export type PluginTransformKyselyResultArgs<Schema extends SchemaDef> = {
-    client: Client<Schema>;
+    client: ClientContract<Schema>;
     result: QueryResult<UnknownRow>;
 };
-
-export type PluginTransformResultArgs<Schema extends SchemaDef> = {
-    result: QueryResult<UnknownRow>;
-} & PluginContext<Schema>;
 
 export interface PluginInfo {
     /**
@@ -99,14 +95,6 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef>
     transformKyselyResult?: (
         args: PluginTransformKyselyResultArgs<Schema>
     ) => Promise<QueryResult<UnknownRow>>;
-
-    /**
-     * Query result transformation. As opposed to Kysely plugin callbacks like {@link RuntimePlugin.transformResult},
-     * this method is called with ORM operations (e.g., `findUnique`, `updateMany`, etc.), args, and results.
-     */
-    transformResult?: (
-        args: PluginTransformResultArgs<Schema>
-    ) => MaybePromise<unknown>;
 
     /**
      * Called before an ORM query is executed.
@@ -154,10 +142,12 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef>
     ) => MaybePromise<void>;
 }
 
+// TODO: move to SDK
 export type CliGeneratorContext = {
     model: Model;
     outputPath: string;
     tsSchemaFile: string;
 };
 
+// TODO: move to SDK
 export type CliGenerator = (context: CliGeneratorContext) => MaybePromise<void>;

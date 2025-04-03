@@ -19,7 +19,10 @@ import { createDeferredPromise } from './promise';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
 
-export type Client<Schema extends SchemaDef> = {
+/**
+ * ZenStack client interface.
+ */
+export type ClientContract<Schema extends SchemaDef> = {
     readonly $schema: Schema;
 
     /**
@@ -35,7 +38,7 @@ export type Client<Schema extends SchemaDef> = {
     /**
      * Returns a new client with the specified plugin installed.
      */
-    $use(plugin: RuntimePlugin<Schema>): Client<Schema>;
+    $use(plugin: RuntimePlugin<Schema>): ClientContract<Schema>;
 
     /**
      * Disconnects the underlying Kysely instance from the database.
@@ -52,19 +55,29 @@ export type Client<Schema extends SchemaDef> = {
         : never]: ModelOperations<Schema, Key>;
 };
 
-export function createClient<Schema extends SchemaDef>(
-    schema: HasComputedFields<Schema> extends false ? Schema : never
-): Client<Schema>;
-export function createClient<Schema extends SchemaDef>(
-    schema: Schema,
-    options: ClientOptions<Schema>
-): Client<Schema>;
-export function createClient<Schema extends SchemaDef>(
+/**
+ * Creates a new ZenStack client instance.
+ */
+export interface ClientConstructor {
+    new <Schema extends SchemaDef>(
+        schema: HasComputedFields<Schema> extends false ? Schema : never
+    ): ClientContract<Schema>;
+    new <Schema extends SchemaDef>(
+        schema: Schema,
+        options: ClientOptions<Schema>
+    ): ClientContract<Schema>;
+}
+
+/**
+ * Creates a new ZenStack client instance.
+ */
+export const ZenStackClient = function <Schema extends SchemaDef>(
+    this: any,
     schema: any,
     options?: ClientOptions<Schema>
 ) {
-    return new ClientImpl<Schema>(schema, options) as unknown as Client<Schema>;
-}
+    return new ClientImpl<Schema>(schema, options);
+} as unknown as ClientConstructor;
 
 class ClientImpl<Schema extends SchemaDef> {
     private kysely: ToKysely<Schema>;
@@ -87,7 +100,7 @@ class ClientImpl<Schema extends SchemaDef> {
                 plugins,
             });
 
-        return createClientProxy(this as Client<Schema>);
+        return createClientProxy(this as ClientContract<Schema>);
     }
 
     public get $qb() {
@@ -136,7 +149,7 @@ class ClientImpl<Schema extends SchemaDef> {
         newClient.kysely = this.installKyselyPlugin(
             this.kysely,
             plugin,
-            newClient as Client<Schema>
+            newClient as ClientContract<Schema>
         );
         return newClient;
     }
@@ -144,7 +157,7 @@ class ClientImpl<Schema extends SchemaDef> {
     private installKyselyPlugin(
         kysely: ToKysely<Schema>,
         plugin: RuntimePlugin<Schema>,
-        client: Client<Schema>
+        client: ClientContract<Schema>
     ) {
         if (plugin.transformKyselyQuery || plugin.transformKyselyResult) {
             const kyselyPlugin: KyselyPlugin = {
@@ -173,7 +186,7 @@ class ClientImpl<Schema extends SchemaDef> {
 }
 
 function createClientProxy<Schema extends SchemaDef>(
-    client: Client<Schema>
+    client: ClientContract<Schema>
 ): ClientImpl<Schema> {
     return new Proxy(client, {
         get: (target, prop, receiver) => {
@@ -198,7 +211,10 @@ function createClientProxy<Schema extends SchemaDef>(
 function createModelProxy<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
->(client: Client<Schema>, model: Model): ModelOperations<Schema, Model> {
+>(
+    client: ClientContract<Schema>,
+    model: Model
+): ModelOperations<Schema, Model> {
     const inputValidator = new InputValidator(client.$schema);
     const resultProcessor = new ResultProcessor(client.$schema);
 
@@ -301,5 +317,5 @@ function createModelProxy<
 }
 
 export type * from './client-types';
-export type { ClientOptions, ToKysely };
 export type { CliGenerator } from './plugin';
+export type { ClientOptions, ToKysely };

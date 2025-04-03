@@ -1,1 +1,1 @@
-export { createClient } from './client';
+export { ZenStackClient, type ClientContract } from './client';

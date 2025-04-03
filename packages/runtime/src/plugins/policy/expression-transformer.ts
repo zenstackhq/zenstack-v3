@@ -10,7 +10,7 @@ import {
 } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
-import type { Client } from '../../client';
+import type { ClientContract } from '../../client';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base';
 import { QueryError } from '../../client/errors';
@@ -59,7 +59,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     private readonly schemaPolicy: SchemaPolicy;
 
     constructor(
-        private readonly client: Client<Schema>,
+        private readonly client: ClientContract<Schema>,
         options: PolicyOptions<Schema>
     ) {
         // if (!options.features?.policy) {

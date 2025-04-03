@@ -1,14 +1,14 @@
 import { createId } from '@paralleldrive/cuid2';
 import SQLite from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { createClient } from '../../src';
+import { ZenStackClient } from '../../src';
 import { getSchema } from '../test-schema';
 
 describe('Client API tests', () => {
     const schema = getSchema('sqlite');
 
     it('works with queries', async () => {
-        const client = createClient(schema, {
+        const client = new ZenStackClient(schema, {
             dialectConfig: {
                 database: new SQLite(':memory:'),
             },

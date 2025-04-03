@@ -1,7 +1,7 @@
-import type { Client } from '../../src/client';
+import type { ClientContract } from '../../src/client';
 import type { schema } from '../test-schema';
 
-type ClientType = Client<typeof schema>;
+type ClientType = ClientContract<typeof schema>;
 
 export async function createUser(
     client: ClientType,

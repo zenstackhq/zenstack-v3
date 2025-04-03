@@ -5,7 +5,7 @@ import type {
     SelectQueryBuilder,
     UpdateQueryBuilder,
 } from 'kysely';
-import type { Client } from '.';
+import type { ClientContract } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { CrudOperation } from './crud/crud-handler';
 import { InternalError } from './errors';
@@ -14,7 +14,7 @@ export type QueryContext<Schema extends SchemaDef> = {
     /**
      * The ZenStack client that's invoking the plugin.
      */
-    client: Client<Schema>;
+    client: ClientContract<Schema>;
 
     model: GetModels<Schema>;
 

@@ -100,14 +100,10 @@ class ClientImpl<Schema extends SchemaDef> {
         this.$schema = schema;
         this.$options = options ?? ({} as ClientOptions<Schema>);
 
-        const plugins = [...(this.options?.kyselyPlugins ?? [])];
-        this.kysely =
-            options?.kysely ??
-            new Kysely({
-                dialect: this.getKyselyDialect(),
-                log: options?.log,
-                plugins,
-            });
+        this.kysely = new Kysely({
+            dialect: this.getKyselyDialect(),
+            log: options?.log,
+        });
 
         return createClientProxy(this as ClientContract<Schema>);
     }

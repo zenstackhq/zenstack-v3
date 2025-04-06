@@ -1,12 +1,13 @@
 import type { Model } from '@zenstackhq/language/ast';
 import type {
     KyselyPlugin,
+    OperationNode,
     QueryResult,
     RootOperationNode,
     UnknownRow,
 } from 'kysely';
 import type { ClientContract } from '.';
-import type { SchemaDef } from '../schema';
+import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
 import type { QueryContext } from './query-executor';
 
@@ -37,6 +38,11 @@ export type MutationInterceptionFilterResult = {
 
 type MutationLifecycleEventArgs<Schema extends SchemaDef> = {
     /**
+     * The model that is being mutated.
+     */
+    model: GetModels<Schema>;
+
+    /**
      * The mutation action that is being performed.
      */
     action: 'create' | 'update' | 'delete';
@@ -44,8 +50,13 @@ type MutationLifecycleEventArgs<Schema extends SchemaDef> = {
     /**
      * The mutation data. Only available for create and update actions.
      */
-    data: unknown | undefined;
-} & PluginContext<Schema>;
+    queryNode: OperationNode;
+
+    /**
+     * The top-level query context.
+     */
+    context: PluginContext<Schema>;
+};
 
 export type PluginContext<Schema extends SchemaDef> = QueryContext<Schema>;
 
@@ -61,23 +72,26 @@ export type PluginTransformKyselyResultArgs<Schema extends SchemaDef> = {
 
 export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> =
     MutationLifecycleEventArgs<Schema> & {
-        entity: unknown | undefined;
+        entities?: Record<string, unknown>[];
     };
 
 export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> =
     MutationLifecycleEventArgs<Schema> & {
-        beforeMutationEntity: unknown | undefined;
-        afterMutationEntity: unknown | undefined;
+        beforeMutationEntities?: Record<string, unknown>[];
+        afterMutationEntities?: Record<string, unknown>[];
     };
 
-export interface PluginInfo {
+/**
+ * ZenStack runtime plugin.
+ */
+export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     /**
      * Plugin ID.
      */
     id: string;
 
     /**
-     * Plugin name.
+     * Plugin display name.
      */
     name?: string;
 
@@ -85,14 +99,7 @@ export interface PluginInfo {
      * Plugin description.
      */
     description?: string;
-}
 
-/**
- * ZenStack runtime plugin. This base class inherits from {@link KyselyPlugin} to support low-level
- * query and result transformation.
- */
-export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef>
-    extends PluginInfo {
     /**
      * Kysely query transformation. See {@link KyselyPlugin.transformQuery}.
      */
@@ -113,7 +120,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef>
     beforeQuery?: (args: PluginContext<Schema>) => MaybePromise<void>;
 
     /**
-     * Called after an ORM is executed.
+     * Called after an ORM query is executed.
      */
     afterQuery?: (
         args: {

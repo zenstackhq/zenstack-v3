@@ -12,8 +12,8 @@ import type {
     SchemaDef,
 } from '../schema/schema';
 import type { MergeIf, PrependParameter } from '../utils/type-utils';
-import type { ToKysely, ToKyselySchema } from './query-builder';
 import type { RuntimePlugin } from './plugin';
+import type { ToKyselySchema } from './query-builder';
 
 type DialectConfig<Provider extends DataSourceProvider> =
     Provider['type'] extends 'sqlite'
@@ -30,16 +30,6 @@ export type ClientOptions<Schema extends SchemaDef> = MergeIf<
         dialectConfig?: DialectConfig<Schema['provider']>;
 
         plugins?: RuntimePlugin<Schema>[];
-
-        /**
-         * Alternative way of constructing with a pre-configured Kysely instance.
-         */
-        kysely?: ToKysely<Schema>;
-
-        /**
-         * Kysely plugins.
-         */
-        kyselyPlugins?: KyselyConfig['plugins'];
 
         /**
          * Logging configuration.

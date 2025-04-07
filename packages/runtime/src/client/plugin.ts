@@ -12,7 +12,7 @@ import type { MaybePromise } from '../utils/type-utils';
 import type { QueryContext } from './query-executor';
 
 /**
- * The result of the lifecycle interception filter.
+ * The result of the hooks interception filter.
  */
 export type MutationInterceptionFilterResult = {
     /**
@@ -36,7 +36,7 @@ export type MutationInterceptionFilterResult = {
     loadAfterMutationEntity?: boolean;
 };
 
-type MutationLifecycleEventArgs<Schema extends SchemaDef> = {
+type MutationHooksArgs<Schema extends SchemaDef> = {
     /**
      * The model that is being mutated.
      */
@@ -71,12 +71,12 @@ export type PluginTransformKyselyResultArgs<Schema extends SchemaDef> = {
 };
 
 export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> =
-    MutationLifecycleEventArgs<Schema> & {
+    MutationHooksArgs<Schema> & {
         entities?: Record<string, unknown>[];
     };
 
 export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> =
-    MutationLifecycleEventArgs<Schema> & {
+    MutationHooksArgs<Schema> & {
         beforeMutationEntities?: Record<string, unknown>[];
         afterMutationEntities?: Record<string, unknown>[];
     };
@@ -101,20 +101,6 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     description?: string;
 
     /**
-     * Kysely query transformation. See {@link KyselyPlugin.transformQuery}.
-     */
-    transformKyselyQuery?: (
-        args: PluginTransformKyselyQueryArgs<Schema>
-    ) => RootOperationNode;
-
-    /**
-     * Kysely query result transformation. See {@link KyselyPlugin.transformResult}.
-     */
-    transformKyselyResult?: (
-        args: PluginTransformKyselyResultArgs<Schema>
-    ) => Promise<QueryResult<UnknownRow>>;
-
-    /**
      * Called before an ORM query is executed.
      */
     beforeQuery?: (args: PluginContext<Schema>) => MaybePromise<void>;
@@ -130,11 +116,25 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     ) => MaybePromise<void>;
 
     /**
+     * Kysely query transformation. See {@link KyselyPlugin.transformQuery}.
+     */
+    transformKyselyQuery?: (
+        args: PluginTransformKyselyQueryArgs<Schema>
+    ) => RootOperationNode;
+
+    /**
+     * Kysely query result transformation. See {@link KyselyPlugin.transformResult}.
+     */
+    transformKyselyResult?: (
+        args: PluginTransformKyselyResultArgs<Schema>
+    ) => Promise<QueryResult<UnknownRow>>;
+
+    /**
      * This callback determines whether a mutation should be intercepted, and if so,
      * what data should be loaded before and after the mutation.
      */
     mutationInterceptionFilter?: (
-        args: MutationLifecycleEventArgs<Schema>
+        args: MutationHooksArgs<Schema>
     ) => MaybePromise<MutationInterceptionFilterResult>;
 
     /**

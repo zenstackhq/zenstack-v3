@@ -45,6 +45,13 @@ export type ClientContract<Schema extends SchemaDef> = {
     readonly $qb: ToKysely<Schema>;
 
     /**
+     * Starts a transaction.
+     */
+    $transaction<T>(
+        callback: (tx: ClientContract<Schema>) => Promise<T>
+    ): Promise<T>;
+
+    /**
      * Returns a new client with the specified plugin installed.
      */
     $use(plugin: RuntimePlugin<Schema>): ClientContract<Schema>;
@@ -137,6 +144,16 @@ class ClientImpl<Schema extends SchemaDef> {
         return new SqliteDialect(mergedConfig);
     }
 
+    async $transaction<T>(
+        callback: (tx: ClientContract<Schema>) => Promise<T>
+    ): Promise<T> {
+        return this.kysely.transaction().execute((tx) => {
+            const txClient = new ClientImpl<Schema>(this.schema, this.$options);
+            txClient.kysely = tx;
+            return callback(txClient as ClientContract<Schema>);
+        });
+    }
+
     async $disconnect() {
         await this.kysely.destroy();
     }
@@ -226,52 +243,6 @@ function createModelCrudHandler<
     const inputValidator = new InputValidator(client.$schema);
     const resultProcessor = new ResultProcessor(client.$schema);
 
-    async function callBeforeQueryLifecycleHooks(
-        operation: CrudOperation,
-        args: unknown
-    ) {
-        const plugins = client.$options.plugins?.filter(
-            (p) => typeof p.beforeQuery === 'function'
-        );
-        if (plugins && plugins.length > 0) {
-            await Promise.all(
-                plugins.map((plugin) => {
-                    plugin.beforeQuery!({
-                        client,
-                        model,
-                        operation,
-                        args,
-                    });
-                })
-            );
-        }
-    }
-
-    async function callAfterQueryLifecycleHooks(
-        operation: CrudOperation,
-        args: unknown,
-        result: unknown | undefined,
-        error: unknown | undefined
-    ) {
-        const plugins = client.$options.plugins?.filter(
-            (p) => typeof p.afterQuery === 'function'
-        );
-        if (plugins && plugins.length > 0) {
-            await Promise.all(
-                plugins.map((plugin) => {
-                    plugin.afterQuery!({
-                        client,
-                        model,
-                        operation,
-                        args,
-                        result,
-                        error,
-                    });
-                })
-            );
-        }
-    }
-
     const createPromise = (
         operation: CrudOperation,
         args: unknown,
@@ -280,42 +251,40 @@ function createModelCrudHandler<
         throwIfNotFound = false
     ) => {
         return createDeferredPromise(async () => {
-            // call beforeQuery lifecycle hooks
-            await callBeforeQueryLifecycleHooks(operation, args);
+            let proceed = async (
+                args: unknown,
+                tx?: ClientContract<Schema>
+            ) => {
+                const _handler = tx ? handler.withClient(tx) : handler;
+                const r = await _handler.handle(operation, args);
+                if (!r && throwIfNotFound) {
+                    throw new NotFoundError(model);
+                }
+                let result: unknown;
+                if (r && postProcess) {
+                    result = resultProcessor.processResult(r, model);
+                } else {
+                    result = r ?? null;
+                }
+                return result;
+            };
 
-            return handler
-                .handle(operation, args)
-                .then((r) => {
-                    if (!r && throwIfNotFound) {
-                        throw new NotFoundError(model);
-                    }
-                    let result: unknown;
-                    if (r && postProcess) {
-                        result = resultProcessor.processResult(r, model);
-                    } else {
-                        result = r ?? null;
-                    }
+            const context = {
+                client,
+                model,
+                operation,
+                queryArgs: args,
+            };
 
-                    // call afterQuery lifecycle hooks with result
-                    callAfterQueryLifecycleHooks(
-                        operation,
-                        args,
-                        result,
-                        undefined
-                    );
+            const plugins = [...(client.$options.plugins ?? [])];
+            for (const plugin of plugins) {
+                if (plugin.onQuery) {
+                    const _proceed = proceed;
+                    proceed = () => plugin.onQuery!(context, _proceed);
+                }
+            }
 
-                    return result;
-                })
-                .catch((err) => {
-                    // call afterQuery lifecycle hooks with error
-                    callAfterQueryLifecycleHooks(
-                        operation,
-                        args,
-                        undefined,
-                        err
-                    );
-                    throw err;
-                });
+            return proceed(args);
         });
     };
 
@@ -328,7 +297,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'findUnique',
-                    args,
+                    queryArgs: args,
                 }),
                 true
             );
@@ -342,7 +311,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'findUnique',
-                    args,
+                    queryArgs: args,
                 }),
                 true,
                 true
@@ -357,7 +326,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'findFirst',
-                    args,
+                    queryArgs: args,
                 }),
                 true
             );
@@ -371,7 +340,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'findFirst',
-                    args,
+                    queryArgs: args,
                 }),
                 true,
                 true
@@ -386,7 +355,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'findMany',
-                    args,
+                    queryArgs: args,
                 }),
                 true
             );
@@ -400,7 +369,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'create',
-                    args,
+                    queryArgs: args,
                 }),
                 true
             );
@@ -414,7 +383,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'createMany',
-                    args,
+                    queryArgs: args,
                 }),
                 false
             );
@@ -428,7 +397,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'update',
-                    args,
+                    queryArgs: args,
                 }),
                 true
             );
@@ -442,7 +411,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'updateMany',
-                    args,
+                    queryArgs: args,
                 }),
                 false
             );
@@ -456,7 +425,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'delete',
-                    args,
+                    queryArgs: args,
                 }),
                 true
             );
@@ -470,7 +439,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'deleteMany',
-                    args,
+                    queryArgs: args,
                 }),
                 false
             );
@@ -484,7 +453,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'count',
-                    args,
+                    queryArgs: args,
                 }),
                 false
             );
@@ -498,7 +467,7 @@ function createModelCrudHandler<
                     client,
                     model,
                     operation: 'aggregate',
-                    args,
+                    queryArgs: args,
                 }),
                 false
             );

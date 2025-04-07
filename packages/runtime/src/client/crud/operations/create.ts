@@ -39,13 +39,13 @@ export class CreateOperationHandler<
                 result = await this.kysely
                     .transaction()
                     .setIsolationLevel('repeatable read')
-                    .execute(async (trx) => {
+                    .execute(async (tx) => {
                         const createResult = await this.create(
-                            trx,
+                            tx,
                             this.model,
                             args.data
                         );
-                        return this.readUnique(trx, this.model, {
+                        return this.readUnique(tx, this.model, {
                             select: args.select,
                             include: args.include,
                             where: getIdValues(

@@ -81,6 +81,11 @@ export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> =
         afterMutationEntities?: Record<string, unknown>[];
     };
 
+export type ProceedQueryFunction<Schema extends SchemaDef> = (
+    queryArgs: unknown,
+    tx?: ClientContract<Schema>
+) => Promise<unknown>;
+
 /**
  * ZenStack runtime plugin.
  */
@@ -101,19 +106,12 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     description?: string;
 
     /**
-     * Called before an ORM query is executed.
+     * Intercepts an ORM query.
      */
-    beforeQuery?: (args: PluginContext<Schema>) => MaybePromise<void>;
-
-    /**
-     * Called after an ORM query is executed.
-     */
-    afterQuery?: (
-        args: {
-            result: unknown | undefined;
-            error: unknown | undefined;
-        } & PluginContext<Schema>
-    ) => MaybePromise<void>;
+    onQuery?: (
+        args: PluginContext<Schema>,
+        proceed: ProceedQueryFunction<Schema>
+    ) => Promise<unknown>;
 
     /**
      * Kysely query transformation. See {@link KyselyPlugin.transformQuery}.

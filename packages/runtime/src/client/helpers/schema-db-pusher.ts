@@ -18,7 +18,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
     ) {}
 
     async push() {
-        await this.kysely.transaction().execute(async (trx) => {
+        await this.kysely.transaction().execute(async (tx) => {
             if (
                 this.schema.enums &&
                 this.schema.provider.type === 'postgresql'
@@ -26,7 +26,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 for (const [name, enumDef] of Object.entries(
                     this.schema.enums
                 )) {
-                    const createEnum = trx.schema
+                    const createEnum = tx.schema
                         .createType(name)
                         .asEnum(Object.values(enumDef));
                     // console.log('Creating enum:', createEnum.compile().sql);
@@ -35,7 +35,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             }
 
             for (const modelDef of Object.values(this.schema.models)) {
-                const createTable = this.createModelTable(trx, modelDef);
+                const createTable = this.createModelTable(tx, modelDef);
                 // console.log('Creating table:', createTable.compile().sql);
                 await createTable.execute();
             }

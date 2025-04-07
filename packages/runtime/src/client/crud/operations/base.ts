@@ -91,6 +91,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     abstract handle(operation: CrudOperation, args: any): Promise<unknown>;
 
+    withClient(client: ClientContract<Schema>) {
+        return new (this.constructor as new (...args: any[]) => this)(
+            client,
+            this.model,
+            this.inputValidator,
+            this.queryContext
+        );
+    }
+
     protected requireModel(model: string) {
         return requireModel(this.schema, model);
     }

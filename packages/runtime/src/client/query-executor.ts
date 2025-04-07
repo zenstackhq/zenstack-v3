@@ -43,7 +43,7 @@ export type QueryContext<Schema extends SchemaDef> = {
     /**
      * The query arguments.
      */
-    args: unknown;
+    queryArgs: unknown;
 };
 
 type ExecutableQueries =
@@ -77,7 +77,7 @@ export class QueryExecutor<Schema extends SchemaDef> {
                 await this.callMutationInterceptionFilters(kysely, node);
         }
 
-        const task = async (trx: Kysely<any>) => {
+        const task = async (tx: Kysely<any>) => {
             await this.callBeforeQueryInterceptionFilters(
                 node,
                 mutationInterceptionInfo
@@ -93,10 +93,10 @@ export class QueryExecutor<Schema extends SchemaDef> {
                 ).returningAll();
             }
 
-            const result = await trx.executeQuery(query.compile());
+            const result = await tx.executeQuery(query.compile());
 
             await this.callAfterQueryInterceptionFilters(
-                trx,
+                tx,
                 result,
                 node,
                 mutationInterceptionInfo
@@ -114,11 +114,11 @@ export class QueryExecutor<Schema extends SchemaDef> {
 
     private executeWithTransaction(
         kysely: Kysely<any>,
-        callback: (trx: Kysely<any>) => Promise<QueryResult<unknown>>,
+        callback: (tx: Kysely<any>) => Promise<QueryResult<unknown>>,
         useTransaction: boolean
     ) {
         if (useTransaction) {
-            return kysely.transaction().execute(async (trx) => callback(trx));
+            return kysely.transaction().execute(async (tx) => callback(tx));
         } else {
             return callback(kysely);
         }

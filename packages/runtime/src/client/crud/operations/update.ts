@@ -36,14 +36,14 @@ export class UpdateOperationHandler<
                 result = await this.kysely
                     .transaction()
                     .setIsolationLevel('repeatable read')
-                    .execute(async (trx) => {
+                    .execute(async (tx) => {
                         const updateResult = await this.update(
-                            trx,
+                            tx,
                             this.model,
                             args.where,
                             args.data
                         );
-                        return this.readUnique(trx, this.model, {
+                        return this.readUnique(tx, this.model, {
                             select: args.select,
                             include: args.include,
                             where: getIdValues(

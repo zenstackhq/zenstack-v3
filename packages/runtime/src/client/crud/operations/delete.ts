@@ -32,8 +32,8 @@ export class DeleteOperationHandler<
 
         if (returnRelations) {
             // employ a transaction
-            return this.kysely.transaction().execute(async (trx) => {
-                const existing = await this.readUnique(trx, this.model, {
+            return this.kysely.transaction().execute(async (tx) => {
+                const existing = await this.readUnique(tx, this.model, {
                     select: args.select,
                     include: args.include,
                     where: args.where,
@@ -41,7 +41,7 @@ export class DeleteOperationHandler<
                 if (!existing) {
                     throw new NotFoundError(this.model);
                 }
-                await this.delete(trx, this.model, args.where, false);
+                await this.delete(tx, this.model, args.where, false);
                 return existing;
             });
         } else {

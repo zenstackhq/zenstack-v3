@@ -18,6 +18,12 @@ async function main() {
                     ]),
             },
         },
+        procs: {
+            signUp: async (client, email, name) => {
+                console.log('Calling "signUp" proc:', email, name);
+                return client.user.create({ data: { email, name } });
+            },
+        },
     });
 
     // clean up existing data
@@ -82,6 +88,10 @@ async function main() {
         },
     });
     console.log('User found with computed field:', userWithEmailDomain);
+
+    // create with custom procedure
+    const newUser = await db.$procs.signUp('marvin@zenstack.dev', 'Marvin');
+    console.log('User signed up:', newUser);
 }
 
 main();

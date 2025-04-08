@@ -8,7 +8,7 @@ import {
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { BuiltinType, GetModels } from '../../../schema/schema';
-import type { FindArgs } from '../../client-types';
+import type { FindArgs } from '../../crud-types';
 import {
     buildFieldRef,
     getRelationForeignKeyFieldPairs,

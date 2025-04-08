@@ -1,7 +1,6 @@
 import type { GetModels, SchemaDef } from '../../../schema';
-import type { FindArgs } from '../../client-types';
-import type { CrudOperation } from '../crud-handler';
-import { BaseOperationHandler } from './base';
+import type { FindArgs } from '../../crud-types';
+import { BaseOperationHandler, type CrudOperation } from './base';
 
 export class FindOperationHandler<
     Schema extends SchemaDef

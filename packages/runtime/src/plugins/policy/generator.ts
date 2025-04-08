@@ -1,7 +1,7 @@
 import { isDataModel, type Model } from '@zenstackhq/language/ast';
 import fs from 'node:fs';
 import ts from 'typescript';
-import type { CliGenerator } from '../../client';
+import type { CliGenerator } from '../../client/plugin';
 
 export const generate: CliGenerator = (context) => {
     const source = fs.readFileSync(context.tsSchemaFile, 'utf-8');

@@ -9,12 +9,13 @@
     ],
     "type": "module",
     "scripts": {
-        "build": "tsup-node",
-        "watch": "tsup-node --watch",
+        "build": "pnpm langium:generate && tsup-node",
+        "watch": "run-p watch:*",
+        "watch:ts": "tsup-node --watch",
+        "watch:langium": "langium generate --watch",
         "lint": "eslint src --ext ts",
         "langium:generate": "langium generate",
         "langium:generate:production": "langium generate --mode=production",
-        "langium:watch": "langium generate --watch",
         "pack": "pnpm pack"
     },
     "exports": {

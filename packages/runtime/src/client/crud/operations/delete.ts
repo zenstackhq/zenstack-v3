@@ -1,6 +1,6 @@
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
-import type { DeleteArgs, DeleteManyArgs } from '../../client-types';
+import type { DeleteArgs, DeleteManyArgs } from '../../crud-types';
 import { NotFoundError } from '../../errors';
 import { BaseOperationHandler } from './base';
 

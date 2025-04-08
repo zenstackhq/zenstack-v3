@@ -36,6 +36,10 @@ export const schema = {
                     type: "String",
                     unique: true
                 },
+                name: {
+                    type: "String",
+                    optional: true
+                },
                 emailDomain: {
                     type: "String",
                     computed: true
@@ -142,6 +146,26 @@ export const schema = {
         Role: {
             ADMIN: "ADMIN",
             USER: "USER"
+        }
+    },
+    procs: {
+        signUp: {
+            params: [
+                { name: "email", type: "String" },
+                { name: "name", optional: true, type: "String" }
+            ] as [
+                email: {
+                    "name": "email";
+                    "type": "String";
+                },
+                name: {
+                    "name": "name";
+                    "type": "String";
+                    "optional": true;
+                }
+            ],
+            returnType: "User",
+            mutation: true
         }
     },
     plugins: { policy: { authModel: "User" } }

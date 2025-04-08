@@ -11,8 +11,10 @@ import {
     isEnumField,
     isInvocationExpr,
     isLiteralExpr,
+    isProcedure,
     isReferenceExpr,
     LiteralExpr,
+    Procedure,
     ReferenceExpr,
     type Model,
 } from '@zenstackhq/language/ast';
@@ -222,6 +224,17 @@ function createSchemaObject(model: Model) {
                     ),
                     true
                 )
+            )
+        );
+    }
+
+    // procedures
+    const procedures = model.declarations.filter(isProcedure);
+    if (procedures.length > 0) {
+        properties.push(
+            ts.factory.createPropertyAssignment(
+                'procs',
+                createProceduresObject(procedures)
             )
         );
     }
@@ -855,6 +868,113 @@ function createDialectConfigProvider(type: string, url: string) {
         .otherwise(() => {
             throw new Error(`Unsupported provider: ${type}`);
         });
+}
+
+function createProceduresObject(procedures: Procedure[]) {
+    return ts.factory.createObjectLiteralExpression(
+        procedures.map((proc) =>
+            ts.factory.createPropertyAssignment(
+                proc.name,
+                createProcedureObject(proc)
+            )
+        ),
+        true
+    );
+}
+
+function createProcedureObject(proc: Procedure) {
+    const params = ts.factory.createArrayLiteralExpression(
+        proc.params.map((param) =>
+            ts.factory.createObjectLiteralExpression([
+                ts.factory.createPropertyAssignment(
+                    'name',
+                    ts.factory.createStringLiteral(param.name)
+                ),
+                ...(param.optional
+                    ? [
+                          ts.factory.createPropertyAssignment(
+                              'optional',
+                              ts.factory.createTrue()
+                          ),
+                      ]
+                    : []),
+                ts.factory.createPropertyAssignment(
+                    'type',
+                    ts.factory.createStringLiteral(
+                        param.type.type ?? param.type.reference?.$refText!
+                    )
+                ),
+            ])
+        ),
+        true
+    );
+
+    const paramsType = ts.factory.createTupleTypeNode([
+        ...proc.params.map((param) =>
+            ts.factory.createNamedTupleMember(
+                undefined,
+                ts.factory.createIdentifier(param.name),
+                undefined,
+                ts.factory.createTypeLiteralNode([
+                    ts.factory.createPropertySignature(
+                        undefined,
+                        ts.factory.createStringLiteral('name'),
+                        undefined,
+                        ts.factory.createLiteralTypeNode(
+                            ts.factory.createStringLiteral(param.name)
+                        )
+                    ),
+                    ts.factory.createPropertySignature(
+                        undefined,
+                        ts.factory.createStringLiteral('type'),
+                        undefined,
+                        ts.factory.createLiteralTypeNode(
+                            ts.factory.createStringLiteral(
+                                param.type.type ??
+                                    param.type.reference?.$refText!
+                            )
+                        )
+                    ),
+                    ...(param.optional
+                        ? [
+                              ts.factory.createPropertySignature(
+                                  undefined,
+                                  ts.factory.createStringLiteral('optional'),
+                                  undefined,
+                                  ts.factory.createLiteralTypeNode(
+                                      ts.factory.createTrue()
+                                  )
+                              ),
+                          ]
+                        : []),
+                ])
+            )
+        ),
+    ]);
+
+    return ts.factory.createObjectLiteralExpression(
+        [
+            ts.factory.createPropertyAssignment(
+                'params',
+                ts.factory.createAsExpression(params, paramsType)
+            ),
+            ts.factory.createPropertyAssignment(
+                'returnType',
+                ts.factory.createStringLiteral(
+                    proc.returnType.type ?? proc.returnType.reference?.$refText!
+                )
+            ),
+            ...(proc.mutation
+                ? [
+                      ts.factory.createPropertyAssignment(
+                          'mutation',
+                          ts.factory.createTrue()
+                      ),
+                  ]
+                : []),
+        ],
+        true
+    );
 }
 
 function generateBannerComments(statements: ts.Statement[]) {

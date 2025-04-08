@@ -21,7 +21,7 @@ import type {
 } from '../../../schema/schema';
 import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
-import type { FindArgs, SelectInclude, Where } from '../../client-types';
+import type { FindArgs, SelectInclude, Where } from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
 import { QueryExecutor, type QueryContext } from '../../query-executor';
@@ -41,7 +41,7 @@ import {
 } from '../../query-utils';
 import { getCrudDialect } from '../dialects';
 import type { BaseCrudDialect } from '../dialects/base';
-import { InputValidator } from './validator';
+import { InputValidator } from '../validator';
 
 export type CrudOperation =
     | 'findMany'

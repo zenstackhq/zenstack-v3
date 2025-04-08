@@ -18,7 +18,7 @@ import type {
     FindArgs,
     SortOrder,
     StringFilter,
-} from '../../client-types';
+} from '../../crud-types';
 import { InternalError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {

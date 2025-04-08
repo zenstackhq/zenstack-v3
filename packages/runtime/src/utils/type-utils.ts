@@ -82,3 +82,7 @@ export type PrependParameter<Param, Func> = Func extends (
 ) => infer R
     ? (p: Param, ...args: Parameters<Func>) => R
     : never;
+
+export type OrUndefinedIf<T, Condition extends boolean> = Condition extends true
+    ? T | undefined
+    : T;

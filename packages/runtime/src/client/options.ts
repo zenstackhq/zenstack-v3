@@ -9,9 +9,11 @@ import type {
     DataSourceProvider,
     GetModel,
     GetModels,
+    ProcedureDef,
     SchemaDef,
 } from '../schema/schema';
-import type { MergeIf, PrependParameter } from '../utils/type-utils';
+import type { PrependParameter } from '../utils/type-utils';
+import type { ClientContract, ProcedureFunc } from './contract';
 import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
 
@@ -22,27 +24,30 @@ type DialectConfig<Provider extends DataSourceProvider> =
         ? Optional<PostgresDialectConfig, 'pool'>
         : never;
 
-export type ClientOptions<Schema extends SchemaDef> = MergeIf<
-    {
-        /**
-         * Database dialect configuration.
-         */
-        dialectConfig?: DialectConfig<Schema['provider']>;
+export type ClientOptions<Schema extends SchemaDef> = {
+    /**
+     * Database dialect configuration.
+     */
+    dialectConfig?: DialectConfig<Schema['provider']>;
 
-        plugins?: RuntimePlugin<Schema>[];
+    plugins?: RuntimePlugin<Schema>[];
 
-        /**
-         * Logging configuration.
-         */
-        log?: KyselyConfig['log'];
-    },
-    {
-        computedFields: ComputedFields<Schema>;
-    },
-    HasComputedFields<Schema>
->;
+    /**
+     * Logging configuration.
+     */
+    log?: KyselyConfig['log'];
+} & (HasComputedFields<Schema> extends true
+    ? {
+          computedFields: ComputedFieldsOptions<Schema>;
+      }
+    : {}) &
+    (HasProcedures<Schema> extends true
+        ? {
+              procs: ProceduresOptions<Schema>;
+          }
+        : {});
 
-export type ComputedFields<Schema extends SchemaDef> = {
+export type ComputedFieldsOptions<Schema extends SchemaDef> = {
     [Model in GetModels<Schema> as 'computedFields' extends keyof GetModel<
         Schema,
         Model
@@ -60,7 +65,21 @@ export type ComputedFields<Schema extends SchemaDef> = {
 };
 
 export type HasComputedFields<Schema extends SchemaDef> =
-    keyof ComputedFields<Schema> extends never ? false : true;
+    keyof ComputedFieldsOptions<Schema> extends never ? false : true;
 
-// // @ts-ignore
-// export type FeatureSettings<Schema extends SchemaDef> = {};
+export type ProceduresOptions<Schema extends SchemaDef> = Schema extends {
+    procs: Record<string, ProcedureDef>;
+}
+    ? {
+          [Key in keyof Schema['procs']]: PrependParameter<
+              ClientContract<Schema>,
+              ProcedureFunc<Schema, Schema['procs'][Key]>
+          >;
+      }
+    : {};
+
+export type HasProcedures<Schema extends SchemaDef> = Schema extends {
+    procs: Record<string, ProcedureDef>;
+}
+    ? true
+    : false;

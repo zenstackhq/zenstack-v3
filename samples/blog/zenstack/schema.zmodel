@@ -17,6 +17,7 @@ model User {
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
     email       String   @unique
+    name        String?
     emailDomain String   @computed
     role        Role     @default(USER)
     posts       Post[]
@@ -41,3 +42,5 @@ model Post {
     author    User     @relation(fields: [authorId], references: [id])
     authorId  String
 }
+
+mutation proc signUp(email: String, name: String?): User

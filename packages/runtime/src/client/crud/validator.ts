@@ -1,7 +1,12 @@
 import { match, P } from 'ts-pattern';
 import { z, ZodSchema } from 'zod';
-import type { GetModels, SchemaDef } from '../../../schema';
-import type { BuiltinType, EnumDef, FieldDef } from '../../../schema/schema';
+import type {
+    BuiltinType,
+    EnumDef,
+    FieldDef,
+    GetModels,
+    SchemaDef,
+} from '../../schema/schema';
 import {
     type AggregateArgs,
     type CountArgs,
@@ -12,8 +17,8 @@ import {
     type FindArgs,
     type UpdateArgs,
     type UpdateManyArgs,
-} from '../../client-types';
-import { InternalError, QueryError } from '../../errors';
+} from '../crud-types';
+import { InternalError, QueryError } from '../errors';
 import {
     fieldHasDefaultValue,
     getEnum,
@@ -21,7 +26,7 @@ import {
     getUniqueFields,
     requireField,
     requireModel,
-} from '../../query-utils';
+} from '../query-utils';
 
 export class InputValidator<Schema extends SchemaDef> {
     private readonly numericTypes = ['Int', 'Float', 'BigInt', 'Decimal'];

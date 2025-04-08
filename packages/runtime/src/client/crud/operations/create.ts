@@ -1,6 +1,6 @@
 import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
-import type { CreateArgs, CreateManyArgs } from '../../client-types';
+import type { CreateArgs, CreateManyArgs } from '../../crud-types';
 import { getIdValues, requireField } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 

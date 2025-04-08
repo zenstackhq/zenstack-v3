@@ -13,6 +13,7 @@ export type SchemaDef = {
     models: Record<string, ModelDef>;
     enums?: Record<string, EnumDef>;
     plugins: Record<string, unknown>;
+    procs?: Record<string, ProcedureDef>;
 };
 
 export type ModelDef = {
@@ -74,6 +75,14 @@ export type FieldDef = {
     relation?: RelationInfo;
     foreignKeyFor?: string[];
     computed?: boolean;
+};
+
+export type ProcedureParam = { name: string; type: string; optional?: boolean };
+
+export type ProcedureDef = {
+    params: [...ProcedureParam[]];
+    returnType: string;
+    mutation?: boolean;
 };
 
 export type BuiltinType =

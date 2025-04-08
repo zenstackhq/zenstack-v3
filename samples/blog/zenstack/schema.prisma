@@ -18,6 +18,7 @@ model User {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt()
     email String @unique()
+    name String?
     role Role @default(USER)
     posts Post[]
     profile Profile?

@@ -70,8 +70,10 @@ export type ZModelKeywordNames =
     | "import"
     | "in"
     | "model"
+    | "mutation"
     | "null"
     | "plugin"
+    | "proc"
     | "this"
     | "true"
     | "type"
@@ -82,7 +84,7 @@ export type ZModelKeywordNames =
 
 export type ZModelTokenNames = ZModelTerminalNames | ZModelKeywordNames;
 
-export type AbstractDeclaration = Attribute | DataModel | DataSource | Enum | FunctionDecl | GeneratorDecl | Plugin | TypeDef;
+export type AbstractDeclaration = Attribute | DataModel | DataSource | Enum | FunctionDecl | GeneratorDecl | Plugin | Procedure | TypeDef;
 
 export const AbstractDeclaration = 'AbstractDeclaration';
 
@@ -483,7 +485,7 @@ export function isFunctionDecl(item: unknown): item is FunctionDecl {
 }
 
 export interface FunctionParam extends AstNode {
-    readonly $container: FunctionDecl;
+    readonly $container: FunctionDecl | Procedure;
     readonly $type: 'FunctionParam';
     name: RegularID;
     optional: boolean;
@@ -497,7 +499,7 @@ export function isFunctionParam(item: unknown): item is FunctionParam {
 }
 
 export interface FunctionParamType extends AstNode {
-    readonly $container: FunctionDecl | FunctionParam;
+    readonly $container: FunctionDecl | FunctionParam | Procedure | ProcedureParam;
     readonly $type: 'FunctionParamType';
     array: boolean;
     reference?: Reference<TypeDeclaration>;
@@ -524,7 +526,7 @@ export function isGeneratorDecl(item: unknown): item is GeneratorDecl {
 }
 
 export interface InternalAttribute extends AstNode {
-    readonly $container: Attribute | AttributeParam | FunctionDecl;
+    readonly $container: Attribute | AttributeParam | FunctionDecl | Procedure;
     readonly $type: 'InternalAttribute';
     args: Array<AttributeArg>;
     decl: Reference<Attribute>;
@@ -646,6 +648,36 @@ export const PluginField = 'PluginField';
 
 export function isPluginField(item: unknown): item is PluginField {
     return reflection.isInstance(item, PluginField);
+}
+
+export interface Procedure extends AstNode {
+    readonly $container: Model;
+    readonly $type: 'Procedure';
+    attributes: Array<InternalAttribute>;
+    mutation: boolean;
+    name: RegularID;
+    params: Array<FunctionParam | ProcedureParam>;
+    returnType: FunctionParamType;
+}
+
+export const Procedure = 'Procedure';
+
+export function isProcedure(item: unknown): item is Procedure {
+    return reflection.isInstance(item, Procedure);
+}
+
+export interface ProcedureParam extends AstNode {
+    readonly $container: Procedure;
+    readonly $type: 'ProcedureParam';
+    name: RegularID;
+    optional: boolean;
+    type: FunctionParamType;
+}
+
+export const ProcedureParam = 'ProcedureParam';
+
+export function isProcedureParam(item: unknown): item is ProcedureParam {
+    return reflection.isInstance(item, ProcedureParam);
 }
 
 export interface ReferenceArg extends AstNode {
@@ -809,6 +841,8 @@ export type ZModelAstType = {
     ObjectExpr: ObjectExpr
     Plugin: Plugin
     PluginField: PluginField
+    Procedure: Procedure
+    ProcedureParam: ProcedureParam
     ReferenceArg: ReferenceArg
     ReferenceExpr: ReferenceExpr
     ReferenceTarget: ReferenceTarget
@@ -826,7 +860,7 @@ export type ZModelAstType = {
 export class ZModelAstReflection extends AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return [AbstractDeclaration, Argument, ArrayExpr, Attribute, AttributeArg, AttributeParam, AttributeParamType, BinaryExpr, BooleanLiteral, ConfigArrayExpr, ConfigExpr, ConfigField, ConfigInvocationArg, ConfigInvocationExpr, DataModel, DataModelAttribute, DataModelField, DataModelFieldAttribute, DataModelFieldType, DataSource, Enum, EnumField, Expression, FieldInitializer, FunctionDecl, FunctionParam, FunctionParamType, GeneratorDecl, InternalAttribute, InvocationExpr, LiteralExpr, MemberAccessExpr, MemberAccessTarget, Model, ModelImport, NullExpr, NumberLiteral, ObjectExpr, Plugin, PluginField, ReferenceArg, ReferenceExpr, ReferenceTarget, StringLiteral, ThisExpr, TypeDeclaration, TypeDef, TypeDefField, TypeDefFieldType, TypeDefFieldTypes, UnaryExpr, UnsupportedFieldType];
+        return [AbstractDeclaration, Argument, ArrayExpr, Attribute, AttributeArg, AttributeParam, AttributeParamType, BinaryExpr, BooleanLiteral, ConfigArrayExpr, ConfigExpr, ConfigField, ConfigInvocationArg, ConfigInvocationExpr, DataModel, DataModelAttribute, DataModelField, DataModelFieldAttribute, DataModelFieldType, DataSource, Enum, EnumField, Expression, FieldInitializer, FunctionDecl, FunctionParam, FunctionParamType, GeneratorDecl, InternalAttribute, InvocationExpr, LiteralExpr, MemberAccessExpr, MemberAccessTarget, Model, ModelImport, NullExpr, NumberLiteral, ObjectExpr, Plugin, PluginField, Procedure, ProcedureParam, ReferenceArg, ReferenceExpr, ReferenceTarget, StringLiteral, ThisExpr, TypeDeclaration, TypeDef, TypeDefField, TypeDefFieldType, TypeDefFieldTypes, UnaryExpr, UnsupportedFieldType];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -845,7 +879,8 @@ export class ZModelAstReflection extends AbstractAstReflection {
             case DataSource:
             case FunctionDecl:
             case GeneratorDecl:
-            case Plugin: {
+            case Plugin:
+            case Procedure: {
                 return this.isSubtype(AbstractDeclaration, supertype);
             }
             case BooleanLiteral:
@@ -1247,6 +1282,28 @@ export class ZModelAstReflection extends AbstractAstReflection {
                     properties: [
                         { name: 'name' },
                         { name: 'value' }
+                    ]
+                };
+            }
+            case Procedure: {
+                return {
+                    name: Procedure,
+                    properties: [
+                        { name: 'attributes', defaultValue: [] },
+                        { name: 'mutation', defaultValue: false },
+                        { name: 'name' },
+                        { name: 'params', defaultValue: [] },
+                        { name: 'returnType' }
+                    ]
+                };
+            }
+            case ProcedureParam: {
+                return {
+                    name: ProcedureParam,
+                    properties: [
+                        { name: 'name' },
+                        { name: 'optional', defaultValue: false },
+                        { name: 'type' }
                     ]
                 };
             }

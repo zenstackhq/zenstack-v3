@@ -11,7 +11,7 @@ ModelImport:
     'import' path=STRING  ';'?;
 
 AbstractDeclaration:
-    DataSource | GeneratorDecl| Plugin | DataModel | TypeDef | Enum | FunctionDecl | Attribute;
+    DataSource | GeneratorDecl| Plugin | DataModel | TypeDef | Enum | FunctionDecl | Attribute | Procedure;
 
 // datasource
 DataSource:
@@ -224,6 +224,12 @@ FunctionParam:
 
 FunctionParamType:
     (type=ExpressionType | reference=[TypeDeclaration:RegularID]) (array?='[' ']')?;
+
+ProcedureParam:
+    TRIPLE_SLASH_COMMENT* name=RegularID ':' type=FunctionParamType (optional?='?')?;
+
+Procedure:
+    TRIPLE_SLASH_COMMENT* (mutation?='mutation') 'proc' name=RegularID '(' (params+=ProcedureParam (',' params+=FunctionParam)*)? ')' ':' returnType=FunctionParamType (attributes+=InternalAttribute)*;
 
 // https://github.com/langium/langium/discussions/1012
 RegularID returns string:

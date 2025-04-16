@@ -22,6 +22,7 @@ import type {
 import { InternalError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
+    buildFieldRef,
     buildJoinPairs,
     getField,
     getRelationForeignKeyFieldPairs,
@@ -106,7 +107,14 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 result = this.and(
                     eb,
                     result,
-                    this.buildPrimitiveFilter(eb, table, key, fieldDef, payload)
+                    this.buildPrimitiveFilter(
+                        eb,
+                        model,
+                        table,
+                        key,
+                        fieldDef,
+                        payload
+                    )
                 );
             }
         }
@@ -450,6 +458,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     buildPrimitiveFilter(
         eb: ExpressionBuilder<any, any>,
+        model: string,
         table: string,
         field: string,
         fieldDef: FieldDef,
@@ -468,7 +477,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 this.buildStringFilter(eb, table, field, payload)
             )
             .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                this.buildNumberFilter(eb, table, field, type, payload)
+                this.buildNumberFilter(eb, model, table, field, type, payload)
             )
             .with('Boolean', () =>
                 this.buildBooleanFilter(eb, table, field, payload)
@@ -652,6 +661,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     private buildNumberFilter(
         eb: ExpressionBuilder<any, any>,
+        model: string,
         table: string,
         field: string,
         type: BuiltinType,
@@ -661,9 +671,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             eb,
             type,
             payload,
-            sql.ref(`${table}.${field}`),
+            buildFieldRef(this.schema, model, field, this.options, eb),
             (value) => this.transformPrimitive(value, type),
-            (value) => this.buildNumberFilter(eb, table, field, type, value)
+            (value) =>
+                this.buildNumberFilter(eb, model, table, field, type, value)
         );
         return this.and(eb, ...conditions);
     }

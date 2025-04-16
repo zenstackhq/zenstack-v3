@@ -229,7 +229,7 @@ ProcedureParam:
     TRIPLE_SLASH_COMMENT* name=RegularID ':' type=FunctionParamType (optional?='?')?;
 
 Procedure:
-    TRIPLE_SLASH_COMMENT* (mutation?='mutation') 'proc' name=RegularID '(' (params+=ProcedureParam (',' params+=FunctionParam)*)? ')' ':' returnType=FunctionParamType (attributes+=InternalAttribute)*;
+    TRIPLE_SLASH_COMMENT* (mutation?='mutation') 'procedure' name=RegularID '(' (params+=ProcedureParam (',' params+=FunctionParam)*)? ')' ':' returnType=FunctionParamType (attributes+=InternalAttribute)*;
 
 // https://github.com/langium/langium/discussions/1012
 RegularID returns string:

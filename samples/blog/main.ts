@@ -5,24 +5,30 @@ async function main() {
     const db = new ZenStackClient(schema, {
         computedFields: {
             User: {
-                // provide implementation of the "User.emailDomain" computed field
-                emailDomain: (eb) =>
-                    // build SQL expression: substr(email, instr(email, '@') + 1)
-                    eb.fn('substr', [
-                        eb.ref('email'),
-                        eb(
-                            eb.fn('instr', [eb.ref('email'), eb.val('@')]),
-                            '+',
-                            1
+                postCount: (eb) =>
+                    eb
+                        .selectFrom('Post')
+                        .whereRef('Post.authorId', '=', 'User.id')
+                        .select(({ fn }) =>
+                            fn.countAll<number>().as('postCount')
                         ),
-                    ]),
             },
         },
-        procs: {
+        procedures: {
             signUp: async (client, email, name) => {
                 console.log('Calling "signUp" proc:', email, name);
                 return client.user.create({ data: { email, name } });
             },
+        },
+    }).$use({
+        id: 'cost-logger',
+        async onQuery({ model, operation, proceed }) {
+            const start = Date.now();
+            const result = await proceed();
+            console.log(
+                `[cost] ${model} ${operation} took ${Date.now() - start}ms`
+            );
+            return result;
         },
     });
 
@@ -81,16 +87,21 @@ async function main() {
     console.log('User found with mixed filter:', userWithProperDomain);
 
     // filter with computed field
-    const userWithEmailDomain = await db.user.findMany({
+    const userWithMorePosts = await db.user.findMany({
         where: {
-            role: 'USER',
-            emailDomain: { endsWith: 'zenstack.dev' },
+            role: 'ADMIN',
+            postCount: {
+                gt: 1,
+            },
         },
     });
-    console.log('User found with computed field:', userWithEmailDomain);
+    console.log('User found with computed field:', userWithMorePosts);
 
     // create with custom procedure
-    const newUser = await db.$procs.signUp('marvin@zenstack.dev', 'Marvin');
+    const newUser = await db.$procedures.signUp(
+        'marvin@zenstack.dev',
+        'Marvin'
+    );
     console.log('User signed up:', newUser);
 }
 

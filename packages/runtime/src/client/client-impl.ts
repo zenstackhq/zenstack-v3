@@ -97,27 +97,30 @@ class ClientImpl<Schema extends SchemaDef> {
         });
     }
 
-    get $procs() {
-        return Object.keys(this.$schema.procs ?? {}).reduce((acc, name) => {
-            acc[name] = (...args: unknown[]) => this.handleProc(name, args);
-            return acc;
-        }, {} as any);
+    get $procedures() {
+        return Object.keys(this.$schema.procedures ?? {}).reduce(
+            (acc, name) => {
+                acc[name] = (...args: unknown[]) => this.handleProc(name, args);
+                return acc;
+            },
+            {} as any
+        );
     }
 
     private async handleProc(name: string, args: unknown[]) {
         if (
-            !('procs' in this.$options) ||
+            !('procedures' in this.$options) ||
             !this.$options ||
-            typeof this.$options.procs !== 'object'
+            typeof this.$options.procedures !== 'object'
         ) {
             throw new QueryError(
                 'Procedures are not configured for the client.'
             );
         }
 
-        const procOptions = this.$options.procs as ProceduresOptions<
+        const procOptions = this.$options.procedures as ProceduresOptions<
             Schema & {
-                procs: Record<string, ProcedureDef>;
+                procedures: Record<string, ProcedureDef>;
             }
         >;
         if (!procOptions[name] || typeof procOptions[name] !== 'function') {
@@ -227,11 +230,11 @@ function createModelCrudHandler<
     ) => {
         return createDeferredPromise(async () => {
             let proceed = async (
-                args: unknown,
+                _args?: unknown,
                 tx?: ClientContract<Schema>
             ) => {
                 const _handler = tx ? handler.withClient(tx) : handler;
-                const r = await _handler.handle(operation, args);
+                const r = await _handler.handle(operation, _args ?? args);
                 if (!r && throwIfNotFound) {
                     throw new NotFoundError(model);
                 }
@@ -255,7 +258,8 @@ function createModelCrudHandler<
             for (const plugin of plugins) {
                 if (plugin.onQuery) {
                     const _proceed = proceed;
-                    proceed = () => plugin.onQuery!(context, _proceed);
+                    proceed = () =>
+                        plugin.onQuery!({ ...context, proceed: _proceed });
                 }
             }
 

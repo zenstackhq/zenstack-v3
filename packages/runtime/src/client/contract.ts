@@ -73,12 +73,12 @@ type MapType<Schema extends SchemaDef, T extends string> = T extends 'String'
     : unknown;
 
 export type Procedures<Schema extends SchemaDef> =
-    Schema['procs'] extends Record<string, ProcedureDef>
+    Schema['procedures'] extends Record<string, ProcedureDef>
         ? {
-              $procs: {
-                  [Key in keyof Schema['procs']]: ProcedureFunc<
+              $procedures: {
+                  [Key in keyof Schema['procedures']]: ProcedureFunc<
                       Schema,
-                      Schema['procs'][Key]
+                      Schema['procedures'][Key]
                   >;
               };
           }

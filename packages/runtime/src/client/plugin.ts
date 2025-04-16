@@ -60,6 +60,10 @@ type MutationHooksArgs<Schema extends SchemaDef> = {
 
 export type PluginContext<Schema extends SchemaDef> = QueryContext<Schema>;
 
+export type OnQueryArgs<Schema extends SchemaDef> = PluginContext<Schema> & {
+    proceed: ProceedQueryFunction<Schema>;
+};
+
 export type PluginTransformKyselyQueryArgs<Schema extends SchemaDef> = {
     client: ClientContract<Schema>;
     node: RootOperationNode;
@@ -82,7 +86,7 @@ export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> =
     };
 
 export type ProceedQueryFunction<Schema extends SchemaDef> = (
-    queryArgs: unknown,
+    queryArgs?: unknown,
     tx?: ClientContract<Schema>
 ) => Promise<unknown>;
 
@@ -108,10 +112,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     /**
      * Intercepts an ORM query.
      */
-    onQuery?: (
-        args: PluginContext<Schema>,
-        proceed: ProceedQueryFunction<Schema>
-    ) => Promise<unknown>;
+    onQuery?: (args: OnQueryArgs<Schema>) => Promise<unknown>;
 
     /**
      * Kysely query transformation. See {@link KyselyPlugin.transformQuery}.
@@ -137,7 +138,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
 
     /**
      * Called before an entity is mutated.
-     * @param entity Only available if `loadBeforeMutationEntity` is set to true in the
+     * @param args.entity Only available if `loadBeforeMutationEntity` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
     beforeEntityMutation?: (
@@ -146,9 +147,9 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
 
     /**
      * Called after an entity is mutated.
-     * @param beforeMutationEntity Only available if `loadBeforeMutationEntity` is set to true in the
+     * @param args.beforeMutationEntity Only available if `loadBeforeMutationEntity` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
-     * @param afterMutationEntity Only available if `loadAfterMutationEntity` is set to true in the
+     * @param args.afterMutationEntity Only available if `loadAfterMutationEntity` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
     afterEntityMutation?: (

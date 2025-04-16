@@ -233,7 +233,7 @@ function createSchemaObject(model: Model) {
     if (procedures.length > 0) {
         properties.push(
             ts.factory.createPropertyAssignment(
-                'procs',
+                'procedures',
                 createProceduresObject(procedures)
             )
         );

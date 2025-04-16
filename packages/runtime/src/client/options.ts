@@ -43,7 +43,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
     : {}) &
     (HasProcedures<Schema> extends true
         ? {
-              procs: ProceduresOptions<Schema>;
+              procedures: ProceduresOptions<Schema>;
           }
         : {});
 
@@ -68,18 +68,18 @@ export type HasComputedFields<Schema extends SchemaDef> =
     keyof ComputedFieldsOptions<Schema> extends never ? false : true;
 
 export type ProceduresOptions<Schema extends SchemaDef> = Schema extends {
-    procs: Record<string, ProcedureDef>;
+    procedures: Record<string, ProcedureDef>;
 }
     ? {
-          [Key in keyof Schema['procs']]: PrependParameter<
+          [Key in keyof Schema['procedures']]: PrependParameter<
               ClientContract<Schema>,
-              ProcedureFunc<Schema, Schema['procs'][Key]>
+              ProcedureFunc<Schema, Schema['procedures'][Key]>
           >;
       }
     : {};
 
 export type HasProcedures<Schema extends SchemaDef> = Schema extends {
-    procs: Record<string, ProcedureDef>;
+    procedures: Record<string, ProcedureDef>;
 }
     ? true
     : false;

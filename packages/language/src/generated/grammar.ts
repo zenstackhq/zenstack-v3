@@ -2979,7 +2979,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
           },
           {
             "$type": "Keyword",
-            "value": "proc"
+            "value": "procedure"
           },
           {
             "$type": "Assignment",

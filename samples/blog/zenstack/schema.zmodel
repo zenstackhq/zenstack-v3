@@ -18,7 +18,7 @@ model User {
     updatedAt   DateTime @updatedAt
     email       String   @unique
     name        String?
-    emailDomain String   @computed
+    postCount   Int      @computed
     role        Role     @default(USER)
     posts       Post[]
     profile     Profile?
@@ -43,4 +43,4 @@ model Post {
     authorId  String
 }
 
-mutation proc signUp(email: String, name: String?): User
+mutation procedure signUp(email: String, name: String?): User

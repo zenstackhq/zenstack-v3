@@ -73,7 +73,7 @@ export type ZModelKeywordNames =
     | "mutation"
     | "null"
     | "plugin"
-    | "proc"
+    | "procedure"
     | "this"
     | "true"
     | "type"

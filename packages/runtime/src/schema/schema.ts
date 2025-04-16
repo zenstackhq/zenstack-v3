@@ -13,7 +13,7 @@ export type SchemaDef = {
     models: Record<string, ModelDef>;
     enums?: Record<string, EnumDef>;
     plugins: Record<string, unknown>;
-    procs?: Record<string, ProcedureDef>;
+    procedures?: Record<string, ProcedureDef>;
 };
 
 export type ModelDef = {

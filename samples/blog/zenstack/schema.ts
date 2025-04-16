@@ -40,8 +40,8 @@ export const schema = {
                     type: "String",
                     optional: true
                 },
-                emailDomain: {
-                    type: "String",
+                postCount: {
+                    type: "Int",
                     computed: true
                 },
                 role: {
@@ -65,7 +65,7 @@ export const schema = {
                 email: { type: "String" }
             },
             computedFields: {
-                emailDomain(): OperandExpression<string> {
+                postCount(): OperandExpression<number> {
                     throw new Error("This is a stub for computed field");
                 }
             }
@@ -148,7 +148,7 @@ export const schema = {
             USER: "USER"
         }
     },
-    procs: {
+    procedures: {
         signUp: {
             params: [
                 { name: "email", type: "String" },

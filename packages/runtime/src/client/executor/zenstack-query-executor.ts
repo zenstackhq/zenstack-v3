@@ -160,27 +160,16 @@ export class ZenStackQueryExecutor<
 
     private async proceedQuery(query: RootOperationNode, queryId: QueryId) {
         // run built-in transformers
-        console.log('Name mapping', this.compileQuery(query).sql);
         const finalQuery = this.nameMapper.transformNode(query);
-        // const finalQuery = query;
 
         const compiled = this.compileQuery(finalQuery);
-        try {
-            return await (this.driver.txConnection
-                ? super
-                      .withConnectionProvider(
-                          new SingleConnectionProvider(this.driver.txConnection)
-                      )
-                      .executeQuery<any>(compiled, queryId)
-                : super.executeQuery<any>(compiled, queryId));
-        } catch (err) {
-            console.error(
-                `Failed to execute query: ${
-                    this.compileQuery(finalQuery).sql
-                }\nOriginal query:\n${this.compileQuery(query).sql}`
-            );
-            throw err;
-        }
+        return this.driver.txConnection
+            ? super
+                  .withConnectionProvider(
+                      new SingleConnectionProvider(this.driver.txConnection)
+                  )
+                  .executeQuery<any>(compiled, queryId)
+            : super.executeQuery<any>(compiled, queryId);
     }
 
     private isMutationNode(queryNode: RootOperationNode) {

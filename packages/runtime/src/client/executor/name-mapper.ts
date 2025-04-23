@@ -252,7 +252,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         this.requireCurrentModel(contextNode);
         const modelDef = requireModel(this.schema, this.currentModel!);
         const scalarFields = Object.entries(modelDef.fields)
-            .filter(([, fieldDef]) => !fieldDef.relation)
+            .filter(([, fieldDef]) => !fieldDef.relation && !fieldDef.computed)
             .map(([fieldName]) => fieldName);
         return scalarFields;
     }

@@ -1,8 +1,10 @@
 import {
+    DefaultConnectionProvider,
     Kysely,
+    Log,
     PostgresDialect,
     SqliteDialect,
-    type KyselyPlugin,
+    type KyselyProps,
     type PostgresDialectConfig,
     type SqliteDialectConfig,
 } from 'kysely';
@@ -20,6 +22,8 @@ import { FindOperationHandler } from './crud/operations/find';
 import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/validator';
 import { NotFoundError, QueryError } from './errors';
+import { ZenStackDriver } from './executor/zenstack-driver';
+import { ZenStackQueryExecutor } from './executor/zenstack-query-executor';
 import { SchemaDbPusher } from './helpers/schema-db-pusher';
 import type { ClientOptions, ProceduresOptions } from './options';
 import type { RuntimePlugin } from './plugin';
@@ -38,22 +42,61 @@ export const ZenStackClient = function <Schema extends SchemaDef>(
     return new ClientImpl<Schema>(schema, options);
 } as unknown as ClientConstructor;
 
-class ClientImpl<Schema extends SchemaDef> {
+export class ClientImpl<Schema extends SchemaDef> {
     private kysely: ToKysely<Schema>;
     public readonly $options: ClientOptions<Schema>;
     public readonly $schema: Schema;
+    readonly kyselyProps: KyselyProps;
 
     constructor(
         private readonly schema: Schema,
-        private options?: ClientOptions<Schema>
+        private options?: ClientOptions<Schema>,
+        baseClient?: ClientImpl<Schema>
     ) {
         this.$schema = schema;
         this.$options = options ?? ({} as ClientOptions<Schema>);
 
-        this.kysely = new Kysely({
-            dialect: this.getKyselyDialect(),
-            log: options?.log,
-        });
+        // here we use kysely's props constructor so we can pass a custom query executor
+        if (baseClient) {
+            this.kyselyProps = {
+                ...baseClient.kyselyProps,
+                executor: new ZenStackQueryExecutor(
+                    this,
+                    baseClient.kyselyProps.driver as ZenStackDriver,
+                    baseClient.kyselyProps.dialect.createQueryCompiler(),
+                    baseClient.kyselyProps.dialect.createAdapter(),
+                    new DefaultConnectionProvider(baseClient.kyselyProps.driver)
+                ),
+            };
+        } else {
+            const dialect = this.getKyselyDialect();
+            const driver = new ZenStackDriver(
+                dialect.createDriver(),
+                new Log(this.$options.log ?? [])
+            );
+            const compiler = dialect.createQueryCompiler();
+            const adapter = dialect.createAdapter();
+            const connectionProvider = new DefaultConnectionProvider(driver);
+            const executor = new ZenStackQueryExecutor(
+                this,
+                driver,
+                compiler,
+                adapter,
+                connectionProvider
+            );
+
+            this.kyselyProps = {
+                config: {
+                    dialect,
+                    log: this.$options.log,
+                },
+                dialect,
+                driver,
+                executor,
+            };
+        }
+
+        this.kysely = new Kysely(this.kyselyProps);
 
         return createClientProxy(this as unknown as ClientContract<Schema>);
     }
@@ -145,43 +188,7 @@ class ClientImpl<Schema extends SchemaDef> {
             ...this.options,
             plugins: [...(this.options?.plugins ?? []), plugin],
         } as ClientOptions<Schema>;
-        const newClient = new ClientImpl<Schema>(this.schema, newOptions);
-        newClient.kysely = this.installKyselyPlugin(
-            this.kysely,
-            plugin,
-            newClient as unknown as ClientContract<Schema>
-        );
-        return newClient;
-    }
-
-    private installKyselyPlugin(
-        kysely: ToKysely<Schema>,
-        plugin: RuntimePlugin<Schema>,
-        client: ClientContract<Schema>
-    ) {
-        if (plugin.transformKyselyQuery || plugin.transformKyselyResult) {
-            const kyselyPlugin: KyselyPlugin = {
-                transformQuery(args) {
-                    return plugin.transformKyselyQuery
-                        ? plugin.transformKyselyQuery({
-                              node: args.node,
-                              client,
-                          })
-                        : args.node;
-                },
-                transformResult(args) {
-                    return plugin.transformKyselyResult
-                        ? plugin.transformKyselyResult({
-                              ...args,
-                              client,
-                          })
-                        : Promise.resolve(args.result);
-                },
-            };
-            return kysely.withPlugin(kyselyPlugin);
-        } else {
-            return kysely;
-        }
+        return new ClientImpl<Schema>(this.schema, newOptions, this);
     }
 }
 
@@ -272,12 +279,7 @@ function createModelCrudHandler<
             return createPromise(
                 'findUnique',
                 args,
-                new FindOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'findUnique',
-                    queryArgs: args,
-                }),
+                new FindOperationHandler(client, model, inputValidator),
                 true
             );
         },
@@ -286,12 +288,7 @@ function createModelCrudHandler<
             return createPromise(
                 'findUnique',
                 args,
-                new FindOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'findUnique',
-                    queryArgs: args,
-                }),
+                new FindOperationHandler(client, model, inputValidator),
                 true,
                 true
             );
@@ -301,12 +298,7 @@ function createModelCrudHandler<
             return createPromise(
                 'findFirst',
                 args,
-                new FindOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'findFirst',
-                    queryArgs: args,
-                }),
+                new FindOperationHandler(client, model, inputValidator),
                 true
             );
         },
@@ -315,12 +307,7 @@ function createModelCrudHandler<
             return createPromise(
                 'findFirst',
                 args,
-                new FindOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'findFirst',
-                    queryArgs: args,
-                }),
+                new FindOperationHandler(client, model, inputValidator),
                 true,
                 true
             );
@@ -330,12 +317,7 @@ function createModelCrudHandler<
             return createPromise(
                 'findMany',
                 args,
-                new FindOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'findMany',
-                    queryArgs: args,
-                }),
+                new FindOperationHandler(client, model, inputValidator),
                 true
             );
         },
@@ -344,12 +326,7 @@ function createModelCrudHandler<
             return createPromise(
                 'create',
                 args,
-                new CreateOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'create',
-                    queryArgs: args,
-                }),
+                new CreateOperationHandler(client, model, inputValidator),
                 true
             );
         },
@@ -358,12 +335,7 @@ function createModelCrudHandler<
             return createPromise(
                 'createMany',
                 args,
-                new CreateOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'createMany',
-                    queryArgs: args,
-                }),
+                new CreateOperationHandler(client, model, inputValidator),
                 false
             );
         },
@@ -372,12 +344,7 @@ function createModelCrudHandler<
             return createPromise(
                 'update',
                 args,
-                new UpdateOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'update',
-                    queryArgs: args,
-                }),
+                new UpdateOperationHandler(client, model, inputValidator),
                 true
             );
         },
@@ -386,12 +353,7 @@ function createModelCrudHandler<
             return createPromise(
                 'updateMany',
                 args,
-                new UpdateOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'updateMany',
-                    queryArgs: args,
-                }),
+                new UpdateOperationHandler(client, model, inputValidator),
                 false
             );
         },
@@ -400,12 +362,7 @@ function createModelCrudHandler<
             return createPromise(
                 'delete',
                 args,
-                new DeleteOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'delete',
-                    queryArgs: args,
-                }),
+                new DeleteOperationHandler(client, model, inputValidator),
                 true
             );
         },
@@ -414,12 +371,7 @@ function createModelCrudHandler<
             return createPromise(
                 'deleteMany',
                 args,
-                new DeleteOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'deleteMany',
-                    queryArgs: args,
-                }),
+                new DeleteOperationHandler(client, model, inputValidator),
                 false
             );
         },
@@ -428,12 +380,7 @@ function createModelCrudHandler<
             return createPromise(
                 'count',
                 args,
-                new CountOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'count',
-                    queryArgs: args,
-                }),
+                new CountOperationHandler(client, model, inputValidator),
                 false
             );
         },
@@ -442,12 +389,7 @@ function createModelCrudHandler<
             return createPromise(
                 'aggregate',
                 args,
-                new AggregateOperationHandler(client, model, inputValidator, {
-                    client,
-                    model,
-                    operation: 'aggregate',
-                    queryArgs: args,
-                }),
+                new AggregateOperationHandler(client, model, inputValidator),
                 false
             );
         },

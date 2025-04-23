@@ -23,6 +23,7 @@
     "scripts": {
         "build": "tsup-node",
         "watch": "tsup-node --watch",
+        "test": "vitest",
         "pack": "pnpm pack"
     },
     "dependencies": {
@@ -43,7 +44,10 @@
     },
     "devDependencies": {
         "@types/async-exit-hook": "^2.0.0",
+        "@types/better-sqlite3": "^7.6.13",
         "@types/semver": "^7.3.13",
-        "@types/tmp": "^0.2.6"
+        "@types/tmp": "^0.2.6",
+        "better-sqlite3": "^11.8.1",
+        "tmp": "^0.2.3"
     }
 }

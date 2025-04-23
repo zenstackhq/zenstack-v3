@@ -72,12 +72,21 @@ importers:
       '@types/async-exit-hook':
         specifier: ^2.0.0
         version: 2.0.2
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/semver':
         specifier: ^7.3.13
         version: 7.5.8
       '@types/tmp':
         specifier: ^0.2.6
         version: 0.2.6
+      better-sqlite3:
+        specifier: ^11.8.1
+        version: 11.8.1
+      tmp:
+        specifier: ^0.2.3
+        version: 0.2.3
 
   packages/language:
     dependencies:
@@ -132,7 +141,7 @@ importers:
         version: 2.5.1
       kysely:
         specifier: ^0.27.5
-        version: 0.27.5
+        version: 0.27.6
       nanoid:
         specifier: ^5.0.9
         version: 5.0.9
@@ -164,6 +173,12 @@ importers:
       '@types/pg':
         specifier: ^8.0.0
         version: 8.11.11
+      '@types/tmp':
+        specifier: ^0.2.6
+        version: 0.2.6
+      tmp:
+        specifier: ^0.2.3
+        version: 0.2.3
 
   packages/tanstack-query:
     dependencies:
@@ -931,6 +946,9 @@ packages:
 
   '@types/better-sqlite3@7.6.12':
     resolution: {integrity: sha512-fnQmj8lELIj7BSrZQAdBMHEHX8OZLYIHXqAKT1O7tDfLxaINzf00PMjw22r3N/xXh0w/sGHlO6SVaCQ2mj78lg==}
+
+  '@types/better-sqlite3@7.6.13':
+    resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
 
   '@types/estree@1.0.6':
     resolution: {integrity: sha512-AYnb1nQyY49te+VRAVgmzfcgjYS91mY5P0TKUDCLEM+gNnA+3T6rWITXRLYCpahpqSQbN5cE+gHpnPyXjHWxcw==}
@@ -1793,8 +1811,8 @@ packages:
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
 
-  kysely@0.27.5:
-    resolution: {integrity: sha512-s7hZHcQeSNKpzCkHRm8yA+0JPLjncSWnjb+2TIElwS2JAqYr+Kv3Ess+9KFfJS0C1xcQ1i9NkNHpWwCYpHMWsA==}
+  kysely@0.27.6:
+    resolution: {integrity: sha512-FIyV/64EkKhJmjgC0g2hygpBv5RNWVPyNCqSAD7eTCv6eFWNIi4PN1UvdSJGicN/o35bnevgis4Y0UDC0qi8jQ==}
     engines: {node: '>=14.0.0'}
 
   langium-cli@3.3.0:
@@ -2489,6 +2507,10 @@ packages:
   tinyspy@3.0.2:
     resolution: {integrity: sha512-n1cw8k1k0x4pgA2+9XrOkFydTerNcJ1zWCO5Nn9scWHTD+5tp8dghT2x1uduQePZTZgd3Tupf+x9BxJjeJi77Q==}
     engines: {node: '>=14.0.0'}
+
+  tmp@0.2.3:
+    resolution: {integrity: sha512-nZD7m9iCPC5g0pYmcaxogYKggSfLsdxl8of3Q/oIbqCqLLIO9IAF0GWjX1z9NZRHPiXv8Wex4yDCaZsgEw0Y8w==}
+    engines: {node: '>=14.14'}
 
   to-regex-range@5.0.1:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
@@ -3261,6 +3283,10 @@ snapshots:
   '@types/better-sqlite3@7.6.12':
     dependencies:
       '@types/node': 18.19.71
+
+  '@types/better-sqlite3@7.6.13':
+    dependencies:
+      '@types/node': 20.17.24
 
   '@types/estree@1.0.6': {}
 
@@ -4314,7 +4340,7 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  kysely@0.27.5: {}
+  kysely@0.27.6: {}
 
   langium-cli@3.3.0:
     dependencies:
@@ -5035,6 +5061,8 @@ snapshots:
   tinyrainbow@2.0.0: {}
 
   tinyspy@3.0.2: {}
+
+  tmp@0.2.3: {}
 
   to-regex-range@5.0.1:
     dependencies:

@@ -18,14 +18,14 @@ describe('Query interception tests', () => {
         let hooksCalled = false;
         const client = _client.$use({
             id: 'test-plugin',
-            onQuery(args, proceed) {
+            onQuery(args) {
                 hooksCalled = true;
                 expect(args).toMatchObject({
                     model: 'User',
                     operation: 'findFirst',
                     queryArgs: { where: { id: user.id } },
                 });
-                return proceed(args.queryArgs);
+                return args.proceed(args.queryArgs);
             },
         });
 
@@ -45,9 +45,9 @@ describe('Query interception tests', () => {
         let hooksCalled = false;
         const client = _client.$use({
             id: 'test-plugin',
-            onQuery(_args, proceed) {
+            onQuery(args) {
                 hooksCalled = true;
-                return proceed({ where: { id: 'non-exist' } });
+                return args.proceed({ where: { id: 'non-exist' } });
             },
         });
 
@@ -67,9 +67,9 @@ describe('Query interception tests', () => {
         let hooksCalled = false;
         const client = _client.$use({
             id: 'test-plugin',
-            async onQuery(args, proceed) {
+            async onQuery({ proceed, queryArgs }) {
                 hooksCalled = true;
-                const result = await proceed(args.queryArgs);
+                const result = await proceed(queryArgs);
                 (result as any).happy = true;
                 return result;
             },
@@ -102,10 +102,10 @@ describe('Query interception tests', () => {
         const client = _client
             .$use({
                 id: 'test-plugin',
-                async onQuery(_args, proceed) {
+                async onQuery(args) {
                     hooks1Called = true;
                     console.log('Plugin1 ready to proceed');
-                    const r = await proceed({ where: { id: user2.id } });
+                    const r = await args.proceed({ where: { id: user2.id } });
                     (r as any).happy = true;
                     (r as any).source = 'plugin1';
                     console.log('Plugin1 ready to return', r);
@@ -114,10 +114,10 @@ describe('Query interception tests', () => {
             })
             .$use({
                 id: 'test-plugin-2',
-                async onQuery(_args, proceed) {
+                async onQuery(args) {
                     hooks2Called = true;
                     console.log('Plugin2 ready to proceed');
-                    const r = await proceed({ where: { id: user3.id } });
+                    const r = await args.proceed({ where: { id: user3.id } });
                     (r as any).source = 'plugin2';
                     console.log('Plugin2 ready to return', r);
                     return r;
@@ -142,9 +142,9 @@ describe('Query interception tests', () => {
         let hooksCalled = false;
         const client = _client.$use({
             id: 'test-plugin',
-            async onQuery(args, proceed) {
+            async onQuery(args) {
                 hooksCalled = true;
-                await proceed(args.queryArgs);
+                await args.proceed(args.queryArgs);
                 throw new Error('trigger error');
             },
         });
@@ -167,10 +167,10 @@ describe('Query interception tests', () => {
         let hooksCalled = false;
         const client = _client.$use({
             id: 'test-plugin',
-            async onQuery(args, proceed) {
+            async onQuery(args) {
                 hooksCalled = true;
                 return args.client.$transaction(async (tx) => {
-                    await proceed(args.queryArgs, tx);
+                    await args.proceed(args.queryArgs, tx);
                     throw new Error('trigger error');
                 });
             },

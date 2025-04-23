@@ -1,6 +1,5 @@
-import type { RootOperationNode } from 'kysely';
 import {
-    type PluginTransformKyselyQueryArgs,
+    type OnKyselyQueryArgs,
     type RuntimePlugin,
 } from '../../client/plugin';
 import type { SchemaDef } from '../../schema';
@@ -28,12 +27,11 @@ export class PolicyPlugin<Schema extends SchemaDef>
         return 'Enforces access policies defined in the schema.';
     }
 
-    transformKyselyQuery: (
-        args: PluginTransformKyselyQueryArgs<Schema>
-    ) => RootOperationNode = ({ node, client }) => {
+    onKyselyQuery({ proceed, query, client }: OnKyselyQueryArgs<Schema>) {
         const transformer = new PolicyTransformer<Schema>(client, this.options);
-        return transformer.transformNode(node);
-    };
+        const transformedQuery = transformer.transformNode(query);
+        return proceed(transformedQuery);
+    }
 
     setAuth(auth: Auth<Schema>) {
         return new PolicyPlugin<Schema>({

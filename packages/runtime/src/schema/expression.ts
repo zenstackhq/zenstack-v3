@@ -1,5 +1,6 @@
 export type Expression =
     | LiteralExpression
+    | ArrayExpression
     | FieldReferenceExpression
     | MemberAccessExpression
     | CallExpression
@@ -11,6 +12,11 @@ export type Expression =
 export type LiteralExpression = {
     kind: 'literal';
     value: string | number | boolean;
+};
+
+export type ArrayExpression = {
+    kind: 'array';
+    items: Expression[];
 };
 
 export type FieldReferenceExpression = {
@@ -68,6 +74,13 @@ export const Expression = {
         return {
             kind: 'literal',
             value,
+        };
+    },
+
+    array: (items: Expression[]): ArrayExpression => {
+        return {
+            kind: 'array',
+            items,
         };
     },
 
@@ -145,6 +158,9 @@ export const Expression = {
 
     isLiteral: (value: unknown): value is LiteralExpression =>
         Expression.is(value, 'literal'),
+
+    isArray: (value: unknown): value is ArrayExpression =>
+        Expression.is(value, 'array'),
 
     isRef: (value: unknown): value is FieldReferenceExpression =>
         Expression.is(value, 'ref'),

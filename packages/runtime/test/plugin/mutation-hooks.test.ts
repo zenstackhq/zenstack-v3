@@ -200,6 +200,8 @@ describe('Entity lifecycle tests', () => {
     it('can intercept multi-entity mutations', async () => {
         let userCreateIntercepted = false;
         let userUpdateIntercepted = false;
+        let userDeleteIntercepted = false;
+
         const client = _client.$use({
             id: 'test',
             mutationInterceptionFilter: () => {
@@ -231,6 +233,14 @@ describe('Entity lifecycle tests', () => {
                             }),
                         ])
                     );
+                } else if (args.action === 'delete') {
+                    userDeleteIntercepted = true;
+                    expect(args.afterMutationEntities).toEqual(
+                        expect.arrayContaining([
+                            expect.objectContaining({ email: 'u1@test.com' }),
+                            expect.objectContaining({ email: 'u2@test.com' }),
+                        ])
+                    );
                 }
             },
         });
@@ -244,6 +254,7 @@ describe('Entity lifecycle tests', () => {
 
         expect(userCreateIntercepted).toBe(true);
         expect(userUpdateIntercepted).toBe(true);
+        expect(userDeleteIntercepted).toBe(false);
     });
 
     it('can intercept nested mutations', async () => {

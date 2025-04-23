@@ -29,7 +29,10 @@ export class PolicyTransformer<
         private readonly options: PolicyOptions<Schema>
     ) {
         super();
-        this.dialect = getCrudDialect(client.$schema, client.$options);
+        this.dialect = getCrudDialect(
+            this.client.$schema,
+            this.client.$options
+        );
     }
 
     protected override transformSelectQuery(node: SelectQueryNode) {
@@ -120,10 +123,11 @@ export class PolicyTransformer<
     }
 
     private buildPolicyWhere(model: GetModels<Schema>, policy: Policy) {
-        return new ExpressionTransformer(this.client, this.options).transform(
-            policy.expression,
-            { model }
-        );
+        return new ExpressionTransformer(
+            this.client.$schema,
+            this.client.$options,
+            this.options
+        ).transform(policy.expression, { model });
     }
 
     private getModelPolicies(modelName: string) {

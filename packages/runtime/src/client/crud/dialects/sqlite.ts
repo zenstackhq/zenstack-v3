@@ -76,23 +76,21 @@ export class SqliteCrudDialect<
 
         // simple select by default
         let tbl: SelectQueryBuilder<any, any, any> = eb.selectFrom(
-            `${relationModelDef.dbTable} as ${subQueryName}`
+            `${relationModel} as ${subQueryName}`
         );
 
         // however if there're filter/orderBy/take/skip,
         // we need to build a subquery to handle them before aggregation
         if (payload && typeof payload === 'object') {
             tbl = eb.selectFrom(() => {
-                let subQuery = eb
-                    .selectFrom(relationModelDef.dbTable)
-                    .selectAll();
+                let subQuery = eb.selectFrom(relationModel).selectAll();
 
                 if (payload.where) {
                     subQuery = subQuery.where((eb) =>
                         this.buildFilter(
                             eb,
                             relationModel,
-                            relationModelDef.dbTable,
+                            relationModel,
                             payload.where
                         )
                     );
@@ -108,7 +106,7 @@ export class SqliteCrudDialect<
                     subQuery = this.buildOrderBy(
                         subQuery,
                         relationModel,
-                        relationModelDef.dbTable,
+                        relationModel,
                         payload.orderBy
                     );
                 }

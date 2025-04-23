@@ -16,7 +16,6 @@ const schema = {
     },
     models: {
         Model: {
-            dbTable: 'Model',
             fields: {
                 uuid: {
                     type: 'String',

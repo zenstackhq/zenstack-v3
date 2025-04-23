@@ -17,8 +17,8 @@ export type SchemaDef = {
 };
 
 export type ModelDef = {
-    dbTable: string;
     fields: Record<string, FieldDef>;
+    attributes?: AttributeApplication[];
     uniqueFields: Record<
         string,
         // singular unique field
@@ -29,6 +29,16 @@ export type ModelDef = {
     idFields: string[];
     policies?: Policy[];
     computedFields?: Record<string, Function>;
+};
+
+export type AttributeApplication = {
+    name: string;
+    args?: AttributeArg[];
+};
+
+export type AttributeArg = {
+    name?: string;
+    value: Expression;
 };
 
 export type PolicyKind = 'allow' | 'deny';
@@ -71,6 +81,7 @@ export type FieldDef = {
     optional?: boolean;
     unique?: boolean;
     updatedAt?: boolean;
+    attributes?: AttributeApplication[];
     default?: MappedBuiltinType | FieldDefaultProvider;
     relation?: RelationInfo;
     foreignKeyFor?: string[];

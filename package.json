@@ -5,7 +5,8 @@
     "packageManager": "pnpm@10.0.0",
     "scripts": {
         "build": "pnpm -r build",
-        "test": "pnpm -r test"
+        "watch": "pnpm -r --parallel watch",
+        "test": "pnpm vitest"
     },
     "keywords": [],
     "author": "",

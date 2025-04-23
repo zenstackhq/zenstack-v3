@@ -20,6 +20,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
         afterEach(async () => {
             await client?.$disconnect();
         });
+
         it('returns correct data rows', async () => {
             let r = await client.user.findMany();
             expect(r).toHaveLength(0);

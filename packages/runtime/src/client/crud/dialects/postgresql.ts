@@ -66,7 +66,6 @@ export class PostgresCrudDialect<
             relationField
         );
         const relationModel = relationFieldDef.type as GetModels<Schema>;
-        const relationModelDef = requireModel(this.schema, relationModel);
 
         return qb.leftJoinLateral(
             (eb) => {
@@ -74,7 +73,7 @@ export class PostgresCrudDialect<
 
                 // simple select by default
                 let result = eb.selectFrom(
-                    `${relationModelDef.dbTable} as ${joinTableName}`
+                    `${relationModel} as ${joinTableName}`
                 );
 
                 // however if there're filter/orderBy/take/skip,
@@ -82,7 +81,7 @@ export class PostgresCrudDialect<
                 if (payload && typeof payload === 'object') {
                     result = eb.selectFrom(() => {
                         let subQuery = eb
-                            .selectFrom(`${relationModelDef.dbTable}`)
+                            .selectFrom(`${relationModel}`)
                             .selectAll();
 
                         if (payload.where) {
@@ -90,7 +89,7 @@ export class PostgresCrudDialect<
                                 this.buildFilter(
                                     eb,
                                     relationModel,
-                                    relationModelDef.dbTable,
+                                    relationModel,
                                     payload.where
                                 )
                             );
@@ -106,7 +105,7 @@ export class PostgresCrudDialect<
                             subQuery = this.buildOrderBy(
                                 subQuery,
                                 relationModel,
-                                relationModelDef.dbTable,
+                                relationModel,
                                 payload.orderBy
                             );
                         }

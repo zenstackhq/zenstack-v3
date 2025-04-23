@@ -11,18 +11,16 @@ export class CountOperationHandler<
             args
         );
 
-        const modelDef = this.requireModel(this.model);
-
         let query = this.kysely.selectFrom((eb) => {
             // nested query for filtering and pagination
             let subQuery = eb
-                .selectFrom(modelDef.dbTable)
+                .selectFrom(this.model)
                 .selectAll()
                 .where((eb1) =>
                     this.dialect.buildFilter(
                         eb1,
                         this.model,
-                        modelDef.dbTable,
+                        this.model,
                         validatedArgs?.where
                     )
                 );
@@ -49,19 +47,13 @@ export class CountOperationHandler<
                 )
             );
 
-            return this.queryExecutor.executeTakeFirstOrThrow(
-                this.kysely,
-                query
-            );
+            return query.executeTakeFirstOrThrow();
         } else {
             // simple count all
             query = query.select((eb) =>
                 eb.cast(eb.fn.countAll(), 'integer').as('count')
             );
-            const result = await this.queryExecutor.executeTakeFirstOrThrow(
-                this.kysely,
-                query
-            );
+            const result = await query.executeTakeFirstOrThrow();
             return (result as any).count as number;
         }
     }

@@ -10,10 +10,10 @@ import {
 } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
-import type { ClientContract } from '../../client';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base';
 import { QueryError } from '../../client/errors';
+import type { ClientOptions } from '../../client/options';
 import {
     getIdFields,
     getRelationForeignKeyFieldPairs,
@@ -59,19 +59,14 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     private readonly schemaPolicy: SchemaPolicy;
 
     constructor(
-        private readonly client: ClientContract<Schema>,
+        private readonly schema: Schema,
+        private readonly clientOptions: ClientOptions<Schema>,
         options: PolicyOptions<Schema>
     ) {
-        // if (!options.features?.policy) {
-        //     throw new QueryError(`Policy feature setting is required`);
-        // }
-        // this.policySettings = options.features.policy;
         this.options = options;
-        this.dialect = getCrudDialect(client.$schema, client.$options);
-        invariant(this.client.$schema.plugins['policy']);
-        this.schemaPolicy = this.client.$schema.plugins[
-            'policy'
-        ] as SchemaPolicy;
+        this.dialect = getCrudDialect(this.schema, this.clientOptions);
+        invariant(this.schema.plugins['policy']);
+        this.schemaPolicy = this.schema.plugins['policy'] as SchemaPolicy;
     }
 
     transform(
@@ -135,7 +130,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             );
         } else if (Expression.isThis(other)) {
             const idFields = getIdFields(
-                this.client.$schema,
+                this.schema,
                 this.schemaPolicy.authModel
             );
             return this.buildAuthFieldComparison(
@@ -144,7 +139,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             );
         } else if (Expression.isRef(other)) {
             const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
-                this.client.$schema,
+                this.schema,
                 other.model,
                 other.field
             );
@@ -195,11 +190,8 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     private transformAuthFieldSelect(field: string): OperationNode {
         return this.transformValue(
             this.options.auth?.[field as keyof typeof this.options.auth],
-            requireField(
-                this.client.$schema,
-                this.schemaPolicy.authModel!,
-                field
-            ).type as BuiltinType
+            requireField(this.schema, this.schemaPolicy.authModel!, field)
+                .type as BuiltinType
         );
     }
 

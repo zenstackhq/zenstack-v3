@@ -1,15 +1,36 @@
 import type { Model } from '@zenstackhq/language/ast';
 import type {
-    KyselyPlugin,
     OperationNode,
     QueryResult,
     RootOperationNode,
     UnknownRow,
 } from 'kysely';
-import type { ClientContract } from '.';
+import type { ClientContract, ToKysely } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
-import type { QueryContext } from './query-executor';
+import type { CrudOperation } from './crud/operations/base';
+
+export type QueryContext<Schema extends SchemaDef> = {
+    /**
+     * The ZenStack client that's invoking the plugin.
+     */
+    client: ClientContract<Schema>;
+
+    /**
+     * The model that is being queried.
+     */
+    model: GetModels<Schema>;
+
+    /**
+     * The query operation that is being performed.
+     */
+    operation: CrudOperation;
+
+    /**
+     * The query arguments.
+     */
+    queryArgs: unknown;
+};
 
 /**
  * The result of the hooks interception filter.
@@ -51,27 +72,10 @@ type MutationHooksArgs<Schema extends SchemaDef> = {
      * The mutation data. Only available for create and update actions.
      */
     queryNode: OperationNode;
-
-    /**
-     * The top-level query context.
-     */
-    context: PluginContext<Schema>;
 };
 
-export type PluginContext<Schema extends SchemaDef> = QueryContext<Schema>;
-
-export type OnQueryArgs<Schema extends SchemaDef> = PluginContext<Schema> & {
+export type OnQueryArgs<Schema extends SchemaDef> = QueryContext<Schema> & {
     proceed: ProceedQueryFunction<Schema>;
-};
-
-export type PluginTransformKyselyQueryArgs<Schema extends SchemaDef> = {
-    client: ClientContract<Schema>;
-    node: RootOperationNode;
-};
-
-export type PluginTransformKyselyResultArgs<Schema extends SchemaDef> = {
-    client: ClientContract<Schema>;
-    result: QueryResult<UnknownRow>;
 };
 
 export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> =
@@ -86,9 +90,28 @@ export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> =
     };
 
 export type ProceedQueryFunction<Schema extends SchemaDef> = (
-    queryArgs?: unknown,
+    queryArgs: unknown,
     tx?: ClientContract<Schema>
 ) => Promise<unknown>;
+
+export type OnKyselyQueryTransactionCallback = (
+    proceed: ProceedKyselyQueryFunction
+) => Promise<QueryResult<any>>;
+
+export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
+    kysely: ToKysely<Schema>;
+    schema: SchemaDef;
+    client: ClientContract<Schema>;
+    query: RootOperationNode;
+    proceed: ProceedKyselyQueryFunction;
+    transaction: (
+        callback: OnKyselyQueryTransactionCallback
+    ) => Promise<QueryResult<any>>;
+};
+
+export type ProceedKyselyQueryFunction = (
+    query: RootOperationNode
+) => Promise<QueryResult<any>>;
 
 /**
  * ZenStack runtime plugin.
@@ -115,17 +138,10 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     onQuery?: (args: OnQueryArgs<Schema>) => Promise<unknown>;
 
     /**
-     * Kysely query transformation. See {@link KyselyPlugin.transformQuery}.
+     * Intercepts a Kysely query.
      */
-    transformKyselyQuery?: (
-        args: PluginTransformKyselyQueryArgs<Schema>
-    ) => RootOperationNode;
-
-    /**
-     * Kysely query result transformation. See {@link KyselyPlugin.transformResult}.
-     */
-    transformKyselyResult?: (
-        args: PluginTransformKyselyResultArgs<Schema>
+    onKyselyQuery?: (
+        args: OnKyselyQueryArgs<Schema>
     ) => Promise<QueryResult<UnknownRow>>;
 
     /**

@@ -161,10 +161,7 @@ export type Where<
           >;
 } & {
     $expr?: (
-        eb: ExpressionBuilder<
-            ToKyselySchema<Schema>,
-            GetModel<Schema, Model>['dbTable']
-        >
+        eb: ExpressionBuilder<ToKyselySchema<Schema>, Model>
     ) => OperandExpression<SqlBool>;
 } & {
     AND?: OrArray<Where<Schema, Model, ScalarOnly>>;

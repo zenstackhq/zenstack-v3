@@ -231,7 +231,7 @@ export function buildJoinPairs(
     model: string,
     modelAlias: string,
     relationField: string,
-    relationAlias: string
+    relationModelAlias: string
 ): [string, string][] {
     const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
         schema,
@@ -242,10 +242,10 @@ export function buildJoinPairs(
     return keyPairs.map(({ fk, pk }) => {
         if (ownedByModel) {
             // the parent model owns the fk
-            return [`${relationAlias}.${pk}`, `${modelAlias}.${fk}`];
+            return [`${relationModelAlias}.${pk}`, `${modelAlias}.${fk}`];
         } else {
             // the relation side owns the fk
-            return [`${relationAlias}.${fk}`, `${modelAlias}.${pk}`];
+            return [`${relationModelAlias}.${fk}`, `${modelAlias}.${pk}`];
         }
     });
 }

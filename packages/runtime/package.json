@@ -6,8 +6,8 @@
     "scripts": {
         "build": "tsup-node",
         "watch": "tsup-node --watch",
-        "pack": "pnpm pack",
-        "test": "vitest"
+        "test": "vitest",
+        "pack": "pnpm pack"
     },
     "keywords": [],
     "author": "ZenStack Team",
@@ -92,6 +92,8 @@
     },
     "devDependencies": {
         "@types/better-sqlite3": "^7.0.0",
-        "@types/pg": "^8.0.0"
+        "@types/pg": "^8.0.0",
+        "@types/tmp": "^0.2.6",
+        "tmp": "^0.2.3"
     }
 }

@@ -55,10 +55,7 @@ export type ComputedFieldsOptions<Schema extends SchemaDef> = {
         ? Model
         : never]: {
         [Field in keyof Schema['models'][Model]['computedFields']]: PrependParameter<
-            ExpressionBuilder<
-                ToKyselySchema<Schema>,
-                GetModel<Schema, Model>['dbTable']
-            >,
+            ExpressionBuilder<ToKyselySchema<Schema>, Model>,
             Schema['models'][Model]['computedFields'][Field]
         >;
     };

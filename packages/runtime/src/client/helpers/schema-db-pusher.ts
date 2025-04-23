@@ -7,7 +7,11 @@ import {
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { FieldDef, ModelDef, SchemaDef } from '../../schema';
-import type { BuiltinType, CascadeAction } from '../../schema/schema';
+import type {
+    BuiltinType,
+    CascadeAction,
+    GetModels,
+} from '../../schema/schema';
 import type { ToKysely } from '../query-builder';
 import { requireModel } from '../query-utils';
 
@@ -34,22 +38,28 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 }
             }
 
-            for (const modelDef of Object.values(this.schema.models)) {
-                const createTable = this.createModelTable(tx, modelDef);
+            for (const model of Object.keys(this.schema.models)) {
+                const createTable = this.createModelTable(
+                    tx,
+                    model as GetModels<Schema>
+                );
                 // console.log('Creating table:', createTable.compile().sql);
                 await createTable.execute();
             }
         });
     }
 
-    private createModelTable(kysely: ToKysely<Schema>, modelDef: ModelDef) {
-        let table = kysely.schema.createTable(modelDef.dbTable).ifNotExists();
-
+    private createModelTable(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>
+    ) {
+        let table = kysely.schema.createTable(model).ifNotExists();
+        const modelDef = requireModel(this.schema, model);
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
             if (fieldDef.relation) {
                 table = this.addForeignKeyConstraint(
                     table,
-                    modelDef,
+                    model,
                     fieldName,
                     fieldDef
                 );
@@ -58,7 +68,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             }
         }
 
-        table = this.addPrimaryKeyConstraint(table, modelDef);
+        table = this.addPrimaryKeyConstraint(table, model, modelDef);
         table = this.addUniqueConstraint(table, modelDef);
 
         return table;
@@ -66,6 +76,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
     private addPrimaryKeyConstraint(
         table: CreateTableBuilder<string, any>,
+        model: GetModels<Schema>,
         modelDef: ModelDef
     ) {
         if (modelDef.idFields.length === 1) {
@@ -77,7 +88,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
         if (modelDef.idFields.length > 0) {
             table = table.addPrimaryKeyConstraint(
-                `pk_${modelDef.dbTable}`,
+                `pk_${model}`,
                 modelDef.idFields
             );
         }
@@ -178,7 +189,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
     private addForeignKeyConstraint(
         table: CreateTableBuilder<string, any>,
-        modelDef: ModelDef,
+        model: GetModels<Schema>,
         fieldName: string,
         fieldDef: FieldDef
     ) {
@@ -189,12 +200,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             return table;
         }
 
-        const relationModelDef = requireModel(this.schema, fieldDef.type);
-
         table = table.addForeignKeyConstraint(
-            `fk_${modelDef.dbTable}_${fieldName}`,
+            `fk_${model}_${fieldName}`,
             fieldDef.relation.fields,
-            relationModelDef.dbTable,
+            fieldDef.type,
             fieldDef.relation.references,
             (cb) => {
                 if (fieldDef.relation?.onDelete) {

@@ -12,16 +12,34 @@ export const schema = {
     },
     models: {
         User: {
-            dbTable: 'User',
             fields: {
                 id: {
                     type: 'String',
                     id: true,
                     default: { call: 'cuid' },
+                    attributes: [
+                        { name: '@id' },
+                        {
+                            name: '@default',
+                            args: [
+                                {
+                                    value: {
+                                        kind: 'call',
+                                        function: 'cuid',
+                                    },
+                                },
+                            ],
+                        },
+                    ],
                 },
                 email: {
                     type: 'String',
                     unique: true,
+                    attributes: [
+                        {
+                            name: '@unique',
+                        },
+                    ],
                 },
                 name: {
                     type: 'String',
@@ -30,10 +48,28 @@ export const schema = {
                 createdAt: {
                     type: 'DateTime',
                     default: { call: 'now' },
+                    attributes: [
+                        {
+                            name: '@default',
+                            args: [
+                                {
+                                    value: {
+                                        kind: 'call',
+                                        function: 'now',
+                                    },
+                                },
+                            ],
+                        },
+                    ],
                 },
                 updatedAt: {
                     type: 'DateTime',
                     updatedAt: true,
+                    attributes: [
+                        {
+                            name: '@updatedAt',
+                        },
+                    ],
                 },
                 role: {
                     type: 'Role',
@@ -83,7 +119,6 @@ export const schema = {
             ],
         },
         Post: {
-            dbTable: 'Post',
             fields: {
                 id: {
                     type: 'String',
@@ -164,7 +199,6 @@ export const schema = {
             ],
         },
         Comment: {
-            dbTable: 'Comment',
             fields: {
                 id: {
                     type: 'String',
@@ -205,7 +239,6 @@ export const schema = {
             },
         },
         Profile: {
-            dbTable: 'Profile',
             fields: {
                 id: {
                     type: 'String',

@@ -62,6 +62,7 @@
         -   [?] Custom table name
         -   [ ] Custom field name
 -   [ ] Access Policy
+-   [ ] Polymorphism
 -   [x] Migration
 -   [ ] Databases
     -   [x] SQLite

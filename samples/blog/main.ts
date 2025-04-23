@@ -22,9 +22,9 @@ async function main() {
         },
     }).$use({
         id: 'cost-logger',
-        async onQuery({ model, operation, proceed }) {
+        async onQuery({ model, operation, proceed, queryArgs }) {
             const start = Date.now();
-            const result = await proceed();
+            const result = await proceed(queryArgs);
             console.log(
                 `[cost] ${model} ${operation} took ${Date.now() - start}ms`
             );

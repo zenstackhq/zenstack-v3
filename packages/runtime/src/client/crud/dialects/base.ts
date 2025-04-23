@@ -28,7 +28,6 @@ import {
     getRelationForeignKeyFieldPairs,
     isEnum,
     requireField,
-    requireModel,
 } from '../../query-utils';
 
 export abstract class BaseCrudDialect<Schema extends SchemaDef> {
@@ -58,7 +57,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     buildFilter(
         eb: ExpressionBuilder<any, any>,
         model: string,
-        table: string,
+        modelAlias: string,
         where: object | undefined
     ) {
         let result = this.true(eb);
@@ -84,7 +83,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 result = this.and(
                     eb,
                     result,
-                    this.buildCompositeFilter(eb, model, table, key, payload)
+                    this.buildCompositeFilter(
+                        eb,
+                        model,
+                        modelAlias,
+                        key,
+                        payload
+                    )
                 );
                 continue;
             }
@@ -97,7 +102,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     this.buildRelationFilter(
                         eb,
                         model,
-                        table,
+                        modelAlias,
                         key,
                         fieldDef,
                         payload
@@ -110,7 +115,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     this.buildPrimitiveFilter(
                         eb,
                         model,
-                        table,
+                        modelAlias,
                         key,
                         fieldDef,
                         payload
@@ -130,7 +135,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     protected buildCompositeFilter(
         eb: ExpressionBuilder<any, any>,
         model: string,
-        table: string,
+        modelAlias: string,
         key: 'AND' | 'OR' | 'NOT',
         payload: any
     ): Expression<SqlBool> {
@@ -139,7 +144,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 this.and(
                     eb,
                     ...enumerate(payload).map((subPayload) =>
-                        this.buildFilter(eb, model, table, subPayload)
+                        this.buildFilter(eb, model, modelAlias, subPayload)
                     )
                 )
             )
@@ -147,22 +152,28 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 this.or(
                     eb,
                     ...enumerate(payload).map((subPayload) =>
-                        this.buildFilter(eb, model, table, subPayload)
+                        this.buildFilter(eb, model, modelAlias, subPayload)
                     )
                 )
             )
             .with('NOT', () =>
                 eb.not(
-                    this.buildCompositeFilter(eb, model, table, 'AND', payload)
+                    this.buildCompositeFilter(
+                        eb,
+                        model,
+                        modelAlias,
+                        'AND',
+                        payload
+                    )
                 )
             )
             .exhaustive();
     }
 
-    buildRelationFilter(
+    private buildRelationFilter(
         eb: ExpressionBuilder<any, any>,
         model: string,
-        table: string,
+        modelAlias: string,
         field: string,
         fieldDef: FieldDef,
         payload: any
@@ -171,7 +182,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             return this.buildToOneRelationFilter(
                 eb,
                 model,
-                table,
+                modelAlias,
                 field,
                 fieldDef,
                 payload
@@ -180,7 +191,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             return this.buildToManyRelationFilter(
                 eb,
                 model,
-                table,
+                modelAlias,
                 field,
                 fieldDef,
                 payload
@@ -322,7 +333,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         fieldDef: FieldDef,
         payload: any
     ) {
-        const fieldModelDef = requireModel(this.schema, fieldDef.type);
+        const relationModel = fieldDef.type;
 
         const relationKeyPairs = getRelationForeignKeyFieldPairs(
             this.schema,
@@ -345,7 +356,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         eb(
                             sql.ref(`${table}.${fk}`),
                             '=',
-                            sql.ref(`${fieldModelDef.dbTable}.${pk}`)
+                            sql.ref(`${relationModel}.${pk}`)
                         )
                     );
                 } else {
@@ -355,7 +366,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         eb(
                             sql.ref(`${table}.${pk}`),
                             '=',
-                            sql.ref(`${fieldModelDef.dbTable}.${fk}`)
+                            sql.ref(`${relationModel}.${fk}`)
                         )
                     );
                 }
@@ -377,7 +388,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         result,
                         eb(
                             eb
-                                .selectFrom(fieldModelDef.dbTable)
+                                .selectFrom(relationModel)
                                 .select((eb1) =>
                                     eb1.fn.count(eb1.lit(1)).as('count')
                                 )
@@ -385,8 +396,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                 .where((eb1) =>
                                     this.buildFilter(
                                         eb1,
-                                        fieldDef.type,
-                                        fieldModelDef.dbTable,
+                                        relationModel,
+                                        relationModel,
                                         subPayload
                                     )
                                 ),
@@ -403,7 +414,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         result,
                         eb(
                             eb
-                                .selectFrom(fieldModelDef.dbTable)
+                                .selectFrom(relationModel)
                                 .select((eb1) =>
                                     eb1.fn.count(eb1.lit(1)).as('count')
                                 )
@@ -412,8 +423,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                     eb1.not(
                                         this.buildFilter(
                                             eb1,
-                                            fieldDef.type,
-                                            fieldModelDef.dbTable,
+                                            relationModel,
+                                            relationModel,
                                             subPayload
                                         )
                                     )
@@ -431,7 +442,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         result,
                         eb(
                             eb
-                                .selectFrom(fieldModelDef.dbTable)
+                                .selectFrom(relationModel)
                                 .select((eb1) =>
                                     eb1.fn.count(eb1.lit(1)).as('count')
                                 )
@@ -439,8 +450,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                 .where((eb1) =>
                                     this.buildFilter(
                                         eb1,
-                                        fieldDef.type,
-                                        fieldModelDef.dbTable,
+                                        relationModel,
+                                        relationModel,
                                         subPayload
                                     )
                                 ),
@@ -751,7 +762,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     buildOrderBy(
         query: SelectQueryBuilder<any, any, any>,
         model: string,
-        table: string,
+        modelAlias: string,
         orderBy: NonNullable<
             FindArgs<Schema, GetModels<Schema>, true>['orderBy']
         >
@@ -768,7 +779,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 if (!fieldDef.relation) {
                     if (value === 'asc' || value === 'desc') {
                         result = result.orderBy(
-                            sql.ref(`${table}.${field}`),
+                            sql.ref(`${modelAlias}.${field}`),
                             value
                         );
                     } else if (
@@ -780,16 +791,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         (value.nulls === 'first' || value.nulls === 'last')
                     ) {
                         result = result.orderBy(
-                            sql.ref(`${table}.${field}`),
+                            sql.ref(`${modelAlias}.${field}`),
                             sql.raw(`${value.sort} nulls ${value.nulls}`)
                         );
                     }
                 } else {
                     // order by relation
-                    const relationModelDef = requireModel(
-                        this.schema,
-                        fieldDef.type
-                    );
+                    const relationModel = fieldDef.type;
 
                     if (fieldDef.array) {
                         // order by to-many relation
@@ -801,15 +809,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         if ('_count' in value) {
                             const sort = value._count;
                             result = result.orderBy((eb) => {
-                                let subQuery = eb.selectFrom(
-                                    relationModelDef.dbTable
-                                );
+                                let subQuery = eb.selectFrom(relationModel);
                                 const joinPairs = buildJoinPairs(
                                     this.schema,
                                     model,
-                                    table,
+                                    modelAlias,
                                     field,
-                                    relationModelDef.dbTable
+                                    relationModel
                                 );
                                 subQuery = subQuery.where(() =>
                                     this.and(
@@ -831,34 +837,27 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         }
                     } else {
                         // order by to-one relation
-                        result = result.leftJoin(
-                            relationModelDef.dbTable,
-                            (join) => {
-                                const joinPairs = buildJoinPairs(
-                                    this.schema,
-                                    model,
-                                    table,
-                                    field,
-                                    relationModelDef.dbTable
-                                );
-                                return join.on((eb) =>
-                                    this.and(
-                                        eb,
-                                        ...joinPairs.map(([left, right]) =>
-                                            eb(
-                                                sql.ref(left),
-                                                '=',
-                                                sql.ref(right)
-                                            )
-                                        )
+                        result = result.leftJoin(relationModel, (join) => {
+                            const joinPairs = buildJoinPairs(
+                                this.schema,
+                                model,
+                                modelAlias,
+                                field,
+                                relationModel
+                            );
+                            return join.on((eb) =>
+                                this.and(
+                                    eb,
+                                    ...joinPairs.map(([left, right]) =>
+                                        eb(sql.ref(left), '=', sql.ref(right))
                                     )
-                                );
-                            }
-                        );
+                                )
+                            );
+                        });
                         result = this.buildOrderBy(
                             result,
                             fieldDef.type,
-                            relationModelDef.dbTable,
+                            relationModel,
                             value
                         );
                     }

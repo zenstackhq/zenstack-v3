@@ -113,6 +113,7 @@ export class ZenStackQueryExecutor<
 
             // trim the result to the original query node
             if (oldQueryNode !== queryNode) {
+                // TODO: trim the result to the original query node
             }
 
             return result;
@@ -158,11 +159,12 @@ export class ZenStackQueryExecutor<
         return proceed(queryNode);
     }
 
-    private async proceedQuery(query: RootOperationNode, queryId: QueryId) {
+    private proceedQuery(query: RootOperationNode, queryId: QueryId) {
         // run built-in transformers
         const finalQuery = this.nameMapper.transformNode(query);
 
         const compiled = this.compileQuery(finalQuery);
+
         return this.driver.txConnection
             ? super
                   .withConnectionProvider(

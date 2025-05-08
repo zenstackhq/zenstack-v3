@@ -1,5 +1,6 @@
 import type { Decimal } from 'decimal.js-light';
 import {
+    type AuthType,
     type GetModels,
     type ProcedureDef,
     type SchemaDef,
@@ -22,6 +23,16 @@ export type ClientContract<Schema extends SchemaDef> = {
     readonly $options: ClientOptions<Schema>;
 
     /**
+     * The current user identity.
+     */
+    get $auth(): AuthType<Schema> | undefined;
+
+    /**
+     * Sets the current user identity.
+     */
+    $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema>;
+
+    /**
      * The Kysely query builder instance.
      */
     readonly $qb: ToKysely<Schema>;
@@ -37,6 +48,11 @@ export type ClientContract<Schema extends SchemaDef> = {
      * Returns a new client with the specified plugin installed.
      */
     $use(plugin: RuntimePlugin<Schema>): ClientContract<Schema>;
+
+    /**
+     * Returns a new client with all plugins removed.
+     */
+    $unuseAll(): ClientContract<Schema>;
 
     /**
      * Disconnects the underlying Kysely instance from the database.

@@ -95,26 +95,42 @@ export const schema = {
                 id: { type: 'String' },
                 email: { type: 'String' },
             },
-            policies: [
+            attributes: [
                 // @@allow('all', auth() == this)
                 {
-                    kind: 'allow',
-                    operations: ['all'],
-                    expression: Expression.binary(
-                        Expression.call('auth'),
-                        '==',
-                        Expression._this()
-                    ),
+                    name: '@@allow',
+                    args: [
+                        {
+                            name: 'operation',
+                            value: Expression.literal('all'),
+                        },
+                        {
+                            name: 'condition',
+                            value: Expression.binary(
+                                Expression.call('auth'),
+                                '==',
+                                Expression._this()
+                            ),
+                        },
+                    ],
                 },
                 // @@allow('read', auth() != null)
                 {
-                    kind: 'allow',
-                    operations: ['read'],
-                    expression: Expression.binary(
-                        Expression.call('auth'),
-                        '!=',
-                        Expression._null()
-                    ),
+                    name: '@@allow',
+                    args: [
+                        {
+                            name: 'operation',
+                            value: Expression.literal('read'),
+                        },
+                        {
+                            name: 'condition',
+                            value: Expression.binary(
+                                Expression.call('auth'),
+                                '!=',
+                                Expression._null()
+                            ),
+                        },
+                    ],
                 },
             ],
         },
@@ -170,31 +186,56 @@ export const schema = {
             uniqueFields: {
                 id: { type: 'String' },
             },
-            policies: [
+            attributes: [
                 // @@deny('all', auth() == null)
                 {
-                    kind: 'deny',
-                    operations: ['all'],
-                    expression: Expression.binary(
-                        Expression.call('auth'),
-                        '==',
-                        Expression._null()
-                    ),
+                    name: '@@deny',
+                    args: [
+                        {
+                            name: 'operation',
+                            value: Expression.literal('all'),
+                        },
+                        {
+                            name: 'condition',
+                            value: Expression.binary(
+                                Expression.call('auth'),
+                                '==',
+                                Expression._null()
+                            ),
+                        },
+                    ],
                 },
                 // @@allow('all', auth() == author)
                 {
-                    kind: 'allow',
-                    operations: ['all'],
-                    expression: Expression.binary(
-                        Expression.call('auth'),
-                        '==',
-                        Expression.ref('Post', 'author')
-                    ),
+                    name: '@@allow',
+                    args: [
+                        {
+                            name: 'operation',
+                            value: Expression.literal('all'),
+                        },
+                        {
+                            name: 'condition',
+                            value: Expression.binary(
+                                Expression.call('auth'),
+                                '==',
+                                Expression.field('author')
+                            ),
+                        },
+                    ],
                 },
+                // @@allow('read', published)
                 {
-                    kind: 'allow',
-                    operations: ['read'],
-                    expression: Expression.ref('Post', 'published'),
+                    name: '@@allow',
+                    args: [
+                        {
+                            name: 'operation',
+                            value: Expression.literal('read'),
+                        },
+                        {
+                            name: 'condition',
+                            value: Expression.field('published'),
+                        },
+                    ],
                 },
             ],
         },
@@ -272,17 +313,14 @@ export const schema = {
             },
         },
     },
+    authType: 'User',
     enums: {
         Role: {
             ADMIN: 'ADMIN',
             USER: 'USER',
         },
     },
-    plugins: {
-        policy: {
-            authModel: 'User',
-        },
-    },
+    plugins: {},
 } as const satisfies SchemaDef;
 
 export function getSchema<ProviderType extends DataSourceProviderType>(

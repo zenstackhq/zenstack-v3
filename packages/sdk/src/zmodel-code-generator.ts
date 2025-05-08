@@ -61,8 +61,8 @@ const generationHandlers = new Map<string, PropertyDescriptor>();
 // generation handler decorator
 function gen(name: string) {
     return function (
-        target: unknown,
-        propertyKey: string,
+        _target: unknown,
+        _propertyKey: string,
         descriptor: PropertyDescriptor
     ) {
         if (!generationHandlers.get(name)) {

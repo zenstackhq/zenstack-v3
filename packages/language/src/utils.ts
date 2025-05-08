@@ -76,13 +76,13 @@ export function isFromStdlib(node: AstNode) {
     );
 }
 
-// export function isAuthInvocation(node: AstNode) {
-//     return (
-//         isInvocationExpr(node) &&
-//         node.function.ref?.name === 'auth' &&
-//         isFromStdlib(node.function.ref)
-//     );
-// }
+export function isAuthInvocation(node: AstNode) {
+    return (
+        isInvocationExpr(node) &&
+        node.function.ref?.name === 'auth' &&
+        isFromStdlib(node.function.ref)
+    );
+}
 
 /**
  * Try getting string value from a potential string literal expression
@@ -161,12 +161,12 @@ export function mapBuiltinTypeToExpressionType(
     }
 }
 
-// export function isAuthOrAuthMemberAccess(expr: Expression): boolean {
-//     return (
-//         isAuthInvocation(expr) ||
-//         (isMemberAccessExpr(expr) && isAuthOrAuthMemberAccess(expr.operand))
-//     );
-// }
+export function isAuthOrAuthMemberAccess(expr: Expression): boolean {
+    return (
+        isAuthInvocation(expr) ||
+        (isMemberAccessExpr(expr) && isAuthOrAuthMemberAccess(expr.operand))
+    );
+}
 
 export function isEnumFieldReference(node: AstNode): node is ReferenceExpr {
     return isReferenceExpr(node) && isEnumField(node.target.ref);
@@ -598,13 +598,13 @@ export function getAllDeclarationsIncludingImports(
     return model.declarations.concat(...imports.map((imp) => imp.declarations));
 }
 
-// export function getAuthDecl(decls: (DataModel | TypeDef)[]) {
-//     let authModel = decls.find((m) => hasAttribute(m, '@@auth'));
-//     if (!authModel) {
-//         authModel = decls.find((m) => m.name === 'User');
-//     }
-//     return authModel;
-// }
+export function getAuthDecl(decls: (DataModel | TypeDef)[]) {
+    let authModel = decls.find((m) => hasAttribute(m, '@@auth'));
+    if (!authModel) {
+        authModel = decls.find((m) => m.name === 'User');
+    }
+    return authModel;
+}
 
 export function isFutureInvocation(node: AstNode) {
     return (

@@ -30,6 +30,7 @@ import type { RuntimePlugin } from './plugin';
 import { createDeferredPromise } from './promise';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
+import type { AuthType } from '../schema/schema';
 
 /**
  * Creates a new ZenStack client instance.
@@ -47,6 +48,7 @@ export class ClientImpl<Schema extends SchemaDef> {
     public readonly $options: ClientOptions<Schema>;
     public readonly $schema: Schema;
     readonly kyselyProps: KyselyProps;
+    private auth: AuthType<Schema> | undefined;
 
     constructor(
         private readonly schema: Schema,
@@ -189,6 +191,28 @@ export class ClientImpl<Schema extends SchemaDef> {
             plugins: [...(this.options?.plugins ?? []), plugin],
         } as ClientOptions<Schema>;
         return new ClientImpl<Schema>(this.schema, newOptions, this);
+    }
+
+    $unuseAll() {
+        const newOptions = {
+            ...this.options,
+            plugins: [] as RuntimePlugin<Schema>[],
+        } as ClientOptions<Schema>;
+        return new ClientImpl<Schema>(this.schema, newOptions, this);
+    }
+
+    $setAuth(auth: AuthType<Schema>) {
+        const newClient = new ClientImpl<Schema>(
+            this.schema,
+            this.$options,
+            this
+        );
+        newClient.auth = auth;
+        return newClient;
+    }
+
+    get $auth() {
+        return this.auth;
     }
 }
 

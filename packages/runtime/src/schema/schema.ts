@@ -1,4 +1,5 @@
 import type Decimal from 'decimal.js';
+import type { ModelResult } from '../client';
 import type { Expression } from './expression';
 
 export type DataSourceProviderType = 'sqlite' | 'postgresql';
@@ -14,6 +15,7 @@ export type SchemaDef = {
     enums?: Record<string, EnumDef>;
     plugins: Record<string, unknown>;
     procedures?: Record<string, ProcedureDef>;
+    authType?: GetModels<SchemaDef>;
 };
 
 export type ModelDef = {
@@ -27,7 +29,6 @@ export type ModelDef = {
         | Record<string, Pick<FieldDef, 'type'>>
     >;
     idFields: string[];
-    policies?: Policy[];
     computedFields?: Record<string, Function>;
 };
 
@@ -39,22 +40,6 @@ export type AttributeApplication = {
 export type AttributeArg = {
     name?: string;
     value: Expression;
-};
-
-export type PolicyKind = 'allow' | 'deny';
-
-export type PolicyOperation =
-    | 'create'
-    | 'read'
-    | 'update'
-    | 'post-update'
-    | 'delete'
-    | 'all';
-
-export type Policy = {
-    kind: PolicyKind;
-    operations: PolicyOperation[];
-    expression: Expression;
 };
 
 export type CascadeAction =
@@ -269,5 +254,12 @@ export type FieldIsRelationArray<
 > = FieldIsRelation<Schema, Model, Field> extends true
     ? FieldIsArray<Schema, Model, Field>
     : false;
+
+export type AuthType<Schema extends SchemaDef> =
+    string extends GetModels<Schema>
+        ? Record<string, unknown>
+        : Schema['authType'] extends GetModels<Schema>
+        ? Partial<ModelResult<Schema, Schema['authType']>>
+        : never;
 
 //#endregion

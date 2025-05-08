@@ -18,7 +18,8 @@ export class DocumentLoadError extends Error {
 }
 
 export async function loadDocument(
-    fileName: string
+    fileName: string,
+    pluginModelFiles: string[] = []
 ): Promise<
     | { success: true; model: Model; warnings: string[] }
     | { success: false; errors: string[]; warnings: string[] }
@@ -55,16 +56,28 @@ export async function loadDocument(
             )
         );
 
-    const langiumDocuments = services.shared.workspace.LangiumDocuments;
+    // load plugin model files
+    const pluginDocs = await Promise.all(
+        pluginModelFiles.map((file) =>
+            services.shared.workspace.LangiumDocuments.getOrCreateDocument(
+                URI.file(path.resolve(file))
+            )
+        )
+    );
+
     // load the document
+    const langiumDocuments = services.shared.workspace.LangiumDocuments;
     const document = await langiumDocuments.getOrCreateDocument(
         URI.file(path.resolve(fileName))
     );
 
     // build the document together with standard library, plugin modules, and imported documents
-    await services.shared.workspace.DocumentBuilder.build([stdLib, document], {
-        validation: true,
-    });
+    await services.shared.workspace.DocumentBuilder.build(
+        [stdLib, ...pluginDocs, document],
+        {
+            validation: true,
+        }
+    );
 
     const diagnostics = langiumDocuments.all
         .flatMap((doc) =>

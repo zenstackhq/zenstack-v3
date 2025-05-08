@@ -90,22 +90,22 @@ export class QueryNameMapper extends OperationNodeTransformer {
     }
 
     protected override transformSelectQuery(node: SelectQueryNode) {
-        this.currentModel = undefined;
-        if (
-            node.from?.froms &&
-            node.from.froms.length === 1 &&
-            node.from.froms[0]
-        ) {
-            const from = node.from.froms[0];
-            if (TableNode.is(from)) {
-                this.currentModel = from.table.identifier.name;
-            } else if (AliasNode.is(from) && TableNode.is(from.node)) {
-                this.currentModel = from.node.table.identifier.name;
-            }
-        } else {
+        if (!node.from?.froms || node.from.froms.length === 0) {
+            return super.transformSelectQuery(node);
+        }
+
+        if (node.from.froms.length > 1) {
             throw new InternalError(
                 `SelectQueryNode must have a single table in from clause`
             );
+        }
+
+        this.currentModel = undefined;
+        const from = node.from.froms[0]!;
+        if (TableNode.is(from)) {
+            this.currentModel = from.table.identifier.name;
+        } else if (AliasNode.is(from) && TableNode.is(from.node)) {
+            this.currentModel = from.node.table.identifier.name;
         }
 
         const selections = node.selections

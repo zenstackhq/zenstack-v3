@@ -2,6 +2,7 @@ import { loadDocument } from '@zenstackhq/language';
 import {
     ArrayExpr,
     AttributeArg,
+    BinaryExpr,
     DataModel,
     DataModelAttribute,
     DataModelField,
@@ -10,20 +11,27 @@ import {
     Expression,
     InvocationExpr,
     isArrayExpr,
+    isBinaryExpr,
     isDataModel,
+    isDataModelField,
     isDataSource,
     isEnum,
     isEnumField,
     isInvocationExpr,
     isLiteralExpr,
+    isMemberAccessExpr,
+    isNullExpr,
     isProcedure,
     isReferenceExpr,
+    isThisExpr,
+    isUnaryExpr,
     LiteralExpr,
+    MemberAccessExpr,
     Procedure,
     ReferenceExpr,
+    UnaryExpr,
     type Model,
 } from '@zenstackhq/language/ast';
-import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
 import invariant from 'tiny-invariant';
@@ -31,30 +39,24 @@ import { match } from 'ts-pattern';
 import * as ts from 'typescript';
 import {
     getAttribute,
+    getAuthDecl,
     hasAttribute,
     isIdField,
     isUniqueField,
 } from './model-utils';
 
 export class TsSchemaGenerator {
-    public async generate(schemaFile: string, outputFile: string) {
-        const loaded = await loadDocument(schemaFile);
+    public async generate(
+        schemaFile: string,
+        pluginModelFiles: string[],
+        outputFile: string
+    ) {
+        const loaded = await loadDocument(schemaFile, pluginModelFiles);
         if (!loaded.success) {
-            console.error(colors.red('Error loading schema:'));
-            loaded.errors.forEach((error) =>
-                console.error(colors.red(`- ${error}`))
-            );
-            return;
+            throw new Error(`Error loading schema:${loaded.errors.join('\n')}`);
         }
 
         const { model, warnings } = loaded;
-        if (warnings.length > 0) {
-            console.warn(colors.yellow('Warnings:'));
-            warnings.forEach((warning) =>
-                console.warn(colors.yellow(`- ${warning}`))
-            );
-        }
-
         const statements: ts.Statement[] = [];
 
         this.generateSchemaStatements(model, statements);
@@ -77,6 +79,8 @@ export class TsSchemaGenerator {
 
         fs.mkdirSync(path.dirname(outputFile), { recursive: true });
         fs.writeFileSync(outputFile, result);
+
+        return { model, warnings };
     }
 
     private generateSchemaStatements(model: Model, statements: ts.Statement[]) {
@@ -242,6 +246,17 @@ export class TsSchemaGenerator {
             );
         }
 
+        // authType
+        const authType = getAuthDecl(model);
+        if (authType) {
+            properties.push(
+                ts.factory.createPropertyAssignment(
+                    'authType',
+                    this.createLiteralNode(authType.name)
+                )
+            );
+        }
+
         // procedures
         const procedures = model.declarations.filter(isProcedure);
         if (procedures.length > 0) {
@@ -284,7 +299,10 @@ export class TsSchemaGenerator {
     private createModelsObject(model: Model) {
         return ts.factory.createObjectLiteralExpression(
             model.declarations
-                .filter(isDataModel)
+                .filter(
+                    (d): d is DataModel =>
+                        isDataModel(d) && !hasAttribute(d, '@@ignore')
+                )
                 .map((dm) =>
                     ts.factory.createPropertyAssignment(
                         dm.name,
@@ -301,12 +319,14 @@ export class TsSchemaGenerator {
             ts.factory.createPropertyAssignment(
                 'fields',
                 ts.factory.createObjectLiteralExpression(
-                    dm.fields.map((field) =>
-                        ts.factory.createPropertyAssignment(
-                            field.name,
-                            this.createDataModelFieldObject(field)
-                        )
-                    ),
+                    dm.fields
+                        .filter((field) => !hasAttribute(field, '@ignore'))
+                        .map((field) =>
+                            ts.factory.createPropertyAssignment(
+                                field.name,
+                                this.createDataModelFieldObject(field)
+                            )
+                        ),
                     true
                 )
             ),
@@ -319,7 +339,8 @@ export class TsSchemaGenerator {
                           ts.factory.createArrayLiteralExpression(
                               dm.attributes.map((attr) =>
                                   this.createAttributeObject(attr)
-                              )
+                              ),
+                              true
                           )
                       ),
                   ]
@@ -553,17 +574,6 @@ export class TsSchemaGenerator {
         return ts.factory.createObjectLiteralExpression(objectFields, true);
     }
 
-    private getTableName(dm: DataModel) {
-        const mapping = dm.attributes.find(
-            (attr) => attr.decl.$refText === '@map'
-        );
-        if (mapping) {
-            return (mapping.args[0]?.value as LiteralExpr).value as string;
-        } else {
-            return dm.name;
-        }
-    }
-
     private getDataSourceProvider(model: Model) {
         const dataSource = model.declarations.find(isDataSource);
         invariant(dataSource, 'No data source found in the model');
@@ -701,7 +711,8 @@ export class TsSchemaGenerator {
                         arg.name === 'fields' &&
                         isArrayExpr(arg.value) &&
                         arg.value.items.some(
-                            (el) => isLiteralExpr(el) && el.value === field.name
+                            (el) =>
+                                isReferenceExpr(el) && el.target.ref === field
                         )
                     ) {
                         result.push(f.name);
@@ -770,22 +781,53 @@ export class TsSchemaGenerator {
                 if (!fieldNames) {
                     continue;
                 }
-                properties.push(
-                    ts.factory.createPropertyAssignment(
-                        fieldNames.join('_'),
-                        ts.factory.createObjectLiteralExpression(
-                            fieldNames.map((field) => {
-                                const f = dm.fields.find(
-                                    (f) => f.name === field
-                                )!;
-                                return ts.factory.createPropertyAssignment(
+
+                if (fieldNames.length === 1) {
+                    // single-field unique
+                    const fieldDef = dm.fields.find(
+                        (f) => f.name === fieldNames[0]
+                    )!;
+                    properties.push(
+                        ts.factory.createPropertyAssignment(
+                            fieldNames[0]!,
+                            ts.factory.createObjectLiteralExpression([
+                                ts.factory.createPropertyAssignment(
                                     'type',
-                                    ts.factory.createStringLiteral(f.type.type!)
-                                );
-                            })
+                                    ts.factory.createStringLiteral(
+                                        fieldDef.type.type!
+                                    )
+                                ),
+                            ])
                         )
-                    )
-                );
+                    );
+                } else {
+                    // multi-field unique
+                    properties.push(
+                        ts.factory.createPropertyAssignment(
+                            fieldNames.join('_'),
+                            ts.factory.createObjectLiteralExpression(
+                                fieldNames.map((field) => {
+                                    const fieldDef = dm.fields.find(
+                                        (f) => f.name === field
+                                    )!;
+                                    return ts.factory.createPropertyAssignment(
+                                        field,
+                                        ts.factory.createObjectLiteralExpression(
+                                            [
+                                                ts.factory.createPropertyAssignment(
+                                                    'type',
+                                                    ts.factory.createStringLiteral(
+                                                        fieldDef.type.type!
+                                                    )
+                                                ),
+                                            ]
+                                        )
+                                    );
+                                })
+                            )
+                        )
+                    );
+                }
             }
         }
 
@@ -819,8 +861,10 @@ export class TsSchemaGenerator {
         }
     }
 
-    private createLiteralNode(arg: string | number | boolean): any {
-        return typeof arg === 'string'
+    private createLiteralNode(arg: string | number | boolean | null): any {
+        return arg === null
+            ? ts.factory.createNull()
+            : typeof arg === 'string'
             ? ts.factory.createStringLiteral(arg)
             : typeof arg === 'number'
             ? ts.factory.createNumericLiteral(arg)
@@ -1107,11 +1151,99 @@ export class TsSchemaGenerator {
             .when(isInvocationExpr, (expr) => this.createCallExpression(expr))
             .when(isReferenceExpr, (expr) => this.createRefExpression(expr))
             .when(isArrayExpr, (expr) => this.createArrayExpression(expr))
+            .when(isUnaryExpr, (expr) => this.createUnaryExpression(expr))
+            .when(isBinaryExpr, (expr) => this.createBinaryExpression(expr))
+            .when(isMemberAccessExpr, (expr) =>
+                this.createMemberExpression(expr)
+            )
+            .when(isNullExpr, () => this.createNullExpression())
+            .when(isThisExpr, () => this.createThisExpression())
             .otherwise(() => {
                 throw new Error(
                     `Unsupported attribute arg value: ${value.$type}`
                 );
             });
+    }
+
+    private createThisExpression() {
+        return ts.factory.createCallExpression(
+            ts.factory.createIdentifier('Expression._this'),
+            undefined,
+            []
+        );
+    }
+
+    private createMemberExpression(expr: MemberAccessExpr) {
+        const members: string[] = [];
+
+        // turn nested member access expression into a flat list of members
+        let current: Expression = expr;
+        while (isMemberAccessExpr(current)) {
+            members.unshift(current.member.$refText);
+            current = current.operand;
+        }
+        const receiver = current;
+
+        const args = [
+            this.createExpression(receiver),
+            ts.factory.createArrayLiteralExpression(
+                members.map((m) => ts.factory.createStringLiteral(m))
+            ),
+        ];
+
+        // if (isDataModel(expr.$resolvedType?.decl)) {
+        //     const operandModel = expr.operand.$resolvedType?.decl! as DataModel;
+        //     const relationModel = expr.$resolvedType.decl;
+        //     args.push(
+        //         ts.factory.createObjectLiteralExpression([
+        //             ts.factory.createPropertyAssignment(
+        //                 'fromModel',
+        //                 ts.factory.createStringLiteral(operandModel.name)
+        //             ),
+        //             ts.factory.createPropertyAssignment(
+        //                 'relationModel',
+        //                 ts.factory.createStringLiteral(relationModel.name)
+        //             ),
+        //         ])
+        //     );
+        // }
+
+        return ts.factory.createCallExpression(
+            ts.factory.createIdentifier('Expression.member'),
+            undefined,
+            args
+        );
+    }
+
+    private createNullExpression() {
+        return ts.factory.createCallExpression(
+            ts.factory.createIdentifier('Expression._null'),
+            undefined,
+            []
+        );
+    }
+
+    private createBinaryExpression(expr: BinaryExpr) {
+        return ts.factory.createCallExpression(
+            ts.factory.createIdentifier('Expression.binary'),
+            undefined,
+            [
+                this.createExpression(expr.left),
+                this.createLiteralNode(expr.operator),
+                this.createExpression(expr.right),
+            ]
+        );
+    }
+
+    private createUnaryExpression(expr: UnaryExpr) {
+        return ts.factory.createCallExpression(
+            ts.factory.createIdentifier('Expression.unary'),
+            undefined,
+            [
+                this.createLiteralNode(expr.operator),
+                this.createExpression(expr.operand),
+            ]
+        );
     }
 
     private createArrayExpression(expr: ArrayExpr): any {
@@ -1127,15 +1259,22 @@ export class TsSchemaGenerator {
     }
 
     private createRefExpression(expr: ReferenceExpr): any {
-        const target = expr.target.ref!;
-        return ts.factory.createCallExpression(
-            ts.factory.createIdentifier('Expression.ref'),
-            undefined,
-            [
-                ts.factory.createStringLiteral(target.$container.name),
-                ts.factory.createStringLiteral(target.name),
-            ]
-        );
+        if (isDataModelField(expr.target.ref)) {
+            return ts.factory.createCallExpression(
+                ts.factory.createIdentifier('Expression.field'),
+                undefined,
+                [this.createLiteralNode(expr.target.$refText)]
+            );
+        } else if (isEnumField(expr.target.ref)) {
+            return this.createLiteralExpression(
+                'StringLiteral',
+                expr.target.$refText
+            );
+        } else {
+            throw new Error(
+                `Unsupported reference type: ${expr.target.$refText}`
+            );
+        }
     }
 
     private createCallExpression(expr: InvocationExpr) {

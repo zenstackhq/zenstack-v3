@@ -19,6 +19,8 @@ import {
 import {
     findUpAst,
     getAttributeArgLiteral,
+    isAuthInvocation,
+    isAuthOrAuthMemberAccess,
     isDataModelFieldReference,
     isEnumFieldReference,
     typeAssignable,
@@ -32,18 +34,17 @@ export default class ExpressionValidator implements AstValidator<Expression> {
     validate(expr: Expression, accept: ValidationAcceptor): void {
         // deal with a few cases where reference resolution fail silently
         if (!expr.$resolvedType) {
-            // TODO: revisit this
-            // if (isAuthInvocation(expr)) {
-            //     // check was done at link time
-            //     accept(
-            //         'error',
-            //         'auth() cannot be resolved because no model marked with "@@auth()" or named "User" is found',
-            //         { node: expr }
-            //     );
-            // } else {
-
-            const hasReferenceResolutionError = AstUtils.streamAst(expr).some(
-                (node) => {
+            if (isAuthInvocation(expr)) {
+                // check was done at link time
+                accept(
+                    'error',
+                    'auth() cannot be resolved because no model marked with "@@auth()" or named "User" is found',
+                    { node: expr }
+                );
+            } else {
+                const hasReferenceResolutionError = AstUtils.streamAst(
+                    expr
+                ).some((node) => {
                     if (isMemberAccessExpr(node)) {
                         return !!node.member.error;
                     }
@@ -51,15 +52,14 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                         return !!node.target.error;
                     }
                     return false;
-                }
-            );
-            if (!hasReferenceResolutionError) {
-                // report silent errors not involving linker errors
-                accept('error', 'Expression cannot be resolved', {
-                    node: expr,
                 });
+                if (!hasReferenceResolutionError) {
+                    // report silent errors not involving linker errors
+                    accept('error', 'Expression cannot be resolved', {
+                        node: expr,
+                    });
+                }
             }
-            // }
         }
 
         // extra validations by expression type
@@ -379,9 +379,8 @@ export default class ExpressionValidator implements AstValidator<Expression> {
             isEnumFieldReference(expr) ||
             // null
             isNullExpr(expr) ||
-            // TODO: revise cross-model field comparison
-            // // `auth()` access
-            // isAuthOrAuthMemberAccess(expr) ||
+            // `auth()` access
+            isAuthOrAuthMemberAccess(expr) ||
             // array
             (isArrayExpr(expr) &&
                 expr.items.every((item) => this.isNotModelFieldExpr(item)))

@@ -1,7 +1,8 @@
 import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { CreateArgs, CreateManyArgs } from '../../crud-types';
-import { getIdValues, requireField } from '../../query-utils';
+import { RejectedByPolicyError } from '../../errors';
+import { getIdValues } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 
 export class CreateOperationHandler<
@@ -26,47 +27,36 @@ export class CreateOperationHandler<
     }
 
     private async runCreate(args: CreateArgs<Schema, GetModels<Schema>>) {
-        const hasRelationCreate = Object.keys(args.data).some(
-            (f) => !!requireField(this.schema, this.model, f).relation
-        );
-
-        const returnRelations = this.needReturnRelations(this.model, args);
-
         let result: any;
-        if (hasRelationCreate || returnRelations) {
-            // employ a transaction
-            try {
-                result = await this.kysely
-                    .transaction()
-                    .setIsolationLevel('repeatable read')
-                    .execute(async (tx) => {
-                        const createResult = await this.create(
-                            tx,
+        try {
+            result = await this.kysely
+                .transaction()
+                .setIsolationLevel('repeatable read')
+                .execute(async (tx) => {
+                    const createResult = await this.create(
+                        tx,
+                        this.model,
+                        args.data
+                    );
+                    return this.readUnique(tx, this.model, {
+                        select: args.select,
+                        include: args.include,
+                        where: getIdValues(
+                            this.schema,
                             this.model,
-                            args.data
-                        );
-                        return this.readUnique(tx, this.model, {
-                            select: args.select,
-                            include: args.include,
-                            where: getIdValues(
-                                this.schema,
-                                this.model,
-                                createResult
-                            ),
-                        });
+                            createResult
+                        ),
                     });
-            } catch (err) {
-                // console.error(err);
-                throw err;
-            }
-        } else {
-            // simple create
-            const createResult = await this.create(
-                this.kysely,
-                this.model,
-                args.data
+                });
+        } catch (err) {
+            // console.error(err);
+            throw err;
+        }
+
+        if (!result) {
+            throw new RejectedByPolicyError(
+                `result is not allowed to be read back`
             );
-            result = this.trimResult(createResult, args);
         }
 
         return result;

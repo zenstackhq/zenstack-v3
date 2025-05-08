@@ -546,7 +546,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     rhs === null ? eb(lhs, 'is', null) : eb(lhs, '=', rhs)
                 )
                 .with('in', () => {
-                    invariant(Array.isArray(rhs));
+                    invariant(
+                        Array.isArray(rhs),
+                        'right hand side must be an array'
+                    );
                     if (rhs.length === 0) {
                         return this.false(eb);
                     } else {
@@ -554,7 +557,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     }
                 })
                 .with('notIn', () => {
-                    invariant(Array.isArray(rhs));
+                    invariant(
+                        Array.isArray(rhs),
+                        'right hand side must be an array'
+                    );
                     if (rhs.length === 0) {
                         return this.true(eb);
                     } else {

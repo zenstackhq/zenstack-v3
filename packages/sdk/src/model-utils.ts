@@ -1,7 +1,6 @@
 import {
     isArrayExpr,
     isDataModel,
-    isInvocationExpr,
     isLiteralExpr,
     isModel,
     isReferenceExpr,
@@ -200,14 +199,6 @@ export function isUniqueField(field: DataModelField) {
     return false;
 }
 
-// export function isAuthInvocation(node: AstNode) {
-//     return (
-//         isInvocationExpr(node) &&
-//         node.function.ref?.name === 'auth' &&
-//         isFromStdlib(node.function.ref)
-//     );
-// }
-
 export function isFromStdlib(node: AstNode) {
     const model = getContainingModel(node);
     return (
@@ -229,4 +220,18 @@ export function resolved<T extends AstNode>(ref: Reference<T>): T {
         throw new Error(`Reference not resolved: ${ref.$refText}`);
     }
     return ref.ref;
+}
+
+export function getAuthDecl(model: Model) {
+    let found = model.declarations.find(
+        (d) =>
+            isDataModel(d) &&
+            d.attributes.some((attr) => attr.decl.$refText === '@@auth')
+    );
+    if (!found) {
+        found = model.declarations.find(
+            (d) => isDataModel(d) && d.name === 'User'
+        );
+    }
+    return found;
 }

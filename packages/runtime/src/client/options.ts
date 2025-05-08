@@ -62,7 +62,11 @@ export type ComputedFieldsOptions<Schema extends SchemaDef> = {
 };
 
 export type HasComputedFields<Schema extends SchemaDef> =
-    keyof ComputedFieldsOptions<Schema> extends never ? false : true;
+    string extends GetModels<Schema>
+        ? false
+        : keyof ComputedFieldsOptions<Schema> extends never
+        ? false
+        : true;
 
 export type ProceduresOptions<Schema extends SchemaDef> = Schema extends {
     procedures: Record<string, ProcedureDef>;

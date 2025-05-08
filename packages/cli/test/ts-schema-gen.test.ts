@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateTsSchema } from './utils';
+import { generateTsSchema } from '@zenstackhq/testtools';
 
 describe('TypeScript schema generation tests', () => {
     it('generates correct data models', async () => {

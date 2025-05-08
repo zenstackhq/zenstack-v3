@@ -27,9 +27,10 @@
         "pack": "pnpm pack"
     },
     "dependencies": {
-        "@types/node": "^20.12.7",
+        "@types/node": "^18.0.0",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/sdk": "workspace:*",
         "async-exit-hook": "^2.0.1",
         "colors": "1.4.0",
         "commander": "^8.3.0",
@@ -43,6 +44,7 @@
         "typescript": "^5.0.0"
     },
     "devDependencies": {
+        "@zenstackhq/testtools": "workspace:*",
         "@types/async-exit-hook": "^2.0.0",
         "@types/better-sqlite3": "^7.6.13",
         "@types/semver": "^7.3.13",

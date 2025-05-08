@@ -436,21 +436,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         const updatedData = this.fillGeneratedValues(modelDef, createFields);
+        const idFields = getIdFields(this.schema, model);
         const query = kysely
             .insertInto(model)
             .values(updatedData)
-            .returningAll();
+            .returning(idFields as any);
 
-        let createdEntity: any;
+        const createdEntity = await query.executeTakeFirst();
 
-        try {
-            createdEntity = await query.executeTakeFirst();
-        } catch (err) {
-            const { sql, parameters } = query.compile();
-            throw new QueryError(
-                `Error during create: ${err}, sql: ${sql}, parameters: ${parameters}`
-            );
-        }
+        // try {
+        //     createdEntity = await query.executeTakeFirst();
+        // } catch (err) {
+        //     const { sql, parameters } = query.compile();
+        //     throw new QueryError(
+        //         `Error during create: ${err}, sql: ${sql}, parameters: ${parameters}`
+        //     );
+        // }
 
         if (Object.keys(postCreateRelations).length > 0) {
             // process nested creates that need to happen after the current entity is created

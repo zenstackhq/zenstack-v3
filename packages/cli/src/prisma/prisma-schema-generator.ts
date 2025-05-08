@@ -32,12 +32,7 @@ import {
 import { AstUtils } from 'langium';
 import { match, P } from 'ts-pattern';
 
-import {
-    hasAttribute,
-    isDelegateModel,
-    isIdField,
-} from '../zmodel/model-utils';
-import { ZModelCodeGenerator } from '../zmodel/zmodel-code-generator';
+import { ModelUtils, ZModelCodeGenerator } from '@zenstackhq/sdk';
 import {
     AttributeArgValue,
     ModelField,
@@ -165,7 +160,7 @@ export class PrismaSchemaGenerator {
             ? prisma.addView(decl.name)
             : prisma.addModel(decl.name);
         for (const field of decl.fields) {
-            if (hasAttribute(field, '@computed')) {
+            if (ModelUtils.hasAttribute(field, '@computed')) {
                 continue; // skip computed fields
             }
             // TODO: exclude fields inherited from delegate
@@ -274,7 +269,7 @@ export class PrismaSchemaGenerator {
                 (attr) =>
                     // when building physical schema, exclude `@default` for id fields inherited from delegate base
                     !(
-                        isIdField(field) &&
+                        ModelUtils.isIdField(field) &&
                         this.isInheritedFromDelegate(field) &&
                         attr.decl.$refText === '@default'
                     )
@@ -360,7 +355,10 @@ export class PrismaSchemaGenerator {
     }
 
     private isInheritedFromDelegate(field: DataModelField) {
-        return field.$inheritedFrom && isDelegateModel(field.$inheritedFrom);
+        return (
+            field.$inheritedFrom &&
+            ModelUtils.isDelegateModel(field.$inheritedFrom)
+        );
     }
 
     private makeFieldAttribute(attr: DataModelFieldAttribute) {

@@ -74,7 +74,6 @@
         "uuid": "^11.0.5"
     },
     "peerDependencies": {
-        "@zenstackhq/language": "workspace:*",
         "better-sqlite3": "^11.8.1",
         "pg": "^8.13.1",
         "zod": "^3.0.0"
@@ -85,15 +84,14 @@
         },
         "pg": {
             "optional": true
-        },
-        "@zenstackhq/language": {
-            "optional": true
         }
     },
     "devDependencies": {
         "@types/better-sqlite3": "^7.0.0",
         "@types/pg": "^8.0.0",
         "@types/tmp": "^0.2.6",
-        "tmp": "^0.2.3"
+        "tmp": "^0.2.3",
+        "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/testtools": "workspace:*"
     }
 }

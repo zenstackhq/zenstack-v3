@@ -22,11 +22,9 @@ describe('Kysely onQuery tests', () => {
         const client = _client.$use({
             id: 'test-plugin',
             onKyselyQuery(args) {
-                called = true;
-                expect(args).toMatchObject({
-                    query: expect.objectContaining({ kind: 'InsertQueryNode' }),
-                    proceed: expect.any(Function),
-                });
+                if (args.query.kind === 'InsertQueryNode') {
+                    called = true;
+                }
                 return args.proceed(args.query);
             },
         });
@@ -63,6 +61,9 @@ describe('Kysely onQuery tests', () => {
         const client = _client.$use({
             id: 'test-plugin',
             onKyselyQuery({ proceed, query }) {
+                if (query.kind !== 'InsertQueryNode') {
+                    return proceed(query);
+                }
                 const valueList = [
                     ...(
                         ((query as InsertQueryNode).values as ValuesNode)
@@ -122,42 +123,6 @@ describe('Kysely onQuery tests', () => {
         });
     });
 
-    it('can partially succeed without a transaction', async () => {
-        const client = _client.$use({
-            id: 'test-plugin',
-            async onKyselyQuery({ kysely, proceed, query }) {
-                if (query.kind !== 'InsertQueryNode') {
-                    return proceed(query);
-                }
-
-                const result = await proceed(query);
-
-                // create a post for the user
-                const now = new Date().toISOString();
-                const createPost = kysely.insertInto('Post').values({
-                    id: '1',
-                    title: 'Post1',
-                    authorId: 'none-exist',
-                    updatedAt: now,
-                });
-                await proceed(createPost.toOperationNode());
-
-                return result;
-            },
-        });
-
-        await expect(
-            client.user.create({
-                data: { id: '1', email: 'u1@test.com' },
-            })
-        ).rejects.toThrow();
-
-        await expect(client.user.findFirst()).resolves.toMatchObject({
-            email: 'u1@test.com',
-        });
-        await expect(client.post.findFirst()).toResolveNull();
-    });
-
     it('rolls back on error when a transaction is used', async () => {
         const client = _client.$use({
             id: 'test-plugin',
@@ -202,6 +167,9 @@ describe('Kysely onQuery tests', () => {
             .$use({
                 id: 'test-plugin',
                 onKyselyQuery({ proceed, query }) {
+                    if (query.kind !== 'InsertQueryNode') {
+                        return proceed(query);
+                    }
                     called1 = true;
                     const valueList = [
                         ...(
@@ -224,6 +192,9 @@ describe('Kysely onQuery tests', () => {
             .$use({
                 id: 'test-plugin2',
                 onKyselyQuery({ proceed, query }) {
+                    if (query.kind !== 'InsertQueryNode') {
+                        return proceed(query);
+                    }
                     called2 = true;
                     const valueList = [
                         ...(

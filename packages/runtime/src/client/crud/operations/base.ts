@@ -436,21 +436,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         const updatedData = this.fillGeneratedValues(modelDef, createFields);
+        const idFields = getIdFields(this.schema, model);
         const query = kysely
             .insertInto(model)
             .values(updatedData)
-            .returningAll();
+            .returning(idFields as any);
 
-        let createdEntity: any;
+        const createdEntity = await query.executeTakeFirst();
 
-        try {
-            createdEntity = await query.executeTakeFirst();
-        } catch (err) {
-            const { sql, parameters } = query.compile();
-            throw new QueryError(
-                `Error during create: ${err}, sql: ${sql}, parameters: ${parameters}`
-            );
-        }
+        // try {
+        //     createdEntity = await query.executeTakeFirst();
+        // } catch (err) {
+        //     const { sql, parameters } = query.compile();
+        //     throw new QueryError(
+        //         `Error during create: ${err}, sql: ${sql}, parameters: ${parameters}`
+        //     );
+        // }
 
         if (Object.keys(postCreateRelations).length > 0) {
             // process nested creates that need to happen after the current entity is created
@@ -864,6 +865,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     this.dialect.buildFilter(eb, model, model, combinedWhere)
                 )
                 .set(updateFields)
+                // TODO: return selectively
                 .returningAll();
 
             let updatedEntity: any;
@@ -1554,6 +1556,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const query = kysely
             .deleteFrom(model)
             .where((eb) => this.dialect.buildFilter(eb, model, model, where))
+            // TODO: return selectively
             .$if(returnData, (qb) => qb.returningAll());
 
         // const result = await this.queryExecutor.execute(kysely, query);
@@ -1605,5 +1608,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             });
         }
         return returnRelation;
+    }
+
+    protected async safeTransaction<T>(
+        callback: (tx: ToKysely<Schema>) => Promise<T>
+    ) {
+        if (this.kysely.isTransaction) {
+            return callback(this.kysely);
+        } else {
+            return this.kysely
+                .transaction()
+                .setIsolationLevel('repeatable read')
+                .execute(callback);
+        }
     }
 }

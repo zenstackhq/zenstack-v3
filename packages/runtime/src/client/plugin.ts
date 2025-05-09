@@ -98,15 +98,17 @@ export type OnKyselyQueryTransactionCallback = (
     proceed: ProceedKyselyQueryFunction
 ) => Promise<QueryResult<any>>;
 
+export type OnKyselyQueryTransaction = (
+    callback: OnKyselyQueryTransactionCallback
+) => Promise<QueryResult<any>>;
+
 export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
     kysely: ToKysely<Schema>;
     schema: SchemaDef;
     client: ClientContract<Schema>;
     query: RootOperationNode;
     proceed: ProceedKyselyQueryFunction;
-    transaction: (
-        callback: OnKyselyQueryTransactionCallback
-    ) => Promise<QueryResult<any>>;
+    transaction: OnKyselyQueryTransaction;
 };
 
 export type ProceedKyselyQueryFunction = (

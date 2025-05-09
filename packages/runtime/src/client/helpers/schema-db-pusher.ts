@@ -101,7 +101,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         modelDef: ModelDef
     ) {
         for (const [key, value] of Object.entries(modelDef.uniqueFields)) {
-            invariant(typeof value === 'object');
+            invariant(typeof value === 'object', 'expecting an object');
             if ('type' in value) {
                 // uni-field constraint, check if it's already defined at field level
                 const fieldDef = modelDef.fields[key]!;
@@ -193,7 +193,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         fieldName: string,
         fieldDef: FieldDef
     ) {
-        invariant(fieldDef.relation);
+        invariant(fieldDef.relation, 'field must be a relation');
 
         if (!fieldDef.relation.fields || !fieldDef.relation.references) {
             // not fk side

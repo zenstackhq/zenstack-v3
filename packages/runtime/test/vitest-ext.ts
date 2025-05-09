@@ -1,5 +1,6 @@
 import { expect } from 'vitest';
 import { NotFoundError } from '../src/client/errors';
+import { RejectedByPolicyError } from '../src/plugins/policy/errors';
 
 function isPromise(value: any) {
     return (
@@ -67,7 +68,7 @@ expect.extend({
         };
     },
 
-    async toRejectNotFound(received: Promise<unknown>) {
+    async toBeRejectedNotFound(received: Promise<unknown>) {
         if (!isPromise(received)) {
             return { message: () => 'a promise is expected', pass: false };
         }
@@ -78,6 +79,36 @@ expect.extend({
         }
         return {
             message: () => `expected NotFoundError, got no error`,
+            pass: false,
+        };
+    },
+
+    async toBeRejectedByPolicy(
+        received: Promise<unknown>,
+        expectedMessages?: string[]
+    ) {
+        if (!isPromise(received)) {
+            return { message: () => 'a promise is expected', pass: false };
+        }
+        try {
+            await received;
+        } catch (err) {
+            if (expectedMessages && err instanceof RejectedByPolicyError) {
+                const message = err.message || '';
+                for (const m of expectedMessages) {
+                    if (!message.includes(m)) {
+                        return {
+                            message: () =>
+                                `expected message not found in error: ${m}, got message: ${message}`,
+                            pass: false,
+                        };
+                    }
+                }
+            }
+            return expectError(err, RejectedByPolicyError);
+        }
+        return {
+            message: () => `expected PolicyError, got no error`,
             pass: false,
         };
     },

@@ -1,8 +1,8 @@
 export type Expression =
     | LiteralExpression
     | ArrayExpression
-    | FieldReferenceExpression
-    | MemberAccessExpression
+    | FieldExpression
+    | MemberExpression
     | CallExpression
     | UnaryExpression
     | BinaryExpression
@@ -19,16 +19,15 @@ export type ArrayExpression = {
     items: Expression[];
 };
 
-export type FieldReferenceExpression = {
-    kind: 'ref';
-    model: string;
+export type FieldExpression = {
+    kind: 'field';
     field: string;
 };
 
-export type MemberAccessExpression = {
+export type MemberExpression = {
     kind: 'member';
-    object: Expression;
-    property: string;
+    receiver: Expression;
+    members: string[];
 };
 
 export type UnaryExpression = {
@@ -67,7 +66,10 @@ export type BinaryOperator =
     | '<'
     | '<='
     | '>'
-    | '>=';
+    | '>='
+    | '?'
+    | '!'
+    | '^';
 
 export const Expression = {
     literal: (value: string | number | boolean): LiteralExpression => {
@@ -113,6 +115,21 @@ export const Expression = {
         };
     },
 
+    field: (field: string): FieldExpression => {
+        return {
+            kind: 'field',
+            field,
+        };
+    },
+
+    member: (receiver: Expression, members: string[]): MemberExpression => {
+        return {
+            kind: 'member',
+            receiver: receiver,
+            members,
+        };
+    },
+
     _this: (): ThisExpression => {
         return {
             kind: 'this',
@@ -122,14 +139,6 @@ export const Expression = {
     _null: (): NullExpression => {
         return {
             kind: 'null',
-        };
-    },
-
-    ref: (model: string, field: string): FieldReferenceExpression => {
-        return {
-            kind: 'ref',
-            model,
-            field,
         };
     },
 
@@ -162,9 +171,6 @@ export const Expression = {
     isArray: (value: unknown): value is ArrayExpression =>
         Expression.is(value, 'array'),
 
-    isRef: (value: unknown): value is FieldReferenceExpression =>
-        Expression.is(value, 'ref'),
-
     isCall: (value: unknown): value is CallExpression =>
         Expression.is(value, 'call'),
 
@@ -172,5 +178,23 @@ export const Expression = {
         Expression.is(value, 'null'),
 
     isThis: (value: unknown): value is ThisExpression =>
+        Expression.is(value, 'this'),
+
+    isUnaryExpr: (value: unknown): value is UnaryExpression =>
+        Expression.is(value, 'unary'),
+
+    isBinaryExpr: (value: unknown): value is BinaryExpression =>
+        Expression.is(value, 'binary'),
+
+    isFieldExpr: (value: unknown): value is FieldExpression =>
+        Expression.is(value, 'field'),
+
+    isMemberExpr: (value: unknown): value is MemberExpression =>
+        Expression.is(value, 'member'),
+
+    isCallExpr: (value: unknown): value is CallExpression =>
+        Expression.is(value, 'call'),
+
+    isThisExpr: (value: unknown): value is ThisExpression =>
         Expression.is(value, 'this'),
 };

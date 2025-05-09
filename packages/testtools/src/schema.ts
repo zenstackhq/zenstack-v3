@@ -1,9 +1,10 @@
+import type { SchemaDef } from '@zenstackhq/runtime/schema';
+import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import tmp from 'tmp';
-import { TsSchemaGenerator } from '../src/zmodel/ts-schema-generator';
-import type { SchemaDef } from '../../runtime/src/schema';
+import { glob } from 'glob';
 
 const ZMODEL_PRELUDE = `
 datasource db {
@@ -12,14 +13,22 @@ datasource db {
 }
 `;
 
-export async function generateTsSchema(schemaText: string) {
+export async function generateTsSchema(schemaText: string, noPrelude = false) {
     const { name: workDir } = tmp.dirSync({ unsafeCleanup: true });
     console.log(`Working directory: ${workDir}`);
     const zmodelPath = path.join(workDir, 'schema.zmodel');
-    fs.writeFileSync(zmodelPath, `${ZMODEL_PRELUDE}\n\n${schemaText}`);
+    fs.writeFileSync(
+        zmodelPath,
+        `${noPrelude ? '' : ZMODEL_PRELUDE}\n\n${schemaText}`
+    );
+
+    const pluginModelFiles = glob.sync(
+        path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel')
+    );
+
     const generator = new TsSchemaGenerator();
     const tsPath = path.join(workDir, 'schema.ts');
-    await generator.generate(zmodelPath, tsPath);
+    await generator.generate(zmodelPath, pluginModelFiles, tsPath);
 
     fs.symlinkSync(
         path.join(__dirname, '../node_modules'),
@@ -58,4 +67,9 @@ export async function generateTsSchema(schemaText: string) {
     // load the schema module
     const module = await import(path.join(workDir, 'schema.js'));
     return module.schema as SchemaDef;
+}
+
+export function generateTsSchemaFromFile(filePath: string) {
+    const schemaText = fs.readFileSync(filePath, 'utf8');
+    return generateTsSchema(schemaText, true);
 }

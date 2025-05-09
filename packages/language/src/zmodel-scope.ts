@@ -33,7 +33,9 @@ import {
 import { PLUGIN_MODULE_NAME, STD_LIB_MODULE_NAME } from './constants';
 import {
     getAllLoadedAndReachableDataModelsAndTypeDefs,
+    getAuthDecl,
     getModelFieldsWithBases,
+    isAuthInvocation,
     isCollectionPredicate,
     isFutureInvocation,
     resolveImportUri,
@@ -213,11 +215,10 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             .when(isInvocationExpr, (operand) => {
                 // deal with member access from `auth()` and `future()
 
-                // TODO: generalize it
-                // if (isAuthInvocation(operand)) {
-                //     // resolve to `User` or `@@auth` decl
-                //     return this.createScopeForAuth(node, globalScope);
-                // }
+                if (isAuthInvocation(operand)) {
+                    // resolve to `User` or `@@auth` decl
+                    return this.createScopeForAuth(node, globalScope);
+                }
 
                 if (isFutureInvocation(operand)) {
                     // resolve `future()` to the containing model
@@ -244,51 +245,48 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         // const allowTypeDefScope = isAuthOrAuthMemberAccess(collection);
         const allowTypeDefScope = false;
 
-        return (
-            match(collection)
-                .when(isReferenceExpr, (expr) => {
-                    // collection is a reference - model or typedef field
-                    const ref = expr.target.ref;
-                    if (isDataModelField(ref) || isTypeDefField(ref)) {
-                        return this.createScopeForContainer(
-                            ref.type.reference?.ref,
-                            globalScope,
-                            allowTypeDefScope
-                        );
-                    }
+        return match(collection)
+            .when(isReferenceExpr, (expr) => {
+                // collection is a reference - model or typedef field
+                const ref = expr.target.ref;
+                if (isDataModelField(ref) || isTypeDefField(ref)) {
+                    return this.createScopeForContainer(
+                        ref.type.reference?.ref,
+                        globalScope,
+                        allowTypeDefScope
+                    );
+                }
+                return EMPTY_SCOPE;
+            })
+            .when(isMemberAccessExpr, (expr) => {
+                // collection is a member access, it can only be resolved to a model or typedef field
+                const ref = expr.member.ref;
+                if (isDataModelField(ref) || isTypeDefField(ref)) {
+                    return this.createScopeForContainer(
+                        ref.type.reference?.ref,
+                        globalScope,
+                        allowTypeDefScope
+                    );
+                }
+                return EMPTY_SCOPE;
+            })
+            .when(isInvocationExpr, (expr) => {
+                const returnTypeDecl =
+                    expr.function.ref?.returnType.reference?.ref;
+                if (isDataModel(returnTypeDecl)) {
+                    return this.createScopeForContainer(
+                        returnTypeDecl,
+                        globalScope,
+                        allowTypeDefScope
+                    );
+                } else {
                     return EMPTY_SCOPE;
-                })
-                .when(isMemberAccessExpr, (expr) => {
-                    // collection is a member access, it can only be resolved to a model or typedef field
-                    const ref = expr.member.ref;
-                    if (isDataModelField(ref) || isTypeDefField(ref)) {
-                        return this.createScopeForContainer(
-                            ref.type.reference?.ref,
-                            globalScope,
-                            allowTypeDefScope
-                        );
-                    }
-                    return EMPTY_SCOPE;
-                })
-                .when(isInvocationExpr, (expr) => {
-                    const returnTypeDecl =
-                        expr.function.ref?.returnType.reference?.ref;
-                    if (isDataModel(returnTypeDecl)) {
-                        return this.createScopeForContainer(
-                            returnTypeDecl,
-                            globalScope,
-                            allowTypeDefScope
-                        );
-                    } else {
-                        return EMPTY_SCOPE;
-                    }
-                })
-                // TODO: generalize it
-                // .when(isAuthInvocation, (expr) => {
-                //     return this.createScopeForAuth(expr, globalScope);
-                // })
-                .otherwise(() => EMPTY_SCOPE)
-        );
+                }
+            })
+            .when(isAuthInvocation, (expr) => {
+                return this.createScopeForAuth(expr, globalScope);
+            })
+            .otherwise(() => EMPTY_SCOPE);
     }
 
     private createScopeForContainingModel(node: AstNode, globalScope: Scope) {
@@ -317,21 +315,20 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         }
     }
 
-    // TODO: revisit this
-    // private createScopeForAuth(node: AstNode, globalScope: Scope) {
-    //     // get all data models and type defs from loaded and reachable documents
-    //     const decls = getAllLoadedAndReachableDataModelsAndTypeDefs(
-    //         this.services.shared.workspace.LangiumDocuments,
-    //         AstUtils.getContainerOfType(node, isDataModel)
-    //     );
+    private createScopeForAuth(node: AstNode, globalScope: Scope) {
+        // get all data models and type defs from loaded and reachable documents
+        const decls = getAllLoadedAndReachableDataModelsAndTypeDefs(
+            this.services.shared.workspace.LangiumDocuments,
+            AstUtils.getContainerOfType(node, isDataModel)
+        );
 
-    //     const authDecl = getAuthDecl(decls);
-    //     if (authDecl) {
-    //         return this.createScopeForContainer(authDecl, globalScope, true);
-    //     } else {
-    //         return EMPTY_SCOPE;
-    //     }
-    // }
+        const authDecl = getAuthDecl(decls);
+        if (authDecl) {
+            return this.createScopeForContainer(authDecl, globalScope, true);
+        } else {
+            return EMPTY_SCOPE;
+        }
+    }
 }
 
 function getCollectionPredicateContext(node: AstNode) {

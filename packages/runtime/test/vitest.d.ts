@@ -5,7 +5,8 @@ interface CustomMatchers<R = unknown> {
     toResolveFalsy: () => Promise<R>;
     toResolveNull: () => Promise<R>;
     toResolveWithLength: (length: number) => Promise<R>;
-    toRejectNotFound: () => Promise<R>;
+    toBeRejectedNotFound: () => Promise<R>;
+    toBeRejectedByPolicy: (expectedMessages?: string[]) => Promise<R>;
 }
 
 declare module 'vitest' {

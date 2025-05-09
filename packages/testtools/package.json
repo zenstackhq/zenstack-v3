@@ -1,0 +1,46 @@
+{
+    "name": "@zenstackhq/testtools",
+    "version": "3.0.0-alpha.1",
+    "description": "ZenStack Test Tools",
+    "type": "module",
+    "scripts": {
+        "build": "tsup-node",
+        "watch": "tsup-node --watch",
+        "test": "vitest",
+        "pack": "pnpm pack"
+    },
+    "keywords": [],
+    "author": "ZenStack Team",
+    "license": "MIT",
+    "files": [
+        "dist"
+    ],
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        }
+    },
+    "dependencies": {
+        "@types/node": "^18.0.0",
+        "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/sdk": "workspace:*",
+        "glob": "^11.0.2",
+        "tmp": "^0.2.3",
+        "typescript": "^5.8.3"
+    },
+    "peerDependencies": {
+        "better-sqlite3": "^11.8.1",
+        "pg": "^8.13.1"
+    },
+    "devDependencies": {
+        "@types/tmp": "^0.2.6"
+    }
+}

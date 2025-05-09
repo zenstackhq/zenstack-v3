@@ -1,16 +1,4 @@
 /**
- * Gets the current login user.
- */
-function auth(): Any {
-} @@@expressionContext([DefaultValue, AccessPolicy])
-
-/**
- * Used to specify the model for resolving `auth()` function call in access policies. A Zmodel
- * can have at most one model with this attribute. By default, the model named "User" is used.
- */
-attribute @@auth() @@@supportTypeDef
-
-/**
  * Defines an access policy that allows a set of operations when the given condition is true.
  * 
  * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.

@@ -7,6 +7,7 @@ import {
     Kysely,
     ReturningNode,
     SelectionNode,
+    SelectQueryNode,
     SingleConnectionProvider,
     UpdateQueryNode,
     WhereNode,
@@ -17,7 +18,6 @@ import {
     type QueryCompiler,
     type QueryResult,
     type RootOperationNode,
-    type SelectQueryNode,
     type TableNode,
 } from 'kysely';
 import { nanoid } from 'nanoid';
@@ -59,6 +59,15 @@ export class ZenStackQueryExecutor<
 
     private get options() {
         return this.client.$options;
+    }
+
+    private isCrudQueryNode(node: RootOperationNode) {
+        return (
+            SelectQueryNode.is(node) ||
+            InsertQueryNode.is(node) ||
+            UpdateQueryNode.is(node) ||
+            DeleteQueryNode.is(node)
+        );
     }
 
     override async executeQuery(
@@ -111,8 +120,8 @@ export class ZenStackQueryExecutor<
                 mutationInterceptionInfo
             );
 
-            // trim the result to the original query node
             if (oldQueryNode !== queryNode) {
+                // TODO: trim the result to the original query node
             }
 
             return result;
@@ -158,10 +167,9 @@ export class ZenStackQueryExecutor<
         return proceed(queryNode);
     }
 
-    private async proceedQuery(query: RootOperationNode, queryId: QueryId) {
+    private proceedQuery(query: RootOperationNode, queryId: QueryId) {
         // run built-in transformers
         const finalQuery = this.nameMapper.transformNode(query);
-
         const compiled = this.compileQuery(finalQuery);
         return this.driver.txConnection
             ? super
@@ -413,7 +421,6 @@ export class ZenStackQueryExecutor<
                     }
 
                     plugin.afterEntityMutation({
-                        // context: this.queryContext,
                         model: this.getMutationModel(queryNode),
                         action: mutationInterceptionInfo.action,
                         queryNode,

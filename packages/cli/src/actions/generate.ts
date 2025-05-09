@@ -1,11 +1,11 @@
 import { isPlugin, LiteralExpr, type Model } from '@zenstackhq/language/ast';
 import type { CliGenerator } from '@zenstackhq/runtime/client';
+import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
 import invariant from 'tiny-invariant';
 import { PrismaSchemaGenerator } from '../prisma/prisma-schema-generator';
-import { TsSchemaGenerator } from '../zmodel/ts-schema-generator';
 import { getSchemaFile, loadSchemaDocument } from './action-utils';
 
 type Options = {
@@ -25,7 +25,7 @@ export async function run(options: Options) {
 
     // generate TS schema
     const tsSchemaFile = path.join(outputPath, 'schema.ts');
-    await new TsSchemaGenerator().generate(schemaFile, tsSchemaFile);
+    await new TsSchemaGenerator().generate(schemaFile, [], tsSchemaFile);
 
     await runPlugins(model, outputPath, tsSchemaFile);
 

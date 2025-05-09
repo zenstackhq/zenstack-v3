@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
+import { RejectedByPolicyError } from '../../../plugins/policy/errors';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { CreateArgs, CreateManyArgs } from '../../crud-types';
-import { RejectedByPolicyError } from '../../errors';
 import { getIdValues } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 
@@ -27,31 +27,15 @@ export class CreateOperationHandler<
     }
 
     private async runCreate(args: CreateArgs<Schema, GetModels<Schema>>) {
-        let result: any;
-        try {
-            result = await this.kysely
-                .transaction()
-                .setIsolationLevel('repeatable read')
-                .execute(async (tx) => {
-                    const createResult = await this.create(
-                        tx,
-                        this.model,
-                        args.data
-                    );
-                    return this.readUnique(tx, this.model, {
-                        select: args.select,
-                        include: args.include,
-                        where: getIdValues(
-                            this.schema,
-                            this.model,
-                            createResult
-                        ),
-                    });
-                });
-        } catch (err) {
-            // console.error(err);
-            throw err;
-        }
+        // TODO: avoid using transaction for simple create
+        const result = await this.safeTransaction(async (tx) => {
+            const createResult = await this.create(tx, this.model, args.data);
+            return this.readUnique(tx, this.model, {
+                select: args.select,
+                include: args.include,
+                where: getIdValues(this.schema, this.model, createResult),
+            });
+        });
 
         if (!result) {
             throw new RejectedByPolicyError(

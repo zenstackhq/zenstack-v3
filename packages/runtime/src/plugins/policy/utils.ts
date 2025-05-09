@@ -20,7 +20,9 @@ import type { SchemaDef } from '../../schema';
 export function trueNode<Schema extends SchemaDef>(
     dialect: BaseCrudDialect<Schema>
 ) {
-    return ValueNode.create(dialect.transformPrimitive(true, 'Boolean'));
+    return ValueNode.createImmediate(
+        dialect.transformPrimitive(true, 'Boolean')
+    );
 }
 
 /**
@@ -29,7 +31,9 @@ export function trueNode<Schema extends SchemaDef>(
 export function falseNode<Schema extends SchemaDef>(
     dialect: BaseCrudDialect<Schema>
 ) {
-    return ValueNode.create(dialect.transformPrimitive(false, 'Boolean'));
+    return ValueNode.createImmediate(
+        dialect.transformPrimitive(false, 'Boolean')
+    );
 }
 
 /**

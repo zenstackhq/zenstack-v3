@@ -129,7 +129,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     @expr('null')
     // @ts-ignore
     private _null() {
-        return ValueNode.create(null);
+        return ValueNode.createImmediate(null);
     }
 
     @expr('binary')
@@ -275,21 +275,21 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                     BinaryOperationNode.create(
                         count,
                         OperatorNode.create('>'),
-                        ValueNode.create(0)
+                        ValueNode.createImmediate(0)
                     )
                 )
                 .with('!', () =>
                     BinaryOperationNode.create(
                         count,
                         OperatorNode.create('='),
-                        ValueNode.create(0)
+                        ValueNode.createImmediate(0)
                     )
                 )
                 .with('^', () =>
                     BinaryOperationNode.create(
                         count,
                         OperatorNode.create('='),
-                        ValueNode.create(0)
+                        ValueNode.createImmediate(0)
                     )
                 )
                 .exhaustive()
@@ -361,7 +361,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 'Boolean'
             );
         } else {
-            throw new Error('Unsupported expression');
+            throw new Error('Unsupported binary expression with `auth()`');
         }
     }
 
@@ -511,7 +511,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         receiverType: string
     ) {
         if (!receiver) {
-            return ValueNode.create(null);
+            return ValueNode.createImmediate(null);
         }
 
         if (expr.members.length !== 1) {

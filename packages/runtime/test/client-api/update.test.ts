@@ -30,7 +30,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         where: { id: 'not-found' },
                         data: { name: 'Foo' },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // empty data
                 await expect(
@@ -286,7 +286,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         },
                         include: { comments: true },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // set multiple
                 await expect(
@@ -359,7 +359,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         },
                         include: { comments: true },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // connect multiple
                 await expect(
@@ -516,7 +516,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         },
                         include: { comments: true },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // multiple
                 await expect(
@@ -574,7 +574,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         data: { comments: { delete: { id: '4' } } },
                         include: { comments: true },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
                 await expect(client.comment.findMany()).toResolveWithLength(3);
 
                 // non-existing
@@ -584,7 +584,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         data: { comments: { delete: { id: '5' } } },
                         include: { comments: true },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
                 await expect(client.comment.findMany()).toResolveWithLength(3);
 
                 // multiple
@@ -796,7 +796,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
                 //  transaction fails as a whole
                 await expect(
                     client.comment.findUnique({ where: { id: '1' } })
@@ -823,7 +823,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
                 //  transaction fails as a whole
                 await expect(
                     client.comment.findUnique({ where: { id: '1' } })
@@ -1240,7 +1240,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         },
                         include: { profile: true },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
             });
 
             it('works with nested to-one relation connectOrCreate', async () => {
@@ -1367,7 +1367,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         },
                         include: { profile: true },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
             });
 
             it('works with nested to-one relation update', async () => {
@@ -1423,7 +1423,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // not connected
                 const user2 = await createUser(client, 'u2@example.com', {});
@@ -1436,7 +1436,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
             });
 
             it('works with nested to-one relation upsert', async () => {
@@ -1558,7 +1558,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // not connected
                 await client.profile.create({
@@ -1573,7 +1573,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // non-existing
                 await client.user.update({
@@ -1593,7 +1593,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
             });
         });
 
@@ -1674,7 +1674,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         },
                         include: { user: true },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
             });
 
             it('works with nested to-one owning relation connectOrCreate', async () => {
@@ -1790,7 +1790,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // null relation
                 await expect(
@@ -1874,7 +1874,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // not connected
                 const profile2 = await client.profile.create({
@@ -1889,7 +1889,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
             });
 
             it('works with nested to-one owning relation upsert', async () => {
@@ -2015,7 +2015,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // not connected
                 await client.user.create({
@@ -2030,7 +2030,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
 
                 // non-existing
                 await client.profile.update({
@@ -2050,7 +2050,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectNotFound();
+                ).toBeRejectedNotFound();
             });
         });
     }

@@ -865,6 +865,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     this.dialect.buildFilter(eb, model, model, combinedWhere)
                 )
                 .set(updateFields)
+                // TODO: return selectively
                 .returningAll();
 
             let updatedEntity: any;
@@ -1555,6 +1556,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const query = kysely
             .deleteFrom(model)
             .where((eb) => this.dialect.buildFilter(eb, model, model, where))
+            // TODO: return selectively
             .$if(returnData, (qb) => qb.returningAll());
 
         // const result = await this.queryExecutor.execute(kysely, query);
@@ -1606,5 +1608,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             });
         }
         return returnRelation;
+    }
+
+    protected async safeTransaction<T>(
+        callback: (tx: ToKysely<Schema>) => Promise<T>
+    ) {
+        if (this.kysely.isTransaction) {
+            return callback(this.kysely);
+        } else {
+            return this.kysely
+                .transaction()
+                .setIsolationLevel('repeatable read')
+                .execute(callback);
+        }
     }
 }

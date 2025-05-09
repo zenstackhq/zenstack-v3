@@ -33,26 +33,23 @@ export class UpdateOperationHandler<
         if (hasRelationUpdate) {
             // employ a transaction
             try {
-                result = await this.kysely
-                    .transaction()
-                    .setIsolationLevel('repeatable read')
-                    .execute(async (tx) => {
-                        const updateResult = await this.update(
-                            tx,
+                result = await this.safeTransaction(async (tx) => {
+                    const updateResult = await this.update(
+                        tx,
+                        this.model,
+                        args.where,
+                        args.data
+                    );
+                    return this.readUnique(tx, this.model, {
+                        select: args.select,
+                        include: args.include,
+                        where: getIdValues(
+                            this.schema,
                             this.model,
-                            args.where,
-                            args.data
-                        );
-                        return this.readUnique(tx, this.model, {
-                            select: args.select,
-                            include: args.include,
-                            where: getIdValues(
-                                this.schema,
-                                this.model,
-                                updateResult
-                            ),
-                        });
+                            updateResult
+                        ),
                     });
+                });
             } catch (err) {
                 // console.error(err);
                 throw err;

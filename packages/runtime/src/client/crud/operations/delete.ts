@@ -28,34 +28,24 @@ export class DeleteOperationHandler<
     async runDelete(
         args: DeleteArgs<Schema, Extract<keyof Schema['models'], string>>
     ) {
-        const returnRelations = this.needReturnRelations(this.model, args);
-
-        if (returnRelations) {
-            // employ a transaction
-            return this.kysely.transaction().execute(async (tx) => {
-                const existing = await this.readUnique(tx, this.model, {
-                    select: args.select,
-                    include: args.include,
-                    where: args.where,
-                });
-                if (!existing) {
-                    throw new NotFoundError(this.model);
-                }
-                await this.delete(tx, this.model, args.where, false);
-                return existing;
-            });
-        } else {
-            const result = await this.delete(
-                this.kysely,
-                this.model,
-                args.where,
-                true
-            );
-            if ((result as unknown[]).length < 1) {
-                throw new NotFoundError(this.model);
-            }
-            return this.trimResult(result[0], args);
+        const existing = await this.readUnique(this.kysely, this.model, {
+            select: args.select,
+            include: args.include,
+            where: args.where,
+        });
+        if (!existing) {
+            throw new NotFoundError(this.model);
         }
+        const result = await this.delete(
+            this.kysely,
+            this.model,
+            args.where,
+            false
+        );
+        if (result.count === 0) {
+            throw new NotFoundError(this.model);
+        }
+        return existing;
     }
 
     async runDeleteMany(

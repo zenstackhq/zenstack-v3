@@ -27,7 +27,7 @@ import { match } from 'ts-pattern';
 import type { ClientContract } from '../../client';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base';
-import { InternalError, RejectedByPolicyError } from '../../client/errors';
+import { InternalError } from '../../client/errors';
 import type {
     OnKyselyQueryTransaction,
     ProceedKyselyQueryFunction,
@@ -35,6 +35,7 @@ import type {
 import { getIdFields, requireModel } from '../../client/query-utils';
 import { Expression, type GetModels, type SchemaDef } from '../../schema';
 import { ColumnCollector } from './column-collector';
+import { RejectedByPolicyError } from './errors';
 import { ExpressionTransformer } from './expression-transformer';
 import type { Policy, PolicyOperation } from './types';
 import {
@@ -83,11 +84,18 @@ export class PolicyHandler<
             throw new RejectedByPolicyError('non CRUD queries are not allowed');
         }
 
+        if (!this.isMutationQueryNode(node)) {
+            // transform and proceed read without transaction
+            return proceed(this.transformNode(node));
+        }
+
         let mutationRequiresTransaction = false;
+        const mutationModel = this.getMutationModel(node);
 
         if (InsertQueryNode.is(node)) {
+            // reject create if unconditional deny
             const constCondition = this.tryGetConstantPolicy(
-                this.getMutationModel(node),
+                mutationModel,
                 'create'
             );
             if (constCondition === false) {
@@ -95,11 +103,6 @@ export class PolicyHandler<
             } else if (constCondition === undefined) {
                 mutationRequiresTransaction = true;
             }
-        }
-
-        if (!this.isMutationQueryNode(node)) {
-            // transform and proceed read without transaction
-            return proceed(this.transformNode(node));
         }
 
         if (!mutationRequiresTransaction && !node.returning) {
@@ -244,39 +247,35 @@ export class PolicyHandler<
         result: QueryResult<any>,
         proceed: ProceedKyselyQueryFunction
     ) {
-        if (
-            InsertQueryNode.is(node) ||
-            UpdateQueryNode.is(node) ||
-            DeleteQueryNode.is(node)
-        ) {
-            if (node.returning) {
-                // do a select (with policy) in place of returning
-                const table = this.getMutationModel(node);
-                if (!table) {
-                    throw new InternalError(
-                        `Unable to get table name for query node: ${node}`
-                    );
-                }
-
-                const idConditions = this.buildIdConditions(table, result.rows);
-                const policyFilter = this.buildPolicyFilter(table, 'read');
-
-                const select: SelectQueryNode = {
-                    kind: 'SelectQueryNode',
-                    from: FromNode.create([TableNode.create(table)]),
-                    where: WhereNode.create(
-                        conjunction(this.dialect, [idConditions, policyFilter])
-                    ),
-                    selections: node.returning.selections,
-                };
-                const selectResult = await proceed(select);
-                return selectResult;
-            } else {
-                return result;
-            }
+        if (result.rows.length === 0) {
+            return result;
         }
 
-        return result;
+        if (!this.isMutationQueryNode(node) || !node.returning) {
+            return result;
+        }
+
+        // do a select (with policy) in place of returning
+        const table = this.getMutationModel(node);
+        if (!table) {
+            throw new InternalError(
+                `Unable to get table name for query node: ${node}`
+            );
+        }
+
+        const idConditions = this.buildIdConditions(table, result.rows);
+        const policyFilter = this.buildPolicyFilter(table, 'read');
+
+        const select: SelectQueryNode = {
+            kind: 'SelectQueryNode',
+            from: FromNode.create([TableNode.create(table)]),
+            where: WhereNode.create(
+                conjunction(this.dialect, [idConditions, policyFilter])
+            ),
+            selections: node.returning.selections,
+        };
+        const selectResult = await proceed(select);
+        return selectResult;
     }
 
     private buildIdConditions(table: string, rows: any[]): OperationNode {
@@ -301,7 +300,7 @@ export class PolicyHandler<
     private getMutationModel(
         node: InsertQueryNode | UpdateQueryNode | DeleteQueryNode
     ) {
-        return match(node)
+        const r = match(node)
             .when(
                 InsertQueryNode.is,
                 (node) => getTableName(node.into) as GetModels<Schema>
@@ -310,11 +309,21 @@ export class PolicyHandler<
                 UpdateQueryNode.is,
                 (node) => getTableName(node.table) as GetModels<Schema>
             )
-            .when(
-                DeleteQueryNode.is,
-                (node) => getTableName(node.from) as GetModels<Schema>
-            )
+            .when(DeleteQueryNode.is, (node) => {
+                if (node.from.froms.length !== 1) {
+                    throw new InternalError(
+                        'Only one from table is supported for delete'
+                    );
+                }
+                return getTableName(node.from.froms[0]) as GetModels<Schema>;
+            })
             .exhaustive();
+        if (!r) {
+            throw new InternalError(
+                `Unable to get table name for query node: ${node}`
+            );
+        }
+        return r;
     }
 
     private isCrudQueryNode(node: RootOperationNode): node is CrudQueryNode {
@@ -362,9 +371,7 @@ export class PolicyHandler<
 
         if (allows.length === 0) {
             // constant false
-            combinedPolicy = ValueNode.create(
-                this.dialect.transformPrimitive(false, 'Boolean')
-            );
+            combinedPolicy = falseNode(this.dialect);
         } else {
             // or(...allows)
             combinedPolicy = disjunction(this.dialect, allows);
@@ -435,23 +442,29 @@ export class PolicyHandler<
 
     protected override transformUpdateQuery(node: UpdateQueryNode) {
         const result = super.transformUpdateQuery(node);
-        if (!node.returning) {
-            return result;
-        }
+        const mutationModel = this.getMutationModel(node);
+        const filter = this.buildPolicyFilter(mutationModel, 'update');
         return {
             ...result,
-            returning: ReturningNode.create([SelectionNode.createSelectAll()]),
+            where: WhereNode.create(
+                result.where
+                    ? conjunction(this.dialect, [result.where.where, filter])
+                    : filter
+            ),
         };
     }
 
     protected override transformDeleteQuery(node: DeleteQueryNode) {
         const result = super.transformDeleteQuery(node);
-        if (!node.returning) {
-            return result;
-        }
+        const mutationModel = this.getMutationModel(node);
+        const filter = this.buildPolicyFilter(mutationModel, 'update');
         return {
             ...result,
-            returning: ReturningNode.create([SelectionNode.createSelectAll()]),
+            where: WhereNode.create(
+                result.where
+                    ? conjunction(this.dialect, [result.where.where, filter])
+                    : filter
+            ),
         };
     }
 

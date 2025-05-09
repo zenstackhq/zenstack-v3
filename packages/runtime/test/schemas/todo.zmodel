@@ -20,7 +20,7 @@ model Space {
     updatedAt DateTime    @updatedAt
     name      String      @length(4, 50)
     slug      String      @unique @length(4, 16)
-    owner     User?       @relation(fields: [ownerId], references: [id])
+    owner     User?       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     ownerId   String?
     members   SpaceUser[]
     lists     List[]

@@ -3,12 +3,15 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { ZenStackClient } from '../../src';
 import type { SchemaDef } from '../../src/schema';
 import { PolicyPlugin } from '../../src/plugins/policy';
+import path from 'node:path';
 
 describe('Todo sample', () => {
     let schema: SchemaDef;
 
     beforeAll(async () => {
-        schema = await generateTsSchemaFromFile('../schemas/todo.zmodel');
+        schema = await generateTsSchemaFromFile(
+            path.join(__dirname, '../schemas/todo.zmodel')
+        );
     });
 
     it('works with user CRUD', async () => {
@@ -99,33 +102,33 @@ describe('Todo sample', () => {
         await expect(user1Db.user.findMany()).resolves.toHaveLength(2);
         await expect(user2Db.user.findMany()).resolves.toHaveLength(2);
 
-        // // update user2 as user1
-        // await expect(
-        //     user2Db.user.update({
-        //         where: { id: user1.id },
-        //         data: { name: 'hello' },
-        //     })
-        // ).toBeRejectedByPolicy();
+        // update user2 as user1
+        await expect(
+            user2Db.user.update({
+                where: { id: user1.id },
+                data: { name: 'hello' },
+            })
+        ).toBeRejectedNotFound();
 
-        // // update user1 as user1
-        // await expect(
-        //     user1Db.user.update({
-        //         where: { id: user1.id },
-        //         data: { name: 'hello' },
-        //     })
-        // ).toResolveTruthy();
+        // update user1 as user1
+        await expect(
+            user1Db.user.update({
+                where: { id: user1.id },
+                data: { name: 'hello' },
+            })
+        ).toResolveTruthy();
 
-        // // delete user2 as user1
-        // await expect(
-        //     user1Db.user.delete({ where: { id: user2.id } })
-        // ).toBeRejectedByPolicy();
+        // delete user2 as user1
+        await expect(
+            user1Db.user.delete({ where: { id: user2.id } })
+        ).toBeRejectedNotFound();
 
-        // // delete user1 as user1
-        // await expect(
-        //     user1Db.user.delete({ where: { id: user1.id } })
-        // ).toResolveTruthy();
-        // await expect(
-        //     user1Db.user.findUnique({ where: { id: user1.id } })
-        // ).toResolveNull();
+        // delete user1 as user1
+        await expect(
+            user1Db.user.delete({ where: { id: user1.id } })
+        ).toResolveTruthy();
+        await expect(
+            user1Db.user.findUnique({ where: { id: user1.id } })
+        ).toResolveNull();
     });
 });

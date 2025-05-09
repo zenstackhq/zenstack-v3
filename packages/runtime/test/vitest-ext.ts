@@ -1,5 +1,6 @@
 import { expect } from 'vitest';
-import { NotFoundError, RejectedByPolicyError } from '../src/client/errors';
+import { NotFoundError } from '../src/client/errors';
+import { RejectedByPolicyError } from '../src/plugins/policy/errors';
 
 function isPromise(value: any) {
     return (

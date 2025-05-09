@@ -107,9 +107,11 @@ export const schema = {
                         {
                             name: 'condition',
                             value: Expression.binary(
-                                Expression.call('auth'),
+                                Expression.member(Expression.call('auth'), [
+                                    'id',
+                                ]),
                                 '==',
-                                Expression._this()
+                                Expression.field('id')
                             ),
                         },
                     ],
@@ -216,9 +218,11 @@ export const schema = {
                         {
                             name: 'condition',
                             value: Expression.binary(
-                                Expression.call('auth'),
+                                Expression.member(Expression.call('auth'), [
+                                    'id',
+                                ]),
                                 '==',
-                                Expression.field('author')
+                                Expression.field('authorId')
                             ),
                         },
                     ],

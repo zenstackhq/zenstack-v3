@@ -15,9 +15,3 @@ export class NotFoundError extends Error {
         super(`Entity not found for model "${model}"`);
     }
 }
-
-export class RejectedByPolicyError extends Error {
-    constructor(reason?: string) {
-        super(reason ?? `Operation rejected by policy`);
-    }
-}

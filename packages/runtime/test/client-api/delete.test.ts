@@ -32,7 +32,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                 client.user.delete({
                     where: { id: '2' },
                 })
-            ).toBeRejectNotFound();
+            ).toBeRejectedNotFound();
 
             // found
             await expect(

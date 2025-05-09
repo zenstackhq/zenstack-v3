@@ -144,8 +144,7 @@ model Post {
                                             kind: 'array',
                                             items: [
                                                 {
-                                                    kind: 'ref',
-                                                    model: 'Post',
+                                                    kind: 'field',
                                                     field: 'authorId',
                                                 },
                                             ],
@@ -157,8 +156,7 @@ model Post {
                                             kind: 'array',
                                             items: [
                                                 {
-                                                    kind: 'ref',
-                                                    model: 'User',
+                                                    kind: 'field',
                                                     field: 'id',
                                                 },
                                             ],
@@ -167,9 +165,8 @@ model Post {
                                     {
                                         name: 'onDelete',
                                         value: {
-                                            kind: 'ref',
-                                            model: 'ReferentialAction',
-                                            field: 'Cascade',
+                                            kind: 'literal',
+                                            value: 'Cascade',
                                         },
                                     },
                                 ],

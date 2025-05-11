@@ -35,6 +35,7 @@ import {
     type UnaryExpression,
 } from '../../schema/expression';
 import type { BuiltinType, GetModels } from '../../schema/schema';
+import { ExpressionEvaluator } from './expression-evaluator';
 import { conjunction, disjunction, logicalNot, trueNode } from './utils';
 
 export type ExpressionTransformerContext<Schema extends SchemaDef> = {
@@ -217,16 +218,22 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             'expected "?" or "!" or "^" operator'
         );
 
+        if (this.isAuthCall(expr.left) || this.isAuthMember(expr.left)) {
+            const value = new ExpressionEvaluator().evaluate(expr, {
+                auth: this.auth,
+            });
+            return this.transformValue(value, 'Boolean');
+        }
+
         const left = this.transform(expr.left, context);
 
         invariant(
-            Expression.isFieldExpr(expr.left) ||
-                Expression.isMemberExpr(expr.left),
+            Expression.isField(expr.left) || Expression.isMember(expr.left),
             'left operand must be field or member access'
         );
 
         let newContextModel: string;
-        if (Expression.isFieldExpr(expr.left)) {
+        if (Expression.isField(expr.left)) {
             const fieldDef = requireField(
                 this.schema,
                 context.model,
@@ -234,7 +241,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             );
             newContextModel = fieldDef.type;
         } else {
-            invariant(Expression.isFieldExpr(expr.left.receiver));
+            invariant(Expression.isField(expr.left.receiver));
             const fieldDef = requireField(
                 this.schema,
                 context.model,
@@ -403,6 +410,10 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         return Expression.isCall(value) && value.function === 'auth';
     }
 
+    private isAuthMember(expr: Expression): boolean {
+        return Expression.isMember(expr) && this.isAuthCall(expr.receiver);
+    }
+
     @expr('member')
     // @ts-ignore
     private _member(
@@ -415,7 +426,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         invariant(
-            Expression.isFieldExpr(expr.receiver),
+            Expression.isField(expr.receiver),
             'expect receiver to be field expression'
         );
 

@@ -26,7 +26,7 @@ describe('Todo sample', () => {
             name: 'User 2',
         };
 
-        const client: any = new ZenStackClient(schema, { log: ['query'] });
+        const client: any = new ZenStackClient(schema);
         await client.$pushSchema();
 
         const anonDb: any = client.$use(new PolicyPlugin());

@@ -37,6 +37,7 @@ import path from 'node:path';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import * as ts from 'typescript';
+import { ModelUtils } from '.';
 import {
     getAttribute,
     getAuthDecl,
@@ -498,32 +499,59 @@ export class TsSchemaGenerator {
 
         const defaultValue = this.getMappedDefault(field);
         if (defaultValue !== undefined) {
-            if (typeof defaultValue === 'object' && 'call' in defaultValue) {
-                objectFields.push(
-                    ts.factory.createPropertyAssignment(
-                        'default',
-                        ts.factory.createObjectLiteralExpression([
-                            ts.factory.createPropertyAssignment(
-                                'call',
-                                ts.factory.createStringLiteral(
-                                    defaultValue.call
-                                )
-                            ),
-                            ...(defaultValue.args.length > 0
-                                ? [
-                                      ts.factory.createPropertyAssignment(
-                                          'args',
-                                          ts.factory.createArrayLiteralExpression(
-                                              defaultValue.args.map((arg) =>
-                                                  this.createLiteralNode(arg)
-                                              )
-                                          )
-                                      ),
-                                  ]
-                                : []),
-                        ])
-                    )
-                );
+            if (typeof defaultValue === 'object') {
+                if ('call' in defaultValue) {
+                    objectFields.push(
+                        ts.factory.createPropertyAssignment(
+                            'default',
+
+                            ts.factory.createCallExpression(
+                                ts.factory.createIdentifier('Expression.call'),
+                                undefined,
+                                [
+                                    ts.factory.createStringLiteral(
+                                        defaultValue.call
+                                    ),
+                                    ts.factory.createArrayLiteralExpression(
+                                        defaultValue.args.map((arg) =>
+                                            this.createLiteralNode(arg)
+                                        )
+                                    ),
+                                ]
+                            )
+                        )
+                    );
+                } else if ('authMember' in defaultValue) {
+                    objectFields.push(
+                        ts.factory.createPropertyAssignment(
+                            'default',
+                            ts.factory.createCallExpression(
+                                ts.factory.createIdentifier(
+                                    'Expression.member'
+                                ),
+                                undefined,
+                                [
+                                    ts.factory.createCallExpression(
+                                        ts.factory.createIdentifier(
+                                            'Expression.call'
+                                        ),
+                                        undefined,
+                                        [ts.factory.createStringLiteral('auth')]
+                                    ),
+                                    ts.factory.createArrayLiteralExpression(
+                                        defaultValue.authMember.map((m) =>
+                                            ts.factory.createStringLiteral(m)
+                                        )
+                                    ),
+                                ]
+                            )
+                        )
+                    );
+                } else {
+                    throw new Error(
+                        `Unsupported default value type for field ${field.name}`
+                    );
+                }
             } else {
                 objectFields.push(
                     ts.factory.createPropertyAssignment(
@@ -611,13 +639,23 @@ export class TsSchemaGenerator {
         return { type, url };
     }
 
-    private getMappedDefault(field: DataModelField) {
+    private getMappedDefault(
+        field: DataModelField
+    ):
+        | string
+        | number
+        | boolean
+        | { call: string; args: any[] }
+        | { authMember: string[] }
+        | undefined {
         const defaultAttr = getAttribute(field, '@default');
         if (!defaultAttr) {
             return undefined;
         }
 
         const defaultValue = defaultAttr.args[0]?.value;
+        invariant(defaultValue, 'Expected a default value');
+
         if (isLiteralExpr(defaultValue)) {
             const lit = (defaultValue as LiteralExpr).value;
             return field.type.type === 'Boolean'
@@ -639,11 +677,45 @@ export class TsSchemaGenerator {
                     this.getLiteral(arg.value)
                 ),
             };
+        } else if (this.isAuthMemberAccess(defaultValue)) {
+            return {
+                authMember: this.getMemberAccessChain(defaultValue),
+            };
         } else {
             throw new Error(
                 `Unsupported default value type for field ${field.name}`
             );
         }
+    }
+
+    private getMemberAccessChain(expr: MemberAccessExpr): string[] {
+        if (!isMemberAccessExpr(expr.operand)) {
+            return [expr.member.$refText];
+        } else {
+            return [
+                ...this.getMemberAccessChain(expr.operand),
+                expr.member.$refText,
+            ];
+        }
+    }
+
+    private isAuthMemberAccess(expr: Expression): expr is MemberAccessExpr {
+        if (isMemberAccessExpr(expr)) {
+            return (
+                this.isAuthInvocation(expr.operand) ||
+                this.isAuthMemberAccess(expr.operand)
+            );
+        } else {
+            return false;
+        }
+    }
+
+    private isAuthInvocation(expr: Expression) {
+        return (
+            isInvocationExpr(expr) &&
+            expr.function.$refText === 'auth' &&
+            ModelUtils.isFromStdlib(expr.function.ref!)
+        );
     }
 
     private createRelationObject(field: DataModelField) {
@@ -1190,23 +1262,6 @@ export class TsSchemaGenerator {
                 members.map((m) => ts.factory.createStringLiteral(m))
             ),
         ];
-
-        // if (isDataModel(expr.$resolvedType?.decl)) {
-        //     const operandModel = expr.operand.$resolvedType?.decl! as DataModel;
-        //     const relationModel = expr.$resolvedType.decl;
-        //     args.push(
-        //         ts.factory.createObjectLiteralExpression([
-        //             ts.factory.createPropertyAssignment(
-        //                 'fromModel',
-        //                 ts.factory.createStringLiteral(operandModel.name)
-        //             ),
-        //             ts.factory.createPropertyAssignment(
-        //                 'relationModel',
-        //                 ts.factory.createStringLiteral(relationModel.name)
-        //             ),
-        //         ])
-        //     );
-        // }
 
         return ts.factory.createCallExpression(
             ts.factory.createIdentifier('Expression.member'),

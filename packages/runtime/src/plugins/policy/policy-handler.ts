@@ -397,12 +397,14 @@ export class PolicyHandler<
 
         node.from?.froms.forEach((from) => {
             let modelName = this.extractTableName(from);
-            const filter = this.buildPolicyFilter(modelName, 'read');
-            whereNode = WhereNode.create(
-                whereNode?.where
-                    ? conjunction(this.dialect, [whereNode.where, filter])
-                    : filter
-            );
+            if (modelName) {
+                const filter = this.buildPolicyFilter(modelName, 'read');
+                whereNode = WhereNode.create(
+                    whereNode?.where
+                        ? conjunction(this.dialect, [whereNode.where, filter])
+                        : filter
+                );
+            }
         });
 
         const baseResult = super.transformSelectQuery({
@@ -468,14 +470,18 @@ export class PolicyHandler<
         };
     }
 
-    private extractTableName(from: OperationNode): GetModels<Schema> {
+    private extractTableName(
+        from: OperationNode
+    ): GetModels<Schema> | undefined {
         if (TableNode.is(from)) {
             return from.table.identifier.name as GetModels<Schema>;
         }
         if (AliasNode.is(from)) {
             return this.extractTableName(from.node);
         } else {
-            throw new Error(`Unexpected "from" node kind: ${from.kind}`);
+            // this can happen for subqueries, which will be handled when nested
+            // transformation happens
+            return undefined;
         }
     }
 

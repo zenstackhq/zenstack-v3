@@ -16,7 +16,7 @@ export const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    default: { call: 'cuid' },
+                    default: Expression.call('cuid'),
                     attributes: [
                         { name: '@id' },
                         {
@@ -47,7 +47,7 @@ export const schema = {
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: { call: 'now' },
+                    default: Expression.call('now'),
                     attributes: [
                         {
                             name: '@default',
@@ -141,11 +141,11 @@ export const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    default: { call: 'cuid' },
+                    default: Expression.call('cuid'),
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: { call: 'now' },
+                    default: Expression.call('now'),
                 },
                 updatedAt: {
                     type: 'DateTime',
@@ -248,11 +248,11 @@ export const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    default: { call: 'cuid' },
+                    default: Expression.call('cuid'),
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: { call: 'now' },
+                    default: Expression.call('now'),
                 },
                 updatedAt: {
                     type: 'DateTime',
@@ -288,7 +288,7 @@ export const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    default: { call: 'cuid' },
+                    default: Expression.call('cuid'),
                 },
                 bio: { type: 'String' },
                 age: { type: 'Int', optional: true },

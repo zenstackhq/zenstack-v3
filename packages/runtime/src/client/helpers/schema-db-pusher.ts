@@ -6,7 +6,12 @@ import {
 } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
-import type { FieldDef, ModelDef, SchemaDef } from '../../schema';
+import {
+    Expression,
+    type FieldDef,
+    type ModelDef,
+    type SchemaDef,
+} from '../../schema';
 import type {
     BuiltinType,
     CascadeAction,
@@ -137,9 +142,12 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 if (fieldDef.default !== undefined) {
                     if (
                         typeof fieldDef.default === 'object' &&
-                        'call' in fieldDef.default
+                        'kind' in fieldDef.default
                     ) {
-                        if (fieldDef.default.call === 'now') {
+                        if (
+                            Expression.isCall(fieldDef.default) &&
+                            fieldDef.default.function === 'now'
+                        ) {
                             col = col.defaultTo(sql`CURRENT_TIMESTAMP`);
                         }
                     } else {

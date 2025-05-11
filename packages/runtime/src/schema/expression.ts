@@ -180,21 +180,15 @@ export const Expression = {
     isThis: (value: unknown): value is ThisExpression =>
         Expression.is(value, 'this'),
 
-    isUnaryExpr: (value: unknown): value is UnaryExpression =>
+    isUnary: (value: unknown): value is UnaryExpression =>
         Expression.is(value, 'unary'),
 
-    isBinaryExpr: (value: unknown): value is BinaryExpression =>
+    isBinary: (value: unknown): value is BinaryExpression =>
         Expression.is(value, 'binary'),
 
-    isFieldExpr: (value: unknown): value is FieldExpression =>
+    isField: (value: unknown): value is FieldExpression =>
         Expression.is(value, 'field'),
 
-    isMemberExpr: (value: unknown): value is MemberExpression =>
+    isMember: (value: unknown): value is MemberExpression =>
         Expression.is(value, 'member'),
-
-    isCallExpr: (value: unknown): value is CallExpression =>
-        Expression.is(value, 'call'),
-
-    isThisExpr: (value: unknown): value is ThisExpression =>
-        Expression.is(value, 'this'),
 };

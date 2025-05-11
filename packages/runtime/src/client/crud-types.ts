@@ -299,6 +299,10 @@ export type WhereUnique<
     Extract<keyof GetModel<Schema, Model>['uniqueFields'], string>
 >;
 
+type OmitFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    [Key in ScalarFields<Schema, Model>]?: true;
+};
+
 export type SelectInclude<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
@@ -306,9 +310,7 @@ export type SelectInclude<
 > = {
     select?: Select<Schema, Model, AllowCount>;
     include?: Include<Schema, Model>;
-    omit?: {
-        [Key in ScalarFields<Schema, Model>]?: true;
-    };
+    omit?: OmitFields<Schema, Model>;
 };
 
 type Select<
@@ -544,6 +546,12 @@ export type CreateManyArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = CreateManyPayload<Schema, Model>;
+
+export type CreateManyAndReturnArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = CreateManyPayload<Schema, Model> &
+    Omit<SelectInclude<Schema, Model, false>, 'include'>;
 
 type OptionalWrap<
     Schema extends SchemaDef,
@@ -1073,6 +1081,12 @@ export type ModelOperations<
     ): Promise<ModelResult<Schema, Model, T>>;
 
     createMany(args?: CreateManyPayload<Schema, Model>): Promise<BatchResult>;
+
+    createManyAndReturn(
+        args?: CreateManyAndReturnArgs<Schema, Model>
+    ): Promise<
+        ModelResult<Schema, Model, CreateManyAndReturnArgs<Schema, Model>>[]
+    >;
 
     update<T extends UpdateArgs<Schema, Model>>(
         args: SelectSubset<T, UpdateArgs<Schema, Model>>

@@ -57,8 +57,6 @@ export type RelationInfo = {
     onUpdate?: CascadeAction;
 };
 
-export type FieldDefaultProvider = { call: string; args?: any[] };
-
 export type FieldDef = {
     type: string;
     id?: boolean;
@@ -67,7 +65,7 @@ export type FieldDef = {
     unique?: boolean;
     updatedAt?: boolean;
     attributes?: AttributeApplication[];
-    default?: MappedBuiltinType | FieldDefaultProvider;
+    default?: MappedBuiltinType | Expression;
     relation?: RelationInfo;
     foreignKeyFor?: string[];
     computed?: boolean;

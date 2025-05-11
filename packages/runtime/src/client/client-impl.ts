@@ -10,6 +10,7 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
+import type { AuthType } from '../schema/schema';
 import type { ClientConstructor, ClientContract } from './contract';
 import type { ModelOperations } from './crud-types';
 import { AggregateOperationHandler } from './crud/operations/aggregate';
@@ -30,7 +31,6 @@ import type { RuntimePlugin } from './plugin';
 import { createDeferredPromise } from './promise';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
-import type { AuthType } from '../schema/schema';
 
 /**
  * Creates a new ZenStack client instance.
@@ -201,7 +201,10 @@ export class ClientImpl<Schema extends SchemaDef> {
         return new ClientImpl<Schema>(this.schema, newOptions, this);
     }
 
-    $setAuth(auth: AuthType<Schema>) {
+    $setAuth(auth: AuthType<Schema> | undefined) {
+        if (auth !== undefined && typeof auth !== 'object') {
+            throw new Error('Invalid auth object');
+        }
         const newClient = new ClientImpl<Schema>(
             this.schema,
             this.$options,
@@ -361,6 +364,15 @@ function createModelCrudHandler<
                 args,
                 new CreateOperationHandler(client, model, inputValidator),
                 false
+            );
+        },
+
+        createManyAndReturn: (args: unknown) => {
+            return createPromise(
+                'createManyAndReturn',
+                args,
+                new CreateOperationHandler(client, model, inputValidator),
+                true
             );
         },
 

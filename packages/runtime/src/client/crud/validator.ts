@@ -11,6 +11,7 @@ import {
     type AggregateArgs,
     type CountArgs,
     type CreateArgs,
+    type CreateManyAndReturnArgs,
     type CreateManyArgs,
     type DeleteArgs,
     type DeleteManyArgs,
@@ -53,6 +54,16 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<
             CreateManyArgs<Schema, GetModels<Schema>> | undefined
         >(this.makeCreateManySchema(model), 'createMany', args);
+    }
+
+    validateCreateManyAndReturnArgs(model: GetModels<Schema>, args: unknown) {
+        return this.validate<
+            CreateManyAndReturnArgs<Schema, GetModels<Schema>> | undefined
+        >(
+            this.makeCreateManyAndReturnSchema(model),
+            'createManyAndReturn',
+            args
+        );
     }
 
     validateUpdateArgs(model: GetModels<Schema>, args: unknown) {
@@ -550,6 +561,18 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.makeCreateManyDataSchema(model, []).optional();
     }
 
+    private makeCreateManyAndReturnSchema(model: string) {
+        const base = this.makeCreateManyDataSchema(model, []);
+        return base
+            .merge(
+                z.object({
+                    select: this.makeSelectSchema(model).optional(),
+                    omit: this.makeOmitSchema(model).optional(),
+                })
+            )
+            .optional();
+    }
+
     private makeCreateDataSchema(
         model: string,
         canBeArray: boolean,
@@ -598,9 +621,23 @@ export class InputValidator<Schema extends SchemaDef> {
                     )
                 );
 
-                // optional or array relations are optional
                 if (fieldDef.optional || fieldDef.array) {
+                    // optional or array relations are optional
                     fieldSchema = fieldSchema.optional();
+                } else {
+                    // if all fk fields are optional, the relation is optional
+                    let allFksOptional = false;
+                    if (fieldDef.relation.fields) {
+                        allFksOptional = fieldDef.relation.fields.every((f) => {
+                            const fkDef = requireField(this.schema, model, f);
+                            return (
+                                fkDef.optional || fieldHasDefaultValue(fkDef)
+                            );
+                        });
+                    }
+                    if (allFksOptional) {
+                        fieldSchema = fieldSchema.optional();
+                    }
                 }
 
                 // optional to-one relation can be null
@@ -612,6 +649,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 let fieldSchema: ZodSchema = this.makePrimitiveSchema(
                     fieldDef.type
                 );
+
                 if (fieldDef.optional || fieldHasDefaultValue(fieldDef)) {
                     fieldSchema = fieldSchema.optional();
                 }

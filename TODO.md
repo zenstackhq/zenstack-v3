@@ -15,9 +15,10 @@
         -   [x] Relation connection
         -   [x] Create many
         -   [x] ID generation
+        -   [x] CreateManyAndReturn
     -   [ ] Find
         -   [x] Input validation
-        -   [ ] Field selection
+        -   [x] Field selection
             -   [x] Omit
             -   [x] Counting relation
         -   [x] Pagination
@@ -42,6 +43,7 @@
         -   [x] Nested to-one
         -   [ ] Delta update for numeric fields
         -   [ ] Array update
+    -   [ ] Upsert
     -   [x] Delete
     -   [ ] Aggregation
         -   [x] Count
@@ -52,15 +54,14 @@
         -   [x] Computed fields
         -   [?] Prisma client extension
     -   [ ] Misc
-        -   [ ] Rename AST Model to Schema
         -   [ ] Compound ID
         -   [ ] Cross field comparison
         -   [ ] Many-to-many relation
         -   [ ] Cache validation schemas
         -   [?] Logging
         -   [ ] Error system
-        -   [?] Custom table name
-        -   [ ] Custom field name
+        -   [x] Custom table name
+        -   [x] Custom field name
 -   [ ] Access Policy
 -   [ ] Polymorphism
 -   [x] Migration

@@ -14,14 +14,19 @@ import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
 import type { ClientContract } from '../..';
-import type { GetModels, ModelDef, SchemaDef } from '../../../schema';
-import type {
-    BuiltinType,
-    FieldDef,
-    FieldDefaultProvider,
-} from '../../../schema/schema';
+import {
+    Expression,
+    type GetModels,
+    type ModelDef,
+    type SchemaDef,
+} from '../../../schema';
+import type { BuiltinType, FieldDef } from '../../../schema/schema';
 import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
+import {
+    extractFields,
+    fieldsToSelectObject,
+} from '../../../utils/object-utils';
 import type { FindArgs, SelectInclude, Where } from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
@@ -49,6 +54,7 @@ export type CrudOperation =
     | 'findFirst'
     | 'create'
     | 'createMany'
+    | 'createManyAndReturn'
     | 'update'
     | 'updateMany'
     | 'delete'
@@ -547,8 +553,42 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
 
                 case 'connect': {
-                    // directly return the payload as foreign key values
-                    result = subPayload;
+                    const referencedPkFields =
+                        relationField.relation!.references!;
+                    invariant(
+                        referencedPkFields,
+                        'relation must have fields info'
+                    );
+                    const extractedFks = extractFields(
+                        subPayload,
+                        referencedPkFields
+                    );
+                    if (
+                        Object.keys(extractedFks).length ===
+                        referencedPkFields.length
+                    ) {
+                        // payload contains all referenced pk fields, we can
+                        // directly use it to connect the relation
+                        result = extractedFks;
+                    } else {
+                        // read the relation entity and fetch the referenced pk fields
+                        const relationEntity = await this.readUnique(
+                            kysely,
+                            relationModel,
+                            {
+                                where: subPayload,
+                                select: fieldsToSelectObject(
+                                    referencedPkFields
+                                ) as any,
+                            }
+                        );
+                        if (!relationEntity) {
+                            throw new NotFoundError(
+                                `Could not find the entity for connect action`
+                            );
+                        }
+                        result = relationEntity;
+                    }
                     break;
                 }
 
@@ -674,12 +714,16 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return Promise.all(tasks);
     }
 
-    protected async createMany(
+    protected async createMany<
+        ReturnData extends boolean,
+        Result = ReturnData extends true ? unknown[] : { count: number }
+    >(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         input: { data: any; skipDuplicates?: boolean },
+        returnData: ReturnData,
         fromRelation?: FromRelationContext<Schema>
-    ) {
+    ): Promise<Result> {
         const modelDef = this.requireModel(model);
 
         let relationKeyPairs: { fk: string; pk: string }[] = [];
@@ -713,8 +757,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             .$if(!!input.skipDuplicates, (qb) =>
                 qb.onConflict((oc) => oc.doNothing())
             );
-        const result = await query.executeTakeFirstOrThrow();
-        return { count: Number(result.numInsertedOrUpdatedRows) };
+
+        if (!returnData) {
+            const result = await query.executeTakeFirstOrThrow();
+            return { count: Number(result.numInsertedOrUpdatedRows) } as Result;
+        } else {
+            const idFields = getIdFields(this.schema, model);
+            const result = await query.returning(idFields as any).execute();
+            return result as Result;
+        }
     }
 
     private fillGeneratedValues(modelDef: ModelDef, data: object) {
@@ -724,10 +775,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             if (!(field in data)) {
                 if (
                     typeof fields[field]?.default === 'object' &&
-                    'call' in fields[field].default
+                    'kind' in fields[field].default
                 ) {
                     const generated = this.evalGenerator(fields[field].default);
-                    if (generated) {
+                    if (generated !== undefined) {
                         values[field] = generated;
                     }
                 } else if (fields[field]?.updatedAt) {
@@ -738,15 +789,40 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return values;
     }
 
-    private evalGenerator(defaultProvider: FieldDefaultProvider) {
-        return match(defaultProvider.call)
-            .with('cuid', () => createId())
-            .with('uuid', () =>
-                defaultProvider.args?.[0] === 7 ? uuid.v7() : uuid.v4()
-            )
-            .with('nanoid', () => nanoid(defaultProvider.args?.[0]))
-            .with('ulid', () => ulid())
-            .otherwise(() => undefined);
+    private evalGenerator(defaultValue: Expression) {
+        if (Expression.isCall(defaultValue)) {
+            return match(defaultValue.function)
+                .with('cuid', () => createId())
+                .with('uuid', () =>
+                    defaultValue.args?.[0] &&
+                    Expression.isLiteral(defaultValue.args?.[0]) &&
+                    defaultValue.args[0].value === 7
+                        ? uuid.v7()
+                        : uuid.v4()
+                )
+                .with('nanoid', () =>
+                    defaultValue.args?.[0] &&
+                    Expression.isLiteral(defaultValue.args[0]) &&
+                    typeof defaultValue.args[0].value === 'number'
+                        ? nanoid(defaultValue.args[0].value)
+                        : nanoid()
+                )
+                .with('ulid', () => ulid())
+                .otherwise(() => undefined);
+        } else if (
+            Expression.isMember(defaultValue) &&
+            Expression.isCall(defaultValue.receiver) &&
+            defaultValue.receiver.function === 'auth'
+        ) {
+            // `auth()` member access
+            let val: any = this.client.$auth;
+            for (const member of defaultValue.members) {
+                val = val?.[member];
+            }
+            return val ?? null;
+        } else {
+            return undefined;
+        }
     }
 
     protected async update(
@@ -1023,6 +1099,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             kysely,
                             fieldModel,
                             value as { data: any; skipDuplicates: boolean },
+                            false,
                             fromRelationContext
                         )
                     );

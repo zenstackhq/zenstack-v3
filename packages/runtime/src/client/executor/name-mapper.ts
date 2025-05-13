@@ -22,7 +22,7 @@ import { requireModel } from '../query-utils';
 export class QueryNameMapper extends OperationNodeTransformer {
     private readonly modelToTableMap = new Map<string, string>();
     private readonly fieldToColumnMap = new Map<string, string>();
-    private currentModel: string | undefined;
+    private readonly modelStack: string[] = [];
 
     constructor(private readonly schema: SchemaDef) {
         super();
@@ -46,14 +46,30 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
+    private get currentModel() {
+        return this.modelStack[this.modelStack.length - 1];
+    }
+
     protected override transformCreateTable(node: CreateTableNode) {
-        this.currentModel = node.table.table.identifier.name;
-        return super.transformCreateTable(node);
+        try {
+            this.modelStack.push(node.table.table.identifier.name);
+            return super.transformCreateTable(node);
+        } finally {
+            this.modelStack.pop();
+        }
     }
 
     protected override transformInsertQuery(node: InsertQueryNode) {
-        this.currentModel = node.into?.table.identifier.name;
-        return super.transformInsertQuery(node);
+        try {
+            if (node.into?.table.identifier.name) {
+                this.modelStack.push(node.into.table.identifier.name);
+            }
+            return super.transformInsertQuery(node);
+        } finally {
+            if (node.into?.table.identifier.name) {
+                this.modelStack.pop();
+            }
+        }
     }
 
     protected override transformReturning(node: ReturningNode) {
@@ -63,17 +79,24 @@ export class QueryNameMapper extends OperationNodeTransformer {
     }
 
     protected override transformUpdateQuery(node: UpdateQueryNode) {
-        this.currentModel = undefined;
+        let pushed = false;
         if (node.table && TableNode.is(node.table)) {
-            this.currentModel = node.table.table.identifier.name;
+            this.modelStack.push(node.table.table.identifier.name);
+            pushed = true;
         }
-        return super.transformUpdateQuery(node);
+        try {
+            return super.transformUpdateQuery(node);
+        } finally {
+            if (pushed) {
+                this.modelStack.pop();
+            }
+        }
     }
 
     protected override transformDeleteQuery(
         node: DeleteQueryNode
     ): DeleteQueryNode {
-        this.currentModel = undefined;
+        let pushed = false;
         if (
             node.from?.froms &&
             node.from.froms.length === 1 &&
@@ -81,12 +104,20 @@ export class QueryNameMapper extends OperationNodeTransformer {
         ) {
             const from = node.from.froms[0];
             if (TableNode.is(from)) {
-                this.currentModel = from.table.identifier.name;
+                this.modelStack.push(from.table.identifier.name);
+                pushed = true;
             } else if (AliasNode.is(from) && TableNode.is(from.node)) {
-                this.currentModel = from.node.table.identifier.name;
+                this.modelStack.push(from.node.table.identifier.name);
+                pushed = true;
             }
         }
-        return super.transformDeleteQuery(node);
+        try {
+            return super.transformDeleteQuery(node);
+        } finally {
+            if (pushed) {
+                this.modelStack.pop();
+            }
+        }
     }
 
     protected override transformSelectQuery(node: SelectQueryNode) {
@@ -100,22 +131,30 @@ export class QueryNameMapper extends OperationNodeTransformer {
             );
         }
 
-        this.currentModel = undefined;
+        let pushed = false;
         const from = node.from.froms[0]!;
         if (TableNode.is(from)) {
-            this.currentModel = from.table.identifier.name;
+            this.modelStack.push(from.table.identifier.name);
+            pushed = true;
         } else if (AliasNode.is(from) && TableNode.is(from.node)) {
-            this.currentModel = from.node.table.identifier.name;
+            this.modelStack.push(from.node.table.identifier.name);
+            pushed = true;
         }
 
         const selections = node.selections
             ? this.transformSelections(node.selections, node)
             : node.selections;
 
-        return {
-            ...super.transformSelectQuery(node),
-            selections,
-        };
+        try {
+            return {
+                ...super.transformSelectQuery(node),
+                selections,
+            };
+        } finally {
+            if (pushed) {
+                this.modelStack.pop();
+            }
+        }
     }
 
     private transformSelections(
@@ -137,23 +176,18 @@ export class QueryNameMapper extends OperationNodeTransformer {
             ...result,
             ...scalarFields.map((fieldName) =>
                 SelectionNode.create(
-                    this.fieldHasMappedName(fieldName, contextNode)
+                    this.fieldHasMappedName(fieldName)
                         ? AliasNode.create(
-                              ColumnNode.create(
-                                  this.mapFieldName(fieldName, contextNode)
-                              ),
+                              ColumnNode.create(this.mapFieldName(fieldName)),
                               IdentifierNode.create(fieldName)
                           )
-                        : ColumnNode.create(
-                              this.mapFieldName(fieldName, contextNode)
-                          )
+                        : ColumnNode.create(this.mapFieldName(fieldName))
                 )
             ),
         ];
     }
 
     private modelHasFieldsWithMappedNames(_contextNode: OperationNode) {
-        // this.requireCurrentModel(contextNode);
         if (!this.currentModel) {
             return false;
         }
@@ -166,7 +200,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
     private transformSelectionWithAlias(node: SelectionNode) {
         if (
             ColumnNode.is(node.selection) &&
-            this.fieldHasMappedName(node.selection.column.name, node)
+            this.fieldHasMappedName(node.selection.column.name)
         ) {
             return SelectionNode.create(
                 AliasNode.create(
@@ -177,8 +211,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         } else if (
             ReferenceNode.is(node.selection) &&
             this.fieldHasMappedName(
-                (node.selection.column as ColumnNode).column.name,
-                node
+                (node.selection.column as ColumnNode).column.name
             )
         ) {
             return SelectionNode.create(
@@ -194,8 +227,10 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    private fieldHasMappedName(name: string, contextNode: OperationNode) {
-        this.requireCurrentModel(contextNode);
+    private fieldHasMappedName(name: string) {
+        if (!this.currentModel) {
+            return false;
+        }
         return this.fieldToColumnMap.has(`${this.currentModel}.${name}`);
     }
 
@@ -211,7 +246,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
     }
 
     protected override transformColumn(node: ColumnNode) {
-        return ColumnNode.create(this.mapFieldName(node.column.name, node));
+        return ColumnNode.create(this.mapFieldName(node.column.name));
     }
 
     private getMappedName(def: ModelDef | FieldDef) {
@@ -227,11 +262,10 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return undefined;
     }
 
-    private mapFieldName(
-        fieldName: string,
-        contextNode: OperationNode
-    ): string {
-        this.requireCurrentModel(contextNode);
+    private mapFieldName(fieldName: string): string {
+        if (!this.currentModel) {
+            return fieldName;
+        }
         const mappedName = this.fieldToColumnMap.get(
             `${this.currentModel}.${fieldName}`
         );

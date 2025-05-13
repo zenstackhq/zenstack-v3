@@ -40,6 +40,7 @@ import { conjunction, disjunction, logicalNot, trueNode } from './utils';
 
 export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
+    alias?: string;
     thisEntity?: Record<string, OperationNode>;
 };
 
@@ -115,15 +116,10 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             if (context.thisEntity) {
                 return context.thisEntity[expr.field];
             } else {
-                return ColumnNode.create(expr.field);
+                return this.createColumnRef(expr.field, context);
             }
         } else {
-            return this._relation(
-                context.model,
-                expr.field,
-                fieldDef.type,
-                context
-            );
+            return this._relation(expr.field, fieldDef.type, context);
         }
     }
 
@@ -261,6 +257,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         let filter = this.transform(expr.right, {
             ...context,
             model: newContextModel as GetModels<Schema>,
+            alias: undefined,
             thisEntity: undefined,
         });
 
@@ -273,7 +270,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             'expected left operand to be select query'
         );
 
-        const count = FunctionNode.create('count', [ValueNode.create(1)]);
+        const count = FunctionNode.create('count', [
+            ValueNode.createImmediate(1),
+        ]);
         const finalSelectQuery = this.updateInnerMostSelectQuery(
             left,
             filter,
@@ -452,30 +451,32 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             currType = fieldDef.type;
         }
 
-        let currNode: SelectQueryNode | ColumnNode | undefined = undefined;
-        const innerContext = { ...context, thisEntity: undefined };
+        let currNode: SelectQueryNode | ColumnNode | ReferenceNode | undefined =
+            undefined;
+        // const innerContext = { ...context, thisEntity: undefined };
 
         for (let i = expr.members.length - 1; i >= 0; i--) {
             const member = expr.members[i]!;
             const { fieldDef, fromModel } = memberFields[i]!;
+
             if (fieldDef.relation) {
-                const relation = this._relation(
-                    fromModel,
-                    member,
-                    fieldDef.type,
-                    innerContext
-                );
+                const relation = this._relation(member, fieldDef.type, {
+                    ...context,
+                    model: fromModel as GetModels<Schema>,
+                    alias: undefined,
+                    thisEntity: undefined,
+                });
                 if (currNode) {
                     invariant(
                         SelectQueryNode.is(currNode),
                         'expected select query node'
                     );
                     currNode = {
-                        ...(currNode as SelectQueryNode),
+                        ...relation,
                         selections: [
                             SelectionNode.create(
                                 AliasNode.create(
-                                    relation,
+                                    currNode,
                                     IdentifierNode.create(member)
                                 )
                             ),
@@ -489,6 +490,8 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                     i === expr.members.length - 1,
                     'plain field access must be the last segment'
                 );
+
+                const columnRef = ColumnNode.create(member);
                 if (currNode) {
                     invariant(
                         SelectQueryNode.is(currNode),
@@ -496,12 +499,10 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                     );
                     currNode = {
                         ...(currNode as SelectQueryNode),
-                        selections: [
-                            SelectionNode.create(ColumnNode.create(member)),
-                        ],
+                        selections: [SelectionNode.create(columnRef)],
                     };
                 } else {
-                    currNode = ColumnNode.create(member);
+                    currNode = columnRef;
                 }
             }
         }
@@ -538,11 +539,11 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     // @expr('relation')
     // @ts-ignore
     private _relation(
-        fromModel: string,
         field: string,
         relationModel: string,
         context: ExpressionTransformerContext<Schema>
     ): SelectQueryNode {
+        const fromModel = context.model;
         const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
             this.schema,
             fromModel,
@@ -596,7 +597,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                         BinaryOperationNode.create(
                             ReferenceNode.create(
                                 ColumnNode.create(fk),
-                                TableNode.create(fromModel)
+                                TableNode.create(context.alias ?? fromModel)
                             ),
                             OperatorNode.create('='),
                             ReferenceNode.create(
@@ -614,7 +615,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                         BinaryOperationNode.create(
                             ReferenceNode.create(
                                 ColumnNode.create(pk),
-                                TableNode.create(fromModel)
+                                TableNode.create(context.alias ?? fromModel)
                             ),
                             OperatorNode.create('='),
                             ReferenceNode.create(
@@ -632,5 +633,15 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 where: WhereNode.create(condition),
             };
         }
+    }
+
+    private createColumnRef(
+        column: string,
+        context: ExpressionTransformerContext<Schema>
+    ): ReferenceNode {
+        return ReferenceNode.create(
+            ColumnNode.create(column),
+            TableNode.create(context.alias ?? context.model)
+        );
     }
 }

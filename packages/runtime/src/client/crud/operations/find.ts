@@ -20,7 +20,8 @@ export class FindOperationHandler<
             : args;
 
         // run query
-        const result = await this.runQuery(
+        const result = await this.read(
+            this.client.$qb,
             this.model,
             parsedArgs as FindArgs<Schema, GetModels<Schema>, true>
         );
@@ -28,12 +29,5 @@ export class FindOperationHandler<
         const finalResult =
             operation === 'findMany' ? result : result[0] ?? null;
         return finalResult;
-    }
-
-    async runQuery(
-        model: GetModels<Schema>,
-        args: FindArgs<Schema, GetModels<Schema>, true> | undefined
-    ) {
-        return this.read(this.client.$qb, model, args);
     }
 }

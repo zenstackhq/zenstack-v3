@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { Expression } from '@zenstackhq/runtime/schema';
 import { generateTsSchema } from '@zenstackhq/testtools';
+import { describe, expect, it } from 'vitest';
 
 describe('TypeScript schema generation tests', () => {
     it('generates correct data models', async () => {
@@ -35,7 +36,7 @@ model Post {
                     id: {
                         type: 'String',
                         id: true,
-                        default: { call: 'uuid' },
+                        default: Expression.call('uuid'),
                         attributes: [
                             { name: '@id' },
                             {
@@ -55,7 +56,7 @@ model Post {
                     email: { type: 'String', unique: true },
                     createdAt: {
                         type: 'DateTime',
-                        default: { call: 'now' },
+                        default: Expression.call('now'),
                         attributes: [
                             {
                                 name: '@default',
@@ -104,7 +105,7 @@ model Post {
                     id: {
                         type: 'String',
                         id: true,
-                        default: { call: 'cuid' },
+                        default: Expression.call('cuid'),
                         attributes: [
                             { name: '@id' },
                             {

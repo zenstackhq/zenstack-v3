@@ -4,7 +4,7 @@ import { isValid as isValidUlid } from 'ulid';
 import { validate as isValidUuid } from 'uuid';
 import { describe, expect, it } from 'vitest';
 import { ZenStackClient } from '../../src';
-import type { SchemaDef } from '../../src/schema';
+import { Expression, type SchemaDef } from '../../src/schema';
 
 const schema = {
     provider: {
@@ -20,33 +20,31 @@ const schema = {
                 uuid: {
                     type: 'String',
                     id: true,
-                    default: { call: 'uuid' },
+                    default: Expression.call('uuid'),
                 },
                 uuid7: {
                     type: 'String',
-                    default: { call: 'uuid', args: [7] },
+                    default: Expression.call('uuid', [Expression.literal(7)]),
                 },
                 cuid: {
                     type: 'String',
-                    default: { call: 'cuid' },
+                    default: Expression.call('cuid'),
                 },
                 cuid2: {
                     type: 'String',
-                    default: { call: 'cuid', args: [2] },
+                    default: Expression.call('cuid', [Expression.literal(2)]),
                 },
                 nanoid: {
                     type: 'String',
-                    default: { call: 'nanoid' },
+                    default: Expression.call('nanoid'),
                 },
                 nanoid8: {
                     type: 'String',
-                    default: { call: 'nanoid', args: [8] },
+                    default: Expression.call('nanoid', [Expression.literal(8)]),
                 },
                 ulid: {
                     type: 'String',
-                    default: {
-                        call: 'ulid',
-                    },
+                    default: Expression.call('ulid'),
                 },
             },
             idFields: ['uuid'],

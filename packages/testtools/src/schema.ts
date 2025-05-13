@@ -9,7 +9,7 @@ import { glob } from 'glob';
 const ZMODEL_PRELUDE = `
 datasource db {
     provider = 'sqlite'
-    url = 'file:./dev.db'
+    url = ':memory:'
 }
 `;
 

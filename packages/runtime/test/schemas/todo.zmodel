@@ -4,7 +4,7 @@
 
 datasource db {
     provider = 'sqlite'
-    url = 'file:./test.db'
+    url = ':memory:'
 }
 
 generator js {

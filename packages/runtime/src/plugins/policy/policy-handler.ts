@@ -172,7 +172,12 @@ export class PolicyHandler<
         }
 
         const model = this.getMutationModel(node);
-        const filter = this.buildPolicyFilter(model, 'create', thisEntity);
+        const filter = this.buildPolicyFilter(
+            model,
+            undefined,
+            'create',
+            thisEntity
+        );
         const preCreateCheck: SelectQueryNode = {
             kind: 'SelectQueryNode',
             selections: [
@@ -264,7 +269,7 @@ export class PolicyHandler<
         }
 
         const idConditions = this.buildIdConditions(table, result.rows);
-        const policyFilter = this.buildPolicyFilter(table, 'read');
+        const policyFilter = this.buildPolicyFilter(table, undefined, 'read');
 
         const select: SelectQueryNode = {
             kind: 'SelectQueryNode',
@@ -347,6 +352,7 @@ export class PolicyHandler<
 
     private buildPolicyFilter(
         model: GetModels<Schema>,
+        alias: string | undefined,
         operation: PolicyOperation,
         thisEntity?: Record<string, OperationNode>
     ) {
@@ -358,13 +364,13 @@ export class PolicyHandler<
         const allows = policies
             .filter((policy) => policy.kind === 'allow')
             .map((policy) =>
-                this.transformPolicyCondition(model, policy, thisEntity)
+                this.transformPolicyCondition(model, alias, policy, thisEntity)
             );
 
         const denies = policies
             .filter((policy) => policy.kind === 'deny')
             .map((policy) =>
-                this.transformPolicyCondition(model, policy, thisEntity)
+                this.transformPolicyCondition(model, alias, policy, thisEntity)
             );
 
         let combinedPolicy: OperationNode;
@@ -396,9 +402,10 @@ export class PolicyHandler<
         let whereNode = node.where;
 
         node.from?.froms.forEach((from) => {
-            let modelName = this.extractTableName(from);
-            if (modelName) {
-                const filter = this.buildPolicyFilter(modelName, 'read');
+            const extractResult = this.extractTableName(from);
+            if (extractResult) {
+                const { model, alias } = extractResult;
+                const filter = this.buildPolicyFilter(model, alias, 'read');
                 whereNode = WhereNode.create(
                     whereNode?.where
                         ? conjunction(this.dialect, [whereNode.where, filter])
@@ -445,7 +452,11 @@ export class PolicyHandler<
     protected override transformUpdateQuery(node: UpdateQueryNode) {
         const result = super.transformUpdateQuery(node);
         const mutationModel = this.getMutationModel(node);
-        const filter = this.buildPolicyFilter(mutationModel, 'update');
+        const filter = this.buildPolicyFilter(
+            mutationModel,
+            undefined,
+            'update'
+        );
         return {
             ...result,
             where: WhereNode.create(
@@ -459,7 +470,11 @@ export class PolicyHandler<
     protected override transformDeleteQuery(node: DeleteQueryNode) {
         const result = super.transformDeleteQuery(node);
         const mutationModel = this.getMutationModel(node);
-        const filter = this.buildPolicyFilter(mutationModel, 'update');
+        const filter = this.buildPolicyFilter(
+            mutationModel,
+            undefined,
+            'delete'
+        );
         return {
             ...result,
             where: WhereNode.create(
@@ -472,12 +487,21 @@ export class PolicyHandler<
 
     private extractTableName(
         from: OperationNode
-    ): GetModels<Schema> | undefined {
+    ): { model: GetModels<Schema>; alias?: string } | undefined {
         if (TableNode.is(from)) {
-            return from.table.identifier.name as GetModels<Schema>;
+            return { model: from.table.identifier.name as GetModels<Schema> };
         }
         if (AliasNode.is(from)) {
-            return this.extractTableName(from.node);
+            const inner = this.extractTableName(from.node);
+            if (!inner) {
+                return undefined;
+            }
+            return {
+                model: inner.model,
+                alias: IdentifierNode.is(from.alias)
+                    ? from.alias.name
+                    : undefined,
+            };
         } else {
             // this can happen for subqueries, which will be handled when nested
             // transformation happens
@@ -487,6 +511,7 @@ export class PolicyHandler<
 
     private transformPolicyCondition(
         model: GetModels<Schema>,
+        alias: string | undefined,
         policy: Policy,
         thisEntity?: Record<string, OperationNode>
     ) {
@@ -494,7 +519,7 @@ export class PolicyHandler<
             this.client.$schema,
             this.client.$options,
             this.client.$auth
-        ).transform(policy.condition, { model, thisEntity });
+        ).transform(policy.condition, { model, alias, thisEntity });
     }
 
     private getModelPolicies(modelName: string, operation: PolicyOperation) {

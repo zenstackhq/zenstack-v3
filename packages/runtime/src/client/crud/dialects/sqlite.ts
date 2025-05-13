@@ -114,7 +114,7 @@ export class SqliteCrudDialect<
             });
         }
 
-        tbl = tbl.select((eb1) => {
+        tbl = tbl.select(() => {
             const objArgs: Array<
                 | Expression<any>
                 | RawBuilder<any>
@@ -140,7 +140,7 @@ export class SqliteCrudDialect<
                                 relationModel,
                                 field,
                                 this.options,
-                                eb1
+                                eb
                             ),
                         ])
                         .flatMap((v) => v)
@@ -157,7 +157,7 @@ export class SqliteCrudDialect<
                                 relationModel,
                                 field,
                                 this.options,
-                                eb1
+                                eb
                             ),
                         ])
                         .flatMap((v) => v)
@@ -176,7 +176,7 @@ export class SqliteCrudDialect<
                         .map(([field, value]) => {
                             const subJson = this.buildRelationJSON(
                                 relationModel as GetModels<Schema>,
-                                eb1,
+                                eb,
                                 field,
                                 `${parentName}$${relationField}`,
                                 value
@@ -188,7 +188,7 @@ export class SqliteCrudDialect<
             }
 
             if (relationFieldDef.array) {
-                return eb1.fn
+                return eb.fn
                     .coalesce(
                         sql`json_group_array(json_object(${sql.join(
                             objArgs

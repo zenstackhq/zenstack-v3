@@ -512,11 +512,17 @@ export class TsSchemaGenerator {
                                     ts.factory.createStringLiteral(
                                         defaultValue.call
                                     ),
-                                    ts.factory.createArrayLiteralExpression(
-                                        defaultValue.args.map((arg) =>
-                                            this.createLiteralNode(arg)
-                                        )
-                                    ),
+                                    ...(defaultValue.args.length > 0
+                                        ? [
+                                              ts.factory.createArrayLiteralExpression(
+                                                  defaultValue.args.map((arg) =>
+                                                      this.createLiteralNode(
+                                                          arg
+                                                      )
+                                                  )
+                                              ),
+                                          ]
+                                        : []),
                                 ]
                             )
                         )
@@ -984,22 +990,26 @@ export class TsSchemaGenerator {
                                             ),
                                             undefined,
                                             [
-                                                ts.factory.createCallExpression(
-                                                    ts.factory.createIdentifier(
-                                                        'path.resolve'
-                                                    ),
-                                                    undefined,
-                                                    [
-                                                        // isomorphic __dirname for CJS and import.meta.url for ESM
-                                                        ts.factory
-                                                            .createIdentifier(`typeof __dirname !== 'undefined'
+                                                dbPath === ':memory:'
+                                                    ? ts.factory.createStringLiteral(
+                                                          dbPath
+                                                      )
+                                                    : ts.factory.createCallExpression(
+                                                          ts.factory.createIdentifier(
+                                                              'path.resolve'
+                                                          ),
+                                                          undefined,
+                                                          [
+                                                              // isomorphic __dirname for CJS and import.meta.url for ESM
+                                                              ts.factory
+                                                                  .createIdentifier(`typeof __dirname !== 'undefined'
         ? __dirname
         : path.dirname(url.fileURLToPath(import.meta.url))`),
-                                                        ts.factory.createStringLiteral(
-                                                            dbPath
-                                                        ),
-                                                    ]
-                                                ),
+                                                              ts.factory.createStringLiteral(
+                                                                  dbPath
+                                                              ),
+                                                          ]
+                                                      ),
                                             ]
                                         )
                                     ),

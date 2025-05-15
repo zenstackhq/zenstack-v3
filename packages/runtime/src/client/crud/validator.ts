@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { match, P } from 'ts-pattern';
 import { z, ZodSchema } from 'zod';
 import type {
@@ -164,9 +165,12 @@ export class InputValidator<Schema extends SchemaDef> {
             .with('Int', () => z.number())
             .with('Float', () => z.number())
             .with('Boolean', () => z.boolean())
-            .with('BigInt', () => z.string())
-            .with('Decimal', () => z.string())
+            .with('BigInt', () => z.union([z.number(), z.bigint()]))
+            .with('Decimal', () =>
+                z.union([z.number(), z.instanceof(Decimal), z.string()])
+            )
             .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
+            .with('Bytes', () => z.instanceof(Uint8Array))
             .otherwise(() => z.unknown());
     }
 
@@ -325,11 +329,15 @@ export class InputValidator<Schema extends SchemaDef> {
     protected makePrimitiveFilterSchema(type: BuiltinType, optional: boolean) {
         return match(type)
             .with('String', () => this.makeStringFilterSchema(optional))
-            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), () =>
-                this.makeNumberFilterSchema(optional)
+            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
+                this.makeNumberFilterSchema(
+                    this.makePrimitiveSchema(type),
+                    optional
+                )
             )
             .with('Boolean', () => this.makeBooleanFilterSchema(optional))
             .with('DateTime', () => this.makeDateTimeFilterSchema(optional))
+            .with('Bytes', () => this.makeBytesFilterSchema(optional))
             .exhaustive();
     }
 
@@ -349,6 +357,24 @@ export class InputValidator<Schema extends SchemaDef> {
                 not: z
                     .lazy(() => this.makeBooleanFilterSchema(optional))
                     .optional(),
+            }),
+        ]);
+    }
+
+    private makeBytesFilterSchema(optional: boolean): ZodSchema {
+        const baseSchema = z.instanceof(Uint8Array);
+        const components = this.makeCommonPrimitiveFilterComponents(
+            baseSchema,
+            optional,
+            () => z.instanceof(Uint8Array)
+        );
+        return z.union([
+            this.nullableIf(baseSchema, optional),
+            z.object({
+                equals: components.equals,
+                in: components.in,
+                notIn: components.notIn,
+                not: components.not,
             }),
         ]);
     }
@@ -388,10 +414,12 @@ export class InputValidator<Schema extends SchemaDef> {
         ]);
     }
 
-    private makeNumberFilterSchema(optional: boolean): ZodSchema {
-        const base = z.union([z.number(), z.bigint()]);
-        return this.makeCommonPrimitiveFilterSchema(base, optional, () =>
-            z.lazy(() => this.makeNumberFilterSchema(optional))
+    private makeNumberFilterSchema(
+        baseSchema: ZodSchema,
+        optional: boolean
+    ): ZodSchema {
+        return this.makeCommonPrimitiveFilterSchema(baseSchema, optional, () =>
+            z.lazy(() => this.makeNumberFilterSchema(baseSchema, optional))
         );
     }
 

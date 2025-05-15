@@ -90,7 +90,6 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                     });
                 }
 
-                this.validateCrossModelFieldComparison(expr, accept);
                 break;
             }
 
@@ -164,10 +163,6 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                         node: expr,
                     });
                 }
-
-                if (expr.operator !== '&&' && expr.operator !== '||') {
-                    this.validateCrossModelFieldComparison(expr, accept);
-                }
                 break;
             }
 
@@ -193,10 +188,6 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                     accept('error', 'incompatible operand types', {
                         node: expr,
                     });
-                    break;
-                }
-
-                if (!this.validateCrossModelFieldComparison(expr, accept)) {
                     break;
                 }
 
@@ -287,67 +278,6 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                 this.validateCollectionPredicate(expr, accept);
                 break;
         }
-    }
-
-    private validateCrossModelFieldComparison(
-        expr: BinaryExpr,
-        accept: ValidationAcceptor
-    ) {
-        // not supported in "read" rules:
-        //   - foo.a == bar
-        //   - foo.user.id == userId
-        // except:
-        //   - future().userId == userId
-        if (
-            (isMemberAccessExpr(expr.left) &&
-                isDataModelField(expr.left.member.ref) &&
-                expr.left.member.ref.$container !=
-                    AstUtils.getContainerOfType(expr, isDataModel)) ||
-            (isMemberAccessExpr(expr.right) &&
-                isDataModelField(expr.right.member.ref) &&
-                expr.right.member.ref.$container !=
-                    AstUtils.getContainerOfType(expr, isDataModel))
-        ) {
-            // foo.user.id == auth().id
-            // foo.user.id == "123"
-            // foo.user.id == null
-            // foo.user.id == EnumValue
-            if (
-                !(
-                    this.isNotModelFieldExpr(expr.left) ||
-                    this.isNotModelFieldExpr(expr.right)
-                )
-            ) {
-                const containingPolicyAttr = findUpAst(
-                    expr,
-                    (node) =>
-                        isDataModelAttribute(node) &&
-                        ['@@allow', '@@deny'].includes(node.decl.$refText)
-                ) as DataModelAttribute | undefined;
-
-                if (containingPolicyAttr) {
-                    const operation = getAttributeArgLiteral<string>(
-                        containingPolicyAttr,
-                        'operation'
-                    );
-                    if (
-                        operation?.split(',').includes('all') ||
-                        operation?.split(',').includes('read')
-                    ) {
-                        accept(
-                            'error',
-                            'comparison between fields of different models is not supported in model-level "read" rules',
-                            {
-                                node: expr,
-                            }
-                        );
-                        return false;
-                    }
-                }
-            }
-        }
-
-        return true;
     }
 
     private validateCollectionPredicate(

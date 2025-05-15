@@ -1,8 +1,9 @@
 import { match } from 'ts-pattern';
+import { RejectedByPolicyError } from '../../../plugins/policy/errors';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { UpdateArgs, UpdateManyArgs } from '../../crud-types';
-import { getIdValues, requireField } from '../../query-utils';
 import { BaseOperationHandler } from './base';
+import { getIdValues } from '../../query-utils';
 
 export class UpdateOperationHandler<
     Schema extends SchemaDef
@@ -23,54 +24,24 @@ export class UpdateOperationHandler<
     }
 
     private async runUpdate(args: UpdateArgs<Schema, GetModels<Schema>>) {
-        const hasRelationUpdate = Object.keys(args.data).some(
-            (f) => !!requireField(this.schema, this.model, f).relation
-        );
-
-        const returnRelations = this.needReturnRelations(this.model, args);
-
-        let result: any;
-        if (hasRelationUpdate) {
-            // employ a transaction
-            try {
-                result = await this.safeTransaction(async (tx) => {
-                    const updateResult = await this.update(
-                        tx,
-                        this.model,
-                        args.where,
-                        args.data
-                    );
-                    return this.readUnique(tx, this.model, {
-                        select: args.select,
-                        include: args.include,
-                        where: getIdValues(
-                            this.schema,
-                            this.model,
-                            updateResult
-                        ),
-                    });
-                });
-            } catch (err) {
-                // console.error(err);
-                throw err;
-            }
-        } else {
-            // simple update
-            const updateResult = await this.update(
-                this.kysely,
+        const result = await this.safeTransaction(async (tx) => {
+            const updated = await this.update(
+                tx,
                 this.model,
                 args.where,
                 args.data
             );
-            if (returnRelations) {
-                result = await this.readUnique(this.kysely, this.model, {
-                    select: args.select,
-                    include: args.include,
-                    where: getIdValues(this.schema, this.model, updateResult),
-                });
-            } else {
-                result = this.trimResult(updateResult, args);
-            }
+            return this.readUnique(tx, this.model, {
+                select: args.select,
+                include: args.include,
+                where: getIdValues(this.schema, this.model, updated),
+            });
+        });
+
+        if (!result) {
+            throw new RejectedByPolicyError(
+                'result is not allowed to be read back'
+            );
         }
 
         return result;

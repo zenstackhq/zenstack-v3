@@ -1,3 +1,5 @@
+import Decimal from 'decimal.js';
+import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { FieldDef, GetModels, SchemaDef } from '../schema';
 import type { BuiltinType } from '../schema/schema';
@@ -73,7 +75,34 @@ export class ResultProcessor<Schema extends SchemaDef> {
         return match(type)
             .with('Boolean', () => this.transformBoolean(value))
             .with('DateTime', () => this.transformDate(value))
+            .with('Bytes', () => this.transformBytes(value))
+            .with('Decimal', () => this.transformDecimal(value))
+            .with('BigInt', () => this.transformBigInt(value))
             .otherwise(() => value);
+    }
+
+    private transformDecimal(value: unknown) {
+        if (value instanceof Decimal) {
+            return value;
+        }
+        invariant(
+            typeof value === 'string' ||
+                typeof value === 'number' ||
+                value instanceof Decimal,
+            `Expected string, number or Decimal, got ${typeof value}`
+        );
+        return new Decimal(value);
+    }
+
+    private transformBigInt(value: unknown) {
+        if (typeof value === 'bigint') {
+            return value;
+        }
+        invariant(
+            typeof value === 'string' || typeof value === 'number',
+            `Expected string or number, got ${typeof value}`
+        );
+        return BigInt(value);
     }
 
     private transformBoolean(value: unknown) {
@@ -88,5 +117,9 @@ export class ResultProcessor<Schema extends SchemaDef> {
         } else {
             return value;
         }
+    }
+
+    private transformBytes(value: unknown) {
+        return Buffer.isBuffer(value) ? Uint8Array.from(value) : value;
     }
 }

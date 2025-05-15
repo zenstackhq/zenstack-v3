@@ -14,7 +14,6 @@ import {
     SelectQueryNode,
     TableNode,
     UpdateQueryNode,
-    ValueListNode,
     ValueNode,
     ValuesNode,
     WhereNode,
@@ -32,8 +31,13 @@ import type {
     OnKyselyQueryTransaction,
     ProceedKyselyQueryFunction,
 } from '../../client/plugin';
-import { getIdFields, requireModel } from '../../client/query-utils';
+import {
+    getIdFields,
+    requireField,
+    requireModel,
+} from '../../client/query-utils';
 import { Expression, type GetModels, type SchemaDef } from '../../schema';
+import type { BuiltinType } from '../../schema/schema';
 import { ColumnCollector } from './column-collector';
 import { RejectedByPolicyError } from './errors';
 import { ExpressionTransformer } from './expression-transformer';
@@ -120,7 +124,7 @@ export class PolicyHandler<
             const transformedNode = this.transformNode(node);
             const result = await txProceed(transformedNode);
 
-            if (!InsertQueryNode.is(node) || !this.onlyReturningId(node)) {
+            if (!this.onlyReturningId(node)) {
                 const readBackResult = await this.processReadBack(
                     node,
                     result,
@@ -144,7 +148,7 @@ export class PolicyHandler<
         return result;
     }
 
-    private onlyReturningId(node: InsertQueryNode) {
+    private onlyReturningId(node: MutationQueryNode) {
         if (!node.returning) {
             return true;
         }
@@ -165,13 +169,34 @@ export class PolicyHandler<
             return;
         }
 
-        const thisEntity: Record<string, OperationNode> = {};
-        const values = this.unwrapCreateValues(node.values);
-        for (let i = 0; i < node.columns?.length; i++) {
-            thisEntity[node.columns![i]!.column.name] = values[i]!;
+        const model = this.getMutationModel(node);
+        const fields = node.columns.map((c) => c.column.name);
+        const valueRows = this.unwrapCreateValueRows(
+            node.values,
+            model,
+            fields
+        );
+        for (const values of valueRows) {
+            await this.enforcePreCreatePolicyForOne(
+                model,
+                fields,
+                values,
+                proceed
+            );
+        }
+    }
+
+    private async enforcePreCreatePolicyForOne(
+        model: GetModels<Schema>,
+        fields: string[],
+        values: ValueNode[],
+        proceed: ProceedKyselyQueryFunction
+    ) {
+        const thisEntity: Record<string, ValueNode> = {};
+        for (let i = 0; i < fields.length; i++) {
+            thisEntity[fields[i]!] = values[i]!;
         }
 
-        const model = this.getMutationModel(node);
         const filter = this.buildPolicyFilter(
             model,
             undefined,
@@ -195,15 +220,17 @@ export class PolicyHandler<
         }
     }
 
-    private unwrapCreateValues(node: OperationNode): readonly OperationNode[] {
+    private unwrapCreateValueRows(
+        node: OperationNode,
+        model: GetModels<Schema>,
+        fields: string[]
+    ) {
         if (ValuesNode.is(node)) {
-            if (node.values.length === 1 && this.isValueList(node.values[0]!)) {
-                return this.unwrapCreateValues(node.values[0]!);
-            } else {
-                return node.values;
-            }
+            return node.values.map((v) =>
+                this.unwrapCreateValueRow(v.values, model, fields)
+            );
         } else if (PrimitiveValueListNode.is(node)) {
-            return node.values.map((v) => ValueNode.create(v));
+            return [this.unwrapCreateValueRow(node.values, model, fields)];
         } else {
             throw new InternalError(
                 `Unexpected node kind: ${node.kind} for unwrapping create values`
@@ -211,8 +238,45 @@ export class PolicyHandler<
         }
     }
 
-    private isValueList(node: OperationNode) {
-        return ValueListNode.is(node) || PrimitiveValueListNode.is(node);
+    private unwrapCreateValueRow(
+        data: readonly unknown[],
+        model: GetModels<Schema>,
+        fields: string[]
+    ) {
+        invariant(
+            data.length === fields.length,
+            'data length must match fields length'
+        );
+        const result: ValueNode[] = [];
+        for (let i = 0; i < data.length; i++) {
+            const item = data[i]!;
+            const fieldDef = requireField(
+                this.client.$schema,
+                model,
+                fields[i]!
+            );
+            if (typeof item === 'object' && item && 'kind' in item) {
+                invariant(item.kind === 'ValueNode', 'expecting a ValueNode');
+                result.push(
+                    ValueNode.create(
+                        this.dialect.transformPrimitive(
+                            (item as ValueNode).value,
+                            fieldDef.type as BuiltinType
+                        )
+                    )
+                );
+            } else {
+                result.push(
+                    ValueNode.create(
+                        this.dialect.transformPrimitive(
+                            item,
+                            fieldDef.type as BuiltinType
+                        )
+                    )
+                );
+            }
+        }
+        return result;
     }
 
     private tryGetConstantPolicy(
@@ -354,7 +418,7 @@ export class PolicyHandler<
         model: GetModels<Schema>,
         alias: string | undefined,
         operation: PolicyOperation,
-        thisEntity?: Record<string, OperationNode>
+        thisEntity?: Record<string, ValueNode>
     ) {
         const policies = this.getModelPolicies(model, operation);
         if (policies.length === 0) {
@@ -513,13 +577,18 @@ export class PolicyHandler<
         model: GetModels<Schema>,
         alias: string | undefined,
         policy: Policy,
-        thisEntity?: Record<string, OperationNode>
+        thisEntity?: Record<string, ValueNode>
     ) {
         return new ExpressionTransformer(
             this.client.$schema,
             this.client.$options,
             this.client.$auth
-        ).transform(policy.condition, { model, alias, thisEntity });
+        ).transform(policy.condition, {
+            model,
+            alias,
+            thisEntity,
+            auth: this.client.$auth,
+        });
     }
 
     private getModelPolicies(modelName: string, operation: PolicyOperation) {

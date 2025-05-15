@@ -13,7 +13,7 @@ describe('Kysely onQuery tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = new ZenStackClient(schema, { log: ['query'] });
+        _client = new ZenStackClient(schema);
         await _client.$pushSchema();
     });
 

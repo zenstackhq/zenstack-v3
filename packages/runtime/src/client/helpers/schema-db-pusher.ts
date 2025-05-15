@@ -186,6 +186,9 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             .with('BigInt', () => 'bigint')
             .with('Decimal', () => 'decimal')
             .with('DateTime', () => 'timestamp')
+            .with('Bytes', () =>
+                this.schema.provider.type === 'postgresql' ? 'bytea' : 'blob'
+            )
             .otherwise(() => {
                 throw new Error(`Unsupported field type: ${type}`);
             });

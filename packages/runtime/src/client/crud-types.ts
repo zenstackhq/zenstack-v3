@@ -232,6 +232,14 @@ export type DateTimeFilter<Nullable extends boolean> =
     | NullableIf<Date | string, Nullable>
     | CommonPrimitiveFilter<Date | string, 'DateTime', Nullable>;
 
+export type BytesFilter<Nullable extends boolean> =
+    | NullableIf<Uint8Array | Buffer, Nullable>
+    | {
+          equals?: NullableIf<Uint8Array, Nullable>;
+          in?: Uint8Array[];
+          notIn?: Uint8Array[];
+          not?: BytesFilter<Nullable>;
+      };
 export type BooleanFilter<Nullable extends boolean> =
     | NullableIf<boolean, Nullable>
     | {

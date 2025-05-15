@@ -21,6 +21,10 @@ import { BaseCrudDialect } from './base';
 export class PostgresCrudDialect<
     Schema extends SchemaDef
 > extends BaseCrudDialect<Schema> {
+    override get provider() {
+        return 'postgresql' as const;
+    }
+
     override transformPrimitive(value: unknown, type: BuiltinType) {
         return match(type)
             .with('DateTime', () =>
@@ -323,5 +327,12 @@ export class PostgresCrudDialect<
 
     override get supportsUpdateWithLimit(): boolean {
         return false;
+    }
+
+    override buildArrayLength(
+        eb: ExpressionBuilder<any, any>,
+        array: Expression<unknown>
+    ): ExpressionWrapper<any, any, number> {
+        return eb.fn('array_length', [array]);
     }
 }

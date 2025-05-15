@@ -1,3 +1,6 @@
+import { AstUtils, type AstNode, type ValidationAcceptor } from 'langium';
+import { match, P } from 'ts-pattern';
+import { ExpressionContext } from '../constants';
 import {
     Argument,
     DataModel,
@@ -7,26 +10,19 @@ import {
     FunctionDecl,
     FunctionParam,
     InvocationExpr,
-    isArrayExpr,
     isDataModel,
     isDataModelAttribute,
     isDataModelFieldAttribute,
-    isLiteralExpr,
 } from '../generated/ast';
-import { match, P } from 'ts-pattern';
 import {
-    getFieldReference,
     getFunctionExpressionContext,
     getLiteral,
     isCheckInvocation,
     isDataModelFieldReference,
-    isEnumFieldReference,
     isFromStdlib,
     typeAssignable,
 } from '../utils';
 import type { AstValidator } from './common';
-import { AstUtils, type AstNode, type ValidationAcceptor } from 'langium';
-import { ExpressionContext } from '../constants';
 
 // a registry of function handlers marked with @func
 const invocationCheckers = new Map<string, PropertyDescriptor>();
@@ -125,54 +121,6 @@ export default class FunctionInvocationValidator
                             .join(', ')}`,
                         {
                             node: expr.args[0]!,
-                        }
-                    );
-                }
-            } else if (
-                funcAllowedContext.includes(ExpressionContext.AccessPolicy) ||
-                funcAllowedContext.includes(ExpressionContext.ValidationRule)
-            ) {
-                // filter operation functions validation
-
-                // first argument must refer to a model field
-                const firstArg = expr.args?.[0]?.value;
-                if (firstArg) {
-                    if (!getFieldReference(firstArg)) {
-                        accept(
-                            'error',
-                            'first argument must be a field reference',
-                            { node: firstArg }
-                        );
-                    }
-                }
-
-                // second argument must be a literal or array of literal
-                const secondArg = expr.args?.[1]?.value;
-                if (
-                    secondArg &&
-                    // literal
-                    !isLiteralExpr(secondArg) &&
-                    // enum field
-                    !isEnumFieldReference(secondArg) &&
-                    // TODO: revisit this
-                    // `auth()...` expression
-                    // !isAuthOrAuthMemberAccess(secondArg) &&
-                    // array of literal/enum
-                    !(
-                        isArrayExpr(secondArg) &&
-                        secondArg.items.every(
-                            (item) =>
-                                isLiteralExpr(item) ||
-                                isEnumFieldReference(item)
-                            // || isAuthOrAuthMemberAccess(item)
-                        )
-                    )
-                ) {
-                    accept(
-                        'error',
-                        'second argument must be a literal, an enum, an expression starting with `auth().`, or an array of them',
-                        {
-                            node: secondArg,
                         }
                     );
                 }

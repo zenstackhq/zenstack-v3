@@ -1,4 +1,4 @@
-import type { Decimal } from 'decimal.js-light';
+import type { Decimal } from 'decimal.js';
 import {
     type AuthType,
     type GetModels,

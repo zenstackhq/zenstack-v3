@@ -742,13 +742,24 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         const createData = enumerate(input.data).map((item) => {
+            const newItem: any = {};
+            for (const [name, value] of Object.entries(item)) {
+                const fieldDef = this.requireField(model, name);
+                invariant(
+                    !fieldDef.relation,
+                    'createMany does not support relations'
+                );
+                newItem[name] = this.dialect.transformPrimitive(
+                    value,
+                    fieldDef.type as BuiltinType
+                );
+            }
             if (fromRelation) {
-                item = { ...item };
                 for (const { fk, pk } of relationKeyPairs) {
-                    item[fk] = fromRelation.ids[pk];
+                    newItem[fk] = fromRelation.ids[pk];
                 }
             }
-            return this.fillGeneratedValues(modelDef, item);
+            return this.fillGeneratedValues(modelDef, newItem);
         });
 
         const query = kysely
@@ -782,7 +793,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         values[field] = generated;
                     }
                 } else if (fields[field]?.updatedAt) {
-                    values[field] = new Date().toISOString();
+                    // TODO: should this work at kysely level instead?
+                    values[field] = this.dialect.transformPrimitive(
+                        new Date(),
+                        'DateTime'
+                    );
                 }
             }
         }
@@ -873,7 +888,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     : parentWhere;
         }
 
-        if (Object.keys(data).length === 0) {
+        // fill in automatically updated fields
+        const modelDef = this.requireModel(model);
+        let finalData = data;
+        for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
+            if (fieldDef.updatedAt) {
+                if (finalData === data) {
+                    finalData = clone(data);
+                }
+                finalData[fieldName] = this.dialect.transformPrimitive(
+                    new Date(),
+                    'DateTime'
+                );
+            }
+        }
+
+        if (Object.keys(finalData).length === 0) {
             // update without data, simply return
             const r = await this.readUnique(kysely, model, {
                 where: combinedWhere,
@@ -887,14 +917,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const updateFields: any = {};
         let thisEntity: any = undefined;
 
-        for (const field in data) {
+        for (const field in finalData) {
             const fieldDef = this.requireField(model, field);
             if (
                 isScalarField(this.schema, model, field) ||
                 isForeignKeyField(this.schema, model, field)
             ) {
                 updateFields[field] = this.dialect.transformPrimitive(
-                    data[field],
+                    finalData[field],
                     fieldDef.type as BuiltinType
                 );
             } else {
@@ -922,7 +952,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     field,
                     fieldDef,
                     thisEntity,
-                    data[field],
+                    finalData[field],
                     throwIfNotFound
                 );
             }
@@ -935,25 +965,25 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 (await this.readUnique(kysely, model, { where: combinedWhere }))
             );
         } else {
+            const idFields = getIdFields(this.schema, model);
             const query = kysely
                 .updateTable(model)
                 .where((eb) =>
                     this.dialect.buildFilter(eb, model, model, combinedWhere)
                 )
                 .set(updateFields)
-                // TODO: return selectively
-                .returningAll();
+                .returning(idFields as any);
 
-            let updatedEntity: any;
+            const updatedEntity = await query.executeTakeFirst();
 
-            try {
-                updatedEntity = await query.executeTakeFirst();
-            } catch (err) {
-                const { sql, parameters } = query.compile();
-                throw new QueryError(
-                    `Error during update: ${err}, sql: ${sql}, parameters: ${parameters}`
-                );
-            }
+            // try {
+            //     updatedEntity = await query.executeTakeFirst();
+            // } catch (err) {
+            //     const { sql, parameters } = query.compile();
+            //     throw new QueryError(
+            //         `Error during update: ${err}, sql: ${sql}, parameters: ${parameters}`
+            //     );
+            // }
 
             if (!updatedEntity) {
                 if (throwIfNotFound) {

@@ -69,7 +69,8 @@ export type BinaryOperator =
     | '>='
     | '?'
     | '!'
-    | '^';
+    | '^'
+    | 'in';
 
 export const Expression = {
     literal: (value: string | number | boolean): LiteralExpression => {

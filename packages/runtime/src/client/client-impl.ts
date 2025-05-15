@@ -31,6 +31,7 @@ import type { RuntimePlugin } from './plugin';
 import { createDeferredPromise } from './promise';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
+import * as BuiltinFunctions from './functions';
 
 /**
  * Creates a new ZenStack client instance.
@@ -57,6 +58,11 @@ export class ClientImpl<Schema extends SchemaDef> {
     ) {
         this.$schema = schema;
         this.$options = options ?? ({} as ClientOptions<Schema>);
+
+        this.$options.functions = {
+            ...BuiltinFunctions,
+            ...this.$options.functions,
+        };
 
         // here we use kysely's props constructor so we can pass a custom query executor
         if (baseClient) {

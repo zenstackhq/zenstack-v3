@@ -231,8 +231,7 @@ model Post {
 
             @@allow('all', true)
         }
-        `,
-            { log: ['query'] }
+        `
         );
 
         const rawDb = db.$unuseAll();

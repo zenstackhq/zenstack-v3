@@ -86,7 +86,8 @@ export type BuiltinType =
     | 'Float'
     | 'BigInt'
     | 'Decimal'
-    | 'DateTime';
+    | 'DateTime'
+    | 'Bytes';
 
 export type MappedBuiltinType =
     | string

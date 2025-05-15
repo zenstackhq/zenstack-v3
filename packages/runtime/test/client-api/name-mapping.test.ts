@@ -59,7 +59,7 @@ describe('Name mapping tests', () => {
     } as const satisfies SchemaDef;
 
     it('works with model and implicit field mapping', async () => {
-        const client = new ZenStackClient(schema, { log: ['query'] });
+        const client = new ZenStackClient(schema);
         await client.$pushSchema();
         const r1 = await client.foo.create({
             data: { id: '1', x: 1 },
@@ -89,7 +89,7 @@ describe('Name mapping tests', () => {
     });
 
     it('works with explicit field mapping', async () => {
-        const client = new ZenStackClient(schema, { log: ['query'] });
+        const client = new ZenStackClient(schema);
         await client.$pushSchema();
         const r1 = await client.foo.create({
             data: { id: '1', x: 1 },

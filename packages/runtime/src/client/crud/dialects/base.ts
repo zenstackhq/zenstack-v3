@@ -9,11 +9,16 @@ import { sql, type SelectQueryBuilder } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match, P } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
-import type { BuiltinType, FieldDef } from '../../../schema/schema';
+import type {
+    BuiltinType,
+    DataSourceProviderType,
+    FieldDef,
+} from '../../../schema/schema';
 import { enumerate } from '../../../utils/enumerate';
 import { isPlainObject } from '../../../utils/is-plain-object';
 import type {
     BooleanFilter,
+    BytesFilter,
     DateTimeFilter,
     FindArgs,
     SortOrder,
@@ -35,6 +40,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         protected readonly schema: Schema,
         protected readonly options: ClientOptions<Schema>
     ) {}
+
+    abstract get provider(): DataSourceProviderType;
 
     transformPrimitive(value: unknown, _type: BuiltinType) {
         return value;
@@ -496,6 +503,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             .with('DateTime', () =>
                 this.buildDateTimeFilter(eb, table, field, payload)
             )
+            .with('Bytes', () =>
+                this.buildBytesFilter(eb, table, field, payload)
+            )
             .exhaustive();
     }
 
@@ -745,6 +755,31 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return this.and(eb, ...conditions);
     }
 
+    private buildBytesFilter(
+        eb: ExpressionBuilder<any, any>,
+        table: string,
+        field: string,
+        payload: BytesFilter<true>
+    ) {
+        const conditions = this.buildStandardFilter(
+            eb,
+            'Bytes',
+            payload,
+            sql.ref(`${table}.${field}`),
+            (value) => this.transformPrimitive(value, 'Bytes'),
+            (value) =>
+                this.buildBytesFilter(
+                    eb,
+                    table,
+                    field,
+                    value as BytesFilter<true>
+                ),
+            true,
+            ['equals', 'in', 'notIn', 'not']
+        );
+        return this.and(eb, ...conditions.conditions);
+    }
+
     private buildEnumFilter(
         eb: ExpressionBuilder<any, any>,
         table: string,
@@ -947,6 +982,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         eb: ExpressionBuilder<any, any>,
         value: Record<string, Expression<unknown>>
     ): ExpressionWrapper<any, any, unknown>;
+
+    abstract buildArrayLength(
+        eb: ExpressionBuilder<any, any>,
+        array: Expression<unknown>
+    ): ExpressionWrapper<any, any, number>;
 
     get supportsUpdateWithLimit() {
         return true;

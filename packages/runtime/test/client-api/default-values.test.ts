@@ -46,6 +46,10 @@ const schema = {
                     type: 'String',
                     default: Expression.call('ulid'),
                 },
+                dt: {
+                    type: 'DateTime',
+                    default: Expression.call('now'),
+                },
             },
             idFields: ['uuid'],
             uniqueFields: {
@@ -56,7 +60,7 @@ const schema = {
     plugins: {},
 } as const satisfies SchemaDef;
 
-describe('Default Value Providers', () => {
+describe('default values tests', () => {
     it('supports generators', async () => {
         const client = new ZenStackClient(schema);
         await client.$pushSchema();
@@ -69,5 +73,6 @@ describe('Default Value Providers', () => {
         expect(entity.nanoid).toSatisfy((id) => id.length >= 21);
         expect(entity.nanoid8).toSatisfy((id) => id.length === 8);
         expect(entity.ulid).toSatisfy(isValidUlid);
+        expect(entity.dt).toBeInstanceOf(Date);
     });
 });

@@ -1,4 +1,5 @@
 import type {
+    Expression,
     ExpressionBuilder,
     KyselyConfig,
     PostgresDialectConfig,
@@ -14,6 +15,7 @@ import type {
 } from '../schema/schema';
 import type { PrependParameter } from '../utils/type-utils';
 import type { ClientContract, ProcedureFunc } from './contract';
+import type { BaseCrudDialect } from './crud/dialects/base';
 import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
 
@@ -24,12 +26,26 @@ type DialectConfig<Provider extends DataSourceProvider> =
         ? Optional<PostgresDialectConfig, 'pool'>
         : never;
 
+export type ZModelFunction<Schema extends SchemaDef> = (
+    eb: ExpressionBuilder<ToKyselySchema<Schema>, keyof ToKyselySchema<Schema>>,
+    args: Expression<any>[],
+    dialect: BaseCrudDialect<Schema>
+) => Expression<unknown>;
+
 export type ClientOptions<Schema extends SchemaDef> = {
     /**
      * Database dialect configuration.
      */
     dialectConfig?: DialectConfig<Schema['provider']>;
 
+    /**
+     * Custom functions.
+     */
+    functions?: Record<string, ZModelFunction<Schema>>;
+
+    /**
+     * Plugins.
+     */
     plugins?: RuntimePlugin<Schema>[];
 
     /**

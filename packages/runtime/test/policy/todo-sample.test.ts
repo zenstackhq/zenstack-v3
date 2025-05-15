@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { SchemaDef } from '../../src/schema';
 import { createPolicyTestClient } from './utils';
 
-describe('Todo sample', () => {
+describe('todo sample tests', () => {
     let schema: SchemaDef;
 
     beforeAll(async () => {
@@ -389,7 +389,7 @@ describe('Todo sample', () => {
     });
 
     it('works with relation queries', async () => {
-        const anonDb = await createPolicyTestClient(schema, { log: ['query'] });
+        const anonDb = await createPolicyTestClient(schema);
         await createSpaceAndUsers(anonDb.$unuseAll());
 
         const user1Db = anonDb.$setAuth({ id: user1.id });
@@ -425,6 +425,67 @@ describe('Todo sample', () => {
             include: { lists: true },
         });
         expect(r1.lists).toHaveLength(1);
+    });
+
+    // TODO: `future()` support
+    it.skip('works with post-update checks', async () => {
+        const anonDb = await createPolicyTestClient(schema);
+        await createSpaceAndUsers(anonDb.$unuseAll());
+
+        const user1Db = anonDb.$setAuth({ id: user1.id });
+
+        await user1Db.list.create({
+            data: {
+                id: 'list1',
+                title: 'List 1',
+                owner: { connect: { id: user1.id } },
+                space: { connect: { id: space1.id } },
+                todos: {
+                    create: {
+                        id: 'todo1',
+                        title: 'Todo 1',
+                        owner: { connect: { id: user1.id } },
+                    },
+                },
+            },
+        });
+
+        // change list's owner
+        await expect(
+            user1Db.list.update({
+                where: { id: 'list1' },
+                data: {
+                    owner: { connect: { id: user2.id } },
+                },
+            })
+        ).toBeRejectedByPolicy();
+
+        // change todo's owner
+        await expect(
+            user1Db.todo.update({
+                where: { id: 'todo1' },
+                data: {
+                    owner: { connect: { id: user2.id } },
+                },
+            })
+        ).toBeRejectedByPolicy();
+
+        // nested change todo's owner
+        await expect(
+            user1Db.list.update({
+                where: { id: 'list1' },
+                data: {
+                    todos: {
+                        update: {
+                            where: { id: 'todo1' },
+                            data: {
+                                owner: { connect: { id: user2.id } },
+                            },
+                        },
+                    },
+                },
+            })
+        ).toBeRejectedByPolicy();
     });
 });
 

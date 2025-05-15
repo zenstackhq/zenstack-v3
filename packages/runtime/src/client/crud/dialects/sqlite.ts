@@ -1,4 +1,5 @@
 import {
+    ExpressionWrapper,
     sql,
     type Expression,
     type ExpressionBuilder,
@@ -16,10 +17,15 @@ import {
     requireModel,
 } from '../../query-utils';
 import { BaseCrudDialect } from './base';
+import type Decimal from 'decimal.js';
 
 export class SqliteCrudDialect<
     Schema extends SchemaDef
 > extends BaseCrudDialect<Schema> {
+    override get provider() {
+        return 'sqlite' as const;
+    }
+
     override transformPrimitive(value: unknown, type: BuiltinType) {
         if (value === undefined) {
             return value;
@@ -30,6 +36,8 @@ export class SqliteCrudDialect<
             .with('DateTime', () =>
                 value instanceof Date ? value.toISOString() : value
             )
+            .with('Decimal', () => (value as Decimal).toString())
+            .with('Bytes', () => Buffer.from(value as Uint8Array))
             .otherwise(() => value);
     }
 
@@ -255,5 +263,12 @@ export class SqliteCrudDialect<
 
     override get supportsUpdateWithLimit() {
         return false;
+    }
+
+    override buildArrayLength(
+        eb: ExpressionBuilder<any, any>,
+        array: Expression<unknown>
+    ): ExpressionWrapper<any, any, number> {
+        return eb.fn('json_array_length', [array]);
     }
 }

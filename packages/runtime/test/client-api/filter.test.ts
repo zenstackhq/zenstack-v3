@@ -549,5 +549,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                 })
             ).toResolveTruthy();
         });
+
+        // TODO: filter for bigint, decimal, bytes
     }
 );

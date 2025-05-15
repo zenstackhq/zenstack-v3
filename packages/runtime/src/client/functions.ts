@@ -1,7 +1,12 @@
-import { sql, type Expression, type ExpressionBuilder } from 'kysely';
-import type { ZModelFunction } from './options';
-import type { BaseCrudDialect } from './crud/dialects/base';
+import {
+    sql,
+    ValueNode,
+    type Expression,
+    type ExpressionBuilder,
+} from 'kysely';
+import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
+import type { ZModelFunction, ZModelFunctionContext } from './options';
 
 // TODO: migrate default value generation functions to here too
 
@@ -100,7 +105,7 @@ export const hasSome: ZModelFunction<any> = (
 export const isEmpty: ZModelFunction<any> = (
     eb: ExpressionBuilder<any, any>,
     args: Expression<any>[],
-    dialect: BaseCrudDialect<any>
+    { dialect }: ZModelFunctionContext<any>
 ) => {
     const [field] = args;
     if (!field) {
@@ -112,10 +117,62 @@ export const isEmpty: ZModelFunction<any> = (
 export const now: ZModelFunction<any> = (
     eb: ExpressionBuilder<any, any>,
     _args: Expression<any>[],
-    dialect: BaseCrudDialect<any>
+    { dialect }: ZModelFunctionContext<any>
 ) => {
     return match(dialect.provider)
         .with('postgresql', () => eb.fn('now'))
         .with('sqlite', () => sql.raw('CURRENT_TIMESTAMP'))
         .exhaustive();
 };
+
+export const currentModel: ZModelFunction<any> = (
+    _eb: ExpressionBuilder<any, any>,
+    args: Expression<any>[],
+    { model }: ZModelFunctionContext<any>
+) => {
+    let result = model;
+    const [casing] = args;
+    if (casing) {
+        result = processCasing(casing, result, model);
+    }
+    return sql.lit(result);
+};
+
+export const currentOperation: ZModelFunction<any> = (
+    _eb: ExpressionBuilder<any, any>,
+    args: Expression<any>[],
+    { operation }: ZModelFunctionContext<any>
+) => {
+    let result: string = operation;
+    const [casing] = args;
+    if (casing) {
+        result = processCasing(casing, result, operation);
+    }
+    return sql.lit(result);
+};
+
+function processCasing(casing: Expression<any>, result: string, model: string) {
+    const opNode = casing.toOperationNode();
+    invariant(
+        ValueNode.is(opNode) && typeof opNode.value === 'string',
+        '"casting" parameter must be a string value'
+    );
+    result = match(opNode.value)
+        .with('original', () => model)
+        .with('upper', () => result.toUpperCase())
+        .with('lower', () => result.toLowerCase())
+        .with(
+            'capitalize',
+            () => `${result.charAt(0).toUpperCase() + result.slice(1)}`
+        )
+        .with(
+            'uncapitalize',
+            () => `${result.charAt(0).toLowerCase() + result.slice(1)}`
+        )
+        .otherwise(() => {
+            throw new Error(
+                `Invalid casing value: ${opNode.value}. Must be "original", "upper", "lower", "capitalize", or "uncapitalize".`
+            );
+        });
+    return result;
+}

@@ -61,15 +61,6 @@ export class ZenStackQueryExecutor<
         return this.client.$options;
     }
 
-    private isCrudQueryNode(node: RootOperationNode) {
-        return (
-            SelectQueryNode.is(node) ||
-            InsertQueryNode.is(node) ||
-            UpdateQueryNode.is(node) ||
-            DeleteQueryNode.is(node)
-        );
-    }
-
     override async executeQuery(
         compiledQuery: CompiledQuery,
         queryId: QueryId

@@ -27,6 +27,8 @@ import {
     extractFields,
     fieldsToSelectObject,
 } from '../../../utils/object-utils';
+import { CONTEXT_COMMENT_PREFIX } from '../../constants';
+import type { CRUD } from '../../contract';
 import type { FindArgs, SelectInclude, Where } from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
@@ -128,7 +130,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             .selectFrom(model)
             .where((eb) => eb.and(filter))
             .select(idFields.map((f) => kysely.dynamic.ref(f)))
-            .limit(1);
+            .limit(1)
+            .modifyEnd(this.makeContextComment({ model, operation: 'read' }));
         return query.executeTakeFirst();
     }
 
@@ -176,6 +179,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 model
             );
         }
+
+        query = query.modifyEnd(
+            this.makeContextComment({ model, operation: 'read' })
+        );
 
         try {
             return await query.execute();
@@ -400,7 +407,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                                 {} as any
                             )
                         )
-                        .where((eb) => eb.and(fromRelation.ids));
+                        .where((eb) => eb.and(fromRelation.ids))
+                        .modifyEnd(
+                            this.makeContextComment({
+                                model: fromRelation.model,
+                                operation: 'update',
+                            })
+                        );
                     return query.execute();
                 };
             }
@@ -446,7 +459,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const query = kysely
             .insertInto(model)
             .values(updatedData)
-            .returning(idFields as any);
+            .returning(idFields as any)
+            .modifyEnd(
+                this.makeContextComment({
+                    model,
+                    operation: 'create',
+                })
+            );
 
         const createdEntity = await query.executeTakeFirst();
 
@@ -767,6 +786,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             .values(createData)
             .$if(!!input.skipDuplicates, (qb) =>
                 qb.onConflict((oc) => oc.doNothing())
+            )
+            .modifyEnd(
+                this.makeContextComment({
+                    model,
+                    operation: 'create',
+                })
             );
 
         if (!returnData) {
@@ -972,7 +997,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     this.dialect.buildFilter(eb, model, model, combinedWhere)
                 )
                 .set(updateFields)
-                .returning(idFields as any);
+                .returning(idFields as any)
+                .modifyEnd(
+                    this.makeContextComment({
+                        model,
+                        operation: 'update',
+                    })
+                );
 
             const updatedEntity = await query.executeTakeFirst();
 
@@ -995,6 +1026,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             return updatedEntity;
         }
+    }
+
+    private makeContextComment(context: {
+        model: GetModels<Schema>;
+        operation: CRUD;
+    }) {
+        return sql.raw(`${CONTEXT_COMMENT_PREFIX}${JSON.stringify(context)}`);
     }
 
     protected async updateMany(
@@ -1062,6 +1100,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 );
             }
         }
+
+        query = query.modifyEnd(
+            this.makeContextComment({ model, operation: 'update' })
+        );
 
         try {
             const result = await query.executeTakeFirstOrThrow();
@@ -1338,6 +1380,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         }),
                         {} as any
                     )
+                )
+                .modifyEnd(
+                    this.makeContextComment({
+                        model: fromRelation.model,
+                        operation: 'update',
+                    })
                 );
             updateResult = await query.executeTakeFirstOrThrow();
         } else {
@@ -1362,6 +1410,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             (acc, { fk }) => ({ ...acc, [fk]: null }),
                             {} as any
                         )
+                    )
+                    .modifyEnd(
+                        this.makeContextComment({
+                            model: fromRelation.model,
+                            operation: 'update',
+                        })
                     );
                 await query.execute();
             }
@@ -1378,6 +1432,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         }),
                         {} as any
                     )
+                )
+                .modifyEnd(
+                    this.makeContextComment({
+                        model,
+                        operation: 'update',
+                    })
                 );
             updateResult = await query.executeTakeFirstOrThrow();
         }
@@ -1475,6 +1535,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         (acc, { fk }) => ({ ...acc, [fk]: null }),
                         {} as any
                     )
+                )
+                .modifyEnd(
+                    this.makeContextComment({
+                        model: fromRelation.model,
+                        operation: 'update',
+                    })
                 );
             updateResult = await query.executeTakeFirstOrThrow();
         } else {
@@ -1489,6 +1555,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         (acc, { fk }) => ({ ...acc, [fk]: null }),
                         {} as any
                     )
+                )
+                .modifyEnd(
+                    this.makeContextComment({
+                        model,
+                        operation: 'update',
+                    })
                 );
             updateResult = await query.executeTakeFirstOrThrow();
         }
@@ -1543,6 +1615,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     (acc, { fk }) => ({ ...acc, [fk]: null }),
                     {} as any
                 )
+            )
+            .modifyEnd(
+                this.makeContextComment({
+                    model,
+                    operation: 'update',
+                })
             );
         await query.execute();
 
@@ -1559,6 +1637,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         }),
                         {} as any
                     )
+                )
+                .modifyEnd(
+                    this.makeContextComment({
+                        model,
+                        operation: 'update',
+                    })
                 );
             const r = await query.executeTakeFirstOrThrow();
 
@@ -1623,6 +1707,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ),
                         eb.or(deleteConditions.map((d) => eb.and(d))),
                     ])
+                )
+                .modifyEnd(
+                    this.makeContextComment({
+                        model,
+                        operation: 'delete',
+                    })
                 );
             deleteResult = await query.executeTakeFirstOrThrow();
         } else {
@@ -1637,6 +1727,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ),
                         eb.or(deleteConditions.map((d) => eb.and(d))),
                     ])
+                )
+                .modifyEnd(
+                    this.makeContextComment({ model, operation: 'delete' })
                 );
             deleteResult = await query.executeTakeFirstOrThrow();
         }
@@ -1664,7 +1757,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             .deleteFrom(model)
             .where((eb) => this.dialect.buildFilter(eb, model, model, where))
             // TODO: return selectively
-            .$if(returnData, (qb) => qb.returningAll());
+            .$if(returnData, (qb) => qb.returningAll())
+            .modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
 
         // const result = await this.queryExecutor.execute(kysely, query);
         if (returnData) {

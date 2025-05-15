@@ -1,3 +1,4 @@
+import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import {
     Expression,
@@ -9,7 +10,6 @@ import {
     type MemberExpression,
     type UnaryExpression,
 } from '../../schema';
-import invariant from 'tiny-invariant';
 
 type ExpressionEvaluatorContext = {
     auth?: any;
@@ -117,6 +117,14 @@ export class ExpressionEvaluator {
             .with('<=', () => left <= right)
             .with('&&', () => left && right)
             .with('||', () => left || right)
+            .with('in', () => {
+                const _right = right ?? [];
+                invariant(
+                    Array.isArray(_right),
+                    'expected array for "in" operator'
+                );
+                return _right.includes(left);
+            })
             .exhaustive();
     }
 

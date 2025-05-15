@@ -128,3 +128,8 @@ export interface ClientConstructor {
         options: ClientOptions<Schema>
     ): ClientContract<Schema>;
 }
+
+/**
+ * CRUD operations.
+ */
+export type CRUD = 'create' | 'read' | 'update' | 'delete';

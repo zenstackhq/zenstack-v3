@@ -24,6 +24,7 @@ import {
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { ClientContract } from '../../client';
+import type { CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base';
 import { InternalError } from '../../client/errors';
@@ -417,7 +418,7 @@ export class PolicyHandler<
     private buildPolicyFilter(
         model: GetModels<Schema>,
         alias: string | undefined,
-        operation: PolicyOperation,
+        operation: CRUD,
         thisEntity?: Record<string, ValueNode>
     ) {
         const policies = this.getModelPolicies(model, operation);
@@ -428,13 +429,25 @@ export class PolicyHandler<
         const allows = policies
             .filter((policy) => policy.kind === 'allow')
             .map((policy) =>
-                this.transformPolicyCondition(model, alias, policy, thisEntity)
+                this.transformPolicyCondition(
+                    model,
+                    alias,
+                    operation,
+                    policy,
+                    thisEntity
+                )
             );
 
         const denies = policies
             .filter((policy) => policy.kind === 'deny')
             .map((policy) =>
-                this.transformPolicyCondition(model, alias, policy, thisEntity)
+                this.transformPolicyCondition(
+                    model,
+                    alias,
+                    operation,
+                    policy,
+                    thisEntity
+                )
             );
 
         let combinedPolicy: OperationNode;
@@ -576,6 +589,7 @@ export class PolicyHandler<
     private transformPolicyCondition(
         model: GetModels<Schema>,
         alias: string | undefined,
+        operation: CRUD,
         policy: Policy,
         thisEntity?: Record<string, ValueNode>
     ) {
@@ -586,6 +600,7 @@ export class PolicyHandler<
         ).transform(policy.condition, {
             model,
             alias,
+            operation,
             thisEntity,
             auth: this.client.$auth,
         });

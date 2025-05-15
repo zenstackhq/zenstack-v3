@@ -20,7 +20,6 @@ import {
 } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
-import type { FieldDef } from '../../../dist/schema';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base';
 import { InternalError, QueryError } from '../../client/errors';
@@ -43,13 +42,15 @@ import {
     type MemberExpression,
     type UnaryExpression,
 } from '../../schema/expression';
-import type { BuiltinType, GetModels } from '../../schema/schema';
+import type { BuiltinType, FieldDef, GetModels } from '../../schema/schema';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { conjunction, disjunction, logicalNot, trueNode } from './utils';
+import type { CRUD } from '../../client/contract';
 
 export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
     alias?: string;
+    operation: CRUD;
     thisEntity?: Record<string, ValueNode>;
     auth?: any;
 };
@@ -452,7 +453,11 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             (expr.args ?? []).map((arg) =>
                 this.transformCallArg(eb, arg, context)
             ),
-            this.dialect
+            {
+                dialect: this.dialect,
+                model: context.model,
+                operation: context.operation,
+            }
         );
     }
 
@@ -531,7 +536,6 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
         let currNode: SelectQueryNode | ColumnNode | ReferenceNode | undefined =
             undefined;
-        // const innerContext = { ...context, thisEntity: undefined };
 
         for (let i = expr.members.length - 1; i >= 0; i--) {
             const member = expr.members[i]!;

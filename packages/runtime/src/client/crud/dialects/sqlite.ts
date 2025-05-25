@@ -1,3 +1,4 @@
+import type Decimal from 'decimal.js';
 import {
     ExpressionWrapper,
     sql,
@@ -17,7 +18,6 @@ import {
     requireModel,
 } from '../../query-utils';
 import { BaseCrudDialect } from './base';
-import type Decimal from 'decimal.js';
 
 export class SqliteCrudDialect<
     Schema extends SchemaDef
@@ -123,11 +123,11 @@ export class SqliteCrudDialect<
         }
 
         tbl = tbl.select(() => {
-            const objArgs: Array<
+            type ArgsType =
                 | Expression<any>
                 | RawBuilder<any>
-                | SelectQueryBuilder<any, any, {}>
-            > = [];
+                | SelectQueryBuilder<any, any, {}>;
+            const objArgs: ArgsType[] = [];
 
             if (payload === true || !payload.select) {
                 // select all scalar fields
@@ -156,18 +156,36 @@ export class SqliteCrudDialect<
             } else if (payload.select) {
                 // select specific fields
                 objArgs.push(
-                    ...Object.entries(payload.select)
+                    ...Object.entries<any>(payload.select)
                         .filter(([, value]) => value)
-                        .map(([field]) => [
-                            sql.lit(field),
-                            buildFieldRef(
+                        .map(([field, value]) => {
+                            const fieldDef = requireField(
                                 this.schema,
                                 relationModel,
-                                field,
-                                this.options,
-                                eb
-                            ),
-                        ])
+                                field
+                            );
+                            if (fieldDef.relation) {
+                                const subJson = this.buildRelationJSON(
+                                    relationModel as GetModels<Schema>,
+                                    eb,
+                                    field,
+                                    `${parentName}$${relationField}`,
+                                    value
+                                );
+                                return [sql.lit(field), subJson as ArgsType];
+                            } else {
+                                return [
+                                    sql.lit(field),
+                                    buildFieldRef(
+                                        this.schema,
+                                        relationModel,
+                                        field,
+                                        this.options,
+                                        eb
+                                    ) as ArgsType,
+                                ];
+                            }
+                        })
                         .flatMap((v) => v)
                 );
             }

@@ -26,7 +26,7 @@ import type { PromiseType } from 'utility-types';
 import type { GetModels, SchemaDef } from '../../schema';
 import type { ClientImpl } from '../client-impl';
 import type { ClientContract } from '../contract';
-import { InternalError } from '../errors';
+import { InternalError, QueryError } from '../errors';
 import type {
     MutationInterceptionFilterResult,
     OnKyselyQueryTransactionCallback,
@@ -158,17 +158,23 @@ export class ZenStackQueryExecutor<
         return proceed(queryNode);
     }
 
-    private proceedQuery(query: RootOperationNode, queryId: QueryId) {
+    private async proceedQuery(query: RootOperationNode, queryId: QueryId) {
         // run built-in transformers
         const finalQuery = this.nameMapper.transformNode(query);
         const compiled = this.compileQuery(finalQuery);
-        return this.driver.txConnection
-            ? super
-                  .withConnectionProvider(
-                      new SingleConnectionProvider(this.driver.txConnection)
-                  )
-                  .executeQuery<any>(compiled, queryId)
-            : super.executeQuery<any>(compiled, queryId);
+        try {
+            return this.driver.txConnection
+                ? await super
+                      .withConnectionProvider(
+                          new SingleConnectionProvider(this.driver.txConnection)
+                      )
+                      .executeQuery<any>(compiled, queryId)
+                : await super.executeQuery<any>(compiled, queryId);
+        } catch (err) {
+            throw new QueryError(
+                `Policy: failed to execute query: ${err}, sql: ${compiled.sql}, parameters: ${compiled.parameters}`
+            );
+        }
     }
 
     private isMutationNode(queryNode: RootOperationNode) {

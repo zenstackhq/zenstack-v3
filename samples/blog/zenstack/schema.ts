@@ -23,12 +23,12 @@ export const schema = {
                     type: "String",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: Expression.call("cuid") }] }],
-                    default: { call: "cuid" }
+                    default: Expression.call("cuid")
                 },
                 createdAt: {
                     type: "DateTime",
                     attributes: [{ name: "@default", args: [{ name: "value", value: Expression.call("now") }] }],
-                    default: { call: "now" }
+                    default: Expression.call("now")
                 },
                 updatedAt: {
                     type: "DateTime",
@@ -51,7 +51,7 @@ export const schema = {
                 },
                 role: {
                     type: "Role",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: Expression.ref("Role", "USER") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: Expression.literal("USER") }] }],
                     default: "USER"
                 },
                 posts: {
@@ -82,7 +82,7 @@ export const schema = {
                     type: "String",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: Expression.call("cuid") }] }],
-                    default: { call: "cuid" }
+                    default: Expression.call("cuid")
                 },
                 bio: {
                     type: "String",
@@ -95,14 +95,17 @@ export const schema = {
                 user: {
                     type: "User",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: Expression.array([Expression.ref("Profile", "userId")]) }, { name: "references", value: Expression.array([Expression.ref("User", "id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: Expression.array([Expression.field("userId")]) }, { name: "references", value: Expression.array([Expression.field("id")]) }] }],
                     relation: { opposite: "profile", fields: ["userId"], references: ["id"] }
                 },
                 userId: {
                     type: "String",
                     unique: true,
                     optional: true,
-                    attributes: [{ name: "@unique" }]
+                    attributes: [{ name: "@unique" }],
+                    foreignKeyFor: [
+                        "user"
+                    ]
                 }
             },
             idFields: ["id"],
@@ -117,12 +120,12 @@ export const schema = {
                     type: "String",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: Expression.call("cuid") }] }],
-                    default: { call: "cuid" }
+                    default: Expression.call("cuid")
                 },
                 createdAt: {
                     type: "DateTime",
                     attributes: [{ name: "@default", args: [{ name: "value", value: Expression.call("now") }] }],
-                    default: { call: "now" }
+                    default: Expression.call("now")
                 },
                 updatedAt: {
                     type: "DateTime",
@@ -142,11 +145,14 @@ export const schema = {
                 },
                 author: {
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: Expression.array([Expression.ref("Post", "authorId")]) }, { name: "references", value: Expression.array([Expression.ref("User", "id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: Expression.array([Expression.field("authorId")]) }, { name: "references", value: Expression.array([Expression.field("id")]) }] }],
                     relation: { opposite: "posts", fields: ["authorId"], references: ["id"] }
                 },
                 authorId: {
-                    type: "String"
+                    type: "String",
+                    foreignKeyFor: [
+                        "author"
+                    ]
                 }
             },
             idFields: ["id"],

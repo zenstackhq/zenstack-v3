@@ -3,6 +3,7 @@ import {
     AliasNode,
     AndNode,
     BinaryOperationNode,
+    FunctionNode,
     OperatorNode,
     OrNode,
     ParensNode,
@@ -133,7 +134,8 @@ export function buildIsFalse<Schema extends SchemaDef>(
         return falseNode(dialect);
     }
     return BinaryOperationNode.create(
-        node,
+        // coalesce so null is treated as false
+        FunctionNode.create('coalesce', [node, falseNode(dialect)]),
         OperatorNode.create('='),
         falseNode(dialect)
     );

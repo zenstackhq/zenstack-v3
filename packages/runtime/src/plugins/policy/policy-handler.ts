@@ -86,7 +86,10 @@ export class PolicyHandler<
     ) {
         if (!this.isCrudQueryNode(node)) {
             // non CRUD queries are not allowed
-            throw new RejectedByPolicyError('non CRUD queries are not allowed');
+            throw new RejectedByPolicyError(
+                undefined,
+                'non-CRUD queries are not allowed'
+            );
         }
 
         if (!this.isMutationQueryNode(node)) {
@@ -104,7 +107,7 @@ export class PolicyHandler<
                 'create'
             );
             if (constCondition === false) {
-                throw new RejectedByPolicyError();
+                throw new RejectedByPolicyError(mutationModel);
             } else if (constCondition === undefined) {
                 mutationRequiresTransaction = true;
             }
@@ -142,6 +145,7 @@ export class PolicyHandler<
 
         if (readBackError) {
             throw new RejectedByPolicyError(
+                mutationModel,
                 'result is not allowed to be read back'
             );
         }
@@ -217,7 +221,7 @@ export class PolicyHandler<
         };
         const result = await proceed(preCreateCheck);
         if (!(result.rows[0] as any)?.$condition) {
-            throw new RejectedByPolicyError();
+            throw new RejectedByPolicyError(model);
         }
     }
 

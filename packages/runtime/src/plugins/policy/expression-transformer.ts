@@ -20,6 +20,7 @@ import {
 } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
+import type { CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base';
 import { InternalError, QueryError } from '../../client/errors';
@@ -45,7 +46,6 @@ import {
 import type { BuiltinType, FieldDef, GetModels } from '../../schema/schema';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { conjunction, disjunction, logicalNot, trueNode } from './utils';
-import type { CRUD } from '../../client/contract';
 
 export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
@@ -53,6 +53,8 @@ export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     operation: CRUD;
     thisEntity?: Record<string, ValueNode>;
     auth?: any;
+    memberFilter?: OperationNode;
+    memberSelect?: SelectionNode;
 };
 
 // a registry of expression handlers marked with @expr
@@ -141,12 +143,33 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 return this.createColumnRef(expr.field, context);
             }
         } else {
-            return this.transformRelationAccess(
+            const { memberFilter, memberSelect, ...restContext } = context;
+            const relation = this.transformRelationAccess(
                 expr.field,
                 fieldDef.type,
-                context
+                restContext
             );
+            return {
+                ...relation,
+                where: this.mergeWhere(relation.where, memberFilter),
+                selections: memberSelect ? [memberSelect] : relation.selections,
+            };
         }
+    }
+
+    private mergeWhere(
+        where: WhereNode | undefined,
+        memberFilter: OperationNode | undefined
+    ) {
+        if (!where) {
+            return WhereNode.create(memberFilter ?? trueNode(this.dialect));
+        }
+        if (!memberFilter) {
+            return where;
+        }
+        return WhereNode.create(
+            conjunction(this.dialect, [where.where, memberFilter])
+        );
     }
 
     @expr('null')
@@ -251,8 +274,6 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             return this.transformValue(value, 'Boolean');
         }
 
-        const left = this.transform(expr.left, context);
-
         invariant(
             Expression.isField(expr.left) || Expression.isMember(expr.left),
             'left operand must be field or member access'
@@ -284,7 +305,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             }
         }
 
-        let filter = this.transform(expr.right, {
+        let predicateFilter = this.transform(expr.right, {
             ...context,
             model: newContextModel as GetModels<Schema>,
             alias: undefined,
@@ -292,92 +313,44 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         });
 
         if (expr.op === '!') {
-            filter = logicalNot(filter);
+            predicateFilter = logicalNot(predicateFilter);
         }
-
-        invariant(
-            SelectQueryNode.is(left),
-            'expected left operand to be select query'
-        );
 
         const count = FunctionNode.create('count', [
             ValueNode.createImmediate(1),
         ]);
-        const finalSelectQuery = this.updateInnerMostSelectQuery(
-            left,
-            filter,
-            match(expr.op)
-                .with('?', () =>
-                    BinaryOperationNode.create(
-                        count,
-                        OperatorNode.create('>'),
-                        ValueNode.createImmediate(0)
-                    )
-                )
-                .with('!', () =>
-                    BinaryOperationNode.create(
-                        count,
-                        OperatorNode.create('='),
-                        ValueNode.createImmediate(0)
-                    )
-                )
-                .with('^', () =>
-                    BinaryOperationNode.create(
-                        count,
-                        OperatorNode.create('='),
-                        ValueNode.createImmediate(0)
-                    )
-                )
-                .exhaustive()
-        );
 
-        return finalSelectQuery;
-    }
+        const predicateResult = match(expr.op)
+            .with('?', () =>
+                BinaryOperationNode.create(
+                    count,
+                    OperatorNode.create('>'),
+                    ValueNode.createImmediate(0)
+                )
+            )
+            .with('!', () =>
+                BinaryOperationNode.create(
+                    count,
+                    OperatorNode.create('='),
+                    ValueNode.createImmediate(0)
+                )
+            )
+            .with('^', () =>
+                BinaryOperationNode.create(
+                    count,
+                    OperatorNode.create('='),
+                    ValueNode.createImmediate(0)
+                )
+            )
+            .exhaustive();
 
-    private updateInnerMostSelectQuery(
-        node: SelectQueryNode,
-        where: OperationNode,
-        selection: OperationNode
-    ): SelectQueryNode {
-        if (!node.selections || node.selections.length === 0) {
-            return {
-                ...node,
-                selections: [
-                    SelectionNode.create(
-                        AliasNode.create(selection, IdentifierNode.create('$t'))
-                    ),
-                ],
-                where: WhereNode.create(
-                    node.where
-                        ? conjunction(this.dialect, [node.where.where, where])
-                        : where
-                ),
-            };
-        } else {
-            invariant(
-                node.selections.length === 1,
-                'expected exactly one selection'
-            );
-            const currSelection = node.selections[0]!;
-            invariant(
-                AliasNode.is(currSelection.selection),
-                'expected alias node'
-            );
-            const alias = currSelection.selection.alias;
-            const inner = currSelection.selection.node;
-            invariant(SelectQueryNode.is(inner), 'expected select query node');
-            const newInner = this.updateInnerMostSelectQuery(
-                inner,
-                where,
-                selection
-            );
-            return {
-                ...node,
-                selections: [
-                    SelectionNode.create(AliasNode.create(newInner, alias)),
-                ],
-            };
-        }
+        return this.transform(expr.left, {
+            ...context,
+            memberSelect: SelectionNode.create(
+                AliasNode.create(predicateResult, IdentifierNode.create('$t'))
+            ),
+            memberFilter: predicateFilter,
+        });
     }
 
     private transformAuthBinary(expr: BinaryExpression) {
@@ -512,7 +485,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             'expect receiver to be field expression'
         );
 
-        const receiver = this.transform(expr.receiver, context);
+        const { memberFilter, memberSelect, ...restContext } = context;
+
+        const receiver = this.transform(expr.receiver, restContext);
         invariant(
             SelectQueryNode.is(receiver),
             'expected receiver to be select query'
@@ -546,12 +521,13 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                     member,
                     fieldDef.type,
                     {
-                        ...context,
+                        ...restContext,
                         model: fromModel as GetModels<Schema>,
                         alias: undefined,
                         thisEntity: undefined,
                     }
                 );
+
                 if (currNode) {
                     invariant(
                         SelectQueryNode.is(currNode),
@@ -563,33 +539,32 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                             SelectionNode.create(
                                 AliasNode.create(
                                     currNode,
-                                    IdentifierNode.create(member)
+                                    IdentifierNode.create(expr.members[i + 1]!)
                                 )
                             ),
                         ],
                     };
                 } else {
-                    currNode = relation;
+                    // inner most member, merge with member filter from the context
+                    currNode = {
+                        ...relation,
+                        where: this.mergeWhere(relation.where, memberFilter),
+                        selections: memberSelect
+                            ? [memberSelect]
+                            : relation.selections,
+                    };
                 }
             } else {
                 invariant(
                     i === expr.members.length - 1,
                     'plain field access must be the last segment'
                 );
+                invariant(
+                    !currNode,
+                    'plain field access must be the last segment'
+                );
 
-                const columnRef = ColumnNode.create(member);
-                if (currNode) {
-                    invariant(
-                        SelectQueryNode.is(currNode),
-                        'expected select query node'
-                    );
-                    currNode = {
-                        ...(currNode as SelectQueryNode),
-                        selections: [SelectionNode.create(columnRef)],
-                    };
-                } else {
-                    currNode = columnRef;
-                }
+                currNode = ColumnNode.create(member);
             }
         }
 

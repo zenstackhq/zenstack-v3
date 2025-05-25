@@ -40,6 +40,7 @@ export class UpdateOperationHandler<
 
         if (!result) {
             throw new RejectedByPolicyError(
+                this.model,
                 'result is not allowed to be read back'
             );
         }

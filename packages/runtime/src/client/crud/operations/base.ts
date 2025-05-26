@@ -29,7 +29,7 @@ import {
 } from '../../../utils/object-utils';
 import { CONTEXT_COMMENT_PREFIX } from '../../constants';
 import type { CRUD } from '../../contract';
-import type { FindArgs, SelectInclude, Where } from '../../crud-types';
+import type { FindArgs, SelectIncludeOmit, Where } from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
 import {
@@ -59,6 +59,7 @@ export type CrudOperation =
     | 'createManyAndReturn'
     | 'update'
     | 'updateMany'
+    | 'upsert'
     | 'delete'
     | 'deleteMany'
     | 'count'
@@ -165,8 +166,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         // select
         if (args?.select) {
+            // select is mutually exclusive with omit
             query = this.buildFieldSelection(model, query, args?.select, model);
         } else {
+            // include all scalar fields except those in omit
             query = this.buildSelectAllScalarFields(model, query, args?.omit);
         }
 
@@ -1783,7 +1786,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     protected trimResult(
         data: any,
-        args: SelectInclude<Schema, GetModels<Schema>, boolean>
+        args: SelectIncludeOmit<Schema, GetModels<Schema>, boolean>
     ) {
         if (!args.select) {
             return data;
@@ -1796,7 +1799,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     protected needReturnRelations(
         model: string,
-        args: SelectInclude<Schema, GetModels<Schema>, boolean>
+        args: SelectIncludeOmit<Schema, GetModels<Schema>, boolean>
     ) {
         let returnRelation = false;
 

@@ -45,6 +45,7 @@ export class CreateOperationHandler<
             return this.readUnique(tx, this.model, {
                 select: args.select,
                 include: args.include,
+                omit: args.omit,
                 where: getIdValues(this.schema, this.model, createResult),
             });
         });

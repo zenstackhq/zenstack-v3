@@ -39,29 +39,35 @@ import type { ToKyselySchema } from './query-builder';
 type DefaultModelResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
+    Omit = undefined,
     Optional = false,
     Array = false
 > = WrapType<
     {
-        [Key in NonRelationFields<Schema, Model>]: MapFieldType<
-            Schema,
-            Model,
-            Key
-        >;
+        [Key in NonRelationFields<Schema, Model> as Key extends keyof Omit
+            ? Omit[Key] extends true
+                ? never
+                : Key
+            : Key]: MapFieldType<Schema, Model, Key>;
     },
     Optional,
     Array
 >;
 
 type ModelSelectResult<
-    Select,
     Schema extends SchemaDef,
-    Model extends GetModels<Schema>
+    Model extends GetModels<Schema>,
+    Select,
+    Omit
 > = {
     [Key in keyof Select & GetFields<Schema, Model> as Select[Key] extends
         | false
         | undefined
         ? never
+        : Key extends keyof Omit
+        ? Omit[Key] extends true
+            ? never
+            : Key
         : Key]: Key extends ScalarFields<Schema, Model>
         ? MapFieldType<Schema, Model, Key>
         : Key extends RelationFields<Schema, Model>
@@ -80,6 +86,7 @@ type ModelSelectResult<
             : DefaultModelResult<
                   Schema,
                   RelationFieldType<Schema, Model, Key>,
+                  Omit,
                   FieldIsOptional<Schema, Model, Key>,
                   FieldIsArray<Schema, Model, Key>
               >
@@ -89,18 +96,20 @@ type ModelSelectResult<
 export type ModelResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Args extends SelectInclude<Schema, Model, boolean> = {},
+    Args extends SelectIncludeOmit<Schema, Model, boolean> = {},
     Optional = false,
     Array = false
 > = WrapType<
     Args extends {
         select: infer S;
+        omit?: infer O;
     }
-        ? ModelSelectResult<S, Schema, Model>
+        ? ModelSelectResult<Schema, Model, S, O>
         : Args extends {
               include: infer I;
+              omit?: infer O;
           }
-        ? DefaultModelResult<Schema, Model> & {
+        ? DefaultModelResult<Schema, Model, O> & {
               [Key in keyof I & RelationFields<Schema, Model> as I[Key] extends
                   | false
                   | undefined
@@ -124,6 +133,8 @@ export type ModelResult<
                         FieldIsArray<Schema, Model, Key>
                     >;
           }
+        : Args extends { omit: infer O }
+        ? DefaultModelResult<Schema, Model, O>
         : DefaultModelResult<Schema, Model>,
     Optional,
     Array
@@ -311,7 +322,7 @@ type OmitFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in ScalarFields<Schema, Model>]?: true;
 };
 
-export type SelectInclude<
+export type SelectIncludeOmit<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     AllowCount extends boolean
@@ -528,14 +539,14 @@ export type FindArgs<
               where?: Where<Schema, Model>;
           }
         : {}) &
-    SelectInclude<Schema, Model, Collection>;
+    SelectIncludeOmit<Schema, Model, Collection>;
 
 export type FindUniqueArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = {
     where?: WhereUnique<Schema, Model>;
-} & SelectInclude<Schema, Model, true>;
+} & SelectIncludeOmit<Schema, Model, true>;
 
 //#endregion
 
@@ -548,6 +559,7 @@ export type CreateArgs<
     data: CreateInput<Schema, Model>;
     select?: Select<Schema, Model, true>;
     include?: Include<Schema, Model>;
+    omit?: OmitFields<Schema, Model>;
 };
 
 export type CreateManyArgs<
@@ -559,7 +571,7 @@ export type CreateManyAndReturnArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = CreateManyPayload<Schema, Model> &
-    Omit<SelectInclude<Schema, Model, false>, 'include'>;
+    Omit<SelectIncludeOmit<Schema, Model, false>, 'include'>;
 
 type OptionalWrap<
     Schema extends SchemaDef,
@@ -678,6 +690,7 @@ export type UpdateArgs<
     where: WhereUnique<Schema, Model>;
     select?: Select<Schema, Model, true>;
     include?: Include<Schema, Model>;
+    omit?: OmitFields<Schema, Model>;
 };
 
 export type UpdateManyArgs<
@@ -687,6 +700,18 @@ export type UpdateManyArgs<
     data: OrArray<UpdateScalarInput<Schema, Model>>;
     where?: Where<Schema, Model>;
     limit?: number;
+};
+
+export type UpsertArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    create: CreateInput<Schema, Model>;
+    update: UpdateInput<Schema, Model>;
+    where: WhereUnique<Schema, Model>;
+    select?: Select<Schema, Model, true>;
+    include?: Include<Schema, Model>;
+    omit?: OmitFields<Schema, Model>;
 };
 
 export type UpdateScalarInput<
@@ -761,6 +786,7 @@ export type DeleteArgs<
     where: WhereUnique<Schema, Model>;
     select?: Select<Schema, Model, true>;
     include?: Include<Schema, Model>;
+    omit?: OmitFields<Schema, Model>;
 };
 
 export type DeleteManyArgs<
@@ -1103,6 +1129,10 @@ export type ModelOperations<
     updateMany<T extends UpdateManyArgs<Schema, Model>>(
         args: Subset<T, UpdateManyArgs<Schema, Model>>
     ): Promise<BatchResult>;
+
+    upsert<T extends UpsertArgs<Schema, Model>>(
+        args: SelectSubset<T, UpsertArgs<Schema, Model>>
+    ): Promise<ModelResult<Schema, Model, T>>;
 
     delete<T extends DeleteArgs<Schema, Model>>(
         args: SelectSubset<T, DeleteArgs<Schema, Model>>

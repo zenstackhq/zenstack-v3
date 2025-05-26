@@ -43,7 +43,7 @@
         -   [x] Nested to-one
         -   [ ] Delta update for numeric fields
         -   [ ] Array update
-    -   [ ] Upsert
+    -   [x] Upsert
     -   [x] Delete
     -   [ ] Aggregation
         -   [x] Count

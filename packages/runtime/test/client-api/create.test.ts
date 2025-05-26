@@ -32,6 +32,33 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                 email: 'u1@test.com',
                 name: 'name',
             });
+
+            const user2 = await client.user.create({
+                data: {
+                    email: 'u2@test.com',
+                    name: 'name',
+                },
+                omit: { name: true },
+            });
+            expect(user2.email).toBe('u2@test.com');
+            expect((user2 as any).name).toBeUndefined();
+            // @ts-expect-error
+            console.log(user2.name);
+
+            const user3 = await client.user.create({
+                data: {
+                    email: 'u3@test.com',
+                    name: 'name',
+                    posts: { create: { title: 'Post1' } },
+                },
+                include: { posts: true },
+                omit: { name: true },
+            });
+            expect(user3.email).toBe('u3@test.com');
+            expect(user3.posts).toHaveLength(1);
+            expect((user3 as any).name).toBeUndefined();
+            // @ts-expect-error
+            console.log(user3.name);
         });
 
         it('works with nested relation one-to-one, owner side', async () => {

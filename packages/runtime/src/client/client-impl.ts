@@ -266,7 +266,7 @@ function createModelCrudHandler<
         args: unknown,
         handler: BaseOperationHandler<Schema>,
         postProcess = false,
-        throwIfNotFound = false
+        throwIfNoResult = false
     ) => {
         return createDeferredPromise(async () => {
             let proceed = async (
@@ -275,7 +275,7 @@ function createModelCrudHandler<
             ) => {
                 const _handler = tx ? handler.withClient(tx) : handler;
                 const r = await _handler.handle(operation, _args ?? args);
-                if (!r && throwIfNotFound) {
+                if (!r && throwIfNoResult) {
                     throw new NotFoundError(model);
                 }
                 let result: unknown;
@@ -397,6 +397,15 @@ function createModelCrudHandler<
                 args,
                 new UpdateOperationHandler(client, model, inputValidator),
                 false
+            );
+        },
+
+        upsert: (args: unknown) => {
+            return createPromise(
+                'upsert',
+                args,
+                new UpdateOperationHandler(client, model, inputValidator),
+                true
             );
         },
 

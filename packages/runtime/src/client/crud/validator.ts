@@ -19,6 +19,7 @@ import {
     type FindArgs,
     type UpdateArgs,
     type UpdateManyArgs,
+    type UpsertArgs,
 } from '../crud-types';
 import { InternalError, QueryError } from '../errors';
 import {
@@ -79,6 +80,14 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<UpdateManyArgs<Schema, GetModels<Schema>>>(
             this.makeUpdateManySchema(model),
             'updateMany',
+            args
+        );
+    }
+
+    validateUpsertArgs(model: GetModels<Schema>, args: unknown) {
+        return this.validate<UpsertArgs<Schema, GetModels<Schema>>>(
+            this.makeUpsertSchema(model),
+            'upsert',
             args
         );
     }
@@ -576,13 +585,15 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeCreateSchema(model: string) {
         const dataSchema = this.makeCreateDataSchema(model, false);
-        return z
+        const schema = z
             .object({
                 data: dataSchema,
-                select: z.record(z.string(), z.any()).optional(),
-                include: z.record(z.string(), z.any()).optional(),
+                select: this.makeSelectSchema(model).optional(),
+                include: this.makeIncludeSchema(model).optional(),
+                omit: this.makeOmitSchema(model).optional(),
             })
             .strict();
+        return this.refineForSelectIncludeMutuallyExclusive(schema);
     }
 
     private makeCreateManySchema(model: string) {
@@ -595,6 +606,7 @@ export class InputValidator<Schema extends SchemaDef> {
             .merge(
                 z.object({
                     select: this.makeSelectSchema(model).optional(),
+                    include: this.makeIncludeSchema(model).optional(),
                     omit: this.makeOmitSchema(model).optional(),
                 })
             )
@@ -896,8 +908,9 @@ export class InputValidator<Schema extends SchemaDef> {
             .object({
                 where: this.makeWhereSchema(model, true),
                 data: this.makeUpdateDataSchema(model),
-                select: z.record(z.string(), z.any()).optional(),
-                include: z.record(z.string(), z.any()).optional(),
+                select: this.makeSelectSchema(model).optional(),
+                include: this.makeIncludeSchema(model).optional(),
+                omit: this.makeOmitSchema(model).optional(),
             })
             .strict();
 
@@ -912,6 +925,21 @@ export class InputValidator<Schema extends SchemaDef> {
                 limit: z.number().int().nonnegative().optional(),
             })
             .strict();
+    }
+
+    private makeUpsertSchema(model: string) {
+        const schema = z
+            .object({
+                where: this.makeWhereSchema(model, true),
+                create: this.makeCreateDataSchema(model, false),
+                update: this.makeUpdateDataSchema(model),
+                select: this.makeSelectSchema(model).optional(),
+                include: this.makeIncludeSchema(model).optional(),
+                omit: this.makeOmitSchema(model).optional(),
+            })
+            .strict();
+
+        return this.refineForSelectIncludeMutuallyExclusive(schema);
     }
 
     private makeUpdateDataSchema(

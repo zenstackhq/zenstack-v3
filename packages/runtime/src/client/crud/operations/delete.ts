@@ -31,6 +31,7 @@ export class DeleteOperationHandler<
         const existing = await this.readUnique(this.kysely, this.model, {
             select: args.select,
             include: args.include,
+            omit: args.omit,
             where: args.where,
         });
         if (!existing) {

@@ -161,40 +161,58 @@ export class QueryNameMapper extends OperationNodeTransformer {
         selections: readonly SelectionNode[],
         contextNode: OperationNode
     ) {
-        const hasSelectAll = selections.some((s) =>
-            SelectAllNode.is(s.selection)
-        );
-        if (!hasSelectAll && !this.modelHasFieldsWithMappedNames(contextNode)) {
-            return selections;
+        const result: SelectionNode[] = [];
+
+        for (const selection of selections) {
+            let selectAllFromModel: string | undefined = undefined;
+            let isSelectAll = false;
+            let selectAllWithAlias = false;
+
+            if (SelectAllNode.is(selection.selection)) {
+                selectAllFromModel = this.currentModel;
+                isSelectAll = true;
+            } else if (
+                ReferenceNode.is(selection.selection) &&
+                SelectAllNode.is(selection.selection.column)
+            ) {
+                selectAllFromModel =
+                    selection.selection.table?.table.identifier.name ??
+                    this.currentModel;
+                isSelectAll = true;
+                selectAllWithAlias = true;
+            }
+
+            if (isSelectAll) {
+                if (!selectAllFromModel) {
+                    continue;
+                } else {
+                    const scalarFields = this.getModelScalarFields(
+                        contextNode,
+                        selectAllFromModel
+                    );
+                    result.push(
+                        ...scalarFields.map((fieldName) => {
+                            const fieldRef = ReferenceNode.create(
+                                ColumnNode.create(this.mapFieldName(fieldName)),
+                                TableNode.create(selectAllFromModel)
+                            );
+                            return SelectionNode.create(
+                                this.fieldHasMappedName(fieldName)
+                                    ? AliasNode.create(
+                                          fieldRef,
+                                          IdentifierNode.create(fieldName)
+                                      )
+                                    : fieldRef
+                            );
+                        })
+                    );
+                }
+            } else {
+                result.push(this.transformSelectionWithAlias(selection));
+            }
         }
 
-        const result = selections
-            .filter((s) => !SelectAllNode.is(s.selection))
-            .map((s) => this.transformSelectionWithAlias(s));
-        const scalarFields = this.getModelScalarFields(contextNode);
-        return [
-            ...result,
-            ...scalarFields.map((fieldName) =>
-                SelectionNode.create(
-                    this.fieldHasMappedName(fieldName)
-                        ? AliasNode.create(
-                              ColumnNode.create(this.mapFieldName(fieldName)),
-                              IdentifierNode.create(fieldName)
-                          )
-                        : ColumnNode.create(this.mapFieldName(fieldName))
-                )
-            ),
-        ];
-    }
-
-    private modelHasFieldsWithMappedNames(_contextNode: OperationNode) {
-        if (!this.currentModel) {
-            return false;
-        }
-        const modelDef = requireModel(this.schema, this.currentModel!);
-        return Object.keys(modelDef.fields).some((name) =>
-            this.fieldToColumnMap.has(`${this.currentModel}.${name}`)
-        );
+        return result;
     }
 
     private transformSelectionWithAlias(node: SelectionNode) {
@@ -282,9 +300,13 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    private getModelScalarFields(contextNode: OperationNode) {
+    private getModelScalarFields(
+        contextNode: OperationNode,
+        model: string | undefined
+    ) {
         this.requireCurrentModel(contextNode);
-        const modelDef = requireModel(this.schema, this.currentModel!);
+        model = model ?? this.currentModel;
+        const modelDef = requireModel(this.schema, model!);
         const scalarFields = Object.entries(modelDef.fields)
             .filter(([, fieldDef]) => !fieldDef.relation && !fieldDef.computed)
             .map(([fieldName]) => fieldName);

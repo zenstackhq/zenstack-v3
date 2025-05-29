@@ -48,7 +48,7 @@
     -   [ ] Aggregation
         -   [x] Count
         -   [x] Aggregate
-        -   [ ] Group by
+        -   [x] Group by
     -   [ ] Extensions
         -   [x] Query builder API
         -   [x] Computed fields

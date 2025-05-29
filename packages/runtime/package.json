@@ -4,7 +4,8 @@
     "description": "ZenStack Runtime",
     "type": "module",
     "scripts": {
-        "build": "tsup-node",
+        "build": "tsup-node && pnpm test-typecheck",
+        "test-typecheck": "tsc --project tsconfig.test.json",
         "watch": "tsup-node --watch",
         "test": "vitest",
         "pack": "pnpm pack"

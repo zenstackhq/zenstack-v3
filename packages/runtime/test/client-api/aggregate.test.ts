@@ -4,7 +4,7 @@ import { schema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 import { createUser } from './utils';
 
-describe.each(createClientSpecs(__filename))(
+describe.each(createClientSpecs(__filename, true))(
     'Client aggregate tests',
     ({ createClient }) => {
         let client: ClientContract<typeof schema>;
@@ -59,6 +59,11 @@ describe.each(createClientSpecs(__filename))(
                 _avg: { age: 15 },
                 _sum: { age: 30 },
             });
+
+            client.user.aggregate({
+                // @ts-expect-error
+                _sum: { name: true },
+            });
         });
 
         it('works with min and max', async () => {
@@ -73,6 +78,99 @@ describe.each(createClientSpecs(__filename))(
             expect(r._max.age).toBe(20);
             expect(r._min.bio).toBe('Bio1');
             expect(r._max.bio).toBe('Bio2');
+        });
+
+        it('works with scalar orderBy', async () => {
+            await createUser(client, 'u1@test.com', {
+                name: 'Admin',
+                role: 'ADMIN',
+            });
+            await createUser(client, 'u2@test.com', {
+                name: 'User',
+                role: 'USER',
+            });
+            await createUser(client, 'u3@test.com', {
+                name: null,
+                role: 'USER',
+            });
+
+            await expect(
+                client.user.aggregate({
+                    orderBy: {
+                        role: 'desc',
+                    },
+                    take: 2,
+                    _count: {
+                        name: true,
+                    },
+                })
+            ).resolves.toMatchObject({
+                _count: {
+                    name: 1,
+                },
+            });
+
+            await expect(
+                client.user.aggregate({
+                    orderBy: {
+                        name: { sort: 'asc', nulls: 'last' },
+                    },
+                    take: 2,
+                    _count: {
+                        name: true,
+                    },
+                })
+            ).resolves.toMatchObject({
+                _count: {
+                    name: 2,
+                },
+            });
+        });
+
+        it('works with relation orderBy', async () => {
+            await createUser(client, 'u1@test.com', {
+                name: 'Admin',
+                role: 'ADMIN',
+                profile: { create: { bio: 'bio', age: 10 } },
+            });
+            await createUser(client, 'u2@test.com', {
+                name: 'User',
+                role: 'USER',
+                profile: { create: { bio: 'bio', age: 20 } },
+            });
+            await createUser(client, 'u3@test.com', {
+                name: null,
+                role: 'USER',
+                profile: { create: { bio: 'bio', age: 30 } },
+            });
+
+            await expect(
+                client.user.aggregate({
+                    take: 2,
+                    orderBy: {
+                        profile: { age: 'asc' },
+                    },
+                    _count: { name: true },
+                })
+            ).resolves.toMatchObject({
+                _count: {
+                    name: 2,
+                },
+            });
+
+            await expect(
+                client.user.aggregate({
+                    take: 2,
+                    orderBy: {
+                        profile: { age: 'desc' },
+                    },
+                    _count: { name: true },
+                })
+            ).resolves.toMatchObject({
+                _count: {
+                    name: 1,
+                },
+            });
         });
     }
 );

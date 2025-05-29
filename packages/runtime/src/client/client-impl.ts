@@ -20,18 +20,19 @@ import { CountOperationHandler } from './crud/operations/count';
 import { CreateOperationHandler } from './crud/operations/create';
 import { DeleteOperationHandler } from './crud/operations/delete';
 import { FindOperationHandler } from './crud/operations/find';
+import { GroupByeOperationHandler } from './crud/operations/group-by';
 import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/validator';
 import { NotFoundError, QueryError } from './errors';
 import { ZenStackDriver } from './executor/zenstack-driver';
 import { ZenStackQueryExecutor } from './executor/zenstack-query-executor';
+import * as BuiltinFunctions from './functions';
 import { SchemaDbPusher } from './helpers/schema-db-pusher';
 import type { ClientOptions, ProceduresOptions } from './options';
 import type { RuntimePlugin } from './plugin';
 import { createDeferredPromise } from './promise';
 import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
-import * as BuiltinFunctions from './functions';
 
 /**
  * Creates a new ZenStack client instance.
@@ -442,6 +443,14 @@ function createModelCrudHandler<
                 args,
                 new AggregateOperationHandler(client, model, inputValidator),
                 false
+            );
+        },
+
+        groupBy: (args: unknown) => {
+            return createPromise(
+                'groupBy',
+                args,
+                new GroupByeOperationHandler(client, model, inputValidator)
             );
         },
     } as ModelOperations<Schema, Model>;

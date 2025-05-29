@@ -27,8 +27,10 @@ import type {
 import type {
     AtLeast,
     MapBaseType,
+    NonEmptyArray,
     NullableIf,
     OrArray,
+    ValueOfPotentialTuple,
     WrapType,
     XOR,
 } from '../utils/type-utils';
@@ -68,7 +70,7 @@ type ModelSelectResult<
         ? Omit[Key] extends true
             ? never
             : Key
-        : Key]: Key extends ScalarFields<Schema, Model>
+        : Key]: Key extends NonRelationFields<Schema, Model>
         ? MapFieldType<Schema, Model, Key>
         : Key extends RelationFields<Schema, Model>
         ? Select[Key] extends FindArgs<
@@ -129,6 +131,7 @@ export type ModelResult<
                   : DefaultModelResult<
                         Schema,
                         RelationFieldType<Schema, Model, Key>,
+                        undefined,
                         FieldIsOptional<Schema, Model, Key>,
                         FieldIsArray<Schema, Model, Key>
                     >;
@@ -146,7 +149,7 @@ export type BatchResult = { count: number };
 
 //#region Common structures
 
-export type Where<
+export type WhereInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     ScalarOnly extends boolean = false
@@ -175,9 +178,9 @@ export type Where<
         eb: ExpressionBuilder<ToKyselySchema<Schema>, Model>
     ) => OperandExpression<SqlBool>;
 } & {
-    AND?: OrArray<Where<Schema, Model, ScalarOnly>>;
-    OR?: Where<Schema, Model, ScalarOnly>[];
-    NOT?: OrArray<Where<Schema, Model, ScalarOnly>>;
+    AND?: OrArray<WhereInput<Schema, Model, ScalarOnly>>;
+    OR?: WhereInput<Schema, Model, ScalarOnly>[];
+    NOT?: OrArray<WhereInput<Schema, Model, ScalarOnly>>;
 };
 
 export type EnumFilter<
@@ -263,29 +266,52 @@ export type NullsOrder = 'first' | 'last';
 
 export type OrderBy<
     Schema extends SchemaDef,
-    Model extends GetModels<Schema>
+    Model extends GetModels<Schema>,
+    WithRelation extends boolean,
+    WithAggregation extends boolean
 > = {
     [Key in NonRelationFields<Schema, Model>]?: FieldIsOptional<
         Schema,
         Model,
         Key
     > extends true
-        ? {
-              sort: SortOrder;
-              nulls?: NullsOrder;
-          }
+        ?
+              | SortOrder
+              | {
+                    sort: SortOrder;
+                    nulls?: NullsOrder;
+                }
         : SortOrder;
-} & {
-    [Key in RelationFields<Schema, Model>]?: FieldIsArray<
-        Schema,
-        Model,
-        Key
-    > extends true
+} & (WithRelation extends true
+    ? {
+          [Key in RelationFields<Schema, Model>]?: FieldIsArray<
+              Schema,
+              Model,
+              Key
+          > extends true
+              ? {
+                    _count?: SortOrder;
+                }
+              : OrderBy<
+                    Schema,
+                    RelationFieldType<Schema, Model, Key>,
+                    WithRelation,
+                    WithAggregation
+                >;
+      }
+    : {}) &
+    (WithAggregation extends true
         ? {
-              _count?: SortOrder;
-          }
-        : OrderBy<Schema, RelationFieldType<Schema, Model, Key>>;
-};
+              _count?: OrderBy<Schema, Model, WithRelation, false>;
+          } & (NumericFields<Schema, Model> extends never
+              ? {}
+              : {
+                    _avg?: SumAvgInput<Schema, Model>;
+                    _sum?: SumAvgInput<Schema, Model>;
+                    _min?: MinMaxInput<Schema, Model>;
+                    _max?: MinMaxInput<Schema, Model>;
+                })
+        : {});
 
 export type WhereUnique<
     Schema extends SchemaDef,
@@ -314,12 +340,12 @@ export type WhereUnique<
                         >
                       : never;
               };
-    } & Where<Schema, Model>,
+    } & WhereInput<Schema, Model>,
     Extract<keyof GetModel<Schema, Model>['uniqueFields'], string>
 >;
 
 type OmitFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in ScalarFields<Schema, Model>]?: true;
+    [Key in NonRelationFields<Schema, Model>]?: true;
 };
 
 export type SelectIncludeOmit<
@@ -337,7 +363,7 @@ type Select<
     Model extends GetModels<Schema>,
     AllowCount extends Boolean
 > = {
-    [Key in ScalarFields<Schema, Model>]?: true;
+    [Key in NonRelationFields<Schema, Model>]?: true;
 } & Include<Schema, Model> &
     // relation count
     (AllowCount extends true ? { _count?: RelationCount<Schema, Model> } : {});
@@ -355,7 +381,7 @@ type RelationCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
                   : never]:
                   | true
                   | {
-                        where: Where<
+                        where: WhereInput<
                             Schema,
                             RelationFieldType<Schema, Model, Key>,
                             false
@@ -397,9 +423,9 @@ type ToManyRelationFilter<
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
 > = {
-    every?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
-    some?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
-    none?: Where<Schema, RelationFieldType<Schema, Model, Field>>;
+    every?: WhereInput<Schema, RelationFieldType<Schema, Model, Field>>;
+    some?: WhereInput<Schema, RelationFieldType<Schema, Model, Field>>;
+    none?: WhereInput<Schema, RelationFieldType<Schema, Model, Field>>;
 };
 
 type ToOneRelationFilter<
@@ -407,13 +433,13 @@ type ToOneRelationFilter<
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
 > = NullableIf<
-    Where<Schema, RelationFieldType<Schema, Model, Field>> & {
+    WhereInput<Schema, RelationFieldType<Schema, Model, Field>> & {
         is?: NullableIf<
-            Where<Schema, RelationFieldType<Schema, Model, Field>>,
+            WhereInput<Schema, RelationFieldType<Schema, Model, Field>>,
             FieldIsOptional<Schema, Model, Field>
         >;
         isNot?: NullableIf<
-            Where<Schema, RelationFieldType<Schema, Model, Field>>,
+            WhereInput<Schema, RelationFieldType<Schema, Model, Field>>,
             FieldIsOptional<Schema, Model, Field>
         >;
     },
@@ -531,12 +557,12 @@ export type FindArgs<
     ? {
           skip?: number;
           take?: number;
-          orderBy?: OrArray<OrderBy<Schema, Model>>;
+          orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
       }
     : {}) &
     (AllowFilter extends true
         ? {
-              where?: Where<Schema, Model>;
+              where?: WhereInput<Schema, Model>;
           }
         : {}) &
     SelectIncludeOmit<Schema, Model, Collection>;
@@ -678,6 +704,29 @@ export type CreateInput<
     Omit<CreateWithRelationInput<Schema, Model>, Without>
 >;
 
+type NestedCreateInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = OrArray<
+    CreateInput<
+        Schema,
+        RelationFieldType<Schema, Model, Field>,
+        OppositeRelationAndFK<Schema, Model, Field>
+    >,
+    FieldIsArray<Schema, Model, Field>
+>;
+
+type NestedCreateManyInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = CreateManyPayload<
+    Schema,
+    RelationFieldType<Schema, Model, Field>,
+    OppositeRelationAndFK<Schema, Model, Field>
+>;
+
 //#endregion
 
 // #region Update args
@@ -698,7 +747,7 @@ export type UpdateManyArgs<
     Model extends GetModels<Schema>
 > = {
     data: OrArray<UpdateScalarInput<Schema, Model>>;
-    where?: Where<Schema, Model>;
+    where?: WhereInput<Schema, Model>;
     limit?: number;
 };
 
@@ -793,7 +842,7 @@ export type DeleteManyArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = {
-    where?: Where<Schema, Model>;
+    where?: WhereInput<Schema, Model>;
     limit?: number;
 };
 
@@ -837,16 +886,21 @@ export type CountResult<
 export type AggregateArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
-> = Omit<
-    FindArgs<Schema, Model, true>,
-    'select' | 'include' | 'distinct' | 'omit'
-> & {
+> = {
+    where?: WhereInput<Schema, Model>;
+    skip?: number;
+    take?: number;
+    orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
+} & {
     _count?: true | CountAggregateInput<Schema, Model>;
-    _avg?: SumAvgInput<Schema, Model>;
-    _sum?: SumAvgInput<Schema, Model>;
-    _min?: MinMaxInput<Schema, Model>;
-    _max?: MinMaxInput<Schema, Model>;
-};
+} & (NumericFields<Schema, Model> extends never
+        ? {}
+        : {
+              _avg?: SumAvgInput<Schema, Model>;
+              _sum?: SumAvgInput<Schema, Model>;
+              _min?: MinMaxInput<Schema, Model>;
+              _max?: MinMaxInput<Schema, Model>;
+          });
 
 type NumericFields<
     Schema extends SchemaDef,
@@ -861,17 +915,11 @@ type NumericFields<
         : never]: GetField<Schema, Model, Key>;
 };
 
-export type SumAvgInput<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>
-> = {
+type SumAvgInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in NumericFields<Schema, Model>]?: true;
 };
 
-export type MinMaxInput<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>
-> = {
+type MinMaxInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in GetFields<Schema, Model> as FieldIsArray<
         Schema,
         Model,
@@ -889,68 +937,106 @@ export type AggregateResult<
     Args extends AggregateArgs<Schema, Model>
 > = (Args extends { _count: infer Count }
     ? {
-          _count: Count extends true
-              ? number
-              : {
-                    [Key in keyof Count]: number;
-                };
+          _count: AggCommonOutput<Count>;
       }
     : {}) &
     (Args extends { _sum: infer Sum }
         ? {
-              _sum: {
-                  [Key in keyof Sum]: number;
-              };
+              _sum: AggCommonOutput<Sum>;
           }
         : {}) &
     (Args extends { _avg: infer Avg }
         ? {
-              _avg: {
-                  [Key in keyof Avg]: number;
-              };
+              _avg: AggCommonOutput<Avg>;
           }
         : {}) &
     (Args extends { _min: infer Min }
         ? {
-              _min: {
-                  [Key in keyof Min]: number;
-              };
+              _min: AggCommonOutput<Min>;
           }
         : {}) &
     (Args extends { _max: infer Max }
         ? {
-              _max: {
-                  [Key in keyof Max]: number;
-              };
+              _max: AggCommonOutput<Max>;
           }
         : {});
+
+type AggCommonOutput<Input> = Input extends true
+    ? number
+    : Input extends {}
+    ? {
+          [Key in keyof Input]: number;
+      }
+    : never;
+
+// #endregion
+
+// #region GroupBy
+
+export type GroupByArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>
+> = {
+    where?: WhereInput<Schema, Model>;
+    orderBy?: OrArray<OrderBy<Schema, Model, false, true>>;
+    by:
+        | NonRelationFields<Schema, Model>
+        | NonEmptyArray<NonRelationFields<Schema, Model>>;
+    having?: WhereInput<Schema, Model, true>;
+    take?: number;
+    skip?: number;
+    _count?: true | CountAggregateInput<Schema, Model>;
+} & (NumericFields<Schema, Model> extends never
+    ? {}
+    : {
+          _avg?: SumAvgInput<Schema, Model>;
+          _sum?: SumAvgInput<Schema, Model>;
+          _min?: MinMaxInput<Schema, Model>;
+          _max?: MinMaxInput<Schema, Model>;
+      });
+
+export type GroupByResult<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Args extends GroupByArgs<Schema, Model>
+> = Array<
+    {
+        [Key in NonRelationFields<
+            Schema,
+            Model
+        > as Key extends ValueOfPotentialTuple<Args['by']>
+            ? Key
+            : never]: MapFieldType<Schema, Model, Key>;
+    } & (Args extends { _count: infer Count }
+        ? {
+              _count: AggCommonOutput<Count>;
+          }
+        : {}) &
+        (Args extends { _avg: infer Avg }
+            ? {
+                  _avg: AggCommonOutput<Avg>;
+              }
+            : {}) &
+        (Args extends { _sum: infer Sum }
+            ? {
+                  _sum: AggCommonOutput<Sum>;
+              }
+            : {}) &
+        (Args extends { _min: infer Min }
+            ? {
+                  _min: AggCommonOutput<Min>;
+              }
+            : {}) &
+        (Args extends { _max: infer Max }
+            ? {
+                  _max: AggCommonOutput<Max>;
+              }
+            : {})
+>;
 
 // #endregion
 
 // #region Relation manipulation
-
-type NestedCreateInput<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Field extends RelationFields<Schema, Model>
-> = OrArray<
-    CreateInput<
-        Schema,
-        RelationFieldType<Schema, Model, Field>,
-        OppositeRelationAndFK<Schema, Model, Field>
-    >,
-    FieldIsArray<Schema, Model, Field>
->;
-
-type NestedCreateManyInput<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Field extends RelationFields<Schema, Model>
-> = CreateManyPayload<
-    Schema,
-    RelationFieldType<Schema, Model, Field>,
-    OppositeRelationAndFK<Schema, Model, Field>
->;
 
 type ConnectInput<
     Schema extends SchemaDef,
@@ -982,7 +1068,7 @@ type DisconnectInput<
           WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
           true
       >
-    : boolean | Where<Schema, RelationFieldType<Schema, Model, Field>>;
+    : boolean | WhereInput<Schema, RelationFieldType<Schema, Model, Field>>;
 
 type SetInput<
     Schema extends SchemaDef,
@@ -1055,7 +1141,7 @@ type NestedUpdateManyInput<
     Field extends RelationFields<Schema, Model>
 > = OrArray<
     {
-        where: Where<Schema, RelationFieldType<Schema, Model, Field>>;
+        where: WhereInput<Schema, RelationFieldType<Schema, Model, Field>>;
         data: UpdateInput<
             Schema,
             RelationFieldType<Schema, Model, Field>,
@@ -1074,13 +1160,13 @@ type NestedDeleteInput<
           WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
           true
       >
-    : boolean | Where<Schema, RelationFieldType<Schema, Model, Field>>;
+    : boolean | WhereInput<Schema, RelationFieldType<Schema, Model, Field>>;
 
 type NestedDeleteManyInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
-> = OrArray<Where<Schema, RelationFieldType<Schema, Model, Field>, true>>;
+> = OrArray<WhereInput<Schema, RelationFieldType<Schema, Model, Field>, true>>;
 
 // #endregion
 
@@ -1149,6 +1235,10 @@ export type ModelOperations<
     aggregate<T extends AggregateArgs<Schema, Model>>(
         args: Subset<T, AggregateArgs<Schema, Model>>
     ): Promise<AggregateResult<Schema, Model, T>>;
+
+    groupBy<T extends GroupByArgs<Schema, Model>>(
+        args: Subset<T, GroupByArgs<Schema, Model>>
+    ): Promise<GroupByResult<Schema, Model, T>>;
 };
 
 //#endregion

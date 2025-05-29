@@ -1176,7 +1176,8 @@ export class InputValidator<Schema extends SchemaDef> {
         const nonRelationFields = Object.keys(modelDef.fields).filter(
             (field) => !modelDef.fields[field]?.relation
         );
-        return z
+
+        let schema: ZodSchema = z
             .object({
                 where: this.makeWhereSchema(model, false).optional(),
                 orderBy: this.orArray(
@@ -1193,8 +1194,33 @@ export class InputValidator<Schema extends SchemaDef> {
                 _min: this.makeMinMaxInputSchema(model).optional(),
                 _max: this.makeMinMaxInputSchema(model).optional(),
             })
-            .strict()
-            .optional();
+            .strict();
+
+        schema = schema.refine((value) => {
+            const bys = typeof value.by === 'string' ? [value.by] : value.by;
+            if (
+                value.having &&
+                Object.keys(value.having).some((key) => !bys.includes(key))
+            ) {
+                return false;
+            } else {
+                return true;
+            }
+        }, 'fields in "having" must be in "by"');
+
+        schema = schema.refine((value) => {
+            const bys = typeof value.by === 'string' ? [value.by] : value.by;
+            if (
+                value.orderBy &&
+                Object.keys(value.orderBy).some((key) => !bys.includes(key))
+            ) {
+                return false;
+            } else {
+                return true;
+            }
+        }, 'fields in "orderBy" must be in "by"');
+
+        return schema;
     }
 
     // #endregion

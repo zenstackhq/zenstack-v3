@@ -4,11 +4,11 @@ import type { SchemaDef } from '../../../schema';
 import { getField } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 
-export class AggregateOperationHandler<
+export class GroupByeOperationHandler<
     Schema extends SchemaDef
 > extends BaseOperationHandler<Schema> {
-    async handle(_operation: 'aggregate', args: unknown | undefined) {
-        const validatedArgs = this.inputValidator.validateAggregateArgs(
+    async handle(_operation: 'groupBy', args: unknown | undefined) {
+        const validatedArgs = this.inputValidator.validateGroupByArgs(
             this.model,
             args
         );
@@ -19,7 +19,7 @@ export class AggregateOperationHandler<
             // where
             let subQuery = eb
                 .selectFrom(this.model)
-                .selectAll(this.model as any) // TODO: check typing
+                .selectAll()
                 .where((eb1) =>
                     this.dialect.buildFilter(
                         eb1,
@@ -36,18 +36,41 @@ export class AggregateOperationHandler<
                 validatedArgs?.take
             );
 
-            // orderBy
-            if (validatedArgs.orderBy) {
-                subQuery = this.dialect.buildOrderBy(
-                    subQuery,
-                    this.model,
-                    this.model,
-                    validatedArgs.orderBy
-                );
-            }
-
             return subQuery.as('$sub');
         });
+
+        const bys =
+            typeof validatedArgs.by === 'string'
+                ? [validatedArgs.by]
+                : (validatedArgs.by as string[]);
+
+        query = query.groupBy(bys as any);
+
+        // orderBy
+        if (validatedArgs.orderBy) {
+            query = this.dialect.buildOrderBy(
+                query,
+                this.model,
+                '$sub',
+                validatedArgs.orderBy
+            );
+        }
+
+        if (validatedArgs.having) {
+            query = query.having((eb1) =>
+                this.dialect.buildFilter(
+                    eb1,
+                    this.model,
+                    '$sub',
+                    validatedArgs.having
+                )
+            );
+        }
+
+        // select all by fields
+        for (const by of bys) {
+            query = query.select(() => sql.ref(`$sub.${by}`).as(by));
+        }
 
         // aggregations
         for (const [key, value] of Object.entries(validatedArgs)) {
@@ -108,17 +131,22 @@ export class AggregateOperationHandler<
             }
         }
 
-        const result = await query.executeTakeFirstOrThrow();
+        const result = await query.execute();
+        return result.map((row) => this.postProcessRow(row));
+    }
+
+    private postProcessRow(row: any) {
         const ret: any = {};
 
         // postprocess result to convert flat fields into nested objects
-        for (const [key, value] of Object.entries(result as object)) {
+        for (const [key, value] of Object.entries(row)) {
             if (key === '_count') {
                 ret[key] = value;
                 continue;
             }
             const parts = key.split('.');
             if (parts.length < 2) {
+                ret[key] = value;
                 continue;
             }
 

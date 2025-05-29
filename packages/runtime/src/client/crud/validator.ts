@@ -17,6 +17,7 @@ import {
     type DeleteArgs,
     type DeleteManyArgs,
     type FindArgs,
+    type GroupByArgs,
     type UpdateArgs,
     type UpdateManyArgs,
     type UpsertArgs,
@@ -122,6 +123,14 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
+    validateGroupByArgs(model: GetModels<Schema>, args: unknown) {
+        return this.validate<GroupByArgs<Schema, GetModels<Schema>>>(
+            this.makeGroupBySchema(model),
+            'groupBy',
+            args
+        );
+    }
+
     private validate<T>(schema: ZodSchema, operation: string, args: unknown) {
         const { error } = schema.safeParse(args);
         if (error) {
@@ -153,7 +162,7 @@ export class InputValidator<Schema extends SchemaDef> {
             fields['skip'] = z.number().int().nonnegative().optional();
             fields['take'] = z.number().int().nonnegative().optional();
             fields['orderBy'] = this.orArray(
-                this.makeOrderBySchema(model),
+                this.makeOrderBySchema(model, true, false),
                 true
             ).optional();
         }
@@ -547,32 +556,61 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.object(fields).strict();
     }
 
-    protected makeOrderBySchema(model: string) {
+    protected makeOrderBySchema(
+        model: string,
+        withRelation: boolean,
+        WithAggregation: boolean
+    ) {
         const modelDef = requireModel(this.schema, model);
         const fields: Record<string, ZodSchema> = {};
+        const sort = z.union([z.literal('asc'), z.literal('desc')]);
         for (const field of Object.keys(modelDef.fields)) {
             const fieldDef = requireField(this.schema, model, field);
             if (fieldDef.relation) {
-                // TODO
+                // relations
+                if (withRelation) {
+                    fields[field] = z.lazy(() =>
+                        this.makeOrderBySchema(
+                            fieldDef.type,
+                            withRelation,
+                            WithAggregation
+                        ).optional()
+                    );
+                }
             } else {
+                // scalars
                 if (fieldDef.optional) {
                     fields[field] = z
-                        .object({
-                            sort: z.union([
-                                z.literal('asc'),
-                                z.literal('desc'),
-                            ]),
-                            nulls: z.union([
-                                z.literal('first'),
-                                z.literal('last'),
-                            ]),
-                        })
+                        .union([
+                            sort,
+                            z.object({
+                                sort,
+                                nulls: z.union([
+                                    z.literal('first'),
+                                    z.literal('last'),
+                                ]),
+                            }),
+                        ])
                         .optional();
                 } else {
-                    fields[field] = z
-                        .union([z.literal('asc'), z.literal('desc')])
-                        .optional();
+                    fields[field] = sort.optional();
                 }
+            }
+        }
+
+        // aggregations
+        if (WithAggregation) {
+            const aggregationFields = [
+                '_count',
+                '_avg',
+                '_sum',
+                '_min',
+                '_max',
+            ];
+            for (const agg of aggregationFields) {
+                fields[agg] = z.lazy(() =>
+                    this.makeOrderBySchema(model, true, false).optional()
+                );
             }
         }
 
@@ -624,7 +662,9 @@ export class InputValidator<Schema extends SchemaDef> {
         const modelDef = requireModel(this.schema, model);
         const hasRelation =
             !withoutRelationFields &&
-            Object.values(modelDef.fields).some((f) => f.relation);
+            Object.entries(modelDef.fields).some(
+                ([f, def]) => !withoutFields.includes(f) && def.relation
+            );
 
         Object.keys(modelDef.fields).forEach((field) => {
             if (withoutFields.includes(field)) {
@@ -1053,7 +1093,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 skip: z.number().int().nonnegative().optional(),
                 take: z.number().int().nonnegative().optional(),
                 orderBy: this.orArray(
-                    this.makeOrderBySchema(model),
+                    this.makeOrderBySchema(model, true, false),
                     true
                 ).optional(),
                 select: this.makeCountAggregateInputSchema(model).optional(),
@@ -1089,7 +1129,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 skip: z.number().int().nonnegative().optional(),
                 take: z.number().int().nonnegative().optional(),
                 orderBy: this.orArray(
-                    this.makeOrderBySchema(model),
+                    this.makeOrderBySchema(model, true, false),
                     true
                 ).optional(),
                 _count: this.makeCountAggregateInputSchema(model).optional(),
@@ -1129,6 +1169,58 @@ export class InputValidator<Schema extends SchemaDef> {
                 return acc;
             }, {} as Record<string, ZodSchema>)
         );
+    }
+
+    private makeGroupBySchema(model: GetModels<Schema>) {
+        const modelDef = requireModel(this.schema, model);
+        const nonRelationFields = Object.keys(modelDef.fields).filter(
+            (field) => !modelDef.fields[field]?.relation
+        );
+
+        let schema: ZodSchema = z
+            .object({
+                where: this.makeWhereSchema(model, false).optional(),
+                orderBy: this.orArray(
+                    this.makeOrderBySchema(model, false, true),
+                    true
+                ).optional(),
+                by: this.orArray(z.enum(nonRelationFields as any), true),
+                having: this.makeWhereSchema(model, false, true).optional(),
+                skip: z.number().int().nonnegative().optional(),
+                take: z.number().int().nonnegative().optional(),
+                _count: this.makeCountAggregateInputSchema(model).optional(),
+                _avg: this.makeSumAvgInputSchema(model).optional(),
+                _sum: this.makeSumAvgInputSchema(model).optional(),
+                _min: this.makeMinMaxInputSchema(model).optional(),
+                _max: this.makeMinMaxInputSchema(model).optional(),
+            })
+            .strict();
+
+        schema = schema.refine((value) => {
+            const bys = typeof value.by === 'string' ? [value.by] : value.by;
+            if (
+                value.having &&
+                Object.keys(value.having).some((key) => !bys.includes(key))
+            ) {
+                return false;
+            } else {
+                return true;
+            }
+        }, 'fields in "having" must be in "by"');
+
+        schema = schema.refine((value) => {
+            const bys = typeof value.by === 'string' ? [value.by] : value.by;
+            if (
+                value.orderBy &&
+                Object.keys(value.orderBy).some((key) => !bys.includes(key))
+            ) {
+                return false;
+            } else {
+                return true;
+            }
+        }, 'fields in "orderBy" must be in "by"');
+
+        return schema;
     }
 
     // #endregion

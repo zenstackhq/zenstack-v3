@@ -51,6 +51,10 @@ export type OrArray<T, IF extends boolean = true> = IF extends true
     ? T | T[]
     : T;
 
+export type NonEmptyArray<T> = [T, ...T[]];
+
+export type ValueOfPotentialTuple<T> = T extends unknown[] ? T[number] : T;
+
 // cause typescript not to expand types and preserve names
 type NoExpand<T> = T extends unknown ? T : never;
 

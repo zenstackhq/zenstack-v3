@@ -16,11 +16,13 @@ import type {
 } from '../../../schema/schema';
 import { enumerate } from '../../../utils/enumerate';
 import { isPlainObject } from '../../../utils/is-plain-object';
+import type { OrArray } from '../../../utils/type-utils';
 import type {
     BooleanFilter,
     BytesFilter,
     DateTimeFilter,
     FindArgs,
+    OrderBy,
     SortOrder,
     StringFilter,
 } from '../../crud-types';
@@ -804,15 +806,48 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         query: SelectQueryBuilder<any, any, any>,
         model: string,
         modelAlias: string,
-        orderBy: NonNullable<
-            FindArgs<Schema, GetModels<Schema>, true>['orderBy']
-        >
+        orderBy: OrArray<OrderBy<Schema, GetModels<Schema>, boolean, boolean>>
     ) {
         let result = query;
         enumerate(orderBy).forEach((orderBy) => {
-            for (const [field, value] of Object.entries(orderBy)) {
+            for (const [field, value] of Object.entries<any>(orderBy)) {
                 if (!value) {
                     continue;
+                }
+
+                // aggregations
+                if (
+                    ['_count', '_avg', '_sum', '_min', '_max'].includes(field)
+                ) {
+                    invariant(
+                        value && typeof value === 'object',
+                        `invalid orderBy value for field "${field}"`
+                    );
+                    for (const [k, v] of Object.entries<string>(value)) {
+                        result = result.orderBy(
+                            (eb) => eb.fn(field.slice(1), [sql.ref(k)]),
+                            sql.raw(v)
+                        );
+                    }
+                    continue;
+                }
+
+                switch (field) {
+                    case '_count': {
+                        invariant(
+                            value && typeof value === 'object',
+                            'invalid orderBy value for field "_count"'
+                        );
+                        for (const [k, v] of Object.entries<string>(value)) {
+                            result = result.orderBy(
+                                (eb) => eb.fn.count(sql.ref(k)),
+                                sql.raw(v)
+                            );
+                        }
+                        continue;
+                    }
+                    default:
+                        break;
                 }
 
                 const fieldDef = requireField(this.schema, model, field);

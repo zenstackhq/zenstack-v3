@@ -29,7 +29,7 @@ import {
 } from '../../../utils/object-utils';
 import { CONTEXT_COMMENT_PREFIX } from '../../constants';
 import type { CRUD } from '../../contract';
-import type { FindArgs, SelectIncludeOmit, Where } from '../../crud-types';
+import type { FindArgs, SelectIncludeOmit, WhereInput } from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
 import {
@@ -907,8 +907,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
 
-        let combinedWhere: Where<Schema, GetModels<Schema>, false> = where ??
-        {};
+        let combinedWhere: WhereInput<
+            Schema,
+            GetModels<Schema>,
+            false
+        > = where ?? {};
         if (Object.keys(parentWhere).length > 0) {
             combinedWhere =
                 Object.keys(combinedWhere).length > 0

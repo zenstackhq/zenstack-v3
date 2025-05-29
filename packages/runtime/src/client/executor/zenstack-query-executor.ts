@@ -172,7 +172,7 @@ export class ZenStackQueryExecutor<
                 : await super.executeQuery<any>(compiled, queryId);
         } catch (err) {
             throw new QueryError(
-                `Policy: failed to execute query: ${err}, sql: ${compiled.sql}, parameters: ${compiled.parameters}`
+                `Failed to execute query: ${err}, sql: ${compiled.sql}, parameters: ${compiled.parameters}`
             );
         }
     }

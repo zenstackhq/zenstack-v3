@@ -38,10 +38,10 @@ export async function run(options: Options) {
         console.log(`You can now create a ZenStack client with it.
 
 \`\`\`
-import { createClient } from '@zenstackhq/runtime';
+import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from '${outputPath}/schema';
 
-const db = createClient(schema);
+const db = new ZenStackClient(schema);
 \`\`\`
 `);
     }

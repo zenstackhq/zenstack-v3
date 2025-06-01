@@ -1,9 +1,13 @@
 import type { LogEvent } from 'kysely';
 import { getSchema, schema } from '../test-schema';
 import { makePostgresClient, makeSqliteClient } from '../utils';
-import type { ClientContract } from '../../src/client';
+import type { ClientContract } from '../../src';
 
-export function createClientSpecs(dbName: string, logQueries = false) {
+export function createClientSpecs(
+    dbName: string,
+    logQueries = false,
+    providers = ['sqlite', 'postgresql'] as const
+) {
     const logger = (provider: string) => (event: LogEvent) => {
         if (event.level === 'query') {
             console.log(
@@ -14,21 +18,46 @@ export function createClientSpecs(dbName: string, logQueries = false) {
         }
     };
     return [
-        {
-            provider: 'sqlite' as const,
-            schema: getSchema('sqlite'),
-            createClient: async () =>
-                makeSqliteClient(getSchema('sqlite'), {
-                    log: logQueries ? logger('sqlite') : undefined,
-                }) as Promise<ClientContract<typeof schema>>,
-        },
-        {
-            provider: 'postgresql' as const,
-            schema: getSchema('postgresql'),
-            createClient: async () =>
-                makePostgresClient(getSchema('postgresql'), dbName, {
-                    log: logQueries ? logger('postgresql') : undefined,
-                }) as unknown as Promise<ClientContract<typeof schema>>,
-        },
+        ...(providers.includes('sqlite')
+            ? [
+                  {
+                      provider: 'sqlite' as const,
+                      schema: getSchema('sqlite'),
+                      createClient: async () => {
+                          const client = await makeSqliteClient(
+                              getSchema('sqlite'),
+                              {
+                                  log: logQueries
+                                      ? logger('sqlite')
+                                      : undefined,
+                              }
+                          );
+                          return client as ClientContract<typeof schema>;
+                      },
+                  },
+              ]
+            : []),
+        ...(providers.includes('postgresql')
+            ? [
+                  {
+                      provider: 'postgresql' as const,
+                      schema: getSchema('postgresql'),
+                      createClient: async () => {
+                          const client = await makePostgresClient(
+                              getSchema('postgresql'),
+                              dbName,
+                              {
+                                  log: logQueries
+                                      ? logger('postgresql')
+                                      : undefined,
+                              }
+                          );
+                          return client as unknown as ClientContract<
+                              typeof schema
+                          >;
+                      },
+                  },
+              ]
+            : []),
     ] as const;
 }

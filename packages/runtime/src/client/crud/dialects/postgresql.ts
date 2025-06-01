@@ -335,4 +335,10 @@ export class PostgresCrudDialect<
     ): ExpressionWrapper<any, any, number> {
         return eb.fn('array_length', [array]);
     }
+
+    override buildArrayLiteralSQL(values: unknown[]): string {
+        return `ARRAY[${values.map((v) =>
+            typeof v === 'string' ? `'${v}'` : v
+        )}]`;
+    }
 }

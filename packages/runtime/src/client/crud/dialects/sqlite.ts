@@ -289,4 +289,8 @@ export class SqliteCrudDialect<
     ): ExpressionWrapper<any, any, number> {
         return eb.fn('json_array_length', [array]);
     }
+
+    override buildArrayLiteralSQL(_values: unknown[]): string {
+        throw new Error('SQLite does not support array literals');
+    }
 }

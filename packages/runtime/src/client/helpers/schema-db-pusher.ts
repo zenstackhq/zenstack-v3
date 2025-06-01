@@ -178,7 +178,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         }
 
         const type = fieldDef.type as BuiltinType;
-        let result = match(type)
+        let result = match<BuiltinType, ColumnDataType>(type)
             .with('String', () => 'text')
             .with('Boolean', () => 'boolean')
             .with('Int', () => 'integer')
@@ -192,10 +192,13 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             .otherwise(() => {
                 throw new Error(`Unsupported field type: ${type}`);
             });
+
         if (fieldDef.array) {
-            result = `${result}[]`;
+            // Kysely doesn't support array type natively
+            return sql.raw(`${result}[]`);
+        } else {
+            return result as ColumnDataType;
         }
-        return result as ColumnDataType;
     }
 
     private addForeignKeyConstraint(

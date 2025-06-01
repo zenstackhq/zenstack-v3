@@ -166,7 +166,6 @@ export class QueryNameMapper extends OperationNodeTransformer {
         for (const selection of selections) {
             let selectAllFromModel: string | undefined = undefined;
             let isSelectAll = false;
-            let selectAllWithAlias = false;
 
             if (SelectAllNode.is(selection.selection)) {
                 selectAllFromModel = this.currentModel;
@@ -179,7 +178,6 @@ export class QueryNameMapper extends OperationNodeTransformer {
                     selection.selection.table?.table.identifier.name ??
                     this.currentModel;
                 isSelectAll = true;
-                selectAllWithAlias = true;
             }
 
             if (isSelectAll) {
@@ -190,11 +188,17 @@ export class QueryNameMapper extends OperationNodeTransformer {
                         contextNode,
                         selectAllFromModel
                     );
+                    const fromModelDef = requireModel(
+                        this.schema,
+                        selectAllFromModel
+                    );
+                    const mappedTableName =
+                        this.getMappedName(fromModelDef) ?? selectAllFromModel;
                     result.push(
                         ...scalarFields.map((fieldName) => {
                             const fieldRef = ReferenceNode.create(
                                 ColumnNode.create(this.mapFieldName(fieldName)),
-                                TableNode.create(selectAllFromModel)
+                                TableNode.create(mappedTableName)
                             );
                             return SelectionNode.create(
                                 this.fieldHasMappedName(fieldName)

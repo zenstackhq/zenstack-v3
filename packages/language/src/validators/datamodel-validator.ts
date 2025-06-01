@@ -4,18 +4,23 @@ import {
     type DiagnosticInfo,
     type ValidationAcceptor,
 } from 'langium';
+import { IssueCodes, SCALAR_TYPES } from '../constants';
 import {
     ArrayExpr,
     DataModel,
     DataModelField,
+    Model,
     ReferenceExpr,
     isDataModel,
+    isDataSource,
     isEnum,
+    isModel,
     isStringLiteral,
     isTypeDef,
 } from '../generated/ast';
 import {
     findUpInheritance,
+    getLiteral,
     getModelFieldsWithBases,
     getModelIdFields,
     getModelUniqueFields,
@@ -25,7 +30,6 @@ import {
 } from '../utils';
 import { validateAttributeApplication } from './attribute-application-validator';
 import { validateDuplicatedDeclarations, type AstValidator } from './common';
-import { IssueCodes, SCALAR_TYPES } from '../constants';
 
 /**
  * Validates data model declarations.
@@ -147,6 +151,19 @@ export default class DataModelValidator implements AstValidator<DataModel> {
             );
         }
 
+        if (field.type.array && !isDataModel(field.type.reference?.ref)) {
+            const provider = this.getDataSourceProvider(
+                AstUtils.getContainerOfType(field, isModel)!
+            );
+            if (provider === 'sqlite') {
+                accept(
+                    'error',
+                    `Array type is not supported for "${provider}" provider.`,
+                    { node: field.type }
+                );
+            }
+        }
+
         field.attributes.forEach((attr) =>
             validateAttributeApplication(attr, accept)
         );
@@ -160,6 +177,18 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                 );
             }
         }
+    }
+
+    private getDataSourceProvider(model: Model) {
+        const dataSource = model.declarations.find(isDataSource);
+        if (!dataSource) {
+            return undefined;
+        }
+        const provider = dataSource?.fields.find((f) => f.name === 'provider');
+        if (!provider) {
+            return undefined;
+        }
+        return getLiteral<string>(provider.value);
     }
 
     private validateAttributes(dm: DataModel, accept: ValidationAcceptor) {

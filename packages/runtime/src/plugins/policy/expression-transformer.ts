@@ -51,7 +51,8 @@ export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
     alias?: string;
     operation: CRUD;
-    thisEntity?: Record<string, ValueNode>;
+    thisEntity?: Record<string, OperationNode>;
+    thisEntityRaw?: Record<string, unknown>;
     auth?: any;
     memberFilter?: OperationNode;
     memberSelect?: SelectionNode;
@@ -210,18 +211,23 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         const right = this.transform(expr.right, context);
 
         if (op === 'in') {
-            invariant(
-                ValueListNode.is(right),
-                '"in" operation requires right operand to be a value list'
-            );
             if (this.isNullNode(left)) {
                 return this.transformValue(false, 'Boolean');
             } else {
-                return BinaryOperationNode.create(
-                    left,
-                    OperatorNode.create('in'),
-                    right
-                );
+                if (ValueListNode.is(right)) {
+                    return BinaryOperationNode.create(
+                        left,
+                        OperatorNode.create('in'),
+                        right
+                    );
+                } else {
+                    // array contains
+                    return BinaryOperationNode.create(
+                        left,
+                        OperatorNode.create('='),
+                        FunctionNode.create('any', [right])
+                    );
+                }
             }
         }
 
@@ -444,8 +450,8 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         if (Expression.isField(arg)) {
-            return context.thisEntity
-                ? eb.val(context.thisEntity[arg.field]?.value)
+            return context.thisEntityRaw
+                ? eb.val(context.thisEntityRaw[arg.field])
                 : eb.ref(arg.field);
         }
 

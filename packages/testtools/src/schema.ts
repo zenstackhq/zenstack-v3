@@ -5,21 +5,42 @@ import fs from 'node:fs';
 import path from 'node:path';
 import tmp from 'tmp';
 import { glob } from 'glob';
+import { match } from 'ts-pattern';
 
-const ZMODEL_PRELUDE = `
+function makePrelude(provider: 'sqlite' | 'postgresql', dbName?: string) {
+    return match(provider)
+        .with('sqlite', () => {
+            return `
 datasource db {
     provider = 'sqlite'
     url = ':memory:'
 }
 `;
+        })
+        .with('postgresql', () => {
+            return `
+datasource db {
+    provider = 'postgresql'
+    url = 'postgres://postgres:abc123@localhost:5432/${dbName}'
+}
+`;
+        })
+        .exhaustive();
+}
 
-export async function generateTsSchema(schemaText: string, noPrelude = false) {
+export async function generateTsSchema(
+    schemaText: string,
+    provider: 'sqlite' | 'postgresql' = 'sqlite',
+    dbName?: string
+) {
     const { name: workDir } = tmp.dirSync({ unsafeCleanup: true });
     console.log(`Working directory: ${workDir}`);
+
     const zmodelPath = path.join(workDir, 'schema.zmodel');
+    const noPrelude = schemaText.includes('datasource ');
     fs.writeFileSync(
         zmodelPath,
-        `${noPrelude ? '' : ZMODEL_PRELUDE}\n\n${schemaText}`
+        `${noPrelude ? '' : makePrelude(provider, dbName)}\n\n${schemaText}`
     );
 
     const pluginModelFiles = glob.sync(
@@ -71,5 +92,5 @@ export async function generateTsSchema(schemaText: string, noPrelude = false) {
 
 export function generateTsSchemaFromFile(filePath: string) {
     const schemaText = fs.readFileSync(filePath, 'utf8');
-    return generateTsSchema(schemaText, true);
+    return generateTsSchema(schemaText);
 }

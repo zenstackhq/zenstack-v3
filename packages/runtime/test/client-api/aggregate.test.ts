@@ -4,14 +4,13 @@ import { schema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 import { createUser } from './utils';
 
-describe.each(createClientSpecs(__filename, true))(
+describe.each(createClientSpecs(__filename))(
     'Client aggregate tests',
     ({ createClient }) => {
         let client: ClientContract<typeof schema>;
 
         beforeEach(async () => {
             client = await createClient();
-            await client.$pushSchema();
         });
 
         afterEach(async () => {

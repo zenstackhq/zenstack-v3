@@ -45,7 +45,7 @@
         -   [ ] Array update
     -   [x] Upsert
     -   [x] Delete
-    -   [ ] Aggregation
+    -   [x] Aggregation
         -   [x] Count
         -   [x] Aggregate
         -   [x] Group by
@@ -62,6 +62,8 @@
         -   [ ] Error system
         -   [x] Custom table name
         -   [x] Custom field name
+        -   [ ] Empty AND/OR/NOT behavior
+        -   [ ] Strict undefined check
 -   [ ] Access Policy
     -   [ ] Short-circuit pre-create check for scalar-field only policies
 -   [ ] Polymorphism

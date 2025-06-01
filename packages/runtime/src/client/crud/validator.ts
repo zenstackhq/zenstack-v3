@@ -730,6 +730,10 @@ export class InputValidator<Schema extends SchemaDef> {
                     fieldDef.type
                 );
 
+                if (fieldDef.array) {
+                    fieldSchema = z.array(fieldSchema).optional();
+                }
+
                 if (fieldDef.optional || fieldHasDefaultValue(fieldDef)) {
                     fieldSchema = fieldSchema.optional();
                 }
@@ -1200,7 +1204,9 @@ export class InputValidator<Schema extends SchemaDef> {
             const bys = typeof value.by === 'string' ? [value.by] : value.by;
             if (
                 value.having &&
-                Object.keys(value.having).some((key) => !bys.includes(key))
+                Object.keys(value.having)
+                    .filter((f) => !f.startsWith('_'))
+                    .some((key) => !bys.includes(key))
             ) {
                 return false;
             } else {
@@ -1212,7 +1218,9 @@ export class InputValidator<Schema extends SchemaDef> {
             const bys = typeof value.by === 'string' ? [value.by] : value.by;
             if (
                 value.orderBy &&
-                Object.keys(value.orderBy).some((key) => !bys.includes(key))
+                Object.keys(value.orderBy)
+                    .filter((f) => !f.startsWith('_'))
+                    .some((key) => !bys.includes(key))
             ) {
                 return false;
             } else {

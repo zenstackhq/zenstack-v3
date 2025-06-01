@@ -6,14 +6,12 @@
 import { type SchemaDef, type OperandExpression, Expression } from "@zenstackhq/runtime/schema";
 import path from "node:path";
 import url from "node:url";
-import SQLite from "better-sqlite3";
+import { toDialectConfig } from "@zenstackhq/runtime/utils/sqlite-utils";
 export const schema = {
     provider: {
         type: "sqlite",
         dialectConfigProvider: function (): any {
-            return { database: new SQLite(path.resolve(typeof __dirname !== 'undefined'
-        ? __dirname
-        : path.dirname(url.fileURLToPath(import.meta.url)), "./dev.db")) };
+            return toDialectConfig("./dev.db", typeof __dirname !== 'undefined' ? __dirname : path.dirname(url.fileURLToPath(import.meta.url)));
         }
     },
     models: {

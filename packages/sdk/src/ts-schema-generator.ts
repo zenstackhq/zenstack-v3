@@ -125,61 +125,85 @@ export class TsSchemaGenerator {
         statements.push(runtimeImportDecl);
 
         const { type: providerType } = this.getDataSourceProvider(model);
-        if (providerType === 'sqlite') {
-            // add imports for calculating the path of sqlite database file
+        switch (providerType) {
+            case 'sqlite': {
+                // add imports for calculating the path of sqlite database file
 
-            // `import path from 'node:path';`
-            const pathImportDecl = ts.factory.createImportDeclaration(
-                undefined,
-                ts.factory.createImportClause(
-                    false,
-                    ts.factory.createIdentifier('path'),
-                    undefined
-                ),
-                ts.factory.createStringLiteral('node:path')
-            );
-            statements.push(pathImportDecl);
+                // `import path from 'node:path';`
+                const pathImportDecl = ts.factory.createImportDeclaration(
+                    undefined,
+                    ts.factory.createImportClause(
+                        false,
+                        ts.factory.createIdentifier('path'),
+                        undefined
+                    ),
+                    ts.factory.createStringLiteral('node:path')
+                );
+                statements.push(pathImportDecl);
 
-            // `import url from 'node:url';`
-            const urlImportDecl = ts.factory.createImportDeclaration(
-                undefined,
-                ts.factory.createImportClause(
-                    false,
-                    ts.factory.createIdentifier('url'),
-                    undefined
-                ),
-                ts.factory.createStringLiteral('node:url')
-            );
-            statements.push(urlImportDecl);
+                // `import url from 'node:url';`
+                const urlImportDecl = ts.factory.createImportDeclaration(
+                    undefined,
+                    ts.factory.createImportClause(
+                        false,
+                        ts.factory.createIdentifier('url'),
+                        undefined
+                    ),
+                    ts.factory.createStringLiteral('node:url')
+                );
+                statements.push(urlImportDecl);
+
+                // `import { toDialectConfig } from '@zenstackhq/runtime/utils/sqlite-utils';`
+                const dialectConfigImportDecl =
+                    ts.factory.createImportDeclaration(
+                        undefined,
+                        ts.factory.createImportClause(
+                            false,
+                            undefined,
+                            ts.factory.createNamedImports([
+                                ts.factory.createImportSpecifier(
+                                    false,
+                                    undefined,
+                                    ts.factory.createIdentifier(
+                                        'toDialectConfig'
+                                    )
+                                ),
+                            ])
+                        ),
+                        ts.factory.createStringLiteral(
+                            '@zenstackhq/runtime/utils/sqlite-utils'
+                        )
+                    );
+                statements.push(dialectConfigImportDecl);
+                break;
+            }
+
+            case 'postgresql': {
+                // `import { toDialectConfig } from '@zenstackhq/runtime/utils/pg-utils';`
+                const dialectConfigImportDecl =
+                    ts.factory.createImportDeclaration(
+                        undefined,
+                        ts.factory.createImportClause(
+                            false,
+                            undefined,
+                            ts.factory.createNamedImports([
+                                ts.factory.createImportSpecifier(
+                                    false,
+                                    undefined,
+                                    ts.factory.createIdentifier(
+                                        'toDialectConfig'
+                                    )
+                                ),
+                            ])
+                        ),
+                        ts.factory.createStringLiteral(
+                            '@zenstackhq/runtime/utils/pg-utils'
+                        )
+                    );
+                statements.push(dialectConfigImportDecl);
+                break;
+            }
         }
-
-        const { type: dsType } = this.getDataSourceProvider(model);
-        const dbImportDecl = ts.factory.createImportDeclaration(
-            undefined,
-            dsType === 'sqlite'
-                ? // `import SQLite from 'better-sqlite3';`
-                  ts.factory.createImportClause(
-                      false,
-                      ts.factory.createIdentifier('SQLite'),
-                      undefined
-                  )
-                : // `import { Pool } from 'pg';`
-                  ts.factory.createImportClause(
-                      false,
-                      undefined,
-                      ts.factory.createNamedImports([
-                          ts.factory.createImportSpecifier(
-                              false,
-                              undefined,
-                              ts.factory.createIdentifier('Pool')
-                          ),
-                      ])
-                  ),
-            ts.factory.createStringLiteral(
-                dsType === 'sqlite' ? 'better-sqlite3' : 'pg'
-            )
-        );
-        statements.push(dbImportDecl);
 
         const declaration = ts.factory.createVariableStatement(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -281,16 +305,16 @@ export class TsSchemaGenerator {
     }
 
     private createProviderObject(model: Model): ts.Expression {
-        const { type, url } = this.getDataSourceProvider(model);
+        const dsProvider = this.getDataSourceProvider(model);
         return ts.factory.createObjectLiteralExpression(
             [
                 ts.factory.createPropertyAssignment(
                     'type',
-                    ts.factory.createStringLiteral(type)
+                    ts.factory.createStringLiteral(dsProvider.type)
                 ),
                 ts.factory.createPropertyAssignment(
                     'dialectConfigProvider',
-                    this.createDialectConfigProvider(type, url)
+                    this.createDialectConfigProvider(dsProvider)
                 ),
             ],
             true
@@ -608,7 +632,11 @@ export class TsSchemaGenerator {
         return ts.factory.createObjectLiteralExpression(objectFields, true);
     }
 
-    private getDataSourceProvider(model: Model) {
+    private getDataSourceProvider(
+        model: Model
+    ):
+        | { type: string; url: string; env: undefined }
+        | { type: string; env: string; url: undefined } {
         const dataSource = model.declarations.find(isDataSource);
         invariant(dataSource, 'No data source found in the model');
 
@@ -623,9 +651,10 @@ export class TsSchemaGenerator {
             isLiteralExpr(urlExpr) || isInvocationExpr(urlExpr),
             'URL must be a literal or env function'
         );
+
         let url: string;
         if (isLiteralExpr(urlExpr)) {
-            url = urlExpr.value as string;
+            return { type, url: urlExpr.value as string, env: undefined };
         } else if (isInvocationExpr(urlExpr)) {
             invariant(
                 urlExpr.function.$refText === 'env',
@@ -638,11 +667,14 @@ export class TsSchemaGenerator {
             url = `env(${
                 (urlExpr.args[0]!.value as LiteralExpr).value as string
             })`;
+            return {
+                type,
+                env: (urlExpr.args[0]!.value as LiteralExpr).value as string,
+                url: undefined,
+            };
         } else {
             throw new Error('Unsupported URL type');
         }
-
-        return { type, url };
     }
 
     private getMappedDefault(
@@ -953,13 +985,26 @@ export class TsSchemaGenerator {
             : undefined;
     }
 
-    private createDialectConfigProvider(type: string, url: string) {
-        return match(type)
-            .with('sqlite', () => {
-                let dbPath = url;
+    private createDialectConfigProvider(
+        dsProvider:
+            | { type: string; env: undefined; url: string }
+            | { type: string; env: string; url: undefined }
+    ) {
+        const type = dsProvider.type;
+
+        let urlExpr: ts.Expression;
+        if (dsProvider.env !== undefined) {
+            urlExpr = ts.factory.createIdentifier(
+                `process.env['${dsProvider.env}']`
+            );
+        } else {
+            urlExpr = ts.factory.createStringLiteral(dsProvider.url);
+
+            if (type === 'sqlite') {
+                // convert file: URL to a regular path
                 let parsedUrl: URL | undefined;
                 try {
-                    parsedUrl = new URL(url);
+                    parsedUrl = new URL(dsProvider.url);
                 } catch {}
 
                 if (parsedUrl) {
@@ -968,52 +1013,37 @@ export class TsSchemaGenerator {
                             'Invalid SQLite URL: only file protocol is supported'
                         );
                     }
-                    dbPath = url.replace(/^file:/, '');
+                    urlExpr = ts.factory.createStringLiteral(
+                        dsProvider.url.replace(/^file:/, '')
+                    );
                 }
+            }
+        }
 
+        return match(type)
+            .with('sqlite', () => {
                 return ts.factory.createFunctionExpression(
                     undefined,
                     undefined,
                     undefined,
                     undefined,
                     undefined,
-                    ts.factory.createTypeReferenceNode('any'),
+                    undefined,
                     ts.factory.createBlock(
                         [
                             ts.factory.createReturnStatement(
-                                ts.factory.createObjectLiteralExpression([
-                                    ts.factory.createPropertyAssignment(
-                                        'database',
-                                        ts.factory.createNewExpression(
-                                            ts.factory.createIdentifier(
-                                                'SQLite'
-                                            ),
-                                            undefined,
-                                            [
-                                                dbPath === ':memory:'
-                                                    ? ts.factory.createStringLiteral(
-                                                          dbPath
-                                                      )
-                                                    : ts.factory.createCallExpression(
-                                                          ts.factory.createIdentifier(
-                                                              'path.resolve'
-                                                          ),
-                                                          undefined,
-                                                          [
-                                                              // isomorphic __dirname for CJS and import.meta.url for ESM
-                                                              ts.factory
-                                                                  .createIdentifier(`typeof __dirname !== 'undefined'
-        ? __dirname
-        : path.dirname(url.fileURLToPath(import.meta.url))`),
-                                                              ts.factory.createStringLiteral(
-                                                                  dbPath
-                                                              ),
-                                                          ]
-                                                      ),
-                                            ]
-                                        )
+                                ts.factory.createCallExpression(
+                                    ts.factory.createIdentifier(
+                                        'toDialectConfig'
                                     ),
-                                ])
+                                    undefined,
+                                    [
+                                        urlExpr,
+                                        ts.factory.createIdentifier(
+                                            `typeof __dirname !== 'undefined' ? __dirname : path.dirname(url.fileURLToPath(import.meta.url))`
+                                        ),
+                                    ]
+                                )
                             ),
                         ],
                         true
@@ -1031,20 +1061,13 @@ export class TsSchemaGenerator {
                     ts.factory.createBlock(
                         [
                             ts.factory.createReturnStatement(
-                                ts.factory.createObjectLiteralExpression([
-                                    ts.factory.createPropertyAssignment(
-                                        'database',
-                                        ts.factory.createNewExpression(
-                                            ts.factory.createIdentifier('Pool'),
-                                            undefined,
-                                            [
-                                                ts.factory.createStringLiteral(
-                                                    url
-                                                ),
-                                            ]
-                                        )
+                                ts.factory.createCallExpression(
+                                    ts.factory.createIdentifier(
+                                        'toDialectConfig'
                                     ),
-                                ])
+                                    undefined,
+                                    [urlExpr]
+                                )
                             ),
                         ],
                         true

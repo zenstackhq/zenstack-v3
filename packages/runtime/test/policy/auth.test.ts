@@ -366,8 +366,12 @@ model Post {
         const r = await userDb.post.createManyAndReturn({
             data: [{ title: 'xxx' }, { title: 'yyy' }],
         });
-        expect(r[0]).toMatchObject({ title: 'xxx', score: 10 });
-        expect(r[1]).toMatchObject({ title: 'yyy', score: 10 });
+        expect(r).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ title: 'xxx', score: 10 }),
+                expect.objectContaining({ title: 'yyy', score: 10 }),
+            ])
+        );
     });
 
     it('respects explicitly passed field values even when default is set', async () => {

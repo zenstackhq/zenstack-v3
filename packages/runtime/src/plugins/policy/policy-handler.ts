@@ -9,6 +9,7 @@ import {
     OperationNodeTransformer,
     OperatorNode,
     PrimitiveValueListNode,
+    RawNode,
     ReturningNode,
     SelectionNode,
     SelectQueryNode,
@@ -185,7 +186,8 @@ export class PolicyHandler<
             await this.enforcePreCreatePolicyForOne(
                 model,
                 fields,
-                values,
+                values.map((v) => v.node),
+                values.map((v) => v.raw),
                 proceed
             );
         }
@@ -194,19 +196,23 @@ export class PolicyHandler<
     private async enforcePreCreatePolicyForOne(
         model: GetModels<Schema>,
         fields: string[],
-        values: ValueNode[],
+        values: OperationNode[],
+        valuesRaw: unknown[],
         proceed: ProceedKyselyQueryFunction
     ) {
-        const thisEntity: Record<string, ValueNode> = {};
+        const thisEntity: Record<string, OperationNode> = {};
+        const thisEntityRaw: Record<string, unknown> = {};
         for (let i = 0; i < fields.length; i++) {
             thisEntity[fields[i]!] = values[i]!;
+            thisEntityRaw[fields[i]!] = valuesRaw[i]!;
         }
 
         const filter = this.buildPolicyFilter(
             model,
             undefined,
             'create',
-            thisEntity
+            thisEntity,
+            thisEntityRaw
         );
         const preCreateCheck: SelectQueryNode = {
             kind: 'SelectQueryNode',
@@ -252,7 +258,7 @@ export class PolicyHandler<
             data.length === fields.length,
             'data length must match fields length'
         );
-        const result: ValueNode[] = [];
+        const result: { node: OperationNode; raw: unknown }[] = [];
         for (let i = 0; i < data.length; i++) {
             const item = data[i]!;
             const fieldDef = requireField(
@@ -262,23 +268,30 @@ export class PolicyHandler<
             );
             if (typeof item === 'object' && item && 'kind' in item) {
                 invariant(item.kind === 'ValueNode', 'expecting a ValueNode');
-                result.push(
-                    ValueNode.create(
+                result.push({
+                    node: ValueNode.create(
                         this.dialect.transformPrimitive(
                             (item as ValueNode).value,
                             fieldDef.type as BuiltinType
                         )
-                    )
-                );
+                    ),
+                    raw: (item as ValueNode).value,
+                });
             } else {
-                result.push(
-                    ValueNode.create(
-                        this.dialect.transformPrimitive(
-                            item,
-                            fieldDef.type as BuiltinType
-                        )
-                    )
+                let value = this.dialect.transformPrimitive(
+                    item,
+                    fieldDef.type as BuiltinType
                 );
+                if (Array.isArray(value)) {
+                    result.push({
+                        node: RawNode.createWithSql(
+                            this.dialect.buildArrayLiteralSQL(value)
+                        ),
+                        raw: value,
+                    });
+                } else {
+                    result.push({ node: ValueNode.create(value), raw: value });
+                }
             }
         }
         return result;
@@ -423,7 +436,8 @@ export class PolicyHandler<
         model: GetModels<Schema>,
         alias: string | undefined,
         operation: CRUD,
-        thisEntity?: Record<string, ValueNode>
+        thisEntity?: Record<string, OperationNode>,
+        thisEntityRaw?: Record<string, unknown>
     ) {
         const policies = this.getModelPolicies(model, operation);
         if (policies.length === 0) {
@@ -438,7 +452,8 @@ export class PolicyHandler<
                     alias,
                     operation,
                     policy,
-                    thisEntity
+                    thisEntity,
+                    thisEntityRaw
                 )
             );
 
@@ -450,7 +465,8 @@ export class PolicyHandler<
                     alias,
                     operation,
                     policy,
-                    thisEntity
+                    thisEntity,
+                    thisEntityRaw
                 )
             );
 
@@ -595,7 +611,8 @@ export class PolicyHandler<
         alias: string | undefined,
         operation: CRUD,
         policy: Policy,
-        thisEntity?: Record<string, ValueNode>
+        thisEntity?: Record<string, OperationNode>,
+        thisEntityRaw?: Record<string, unknown>
     ) {
         return new ExpressionTransformer(
             this.client.$schema,
@@ -606,6 +623,7 @@ export class PolicyHandler<
             alias,
             operation,
             thisEntity,
+            thisEntityRaw,
             auth: this.client.$auth,
         });
     }

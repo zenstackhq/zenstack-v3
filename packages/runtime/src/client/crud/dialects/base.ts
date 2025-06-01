@@ -1023,6 +1023,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         array: Expression<unknown>
     ): ExpressionWrapper<any, any, number>;
 
+    abstract buildArrayLiteralSQL(values: unknown[]): string;
+
     get supportsUpdateWithLimit() {
         return true;
     }

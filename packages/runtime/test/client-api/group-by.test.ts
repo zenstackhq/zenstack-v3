@@ -4,14 +4,13 @@ import { schema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 import { createUser } from './utils';
 
-describe.each(createClientSpecs(__filename, true))(
+describe.each(createClientSpecs(__filename))(
     'Client groupBy tests',
     ({ createClient }) => {
         let client: ClientContract<typeof schema>;
 
         beforeEach(async () => {
             client = await createClient();
-            await client.$pushSchema();
         });
 
         afterEach(async () => {
@@ -75,7 +74,7 @@ describe.each(createClientSpecs(__filename, true))(
 
             await expect(
                 client.user.groupBy({
-                    by: ['name'],
+                    by: ['name', 'role'],
                     orderBy: {
                         _count: {
                             role: 'desc',
@@ -84,8 +83,8 @@ describe.each(createClientSpecs(__filename, true))(
                     _count: true,
                 })
             ).resolves.toEqual([
-                { name: 'User', _count: 2 },
-                { name: 'Admin', _count: 1 },
+                { name: 'User', role: 'USER', _count: 2 },
+                { name: 'Admin', role: 'ADMIN', _count: 1 },
             ]);
         });
 

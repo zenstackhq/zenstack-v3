@@ -1025,7 +1025,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     abstract buildArrayLiteralSQL(values: unknown[]): string;
 
-    get supportsUpdateWithLimit() {
-        return true;
-    }
+    abstract get supportsUpdateWithLimit(): boolean;
+
+    abstract get supportsDistinctOn(): boolean;
 }

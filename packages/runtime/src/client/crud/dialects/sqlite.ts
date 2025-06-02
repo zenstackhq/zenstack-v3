@@ -283,6 +283,10 @@ export class SqliteCrudDialect<
         return false;
     }
 
+    override get supportsDistinctOn() {
+        return false;
+    }
+
     override buildArrayLength(
         eb: ExpressionBuilder<any, any>,
         array: Expression<unknown>

@@ -121,7 +121,7 @@ export type GetEnum<
 export type GetFields<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
-> = keyof Schema['models'][Model]['fields'];
+> = Extract<keyof GetModel<Schema, Model>['fields'], string>;
 
 export type GetField<
     Schema extends SchemaDef,

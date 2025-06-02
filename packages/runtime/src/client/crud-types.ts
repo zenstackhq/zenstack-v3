@@ -358,6 +358,10 @@ export type SelectIncludeOmit<
     omit?: OmitFields<Schema, Model>;
 };
 
+type Distinct<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    distinct?: OrArray<NonRelationFields<Schema, Model>>;
+};
+
 type Select<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
@@ -565,7 +569,8 @@ export type FindArgs<
               where?: WhereInput<Schema, Model>;
           }
         : {}) &
-    SelectIncludeOmit<Schema, Model, Collection>;
+    SelectIncludeOmit<Schema, Model, Collection> &
+    Distinct<Schema, Model>;
 
 export type FindUniqueArgs<
     Schema extends SchemaDef,

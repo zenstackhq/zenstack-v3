@@ -154,6 +154,48 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             ).resolves.toMatchObject(user2);
         });
 
+        it('works with distinct', async () => {
+            await createUser(client, 'u1@test.com', {
+                name: 'Admin1',
+                role: 'ADMIN',
+            });
+            await createUser(client, 'u3@test.com', {
+                name: 'User',
+                role: 'USER',
+            });
+            await createUser(client, 'u2@test.com', {
+                name: 'Admin2',
+                role: 'ADMIN',
+            });
+            await createUser(client, 'u4@test.com', {
+                name: 'User',
+                role: 'USER',
+            });
+
+            // single field distinct
+            let r = await client.user.findMany({ distinct: ['role'] });
+            expect(r).toHaveLength(2);
+            expect(r).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ role: 'ADMIN' }),
+                    expect.objectContaining({ role: 'USER' }),
+                ])
+            );
+
+            // multiple fields distinct
+            r = await client.user.findMany({
+                distinct: ['role', 'name'],
+            });
+            expect(r).toHaveLength(3);
+            expect(r).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ name: 'Admin1', role: 'ADMIN' }),
+                    expect.objectContaining({ name: 'Admin2', role: 'ADMIN' }),
+                    expect.objectContaining({ name: 'User', role: 'USER' }),
+                ])
+            );
+        });
+
         it('works with unique finds', async () => {
             let r = await client.user.findUnique({ where: { id: 'none' } });
             expect(r).toBeNull();

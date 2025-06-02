@@ -329,6 +329,10 @@ export class PostgresCrudDialect<
         return false;
     }
 
+    override get supportsDistinctOn(): boolean {
+        return true;
+    }
+
     override buildArrayLength(
         eb: ExpressionBuilder<any, any>,
         array: Expression<unknown>

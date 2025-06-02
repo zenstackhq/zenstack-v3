@@ -46,7 +46,11 @@ export class CreateOperationHandler<
                 select: args.select,
                 include: args.include,
                 omit: args.omit,
-                where: getIdValues(this.schema, this.model, createResult),
+                where: getIdValues(
+                    this.schema,
+                    this.model,
+                    createResult
+                ) as any,
             });
         });
 

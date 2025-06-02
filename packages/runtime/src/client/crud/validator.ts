@@ -157,6 +157,7 @@ export class InputValidator<Schema extends SchemaDef> {
         fields['select'] = this.makeSelectSchema(model).optional();
         fields['include'] = this.makeIncludeSchema(model).optional();
         fields['omit'] = this.makeOmitSchema(model).optional();
+        fields['distinct'] = this.makeDistinctSchema(model).optional();
 
         if (collection) {
             fields['skip'] = z.number().int().nonnegative().optional();
@@ -192,7 +193,7 @@ export class InputValidator<Schema extends SchemaDef> {
             .otherwise(() => z.unknown());
     }
 
-    protected makeWhereSchema(
+    private makeWhereSchema(
         model: string,
         unique: boolean,
         withoutRelationFields = false
@@ -344,7 +345,7 @@ export class InputValidator<Schema extends SchemaDef> {
         ]);
     }
 
-    protected makePrimitiveFilterSchema(type: BuiltinType, optional: boolean) {
+    private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean) {
         return match(type)
             .with('String', () => this.makeStringFilterSchema(optional))
             .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
@@ -447,7 +448,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    protected makeSelectSchema(model: string) {
+    private makeSelectSchema(model: string) {
         const modelDef = requireModel(this.schema, model);
         const fields: Record<string, ZodSchema> = {};
         for (const field of Object.keys(modelDef.fields)) {
@@ -510,7 +511,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.object(fields).strict();
     }
 
-    protected makeOmitSchema(model: string) {
+    private makeOmitSchema(model: string) {
         const modelDef = requireModel(this.schema, model);
         const fields: Record<string, ZodSchema> = {};
         for (const field of Object.keys(modelDef.fields)) {
@@ -522,7 +523,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.object(fields).strict();
     }
 
-    protected makeIncludeSchema(model: string) {
+    private makeIncludeSchema(model: string) {
         const modelDef = requireModel(this.schema, model);
         const fields: Record<string, ZodSchema> = {};
         for (const field of Object.keys(modelDef.fields)) {
@@ -556,7 +557,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.object(fields).strict();
     }
 
-    protected makeOrderBySchema(
+    private makeOrderBySchema(
         model: string,
         withRelation: boolean,
         WithAggregation: boolean
@@ -615,6 +616,14 @@ export class InputValidator<Schema extends SchemaDef> {
         }
 
         return z.object(fields);
+    }
+
+    private makeDistinctSchema(model: string) {
+        const modelDef = requireModel(this.schema, model);
+        const nonRelationFields = Object.keys(modelDef.fields).filter(
+            (field) => !modelDef.fields[field]?.relation
+        );
+        return this.orArray(z.enum(nonRelationFields as any), true);
     }
 
     // #endregion

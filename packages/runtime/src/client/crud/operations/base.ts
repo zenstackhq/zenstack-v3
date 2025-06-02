@@ -35,6 +35,7 @@ import type { ToKysely } from '../../query-builder';
 import {
     buildFieldRef,
     buildJoinPairs,
+    ensureArray,
     getField,
     getIdFields,
     getIdValues,
@@ -154,6 +155,21 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // skip && take
         query = this.dialect.buildSkipTake(query, args?.skip, args?.take);
 
+        let inMemoryDistinct: string[] | undefined = undefined;
+
+        // distinct
+        if (args?.distinct) {
+            const distinct = ensureArray(args.distinct);
+            if (this.dialect.supportsDistinctOn) {
+                query = query.distinctOn(
+                    distinct.map((f: any) => sql.ref(`${model}.${f}`))
+                );
+            } else {
+                // in-memory distinct after fetching all results
+                inMemoryDistinct = distinct;
+            }
+        }
+
         // orderBy
         if (args?.orderBy) {
             query = this.dialect.buildOrderBy(
@@ -188,7 +204,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         );
 
         try {
-            return await query.execute();
+            let result = await query.execute();
+            if (inMemoryDistinct) {
+                const distinctResult: Record<string, unknown>[] = [];
+                const seen = new Set<string>();
+                for (const r of result as any[]) {
+                    const key = JSON.stringify(
+                        inMemoryDistinct.map((f) => r[f])
+                    )!;
+                    if (!seen.has(key)) {
+                        distinctResult.push(r);
+                        seen.add(key);
+                    }
+                }
+                result = distinctResult;
+            }
+            return result;
         } catch (err) {
             const { sql, parameters } = query.compile();
             throw new QueryError(

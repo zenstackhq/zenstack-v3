@@ -35,7 +35,7 @@
             -   [x] Filtering
             -   [x] Sorting
             -   [x] Pagination
-        -   [ ] Distinct
+        -   [x] Distinct
     -   [ ] Update
         -   [x] Input validation
         -   [x] Top-level
@@ -52,7 +52,7 @@
     -   [ ] Extensions
         -   [x] Query builder API
         -   [x] Computed fields
-        -   [?] Prisma client extension
+        -   [ ] Prisma client extension
     -   [ ] Misc
         -   [ ] Compound ID
         -   [ ] Cross field comparison

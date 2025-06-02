@@ -153,11 +153,27 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // skip && take
-        query = this.dialect.buildSkipTake(query, args?.skip, args?.take);
+        let negateOrderBy = false;
+        let skip = args?.skip;
+        let take = args?.take;
+        if (take !== undefined && take < 0) {
+            negateOrderBy = true;
+            take = -take;
+        }
+        query = this.dialect.buildSkipTake(query, skip, take);
 
-        let inMemoryDistinct: string[] | undefined = undefined;
+        // orderBy
+        query = this.dialect.buildOrderBy(
+            query,
+            model,
+            model,
+            args?.orderBy,
+            skip !== undefined || take !== undefined,
+            negateOrderBy
+        );
 
         // distinct
+        let inMemoryDistinct: string[] | undefined = undefined;
         if (args?.distinct) {
             const distinct = ensureArray(args.distinct);
             if (this.dialect.supportsDistinctOn) {
@@ -168,16 +184,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 // in-memory distinct after fetching all results
                 inMemoryDistinct = distinct;
             }
-        }
-
-        // orderBy
-        if (args?.orderBy) {
-            query = this.dialect.buildOrderBy(
-                query,
-                model,
-                model,
-                args.orderBy
-            );
         }
 
         // select

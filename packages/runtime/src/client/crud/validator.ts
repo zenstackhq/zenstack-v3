@@ -161,7 +161,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
         if (collection) {
             fields['skip'] = z.number().int().nonnegative().optional();
-            fields['take'] = z.number().int().nonnegative().optional();
+            fields['take'] = z.number().int().optional();
             fields['orderBy'] = this.orArray(
                 this.makeOrderBySchema(model, true, false),
                 true
@@ -1104,7 +1104,7 @@ export class InputValidator<Schema extends SchemaDef> {
             .object({
                 where: this.makeWhereSchema(model, false).optional(),
                 skip: z.number().int().nonnegative().optional(),
-                take: z.number().int().nonnegative().optional(),
+                take: z.number().int().optional(),
                 orderBy: this.orArray(
                     this.makeOrderBySchema(model, true, false),
                     true
@@ -1140,7 +1140,7 @@ export class InputValidator<Schema extends SchemaDef> {
             .object({
                 where: this.makeWhereSchema(model, false).optional(),
                 skip: z.number().int().nonnegative().optional(),
-                take: z.number().int().nonnegative().optional(),
+                take: z.number().int().optional(),
                 orderBy: this.orArray(
                     this.makeOrderBySchema(model, true, false),
                     true
@@ -1200,7 +1200,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 by: this.orArray(z.enum(nonRelationFields as any), true),
                 having: this.makeWhereSchema(model, false, true).optional(),
                 skip: z.number().int().nonnegative().optional(),
-                take: z.number().int().nonnegative().optional(),
+                take: z.number().int().optional(),
                 _count: this.makeCountAggregateInputSchema(model).optional(),
                 _avg: this.makeSumAvgInputSchema(model).optional(),
                 _sum: this.makeSumAvgInputSchema(model).optional(),

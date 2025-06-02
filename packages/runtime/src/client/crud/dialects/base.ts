@@ -34,6 +34,7 @@ import {
     getField,
     getRelationForeignKeyFieldPairs,
     isEnum,
+    makeDefaultOrderBy,
     requireField,
 } from '../../query-utils';
 
@@ -806,8 +807,20 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         query: SelectQueryBuilder<any, any, any>,
         model: string,
         modelAlias: string,
-        orderBy: OrArray<OrderBy<Schema, GetModels<Schema>, boolean, boolean>>
+        orderBy:
+            | OrArray<OrderBy<Schema, GetModels<Schema>, boolean, boolean>>
+            | undefined,
+        useDefaultIfEmpty: boolean,
+        negated: boolean
     ) {
+        if (!orderBy) {
+            if (useDefaultIfEmpty) {
+                orderBy = makeDefaultOrderBy(this.schema, model);
+            } else {
+                return query;
+            }
+        }
+
         let result = query;
         enumerate(orderBy).forEach((orderBy) => {
             for (const [field, value] of Object.entries<any>(orderBy)) {
@@ -824,9 +837,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         `invalid orderBy value for field "${field}"`
                     );
                     for (const [k, v] of Object.entries<string>(value)) {
+                        invariant(
+                            v === 'asc' || v === 'desc',
+                            `invalid orderBy value for field "${field}"`
+                        );
                         result = result.orderBy(
                             (eb) => eb.fn(field.slice(1), [sql.ref(k)]),
-                            sql.raw(v)
+                            sql.raw(this.negateSort(v, negated))
                         );
                     }
                     continue;
@@ -839,9 +856,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                             'invalid orderBy value for field "_count"'
                         );
                         for (const [k, v] of Object.entries<string>(value)) {
+                            invariant(
+                                v === 'asc' || v === 'desc',
+                                `invalid orderBy value for field "${field}"`
+                            );
                             result = result.orderBy(
                                 (eb) => eb.fn.count(sql.ref(k)),
-                                sql.raw(v)
+                                sql.raw(this.negateSort(v, negated))
                             );
                         }
                         continue;
@@ -856,7 +877,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     if (value === 'asc' || value === 'desc') {
                         result = result.orderBy(
                             sql.ref(`${modelAlias}.${field}`),
-                            value
+                            this.negateSort(value, negated)
                         );
                     } else if (
                         value &&
@@ -868,7 +889,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     ) {
                         result = result.orderBy(
                             sql.ref(`${modelAlias}.${field}`),
-                            sql.raw(`${value.sort} nulls ${value.nulls}`)
+                            sql.raw(
+                                `${this.negateSort(
+                                    value.sort,
+                                    negated
+                                )} nulls ${value.nulls}`
+                            )
                         );
                     }
                 } else {
@@ -883,7 +909,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                             );
                         }
                         if ('_count' in value) {
-                            const sort = value._count;
+                            invariant(
+                                value._count === 'asc' ||
+                                    value._count === 'desc',
+                                'invalid orderBy value for field "_count"'
+                            );
+                            const sort = this.negateSort(value._count, negated);
                             result = result.orderBy((eb) => {
                                 let subQuery = eb.selectFrom(relationModel);
                                 const joinPairs = buildJoinPairs(
@@ -909,7 +940,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                     eb.fn.count(eb.lit(1)).as('_count')
                                 );
                                 return subQuery;
-                            }, sort as SortOrder);
+                            }, sort);
                         }
                     } else {
                         // order by to-one relation
@@ -934,7 +965,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                             result,
                             fieldDef.type,
                             relationModel,
-                            value
+                            value,
+                            false,
+                            negated
                         );
                     }
                 }
@@ -942,6 +975,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         });
 
         return result;
+    }
+
+    private negateSort(sort: SortOrder, negated: boolean) {
+        return negated ? (sort === 'asc' ? 'desc' : 'asc') : sort;
     }
 
     public true(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {

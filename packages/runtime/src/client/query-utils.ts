@@ -1,5 +1,6 @@
 import type { ExpressionBuilder, ExpressionWrapper } from 'kysely';
 import type { FieldDef, GetModels, SchemaDef } from '../schema/schema';
+import type { OrderBy } from './crud-types';
 import { InternalError, QueryError } from './errors';
 import type { ClientOptions } from './options';
 
@@ -248,6 +249,17 @@ export function buildJoinPairs(
             return [`${relationModelAlias}.${fk}`, `${modelAlias}.${pk}`];
         }
     });
+}
+
+export function makeDefaultOrderBy<Schema extends SchemaDef>(
+    schema: SchemaDef,
+    model: string
+) {
+    const idFields = getIdFields(schema, model);
+    return idFields.map(
+        (f) =>
+            ({ [f]: 'asc' } as OrderBy<Schema, GetModels<Schema>, true, false>)
+    );
 }
 
 export function ensureArray<T>(value: T | T[]): T[] {

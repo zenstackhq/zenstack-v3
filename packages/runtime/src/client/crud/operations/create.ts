@@ -5,6 +5,7 @@ import type {
     CreateArgs,
     CreateManyAndReturnArgs,
     CreateManyArgs,
+    WhereInput,
 } from '../../crud-types';
 import { getIdValues } from '../../query-utils';
 import { BaseOperationHandler } from './base';
@@ -50,7 +51,7 @@ export class CreateOperationHandler<
                     this.schema,
                     this.model,
                     createResult
-                ) as any,
+                ) as WhereInput<Schema, GetModels<Schema>, false>,
             });
         });
 

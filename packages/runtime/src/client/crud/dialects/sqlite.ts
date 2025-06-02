@@ -104,20 +104,26 @@ export class SqliteCrudDialect<
                     );
                 }
 
-                subQuery = this.buildSkipTake(
+                // skip & take
+                const skip = payload.skip;
+                let take = payload.take;
+                let negateOrderBy = false;
+                if (take !== undefined && take < 0) {
+                    negateOrderBy = true;
+                    take = -take;
+                }
+                subQuery = this.buildSkipTake(subQuery, skip, take);
+
+                // orderBy
+                subQuery = this.buildOrderBy(
                     subQuery,
-                    payload.skip,
-                    payload.take
+                    relationModel,
+                    relationModel,
+                    payload.orderBy,
+                    skip !== undefined || take !== undefined,
+                    negateOrderBy
                 );
 
-                if (payload.orderBy) {
-                    subQuery = this.buildOrderBy(
-                        subQuery,
-                        relationModel,
-                        relationModel,
-                        payload.orderBy
-                    );
-                }
                 return subQuery.as(subQueryName);
             });
         }

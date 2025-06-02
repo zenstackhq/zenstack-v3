@@ -30,10 +30,23 @@ export class GroupByeOperationHandler<
                 );
 
             // skip & take
-            subQuery = this.dialect.buildSkipTake(
+            const skip = validatedArgs?.skip;
+            let take = validatedArgs?.take;
+            let negateOrderBy = false;
+            if (take !== undefined && take < 0) {
+                negateOrderBy = true;
+                take = -take;
+            }
+            subQuery = this.dialect.buildSkipTake(subQuery, skip, take);
+
+            // default orderBy
+            subQuery = this.dialect.buildOrderBy(
                 subQuery,
-                validatedArgs?.skip,
-                validatedArgs?.take
+                this.model,
+                this.model,
+                undefined,
+                skip !== undefined || take !== undefined,
+                negateOrderBy
             );
 
             return subQuery.as('$sub');
@@ -52,7 +65,9 @@ export class GroupByeOperationHandler<
                 query,
                 this.model,
                 '$sub',
-                validatedArgs.orderBy
+                validatedArgs.orderBy,
+                false,
+                false
             );
         }
 

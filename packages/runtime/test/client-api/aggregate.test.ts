@@ -46,6 +46,34 @@ describe.each(createClientSpecs(__filename))(
             ).resolves.toMatchObject({ _count: 1 });
         });
 
+        it('works with skip, take, orderBy', async () => {
+            await createUser(client, 'u1@test.com', { name: 'User1' });
+            await createUser(client, 'u2@test.com', { name: 'User2' });
+            await createUser(client, 'u3@test.com', { name: 'User3' });
+
+            await expect(
+                client.user.aggregate({
+                    _count: true,
+                    skip: 1,
+                    take: 1,
+                })
+            ).resolves.toMatchObject({ _count: 1 });
+
+            await expect(
+                client.user.aggregate({
+                    _count: true,
+                    orderBy: { name: 'asc' },
+                })
+            ).resolves.toMatchObject({ _count: 3 });
+
+            await expect(
+                client.user.aggregate({
+                    _count: true,
+                    take: -2,
+                })
+            ).resolves.toMatchObject({ _count: 2 });
+        });
+
         it('works with sum and avg', async () => {
             await client.profile.create({ data: { age: 10, bio: 'Bio1' } });
             await client.profile.create({ data: { age: 20, bio: 'Bio2' } });

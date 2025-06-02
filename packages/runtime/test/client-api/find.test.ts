@@ -48,14 +48,20 @@ describe.each(createClientSpecs(PG_DB_NAME))(
         });
 
         it('works with take and skip', async () => {
-            await createUser(client, 'u1@test.com');
-            await createUser(client, 'u2@test.com');
-            await createUser(client, 'u3@test.com');
+            await createUser(client, 'u1@test.com', { id: '1' });
+            await createUser(client, 'u02@test.com', { id: '2' });
+            await createUser(client, 'u3@test.com', { id: '3' });
 
             // take
             await expect(
                 client.user.findMany({ take: 1 })
             ).resolves.toHaveLength(1);
+            // default sorted by id
+            await expect(
+                client.user.findFirst({ take: 1 })
+            ).resolves.toMatchObject({
+                email: 'u1@test.com',
+            });
             await expect(
                 client.user.findMany({ take: 2 })
             ).resolves.toHaveLength(2);
@@ -70,6 +76,21 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             await expect(
                 client.user.findMany({ skip: 2 })
             ).resolves.toHaveLength(1);
+            // default sorted by id
+            await expect(
+                client.user.findFirst({ skip: 1, take: 1 })
+            ).resolves.toMatchObject({
+                email: 'u02@test.com',
+            });
+            // explicit sort
+            await expect(
+                client.user.findFirst({
+                    skip: 2,
+                    orderBy: { email: 'desc' },
+                })
+            ).resolves.toMatchObject({
+                email: 'u02@test.com',
+            });
 
             // take + skip
             await expect(
@@ -78,6 +99,32 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             await expect(
                 client.user.findMany({ take: 3, skip: 2 })
             ).resolves.toHaveLength(1);
+
+            // negative take, default sort is negated
+            await expect(
+                client.user.findMany({ take: -1 })
+            ).toResolveWithLength(1);
+            await expect(client.user.findMany({ take: -1 })).resolves.toEqual(
+                expect.arrayContaining([expect.objectContaining({ id: '3' })])
+            );
+            await expect(
+                client.user.findMany({ skip: 1, take: -1 })
+            ).resolves.toEqual(
+                expect.arrayContaining([expect.objectContaining({ id: '2' })])
+            );
+
+            // negative take, explicit sort is negated
+            await expect(
+                client.user.findMany({
+                    skip: 2,
+                    take: -1,
+                    orderBy: { email: 'asc' },
+                })
+            ).resolves.toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ email: 'u02@test.com' }),
+                ])
+            );
         });
 
         it('works with orderBy', async () => {

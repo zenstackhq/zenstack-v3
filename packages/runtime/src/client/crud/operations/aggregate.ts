@@ -30,21 +30,24 @@ export class AggregateOperationHandler<
                 );
 
             // skip & take
-            subQuery = this.dialect.buildSkipTake(
-                subQuery,
-                validatedArgs?.skip,
-                validatedArgs?.take
-            );
+            const skip = validatedArgs?.skip;
+            let take = validatedArgs?.take;
+            let negateOrderBy = false;
+            if (take !== undefined && take < 0) {
+                negateOrderBy = true;
+                take = -take;
+            }
+            subQuery = this.dialect.buildSkipTake(subQuery, skip, take);
 
             // orderBy
-            if (validatedArgs.orderBy) {
-                subQuery = this.dialect.buildOrderBy(
-                    subQuery,
-                    this.model,
-                    this.model,
-                    validatedArgs.orderBy
-                );
-            }
+            subQuery = this.dialect.buildOrderBy(
+                subQuery,
+                this.model,
+                this.model,
+                validatedArgs.orderBy,
+                skip !== undefined || take !== undefined,
+                negateOrderBy
+            );
 
             return subQuery.as('$sub');
         });

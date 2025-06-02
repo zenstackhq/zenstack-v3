@@ -1,7 +1,12 @@
 import { match } from 'ts-pattern';
 import { RejectedByPolicyError } from '../../../plugins/policy/errors';
 import type { GetModels, SchemaDef } from '../../../schema';
-import type { UpdateArgs, UpdateManyArgs, UpsertArgs } from '../../crud-types';
+import type {
+    UpdateArgs,
+    UpdateManyArgs,
+    UpsertArgs,
+    WhereInput,
+} from '../../crud-types';
 import { getIdValues } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 
@@ -40,7 +45,11 @@ export class UpdateOperationHandler<
                 select: args.select,
                 include: args.include,
                 omit: args.omit,
-                where: getIdValues(this.schema, this.model, updated),
+                where: getIdValues(
+                    this.schema,
+                    this.model,
+                    updated
+                ) as WhereInput<Schema, GetModels<Schema>, false>,
             });
         });
 
@@ -87,7 +96,11 @@ export class UpdateOperationHandler<
                 select: args.select,
                 include: args.include,
                 omit: args.omit,
-                where: getIdValues(this.schema, this.model, mutationResult),
+                where: getIdValues(
+                    this.schema,
+                    this.model,
+                    mutationResult
+                ) as WhereInput<Schema, GetModels<Schema>, false>,
             });
         });
 

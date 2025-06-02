@@ -19,14 +19,17 @@ describe.each(createClientSpecs(__filename))(
 
         it('works with single by', async () => {
             await createUser(client, 'u1@test.com', {
+                id: '1',
                 name: 'Admin',
                 role: 'ADMIN',
             });
             await createUser(client, 'u2@test.com', {
+                id: '2',
                 name: 'User',
                 role: 'USER',
             });
             await createUser(client, 'u3@test.com', {
+                id: '3',
                 name: 'User',
                 role: 'USER',
             });
@@ -51,14 +54,11 @@ describe.each(createClientSpecs(__filename))(
                     where: {
                         email: { not: 'u2@test.com' },
                     },
+                    skip: 1,
+                    take: -1,
                     orderBy: { email: 'desc' },
                 })
-            ).resolves.toEqual(
-                expect.arrayContaining([
-                    { email: 'u3@test.com' },
-                    { email: 'u1@test.com' },
-                ])
-            );
+            ).resolves.toEqual([{ email: 'u1@test.com' }]);
 
             await expect(
                 client.user.groupBy({

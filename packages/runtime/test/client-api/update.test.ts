@@ -125,6 +125,61 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                     })
                 ).resolves.toMatchObject({ id: 'user2' });
             });
+
+            it('works with numeric incremental update', async () => {
+                await createUser(client, 'u1@test.com', {
+                    profile: { create: { id: '1', bio: 'bio' } },
+                });
+
+                await expect(
+                    client.profile.update({
+                        where: { id: '1' },
+                        data: { age: { increment: 1 } },
+                    })
+                ).resolves.toMatchObject({ age: null });
+
+                await expect(
+                    client.profile.update({
+                        where: { id: '1' },
+                        data: { age: { set: 1 } },
+                    })
+                ).resolves.toMatchObject({ age: 1 });
+
+                await expect(
+                    client.profile.update({
+                        where: { id: '1' },
+                        data: { age: { increment: 1 } },
+                    })
+                ).resolves.toMatchObject({ age: 2 });
+
+                await expect(
+                    client.profile.update({
+                        where: { id: '1' },
+                        data: { age: { multiply: 2 } },
+                    })
+                ).resolves.toMatchObject({ age: 4 });
+
+                await expect(
+                    client.profile.update({
+                        where: { id: '1' },
+                        data: { age: { divide: 2 } },
+                    })
+                ).resolves.toMatchObject({ age: 2 });
+
+                await expect(
+                    client.profile.update({
+                        where: { id: '1' },
+                        data: { age: { decrement: 1 } },
+                    })
+                ).resolves.toMatchObject({ age: 1 });
+
+                await expect(
+                    client.profile.update({
+                        where: { id: '1' },
+                        data: { age: { set: null } },
+                    })
+                ).resolves.toMatchObject({ age: null });
+            });
         });
 
         describe('nested to-many', () => {

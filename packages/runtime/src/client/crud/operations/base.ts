@@ -28,7 +28,7 @@ import {
     extractFields,
     fieldsToSelectObject,
 } from '../../../utils/object-utils';
-import { CONTEXT_COMMENT_PREFIX } from '../../constants';
+import { CONTEXT_COMMENT_PREFIX, NUMERIC_FIELD_TYPES } from '../../constants';
 import type { CRUD } from '../../contract';
 import type {
     FindArgs,
@@ -1064,10 +1064,23 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 isScalarField(this.schema, model, field) ||
                 isForeignKeyField(this.schema, model, field)
             ) {
-                updateFields[field] = this.dialect.transformPrimitive(
-                    finalData[field],
-                    fieldDef.type as BuiltinType
-                );
+                if (
+                    this.isNumericField(fieldDef) &&
+                    typeof finalData[field] === 'object' &&
+                    finalData[field]
+                ) {
+                    updateFields[field] = this.transformIncrementalUpdate(
+                        model,
+                        field,
+                        fieldDef,
+                        finalData[field]
+                    );
+                } else {
+                    updateFields[field] = this.dialect.transformPrimitive(
+                        finalData[field],
+                        fieldDef.type as BuiltinType
+                    );
+                }
             } else {
                 if (!allowRelationUpdate) {
                     throw new QueryError(
@@ -1142,6 +1155,49 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             return updatedEntity;
         }
+    }
+
+    private transformIncrementalUpdate(
+        model: GetModels<Schema>,
+        field: string,
+        fieldDef: FieldDef,
+        payload: Record<string, number | null>
+    ) {
+        invariant(
+            Object.keys(payload).length === 1,
+            'Only one of "set", "increment", "decrement", "multiply", or "divide" can be provided'
+        );
+
+        const key = Object.keys(payload)[0];
+        const value = this.dialect.transformPrimitive(
+            Object.values(payload)[0],
+            fieldDef.type as BuiltinType
+        );
+        const eb = expressionBuilder<any, any>();
+        const fieldRef = buildFieldRef(
+            this.schema,
+            model,
+            field,
+            this.options,
+            eb
+        );
+
+        const op = match(key)
+            .with('set', () => value)
+            .with('increment', () => eb(fieldRef, '+', value))
+            .with('decrement', () => eb(fieldRef, '-', value))
+            .with('multiply', () => eb(fieldRef, '*', value))
+            .with('divide', () => eb(fieldRef, '/', value))
+            .otherwise(() => {
+                throw new InternalError(
+                    `Invalid incremental update operation: ${key}`
+                );
+            });
+        return op;
+    }
+
+    private isNumericField(fieldDef: FieldDef) {
+        return NUMERIC_FIELD_TYPES.includes(fieldDef.type) && !fieldDef.array;
     }
 
     private makeContextComment(context: {

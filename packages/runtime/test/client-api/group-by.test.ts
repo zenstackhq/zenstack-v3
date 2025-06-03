@@ -4,7 +4,9 @@ import { schema } from '../test-schema';
 import { createClientSpecs } from './client-specs';
 import { createUser } from './utils';
 
-describe.each(createClientSpecs(__filename))(
+const PG_DB_NAME = 'client-api-group-by-tests';
+
+describe.each(createClientSpecs(PG_DB_NAME))(
     'Client groupBy tests',
     ({ createClient }) => {
         let client: ClientContract<typeof schema>;

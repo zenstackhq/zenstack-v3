@@ -41,7 +41,7 @@
         -   [x] Top-level
         -   [x] Nested to-many
         -   [x] Nested to-one
-        -   [ ] Delta update for numeric fields
+        -   [x] Incremental update for numeric fields
         -   [ ] Array update
     -   [x] Upsert
     -   [x] Delete
@@ -63,7 +63,7 @@
         -   [x] Custom table name
         -   [x] Custom field name
         -   [ ] Empty AND/OR/NOT behavior
-        -   [ ] Strict undefined check
+        -   [?] Strict undefined check
 -   [ ] Access Policy
     -   [ ] Short-circuit pre-create check for scalar-field only policies
 -   [ ] Polymorphism

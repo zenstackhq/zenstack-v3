@@ -281,7 +281,7 @@ function createModelCrudHandler<
                 }
                 let result: unknown;
                 if (r && postProcess) {
-                    result = resultProcessor.processResult(r, model);
+                    result = resultProcessor.processResult(r, model, args);
                 } else {
                     result = r ?? null;
                 }

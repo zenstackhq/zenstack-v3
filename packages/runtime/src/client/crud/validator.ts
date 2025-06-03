@@ -158,6 +158,7 @@ export class InputValidator<Schema extends SchemaDef> {
         fields['include'] = this.makeIncludeSchema(model).optional();
         fields['omit'] = this.makeOmitSchema(model).optional();
         fields['distinct'] = this.makeDistinctSchema(model).optional();
+        fields['cursor'] = this.makeCursorSchema(model).optional();
 
         if (collection) {
             fields['skip'] = z.number().int().nonnegative().optional();
@@ -624,6 +625,10 @@ export class InputValidator<Schema extends SchemaDef> {
             (field) => !modelDef.fields[field]?.relation
         );
         return this.orArray(z.enum(nonRelationFields as any), true);
+    }
+
+    private makeCursorSchema(model: string) {
+        return this.makeWhereSchema(model, true, true).optional();
     }
 
     // #endregion

@@ -269,3 +269,13 @@ export function ensureArray<T>(value: T | T[]): T[] {
         return [value];
     }
 }
+
+export function safeJSONStringify(value: unknown) {
+    return JSON.stringify(value, (_, v) => {
+        if (typeof v === 'bigint') {
+            return v.toString();
+        } else {
+            return v;
+        }
+    });
+}

@@ -23,7 +23,7 @@
             -   [x] Counting relation
         -   [x] Pagination
             -   [x] Skip and limit
-            -   [ ] Cursor
+            -   [x] Cursor
         -   [x] Filtering
             -   [x] Unique fields
             -   [x] Scalar fields

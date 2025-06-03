@@ -74,25 +74,12 @@ export class SqliteCrudDialect<
         const relationModel = relationFieldDef.type as GetModels<Schema>;
         const relationModelDef = requireModel(this.schema, relationModel);
 
-        const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
-            this.schema,
-            model,
-            relationField
-        );
-
         const subQueryName = `${parentName}$${relationField}`;
 
-        // simple select by default
-        let tbl: SelectQueryBuilder<any, any, any> = eb.selectFrom(
-            `${relationModel} as ${subQueryName}`
-        );
+        let tbl = eb.selectFrom(() => {
+            let subQuery = eb.selectFrom(relationModel).selectAll();
 
-        // however if there're filter/orderBy/take/skip,
-        // we need to build a subquery to handle them before aggregation
-        if (payload && typeof payload === 'object') {
-            tbl = eb.selectFrom(() => {
-                let subQuery = eb.selectFrom(relationModel).selectAll();
-
+            if (payload && typeof payload === 'object') {
                 if (payload.where) {
                     subQuery = subQuery.where((eb) =>
                         this.buildFilter(
@@ -123,10 +110,33 @@ export class SqliteCrudDialect<
                     skip !== undefined || take !== undefined,
                     negateOrderBy
                 );
+            }
 
-                return subQuery.as(subQueryName);
+            // join conditions
+            const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
+                this.schema,
+                model,
+                relationField
+            );
+            keyPairs.forEach(({ fk, pk }) => {
+                if (ownedByModel) {
+                    // the parent model owns the fk
+                    subQuery = subQuery.whereRef(
+                        `${relationModel}.${pk}`,
+                        '=',
+                        `${parentName}.${fk}`
+                    );
+                } else {
+                    // the relation side owns the fk
+                    subQuery = subQuery.whereRef(
+                        `${relationModel}.${fk}`,
+                        '=',
+                        `${parentName}.${pk}`
+                    );
+                }
             });
-        }
+            return subQuery.as(subQueryName);
+        });
 
         tbl = tbl.select(() => {
             type ArgsType =
@@ -227,30 +237,12 @@ export class SqliteCrudDialect<
                         )}))`,
                         sql`json_array()`
                     )
-                    .as('data');
+                    .as('$j');
             } else {
                 return sql`json_object(${sql.join(objArgs)})`.as('data');
             }
         });
 
-        // join conditions
-        keyPairs.forEach(({ fk, pk }) => {
-            if (ownedByModel) {
-                // the parent model owns the fk
-                tbl = tbl.whereRef(
-                    `${parentName}$${relationField}.${pk}`,
-                    '=',
-                    `${parentName}.${fk}`
-                );
-            } else {
-                // the relation side owns the fk
-                tbl = tbl.whereRef(
-                    `${parentName}$${relationField}.${fk}`,
-                    '=',
-                    `${parentName}.${pk}`
-                );
-            }
-        });
         return tbl;
     }
 

@@ -2,6 +2,7 @@ import { createId } from '@paralleldrive/cuid2';
 import {
     DeleteResult,
     expressionBuilder,
+    ExpressionWrapper,
     sql,
     UpdateResult,
     type ExpressionBuilder,
@@ -29,7 +30,12 @@ import {
 } from '../../../utils/object-utils';
 import { CONTEXT_COMMENT_PREFIX } from '../../constants';
 import type { CRUD } from '../../contract';
-import type { FindArgs, SelectIncludeOmit, WhereInput } from '../../crud-types';
+import type {
+    FindArgs,
+    SelectIncludeOmit,
+    SortOrder,
+    WhereInput,
+} from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
 import {
@@ -44,8 +50,10 @@ import {
     isForeignKeyField,
     isRelationField,
     isScalarField,
+    makeDefaultOrderBy,
     requireField,
     requireModel,
+    safeJSONStringify,
 } from '../../query-utils';
 import { getCrudDialect } from '../dialects';
 import type { BaseCrudDialect } from '../dialects/base';
@@ -205,33 +213,46 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
         }
 
+        if (args?.cursor) {
+            query = this.buildCursorFilter(
+                model,
+                query,
+                args.cursor,
+                args.orderBy,
+                negateOrderBy
+            );
+        }
+
         query = query.modifyEnd(
             this.makeContextComment({ model, operation: 'read' })
         );
 
+        let result: any[] = [];
         try {
-            let result = await query.execute();
-            if (inMemoryDistinct) {
-                const distinctResult: Record<string, unknown>[] = [];
-                const seen = new Set<string>();
-                for (const r of result as any[]) {
-                    const key = JSON.stringify(
-                        inMemoryDistinct.map((f) => r[f])
-                    )!;
-                    if (!seen.has(key)) {
-                        distinctResult.push(r);
-                        seen.add(key);
-                    }
-                }
-                result = distinctResult;
-            }
-            return result;
+            result = await query.execute();
         } catch (err) {
             const { sql, parameters } = query.compile();
             throw new QueryError(
                 `Failed to execute query: ${err}, sql: ${sql}, parameters: ${parameters}`
             );
         }
+
+        if (inMemoryDistinct) {
+            const distinctResult: Record<string, unknown>[] = [];
+            const seen = new Set<string>();
+            for (const r of result as any[]) {
+                const key = safeJSONStringify(
+                    inMemoryDistinct.map((f) => r[f])
+                )!;
+                if (!seen.has(key)) {
+                    distinctResult.push(r);
+                    seen.add(key);
+                }
+            }
+            result = distinctResult;
+        }
+
+        return result;
     }
 
     protected async readUnique(
@@ -406,6 +427,58 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 )
             );
         }
+    }
+
+    private buildCursorFilter(
+        model: string,
+        query: SelectQueryBuilder<any, any, {}>,
+        cursor: FindArgs<Schema, GetModels<Schema>, true>['cursor'],
+        orderBy: FindArgs<Schema, GetModels<Schema>, true>['orderBy'],
+        negateOrderBy: boolean
+    ) {
+        if (!orderBy) {
+            orderBy = makeDefaultOrderBy(this.schema, model);
+        }
+
+        const orderByItems = ensureArray(orderBy).flatMap((obj) =>
+            Object.entries<SortOrder>(obj)
+        );
+
+        const eb = expressionBuilder<any, any>();
+        const cursorFilter = this.dialect.buildFilter(eb, model, model, cursor);
+
+        let result = query;
+        let filters: ExpressionWrapper<any, any, any>[] = [];
+
+        for (let i = orderByItems.length - 1; i >= 0; i--) {
+            const andFilters: ExpressionWrapper<any, any, any>[] = [];
+
+            for (let j = 0; j <= i; j++) {
+                const [field, order] = orderByItems[j]!;
+                const _order = negateOrderBy
+                    ? order === 'asc'
+                        ? 'desc'
+                        : 'asc'
+                    : order;
+                const op = j === i ? (_order === 'asc' ? '>=' : '<=') : '=';
+                andFilters.push(
+                    eb(
+                        eb.ref(`${model}.${field}`),
+                        op,
+                        eb
+                            .selectFrom(model)
+                            .select(`${model}.${field}`)
+                            .where(cursorFilter)
+                    )
+                );
+            }
+
+            filters.push(eb.and(andFilters));
+        }
+
+        result = result.where((eb) => eb.or(filters));
+
+        return result;
     }
 
     protected async create(

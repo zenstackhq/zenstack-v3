@@ -62,6 +62,18 @@ describe.each(createClientSpecs(__filename))(
 
             await expect(
                 client.user.groupBy({
+                    by: ['email'],
+                    skip: 1,
+                    take: -2,
+                    orderBy: { email: 'desc' },
+                })
+            ).resolves.toEqual([
+                { email: 'u2@test.com' },
+                { email: 'u1@test.com' },
+            ]);
+
+            await expect(
+                client.user.groupBy({
                     by: ['name'],
                     _count: true,
                     having: {

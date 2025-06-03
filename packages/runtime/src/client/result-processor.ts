@@ -3,12 +3,19 @@ import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { FieldDef, GetModels, SchemaDef } from '../schema';
 import type { BuiltinType } from '../schema/schema';
-import { getField } from './query-utils';
+import { ensureArray, getField } from './query-utils';
 
 export class ResultProcessor<Schema extends SchemaDef> {
     constructor(private readonly schema: Schema) {}
 
-    processResult(data: any, model: GetModels<Schema>) {
+    processResult(data: any, model: GetModels<Schema>, args?: any) {
+        const result = this.doProcessResult(data, model);
+        // deal with correcting the reversed order due to negative take
+        this.fixReversedResult(result, model, args);
+        return result;
+    }
+
+    private doProcessResult(data: any, model: GetModels<Schema>) {
         if (Array.isArray(data)) {
             data.forEach((row, i) => (data[i] = this.processRow(row, model)));
             return data;
@@ -65,7 +72,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 return value;
             }
         }
-        return this.processResult(
+        return this.doProcessResult(
             relationData,
             fieldDef.type as GetModels<Schema>
         );
@@ -121,5 +128,39 @@ export class ResultProcessor<Schema extends SchemaDef> {
 
     private transformBytes(value: unknown) {
         return Buffer.isBuffer(value) ? Uint8Array.from(value) : value;
+    }
+
+    private fixReversedResult(data: any, model: GetModels<Schema>, args: any) {
+        if (
+            Array.isArray(data) &&
+            typeof args === 'object' &&
+            args &&
+            args.take !== undefined &&
+            args.take < 0
+        ) {
+            data.reverse();
+        }
+
+        const selectInclude = args?.include ?? args?.select;
+        if (!selectInclude) {
+            return;
+        }
+
+        for (const row of ensureArray(data)) {
+            for (const [field, value] of Object.entries<any>(selectInclude)) {
+                if (typeof value !== 'object' || !value) {
+                    continue;
+                }
+                const fieldDef = getField(this.schema, model, field);
+                if (!fieldDef?.relation) {
+                    continue;
+                }
+                this.fixReversedResult(
+                    row[field],
+                    fieldDef.type as GetModels<Schema>,
+                    value
+                );
+            }
+        }
     }
 }

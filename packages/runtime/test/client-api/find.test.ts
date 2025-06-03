@@ -102,29 +102,29 @@ describe.each(createClientSpecs(PG_DB_NAME))(
 
             // negative take, default sort is negated
             await expect(
-                client.user.findMany({ take: -1 })
-            ).toResolveWithLength(1);
-            await expect(client.user.findMany({ take: -1 })).resolves.toEqual(
-                expect.arrayContaining([expect.objectContaining({ id: '3' })])
+                client.user.findMany({ take: -2 })
+            ).toResolveWithLength(2);
+            await expect(client.user.findMany({ take: -2 })).resolves.toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ id: '3' }),
+                    expect.objectContaining({ id: '2' }),
+                ])
             );
             await expect(
                 client.user.findMany({ skip: 1, take: -1 })
-            ).resolves.toEqual(
-                expect.arrayContaining([expect.objectContaining({ id: '2' })])
-            );
+            ).resolves.toEqual([expect.objectContaining({ id: '2' })]);
 
             // negative take, explicit sort is negated
             await expect(
                 client.user.findMany({
-                    skip: 2,
-                    take: -1,
+                    skip: 1,
+                    take: -2,
                     orderBy: { email: 'asc' },
                 })
-            ).resolves.toEqual(
-                expect.arrayContaining([
-                    expect.objectContaining({ email: 'u02@test.com' }),
-                ])
-            );
+            ).resolves.toEqual([
+                expect.objectContaining({ email: 'u02@test.com' }),
+                expect.objectContaining({ email: 'u1@test.com' }),
+            ]);
         });
 
         it('works with orderBy', async () => {
@@ -201,6 +201,79 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             ).resolves.toMatchObject(user2);
         });
 
+        it('works with cursor', async () => {
+            const user1 = await createUser(client, 'u1@test.com', {
+                id: '1',
+                role: 'ADMIN',
+            });
+            const user2 = await createUser(client, 'u2@test.com', {
+                id: '2',
+                role: 'USER',
+            });
+            const user3 = await createUser(client, 'u3@test.com', {
+                id: '3',
+                role: 'ADMIN',
+            });
+
+            // cursor is inclusive
+            await expect(
+                client.user.findMany({
+                    cursor: { id: user2.id },
+                })
+            ).resolves.toEqual([user2, user3]);
+
+            // skip cursor
+            await expect(
+                client.user.findMany({
+                    skip: 1,
+                    cursor: { id: user1.id },
+                })
+            ).resolves.toEqual([user2, user3]);
+
+            // custom orderBy
+            await expect(
+                client.user.findMany({
+                    skip: 1,
+                    cursor: { id: user2.id },
+                    orderBy: { email: 'desc' },
+                })
+            ).resolves.toEqual([user1]);
+
+            // multiple orderBy
+            await expect(
+                client.user.findMany({
+                    skip: 1,
+                    cursor: { id: user1.id },
+                    orderBy: [{ role: 'desc' }, { id: 'asc' }],
+                })
+            ).resolves.toEqual([user3]);
+
+            // multiple cursor
+            await expect(
+                client.user.findMany({
+                    skip: 1,
+                    cursor: { id: user1.id, role: 'ADMIN' },
+                })
+            ).resolves.toEqual([user2, user3]);
+
+            // non-existing cursor
+            await expect(
+                client.user.findMany({
+                    skip: 1,
+                    cursor: { id: 'none' },
+                })
+            ).resolves.toEqual([]);
+
+            // backward from cursor
+            await expect(
+                client.user.findMany({
+                    skip: 1,
+                    take: -2,
+                    cursor: { id: user3.id },
+                })
+            ).resolves.toEqual([user1, user2]);
+        });
+
         it('works with distinct', async () => {
             await createUser(client, 'u1@test.com', {
                 name: 'Admin1',
@@ -240,6 +313,48 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                     expect.objectContaining({ name: 'Admin2', role: 'ADMIN' }),
                     expect.objectContaining({ name: 'User', role: 'USER' }),
                 ])
+            );
+        });
+
+        it('works with nested skip, take, orderBy', async () => {
+            await createUser(client, 'u1@test.com', {
+                posts: {
+                    create: [
+                        { id: '1', title: 'Post1' },
+                        { id: '2', title: 'Post2' },
+                        { id: '3', title: 'Post3' },
+                    ],
+                },
+            });
+
+            await expect(
+                client.user.findFirst({
+                    include: {
+                        posts: { orderBy: { title: 'desc' }, skip: 2, take: 1 },
+                    },
+                })
+            ).resolves.toEqual(
+                expect.objectContaining({
+                    posts: [expect.objectContaining({ id: '1' })],
+                })
+            );
+
+            await expect(
+                client.user.findFirst({
+                    include: {
+                        posts: {
+                            skip: 1,
+                            take: -2,
+                        },
+                    },
+                })
+            ).resolves.toEqual(
+                expect.objectContaining({
+                    posts: [
+                        expect.objectContaining({ id: '1' }),
+                        expect.objectContaining({ id: '2' }),
+                    ],
+                })
             );
         });
 

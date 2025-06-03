@@ -362,6 +362,10 @@ type Distinct<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     distinct?: OrArray<NonRelationFields<Schema, Model>>;
 };
 
+type Cursor<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    cursor?: WhereUnique<Schema, Model>;
+};
+
 type Select<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
@@ -570,7 +574,8 @@ export type FindArgs<
           }
         : {}) &
     SelectIncludeOmit<Schema, Model, Collection> &
-    Distinct<Schema, Model>;
+    Distinct<Schema, Model> &
+    Cursor<Schema, Model>;
 
 export type FindUniqueArgs<
     Schema extends SchemaDef,

@@ -53,7 +53,7 @@ export class PostgresCrudDialect<
         );
 
         return joinedQuery.select(
-            `${parentAlias}$${relationField}.data as ${relationField}`
+            `${parentAlias}$${relationField}.$j as ${relationField}`
         );
     }
 
@@ -82,12 +82,12 @@ export class PostgresCrudDialect<
 
                 // however if there're filter/orderBy/take/skip,
                 // we need to build a subquery to handle them before aggregation
-                if (payload && typeof payload === 'object') {
-                    result = eb.selectFrom(() => {
-                        let subQuery = eb
-                            .selectFrom(`${relationModel}`)
-                            .selectAll();
+                result = eb.selectFrom(() => {
+                    let subQuery = eb
+                        .selectFrom(`${relationModel}`)
+                        .selectAll();
 
+                    if (payload && typeof payload === 'object') {
                         if (payload.where) {
                             subQuery = subQuery.where((eb) =>
                                 this.buildFilter(
@@ -118,9 +118,27 @@ export class PostgresCrudDialect<
                             skip !== undefined || take !== undefined,
                             negateOrderBy
                         );
-                        return subQuery.as(joinTableName);
-                    });
-                }
+                    }
+
+                    // add join conditions
+                    const joinPairs = buildJoinPairs(
+                        this.schema,
+                        model,
+                        parentName,
+                        relationField,
+                        relationModel
+                    );
+                    subQuery = subQuery.where((eb) =>
+                        this.and(
+                            eb,
+                            ...joinPairs.map(([left, right]) =>
+                                eb(sql.ref(left), '=', sql.ref(right))
+                            )
+                        )
+                    );
+
+                    return subQuery.as(joinTableName);
+                });
 
                 result = this.buildRelationObjectSelect(
                     relationModel,
@@ -129,23 +147,6 @@ export class PostgresCrudDialect<
                     result,
                     payload,
                     parentName
-                );
-
-                // add join conditions
-                const joinPairs = buildJoinPairs(
-                    this.schema,
-                    model,
-                    parentName,
-                    relationField,
-                    joinTableName
-                );
-                result = result.where((eb) =>
-                    this.and(
-                        eb,
-                        ...joinPairs.map(([left, right]) =>
-                            eb(sql.ref(left), '=', sql.ref(right))
-                        )
-                    )
                 );
 
                 // add nested joins for each relation
@@ -189,9 +190,9 @@ export class PostgresCrudDialect<
                         )}))`,
                         sql`'[]'::jsonb`
                     )
-                    .as('data');
+                    .as('$j');
             } else {
-                return sql`jsonb_build_object(${sql.join(objArgs)})`.as('data');
+                return sql`jsonb_build_object(${sql.join(objArgs)})`.as('$j');
             }
         });
 
@@ -267,7 +268,7 @@ export class PostgresCrudDialect<
                     .filter(([, value]) => value)
                     .map(([field]) => [
                         sql.lit(field),
-                        eb.ref(`${parentName}$${relationField}$${field}.data`),
+                        eb.ref(`${parentName}$${relationField}$${field}.$j`),
                     ])
                     .flatMap((v) => v)
             );

@@ -779,7 +779,7 @@ export type UpdateScalarInput<
     Without extends string = never
 > = Omit<
     {
-        [Key in NonRelationFields<Schema, Model>]?: MapFieldType<
+        [Key in NonRelationFields<Schema, Model>]?: ScalarUpdatePayload<
             Schema,
             Model,
             Key
@@ -787,6 +787,22 @@ export type UpdateScalarInput<
     },
     Without
 >;
+
+type ScalarUpdatePayload<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends NonRelationFields<Schema, Model>
+> =
+    | MapFieldType<Schema, Model, Field>
+    | (Field extends NumericFields<Schema, Model>
+          ? {
+                set?: NullableIf<number, FieldIsOptional<Schema, Model, Field>>;
+                increment?: number;
+                decrement?: number;
+                multiply?: number;
+                divide?: number;
+            }
+          : never);
 
 export type UpdateRelationInput<
     Schema extends SchemaDef,

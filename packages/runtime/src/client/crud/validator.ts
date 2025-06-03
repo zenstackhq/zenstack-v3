@@ -8,6 +8,7 @@ import type {
     GetModels,
     SchemaDef,
 } from '../../schema/schema';
+import { NUMERIC_FIELD_TYPES } from '../constants';
 import {
     type AggregateArgs,
     type CountArgs,
@@ -33,8 +34,6 @@ import {
 } from '../query-utils';
 
 export class InputValidator<Schema extends SchemaDef> {
-    private readonly numericTypes = ['Int', 'Float', 'BigInt', 'Decimal'];
-
     constructor(private readonly schema: Schema) {}
 
     validateFindArgs(model: GetModels<Schema>, unique: boolean, args: unknown) {
@@ -1054,6 +1053,27 @@ export class InputValidator<Schema extends SchemaDef> {
                     fieldDef.type
                 ).optional();
 
+                if (this.isNumericField(fieldDef)) {
+                    fieldSchema = z.union([
+                        fieldSchema,
+                        z
+                            .object({
+                                set: this.nullableIf(
+                                    z.number().optional(),
+                                    !!fieldDef.optional
+                                ),
+                                increment: z.number().optional(),
+                                decrement: z.number().optional(),
+                                multiply: z.number().optional(),
+                                divide: z.number().optional(),
+                            })
+                            .refine(
+                                (v) => Object.keys(v).length <= 1,
+                                'Only one of "set", "increment", "decrement", "multiply", or "divide" can be provided'
+                            ),
+                    ]);
+                }
+
                 if (fieldDef.optional) {
                     fieldSchema = fieldSchema.nullable();
                 }
@@ -1165,10 +1185,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.object(
             Object.keys(modelDef.fields).reduce((acc, field) => {
                 const fieldDef = requireField(this.schema, model, field);
-                if (
-                    this.numericTypes.includes(fieldDef.type) &&
-                    !fieldDef.array
-                ) {
+                if (this.isNumericField(fieldDef)) {
                     acc[field] = z.literal(true).optional();
                 }
                 return acc;
@@ -1270,5 +1287,10 @@ export class InputValidator<Schema extends SchemaDef> {
     private orArray(schema: ZodSchema, canBeArray: boolean) {
         return canBeArray ? z.union([schema, z.array(schema)]) : schema;
     }
+
+    private isNumericField(fieldDef: FieldDef) {
+        return NUMERIC_FIELD_TYPES.includes(fieldDef.type) && !fieldDef.array;
+    }
+
     // #endregion
 }

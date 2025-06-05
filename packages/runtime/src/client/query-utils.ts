@@ -192,11 +192,12 @@ export function buildFieldRef<Schema extends SchemaDef>(
     model: string,
     field: string,
     options: ClientOptions<Schema>,
-    eb: ExpressionBuilder<any, any>
+    eb: ExpressionBuilder<any, any>,
+    modelAlias?: string
 ): ExpressionWrapper<any, any, unknown> {
     const fieldDef = requireField(schema, model, field);
     if (!fieldDef.computed) {
-        return eb.ref(field);
+        return eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
     } else {
         let computer: Function | undefined;
         if ('computedFields' in options) {

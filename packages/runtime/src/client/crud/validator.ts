@@ -252,6 +252,11 @@ export class InputValidator<Schema extends SchemaDef> {
                             !!fieldDef.optional
                         );
                     }
+                } else if (fieldDef.array) {
+                    // array field
+                    fieldSchema = this.makeArrayFilterSchema(
+                        fieldDef.type as BuiltinType
+                    );
                 } else {
                     // primitive field
                     fieldSchema = this.makePrimitiveFilterSchema(
@@ -343,6 +348,16 @@ export class InputValidator<Schema extends SchemaDef> {
                 not: components.not,
             }),
         ]);
+    }
+
+    private makeArrayFilterSchema(type: BuiltinType) {
+        return z.object({
+            equals: this.makePrimitiveSchema(type).array().optional(),
+            has: this.makePrimitiveSchema(type).optional(),
+            hasEvery: this.makePrimitiveSchema(type).array().optional(),
+            hasSome: this.makePrimitiveSchema(type).array().optional(),
+            isEmpty: z.boolean().optional(),
+        });
     }
 
     private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean) {
@@ -744,7 +759,14 @@ export class InputValidator<Schema extends SchemaDef> {
                 );
 
                 if (fieldDef.array) {
-                    fieldSchema = z.array(fieldSchema).optional();
+                    fieldSchema = z
+                        .union([
+                            z.array(fieldSchema),
+                            z.object({
+                                set: z.array(fieldSchema),
+                            }),
+                        ])
+                        .optional();
                 }
 
                 if (fieldDef.optional || fieldHasDefaultValue(fieldDef)) {
@@ -1068,10 +1090,30 @@ export class InputValidator<Schema extends SchemaDef> {
                                 divide: z.number().optional(),
                             })
                             .refine(
-                                (v) => Object.keys(v).length <= 1,
+                                (v) => Object.keys(v).length === 1,
                                 'Only one of "set", "increment", "decrement", "multiply", or "divide" can be provided'
                             ),
                     ]);
+                }
+
+                if (fieldDef.array) {
+                    fieldSchema = z
+                        .union([
+                            fieldSchema.array(),
+                            z
+                                .object({
+                                    set: z.array(fieldSchema).optional(),
+                                    push: this.orArray(
+                                        fieldSchema,
+                                        true
+                                    ).optional(),
+                                })
+                                .refine(
+                                    (v) => Object.keys(v).length === 1,
+                                    'Only one of "set", "push" can be provided'
+                                ),
+                        ])
+                        .optional();
                 }
 
                 if (fieldDef.optional) {

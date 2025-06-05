@@ -29,11 +29,12 @@ export class ResultProcessor<Schema extends SchemaDef> {
             return data;
         }
         for (const [key, value] of Object.entries<any>(data)) {
-            if (value === undefined || value === null) {
+            if (value === undefined) {
                 continue;
             }
 
             if (key === '_count') {
+                // underlying database provider may return string for count
                 data[key] =
                     typeof value === 'string' ? JSON.parse(value) : value;
                 continue;
@@ -43,6 +44,15 @@ export class ResultProcessor<Schema extends SchemaDef> {
             if (!fieldDef) {
                 continue;
             }
+
+            if (value === null) {
+                // scalar list defaults to empty array
+                if (fieldDef.array && !fieldDef.relation && value === null) {
+                    data[key] = [];
+                }
+                continue;
+            }
+
             if (fieldDef.relation) {
                 data[key] = this.processRelation(value, fieldDef);
             } else {

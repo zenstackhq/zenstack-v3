@@ -161,7 +161,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 }
 
                 // nullable
-                if (!fieldDef.optional) {
+                if (!fieldDef.optional && !fieldDef.array) {
                     col = col.notNull();
                 }
 

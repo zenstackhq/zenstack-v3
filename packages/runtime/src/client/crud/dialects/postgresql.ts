@@ -25,16 +25,24 @@ export class PostgresCrudDialect<
         return 'postgresql' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType) {
-        return match(type)
-            .with('DateTime', () =>
-                value instanceof Date
-                    ? value
-                    : typeof value === 'string'
-                    ? new Date(value)
-                    : value
-            )
-            .otherwise(() => value);
+    override transformPrimitive(value: unknown, type: BuiltinType): unknown {
+        if (value === undefined) {
+            return value;
+        }
+
+        if (Array.isArray(value)) {
+            return value.map((v) => this.transformPrimitive(v, type));
+        } else {
+            return match(type)
+                .with('DateTime', () =>
+                    value instanceof Date
+                        ? value
+                        : typeof value === 'string'
+                        ? new Date(value)
+                        : value
+                )
+                .otherwise(() => value);
+        }
     }
 
     override buildRelationSelection(
@@ -347,8 +355,12 @@ export class PostgresCrudDialect<
     }
 
     override buildArrayLiteralSQL(values: unknown[]): string {
-        return `ARRAY[${values.map((v) =>
-            typeof v === 'string' ? `'${v}'` : v
-        )}]`;
+        if (values.length === 0) {
+            return '{}';
+        } else {
+            return `ARRAY[${values.map((v) =>
+                typeof v === 'string' ? `'${v}'` : v
+            )}]`;
+        }
     }
 }

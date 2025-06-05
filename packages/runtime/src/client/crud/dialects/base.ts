@@ -118,6 +118,19 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         payload
                     )
                 );
+            } else if (fieldDef.array) {
+                result = this.and(
+                    eb,
+                    result,
+                    this.buildArrayFilter(
+                        eb,
+                        model,
+                        modelAlias,
+                        key,
+                        fieldDef,
+                        payload
+                    )
+                );
             } else {
                 result = this.and(
                     eb,
@@ -477,37 +490,120 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
+    private buildArrayFilter(
+        eb: ExpressionBuilder<any, any>,
+        model: string,
+        modelAlias: string,
+        field: string,
+        fieldDef: FieldDef,
+        payload: any
+    ) {
+        const clauses: Expression<SqlBool>[] = [];
+        const fieldType = fieldDef.type as BuiltinType;
+        const fieldRef = buildFieldRef(
+            this.schema,
+            model,
+            field,
+            this.options,
+            eb,
+            modelAlias
+        );
+
+        for (const [key, _value] of Object.entries(payload)) {
+            if (_value === undefined) {
+                continue;
+            }
+
+            const value = this.transformPrimitive(_value, fieldType);
+
+            switch (key) {
+                case 'equals': {
+                    clauses.push(
+                        this.buildLiteralFilter(
+                            eb,
+                            fieldRef,
+                            fieldType,
+                            eb.val(value)
+                        )
+                    );
+                    break;
+                }
+
+                case 'has': {
+                    clauses.push(eb(fieldRef, '@>', eb.val([value])));
+                    break;
+                }
+
+                case 'hasEvery': {
+                    clauses.push(eb(fieldRef, '@>', eb.val(value)));
+                    break;
+                }
+
+                case 'hasSome': {
+                    clauses.push(eb(fieldRef, '&&', eb.val(value)));
+                    break;
+                }
+
+                case 'isEmpty': {
+                    clauses.push(
+                        eb(fieldRef, value === true ? '=' : '!=', eb.val([]))
+                    );
+                    break;
+                }
+
+                default: {
+                    throw new InternalError(`Invalid array filter key: ${key}`);
+                }
+            }
+        }
+
+        return this.and(eb, ...clauses);
+    }
+
     buildPrimitiveFilter(
         eb: ExpressionBuilder<any, any>,
         model: string,
-        table: string,
+        modelAlias: string,
         field: string,
         fieldDef: FieldDef,
         payload: any
     ) {
         if (payload === null) {
-            return eb(sql.ref(`${table}.${field}`), 'is', null);
+            return eb(sql.ref(`${modelAlias}.${field}`), 'is', null);
         }
 
         if (isEnum(this.schema, fieldDef.type)) {
-            return this.buildEnumFilter(eb, table, field, fieldDef, payload);
+            return this.buildEnumFilter(
+                eb,
+                modelAlias,
+                field,
+                fieldDef,
+                payload
+            );
         }
 
         return match(fieldDef.type as BuiltinType)
             .with('String', () =>
-                this.buildStringFilter(eb, table, field, payload)
+                this.buildStringFilter(eb, modelAlias, field, payload)
             )
             .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                this.buildNumberFilter(eb, model, table, field, type, payload)
+                this.buildNumberFilter(
+                    eb,
+                    model,
+                    modelAlias,
+                    field,
+                    type,
+                    payload
+                )
             )
             .with('Boolean', () =>
-                this.buildBooleanFilter(eb, table, field, payload)
+                this.buildBooleanFilter(eb, modelAlias, field, payload)
             )
             .with('DateTime', () =>
-                this.buildDateTimeFilter(eb, table, field, payload)
+                this.buildDateTimeFilter(eb, modelAlias, field, payload)
             )
             .with('Bytes', () =>
-                this.buildBytesFilter(eb, table, field, payload)
+                this.buildBytesFilter(eb, modelAlias, field, payload)
             )
             .exhaustive();
     }

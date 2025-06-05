@@ -42,7 +42,7 @@
         -   [x] Nested to-many
         -   [x] Nested to-one
         -   [x] Incremental update for numeric fields
-        -   [ ] Array update
+        -   [x] Array update
     -   [x] Upsert
     -   [x] Delete
     -   [x] Aggregation

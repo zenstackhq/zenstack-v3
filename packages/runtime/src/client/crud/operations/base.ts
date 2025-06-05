@@ -540,10 +540,24 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 isScalarField(this.schema, model, field) ||
                 isForeignKeyField(this.schema, model, field)
             ) {
-                createFields[field] = this.dialect.transformPrimitive(
-                    value,
-                    fieldDef.type as BuiltinType
-                );
+                if (
+                    fieldDef.array &&
+                    value &&
+                    typeof value === 'object' &&
+                    'set' in value &&
+                    Array.isArray(value.set)
+                ) {
+                    // deal with nested "set" for scalar lists
+                    createFields[field] = this.dialect.transformPrimitive(
+                        value.set,
+                        fieldDef.type as BuiltinType
+                    );
+                } else {
+                    createFields[field] = this.dialect.transformPrimitive(
+                        value,
+                        fieldDef.type as BuiltinType
+                    );
+                }
             } else {
                 if (
                     fieldDef.relation?.fields &&
@@ -1069,18 +1083,36 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     typeof finalData[field] === 'object' &&
                     finalData[field]
                 ) {
+                    // numeric fields incremental updates
                     updateFields[field] = this.transformIncrementalUpdate(
                         model,
                         field,
                         fieldDef,
                         finalData[field]
                     );
-                } else {
-                    updateFields[field] = this.dialect.transformPrimitive(
-                        finalData[field],
-                        fieldDef.type as BuiltinType
-                    );
+                    continue;
                 }
+
+                if (
+                    fieldDef.array &&
+                    typeof finalData[field] === 'object' &&
+                    !Array.isArray(finalData[field]) &&
+                    finalData[field]
+                ) {
+                    // scalar list updates
+                    updateFields[field] = this.transformScalarListUpdate(
+                        model,
+                        field,
+                        fieldDef,
+                        finalData[field]
+                    );
+                    continue;
+                }
+
+                updateFields[field] = this.dialect.transformPrimitive(
+                    finalData[field],
+                    fieldDef.type as BuiltinType
+                );
             } else {
                 if (!allowRelationUpdate) {
                     throw new QueryError(
@@ -1170,7 +1202,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         const key = Object.keys(payload)[0];
         const value = this.dialect.transformPrimitive(
-            Object.values(payload)[0],
+            payload[key!],
             fieldDef.type as BuiltinType
         );
         const eb = expressionBuilder<any, any>();
@@ -1182,7 +1214,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             eb
         );
 
-        const op = match(key)
+        return match(key)
             .with('set', () => value)
             .with('increment', () => eb(fieldRef, '+', value))
             .with('decrement', () => eb(fieldRef, '-', value))
@@ -1193,7 +1225,42 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     `Invalid incremental update operation: ${key}`
                 );
             });
-        return op;
+    }
+
+    private transformScalarListUpdate(
+        model: GetModels<Schema>,
+        field: string,
+        fieldDef: FieldDef,
+        payload: Record<string, unknown>
+    ) {
+        invariant(
+            Object.keys(payload).length === 1,
+            'Only one of "set", "push" can be provided'
+        );
+        const key = Object.keys(payload)[0];
+        const value = this.dialect.transformPrimitive(
+            payload[key!],
+            fieldDef.type as BuiltinType
+        );
+        const eb = expressionBuilder<any, any>();
+        const fieldRef = buildFieldRef(
+            this.schema,
+            model,
+            field,
+            this.options,
+            eb
+        );
+
+        return match(key)
+            .with('set', () => value)
+            .with('push', () => {
+                return eb(fieldRef, '||', eb.val(ensureArray(value)));
+            })
+            .otherwise(() => {
+                throw new InternalError(
+                    `Invalid array update operation: ${key}`
+                );
+            });
     }
 
     private isNumericField(fieldDef: FieldDef) {

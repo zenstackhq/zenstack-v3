@@ -168,6 +168,8 @@ export type WhereInput<
               GetFieldType<Schema, Model, Key>,
               FieldIsOptional<Schema, Model, Key>
           >
+        : FieldIsArray<Schema, Model, Key> extends true
+        ? ArrayFilter<GetFieldType<Schema, Model, Key>>
         : // primitive
           PrimitiveFilter<
               GetFieldType<Schema, Model, Key>,
@@ -183,7 +185,7 @@ export type WhereInput<
     NOT?: OrArray<WhereInput<Schema, Model, ScalarOnly>>;
 };
 
-export type EnumFilter<
+type EnumFilter<
     Schema extends SchemaDef,
     T extends GetEnums<Schema>,
     Nullable extends boolean
@@ -196,7 +198,15 @@ export type EnumFilter<
           not?: EnumFilter<Schema, T, Nullable>;
       };
 
-export type PrimitiveFilter<
+type ArrayFilter<T extends string> = {
+    equals?: MapBaseType<T>[];
+    has?: MapBaseType<T>;
+    hasEvery?: MapBaseType<T>[];
+    hasSome?: MapBaseType<T>[];
+    isEmpty?: boolean;
+};
+
+type PrimitiveFilter<
     T extends string,
     Nullable extends boolean
 > = T extends 'String'
@@ -622,13 +632,25 @@ type CreateScalarPayload<
     Schema,
     Model,
     {
-        [Key in ScalarFields<Schema, Model, false>]: MapFieldType<
+        [Key in ScalarFields<Schema, Model, false>]: ScalarCreatePayload<
             Schema,
             Model,
             Key
         >;
     }
 >;
+
+type ScalarCreatePayload<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends ScalarFields<Schema, Model, false>
+> =
+    | MapFieldType<Schema, Model, Field>
+    | (FieldIsArray<Schema, Model, Field> extends true
+          ? {
+                set?: MapFieldType<Schema, Model, Field>[];
+            }
+          : never);
 
 type CreateFKPayload<
     Schema extends SchemaDef,
@@ -802,6 +824,12 @@ type ScalarUpdatePayload<
                 multiply?: number;
                 divide?: number;
             }
+          : never)
+    | (FieldIsArray<Schema, Model, Field> extends true
+          ? {
+                set?: MapFieldType<Schema, Model, Field>[];
+                push?: OrArray<MapFieldType<Schema, Model, Field>, true>;
+            }
           : never);
 
 export type UpdateRelationInput<
@@ -937,7 +965,9 @@ type NumericFields<
         Model,
         Key
     > extends 'Int' | 'Float' | 'BigInt' | 'Decimal'
-        ? Key
+        ? FieldIsArray<Schema, Model, Key> extends true
+            ? never
+            : Key
         : never]: GetField<Schema, Model, Key>;
 };
 

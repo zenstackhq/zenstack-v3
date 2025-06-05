@@ -26,19 +26,23 @@ export class SqliteCrudDialect<
         return 'sqlite' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType) {
+    override transformPrimitive(value: unknown, type: BuiltinType): unknown {
         if (value === undefined) {
             return value;
         }
 
-        return match(type)
-            .with('Boolean', () => (value ? 1 : 0))
-            .with('DateTime', () =>
-                value instanceof Date ? value.toISOString() : value
-            )
-            .with('Decimal', () => (value as Decimal).toString())
-            .with('Bytes', () => Buffer.from(value as Uint8Array))
-            .otherwise(() => value);
+        if (Array.isArray(value)) {
+            return value.map((v) => this.transformPrimitive(v, type));
+        } else {
+            return match(type)
+                .with('Boolean', () => (value ? 1 : 0))
+                .with('DateTime', () =>
+                    value instanceof Date ? value.toISOString() : value
+                )
+                .with('Decimal', () => (value as Decimal).toString())
+                .with('Bytes', () => Buffer.from(value as Uint8Array))
+                .otherwise(() => value);
+        }
     }
 
     override buildRelationSelection(

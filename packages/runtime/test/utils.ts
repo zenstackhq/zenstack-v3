@@ -107,26 +107,28 @@ export async function createTestClient<Schema extends SchemaDef>(
             prismaSchemaText
         );
         execSync(
-            'npx prisma db push --schema ./schema.prisma --skip-generate',
+            'npx prisma db push --schema ./schema.prisma --skip-generate --force-reset',
             {
                 cwd: workDir!,
                 stdio: 'inherit',
             }
         );
+    } else {
+        if (options?.provider === 'postgresql') {
+            invariant(options?.dbName, 'dbName is required');
+            const pgClient = new PGClient(TEST_PG_CONFIG);
+            await pgClient.connect();
+            await pgClient.query(
+                `DROP DATABASE IF EXISTS "${options!.dbName}"`
+            );
+            await pgClient.query(`CREATE DATABASE "${options!.dbName}"`);
+            await pgClient.end();
+        }
     }
 
     const { plugins, usePrismaPush, ...rest } = options ?? {};
 
     let client = new ZenStackClient(_schema, rest as ClientOptions<Schema>);
-
-    if (options?.provider === 'postgresql') {
-        invariant(options?.dbName, 'dbName is required');
-        const pgClient = new PGClient(TEST_PG_CONFIG);
-        await pgClient.connect();
-        await pgClient.query(`DROP DATABASE IF EXISTS "${options!.dbName}"`);
-        await pgClient.query(`CREATE DATABASE "${options!.dbName}"`);
-        await pgClient.end();
-    }
 
     if (!usePrismaPush) {
         await client.$pushSchema();

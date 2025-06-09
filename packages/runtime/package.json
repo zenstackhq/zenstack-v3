@@ -113,6 +113,7 @@
         "@types/tmp": "^0.2.6",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/testtools": "workspace:*",
+        "@zenstackhq/sdk": "workspace:*",
         "tmp": "^0.2.3"
     }
 }

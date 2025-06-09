@@ -1,11 +1,10 @@
 import { isPlugin, LiteralExpr, type Model } from '@zenstackhq/language/ast';
 import type { CliGenerator } from '@zenstackhq/runtime/client';
-import { TsSchemaGenerator } from '@zenstackhq/sdk';
+import { PrismaSchemaGenerator, TsSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
 import invariant from 'tiny-invariant';
-import { PrismaSchemaGenerator } from '../prisma/prisma-schema-generator';
 import { getSchemaFile, loadSchemaDocument } from './action-utils';
 
 type Options = {

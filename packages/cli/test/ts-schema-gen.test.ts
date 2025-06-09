@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('TypeScript schema generation tests', () => {
     it('generates correct data models', async () => {
-        const schema = await generateTsSchema(`
+        const { schema } = await generateTsSchema(`
 model User {
     id String @id @default(uuid())
     name String

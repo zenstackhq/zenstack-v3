@@ -8,9 +8,10 @@ describe('todo sample tests', () => {
     let schema: SchemaDef;
 
     beforeAll(async () => {
-        schema = await generateTsSchemaFromFile(
+        const r = await generateTsSchemaFromFile(
             path.join(__dirname, '../schemas/todo.zmodel')
         );
+        schema = r.schema;
     });
 
     it('works with user CRUD', async () => {

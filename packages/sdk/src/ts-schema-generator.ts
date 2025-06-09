@@ -769,6 +769,16 @@ export class TsSchemaGenerator {
             );
         }
 
+        const relationName = this.getRelationName(field);
+        if (relationName) {
+            relationFields.push(
+                ts.factory.createPropertyAssignment(
+                    'name',
+                    ts.factory.createStringLiteral(relationName)
+                )
+            );
+        }
+
         const relation = getAttribute(field, '@relation');
         if (relation) {
             for (const arg of relation.args) {
@@ -843,15 +853,39 @@ export class TsSchemaGenerator {
 
         const sourceModel = field.$container as DataModel;
         const targetModel = field.type.reference.ref as DataModel;
-
+        const relationName = this.getRelationName(field);
         for (const otherField of targetModel.fields) {
             if (otherField === field) {
                 // backlink field is never self
                 continue;
             }
             if (otherField.type.reference?.ref === sourceModel) {
-                // TODO: named relation
-                return otherField;
+                if (relationName) {
+                    // if relation has a name, the opposite side must match
+                    const otherRelationName = this.getRelationName(otherField);
+                    if (otherRelationName === relationName) {
+                        return otherField;
+                    }
+                } else {
+                    return otherField;
+                }
+            }
+        }
+        return undefined;
+    }
+
+    private getRelationName(field: DataModelField) {
+        const relation = getAttribute(field, '@relation');
+        if (relation) {
+            const nameArg = relation.args.find(
+                (arg) => arg.$resolvedParam.name === 'name'
+            );
+            if (nameArg) {
+                invariant(
+                    isLiteralExpr(nameArg.value),
+                    'name must be a literal'
+                );
+                return nameArg.value.value as string;
             }
         }
         return undefined;

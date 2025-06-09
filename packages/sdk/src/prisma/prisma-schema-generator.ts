@@ -32,7 +32,7 @@ import {
 import { AstUtils } from 'langium';
 import { match, P } from 'ts-pattern';
 
-import { ModelUtils, ZModelCodeGenerator } from '@zenstackhq/sdk';
+import { ModelUtils, ZModelCodeGenerator } from '..';
 import {
     AttributeArgValue,
     ModelField,

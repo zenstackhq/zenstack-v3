@@ -10,7 +10,7 @@ import { toDialectConfig } from "@zenstackhq/runtime/utils/sqlite-utils";
 export const schema = {
     provider: {
         type: "sqlite",
-        dialectConfigProvider: function (): any {
+        dialectConfigProvider: function () {
             return toDialectConfig("./dev.db", typeof __dirname !== 'undefined' ? __dirname : path.dirname(url.fileURLToPath(import.meta.url)));
         }
     },

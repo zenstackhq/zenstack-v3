@@ -1,10 +1,10 @@
 import type { SchemaDef } from '@zenstackhq/runtime/schema';
 import { TsSchemaGenerator } from '@zenstackhq/sdk';
+import { glob } from 'glob';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import tmp from 'tmp';
-import { glob } from 'glob';
 import { match } from 'ts-pattern';
 
 function makePrelude(provider: 'sqlite' | 'postgresql', dbName?: string) {
@@ -13,7 +13,7 @@ function makePrelude(provider: 'sqlite' | 'postgresql', dbName?: string) {
             return `
 datasource db {
     provider = 'sqlite'
-    url = ':memory:'
+    url = '${dbName ?? ':memory:'}'
 }
 `;
         })
@@ -87,7 +87,7 @@ export async function generateTsSchema(
 
     // load the schema module
     const module = await import(path.join(workDir, 'schema.js'));
-    return module.schema as SchemaDef;
+    return { workDir, schema: module.schema as SchemaDef };
 }
 
 export function generateTsSchemaFromFile(filePath: string) {

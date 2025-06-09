@@ -38,6 +38,11 @@ export type ClientContract<Schema extends SchemaDef> = {
     readonly $qb: ToKysely<Schema>;
 
     /**
+     * The raw Kysely query builder without any ZenStack enhancements.
+     */
+    readonly $qbRaw: ToKysely<any>;
+
+    /**
      * Starts a transaction.
      */
     $transaction<T>(

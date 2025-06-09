@@ -263,6 +263,40 @@ export function makeDefaultOrderBy<Schema extends SchemaDef>(
     );
 }
 
+export function getManyToManyRelation(
+    schema: SchemaDef,
+    model: string,
+    field: string
+) {
+    const fieldDef = requireField(schema, model, field);
+    if (!fieldDef.array || !fieldDef.relation?.opposite) {
+        return undefined;
+    }
+    const oppositeFieldDef = requireField(
+        schema,
+        fieldDef.type,
+        fieldDef.relation.opposite
+    );
+    if (oppositeFieldDef.array) {
+        // Prisma's convention for many-to-many relation:
+        // - model are sorted alphabetically by name
+        // - join table is named _<model1>To<model2>, unless an explicit name is provided by `@relation`
+        // - foreign keys are named A and B (based on the order of the model)
+        const sortedModelNames = [model, fieldDef.type].sort();
+        return {
+            parentFkName: sortedModelNames[0] === model ? 'A' : 'B',
+            otherModel: fieldDef.type,
+            otherField: fieldDef.relation.opposite,
+            otherFkName: sortedModelNames[0] === fieldDef.type ? 'A' : 'B',
+            joinTable: fieldDef.relation.name
+                ? `_${fieldDef.relation.name}`
+                : `_${sortedModelNames[0]}To${sortedModelNames[1]}`,
+        };
+    } else {
+        return undefined;
+    }
+}
+
 export function ensureArray<T>(value: T | T[]): T[] {
     if (Array.isArray(value)) {
         return value;

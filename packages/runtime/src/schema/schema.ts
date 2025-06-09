@@ -50,6 +50,7 @@ export type CascadeAction =
     | 'SetDefault';
 
 export type RelationInfo = {
+    name?: string;
     fields?: string[];
     references?: string[];
     opposite?: string;

@@ -45,6 +45,7 @@ import {
     getField,
     getIdFields,
     getIdValues,
+    getManyToManyRelation,
     getModel,
     getRelationForeignKeyFieldPairs,
     isForeignKeyField,
@@ -492,43 +493,54 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         let parentUpdateTask: ((entity: any) => Promise<unknown>) | undefined =
             undefined;
 
-        if (fromRelation) {
-            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
-                this.schema,
-                fromRelation?.model ?? '',
-                fromRelation?.field ?? ''
-            );
+        let m2m: ReturnType<typeof getManyToManyRelation> = undefined;
 
-            if (!ownedByModel) {
-                // assign fks from parent
-                const parentFkFields = this.buildFkAssignments(
-                    fromRelation.model,
-                    fromRelation.field,
-                    fromRelation.ids
-                );
-                Object.assign(createFields, parentFkFields);
-            } else {
-                parentUpdateTask = (entity) => {
-                    const query = kysely
-                        .updateTable(fromRelation.model)
-                        .set(
-                            keyPairs.reduce(
-                                (acc, { fk, pk }) => ({
-                                    ...acc,
-                                    [fk]: entity[pk],
-                                }),
-                                {} as any
+        if (fromRelation) {
+            m2m = getManyToManyRelation(
+                this.schema,
+                fromRelation.model,
+                fromRelation.field
+            );
+            if (!m2m) {
+                // many-to-many relations are handled after create
+                const { ownedByModel, keyPairs } =
+                    getRelationForeignKeyFieldPairs(
+                        this.schema,
+                        fromRelation?.model ?? '',
+                        fromRelation?.field ?? ''
+                    );
+
+                if (!ownedByModel) {
+                    // assign fks from parent
+                    const parentFkFields = this.buildFkAssignments(
+                        fromRelation.model,
+                        fromRelation.field,
+                        fromRelation.ids
+                    );
+                    Object.assign(createFields, parentFkFields);
+                } else {
+                    parentUpdateTask = (entity) => {
+                        const query = kysely
+                            .updateTable(fromRelation.model)
+                            .set(
+                                keyPairs.reduce(
+                                    (acc, { fk, pk }) => ({
+                                        ...acc,
+                                        [fk]: entity[pk],
+                                    }),
+                                    {} as any
+                                )
                             )
-                        )
-                        .where((eb) => eb.and(fromRelation.ids))
-                        .modifyEnd(
-                            this.makeContextComment({
-                                model: fromRelation.model,
-                                operation: 'update',
-                            })
-                        );
-                    return query.execute();
-                };
+                            .where((eb) => eb.and(fromRelation.ids))
+                            .modifyEnd(
+                                this.makeContextComment({
+                                    model: fromRelation.model,
+                                    operation: 'update',
+                                })
+                            );
+                        return query.execute();
+                    };
+                }
             }
         }
 
@@ -559,7 +571,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     );
                 }
             } else {
+                const subM2M = getManyToManyRelation(this.schema, model, field);
                 if (
+                    !subM2M &&
                     fieldDef.relation?.fields &&
                     fieldDef.relation?.references
                 ) {
@@ -623,6 +637,21 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             await Promise.all(relationPromises);
         }
 
+        if (fromRelation && m2m) {
+            // connect many-to-many relation
+            await this.handleManyToManyRelation(
+                kysely,
+                'connect',
+                fromRelation.model,
+                fromRelation.field,
+                fromRelation.ids,
+                m2m.otherModel,
+                m2m.otherField,
+                createdEntity,
+                m2m.joinTable
+            );
+        }
+
         // finally update parent if needed
         if (parentUpdateTask) {
             await parentUpdateTask(createdEntity);
@@ -664,6 +693,103 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             });
         }
         return parentFkFields;
+    }
+
+    private async handleManyToManyRelation<
+        Action extends 'connect' | 'disconnect'
+    >(
+        kysely: ToKysely<Schema>,
+        action: Action,
+        leftModel: string,
+        leftField: string,
+        leftEntity: any,
+        rightModel: string,
+        rightField: string,
+        rightEntity: any,
+        joinTable: string
+    ): Promise<
+        Action extends 'connect'
+            ? UpdateResult | undefined
+            : DeleteResult | undefined
+    > {
+        const sortedRecords = [
+            {
+                model: leftModel,
+                field: leftField,
+                entity: leftEntity,
+            },
+            {
+                model: rightModel,
+                field: rightField,
+                entity: rightEntity,
+            },
+        ].sort((a, b) => a.model.localeCompare(b.model));
+
+        const firstIds = getIdFields(this.schema, sortedRecords[0]!.model);
+        const secondIds = getIdFields(this.schema, sortedRecords[1]!.model);
+        invariant(
+            firstIds.length === 1,
+            'many-to-many relation must have exactly one id field'
+        );
+        invariant(
+            secondIds.length === 1,
+            'many-to-many relation must have exactly one id field'
+        );
+
+        // Prisma's convention for many-to-many: fk fields are named "A" and "B"
+        if (action === 'connect') {
+            const result = await kysely
+                .insertInto(joinTable as any)
+                .values({
+                    A: sortedRecords[0]!.entity[firstIds[0]!],
+                    B: sortedRecords[1]!.entity[secondIds[0]!],
+                } as any)
+                .onConflict((oc) => oc.columns(['A', 'B'] as any).doNothing())
+                .execute();
+            return result[0] as any;
+        } else {
+            const eb = expressionBuilder<any, any>();
+            const result = await kysely
+                .deleteFrom(joinTable as any)
+                .where(
+                    eb(
+                        `${joinTable}.A`,
+                        '=',
+                        sortedRecords[0]!.entity[firstIds[0]!]
+                    )
+                )
+                .where(
+                    eb(
+                        `${joinTable}.B`,
+                        '=',
+                        sortedRecords[1]!.entity[secondIds[0]!]
+                    )
+                )
+                .execute();
+            return result[0] as any;
+        }
+    }
+
+    private resetManyToManyRelation(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        field: string,
+        parentIds: any
+    ) {
+        invariant(
+            Object.keys(parentIds).length === 1,
+            'parentIds must have exactly one field'
+        );
+        const parentId = Object.values(parentIds)[0]!;
+
+        const m2m = getManyToManyRelation(this.schema, model, field);
+        invariant(m2m, 'not a many-to-many relation');
+
+        const eb = expressionBuilder<any, any>();
+        return kysely
+            .deleteFrom(m2m.joinTable as any)
+            .where(eb(`${m2m.joinTable}.${m2m.parentFkName}`, '=', parentId))
+            .execute();
     }
 
     private async processOwnedRelation(
@@ -1006,28 +1132,48 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         const parentWhere: any = {};
+        let m2m: ReturnType<typeof getManyToManyRelation> = undefined;
+
         if (fromRelation) {
-            // merge foreign key conditions from the relation
-            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+            m2m = getManyToManyRelation(
                 this.schema,
                 fromRelation.model,
                 fromRelation.field
             );
-            if (ownedByModel) {
-                const fromEntity = await this.readUnique(
-                    kysely,
-                    fromRelation.model as GetModels<Schema>,
-                    {
-                        where: fromRelation.ids,
+            if (!m2m) {
+                // merge foreign key conditions from the relation
+                const { ownedByModel, keyPairs } =
+                    getRelationForeignKeyFieldPairs(
+                        this.schema,
+                        fromRelation.model,
+                        fromRelation.field
+                    );
+                if (ownedByModel) {
+                    const fromEntity = await this.readUnique(
+                        kysely,
+                        fromRelation.model as GetModels<Schema>,
+                        {
+                            where: fromRelation.ids,
+                        }
+                    );
+                    for (const { fk, pk } of keyPairs) {
+                        parentWhere[pk] = fromEntity[fk];
                     }
-                );
-                for (const { fk, pk } of keyPairs) {
-                    parentWhere[pk] = fromEntity[fk];
+                } else {
+                    for (const { fk, pk } of keyPairs) {
+                        parentWhere[fk] = fromRelation.ids[pk];
+                    }
                 }
             } else {
-                for (const { fk, pk } of keyPairs) {
-                    parentWhere[fk] = fromRelation.ids[pk];
-                }
+                // many-to-many relation, filter for parent with "some"
+                const fromRelationFieldDef = this.requireField(
+                    fromRelation.model,
+                    fromRelation.field
+                );
+                invariant(fromRelationFieldDef.relation?.opposite);
+                parentWhere[fromRelationFieldDef.relation.opposite] = {
+                    some: fromRelation.ids,
+                };
             }
         }
 
@@ -1592,61 +1738,62 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return;
         }
 
-        const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+        const m2m = getManyToManyRelation(
             this.schema,
             fromRelation.model,
             fromRelation.field
         );
-        let updateResult: UpdateResult;
-
-        if (ownedByModel) {
-            // set parent fk directly
-            invariant(_data.length === 1, 'only one entity can be connected');
-            const target = await this.readUnique(kysely, model, {
-                where: _data[0],
+        if (m2m) {
+            // handle many-to-many relation
+            const actions = _data.map(async (d) => {
+                const ids = await this.getEntityIds(kysely, model, d);
+                return this.handleManyToManyRelation(
+                    kysely,
+                    'connect',
+                    fromRelation.model,
+                    fromRelation.field,
+                    fromRelation.ids,
+                    m2m.otherModel!,
+                    m2m.otherField!,
+                    ids,
+                    m2m.joinTable
+                );
             });
-            if (!target) {
+            const results = await Promise.all(actions);
+
+            // validate connect result
+            if (_data.length > results.filter((r) => !!r).length) {
                 throw new NotFoundError(model);
             }
-            const query = kysely
-                .updateTable(fromRelation.model)
-                .where((eb) => eb.and(fromRelation.ids))
-                .set(
-                    keyPairs.reduce(
-                        (acc, { fk, pk }) => ({
-                            ...acc,
-                            [fk]: target[pk],
-                        }),
-                        {} as any
-                    )
-                )
-                .modifyEnd(
-                    this.makeContextComment({
-                        model: fromRelation.model,
-                        operation: 'update',
-                    })
-                );
-            updateResult = await query.executeTakeFirstOrThrow();
         } else {
-            // disconnect current if it's a one-one relation
-            const relationFieldDef = this.requireField(
+            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                this.schema,
                 fromRelation.model,
                 fromRelation.field
             );
+            let updateResult: UpdateResult;
 
-            if (!relationFieldDef.array) {
+            if (ownedByModel) {
+                // set parent fk directly
+                invariant(
+                    _data.length === 1,
+                    'only one entity can be connected'
+                );
+                const target = await this.readUnique(kysely, model, {
+                    where: _data[0],
+                });
+                if (!target) {
+                    throw new NotFoundError(model);
+                }
                 const query = kysely
-                    .updateTable(model)
-                    .where((eb) =>
-                        eb.and(
-                            keyPairs.map(({ fk, pk }) =>
-                                eb(sql.ref(fk), '=', fromRelation.ids[pk])
-                            )
-                        )
-                    )
+                    .updateTable(fromRelation.model)
+                    .where((eb) => eb.and(fromRelation.ids))
                     .set(
                         keyPairs.reduce(
-                            (acc, { fk }) => ({ ...acc, [fk]: null }),
+                            (acc, { fk, pk }) => ({
+                                ...acc,
+                                [fk]: target[pk],
+                            }),
                             {} as any
                         )
                     )
@@ -1656,36 +1803,86 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         })
                     );
-                await query.execute();
+                updateResult = await query.executeTakeFirstOrThrow();
+            } else {
+                // disconnect current if it's a one-one relation
+                const relationFieldDef = this.requireField(
+                    fromRelation.model,
+                    fromRelation.field
+                );
+
+                if (!relationFieldDef.array) {
+                    const query = kysely
+                        .updateTable(model)
+                        .where((eb) =>
+                            eb.and(
+                                keyPairs.map(({ fk, pk }) =>
+                                    eb(sql.ref(fk), '=', fromRelation.ids[pk])
+                                )
+                            )
+                        )
+                        .set(
+                            keyPairs.reduce(
+                                (acc, { fk }) => ({ ...acc, [fk]: null }),
+                                {} as any
+                            )
+                        )
+                        .modifyEnd(
+                            this.makeContextComment({
+                                model: fromRelation.model,
+                                operation: 'update',
+                            })
+                        );
+                    await query.execute();
+                }
+
+                // connect
+                const query = kysely
+                    .updateTable(model)
+                    .where((eb) => eb.or(_data.map((d) => eb.and(d))))
+                    .set(
+                        keyPairs.reduce(
+                            (acc, { fk, pk }) => ({
+                                ...acc,
+                                [fk]: fromRelation.ids[pk],
+                            }),
+                            {} as any
+                        )
+                    )
+                    .modifyEnd(
+                        this.makeContextComment({
+                            model,
+                            operation: 'update',
+                        })
+                    );
+                updateResult = await query.executeTakeFirstOrThrow();
             }
 
-            // connect
-            const query = kysely
-                .updateTable(model)
-                .where((eb) => eb.or(_data.map((d) => eb.and(d))))
-                .set(
-                    keyPairs.reduce(
-                        (acc, { fk, pk }) => ({
-                            ...acc,
-                            [fk]: fromRelation.ids[pk],
-                        }),
-                        {} as any
-                    )
-                )
-                .modifyEnd(
-                    this.makeContextComment({
-                        model,
-                        operation: 'update',
-                    })
-                );
-            updateResult = await query.executeTakeFirstOrThrow();
+            // validate connect result
+            if (_data.length > updateResult.numUpdatedRows) {
+                // some entities were not connected
+                throw new NotFoundError(model);
+            }
+        }
+    }
+
+    private getEntityIds(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        uniqueFilter: any
+    ) {
+        const idFields = getIdFields(this.schema, model);
+        if (
+            idFields.every(
+                (f) => f in uniqueFilter && uniqueFilter[f] !== undefined
+            )
+        ) {
+            return uniqueFilter;
         }
 
-        // validate connect result
-        if (_data.length > updateResult.numUpdatedRows) {
-            // some entities were not connected
-            throw new NotFoundError(model);
-        }
+        return this.readUnique(kysely, model, {
+            where: uniqueFilter,
+        });
     }
 
     protected async connectOrCreateRelation(
@@ -1743,71 +1940,100 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return;
         }
 
-        const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+        const m2m = getManyToManyRelation(
             this.schema,
             fromRelation.model,
             fromRelation.field
         );
-
-        let updateResult: UpdateResult;
-
-        if (ownedByModel) {
-            // set parent fk directly
-            invariant(
-                disconnectConditions.length === 1,
-                'only one entity can be disconnected'
-            );
-            const target = await this.readUnique(kysely, model, {
-                where:
-                    disconnectConditions[0] === true
-                        ? {}
-                        : disconnectConditions[0],
+        if (m2m) {
+            // handle many-to-many relation
+            const actions = disconnectConditions.map(async (d) => {
+                const ids = await this.getEntityIds(kysely, model, d);
+                return this.handleManyToManyRelation(
+                    kysely,
+                    'disconnect',
+                    fromRelation.model,
+                    fromRelation.field,
+                    fromRelation.ids,
+                    m2m.otherModel,
+                    m2m.otherField,
+                    ids,
+                    m2m.joinTable
+                );
             });
-            if (!target) {
+            const results = await Promise.all(actions);
+
+            // validate disconnect result
+            if (expectedUpdateCount > results.filter((r) => !!r).length) {
                 throw new NotFoundError(model);
             }
-            const query = kysely
-                .updateTable(fromRelation.model)
-                .where((eb) => eb.and(fromRelation.ids))
-                .set(
-                    keyPairs.reduce(
-                        (acc, { fk }) => ({ ...acc, [fk]: null }),
-                        {} as any
-                    )
-                )
-                .modifyEnd(
-                    this.makeContextComment({
-                        model: fromRelation.model,
-                        operation: 'update',
-                    })
-                );
-            updateResult = await query.executeTakeFirstOrThrow();
         } else {
-            // disconnect
-            const query = kysely
-                .updateTable(model)
-                .where((eb) =>
-                    eb.or(disconnectConditions.map((d) => eb.and(d)))
-                )
-                .set(
-                    keyPairs.reduce(
-                        (acc, { fk }) => ({ ...acc, [fk]: null }),
-                        {} as any
-                    )
-                )
-                .modifyEnd(
-                    this.makeContextComment({
-                        model,
-                        operation: 'update',
-                    })
-                );
-            updateResult = await query.executeTakeFirstOrThrow();
-        }
+            let updateResult: UpdateResult;
 
-        // validate connect result
-        if (expectedUpdateCount > updateResult.numUpdatedRows!) {
-            // some entities were not connected
-            throw new NotFoundError(model);
+            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                this.schema,
+                fromRelation.model,
+                fromRelation.field
+            );
+
+            if (ownedByModel) {
+                // set parent fk directly
+                invariant(
+                    disconnectConditions.length === 1,
+                    'only one entity can be disconnected'
+                );
+                const target = await this.readUnique(kysely, model, {
+                    where:
+                        disconnectConditions[0] === true
+                            ? {}
+                            : disconnectConditions[0],
+                });
+                if (!target) {
+                    throw new NotFoundError(model);
+                }
+                const query = kysely
+                    .updateTable(fromRelation.model)
+                    .where((eb) => eb.and(fromRelation.ids))
+                    .set(
+                        keyPairs.reduce(
+                            (acc, { fk }) => ({ ...acc, [fk]: null }),
+                            {} as any
+                        )
+                    )
+                    .modifyEnd(
+                        this.makeContextComment({
+                            model: fromRelation.model,
+                            operation: 'update',
+                        })
+                    );
+                updateResult = await query.executeTakeFirstOrThrow();
+            } else {
+                // disconnect
+                const query = kysely
+                    .updateTable(model)
+                    .where((eb) =>
+                        eb.or(disconnectConditions.map((d) => eb.and(d)))
+                    )
+                    .set(
+                        keyPairs.reduce(
+                            (acc, { fk }) => ({ ...acc, [fk]: null }),
+                            {} as any
+                        )
+                    )
+                    .modifyEnd(
+                        this.makeContextComment({
+                            model,
+                            operation: 'update',
+                        })
+                    );
+                updateResult = await query.executeTakeFirstOrThrow();
+            }
+
+            // validate disconnect result
+            if (expectedUpdateCount > updateResult.numUpdatedRows!) {
+                // some entities were not connected
+                throw new NotFoundError(model);
+            }
         }
     }
 
@@ -1818,62 +2044,80 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fromRelation: FromRelationContext<Schema>
     ) {
         const _data = enumerate(data);
-        const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+
+        const m2m = getManyToManyRelation(
             this.schema,
             fromRelation.model,
             fromRelation.field
         );
 
-        if (ownedByModel) {
-            throw new InternalError(
-                'relation can only be set from the non-owning side'
+        if (m2m) {
+            // handle many-to-many relation
+
+            // reset for the parent
+            await this.resetManyToManyRelation(
+                kysely,
+                fromRelation.model,
+                fromRelation.field,
+                fromRelation.ids
             );
-        }
 
-        const fkConditions = keyPairs.reduce(
-            (acc, { fk, pk }) => ({
-                ...acc,
-                [fk]: fromRelation.ids[pk],
-            }),
-            {} as any
-        );
+            // connect new entities
+            const actions = _data.map(async (d) => {
+                const ids = await this.getEntityIds(kysely, model, d);
+                return this.handleManyToManyRelation(
+                    kysely,
+                    'connect',
+                    fromRelation.model,
+                    fromRelation.field,
+                    fromRelation.ids,
+                    m2m.otherModel,
+                    m2m.otherField,
+                    ids,
+                    m2m.joinTable
+                );
+            });
+            const results = await Promise.all(actions);
 
-        // disconnect
-        const query = kysely
-            .updateTable(model)
-            .where((eb) =>
-                eb.and([
-                    // match parent
-                    eb.and(fkConditions),
-                    // exclude entities to be connected
-                    eb.not(eb.or(_data.map((d) => eb.and(d)))),
-                ])
-            )
-            .set(
-                keyPairs.reduce(
-                    (acc, { fk }) => ({ ...acc, [fk]: null }),
-                    {} as any
-                )
-            )
-            .modifyEnd(
-                this.makeContextComment({
-                    model,
-                    operation: 'update',
-                })
+            // validate connect result
+            if (_data.length > results.filter((r) => !!r).length) {
+                throw new NotFoundError(model);
+            }
+        } else {
+            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                this.schema,
+                fromRelation.model,
+                fromRelation.field
             );
-        await query.execute();
 
-        // connect
-        if (_data.length > 0) {
+            if (ownedByModel) {
+                throw new InternalError(
+                    'relation can only be set from the non-owning side'
+                );
+            }
+
+            const fkConditions = keyPairs.reduce(
+                (acc, { fk, pk }) => ({
+                    ...acc,
+                    [fk]: fromRelation.ids[pk],
+                }),
+                {} as any
+            );
+
+            // disconnect
             const query = kysely
                 .updateTable(model)
-                .where((eb) => eb.or(_data.map((d) => eb.and(d))))
+                .where((eb) =>
+                    eb.and([
+                        // match parent
+                        eb.and(fkConditions),
+                        // exclude entities to be connected
+                        eb.not(eb.or(_data.map((d) => eb.and(d)))),
+                    ])
+                )
                 .set(
                     keyPairs.reduce(
-                        (acc, { fk, pk }) => ({
-                            ...acc,
-                            [fk]: fromRelation.ids[pk],
-                        }),
+                        (acc, { fk }) => ({ ...acc, [fk]: null }),
                         {} as any
                     )
                 )
@@ -1883,16 +2127,38 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         operation: 'update',
                     })
                 );
-            const r = await query.executeTakeFirstOrThrow();
+            await query.execute();
 
-            // validate result
-            if (_data.length > r.numUpdatedRows!) {
-                // some entities were not connected
-                throw new NotFoundError(model);
+            // connect
+            if (_data.length > 0) {
+                const query = kysely
+                    .updateTable(model)
+                    .where((eb) => eb.or(_data.map((d) => eb.and(d))))
+                    .set(
+                        keyPairs.reduce(
+                            (acc, { fk, pk }) => ({
+                                ...acc,
+                                [fk]: fromRelation.ids[pk],
+                            }),
+                            {} as any
+                        )
+                    )
+                    .modifyEnd(
+                        this.makeContextComment({
+                            model,
+                            operation: 'update',
+                        })
+                    );
+                const r = await query.executeTakeFirstOrThrow();
+
+                // validate result
+                if (_data.length > r.numUpdatedRows!) {
+                    // some entities were not connected
+                    throw new NotFoundError(model);
+                }
             }
         }
     }
-
     protected async deleteRelation(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
@@ -1917,67 +2183,108 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             expectedDeleteCount = deleteConditions.length;
         }
 
-        const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+        let deleteResult: { count: number };
+        const m2m = getManyToManyRelation(
             this.schema,
             fromRelation.model,
             fromRelation.field
         );
 
-        let deleteResult: DeleteResult;
-        if (ownedByModel) {
-            const fromEntity = await this.readUnique(
-                kysely,
-                fromRelation.model as GetModels<Schema>,
-                {
-                    where: fromRelation.ids,
-                }
+        if (m2m) {
+            // handle many-to-many relation
+            const fieldDef = this.requireField(
+                fromRelation.model,
+                fromRelation.field
             );
-            if (!fromEntity) {
-                throw new NotFoundError(model);
-            }
-            const query = kysely
-                .deleteFrom(model)
-                .where((eb) =>
-                    eb.and([
-                        eb.and(
-                            keyPairs.map(({ fk, pk }) =>
-                                eb(sql.ref(pk), '=', fromEntity[fk])
-                            )
-                        ),
-                        eb.or(deleteConditions.map((d) => eb.and(d))),
-                    ])
-                )
-                .modifyEnd(
-                    this.makeContextComment({
-                        model,
-                        operation: 'delete',
-                    })
-                );
-            deleteResult = await query.executeTakeFirstOrThrow();
+            invariant(fieldDef.relation?.opposite);
+
+            deleteResult = await this.delete(
+                kysely,
+                model,
+                {
+                    AND: [
+                        {
+                            [fieldDef.relation.opposite]: {
+                                some: fromRelation.ids,
+                            },
+                        },
+                        {
+                            OR: deleteConditions,
+                        },
+                    ],
+                },
+                false
+            );
         } else {
-            const query = kysely
-                .deleteFrom(model)
-                .where((eb) =>
-                    eb.and([
-                        eb.and(
-                            keyPairs.map(({ fk, pk }) =>
-                                eb(sql.ref(fk), '=', fromRelation.ids[pk])
-                            )
-                        ),
-                        eb.or(deleteConditions.map((d) => eb.and(d))),
-                    ])
-                )
-                .modifyEnd(
-                    this.makeContextComment({ model, operation: 'delete' })
+            const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                this.schema,
+                fromRelation.model,
+                fromRelation.field
+            );
+
+            if (ownedByModel) {
+                const fromEntity = await this.readUnique(
+                    kysely,
+                    fromRelation.model as GetModels<Schema>,
+                    {
+                        where: fromRelation.ids,
+                    }
                 );
-            deleteResult = await query.executeTakeFirstOrThrow();
+                if (!fromEntity) {
+                    throw new NotFoundError(model);
+                }
+
+                const fieldDef = this.requireField(
+                    fromRelation.model,
+                    fromRelation.field
+                );
+                invariant(fieldDef.relation?.opposite);
+                deleteResult = await this.delete(
+                    kysely,
+                    model,
+                    {
+                        AND: [
+                            {
+                                // filter for parent
+                                [fieldDef.relation.opposite]:
+                                    Object.fromEntries(
+                                        keyPairs.map(({ fk, pk }) => [
+                                            fk,
+                                            fromEntity[pk],
+                                        ])
+                                    ),
+                            },
+                            {
+                                OR: deleteConditions,
+                            },
+                        ],
+                    },
+                    false
+                );
+            } else {
+                deleteResult = await this.delete(
+                    kysely,
+                    model,
+                    {
+                        AND: [
+                            Object.fromEntries(
+                                keyPairs.map(({ fk, pk }) => [
+                                    fk,
+                                    fromRelation.ids[pk],
+                                ])
+                            ),
+                            {
+                                OR: deleteConditions,
+                            },
+                        ],
+                    },
+                    false
+                );
+            }
         }
 
         // validate result
-        if (
-            throwForNotFound &&
-            expectedDeleteCount > deleteResult.numDeletedRows
-        ) {
+        if (throwForNotFound && expectedDeleteCount > deleteResult.count) {
             // some entities were not deleted
             throw new NotFoundError(model);
         }

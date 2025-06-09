@@ -1,5 +1,6 @@
 import {
     DefaultConnectionProvider,
+    DefaultQueryExecutor,
     Kysely,
     Log,
     PostgresDialect,
@@ -47,6 +48,7 @@ export const ZenStackClient = function <Schema extends SchemaDef>(
 
 export class ClientImpl<Schema extends SchemaDef> {
     private kysely: ToKysely<Schema>;
+    private kyselyRaw: ToKysely<any>;
     public readonly $options: ClientOptions<Schema>;
     public readonly $schema: Schema;
     readonly kyselyProps: KyselyProps;
@@ -77,6 +79,7 @@ export class ClientImpl<Schema extends SchemaDef> {
                     new DefaultConnectionProvider(baseClient.kyselyProps.driver)
                 ),
             };
+            this.kyselyRaw = baseClient.kyselyRaw;
         } else {
             const dialect = this.getKyselyDialect();
             const driver = new ZenStackDriver(
@@ -103,6 +106,17 @@ export class ClientImpl<Schema extends SchemaDef> {
                 driver,
                 executor,
             };
+
+            // raw kysely instance with default executor
+            this.kyselyRaw = new Kysely({
+                ...this.kyselyProps,
+                executor: new DefaultQueryExecutor(
+                    compiler,
+                    adapter,
+                    connectionProvider,
+                    []
+                ),
+            });
         }
 
         this.kysely = new Kysely(this.kyselyProps);
@@ -112,6 +126,10 @@ export class ClientImpl<Schema extends SchemaDef> {
 
     public get $qb() {
         return this.kysely;
+    }
+
+    public get $qbRaw() {
+        return this.kyselyRaw;
     }
 
     private getKyselyDialect() {

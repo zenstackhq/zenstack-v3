@@ -6,6 +6,7 @@ import {
     type RawBuilder,
     type SelectQueryBuilder,
 } from 'kysely';
+import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { BuiltinType, FieldDef, GetModels } from '../../../schema/schema';
@@ -13,6 +14,8 @@ import type { FindArgs } from '../../crud-types';
 import {
     buildFieldRef,
     buildJoinPairs,
+    getIdFields,
+    getManyToManyRelation,
     requireField,
     requireModel,
 } from '../../query-utils';
@@ -129,21 +132,61 @@ export class PostgresCrudDialect<
                     }
 
                     // add join conditions
-                    const joinPairs = buildJoinPairs(
+
+                    const m2m = getManyToManyRelation(
                         this.schema,
                         model,
-                        parentName,
-                        relationField,
-                        relationModel
+                        relationField
                     );
-                    subQuery = subQuery.where((eb) =>
-                        this.and(
-                            eb,
-                            ...joinPairs.map(([left, right]) =>
-                                eb(sql.ref(left), '=', sql.ref(right))
+
+                    if (m2m) {
+                        // many-to-many relation
+                        const parentIds = getIdFields(this.schema, model);
+                        const relationIds = getIdFields(
+                            this.schema,
+                            relationModel
+                        );
+                        invariant(
+                            parentIds.length === 1,
+                            'many-to-many relation must have exactly one id field'
+                        );
+                        invariant(
+                            relationIds.length === 1,
+                            'many-to-many relation must have exactly one id field'
+                        );
+                        subQuery = subQuery.where(
+                            eb(
+                                eb.ref(`${relationModel}.${relationIds[0]}`),
+                                'in',
+                                eb
+                                    .selectFrom(m2m.joinTable)
+                                    .select(
+                                        `${m2m.joinTable}.${m2m.otherFkName}`
+                                    )
+                                    .whereRef(
+                                        `${parentName}.${parentIds[0]}`,
+                                        '=',
+                                        `${m2m.joinTable}.${m2m.parentFkName}`
+                                    )
                             )
-                        )
-                    );
+                        );
+                    } else {
+                        const joinPairs = buildJoinPairs(
+                            this.schema,
+                            model,
+                            parentName,
+                            relationField,
+                            relationModel
+                        );
+                        subQuery = subQuery.where((eb) =>
+                            this.and(
+                                eb,
+                                ...joinPairs.map(([left, right]) =>
+                                    eb(sql.ref(left), '=', sql.ref(right))
+                                )
+                            )
+                        );
+                    }
 
                     return subQuery.as(joinTableName);
                 });

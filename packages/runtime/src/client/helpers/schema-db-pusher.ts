@@ -165,6 +165,13 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                     col = col.notNull();
                 }
 
+                if (
+                    this.isAutoIncrement(fieldDef) &&
+                    this.schema.provider.type === 'sqlite'
+                ) {
+                    col = col.autoIncrement();
+                }
+
                 return col;
             }
         );
@@ -175,6 +182,13 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             return this.schema.provider.type === 'postgresql'
                 ? sql.ref(fieldDef.type)
                 : 'text';
+        }
+
+        if (
+            this.isAutoIncrement(fieldDef) &&
+            this.schema.provider.type === 'postgresql'
+        ) {
+            return 'serial';
         }
 
         const type = fieldDef.type as BuiltinType;
@@ -199,6 +213,14 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         } else {
             return result as ColumnDataType;
         }
+    }
+
+    private isAutoIncrement(fieldDef: FieldDef) {
+        return (
+            fieldDef.default &&
+            Expression.isCall(fieldDef.default) &&
+            fieldDef.default.function === 'autoincrement'
+        );
     }
 
     private addForeignKeyConstraint(

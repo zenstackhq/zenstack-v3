@@ -36,7 +36,7 @@
             -   [x] Sorting
             -   [x] Pagination
         -   [x] Distinct
-    -   [ ] Update
+    -   [x] Update
         -   [x] Input validation
         -   [x] Top-level
         -   [x] Nested to-many
@@ -44,6 +44,7 @@
         -   [x] Incremental update for numeric fields
         -   [x] Array update
     -   [x] Upsert
+        -   [ ] Implement with "on conflict"
     -   [x] Delete
     -   [x] Aggregation
         -   [x] Count
@@ -54,22 +55,23 @@
         -   [x] Computed fields
         -   [ ] Prisma client extension
     -   [ ] Misc
+        -   [ ] Cache validation schemas
         -   [ ] Compound ID
         -   [ ] Cross field comparison
-        -   [ ] Many-to-many relation
-        -   [ ] Cache validation schemas
+        -   [x] Many-to-many relation
+        -   [ ] Empty AND/OR/NOT behavior
         -   [?] Logging
-        -   [ ] Error system
+        -   [?] Error system
         -   [x] Custom table name
         -   [x] Custom field name
-        -   [ ] Empty AND/OR/NOT behavior
         -   [?] Strict undefined check
 -   [ ] Access Policy
     -   [ ] Short-circuit pre-create check for scalar-field only policies
+    -   [ ] Inject "replace into"
+    -   [ ] Inject "on conflict do update"
 -   [ ] Polymorphism
 -   [x] Migration
 -   [ ] Databases
     -   [x] SQLite
     -   [x] PostgreSQL
         -   [ ] Schema
-    -   [ ] MySQL

@@ -7,12 +7,15 @@ import {
     type RawBuilder,
     type SelectQueryBuilder,
 } from 'kysely';
+import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { BuiltinType, GetModels } from '../../../schema/schema';
 import type { FindArgs } from '../../crud-types';
 import {
     buildFieldRef,
+    getIdFields,
+    getManyToManyRelation,
     getRelationForeignKeyFieldPairs,
     requireField,
     requireModel,
@@ -117,28 +120,63 @@ export class SqliteCrudDialect<
             }
 
             // join conditions
-            const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
+
+            const m2m = getManyToManyRelation(
                 this.schema,
                 model,
                 relationField
             );
-            keyPairs.forEach(({ fk, pk }) => {
-                if (ownedByModel) {
-                    // the parent model owns the fk
-                    subQuery = subQuery.whereRef(
-                        `${relationModel}.${pk}`,
-                        '=',
-                        `${parentName}.${fk}`
+            if (m2m) {
+                // many-to-many relation
+                const parentIds = getIdFields(this.schema, model);
+                const relationIds = getIdFields(this.schema, relationModel);
+                invariant(
+                    parentIds.length === 1,
+                    'many-to-many relation must have exactly one id field'
+                );
+                invariant(
+                    relationIds.length === 1,
+                    'many-to-many relation must have exactly one id field'
+                );
+                subQuery = subQuery.where(
+                    eb(
+                        eb.ref(`${relationModel}.${relationIds[0]}`),
+                        'in',
+                        eb
+                            .selectFrom(m2m.joinTable)
+                            .select(`${m2m.joinTable}.${m2m.otherFkName}`)
+                            .whereRef(
+                                `${parentName}.${parentIds[0]}`,
+                                '=',
+                                `${m2m.joinTable}.${m2m.parentFkName}`
+                            )
+                    )
+                );
+            } else {
+                const { keyPairs, ownedByModel } =
+                    getRelationForeignKeyFieldPairs(
+                        this.schema,
+                        model,
+                        relationField
                     );
-                } else {
-                    // the relation side owns the fk
-                    subQuery = subQuery.whereRef(
-                        `${relationModel}.${fk}`,
-                        '=',
-                        `${parentName}.${pk}`
-                    );
-                }
-            });
+                keyPairs.forEach(({ fk, pk }) => {
+                    if (ownedByModel) {
+                        // the parent model owns the fk
+                        subQuery = subQuery.whereRef(
+                            `${relationModel}.${pk}`,
+                            '=',
+                            `${parentName}.${fk}`
+                        );
+                    } else {
+                        // the relation side owns the fk
+                        subQuery = subQuery.whereRef(
+                            `${relationModel}.${fk}`,
+                            '=',
+                            `${parentName}.${pk}`
+                        );
+                    }
+                });
+            }
             return subQuery.as(subQueryName);
         });
 

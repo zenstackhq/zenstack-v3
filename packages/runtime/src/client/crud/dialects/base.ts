@@ -32,6 +32,8 @@ import {
     buildFieldRef,
     buildJoinPairs,
     getField,
+    getIdFields,
+    getManyToManyRelation,
     getRelationForeignKeyFieldPairs,
     isEnum,
     makeDefaultOrderBy,
@@ -68,17 +70,17 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         eb: ExpressionBuilder<any, any>,
         model: string,
         modelAlias: string,
-        where: object | undefined
+        where: boolean | object | undefined
     ) {
+        if (where === true || where === undefined) {
+            return this.true(eb);
+        }
+
+        if (where === false) {
+            return this.false(eb);
+        }
+
         let result = this.true(eb);
-
-        if (where === undefined) {
-            return result;
-        }
-
-        if (where === null || typeof where !== 'object') {
-            throw new InternalError('impossible null as filter');
-        }
 
         for (const [key, payload] of Object.entries(where)) {
             if (payload === undefined) {
@@ -148,7 +150,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         // call expression builder and combine the results
-        if ('$expr' in where && typeof where['$expr'] === 'function') {
+        if (
+            typeof where === 'object' &&
+            where !== null &&
+            '$expr' in where &&
+            typeof where['$expr'] === 'function'
+        ) {
             result = this.and(eb, result, where['$expr'](eb));
         }
 
@@ -356,45 +363,67 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         fieldDef: FieldDef,
         payload: any
     ) {
-        const relationModel = fieldDef.type;
-
-        const relationKeyPairs = getRelationForeignKeyFieldPairs(
-            this.schema,
-            model,
-            field
-        );
-
         // null check needs to be converted to fk "is null" checks
         if (payload === null) {
             return eb(sql.ref(`${table}.${field}`), 'is', null);
         }
 
+        const relationModel = fieldDef.type;
+
         const buildPkFkWhereRefs = (eb: ExpressionBuilder<any, any>) => {
-            let r = this.true(eb);
-            for (const { fk, pk } of relationKeyPairs.keyPairs) {
-                if (relationKeyPairs.ownedByModel) {
-                    r = this.and(
-                        eb,
-                        r,
-                        eb(
-                            sql.ref(`${table}.${fk}`),
+            const m2m = getManyToManyRelation(this.schema, model, field);
+            if (m2m) {
+                // many-to-many relation
+                const modelIdField = getIdFields(this.schema, model)[0]!;
+                const relationIdField = getIdFields(
+                    this.schema,
+                    relationModel
+                )[0]!;
+                return eb(
+                    sql.ref(`${relationModel}.${relationIdField}`),
+                    'in',
+                    eb
+                        .selectFrom(m2m.joinTable)
+                        .select(`${m2m.joinTable}.${m2m.otherFkName}`)
+                        .whereRef(
+                            sql.ref(`${m2m.joinTable}.${m2m.parentFkName}`),
                             '=',
-                            sql.ref(`${relationModel}.${pk}`)
+                            sql.ref(`${table}.${modelIdField}`)
                         )
-                    );
-                } else {
-                    r = this.and(
-                        eb,
-                        r,
-                        eb(
-                            sql.ref(`${table}.${pk}`),
-                            '=',
-                            sql.ref(`${relationModel}.${fk}`)
-                        )
-                    );
+                );
+            } else {
+                const relationKeyPairs = getRelationForeignKeyFieldPairs(
+                    this.schema,
+                    model,
+                    field
+                );
+
+                let result = this.true(eb);
+                for (const { fk, pk } of relationKeyPairs.keyPairs) {
+                    if (relationKeyPairs.ownedByModel) {
+                        result = this.and(
+                            eb,
+                            result,
+                            eb(
+                                sql.ref(`${table}.${fk}`),
+                                '=',
+                                sql.ref(`${relationModel}.${pk}`)
+                            )
+                        );
+                    } else {
+                        result = this.and(
+                            eb,
+                            result,
+                            eb(
+                                sql.ref(`${table}.${pk}`),
+                                '=',
+                                sql.ref(`${relationModel}.${fk}`)
+                            )
+                        );
+                    }
                 }
+                return result;
             }
-            return r;
         };
 
         let result = this.true(eb);

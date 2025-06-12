@@ -1,12 +1,10 @@
 import { AstUtils, type AstNode, type ValidationAcceptor } from 'langium';
 import {
     BinaryExpr,
-    DataModelAttribute,
     Expression,
     isArrayExpr,
     isDataModel,
     isDataModelAttribute,
-    isDataModelField,
     isEnum,
     isLiteralExpr,
     isMemberAccessExpr,
@@ -18,7 +16,6 @@ import {
 
 import {
     findUpAst,
-    getAttributeArgLiteral,
     isAuthInvocation,
     isAuthOrAuthMemberAccess,
     isDataModelFieldReference,

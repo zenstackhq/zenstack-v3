@@ -29,6 +29,7 @@ export type ModelDef = {
         | Record<string, Pick<FieldDef, 'type'>>
     >;
     idFields: string[];
+    // eslint-disable-next-line @typescript-eslint/ban-types
     computedFields?: Record<string, Function>;
 };
 

@@ -199,6 +199,7 @@ export class ClientImpl<Schema extends SchemaDef> {
             );
         }
 
+        // eslint-disable-next-line @typescript-eslint/ban-types
         return (procOptions[name] as Function).apply(this, [this, ...args]);
     }
 

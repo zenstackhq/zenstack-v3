@@ -11,6 +11,9 @@ importers:
       '@swc/core':
         specifier: ^1.10.15
         version: 1.10.15
+      eslint:
+        specifier: ~8.57.1
+        version: 8.57.1
       npm-run-all:
         specifier: ^4.1.5
         version: 4.1.5
@@ -139,6 +142,9 @@ importers:
       decimal.js:
         specifier: ^10.4.3
         version: 10.4.3
+      is-plain-object:
+        specifier: ^5.0.0
+        version: 5.0.0
       kysely:
         specifier: ^0.27.5
         version: 0.27.6
@@ -1832,6 +1838,10 @@ packages:
   is-path-inside@3.0.3:
     resolution: {integrity: sha512-Fd4gABb+ycGAmKou8eMftCupSir5lRxqf4aD/vd0cD2qc4HL07OjCeuHMr8Ro4CoMaeCKDB0/ECBOVWjTwUvPQ==}
     engines: {node: '>=8'}
+
+  is-plain-object@5.0.0:
+    resolution: {integrity: sha512-VRSzKkbMm5jMDoKLbltAkFQ5Qr7VDiTFGXxYFXXowVj387GeGNOCsOH6Msy00SGZ3Fp84b1Naa1psqgcCIEP5Q==}
+    engines: {node: '>=0.10.0'}
 
   is-regex@1.2.1:
     resolution: {integrity: sha512-MjYsKHO5O7mCsmRGxWcLWheFqN9DJ/2TmngvjKXihe6efViPqc274+Fx/4fYj/r03+ESvBdTXK0V6tA3rgez1g==}
@@ -4439,6 +4449,8 @@ snapshots:
   is-number@7.0.0: {}
 
   is-path-inside@3.0.3: {}
+
+  is-plain-object@5.0.0: {}
 
   is-regex@1.2.1:
     dependencies:

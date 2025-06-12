@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-types */
+
 import type { Decimal } from 'decimal.js';
 import {
     type AuthType,

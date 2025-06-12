@@ -198,7 +198,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         }
 
         const type = fieldDef.type as BuiltinType;
-        let result = match<BuiltinType, ColumnDataType>(type)
+        const result = match<BuiltinType, ColumnDataType>(type)
             .with('String', () => 'text')
             .with('Boolean', () => 'boolean')
             .with('Int', () => 'integer')

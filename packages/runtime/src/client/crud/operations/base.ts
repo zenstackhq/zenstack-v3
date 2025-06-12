@@ -146,7 +146,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         filter: any
     ): Promise<unknown | undefined> {
         const idFields = getIdFields(this.schema, model);
-        let _filter = flattenCompoundUniqueFilters(this.schema, model, filter);
+        const _filter = flattenCompoundUniqueFilters(
+            this.schema,
+            model,
+            filter
+        );
         const query = kysely
             .selectFrom(model)
             .where((eb) => eb.and(_filter))
@@ -173,7 +177,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         // skip && take
         let negateOrderBy = false;
-        let skip = args?.skip;
+        const skip = args?.skip;
         let take = args?.take;
         if (take !== undefined && take < 0) {
             negateOrderBy = true;
@@ -277,7 +281,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     private buildFieldSelection(
         model: string,
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         selectOrInclude: Record<string, any>,
         parentAlias: string
     ) {
@@ -321,7 +325,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private buildCountSelection(
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         model: string,
         parentAlias: string,
         payload: any
@@ -331,7 +335,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             ([, field]) => field.relation && field.array
         );
 
-        let selections =
+        const selections =
             payload === true
                 ? {
                       select: toManyRelations.reduce((acc, [field]) => {
@@ -411,19 +415,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     private buildSelectAllScalarFields(
         model: string,
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         omit?: Record<string, boolean | undefined>
     ) {
-        let result = query;
         const modelDef = this.requireModel(model);
         return Object.keys(modelDef.fields)
             .filter((f) => !isRelationField(this.schema, model, f))
             .filter((f) => omit?.[f] !== true)
-            .reduce((acc, f) => this.selectField(acc, model, model, f), result);
+            .reduce((acc, f) => this.selectField(acc, model, model, f), query);
     }
 
     private selectField(
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         model: string,
         modelAlias: string,
         field: string
@@ -442,7 +445,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     private buildCursorFilter(
         model: string,
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         cursor: FindArgs<Schema, GetModels<Schema>, true>['cursor'],
         orderBy: FindArgs<Schema, GetModels<Schema>, true>['orderBy'],
         negateOrderBy: boolean
@@ -459,7 +462,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const cursorFilter = this.dialect.buildFilter(eb, model, model, cursor);
 
         let result = query;
-        let filters: ExpressionWrapper<any, any, any>[] = [];
+        const filters: ExpressionWrapper<any, any, any>[] = [];
 
         for (let i = orderByItems.length - 1; i >= 0; i--) {
             const andFilters: ExpressionWrapper<any, any, any>[] = [];

@@ -6,6 +6,7 @@
     "scripts": {
         "build": "tsup-node",
         "watch": "tsup-node --watch",
+        "lint": "eslint src --ext ts",
         "test": "vitest",
         "pack": "pnpm pack"
     },

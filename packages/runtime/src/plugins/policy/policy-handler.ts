@@ -278,7 +278,7 @@ export class PolicyHandler<
                     raw: (item as ValueNode).value,
                 });
             } else {
-                let value = this.dialect.transformPrimitive(
+                const value = this.dialect.transformPrimitive(
                     item,
                     fieldDef.type as BuiltinType
                 );

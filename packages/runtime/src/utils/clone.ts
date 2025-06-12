@@ -1,4 +1,5 @@
-import { isPlainObject } from './is-plain-object';
+// @ts-expect-error
+import { isPlainObject } from 'is-plain-object';
 
 /**
  * Clones the given object. Only arrays and plain objects are cloned. Other values are returned as is.

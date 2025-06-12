@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-types */
+
 import type { ExpressionBuilder, OperandExpression, SqlBool } from 'kysely';
 import type { Optional } from 'utility-types';
 import type {

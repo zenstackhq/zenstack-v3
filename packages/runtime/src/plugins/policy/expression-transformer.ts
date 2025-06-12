@@ -107,7 +107,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     @expr('literal')
-    // @ts-ignore
+    // @ts-expect-error
     private _literal(expr: LiteralExpression) {
         return this.transformValue(
             expr.value,
@@ -120,7 +120,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     @expr('array')
-    // @ts-ignore
+    // @ts-expect-error
     private _array(
         expr: ArrayExpression,
         context: ExpressionTransformerContext<Schema>
@@ -131,7 +131,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     @expr('field')
-    // @ts-ignore
+    // @ts-expect-error
     private _field(
         expr: FieldExpression,
         context: ExpressionTransformerContext<Schema>

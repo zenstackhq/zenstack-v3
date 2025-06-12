@@ -207,6 +207,7 @@ export function buildFieldRef<Schema extends SchemaDef>(
     if (!fieldDef.computed) {
         return eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
     } else {
+        // eslint-disable-next-line @typescript-eslint/ban-types
         let computer: Function | undefined;
         if ('computedFields' in options) {
             const computedFields = options.computedFields as Record<

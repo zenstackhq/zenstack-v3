@@ -49,12 +49,12 @@ export class PostgresCrudDialect<
     }
 
     override buildRelationSelection(
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         model: string,
         relationField: string,
         parentAlias: string,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>
-    ): SelectQueryBuilder<any, any, {}> {
+    ): SelectQueryBuilder<any, any, any> {
         const joinedQuery = this.buildRelationJSON(
             model,
             query,
@@ -261,7 +261,7 @@ export class PostgresCrudDialect<
         const objArgs: Array<
             | string
             | ExpressionWrapper<any, any, any>
-            | SelectQueryBuilder<any, any, {}>
+            | SelectQueryBuilder<any, any, any>
             | RawBuilder<any>
         > = [];
 

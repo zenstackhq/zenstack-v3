@@ -457,7 +457,7 @@ export class TsSchemaGenerator {
             ts.factory.createPropertyAssignment(
                 'type',
                 ts.factory.createStringLiteral(
-                    field.type.type ?? field.type.reference?.$refText!
+                    field.type.type ?? field.type.reference!.$refText
                 )
             ),
         ];
@@ -635,7 +635,7 @@ export class TsSchemaGenerator {
     private getDataSourceProvider(
         model: Model
     ):
-        | { type: string; url: string; env: undefined }
+        | { type: string; env: undefined; url: string }
         | { type: string; env: string; url: undefined } {
         const dataSource = model.declarations.find(isDataSource);
         invariant(dataSource, 'No data source found in the model');
@@ -652,7 +652,6 @@ export class TsSchemaGenerator {
             'URL must be a literal or env function'
         );
 
-        let url: string;
         if (isLiteralExpr(urlExpr)) {
             return { type, url: urlExpr.value as string, env: undefined };
         } else if (isInvocationExpr(urlExpr)) {
@@ -664,9 +663,6 @@ export class TsSchemaGenerator {
                 urlExpr.args.length === 1,
                 'env function must have one argument'
             );
-            url = `env(${
-                (urlExpr.args[0]!.value as LiteralExpr).value as string
-            })`;
             return {
                 type,
                 env: (urlExpr.args[0]!.value as LiteralExpr).value as string,
@@ -1039,7 +1035,9 @@ export class TsSchemaGenerator {
                 let parsedUrl: URL | undefined;
                 try {
                     parsedUrl = new URL(dsProvider.url);
-                } catch {}
+                } catch {
+                    // ignore
+                }
 
                 if (parsedUrl) {
                     if (parsedUrl.protocol !== 'file:') {
@@ -1144,7 +1142,7 @@ export class TsSchemaGenerator {
                     ts.factory.createPropertyAssignment(
                         'type',
                         ts.factory.createStringLiteral(
-                            param.type.type ?? param.type.reference?.$refText!
+                            param.type.type ?? param.type.reference!.$refText
                         )
                     ),
                 ])
@@ -1174,7 +1172,7 @@ export class TsSchemaGenerator {
                             ts.factory.createLiteralTypeNode(
                                 ts.factory.createStringLiteral(
                                     param.type.type ??
-                                        param.type.reference?.$refText!
+                                        param.type.reference!.$refText
                                 )
                             )
                         ),
@@ -1207,7 +1205,7 @@ export class TsSchemaGenerator {
                     'returnType',
                     ts.factory.createStringLiteral(
                         proc.returnType.type ??
-                            proc.returnType.reference?.$refText!
+                            proc.returnType.reference!.$refText
                     )
                 ),
                 ...(proc.mutation

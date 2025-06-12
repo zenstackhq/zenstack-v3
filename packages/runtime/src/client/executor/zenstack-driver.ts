@@ -130,6 +130,7 @@ export class ZenStackDriver implements Driver {
     #addLogging(connection: DatabaseConnection): void {
         const executeQuery = connection.executeQuery;
         const streamQuery = connection.streamQuery;
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const dis = this;
 
         connection.executeQuery = async (

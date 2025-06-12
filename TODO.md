@@ -16,7 +16,7 @@
         -   [x] Create many
         -   [x] ID generation
         -   [x] CreateManyAndReturn
-    -   [ ] Find
+    -   [x] Find
         -   [x] Input validation
         -   [x] Field selection
             -   [x] Omit
@@ -56,15 +56,15 @@
         -   [ ] Prisma client extension
     -   [ ] Misc
         -   [ ] Cache validation schemas
-        -   [ ] Compound ID
+        -   [x] Compound ID
         -   [ ] Cross field comparison
         -   [x] Many-to-many relation
         -   [ ] Empty AND/OR/NOT behavior
         -   [?] Logging
-        -   [?] Error system
+        -   [ ] Error system
         -   [x] Custom table name
         -   [x] Custom field name
-        -   [?] Strict undefined check
+        -   [ ] Strict undefined check
 -   [ ] Access Policy
     -   [ ] Short-circuit pre-create check for scalar-field only policies
     -   [ ] Inject "replace into"
@@ -74,4 +74,4 @@
 -   [ ] Databases
     -   [x] SQLite
     -   [x] PostgreSQL
-        -   [ ] Schema
+        -   [x] Multi-schema

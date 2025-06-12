@@ -15,6 +15,7 @@ import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
 import type { ClientContract } from '../..';
+import { PolicyPlugin } from '../../../plugins/policy';
 import {
     Expression,
     type GetModels,
@@ -42,6 +43,7 @@ import {
     buildFieldRef,
     buildJoinPairs,
     ensureArray,
+    flattenCompoundUniqueFilters,
     getField,
     getIdFields,
     getIdValues,
@@ -115,6 +117,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         );
     }
 
+    // TODO: this is not clean, needs a better solution
+    protected get hasPolicyEnabled() {
+        return this.options.plugins?.some(
+            (plugin) => plugin instanceof PolicyPlugin
+        );
+    }
+
     protected requireModel(model: string) {
         return requireModel(this.schema, model);
     }
@@ -137,9 +146,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         filter: any
     ): Promise<unknown | undefined> {
         const idFields = getIdFields(this.schema, model);
+        let _filter = flattenCompoundUniqueFilters(this.schema, model, filter);
         const query = kysely
             .selectFrom(model)
-            .where((eb) => eb.and(filter))
+            .where((eb) => eb.and(_filter))
             .select(idFields.map((f) => kysely.dynamic.ref(f)))
             .limit(1)
             .modifyEnd(this.makeContextComment({ model, operation: 'read' }));
@@ -1727,13 +1737,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         await Promise.all(tasks);
     }
 
+    // #region relation manipulation
+
     protected async connectRelation(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         data: any,
         fromRelation: FromRelationContext<Schema>
     ) {
-        const _data = enumerate(data);
+        const _data = this.normalizeRelationManipulationInput(model, data);
         if (_data.length === 0) {
             return;
         }
@@ -1866,25 +1878,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    private getEntityIds(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        uniqueFilter: any
-    ) {
-        const idFields = getIdFields(this.schema, model);
-        if (
-            idFields.every(
-                (f) => f in uniqueFilter && uniqueFilter[f] !== undefined
-            )
-        ) {
-            return uniqueFilter;
-        }
-
-        return this.readUnique(kysely, model, {
-            where: uniqueFilter,
-        });
-    }
-
     protected async connectOrCreateRelation(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
@@ -1920,20 +1913,21 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fromRelation: FromRelationContext<Schema>
     ) {
         let disconnectConditions: any[] = [];
-        let expectedUpdateCount: number;
         if (typeof data === 'boolean') {
             if (data === false) {
                 return;
             } else {
                 disconnectConditions = [true];
-                expectedUpdateCount = 1;
             }
         } else {
-            disconnectConditions = enumerate(data);
+            disconnectConditions = this.normalizeRelationManipulationInput(
+                model,
+                data
+            );
+
             if (disconnectConditions.length === 0) {
                 return;
             }
-            expectedUpdateCount = disconnectConditions.length;
         }
 
         if (disconnectConditions.length === 0) {
@@ -1949,6 +1943,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             // handle many-to-many relation
             const actions = disconnectConditions.map(async (d) => {
                 const ids = await this.getEntityIds(kysely, model, d);
+                if (!ids) {
+                    // not found
+                    return;
+                }
                 return this.handleManyToManyRelation(
                     kysely,
                     'disconnect',
@@ -1961,39 +1959,47 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     m2m.joinTable
                 );
             });
-            const results = await Promise.all(actions);
-
-            // validate disconnect result
-            if (expectedUpdateCount > results.filter((r) => !!r).length) {
-                throw new NotFoundError(model);
-            }
+            await Promise.all(actions);
         } else {
-            let updateResult: UpdateResult;
-
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
                 this.schema,
                 fromRelation.model,
                 fromRelation.field
             );
 
+            const eb = expressionBuilder<any, any>();
             if (ownedByModel) {
                 // set parent fk directly
                 invariant(
                     disconnectConditions.length === 1,
                     'only one entity can be disconnected'
                 );
-                const target = await this.readUnique(kysely, model, {
-                    where:
-                        disconnectConditions[0] === true
-                            ? {}
-                            : disconnectConditions[0],
-                });
-                if (!target) {
-                    throw new NotFoundError(model);
-                }
+                const condition = disconnectConditions[0];
                 const query = kysely
                     .updateTable(fromRelation.model)
-                    .where((eb) => eb.and(fromRelation.ids))
+                    // id filter
+                    .where(eb.and(fromRelation.ids))
+                    // merge extra disconnect conditions
+                    .$if(condition !== true, (qb) =>
+                        qb.where(
+                            eb(
+                                // @ts-ignore
+                                eb.refTuple(...keyPairs.map(({ fk }) => fk)),
+                                'in',
+                                eb
+                                    .selectFrom(model)
+                                    .select(keyPairs.map(({ pk }) => pk))
+                                    .where(
+                                        this.dialect.buildFilter(
+                                            eb,
+                                            model,
+                                            model,
+                                            condition
+                                        )
+                                    )
+                            )
+                        )
+                    )
                     .set(
                         keyPairs.reduce(
                             (acc, { fk }) => ({ ...acc, [fk]: null }),
@@ -2006,13 +2012,25 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         })
                     );
-                updateResult = await query.executeTakeFirstOrThrow();
+                await query.executeTakeFirstOrThrow();
             } else {
                 // disconnect
                 const query = kysely
                     .updateTable(model)
-                    .where((eb) =>
-                        eb.or(disconnectConditions.map((d) => eb.and(d)))
+                    .where(
+                        eb.and([
+                            // fk filter
+                            eb.and(
+                                Object.fromEntries(
+                                    keyPairs.map(({ fk, pk }) => [
+                                        fk,
+                                        fromRelation.ids[pk],
+                                    ])
+                                )
+                            ),
+                            // merge extra disconnect conditions
+                            eb.or(disconnectConditions.map((d) => eb.and(d))),
+                        ])
                     )
                     .set(
                         keyPairs.reduce(
@@ -2026,13 +2044,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         })
                     );
-                updateResult = await query.executeTakeFirstOrThrow();
-            }
-
-            // validate disconnect result
-            if (expectedUpdateCount > updateResult.numUpdatedRows!) {
-                // some entities were not connected
-                throw new NotFoundError(model);
+                await query.executeTakeFirstOrThrow();
             }
         }
     }
@@ -2043,7 +2055,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         data: any,
         fromRelation: FromRelationContext<Schema>
     ) {
-        const _data = enumerate(data);
+        const _data = this.normalizeRelationManipulationInput(model, data);
 
         const m2m = getManyToManyRelation(
             this.schema,
@@ -2159,6 +2171,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
     }
+
     protected async deleteRelation(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
@@ -2176,7 +2189,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 expectedDeleteCount = 1;
             }
         } else {
-            deleteConditions = enumerate(data);
+            deleteConditions = this.normalizeRelationManipulationInput(
+                model,
+                data
+            );
             if (deleteConditions.length === 0) {
                 return;
             }
@@ -2244,16 +2260,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     model,
                     {
                         AND: [
-                            {
-                                // filter for parent
-                                [fieldDef.relation.opposite]:
-                                    Object.fromEntries(
-                                        keyPairs.map(({ fk, pk }) => [
-                                            fk,
-                                            fromEntity[pk],
-                                        ])
-                                    ),
-                            },
+                            // filter for parent
+                            Object.fromEntries(
+                                keyPairs.map(({ fk, pk }) => [
+                                    pk,
+                                    fromEntity[fk],
+                                ])
+                            ),
                             {
                                 OR: deleteConditions,
                             },
@@ -2289,6 +2302,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             throw new NotFoundError(model);
         }
     }
+
+    private normalizeRelationManipulationInput(
+        model: GetModels<Schema>,
+        data: any
+    ) {
+        return enumerate(data).map((item) =>
+            flattenCompoundUniqueFilters(this.schema, model, item)
+        );
+    }
+
+    // #endregion
 
     protected async delete<
         ReturnData extends boolean,
@@ -2368,5 +2392,30 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 .setIsolationLevel('repeatable read')
                 .execute(callback);
         }
+    }
+
+    // Given a unique filter of a model, return the entity ids by trying to
+    // reused the filter if it's a complete id filter (without extra fields)
+    // otherwise, read the entity by the filter
+    private getEntityIds(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        uniqueFilter: any
+    ) {
+        const idFields: string[] = getIdFields(this.schema, model);
+        if (
+            // all id fields are provided
+            idFields.every(
+                (f) => f in uniqueFilter && uniqueFilter[f] !== undefined
+            ) &&
+            // no non-id filter exists
+            Object.keys(uniqueFilter).every((k) => idFields.includes(k))
+        ) {
+            return uniqueFilter;
+        }
+
+        return this.readUnique(kysely, model, {
+            where: uniqueFilter,
+        });
     }
 }

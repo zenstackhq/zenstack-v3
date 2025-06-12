@@ -543,7 +543,24 @@ describe.each([
                     ],
                 });
 
-                // disconnect
+                // disconnect - not found
+                await expect(
+                    client.user.update({
+                        where: { id: 1 },
+                        data: {
+                            tags: { disconnect: { id: 3, name: 'not found' } },
+                        },
+                        include: { tags: true },
+                    })
+                ).resolves.toMatchObject({
+                    tags: [
+                        expect.objectContaining({ id: 1 }),
+                        expect.objectContaining({ id: 2 }),
+                        expect.objectContaining({ id: 3 }),
+                    ],
+                });
+
+                // disconnect - found
                 await expect(
                     client.user.update({
                         where: { id: 1 },

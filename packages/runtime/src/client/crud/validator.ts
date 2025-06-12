@@ -271,6 +271,30 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         }
 
+        if (unique) {
+            // add compound unique fields, e.g. `{ id1_id2: { id1: 1, id2: 1 } }`
+            const uniqueFields = getUniqueFields(this.schema, model);
+            for (const uniqueField of uniqueFields) {
+                if ('defs' in uniqueField) {
+                    fields[uniqueField.name] = z
+                        .object(
+                            Object.fromEntries(
+                                Object.entries(uniqueField.defs).map(
+                                    ([key, def]) => [
+                                        key,
+                                        this.makePrimitiveFilterSchema(
+                                            def.type as BuiltinType,
+                                            !!def.optional
+                                        ),
+                                    ]
+                                )
+                            )
+                        )
+                        .optional();
+                }
+            }
+        }
+
         // expression builder
         fields['$expr'] = z.function().optional();
 
@@ -308,20 +332,14 @@ export class InputValidator<Schema extends SchemaDef> {
 
             if (uniqueFields.length === 1) {
                 // only one unique field (set), mark the field(s) required
-                result = baseWhere.required(
-                    uniqueFields[0]!.reduce(
-                        (acc, k) => ({
-                            ...acc,
-                            [k.name]: true,
-                        }),
-                        {}
-                    )
-                );
+                result = baseWhere.required({
+                    [uniqueFields[0]!.name]: true,
+                } as any);
             } else {
                 result = baseWhere.refine((value) => {
                     // check that at least one unique field is set
-                    return uniqueFields.some((fields) =>
-                        fields.every(({ name }) => value[name] !== undefined)
+                    return uniqueFields.some(
+                        ({ name }) => value[name] !== undefined
                     );
                 }, `At least one unique field or field set must be set`);
             }
@@ -810,7 +828,7 @@ export class InputValidator<Schema extends SchemaDef> {
     ) {
         const fieldType = fieldDef.type;
         const array = !!fieldDef.array;
-        let fields: Record<string, ZodSchema> = {
+        const fields: Record<string, ZodSchema> = {
             create: this.makeCreateDataSchema(
                 fieldDef.type,
                 !!fieldDef.array,
@@ -824,17 +842,6 @@ export class InputValidator<Schema extends SchemaDef> {
                 array,
                 withoutFields
             ).optional(),
-
-            disconnect: this.makeDisconnectDataSchema(
-                fieldType,
-                array
-            ).optional(),
-
-            delete: this.makeDeleteRelationDataSchema(
-                fieldType,
-                array,
-                true
-            ).optional(),
         };
 
         if (array) {
@@ -845,6 +852,20 @@ export class InputValidator<Schema extends SchemaDef> {
         }
 
         if (mode === 'update') {
+            if (fieldDef.optional || fieldDef.array) {
+                // disconnect and delete are only available for optional/to-many relations
+                fields['disconnect'] = this.makeDisconnectDataSchema(
+                    fieldType,
+                    array
+                ).optional();
+
+                fields['delete'] = this.makeDeleteRelationDataSchema(
+                    fieldType,
+                    array,
+                    true
+                ).optional();
+            }
+
             fields['update'] = array
                 ? this.orArray(
                       z.object({
@@ -883,6 +904,7 @@ export class InputValidator<Schema extends SchemaDef> {
             ).optional();
 
             if (array) {
+                // to-many relation specifics
                 fields['set'] = this.makeSetDataSchema(
                     fieldType,
                     true
@@ -926,9 +948,12 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeDisconnectDataSchema(model: string, canBeArray: boolean) {
         if (canBeArray) {
+            // to-many relation, must be unique filters
             return this.orArray(this.makeWhereSchema(model, true), canBeArray);
         } else {
-            return z.union([z.boolean(), this.makeWhereSchema(model, true)]);
+            // to-one relation, can be boolean or a regular filter - the entity
+            // being disconnected is already uniquely identified by its parent
+            return z.union([z.boolean(), this.makeWhereSchema(model, false)]);
         }
     }
 

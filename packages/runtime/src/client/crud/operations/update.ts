@@ -53,13 +53,16 @@ export class UpdateOperationHandler<
             });
         });
 
-        if (!result) {
+        if (!result && this.hasPolicyEnabled) {
             throw new RejectedByPolicyError(
                 this.model,
                 'result is not allowed to be read back'
             );
         }
 
+        // NOTE: update can actually return null if the entity being updated is deleted
+        // due to cascade when a relation is deleted during update. This doesn't comply
+        // with `update`'s method signature, but we'll allow it to be consistent with Prisma.
         return result;
     }
 

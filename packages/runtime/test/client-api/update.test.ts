@@ -538,6 +538,23 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                 await expect(
                     client.post.update({
                         where: { id: post.id },
+                        data: {
+                            comments: {
+                                disconnect: { id: '1', content: 'non found' },
+                            },
+                        },
+                        include: { comments: true },
+                    })
+                ).resolves.toMatchObject({
+                    comments: [
+                        expect.objectContaining({ id: '1' }),
+                        expect.objectContaining({ id: '2' }),
+                        expect.objectContaining({ id: '3' }),
+                    ],
+                });
+                await expect(
+                    client.post.update({
+                        where: { id: post.id },
                         data: { comments: { disconnect: { id: '1' } } },
                         include: { comments: true },
                     })
@@ -577,7 +594,9 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         },
                         include: { comments: true },
                     })
-                ).toBeRejectedNotFound();
+                ).resolves.toMatchObject({
+                    comments: [],
+                });
 
                 // multiple
                 await expect(
@@ -1428,7 +1447,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                         },
                         include: { profile: true },
                     })
-                ).toBeRejectedNotFound();
+                ).toResolveTruthy();
             });
 
             it('works with nested to-one relation update', async () => {
@@ -1851,7 +1870,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                             },
                         },
                     })
-                ).toBeRejectedNotFound();
+                ).toResolveTruthy();
 
                 // null relation
                 await expect(

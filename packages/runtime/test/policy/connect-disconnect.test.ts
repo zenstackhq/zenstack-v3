@@ -64,8 +64,11 @@ describe('connect and disconnect tests', () => {
                         disconnect: { id: 'm2-1' },
                     },
                 },
+                include: { m2: true },
             })
-        ).toBeRejectedNotFound();
+        ).resolves.toMatchObject({
+            m2: [expect.objectContaining({ id: 'm2-1' })],
+        });
         // reset m2-1 delete
         await rawDb.m2.update({
             where: { id: 'm2-1' },
@@ -221,8 +224,11 @@ describe('connect and disconnect tests', () => {
                         disconnect: { id: 'm2-1' },
                     },
                 },
+                include: { m2: true },
             })
-        ).toBeRejectedNotFound();
+        ).resolves.toMatchObject({
+            m2: expect.objectContaining({ id: 'm2-1' }),
+        });
         await rawDb.m2.update({
             where: { id: 'm2-1' },
             data: { deleted: false },

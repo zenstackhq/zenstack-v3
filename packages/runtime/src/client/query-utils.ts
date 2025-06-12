@@ -148,7 +148,12 @@ export function isRelationField(
 
 export function getUniqueFields(schema: SchemaDef, model: string) {
     const modelDef = requireModel(schema, model);
-    const result: Array<{ name: string; def: FieldDef }[]> = [];
+    const result: Array<
+        // single field unique
+        | { name: string; def: FieldDef }
+        // multi-field unique
+        | { name: string; defs: Record<string, FieldDef> }
+    > = [];
     for (const [key, value] of Object.entries(modelDef.uniqueFields)) {
         if (typeof value !== 'object') {
             throw new InternalError(
@@ -158,15 +163,18 @@ export function getUniqueFields(schema: SchemaDef, model: string) {
 
         if (typeof value.type === 'string') {
             // singular unique field
-            result.push([{ name: key, def: requireField(schema, model, key) }]);
+            result.push({ name: key, def: requireField(schema, model, key) });
         } else {
             // compound unique field
-            result.push(
-                Object.keys(value).map((k) => ({
-                    name: k,
-                    def: requireField(schema, model, k),
-                }))
-            );
+            result.push({
+                name: key,
+                defs: Object.fromEntries(
+                    Object.keys(value).map((k) => [
+                        k,
+                        requireField(schema, model, k),
+                    ])
+                ),
+            });
         }
     }
     return result;
@@ -295,6 +303,36 @@ export function getManyToManyRelation(
     } else {
         return undefined;
     }
+}
+
+/**
+ * Convert filter like `{ id1_id2: { id1: 1, id2: 1 } }` to `{ id1: 1, id2: 1 }`
+ */
+export function flattenCompoundUniqueFilters(
+    schema: SchemaDef,
+    model: string,
+    filter: unknown
+) {
+    if (typeof filter !== 'object' || !filter) {
+        return filter;
+    }
+
+    const uniqueFields = getUniqueFields(schema, model);
+    const compoundUniques = uniqueFields.filter((u) => 'defs' in u);
+    if (compoundUniques.length === 0) {
+        return filter;
+    }
+
+    const result: any = {};
+    for (const [key, value] of Object.entries(filter)) {
+        if (compoundUniques.some(({ name }) => name === key)) {
+            // flatten the compound field
+            Object.assign(result, value);
+        } else {
+            result[key] = value;
+        }
+    }
+    return result;
 }
 
 export function ensureArray<T>(value: T | T[]): T[] {

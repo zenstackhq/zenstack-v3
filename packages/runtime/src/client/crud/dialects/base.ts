@@ -31,6 +31,7 @@ import type { ClientOptions } from '../../options';
 import {
     buildFieldRef,
     buildJoinPairs,
+    flattenCompoundUniqueFilters,
     getField,
     getIdFields,
     getManyToManyRelation,
@@ -81,8 +82,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         let result = this.true(eb);
+        let _where = flattenCompoundUniqueFilters(this.schema, model, where);
 
-        for (const [key, payload] of Object.entries(where)) {
+        for (const [key, payload] of Object.entries(_where)) {
             if (payload === undefined) {
                 continue;
             }
@@ -150,13 +152,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         // call expression builder and combine the results
-        if (
-            typeof where === 'object' &&
-            where !== null &&
-            '$expr' in where &&
-            typeof where['$expr'] === 'function'
-        ) {
-            result = this.and(eb, result, where['$expr'](eb));
+        if ('$expr' in _where && typeof _where['$expr'] === 'function') {
+            result = this.and(eb, result, _where['$expr'](eb));
         }
 
         return result;

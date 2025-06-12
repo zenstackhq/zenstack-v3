@@ -69,7 +69,12 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                     fieldDef
                 );
             } else {
-                table = this.createModelField(table, fieldName, fieldDef);
+                table = this.createModelField(
+                    table,
+                    fieldName,
+                    fieldDef,
+                    modelDef
+                );
             }
         }
 
@@ -127,14 +132,15 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
     private createModelField(
         table: CreateTableBuilder<any>,
         fieldName: string,
-        fieldDef: FieldDef
+        fieldDef: FieldDef,
+        modelDef: ModelDef
     ) {
         return table.addColumn(
             fieldName,
             this.mapFieldType(fieldDef),
             (col) => {
                 // @id
-                if (fieldDef.id) {
+                if (fieldDef.id && modelDef.idFields.length === 1) {
                     col = col.primaryKey();
                 }
 

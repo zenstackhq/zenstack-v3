@@ -323,7 +323,7 @@ export type OrderBy<
                 })
         : {});
 
-export type WhereUnique<
+export type WhereUniqueInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = AtLeast<
@@ -336,7 +336,8 @@ export type WhereUnique<
                   Schema,
                   GetModel<Schema, Model>['uniqueFields'][Key]
               >
-            : {
+            : // multi-field unique
+              {
                   [Key1 in keyof GetModel<
                       Schema,
                       Model
@@ -373,7 +374,7 @@ type Distinct<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
 };
 
 type Cursor<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    cursor?: WhereUnique<Schema, Model>;
+    cursor?: WhereUniqueInput<Schema, Model>;
 };
 
 type Select<
@@ -591,7 +592,7 @@ export type FindUniqueArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = {
-    where?: WhereUnique<Schema, Model>;
+    where?: WhereUniqueInput<Schema, Model>;
 } & SelectIncludeOmit<Schema, Model, true>;
 
 //#endregion
@@ -711,7 +712,7 @@ type ConnectOrCreatePayload<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = {
-    where: WhereUnique<Schema, Model>;
+    where: WhereUniqueInput<Schema, Model>;
     create: CreateInput<Schema, Model>;
 };
 
@@ -768,7 +769,7 @@ export type UpdateArgs<
     Model extends GetModels<Schema>
 > = {
     data: UpdateInput<Schema, Model>;
-    where: WhereUnique<Schema, Model>;
+    where: WhereUniqueInput<Schema, Model>;
     select?: Select<Schema, Model, true>;
     include?: Include<Schema, Model>;
     omit?: OmitFields<Schema, Model>;
@@ -789,7 +790,7 @@ export type UpsertArgs<
 > = {
     create: CreateInput<Schema, Model>;
     update: UpdateInput<Schema, Model>;
-    where: WhereUnique<Schema, Model>;
+    where: WhereUniqueInput<Schema, Model>;
     select?: Select<Schema, Model, true>;
     include?: Include<Schema, Model>;
     omit?: OmitFields<Schema, Model>;
@@ -858,25 +859,44 @@ type UpdateRelationFieldPayload<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
-> = Omit<
-    {
-        create?: NestedCreateInput<Schema, Model, Field>;
-        createMany?: NestedCreateManyInput<Schema, Model, Field>;
-        connect?: ConnectInput<Schema, Model, Field>;
-        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
-        disconnect?: DisconnectInput<Schema, Model, Field>;
-        set?: SetInput<Schema, Model, Field>;
-        update?: NestedUpdateInput<Schema, Model, Field>;
-        upsert?: NestedUpsertInput<Schema, Model, Field>;
-        updateMany?: NestedUpdateManyInput<Schema, Model, Field>;
-        delete?: NestedDeleteInput<Schema, Model, Field>;
-        deleteMany?: NestedDeleteManyInput<Schema, Model, Field>;
-    },
-    // no "createMany" for non-array fields
-    FieldIsArray<Schema, Model, Field> extends true
-        ? never
-        : 'createMany' | 'set'
->;
+> = FieldIsArray<Schema, Model, Field> extends true
+    ? ToManyRelationUpdateInput<Schema, Model, Field>
+    : ToOneRelationUpdateInput<Schema, Model, Field>;
+
+type ToManyRelationUpdateInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = {
+    create?: NestedCreateInput<Schema, Model, Field>;
+    createMany?: NestedCreateManyInput<Schema, Model, Field>;
+    connect?: ConnectInput<Schema, Model, Field>;
+    connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+    disconnect?: DisconnectInput<Schema, Model, Field>;
+    update?: NestedUpdateInput<Schema, Model, Field>;
+    upsert?: NestedUpsertInput<Schema, Model, Field>;
+    updateMany?: NestedUpdateManyInput<Schema, Model, Field>;
+    delete?: NestedDeleteInput<Schema, Model, Field>;
+    deleteMany?: NestedDeleteManyInput<Schema, Model, Field>;
+    set?: SetRelationInput<Schema, Model, Field>;
+};
+
+type ToOneRelationUpdateInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>
+> = {
+    create?: NestedCreateInput<Schema, Model, Field>;
+    connect?: ConnectInput<Schema, Model, Field>;
+    connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+    update?: NestedUpdateInput<Schema, Model, Field>;
+    upsert?: NestedUpsertInput<Schema, Model, Field>;
+} & (FieldIsOptional<Schema, Model, Field> extends true
+    ? {
+          disconnect?: DisconnectInput<Schema, Model, Field>;
+          delete?: NestedDeleteInput<Schema, Model, Field>;
+      }
+    : {});
 
 // #endregion
 
@@ -886,7 +906,7 @@ export type DeleteArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
 > = {
-    where: WhereUnique<Schema, Model>;
+    where: WhereUniqueInput<Schema, Model>;
     select?: Select<Schema, Model, true>;
     include?: Include<Schema, Model>;
     omit?: OmitFields<Schema, Model>;
@@ -1099,8 +1119,8 @@ type ConnectInput<
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
 > = FieldIsArray<Schema, Model, Field> extends true
-    ? OrArray<WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>>
-    : WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>;
+    ? OrArray<WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>>
+    : WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>;
 
 type ConnectOrCreateInput<
     Schema extends SchemaDef,
@@ -1121,16 +1141,16 @@ type DisconnectInput<
     Field extends RelationFields<Schema, Model>
 > = FieldIsArray<Schema, Model, Field> extends true
     ? OrArray<
-          WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
+          WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>,
           true
       >
     : boolean | WhereInput<Schema, RelationFieldType<Schema, Model, Field>>;
 
-type SetInput<
+type SetRelationInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>
-> = OrArray<WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>>;
+> = OrArray<WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>>;
 
 type NestedUpdateInput<
     Schema extends SchemaDef,
@@ -1139,7 +1159,7 @@ type NestedUpdateInput<
 > = FieldIsArray<Schema, Model, Field> extends true
     ? OrArray<
           {
-              where: WhereUnique<
+              where: WhereUniqueInput<
                   Schema,
                   RelationFieldType<Schema, Model, Field>
               >;
@@ -1153,7 +1173,7 @@ type NestedUpdateInput<
       >
     : XOR<
           {
-              where: WhereUnique<
+              where: WhereUniqueInput<
                   Schema,
                   RelationFieldType<Schema, Model, Field>
               >;
@@ -1176,7 +1196,7 @@ type NestedUpsertInput<
     Field extends RelationFields<Schema, Model>
 > = OrArray<
     {
-        where: WhereUnique<Schema, Model>;
+        where: WhereUniqueInput<Schema, Model>;
         create: CreateInput<
             Schema,
             RelationFieldType<Schema, Model, Field>,
@@ -1213,7 +1233,7 @@ type NestedDeleteInput<
     Field extends RelationFields<Schema, Model>
 > = FieldIsArray<Schema, Model, Field> extends true
     ? OrArray<
-          WhereUnique<Schema, RelationFieldType<Schema, Model, Field>>,
+          WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>,
           true
       >
     : boolean | WhereInput<Schema, RelationFieldType<Schema, Model, Field>>;

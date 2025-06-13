@@ -1,5 +1,5 @@
 {
-    "name": "@zenstackhq/cli",
+    "name": "zenstack",
     "publisher": "zenstack",
     "displayName": "ZenStack Language Tools",
     "description": "FullStack database toolkit with built-in access control and automatic API generation.",

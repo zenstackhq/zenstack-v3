@@ -3,5 +3,6 @@ packages:
     - packages/sdk
     - packages/runtime
     - packages/cli
+    - packages/create-zenstack
     - packages/testtools
     - samples/**

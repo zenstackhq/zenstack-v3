@@ -1,8 +1,7 @@
 import path from 'node:path';
 import { execPackage } from '../utils/exec-utils';
-import { getSchemaFile } from './action-utils';
+import { getSchemaFile, handleSubProcessError } from './action-utils';
 import { run as runGenerate } from './generate';
-import { handleSubProcessError } from './common';
 
 type CommonOptions = {
     schema?: string;

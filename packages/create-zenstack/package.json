@@ -1,13 +1,12 @@
 {
-    "name": "@zenstackhq/testtools",
+    "name": "create-zenstack",
     "version": "3.0.0-alpha.0",
-    "description": "ZenStack Test Tools",
+    "description": "Create a new ZenStack project",
     "type": "module",
     "scripts": {
         "build": "tsup-node",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
-        "test": "vitest",
         "pack": "pnpm pack"
     },
     "keywords": [],
@@ -16,6 +15,9 @@
     "files": [
         "dist"
     ],
+    "bin": {
+        "create-zenstack": "bin/cli"
+    },
     "exports": {
         ".": {
             "import": {
@@ -29,20 +31,12 @@
         }
     },
     "dependencies": {
-        "@types/node": "^20.0.0",
-        "@zenstackhq/language": "workspace:*",
-        "@zenstackhq/sdk": "workspace:*",
-        "glob": "^11.0.2",
-        "tmp": "^0.2.3",
-        "ts-pattern": "^5.7.1",
-        "typescript": "^5.8.3",
-        "prisma": "^6.9.0"
-    },
-    "peerDependencies": {
-        "better-sqlite3": "^11.8.1",
-        "pg": "^8.13.1"
+        "colors": "1.4.0",
+        "commander": "^8.3.0",
+        "ora": "^5.4.1"
     },
     "devDependencies": {
-        "@types/tmp": "^0.2.6"
+        "@types/colors": "^1.2.4",
+        "@types/node": "^20.0.0"
     }
 }

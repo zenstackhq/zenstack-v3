@@ -50,11 +50,11 @@ async function getZenStackPackages(
     }
 
     const packages = [
-        ...Object.keys(pkgJson.dependencies ?? {}).filter((p) =>
-            p.startsWith('@zenstackhq/')
+        ...Object.keys(pkgJson.dependencies ?? {}).filter(
+            (p) => p.startsWith('@zenstackhq/') || p === 'zenstack'
         ),
-        ...Object.keys(pkgJson.devDependencies ?? {}).filter((p) =>
-            p.startsWith('@zenstackhq/')
+        ...Object.keys(pkgJson.devDependencies ?? {}).filter(
+            (p) => p.startsWith('@zenstackhq/') || p === 'zenstack'
         ),
     ];
 

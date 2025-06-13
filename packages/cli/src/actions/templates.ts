@@ -1,0 +1,52 @@
+export const STARTER_ZMODEL = `// This is a sample model to get you started.
+
+/// A sample data source using local sqlite db.
+datasource db {
+    provider = 'sqlite'
+    url = 'file:./dev.db'
+}
+
+/// User model
+model User {
+    id       String @id @default(cuid())
+    email    String @unique @email @length(6, 32)
+    posts    Post[]
+}
+
+/// Post model
+model Post {
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    title     String   @length(1, 256)
+    content   String
+    published Boolean  @default(false)
+    author    User     @relation(fields: [authorId], references: [id])
+    authorId  String
+}
+`;
+
+export const STARTER_MAIN_TS = `import { ZenStackClient } from '@zenstackhq/runtime';
+import { schema } from './zenstack/schema';
+
+async function main() {
+    const client = new ZenStackClient(schema);
+    const user = await client.user.create({
+        data: {
+            email: 'test@zenstack.dev',
+            posts: {
+                create: [
+                    {
+                        title: 'Hello World',
+                        content: 'This is a test post',
+                    },
+                ],
+            },
+        },
+        include: { posts: true }
+    });
+    console.log('User created:', user);
+}
+
+main();
+`;

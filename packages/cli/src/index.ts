@@ -4,10 +4,6 @@ import { Command, Option } from 'commander';
 import * as actions from './actions';
 import { getVersion } from './utils/version-utils';
 
-const infoAction = async (projectPath: string): Promise<void> => {
-    await actions.info(projectPath);
-};
-
 const generateAction = async (
     options: Parameters<typeof actions.generate>[0]
 ): Promise<void> => {
@@ -20,6 +16,14 @@ const migrateAction = async (command: string, options: any): Promise<void> => {
 
 const dbAction = async (command: string, options: any): Promise<void> => {
     await actions.db(command, options);
+};
+
+const infoAction = async (projectPath: string): Promise<void> => {
+    await actions.info(projectPath);
+};
+
+const initAction = async (projectPath: string): Promise<void> => {
+    await actions.init(projectPath);
 };
 
 export function createProgram() {
@@ -42,14 +46,6 @@ export function createProgram() {
         '--schema <file>',
         `schema file (with extension ${schemaExtensions}). Defaults to "schema.zmodel" unless specified in package.json.`
     );
-
-    program
-        .command('info')
-        .description(
-            'Get information of installed ZenStack and related packages.'
-        )
-        .argument('[path]', 'project path', '.')
-        .action(infoAction);
 
     program
         .command('generate')
@@ -120,6 +116,20 @@ export function createProgram() {
             )
         )
         .action((options) => dbAction('push', options));
+
+    program
+        .command('info')
+        .description(
+            'Get information of installed ZenStack and related packages.'
+        )
+        .argument('[path]', 'project path', '.')
+        .action(infoAction);
+
+    program
+        .command('init')
+        .description('Initialize an existing project for ZenStack.')
+        .argument('[path]', 'project path', '.')
+        .action(initAction);
 
     return program;
 }

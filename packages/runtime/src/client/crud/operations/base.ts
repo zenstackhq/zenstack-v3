@@ -16,13 +16,13 @@ import { ulid } from 'ulid';
 import * as uuid from 'uuid';
 import type { ClientContract } from '../..';
 import { PolicyPlugin } from '../../../plugins/policy';
+import type { BuiltinType, Expression, FieldDef } from '../../../schema';
 import {
-    Expression,
+    ExpressionUtils,
     type GetModels,
     type ModelDef,
     type SchemaDef,
 } from '../../../schema';
-import type { BuiltinType, FieldDef } from '../../../schema/schema';
 import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
 import {
@@ -1096,19 +1096,19 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private evalGenerator(defaultValue: Expression) {
-        if (Expression.isCall(defaultValue)) {
+        if (ExpressionUtils.isCall(defaultValue)) {
             return match(defaultValue.function)
                 .with('cuid', () => createId())
                 .with('uuid', () =>
                     defaultValue.args?.[0] &&
-                    Expression.isLiteral(defaultValue.args?.[0]) &&
+                    ExpressionUtils.isLiteral(defaultValue.args?.[0]) &&
                     defaultValue.args[0].value === 7
                         ? uuid.v7()
                         : uuid.v4()
                 )
                 .with('nanoid', () =>
                     defaultValue.args?.[0] &&
-                    Expression.isLiteral(defaultValue.args[0]) &&
+                    ExpressionUtils.isLiteral(defaultValue.args[0]) &&
                     typeof defaultValue.args[0].value === 'number'
                         ? nanoid(defaultValue.args[0].value)
                         : nanoid()
@@ -1116,8 +1116,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 .with('ulid', () => ulid())
                 .otherwise(() => undefined);
         } else if (
-            Expression.isMember(defaultValue) &&
-            Expression.isCall(defaultValue.receiver) &&
+            ExpressionUtils.isMember(defaultValue) &&
+            ExpressionUtils.isCall(defaultValue.receiver) &&
             defaultValue.receiver.function === 'auth'
         ) {
             // `auth()` member access

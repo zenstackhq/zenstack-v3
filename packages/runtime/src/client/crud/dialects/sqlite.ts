@@ -9,8 +9,7 @@ import {
 } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
-import type { SchemaDef } from '../../../schema';
-import type { BuiltinType, GetModels } from '../../../schema/schema';
+import type { BuiltinType, GetModels, SchemaDef } from '../../../schema';
 import type { FindArgs } from '../../crud-types';
 import {
     buildFieldRef,

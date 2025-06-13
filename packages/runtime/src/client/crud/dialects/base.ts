@@ -8,12 +8,13 @@ import type {
 import { sql, type SelectQueryBuilder } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match, P } from 'ts-pattern';
-import type { GetModels, SchemaDef } from '../../../schema';
 import type {
     BuiltinType,
     DataSourceProviderType,
     FieldDef,
-} from '../../../schema/schema';
+    GetModels,
+    SchemaDef,
+} from '../../../schema';
 import { enumerate } from '../../../utils/enumerate';
 // @ts-expect-error
 import { isPlainObject } from 'is-plain-object';

@@ -25,7 +25,7 @@ import type {
     RelationInfo,
     ScalarFields,
     SchemaDef,
-} from '../schema/schema';
+} from '../schema';
 import type {
     AtLeast,
     MapBaseType,

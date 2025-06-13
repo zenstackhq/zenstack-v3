@@ -1,10 +1,11 @@
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import {
-    Expression,
+    ExpressionUtils,
     type ArrayExpression,
     type BinaryExpression,
     type CallExpression,
+    type Expression,
     type FieldExpression,
     type LiteralExpression,
     type MemberExpression,
@@ -22,25 +23,29 @@ type ExpressionEvaluatorContext = {
 export class ExpressionEvaluator {
     evaluate(expression: Expression, context: ExpressionEvaluatorContext): any {
         const result = match(expression)
-            .when(Expression.isArray, (expr) =>
+            .when(ExpressionUtils.isArray, (expr) =>
                 this.evaluateArray(expr, context)
             )
-            .when(Expression.isBinary, (expr) =>
+            .when(ExpressionUtils.isBinary, (expr) =>
                 this.evaluateBinary(expr, context)
             )
-            .when(Expression.isField, (expr) =>
+            .when(ExpressionUtils.isField, (expr) =>
                 this.evaluateField(expr, context)
             )
-            .when(Expression.isLiteral, (expr) => this.evaluateLiteral(expr))
-            .when(Expression.isMember, (expr) =>
+            .when(ExpressionUtils.isLiteral, (expr) =>
+                this.evaluateLiteral(expr)
+            )
+            .when(ExpressionUtils.isMember, (expr) =>
                 this.evaluateMember(expr, context)
             )
-            .when(Expression.isUnary, (expr) =>
+            .when(ExpressionUtils.isUnary, (expr) =>
                 this.evaluateUnary(expr, context)
             )
-            .when(Expression.isCall, (expr) => this.evaluateCall(expr, context))
-            .when(Expression.isThis, () => context.thisValue)
-            .when(Expression.isNull, () => null)
+            .when(ExpressionUtils.isCall, (expr) =>
+                this.evaluateCall(expr, context)
+            )
+            .when(ExpressionUtils.isThis, () => context.thisValue)
+            .when(ExpressionUtils.isNull, () => null)
             .exhaustive();
 
         return result ?? null;

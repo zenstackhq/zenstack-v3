@@ -1,5 +1,5 @@
 import type { ExpressionBuilder, ExpressionWrapper } from 'kysely';
-import type { FieldDef, GetModels, SchemaDef } from '../schema/schema';
+import type { FieldDef, GetModels, SchemaDef } from '../schema';
 import type { OrderBy } from './crud-types';
 import { InternalError, QueryError } from './errors';
 import type { ClientOptions } from './options';

@@ -6,6 +6,7 @@
     "scripts": {
         "build": "tsup-node",
         "watch": "tsup-node --watch",
+        "lint": "eslint src --ext ts",
         "test": "vitest",
         "pack": "pnpm pack"
     },
@@ -30,7 +31,6 @@
     "dependencies": {
         "@types/node": "^18.0.0",
         "@zenstackhq/language": "workspace:*",
-        "@zenstackhq/runtime": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "glob": "^11.0.2",
         "tmp": "^0.2.3",

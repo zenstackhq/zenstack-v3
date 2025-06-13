@@ -11,7 +11,7 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
-import type { AuthType } from '../schema/schema';
+import type { AuthType } from '../schema/auth';
 import type { ClientConstructor, ClientContract } from './contract';
 import type { ModelOperations } from './crud-types';
 import { AggregateOperationHandler } from './crud/operations/aggregate';

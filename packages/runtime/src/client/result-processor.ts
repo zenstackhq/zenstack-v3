@@ -1,8 +1,7 @@
 import Decimal from 'decimal.js';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
-import type { FieldDef, GetModels, SchemaDef } from '../schema';
-import type { BuiltinType } from '../schema/schema';
+import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../schema';
 import { ensureArray, getField } from './query-utils';
 
 export class ResultProcessor<Schema extends SchemaDef> {

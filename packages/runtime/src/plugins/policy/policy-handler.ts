@@ -38,8 +38,13 @@ import {
     requireField,
     requireModel,
 } from '../../client/query-utils';
-import { Expression, type GetModels, type SchemaDef } from '../../schema';
-import type { BuiltinType } from '../../schema/schema';
+import {
+    ExpressionUtils,
+    type BuiltinType,
+    type Expression,
+    type GetModels,
+    type SchemaDef,
+} from '../../schema';
 import { ColumnCollector } from './column-collector';
 import { RejectedByPolicyError } from './errors';
 import { ExpressionTransformer } from './expression-transformer';
@@ -326,7 +331,7 @@ export class PolicyHandler<
     }
 
     private isTrueExpr(expr: Expression) {
-        return Expression.isLiteral(expr) && expr.value === true;
+        return ExpressionUtils.isLiteral(expr) && expr.value === true;
     }
 
     private async processReadBack(
@@ -633,7 +638,7 @@ export class PolicyHandler<
         const result: Policy[] = [];
 
         const extractOperations = (expr: Expression) => {
-            invariant(Expression.isLiteral(expr), 'expecting a literal');
+            invariant(ExpressionUtils.isLiteral(expr), 'expecting a literal');
             invariant(
                 typeof expr.value === 'string',
                 'expecting a string literal'

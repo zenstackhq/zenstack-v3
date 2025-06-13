@@ -7,16 +7,14 @@ import {
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import {
-    Expression,
+    ExpressionUtils,
+    type BuiltinType,
+    type CascadeAction,
     type FieldDef,
+    type GetModels,
     type ModelDef,
     type SchemaDef,
 } from '../../schema';
-import type {
-    BuiltinType,
-    CascadeAction,
-    GetModels,
-} from '../../schema/schema';
 import type { ToKysely } from '../query-builder';
 import { requireModel } from '../query-utils';
 
@@ -151,7 +149,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                         'kind' in fieldDef.default
                     ) {
                         if (
-                            Expression.isCall(fieldDef.default) &&
+                            ExpressionUtils.isCall(fieldDef.default) &&
                             fieldDef.default.function === 'now'
                         ) {
                             col = col.defaultTo(sql`CURRENT_TIMESTAMP`);
@@ -224,7 +222,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
     private isAutoIncrement(fieldDef: FieldDef) {
         return (
             fieldDef.default &&
-            Expression.isCall(fieldDef.default) &&
+            ExpressionUtils.isCall(fieldDef.default) &&
             fieldDef.default.function === 'autoincrement'
         );
     }

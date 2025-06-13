@@ -116,7 +116,7 @@ export class TsSchemaGenerator {
                     ts.factory.createImportSpecifier(
                         false,
                         undefined,
-                        ts.factory.createIdentifier('Expression')
+                        ts.factory.createIdentifier('ExpressionUtils')
                     ),
                 ])
             ),
@@ -530,7 +530,9 @@ export class TsSchemaGenerator {
                             'default',
 
                             ts.factory.createCallExpression(
-                                ts.factory.createIdentifier('Expression.call'),
+                                ts.factory.createIdentifier(
+                                    'ExpressionUtils.call'
+                                ),
                                 undefined,
                                 [
                                     ts.factory.createStringLiteral(
@@ -557,13 +559,13 @@ export class TsSchemaGenerator {
                             'default',
                             ts.factory.createCallExpression(
                                 ts.factory.createIdentifier(
-                                    'Expression.member'
+                                    'ExpressionUtils.member'
                                 ),
                                 undefined,
                                 [
                                     ts.factory.createCallExpression(
                                         ts.factory.createIdentifier(
-                                            'Expression.call'
+                                            'ExpressionUtils.call'
                                         ),
                                         undefined,
                                         [ts.factory.createStringLiteral('auth')]
@@ -1304,7 +1306,7 @@ export class TsSchemaGenerator {
 
     private createThisExpression() {
         return ts.factory.createCallExpression(
-            ts.factory.createIdentifier('Expression._this'),
+            ts.factory.createIdentifier('ExpressionUtils._this'),
             undefined,
             []
         );
@@ -1329,7 +1331,7 @@ export class TsSchemaGenerator {
         ];
 
         return ts.factory.createCallExpression(
-            ts.factory.createIdentifier('Expression.member'),
+            ts.factory.createIdentifier('ExpressionUtils.member'),
             undefined,
             args
         );
@@ -1337,7 +1339,7 @@ export class TsSchemaGenerator {
 
     private createNullExpression() {
         return ts.factory.createCallExpression(
-            ts.factory.createIdentifier('Expression._null'),
+            ts.factory.createIdentifier('ExpressionUtils._null'),
             undefined,
             []
         );
@@ -1345,7 +1347,7 @@ export class TsSchemaGenerator {
 
     private createBinaryExpression(expr: BinaryExpr) {
         return ts.factory.createCallExpression(
-            ts.factory.createIdentifier('Expression.binary'),
+            ts.factory.createIdentifier('ExpressionUtils.binary'),
             undefined,
             [
                 this.createExpression(expr.left),
@@ -1357,7 +1359,7 @@ export class TsSchemaGenerator {
 
     private createUnaryExpression(expr: UnaryExpr) {
         return ts.factory.createCallExpression(
-            ts.factory.createIdentifier('Expression.unary'),
+            ts.factory.createIdentifier('ExpressionUtils.unary'),
             undefined,
             [
                 this.createLiteralNode(expr.operator),
@@ -1368,7 +1370,7 @@ export class TsSchemaGenerator {
 
     private createArrayExpression(expr: ArrayExpr): any {
         return ts.factory.createCallExpression(
-            ts.factory.createIdentifier('Expression.array'),
+            ts.factory.createIdentifier('ExpressionUtils.array'),
             undefined,
             [
                 ts.factory.createArrayLiteralExpression(
@@ -1381,7 +1383,7 @@ export class TsSchemaGenerator {
     private createRefExpression(expr: ReferenceExpr): any {
         if (isDataModelField(expr.target.ref)) {
             return ts.factory.createCallExpression(
-                ts.factory.createIdentifier('Expression.field'),
+                ts.factory.createIdentifier('ExpressionUtils.field'),
                 undefined,
                 [this.createLiteralNode(expr.target.$refText)]
             );
@@ -1399,7 +1401,7 @@ export class TsSchemaGenerator {
 
     private createCallExpression(expr: InvocationExpr) {
         return ts.factory.createCallExpression(
-            ts.factory.createIdentifier('Expression.call'),
+            ts.factory.createIdentifier('ExpressionUtils.call'),
             undefined,
             [
                 ts.factory.createStringLiteral(expr.function.$refText),
@@ -1420,21 +1422,21 @@ export class TsSchemaGenerator {
         return match(type)
             .with('BooleanLiteral', () =>
                 ts.factory.createCallExpression(
-                    ts.factory.createIdentifier('Expression.literal'),
+                    ts.factory.createIdentifier('ExpressionUtils.literal'),
                     undefined,
                     [this.createLiteralNode(value)]
                 )
             )
             .with('NumberLiteral', () =>
                 ts.factory.createCallExpression(
-                    ts.factory.createIdentifier('Expression.literal'),
+                    ts.factory.createIdentifier('ExpressionUtils.literal'),
                     undefined,
                     [ts.factory.createIdentifier(value as string)]
                 )
             )
             .with('StringLiteral', () =>
                 ts.factory.createCallExpression(
-                    ts.factory.createIdentifier('Expression.literal'),
+                    ts.factory.createIdentifier('ExpressionUtils.literal'),
                     undefined,
                     [this.createLiteralNode(value)]
                 )

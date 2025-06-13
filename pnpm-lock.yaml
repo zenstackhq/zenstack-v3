@@ -225,6 +225,12 @@ importers:
       '@types/tmp':
         specifier: ^0.2.6
         version: 0.2.6
+      decimal.js:
+        specifier: ^10.4.3
+        version: 10.4.3
+      kysely:
+        specifier: ^0.27.6
+        version: 0.27.6
 
   packages/tanstack-query:
     dependencies:
@@ -243,9 +249,6 @@ importers:
       '@zenstackhq/language':
         specifier: workspace:*
         version: link:../language
-      '@zenstackhq/runtime':
-        specifier: workspace:*
-        version: link:../runtime
       '@zenstackhq/sdk':
         specifier: workspace:*
         version: link:../sdk

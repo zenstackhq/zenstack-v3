@@ -1,5 +1,4 @@
 import type Decimal from 'decimal.js';
-import type { ModelResult } from '../client';
 import type { Expression } from './expression';
 
 export type DataSourceProviderType = 'sqlite' | 'postgresql';
@@ -255,12 +254,5 @@ export type FieldIsRelationArray<
 > = FieldIsRelation<Schema, Model, Field> extends true
     ? FieldIsArray<Schema, Model, Field>
     : false;
-
-export type AuthType<Schema extends SchemaDef> =
-    string extends GetModels<Schema>
-        ? Record<string, unknown>
-        : Schema['authType'] extends GetModels<Schema>
-        ? Partial<ModelResult<Schema, Schema['authType']>>
-        : never;
 
 //#endregion

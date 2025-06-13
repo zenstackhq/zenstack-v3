@@ -248,6 +248,9 @@ export class ClientImpl<Schema extends SchemaDef> {
 function createClientProxy<Schema extends SchemaDef>(
     client: ClientContract<Schema>
 ): ClientImpl<Schema> {
+    const inputValidator = new InputValidator(client.$schema);
+    const resultProcessor = new ResultProcessor(client.$schema);
+
     return new Proxy(client, {
         get: (target, prop, receiver) => {
             if (typeof prop === 'string' && prop.startsWith('$')) {
@@ -261,7 +264,9 @@ function createClientProxy<Schema extends SchemaDef>(
                 if (model) {
                     return createModelCrudHandler(
                         client,
-                        model as GetModels<Schema>
+                        model as GetModels<Schema>,
+                        inputValidator,
+                        resultProcessor
                     );
                 }
             }
@@ -276,11 +281,10 @@ function createModelCrudHandler<
     Model extends GetModels<Schema>
 >(
     client: ClientContract<Schema>,
-    model: Model
+    model: Model,
+    inputValidator: InputValidator<Schema>,
+    resultProcessor: ResultProcessor<Schema>
 ): ModelOperations<Schema, Model> {
-    const inputValidator = new InputValidator(client.$schema);
-    const resultProcessor = new ResultProcessor(client.$schema);
-
     const createPromise = (
         operation: CrudOperation,
         args: unknown,

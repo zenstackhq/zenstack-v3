@@ -1,4 +1,5 @@
 import Decimal from 'decimal.js';
+import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
 import { z, ZodSchema } from 'zod';
 import type {
@@ -33,69 +34,100 @@ import {
     requireModel,
 } from '../query-utils';
 
+type GetSchemaFunc<Schema extends SchemaDef, Options> = (
+    model: GetModels<Schema>,
+    options: Options
+) => ZodSchema;
+
 export class InputValidator<Schema extends SchemaDef> {
+    private schemaCache = new Map<string, ZodSchema>();
+
     constructor(private readonly schema: Schema) {}
 
     validateFindArgs(model: GetModels<Schema>, unique: boolean, args: unknown) {
-        return this.validate<FindArgs<Schema, GetModels<Schema>, true>>(
-            this.makeFindSchema(model, unique, true),
+        return this.validate<
+            FindArgs<Schema, GetModels<Schema>, true>,
+            Parameters<typeof this.makeFindSchema>[1]
+        >(
+            model,
             'find',
+            { unique, collection: true },
+            (model, options) => this.makeFindSchema(model, options),
             args
         );
     }
 
     validateCreateArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<CreateArgs<Schema, GetModels<Schema>>>(
-            this.makeCreateSchema(model),
+            model,
             'create',
+            undefined,
+            (model) => this.makeCreateSchema(model),
             args
         );
     }
 
     validateCreateManyArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<
-            CreateManyArgs<Schema, GetModels<Schema>> | undefined
-        >(this.makeCreateManySchema(model), 'createMany', args);
+            CreateManyArgs<Schema, GetModels<Schema>>,
+            undefined
+        >(
+            model,
+            'createMany',
+            undefined,
+            (model) => this.makeCreateManySchema(model),
+            args
+        );
     }
 
     validateCreateManyAndReturnArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<
             CreateManyAndReturnArgs<Schema, GetModels<Schema>> | undefined
         >(
-            this.makeCreateManyAndReturnSchema(model),
+            model,
             'createManyAndReturn',
+            undefined,
+            (model) => this.makeCreateManyAndReturnSchema(model),
             args
         );
     }
 
     validateUpdateArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<UpdateArgs<Schema, GetModels<Schema>>>(
-            this.makeUpdateSchema(model),
+            model,
             'update',
+            undefined,
+            (model) => this.makeUpdateSchema(model),
             args
         );
     }
 
     validateUpdateManyArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<UpdateManyArgs<Schema, GetModels<Schema>>>(
-            this.makeUpdateManySchema(model),
+            model,
             'updateMany',
+            undefined,
+            (model) => this.makeUpdateManySchema(model),
             args
         );
     }
 
     validateUpsertArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<UpsertArgs<Schema, GetModels<Schema>>>(
-            this.makeUpsertSchema(model),
+            model,
             'upsert',
+            undefined,
+            (model) => this.makeUpsertSchema(model),
             args
         );
     }
 
     validateDeleteArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<DeleteArgs<Schema, GetModels<Schema>>>(
-            this.makeDeleteSchema(model),
+            model,
             'delete',
+            undefined,
+            (model) => this.makeDeleteSchema(model),
             args
         );
     }
@@ -103,34 +135,68 @@ export class InputValidator<Schema extends SchemaDef> {
     validateDeleteManyArgs(model: GetModels<Schema>, args: unknown) {
         return this.validate<
             DeleteManyArgs<Schema, GetModels<Schema>> | undefined
-        >(this.makeDeleteManySchema(model), 'deleteMany', args);
+        >(
+            model,
+            'deleteMany',
+            undefined,
+            (model) => this.makeDeleteManySchema(model),
+            args
+        );
     }
 
     validateCountArgs(model: GetModels<Schema>, args: unknown) {
-        return this.validate<CountArgs<Schema, GetModels<Schema>> | undefined>(
-            this.makeCountSchema(model),
+        return this.validate<
+            CountArgs<Schema, GetModels<Schema>> | undefined,
+            undefined
+        >(
+            model,
             'count',
+            undefined,
+            (model) => this.makeCountSchema(model),
             args
         );
     }
 
     validateAggregateArgs(model: GetModels<Schema>, args: unknown) {
-        return this.validate<AggregateArgs<Schema, GetModels<Schema>>>(
-            this.makeAggregateSchema(model),
+        return this.validate<
+            AggregateArgs<Schema, GetModels<Schema>>,
+            undefined
+        >(
+            model,
             'aggregate',
+            undefined,
+            (model) => this.makeAggregateSchema(model),
             args
         );
     }
 
     validateGroupByArgs(model: GetModels<Schema>, args: unknown) {
-        return this.validate<GroupByArgs<Schema, GetModels<Schema>>>(
-            this.makeGroupBySchema(model),
+        return this.validate<GroupByArgs<Schema, GetModels<Schema>>, undefined>(
+            model,
             'groupBy',
+            undefined,
+            (model) => this.makeGroupBySchema(model),
             args
         );
     }
 
-    private validate<T>(schema: ZodSchema, operation: string, args: unknown) {
+    private validate<T, Options = undefined>(
+        model: GetModels<Schema>,
+        operation: string,
+        options: Options,
+        getSchema: GetSchemaFunc<Schema, Options>,
+        args: unknown
+    ) {
+        const cacheKey = stableStringify({
+            model,
+            operation,
+            options,
+        });
+        let schema = this.schemaCache.get(cacheKey!);
+        if (!schema) {
+            schema = getSchema(model, options);
+            this.schemaCache.set(cacheKey!, schema);
+        }
         const { error } = schema.safeParse(args);
         if (error) {
             throw new QueryError(`Invalid ${operation} args: ${error.message}`);
@@ -142,12 +208,11 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeFindSchema(
         model: string,
-        unique: boolean,
-        collection: boolean
+        options: { unique: boolean; collection: boolean }
     ) {
         const fields: Record<string, z.ZodSchema> = {};
-        const where = this.makeWhereSchema(model, unique);
-        if (unique) {
+        const where = this.makeWhereSchema(model, options.unique);
+        if (options.unique) {
             fields['where'] = where;
         } else {
             fields['where'] = where.optional();
@@ -159,7 +224,7 @@ export class InputValidator<Schema extends SchemaDef> {
         fields['distinct'] = this.makeDistinctSchema(model).optional();
         fields['cursor'] = this.makeCursorSchema(model).optional();
 
-        if (collection) {
+        if (options.collection) {
             fields['skip'] = z.number().int().nonnegative().optional();
             fields['take'] = z.number().int().optional();
             fields['orderBy'] = this.orArray(
@@ -172,7 +237,7 @@ export class InputValidator<Schema extends SchemaDef> {
         result = this.refineForSelectIncludeMutuallyExclusive(result);
         result = this.refineForSelectOmitMutuallyExclusive(result);
 
-        if (!unique) {
+        if (!options.unique) {
             result = result.optional();
         }
         return result;

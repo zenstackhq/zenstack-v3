@@ -49,14 +49,14 @@ async function getZenStackPackages(
         return [];
     }
 
-    const packages = [
-        ...Object.keys(pkgJson.dependencies ?? {}).filter(
-            (p) => p.startsWith('@zenstackhq/') || p === 'zenstack'
-        ),
-        ...Object.keys(pkgJson.devDependencies ?? {}).filter(
-            (p) => p.startsWith('@zenstackhq/') || p === 'zenstack'
-        ),
-    ];
+    const packages = Array.from(
+        new Set(
+            [
+                ...Object.keys(pkgJson.dependencies ?? {}),
+                ...Object.keys(pkgJson.devDependencies ?? {}),
+            ].filter((p) => p.startsWith('@zenstackhq/') || p === 'zenstack')
+        )
+    ).sort();
 
     const result = await Promise.all(
         packages.map(async (pkg) => {

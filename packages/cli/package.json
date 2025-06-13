@@ -1,9 +1,9 @@
 {
-    "name": "zenstack",
+    "name": "@zenstackhq/cli",
     "publisher": "zenstack",
-    "displayName": "ZenStack Language Tools",
+    "displayName": "ZenStack CLI",
     "description": "FullStack database toolkit with built-in access control and automatic API generation.",
-    "version": "3.0.0-alpha.1",
+    "version": "3.0.0-alpha.0",
     "type": "module",
     "author": {
         "name": "ZenStack Team"
@@ -28,7 +28,7 @@
         "pack": "pnpm pack"
     },
     "dependencies": {
-        "@types/node": "^18.0.0",
+        "@types/node": "^20.0.0",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
@@ -37,6 +37,7 @@
         "commander": "^8.3.0",
         "langium": "~3.3.0",
         "ora": "^5.4.1",
+        "package-manager-detector": "^1.3.0",
         "tiny-invariant": "^1.3.3",
         "ts-pattern": "^4.3.0"
     },
@@ -45,11 +46,11 @@
         "typescript": "^5.0.0"
     },
     "devDependencies": {
-        "@zenstackhq/testtools": "workspace:*",
         "@types/async-exit-hook": "^2.0.0",
         "@types/better-sqlite3": "^7.6.13",
         "@types/semver": "^7.3.13",
         "@types/tmp": "^0.2.6",
+        "@zenstackhq/testtools": "workspace:*",
         "better-sqlite3": "^11.8.1",
         "tmp": "^0.2.3"
     }

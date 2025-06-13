@@ -1,7 +1,7 @@
 {
     "name": "@zenstackhq/language",
     "description": "ZenStack ZModel language specification",
-    "version": "3.0.0-alpha.1",
+    "version": "3.0.0-alpha.0",
     "license": "MIT",
     "author": "ZenStack Team",
     "files": [
@@ -38,7 +38,7 @@
         "ts-pattern": "^5.6.0"
     },
     "devDependencies": {
-        "@types/node": "^18.0.0",
+        "@types/node": "^20.0.0",
         "@types/pluralize": "^0.0.33",
         "langium-cli": "~3.3.0",
         "typescript": "~5.1.6"

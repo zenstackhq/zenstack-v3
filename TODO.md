@@ -55,7 +55,7 @@
         -   [x] Computed fields
         -   [ ] Prisma client extension
     -   [ ] Misc
-        -   [ ] Cache validation schemas
+        -   [x] Cache validation schemas
         -   [x] Compound ID
         -   [ ] Cross field comparison
         -   [x] Many-to-many relation

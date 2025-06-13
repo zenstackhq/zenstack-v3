@@ -8,14 +8,16 @@ import type {
 import { sql, type SelectQueryBuilder } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match, P } from 'ts-pattern';
-import type { GetModels, SchemaDef } from '../../../schema';
 import type {
     BuiltinType,
     DataSourceProviderType,
     FieldDef,
-} from '../../../schema/schema';
+    GetModels,
+    SchemaDef,
+} from '../../../schema';
 import { enumerate } from '../../../utils/enumerate';
-import { isPlainObject } from '../../../utils/is-plain-object';
+// @ts-expect-error
+import { isPlainObject } from 'is-plain-object';
 import type { OrArray } from '../../../utils/type-utils';
 import type {
     BooleanFilter,
@@ -54,12 +56,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     abstract buildRelationSelection(
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         model: string,
         relationField: string,
         parentAlias: string,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>
-    ): SelectQueryBuilder<any, any, {}>;
+    ): SelectQueryBuilder<any, any, any>;
 
     abstract buildSkipTake(
         query: SelectQueryBuilder<any, any, any>,
@@ -82,7 +84,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         let result = this.true(eb);
-        let _where = flattenCompoundUniqueFilters(this.schema, model, where);
+        const _where = flattenCompoundUniqueFilters(this.schema, model, where);
 
         for (const [key, payload] of Object.entries(_where)) {
             if (payload === undefined) {
@@ -284,7 +286,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             )
             .select(() => eb.fn.count(eb.lit(1)).as(filterResultField));
 
-        let conditions: Expression<SqlBool>[] = [];
+        const conditions: Expression<SqlBool>[] = [];
 
         if ('is' in payload || 'isNot' in payload) {
             if ('is' in payload) {

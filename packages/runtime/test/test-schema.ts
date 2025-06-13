@@ -1,6 +1,6 @@
 import Sqlite from 'better-sqlite3';
-import { Expression } from '../src/schema/expression';
-import type { DataSourceProviderType, SchemaDef } from '../src/schema/schema';
+import type { DataSourceProviderType, SchemaDef } from '../src/schema';
+import { ExpressionUtils } from '../src/schema/expression';
 
 export const schema = {
     provider: {
@@ -16,7 +16,7 @@ export const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    default: Expression.call('cuid'),
+                    default: ExpressionUtils.call('cuid'),
                     attributes: [
                         { name: '@id' },
                         {
@@ -47,7 +47,7 @@ export const schema = {
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: Expression.call('now'),
+                    default: ExpressionUtils.call('now'),
                     attributes: [
                         {
                             name: '@default',
@@ -102,16 +102,17 @@ export const schema = {
                     args: [
                         {
                             name: 'operation',
-                            value: Expression.literal('all'),
+                            value: ExpressionUtils.literal('all'),
                         },
                         {
                             name: 'condition',
-                            value: Expression.binary(
-                                Expression.member(Expression.call('auth'), [
-                                    'id',
-                                ]),
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.member(
+                                    ExpressionUtils.call('auth'),
+                                    ['id']
+                                ),
                                 '==',
-                                Expression.field('id')
+                                ExpressionUtils.field('id')
                             ),
                         },
                     ],
@@ -122,14 +123,14 @@ export const schema = {
                     args: [
                         {
                             name: 'operation',
-                            value: Expression.literal('read'),
+                            value: ExpressionUtils.literal('read'),
                         },
                         {
                             name: 'condition',
-                            value: Expression.binary(
-                                Expression.call('auth'),
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.call('auth'),
                                 '!=',
-                                Expression._null()
+                                ExpressionUtils._null()
                             ),
                         },
                     ],
@@ -141,11 +142,11 @@ export const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    default: Expression.call('cuid'),
+                    default: ExpressionUtils.call('cuid'),
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: Expression.call('now'),
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
                     type: 'DateTime',
@@ -195,14 +196,14 @@ export const schema = {
                     args: [
                         {
                             name: 'operation',
-                            value: Expression.literal('all'),
+                            value: ExpressionUtils.literal('all'),
                         },
                         {
                             name: 'condition',
-                            value: Expression.binary(
-                                Expression.call('auth'),
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.call('auth'),
                                 '==',
-                                Expression._null()
+                                ExpressionUtils._null()
                             ),
                         },
                     ],
@@ -213,16 +214,17 @@ export const schema = {
                     args: [
                         {
                             name: 'operation',
-                            value: Expression.literal('all'),
+                            value: ExpressionUtils.literal('all'),
                         },
                         {
                             name: 'condition',
-                            value: Expression.binary(
-                                Expression.member(Expression.call('auth'), [
-                                    'id',
-                                ]),
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.member(
+                                    ExpressionUtils.call('auth'),
+                                    ['id']
+                                ),
                                 '==',
-                                Expression.field('authorId')
+                                ExpressionUtils.field('authorId')
                             ),
                         },
                     ],
@@ -233,11 +235,11 @@ export const schema = {
                     args: [
                         {
                             name: 'operation',
-                            value: Expression.literal('read'),
+                            value: ExpressionUtils.literal('read'),
                         },
                         {
                             name: 'condition',
-                            value: Expression.field('published'),
+                            value: ExpressionUtils.field('published'),
                         },
                     ],
                 },
@@ -248,11 +250,11 @@ export const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    default: Expression.call('cuid'),
+                    default: ExpressionUtils.call('cuid'),
                 },
                 createdAt: {
                     type: 'DateTime',
-                    default: Expression.call('now'),
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
                     type: 'DateTime',
@@ -288,7 +290,7 @@ export const schema = {
                 id: {
                     type: 'String',
                     id: true,
-                    default: Expression.call('cuid'),
+                    default: ExpressionUtils.call('cuid'),
                 },
                 bio: { type: 'String' },
                 age: { type: 'Int', optional: true },

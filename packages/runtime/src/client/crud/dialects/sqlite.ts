@@ -9,8 +9,7 @@ import {
 } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
-import type { SchemaDef } from '../../../schema';
-import type { BuiltinType, GetModels } from '../../../schema/schema';
+import type { BuiltinType, GetModels, SchemaDef } from '../../../schema';
 import type { FindArgs } from '../../crud-types';
 import {
     buildFieldRef,
@@ -49,12 +48,12 @@ export class SqliteCrudDialect<
     }
 
     override buildRelationSelection(
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         model: string,
         relationField: string,
         parentAlias: string,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>
-    ): SelectQueryBuilder<any, any, {}> {
+    ): SelectQueryBuilder<any, any, any> {
         return query.select((eb) =>
             this.buildRelationJSON(
                 model,
@@ -184,7 +183,7 @@ export class SqliteCrudDialect<
             type ArgsType =
                 | Expression<any>
                 | RawBuilder<any>
-                | SelectQueryBuilder<any, any, {}>;
+                | SelectQueryBuilder<any, any, any>;
             const objArgs: ArgsType[] = [];
 
             if (payload === true || !payload.select) {

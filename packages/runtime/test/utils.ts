@@ -9,7 +9,7 @@ import { Client as PGClient, Pool } from 'pg';
 import invariant from 'tiny-invariant';
 import { ZenStackClient } from '../src/client';
 import type { ClientOptions } from '../src/client/options';
-import type { SchemaDef } from '../src/schema/schema';
+import type { SchemaDef } from '../src/schema';
 
 type SqliteSchema = SchemaDef & { provider: { type: 'sqlite' } };
 type PostgresSchema = SchemaDef & { provider: { type: 'postgresql' } };

@@ -1,5 +1,4 @@
 import type Decimal from 'decimal.js';
-import type { ModelResult } from '../client';
 import type { Expression } from './expression';
 
 export type DataSourceProviderType = 'sqlite' | 'postgresql';
@@ -29,6 +28,7 @@ export type ModelDef = {
         | Record<string, Pick<FieldDef, 'type'>>
     >;
     idFields: string[];
+    // eslint-disable-next-line @typescript-eslint/ban-types
     computedFields?: Record<string, Function>;
 };
 
@@ -254,12 +254,5 @@ export type FieldIsRelationArray<
 > = FieldIsRelation<Schema, Model, Field> extends true
     ? FieldIsArray<Schema, Model, Field>
     : false;
-
-export type AuthType<Schema extends SchemaDef> =
-    string extends GetModels<Schema>
-        ? Record<string, unknown>
-        : Schema['authType'] extends GetModels<Schema>
-        ? Partial<ModelResult<Schema, Schema['authType']>>
-        : never;
 
 //#endregion

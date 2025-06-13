@@ -29,21 +29,24 @@ import {
     getRelationForeignKeyFieldPairs,
     requireField,
 } from '../../client/query-utils';
-import type {
-    ArrayExpression,
-    CallExpression,
-    FieldExpression,
-    SchemaDef,
-} from '../../schema';
 import {
-    Expression,
-    type BinaryExpression,
-    type BinaryOperator,
-    type LiteralExpression,
-    type MemberExpression,
-    type UnaryExpression,
-} from '../../schema/expression';
-import type { BuiltinType, FieldDef, GetModels } from '../../schema/schema';
+    ExpressionUtils,
+    type ArrayExpression,
+    type CallExpression,
+    type Expression,
+    type FieldExpression,
+    type SchemaDef,
+} from '../../schema';
+import type {
+    BinaryExpression,
+    BinaryOperator,
+    LiteralExpression,
+    MemberExpression,
+    UnaryExpression,
+    BuiltinType,
+    FieldDef,
+    GetModels,
+} from '../../schema';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { conjunction, disjunction, logicalNot, trueNode } from './utils';
 
@@ -107,7 +110,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     @expr('literal')
-    // @ts-ignore
+    // @ts-expect-error
     private _literal(expr: LiteralExpression) {
         return this.transformValue(
             expr.value,
@@ -120,7 +123,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     @expr('array')
-    // @ts-ignore
+    // @ts-expect-error
     private _array(
         expr: ArrayExpression,
         context: ExpressionTransformerContext<Schema>
@@ -131,7 +134,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     @expr('field')
-    // @ts-ignore
+    // @ts-expect-error
     private _field(
         expr: FieldExpression,
         context: ExpressionTransformerContext<Schema>
@@ -281,12 +284,13 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         invariant(
-            Expression.isField(expr.left) || Expression.isMember(expr.left),
+            ExpressionUtils.isField(expr.left) ||
+                ExpressionUtils.isMember(expr.left),
             'left operand must be field or member access'
         );
 
         let newContextModel: string;
-        if (Expression.isField(expr.left)) {
+        if (ExpressionUtils.isField(expr.left)) {
             const fieldDef = requireField(
                 this.schema,
                 context.model,
@@ -294,7 +298,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             );
             newContextModel = fieldDef.type;
         } else {
-            invariant(Expression.isField(expr.left.receiver));
+            invariant(ExpressionUtils.isField(expr.left.receiver));
             const fieldDef = requireField(
                 this.schema,
                 context.model,
@@ -370,7 +374,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             other = expr.left;
         }
 
-        if (Expression.isNull(other)) {
+        if (ExpressionUtils.isNull(other)) {
             return this.transformValue(
                 expr.op === '==' ? !this.auth : !!this.auth,
                 'Boolean'
@@ -445,17 +449,17 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         arg: Expression,
         context: ExpressionTransformerContext<Schema>
     ): OperandExpression<any> {
-        if (Expression.isLiteral(arg)) {
+        if (ExpressionUtils.isLiteral(arg)) {
             return eb.val(arg.value);
         }
 
-        if (Expression.isField(arg)) {
+        if (ExpressionUtils.isField(arg)) {
             return context.thisEntityRaw
                 ? eb.val(context.thisEntityRaw[arg.field])
                 : eb.ref(arg.field);
         }
 
-        if (Expression.isCall(arg)) {
+        if (ExpressionUtils.isCall(arg)) {
             return this.transformCall(arg, context);
         }
 
@@ -487,7 +491,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         invariant(
-            Expression.isField(expr.receiver),
+            ExpressionUtils.isField(expr.receiver),
             'expect receiver to be field expression'
         );
 
@@ -711,11 +715,11 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private isAuthCall(value: unknown): value is CallExpression {
-        return Expression.isCall(value) && value.function === 'auth';
+        return ExpressionUtils.isCall(value) && value.function === 'auth';
     }
 
     private isAuthMember(expr: Expression) {
-        return Expression.isMember(expr) && this.isAuthCall(expr.receiver);
+        return ExpressionUtils.isMember(expr) && this.isAuthCall(expr.receiver);
     }
 
     private isNullNode(node: OperationNode) {

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-types */
+
 import type {
     Expression,
     ExpressionBuilder,
@@ -12,7 +14,7 @@ import type {
     GetModels,
     ProcedureDef,
     SchemaDef,
-} from '../schema/schema';
+} from '../schema';
 import type { PrependParameter } from '../utils/type-utils';
 import type { ClientContract, CRUD, ProcedureFunc } from './contract';
 import type { BaseCrudDialect } from './crud/dialects/base';

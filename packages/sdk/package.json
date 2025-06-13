@@ -6,6 +6,7 @@
     "scripts": {
         "build": "tsup-node",
         "watch": "tsup-node --watch",
+        "lint": "eslint src --ext ts",
         "test": "vitest",
         "pack": "pnpm pack"
     },
@@ -25,6 +26,16 @@
                 "types": "./dist/index.d.cts",
                 "default": "./dist/index.cjs"
             }
+        },
+        "./schema": {
+            "import": {
+                "types": "./dist/schema.d.ts",
+                "default": "./dist/schema.js"
+            },
+            "require": {
+                "types": "./dist/schema.d.cts",
+                "default": "./dist/schema.cjs"
+            }
         }
     },
     "dependencies": {
@@ -37,6 +48,8 @@
     },
     "devDependencies": {
         "@types/node": "^18.0.0",
-        "@types/tmp": "^0.2.6"
+        "@types/tmp": "^0.2.6",
+        "decimal.js": "^10.4.3",
+        "kysely": "^0.27.6"
     }
 }

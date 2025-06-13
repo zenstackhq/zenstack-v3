@@ -1,10 +1,8 @@
+/* eslint-disable @typescript-eslint/ban-types */
+
+import { type GetModels, type ProcedureDef, type SchemaDef } from '../schema';
 import type { Decimal } from 'decimal.js';
-import {
-    type AuthType,
-    type GetModels,
-    type ProcedureDef,
-    type SchemaDef,
-} from '../schema/schema';
+import type { AuthType } from '../schema/auth';
 import type { OrUndefinedIf } from '../utils/type-utils';
 import type { ModelOperations, ModelResult } from './crud-types';
 import type { ClientOptions, HasComputedFields } from './options';

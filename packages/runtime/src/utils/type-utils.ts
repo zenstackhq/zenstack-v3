@@ -41,6 +41,7 @@ export type JsonValue =
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonArray = Array<JsonValue>;
 
+// eslint-disable-next-line @typescript-eslint/ban-types
 export type Simplify<T> = { [Key in keyof T]: T[Key] } & {};
 
 export function call(code: string) {

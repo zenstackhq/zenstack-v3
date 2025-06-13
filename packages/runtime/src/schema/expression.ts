@@ -1,78 +1,19 @@
-export type Expression =
-    | LiteralExpression
-    | ArrayExpression
-    | FieldExpression
-    | MemberExpression
-    | CallExpression
-    | UnaryExpression
-    | BinaryExpression
-    | ThisExpression
-    | NullExpression;
+import type {
+    ArrayExpression,
+    BinaryExpression,
+    BinaryOperator,
+    CallExpression,
+    Expression,
+    FieldExpression,
+    LiteralExpression,
+    MemberExpression,
+    NullExpression,
+    ThisExpression,
+    UnaryExpression,
+    UnaryOperator,
+} from '.';
 
-export type LiteralExpression = {
-    kind: 'literal';
-    value: string | number | boolean;
-};
-
-export type ArrayExpression = {
-    kind: 'array';
-    items: Expression[];
-};
-
-export type FieldExpression = {
-    kind: 'field';
-    field: string;
-};
-
-export type MemberExpression = {
-    kind: 'member';
-    receiver: Expression;
-    members: string[];
-};
-
-export type UnaryExpression = {
-    kind: 'unary';
-    op: UnaryOperator;
-    operand: Expression;
-};
-
-export type BinaryExpression = {
-    kind: 'binary';
-    op: BinaryOperator;
-    left: Expression;
-    right: Expression;
-};
-
-export type CallExpression = {
-    kind: 'call';
-    function: string;
-    args?: Expression[];
-};
-
-export type ThisExpression = {
-    kind: 'this';
-};
-
-export type NullExpression = {
-    kind: 'null';
-};
-
-export type UnaryOperator = '!';
-export type BinaryOperator =
-    | '&&'
-    | '||'
-    | '=='
-    | '!='
-    | '<'
-    | '<='
-    | '>'
-    | '>='
-    | '?'
-    | '!'
-    | '^'
-    | 'in';
-
-export const Expression = {
+export const ExpressionUtils = {
     literal: (value: string | number | boolean): LiteralExpression => {
         return {
             kind: 'literal',
@@ -145,14 +86,14 @@ export const Expression = {
 
     and: (expr: Expression, ...expressions: Expression[]) => {
         return expressions.reduce(
-            (acc, exp) => Expression.binary(acc, '&&', exp),
+            (acc, exp) => ExpressionUtils.binary(acc, '&&', exp),
             expr
         );
     },
 
     or: (expr: Expression, ...expressions: Expression[]) => {
         return expressions.reduce(
-            (acc, exp) => Expression.binary(acc, '||', exp),
+            (acc, exp) => ExpressionUtils.binary(acc, '||', exp),
             expr
         );
     },
@@ -167,29 +108,29 @@ export const Expression = {
     },
 
     isLiteral: (value: unknown): value is LiteralExpression =>
-        Expression.is(value, 'literal'),
+        ExpressionUtils.is(value, 'literal'),
 
     isArray: (value: unknown): value is ArrayExpression =>
-        Expression.is(value, 'array'),
+        ExpressionUtils.is(value, 'array'),
 
     isCall: (value: unknown): value is CallExpression =>
-        Expression.is(value, 'call'),
+        ExpressionUtils.is(value, 'call'),
 
     isNull: (value: unknown): value is NullExpression =>
-        Expression.is(value, 'null'),
+        ExpressionUtils.is(value, 'null'),
 
     isThis: (value: unknown): value is ThisExpression =>
-        Expression.is(value, 'this'),
+        ExpressionUtils.is(value, 'this'),
 
     isUnary: (value: unknown): value is UnaryExpression =>
-        Expression.is(value, 'unary'),
+        ExpressionUtils.is(value, 'unary'),
 
     isBinary: (value: unknown): value is BinaryExpression =>
-        Expression.is(value, 'binary'),
+        ExpressionUtils.is(value, 'binary'),
 
     isField: (value: unknown): value is FieldExpression =>
-        Expression.is(value, 'field'),
+        ExpressionUtils.is(value, 'field'),
 
     isMember: (value: unknown): value is MemberExpression =>
-        Expression.is(value, 'member'),
+        ExpressionUtils.is(value, 'member'),
 };

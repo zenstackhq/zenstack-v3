@@ -7,7 +7,7 @@ import type {
     FieldDef,
     GetModels,
     SchemaDef,
-} from '../../schema/schema';
+} from '../../schema';
 import { NUMERIC_FIELD_TYPES } from '../constants';
 import {
     type AggregateArgs,

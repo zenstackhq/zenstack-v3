@@ -1,8 +1,7 @@
 import SQLite from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { Expression } from '../../dist/schema';
 import { ZenStackClient } from '../../src';
-import type { SchemaDef } from '../../src/schema';
+import { type SchemaDef, ExpressionUtils } from '../../src/schema';
 
 describe('Name mapping tests', () => {
     const schema = {
@@ -18,7 +17,7 @@ describe('Name mapping tests', () => {
                     id: {
                         type: 'String',
                         id: true,
-                        default: Expression.call('uuid'),
+                        default: ExpressionUtils.call('uuid'),
                     },
                     x: {
                         type: 'Int',

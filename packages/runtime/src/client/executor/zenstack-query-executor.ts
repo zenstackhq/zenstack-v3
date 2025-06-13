@@ -82,7 +82,7 @@ export class ZenStackQueryExecutor<
             );
 
             // TODO: make sure insert and delete return rows
-            let oldQueryNode = queryNode;
+            const oldQueryNode = queryNode;
             if (
                 (InsertQueryNode.is(queryNode) ||
                     DeleteQueryNode.is(queryNode)) &&

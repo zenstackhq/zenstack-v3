@@ -8,8 +8,12 @@ import {
 } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
-import type { SchemaDef } from '../../../schema';
-import type { BuiltinType, FieldDef, GetModels } from '../../../schema/schema';
+import type {
+    BuiltinType,
+    FieldDef,
+    GetModels,
+    SchemaDef,
+} from '../../../schema';
 import type { FindArgs } from '../../crud-types';
 import {
     buildFieldRef,
@@ -49,12 +53,12 @@ export class PostgresCrudDialect<
     }
 
     override buildRelationSelection(
-        query: SelectQueryBuilder<any, any, {}>,
+        query: SelectQueryBuilder<any, any, any>,
         model: string,
         relationField: string,
         parentAlias: string,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>
-    ): SelectQueryBuilder<any, any, {}> {
+    ): SelectQueryBuilder<any, any, any> {
         const joinedQuery = this.buildRelationJSON(
             model,
             query,
@@ -261,7 +265,7 @@ export class PostgresCrudDialect<
         const objArgs: Array<
             | string
             | ExpressionWrapper<any, any, any>
-            | SelectQueryBuilder<any, any, {}>
+            | SelectQueryBuilder<any, any, any>
             | RawBuilder<any>
         > = [];
 

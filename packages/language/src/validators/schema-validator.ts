@@ -1,10 +1,8 @@
 import type { LangiumDocuments, ValidationAcceptor } from 'langium';
 import { PLUGIN_MODULE_NAME, STD_LIB_MODULE_NAME } from '../constants';
-import { isDataModel, isDataSource, type Model } from '../generated/ast';
+import { isDataSource, type Model } from '../generated/ast';
 import {
     getAllDeclarationsIncludingImports,
-    getDataModelAndTypeDefs,
-    hasAttribute,
     resolveImport,
     resolveTransitiveImports,
 } from '../utils';

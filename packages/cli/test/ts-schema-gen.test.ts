@@ -1,4 +1,4 @@
-import { Expression } from '@zenstackhq/runtime/schema';
+import { ExpressionUtils } from '@zenstackhq/runtime/schema';
 import { generateTsSchema } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
 
@@ -36,7 +36,7 @@ model Post {
                     id: {
                         type: 'String',
                         id: true,
-                        default: Expression.call('uuid'),
+                        default: ExpressionUtils.call('uuid'),
                         attributes: [
                             { name: '@id' },
                             {
@@ -56,7 +56,7 @@ model Post {
                     email: { type: 'String', unique: true },
                     createdAt: {
                         type: 'DateTime',
-                        default: Expression.call('now'),
+                        default: ExpressionUtils.call('now'),
                         attributes: [
                             {
                                 name: '@default',
@@ -105,7 +105,7 @@ model Post {
                     id: {
                         type: 'String',
                         id: true,
-                        default: Expression.call('cuid'),
+                        default: ExpressionUtils.call('cuid'),
                         attributes: [
                             { name: '@id' },
                             {

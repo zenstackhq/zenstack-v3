@@ -1,5 +1,5 @@
 import type { ExpressionBuilder, ExpressionWrapper } from 'kysely';
-import type { FieldDef, GetModels, SchemaDef } from '../schema/schema';
+import type { FieldDef, GetModels, SchemaDef } from '../schema';
 import type { OrderBy } from './crud-types';
 import { InternalError, QueryError } from './errors';
 import type { ClientOptions } from './options';
@@ -207,6 +207,7 @@ export function buildFieldRef<Schema extends SchemaDef>(
     if (!fieldDef.computed) {
         return eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
     } else {
+        // eslint-disable-next-line @typescript-eslint/ban-types
         let computer: Function | undefined;
         if ('computedFields' in options) {
             const computedFields = options.computedFields as Record<

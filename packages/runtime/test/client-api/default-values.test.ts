@@ -4,7 +4,7 @@ import { isValid as isValidUlid } from 'ulid';
 import { validate as isValidUuid } from 'uuid';
 import { describe, expect, it } from 'vitest';
 import { ZenStackClient } from '../../src';
-import { Expression, type SchemaDef } from '../../src/schema';
+import { ExpressionUtils, type SchemaDef } from '../../src/schema';
 
 const schema = {
     provider: {
@@ -20,35 +20,41 @@ const schema = {
                 uuid: {
                     type: 'String',
                     id: true,
-                    default: Expression.call('uuid'),
+                    default: ExpressionUtils.call('uuid'),
                 },
                 uuid7: {
                     type: 'String',
-                    default: Expression.call('uuid', [Expression.literal(7)]),
+                    default: ExpressionUtils.call('uuid', [
+                        ExpressionUtils.literal(7),
+                    ]),
                 },
                 cuid: {
                     type: 'String',
-                    default: Expression.call('cuid'),
+                    default: ExpressionUtils.call('cuid'),
                 },
                 cuid2: {
                     type: 'String',
-                    default: Expression.call('cuid', [Expression.literal(2)]),
+                    default: ExpressionUtils.call('cuid', [
+                        ExpressionUtils.literal(2),
+                    ]),
                 },
                 nanoid: {
                     type: 'String',
-                    default: Expression.call('nanoid'),
+                    default: ExpressionUtils.call('nanoid'),
                 },
                 nanoid8: {
                     type: 'String',
-                    default: Expression.call('nanoid', [Expression.literal(8)]),
+                    default: ExpressionUtils.call('nanoid', [
+                        ExpressionUtils.literal(8),
+                    ]),
                 },
                 ulid: {
                     type: 'String',
-                    default: Expression.call('ulid'),
+                    default: ExpressionUtils.call('ulid'),
                 },
                 dt: {
                     type: 'DateTime',
-                    default: Expression.call('now'),
+                    default: ExpressionUtils.call('now'),
                 },
             },
             idFields: ['uuid'],

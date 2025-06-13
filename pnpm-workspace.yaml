@@ -3,4 +3,5 @@ packages:
     - packages/sdk
     - packages/runtime
     - packages/cli
+    - packages/testtools
     - samples/**

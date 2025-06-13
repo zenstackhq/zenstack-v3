@@ -13,7 +13,7 @@
     "author": "",
     "license": "MIT",
     "dependencies": {
-        "@zenstackhq/cli": "workspace:*",
+        "zenstack": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
         "better-sqlite3": "^11.8.1"
     },

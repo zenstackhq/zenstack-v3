@@ -34,10 +34,15 @@ export async function run(projectPath: string) {
         }
 
         const spinner = ora(`Installing "${pkg.name}"`).start();
-        execSync(`${resolved.command} ${resolved.args.join(' ')}`, {
-            cwd: projectPath,
-        });
-        spinner.succeed();
+        try {
+            execSync(`${resolved.command} ${resolved.args.join(' ')}`, {
+                cwd: projectPath,
+            });
+            spinner.succeed();
+        } catch (e) {
+            spinner.fail();
+            throw e;
+        }
     }
 
     const generationFolder = 'zenstack';

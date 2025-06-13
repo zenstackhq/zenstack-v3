@@ -68,24 +68,26 @@ function initProject(name: string) {
     fs.writeFileSync('main.ts', STARTER_MAIN_TS);
 
     // run `zenstack generate`
-    let spinner = ora('Running `zenstack generate`').start();
-    execSync(`${agentExec} zenstack generate`);
-    spinner.succeed();
+    runCommand(`${agentExec} zenstack generate`, 'Running `zenstack generate`');
 
     // run `zenstack db push`
-    spinner = ora('Running `zenstack db push`').start();
-    execSync(`${agentExec} zenstack db push`);
-    spinner.succeed();
-
-    console.log(colors.green(`Project initialized successfully!`));
-    console.log(
-        colors.gray(`Run \`npx tsx main.ts\` to start the application.`)
-    );
+    runCommand(`${agentExec} zenstack db push`, 'Running `zenstack db push`');
 }
 
 function installPackage(pkg: { name: string; dev: boolean }) {
-    const spinner = ora(`Installing "${pkg.name}"`).start();
-    const cmd = `${agent} install ${pkg.name} ${pkg.dev ? saveDev : ''}`;
-    execSync(cmd);
-    spinner.succeed();
+    runCommand(
+        `${agent} install ${pkg.name} ${pkg.dev ? saveDev : ''}`,
+        `Installing "${pkg.name}"`
+    );
+}
+
+function runCommand(cmd: string, status: string) {
+    const spinner = ora(status).start();
+    try {
+        execSync(cmd);
+        spinner.succeed();
+    } catch (e) {
+        spinner.fail();
+        throw e;
+    }
 }

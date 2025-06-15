@@ -64,15 +64,19 @@ type ModelSelectResult<
     Select,
     Omit
 > = {
-    [Key in keyof Select & GetFields<Schema, Model> as Select[Key] extends
-        | false
-        | undefined
+    [Key in keyof Select as Select[Key] extends false | undefined
         ? never
         : Key extends keyof Omit
         ? Omit[Key] extends true
             ? never
             : Key
-        : Key]: Key extends NonRelationFields<Schema, Model>
+        : Key extends '_count'
+        ? Select[Key] extends SelectCount<Schema, Model>
+            ? Key
+            : never
+        : Key]: Key extends '_count'
+        ? SelectCountResult<Select[Key]>
+        : Key extends NonRelationFields<Schema, Model>
         ? MapFieldType<Schema, Model, Key>
         : Key extends RelationFields<Schema, Model>
         ? Select[Key] extends FindArgs<
@@ -96,6 +100,12 @@ type ModelSelectResult<
               >
         : never;
 };
+
+type SelectCountResult<C> = C extends true
+    ? number
+    : C extends { select: infer S }
+    ? { [Key in keyof S]: number }
+    : never;
 
 export type ModelResult<
     Schema extends SchemaDef,
@@ -366,7 +376,7 @@ export type SelectIncludeOmit<
     Model extends GetModels<Schema>,
     AllowCount extends boolean
 > = {
-    select?: Select<Schema, Model, AllowCount>;
+    select?: Select<Schema, Model, AllowCount, boolean>;
     include?: Include<Schema, Model>;
     omit?: OmitFields<Schema, Model>;
 };
@@ -382,14 +392,15 @@ type Cursor<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
 type Select<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    AllowCount extends Boolean
+    AllowCount extends Boolean,
+    AllowRelation extends boolean = true
 > = {
     [Key in NonRelationFields<Schema, Model>]?: true;
-} & Include<Schema, Model> &
+} & (AllowRelation extends true ? Include<Schema, Model> : {}) & // relation fields
     // relation count
-    (AllowCount extends true ? { _count?: RelationCount<Schema, Model> } : {});
+    (AllowCount extends true ? { _count?: SelectCount<Schema, Model> } : {});
 
-type RelationCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
+type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
     | true
     | {
           select: {
@@ -619,8 +630,10 @@ export type CreateManyArgs<
 export type CreateManyAndReturnArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>
-> = CreateManyPayload<Schema, Model> &
-    Omit<SelectIncludeOmit<Schema, Model, false>, 'include'>;
+> = CreateManyPayload<Schema, Model> & {
+    select?: Select<Schema, Model, false, false>;
+    omit?: OmitFields<Schema, Model>;
+};
 
 type OptionalWrap<
     Schema extends SchemaDef,
@@ -712,10 +725,11 @@ type CreateWithRelationInput<
 
 type ConnectOrCreatePayload<
     Schema extends SchemaDef,
-    Model extends GetModels<Schema>
+    Model extends GetModels<Schema>,
+    Without extends string = never
 > = {
     where: WhereUniqueInput<Schema, Model>;
-    create: CreateInput<Schema, Model>;
+    create: CreateInput<Schema, Model, Without>;
 };
 
 type CreateManyPayload<
@@ -1132,10 +1146,15 @@ type ConnectOrCreateInput<
     ? OrArray<
           ConnectOrCreatePayload<
               Schema,
-              RelationFieldType<Schema, Model, Field>
+              RelationFieldType<Schema, Model, Field>,
+              OppositeRelationAndFK<Schema, Model, Field>
           >
       >
-    : ConnectOrCreatePayload<Schema, RelationFieldType<Schema, Model, Field>>;
+    : ConnectOrCreatePayload<
+          Schema,
+          RelationFieldType<Schema, Model, Field>,
+          OppositeRelationAndFK<Schema, Model, Field>
+      >;
 
 type DisconnectInput<
     Schema extends SchemaDef,
@@ -1280,11 +1299,9 @@ export type ModelOperations<
 
     createMany(args?: CreateManyPayload<Schema, Model>): Promise<BatchResult>;
 
-    createManyAndReturn(
-        args?: CreateManyAndReturnArgs<Schema, Model>
-    ): Promise<
-        ModelResult<Schema, Model, CreateManyAndReturnArgs<Schema, Model>>[]
-    >;
+    createManyAndReturn<T extends CreateManyAndReturnArgs<Schema, Model>>(
+        args?: SelectSubset<T, CreateManyAndReturnArgs<Schema, Model>>
+    ): Promise<ModelResult<Schema, Model, T>[]>;
 
     update<T extends UpdateArgs<Schema, Model>>(
         args: SelectSubset<T, UpdateArgs<Schema, Model>>

@@ -1,6 +1,9 @@
 import Sqlite from 'better-sqlite3';
-import type { DataSourceProviderType, SchemaDef } from '../src/schema';
-import { ExpressionUtils } from '../src/schema/expression';
+import {
+    ExpressionUtils,
+    type DataSourceProviderType,
+    type SchemaDef,
+} from '../src/schema';
 
 export const schema = {
     provider: {

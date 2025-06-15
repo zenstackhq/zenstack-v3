@@ -55,7 +55,7 @@ export class CreateOperationHandler<
             });
         });
 
-        if (!result) {
+        if (!result && this.hasPolicyEnabled) {
             throw new RejectedByPolicyError(
                 this.model,
                 `result is not allowed to be read back`

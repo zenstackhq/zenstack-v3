@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Client as PGClient, Pool } from 'pg';
 import invariant from 'tiny-invariant';
+import type { ClientOptions } from '../src/client';
 import { ZenStackClient } from '../src/client';
-import type { ClientOptions } from '../src/client/options';
 import type { SchemaDef } from '../src/schema';
 
 type SqliteSchema = SchemaDef & { provider: { type: 'sqlite' } };

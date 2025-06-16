@@ -32,7 +32,7 @@ const TEST_PG_CONFIG = {
         ? parseInt(process.env['TEST_PG_PORT'])
         : 5432,
     user: process.env['TEST_PG_USER'] ?? 'postgres',
-    password: process.env['TEST_PG_PASSWORD'] ?? 'abc123',
+    password: process.env['TEST_PG_PASSWORD'] ?? 'postgres',
 };
 
 export async function makePostgresClient<Schema extends PostgresSchema>(

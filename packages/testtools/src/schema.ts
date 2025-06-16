@@ -21,7 +21,7 @@ datasource db {
             return `
 datasource db {
     provider = 'postgresql'
-    url = 'postgres://postgres:abc123@localhost:5432/${dbName}'
+    url = 'postgres://postgres:postgres@localhost:5432/${dbName}'
 }
 `;
         })

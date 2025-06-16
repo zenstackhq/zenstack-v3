@@ -6,3 +6,4 @@ dist
 *.db
 *.db-journal
 *.tgz
+.pnpm-store

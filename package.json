@@ -8,7 +8,8 @@
         "watch": "pnpm -r --parallel watch",
         "lint": "pnpm -r lint",
         "test": "pnpm vitest",
-        "publish-preview": "pnpm --filter \"./packages/**\" -r publish --force --registry https://preview.registry.zenstack.dev/",
+        "publish-all": "pnpm --filter \"./packages/**\" -r publish --tag next",
+        "publish-preview": "pnpm --filter \"./packages/**\" -r publish --tag next --force --registry https://preview.registry.zenstack.dev/",
         "unpublish-preview": "pnpm --filter \"./packages/**\" -r --shell-mode exec -- npm unpublish -f --registry https://preview.registry.zenstack.dev/ \"\\$PNPM_PACKAGE_NAME\""
     },
     "keywords": [],

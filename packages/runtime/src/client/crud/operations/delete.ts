@@ -41,6 +41,7 @@ export class DeleteOperationHandler<
             this.kysely,
             this.model,
             args.where,
+            undefined,
             false
         );
         if (result.count === 0) {
@@ -58,6 +59,7 @@ export class DeleteOperationHandler<
             this.kysely,
             this.model,
             args?.where,
+            args?.limit,
             false
         );
         return result;

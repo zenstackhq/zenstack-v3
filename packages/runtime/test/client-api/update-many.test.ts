@@ -98,5 +98,23 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                 })
             ).resolves.toMatchObject({ count: 0 });
         });
+
+        it('works with updateManyAndReturn', async () => {
+            await client.user.create({
+                data: { id: '1', email: 'u1@test.com', name: 'User1' },
+            });
+            await client.user.create({
+                data: { id: '2', email: 'u2@test.com', name: 'User2' },
+            });
+
+            const r = await client.user.updateManyAndReturn({
+                where: { email: 'u1@test.com' },
+                data: { name: 'User1-new' },
+                select: { id: true, name: true },
+            });
+            expect(r).toMatchObject([{ id: '1', name: 'User1-new' }]);
+            // @ts-expect-error
+            expect(r[0]!.email).toBeUndefined();
+        });
     }
 );

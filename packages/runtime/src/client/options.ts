@@ -40,6 +40,9 @@ export type ZModelFunction<Schema extends SchemaDef> = (
     context: ZModelFunctionContext<Schema>
 ) => Expression<unknown>;
 
+/**
+ * ZenStack client options.
+ */
 export type ClientOptions<Schema extends SchemaDef> = {
     /**
      * Database dialect configuration.
@@ -47,7 +50,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
     dialectConfig?: DialectConfig<Schema['provider']>;
 
     /**
-     * Custom functions.
+     * Custom function definitions.
      */
     functions?: Record<string, ZModelFunction<Schema>>;
 
@@ -62,11 +65,17 @@ export type ClientOptions<Schema extends SchemaDef> = {
     log?: KyselyConfig['log'];
 } & (HasComputedFields<Schema> extends true
     ? {
+          /**
+           * Computed field definitions.
+           */
           computedFields: ComputedFieldsOptions<Schema>;
       }
     : {}) &
     (HasProcedures<Schema> extends true
         ? {
+              /**
+               * Custom procedure definitions.
+               */
               procedures: ProceduresOptions<Schema>;
           }
         : {});

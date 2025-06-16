@@ -74,8 +74,8 @@ async function find() {
             },
         },
     });
-    console.log(user3._count);
-    console.log(user3.posts[0]?._count);
+    console.log(user3._count.posts);
+    console.log(user3.posts[0]?._count.tags);
 
     (
         await client.user.findFirstOrThrow({

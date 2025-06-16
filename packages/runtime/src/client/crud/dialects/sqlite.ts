@@ -322,6 +322,10 @@ export class SqliteCrudDialect<
         return false;
     }
 
+    override get supportsDeleteWithLimit() {
+        return false;
+    }
+
     override get supportsDistinctOn() {
         return false;
     }

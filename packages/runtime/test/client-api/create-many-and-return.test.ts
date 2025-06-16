@@ -80,6 +80,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                 select: { email: true },
             });
             expect(r[0]!.email).toBe('u1@test.com');
+            // @ts-expect-error
             expect(r[0]!.name).toBeUndefined();
 
             r = await client.user.createManyAndReturn({
@@ -87,6 +88,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
                 omit: { name: true },
             });
             expect(r[0]!.email).toBe('u2@test.com');
+            // @ts-expect-error
             expect(r[0]!.name).toBeUndefined();
         });
     }

@@ -828,6 +828,28 @@ describe.each(createClientSpecs(PG_DB_NAME))(
 
             await expect(
                 client.user.findUnique({
+                    where: { id: user1.id },
+                    select: { _count: { select: { posts: true } } },
+                })
+            ).resolves.toMatchObject({
+                _count: { posts: 2 },
+            });
+
+            await expect(
+                client.user.findUnique({
+                    where: { id: user1.id },
+                    select: {
+                        _count: {
+                            select: { posts: { where: { title: 'Post1' } } },
+                        },
+                    },
+                })
+            ).resolves.toMatchObject({
+                _count: { posts: 1 },
+            });
+
+            await expect(
+                client.user.findUnique({
                     where: { id: user2.id },
                     select: { _count: true },
                 })

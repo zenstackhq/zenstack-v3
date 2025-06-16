@@ -3,6 +3,7 @@ import { RejectedByPolicyError } from '../../../plugins/policy/errors';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type {
     UpdateArgs,
+    UpdateManyAndReturnArgs,
     UpdateManyArgs,
     UpsertArgs,
     WhereInput,
@@ -13,7 +14,10 @@ import { BaseOperationHandler } from './base';
 export class UpdateOperationHandler<
     Schema extends SchemaDef
 > extends BaseOperationHandler<Schema> {
-    async handle(operation: 'update' | 'updateMany' | 'upsert', args: unknown) {
+    async handle(
+        operation: 'update' | 'updateMany' | 'updateManyAndReturn' | 'upsert',
+        args: unknown
+    ) {
         return match(operation)
             .with('update', () =>
                 this.runUpdate(
@@ -23,6 +27,14 @@ export class UpdateOperationHandler<
             .with('updateMany', () =>
                 this.runUpdateMany(
                     this.inputValidator.validateUpdateManyArgs(this.model, args)
+                )
+            )
+            .with('updateManyAndReturn', () =>
+                this.runUpdateManyAndReturn(
+                    this.inputValidator.validateUpdateManyAndReturnArgs(
+                        this.model,
+                        args
+                    )
                 )
             )
             .with('upsert', () =>
@@ -74,8 +86,38 @@ export class UpdateOperationHandler<
             this.model,
             args.where,
             args.data,
-            args.limit
+            args.limit,
+            false
         );
+    }
+
+    private async runUpdateManyAndReturn(
+        args: UpdateManyAndReturnArgs<Schema, GetModels<Schema>> | undefined
+    ) {
+        if (!args) {
+            return [];
+        }
+
+        return this.safeTransaction(async (tx) => {
+            const updateResult = await this.updateMany(
+                tx,
+                this.model,
+                args.where,
+                args.data,
+                args.limit,
+                true
+            );
+            return this.read(tx, this.model, {
+                select: args.select,
+                omit: args.omit,
+                where: {
+                    OR: updateResult.map(
+                        (item) =>
+                            getIdValues(this.schema, this.model, item) as any
+                    ),
+                } as any, // TODO: fix type
+            });
+        });
     }
 
     private async runUpsert(args: UpsertArgs<Schema, GetModels<Schema>>) {

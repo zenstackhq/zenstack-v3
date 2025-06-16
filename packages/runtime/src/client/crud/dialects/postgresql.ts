@@ -390,6 +390,10 @@ export class PostgresCrudDialect<
         return false;
     }
 
+    override get supportsDeleteWithLimit(): boolean {
+        return false;
+    }
+
     override get supportsDistinctOn(): boolean {
         return true;
     }

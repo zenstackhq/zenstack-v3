@@ -1174,19 +1174,39 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return eb.not(this.and(eb, ...args));
     }
 
+    /**
+     * Builds an Kysely expression that returns a JSON object for the given key-value pairs.
+     */
     abstract buildJsonObject(
         eb: ExpressionBuilder<any, any>,
         value: Record<string, Expression<unknown>>
     ): ExpressionWrapper<any, any, unknown>;
 
+    /**
+     * Builds an Kysely expression that returns the length of an array.
+     */
     abstract buildArrayLength(
         eb: ExpressionBuilder<any, any>,
         array: Expression<unknown>
     ): ExpressionWrapper<any, any, number>;
 
+    /**
+     * Builds an array literal SQL string for the given values.
+     */
     abstract buildArrayLiteralSQL(values: unknown[]): string;
 
+    /**
+     * Whether the dialect supports updating with a limit on the number of updated rows.
+     */
     abstract get supportsUpdateWithLimit(): boolean;
 
+    /**
+     * Whether the dialect supports deleting with a limit on the number of deleted rows.
+     */
+    abstract get supportsDeleteWithLimit(): boolean;
+
+    /**
+     * Whether the dialect supports DISTINCT ON.
+     */
     abstract get supportsDistinctOn(): boolean;
 }

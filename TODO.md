@@ -55,6 +55,7 @@
         -   [x] Computed fields
         -   [ ] Prisma client extension
     -   [ ] Misc
+        -   [x] JSDoc for CRUD methods
         -   [x] Cache validation schemas
         -   [x] Compound ID
         -   [ ] Cross field comparison

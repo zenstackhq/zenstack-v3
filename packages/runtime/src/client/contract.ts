@@ -64,6 +64,7 @@ export type ClientContract<Schema extends SchemaDef> = {
 
     /**
      * Pushes the schema to the database. For testing purposes only.
+     * @private
      */
     $pushSchema(): Promise<void>;
 } & {

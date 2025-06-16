@@ -71,6 +71,7 @@ export type CrudOperation =
     | 'createManyAndReturn'
     | 'update'
     | 'updateMany'
+    | 'updateManyAndReturn'
     | 'upsert'
     | 'delete'
     | 'deleteMany'
@@ -1433,19 +1434,23 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return sql.raw(`${CONTEXT_COMMENT_PREFIX}${JSON.stringify(context)}`);
     }
 
-    protected async updateMany(
+    protected async updateMany<
+        ReturnData extends boolean,
+        Result = ReturnData extends true ? unknown[] : { count: number }
+    >(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         where: any,
         data: any,
-        limit?: number
-    ) {
+        limit: number | undefined,
+        returnData: ReturnData
+    ): Promise<Result> {
         if (typeof data !== 'object') {
             throw new InternalError('data must be an object');
         }
 
         if (Object.keys(data).length === 0) {
-            return { count: 0 };
+            return (returnData ? [] : { count: 0 }) as Result;
         }
 
         const updateFields: any = {};
@@ -1504,8 +1509,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         );
 
         try {
-            const result = await query.executeTakeFirstOrThrow();
-            return { count: Number(result.numUpdatedRows) };
+            if (!returnData) {
+                const result = await query.executeTakeFirstOrThrow();
+                return { count: Number(result.numUpdatedRows) } as Result;
+            } else {
+                const idFields = getIdFields(this.schema, model);
+                const result = await query.returning(idFields as any).execute();
+                return result as Result;
+            }
         } catch (err) {
             const { sql, parameters } = query.compile();
             throw new QueryError(
@@ -2232,6 +2243,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         },
                     ],
                 },
+                undefined,
                 false
             );
         } else {
@@ -2275,6 +2287,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             },
                         ],
                     },
+                    undefined,
                     false
                 );
             } else {
@@ -2294,6 +2307,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             },
                         ],
                     },
+                    undefined,
                     false
                 );
             }
@@ -2324,16 +2338,51 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         where: any,
+        limit: number | undefined,
         returnData: ReturnData
     ): Promise<Result> {
-        const query = kysely
-            .deleteFrom(model)
-            .where((eb) => this.dialect.buildFilter(eb, model, model, where))
-            // TODO: return selectively
-            .$if(returnData, (qb) => qb.returningAll())
-            .modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
+        let query = kysely.deleteFrom(model);
 
-        // const result = await this.queryExecutor.execute(kysely, query);
+        if (limit === undefined) {
+            query = query.where((eb) =>
+                this.dialect.buildFilter(eb, model, model, where)
+            );
+        } else {
+            if (this.dialect.supportsDeleteWithLimit) {
+                query = query
+                    .where((eb) =>
+                        this.dialect.buildFilter(eb, model, model, where)
+                    )
+                    .limit(limit!);
+            } else {
+                query = query.where((eb) =>
+                    eb(
+                        eb.refTuple(
+                            // @ts-expect-error
+                            ...this.buildIdFieldRefs(kysely, model)
+                        ),
+                        'in',
+                        kysely
+                            .selectFrom(model)
+                            .where((eb) =>
+                                this.dialect.buildFilter(
+                                    eb,
+                                    model,
+                                    model,
+                                    where
+                                )
+                            )
+                            .select(this.buildIdFieldRefs(kysely, model))
+                            .limit(limit!)
+                    )
+                );
+            }
+        }
+
+        query = query.modifyEnd(
+            this.makeContextComment({ model, operation: 'delete' })
+        );
+
         if (returnData) {
             const result = await query.execute();
             return result as Result;

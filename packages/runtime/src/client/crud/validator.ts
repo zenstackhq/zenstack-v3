@@ -21,6 +21,7 @@ import {
     type FindArgs,
     type GroupByArgs,
     type UpdateArgs,
+    type UpdateManyAndReturnArgs,
     type UpdateManyArgs,
     type UpsertArgs,
 } from '../crud-types';
@@ -108,6 +109,18 @@ export class InputValidator<Schema extends SchemaDef> {
             'updateMany',
             undefined,
             (model) => this.makeUpdateManySchema(model),
+            args
+        );
+    }
+
+    validateUpdateManyAndReturnArgs(model: GetModels<Schema>, args: unknown) {
+        return this.validate<
+            UpdateManyAndReturnArgs<Schema, GetModels<Schema>> | undefined
+        >(
+            model,
+            'updateManyAndReturn',
+            undefined,
+            (model) => this.makeUpdateManyAndReturnSchema(model),
             args
         );
     }
@@ -751,15 +764,13 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeCreateManyAndReturnSchema(model: string) {
         const base = this.makeCreateManyDataSchema(model, []);
-        return base
-            .merge(
-                z.object({
-                    select: this.makeSelectSchema(model).optional(),
-                    include: this.makeIncludeSchema(model).optional(),
-                    omit: this.makeOmitSchema(model).optional(),
-                })
-            )
-            .optional();
+        const result = base.merge(
+            z.object({
+                select: this.makeSelectSchema(model).optional(),
+                omit: this.makeOmitSchema(model).optional(),
+            })
+        );
+        return this.refineForSelectOmitMutuallyExclusive(result).optional();
     }
 
     private makeCreateDataSchema(
@@ -1094,6 +1105,17 @@ export class InputValidator<Schema extends SchemaDef> {
                 limit: z.number().int().nonnegative().optional(),
             })
             .strict();
+    }
+
+    private makeUpdateManyAndReturnSchema(model: string) {
+        const base = this.makeUpdateManySchema(model);
+        const result = base.merge(
+            z.object({
+                select: this.makeSelectSchema(model).optional(),
+                omit: this.makeOmitSchema(model).optional(),
+            })
+        );
+        return this.refineForSelectOmitMutuallyExclusive(result);
     }
 
     private makeUpsertSchema(model: string) {

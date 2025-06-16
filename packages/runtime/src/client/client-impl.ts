@@ -36,7 +36,7 @@ import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
 
 /**
- * Creates a new ZenStack client instance.
+ * ZenStack client.
  */
 export const ZenStackClient = function <Schema extends SchemaDef>(
     this: any,
@@ -421,6 +421,15 @@ function createModelCrudHandler<
                 args,
                 new UpdateOperationHandler(client, model, inputValidator),
                 false
+            );
+        },
+
+        updateManyAndReturn: (args: unknown) => {
+            return createPromise(
+                'updateManyAndReturn',
+                args,
+                new UpdateOperationHandler(client, model, inputValidator),
+                true
             );
         },
 

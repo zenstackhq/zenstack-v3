@@ -11,6 +11,7 @@ model User {
     email     String   @unique
     posts     Post[]
     profile   Profile?
+    postCount Int      @computed
 }
 
 model Post {

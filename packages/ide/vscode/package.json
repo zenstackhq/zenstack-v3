@@ -1,0 +1,88 @@
+{
+    "name": "zenstack",
+    "publisher": "zenstack",
+    "version": "3.0.0",
+    "displayName": "ZenStack Language Tools",
+    "description": "VSCode extension for ZenStack ZModel language",
+    "private": true,
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zenstackhq/zenstack-v3"
+    },
+    "scripts": {
+        "build": "tsc --noEmit && tsup",
+        "watch": "run-p watch:*",
+        "watch:tsc": "tsc --watch --noEmit",
+        "watch:tsup": "tsup --watch",
+        "lint": "eslint src --ext ts",
+        "vscode:publish": "pnpm build && vsce publish --no-dependencies --pre-release --follow-symlinks",
+        "vscode:package": "pnpm build && vsce package --no-dependencies"
+    },
+    "homepage": "https://zenstack.dev",
+    "icon": "asset/logo-256-bg.png",
+    "keywords": [
+        "fullstack",
+        "react",
+        "typescript",
+        "data modeling",
+        "prisma"
+    ],
+    "author": {
+        "name": "ZenStack Team"
+    },
+    "license": "MIT",
+    "packageManager": "pnpm@10.12.1",
+    "dependencies": {
+        "langium": "~3.3.0",
+        "vscode-languageclient": "^9.0.1",
+        "vscode-languageserver": "^9.0.1",
+        "@zenstackhq/language": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.63.0"
+    },
+    "files": [
+        "dist",
+        "res",
+        "syntaxes",
+        "asset",
+        "language-configuration.json"
+    ],
+    "engines": {
+        "vscode": "^1.63.0",
+        "node": ">=18.0.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "zmodel",
+                "aliases": [
+                    "ZenStack Model",
+                    "zmodel"
+                ],
+                "extensions": [
+                    ".zmodel"
+                ],
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./asset/logo-light-256.png",
+                    "dark": "./asset/logo-dark-256.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "zmodel",
+                "scopeName": "source.zmodel",
+                "path": "./syntaxes/zmodel.tmLanguage.json"
+            }
+        ]
+    },
+    "activationEvents": [
+        "onLanguage:zmodel"
+    ],
+    "main": "./dist/extension.js"
+}

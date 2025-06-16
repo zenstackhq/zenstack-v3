@@ -43,16 +43,16 @@ export async function loadDocument(
     }
 
     // load standard library
+
+    // isomorphic __dirname
+    const _dirname =
+        typeof __dirname !== 'undefined'
+            ? __dirname
+            : path.dirname(fileURLToPath(import.meta.url));
     const stdLib =
         await services.shared.workspace.LangiumDocuments.getOrCreateDocument(
             URI.file(
-                path.resolve(
-                    path.join(
-                        path.dirname(fileURLToPath(import.meta.url)),
-                        './res',
-                        STD_LIB_MODULE_NAME
-                    )
-                )
+                path.resolve(path.join(_dirname, '../res', STD_LIB_MODULE_NAME))
             )
         );
 

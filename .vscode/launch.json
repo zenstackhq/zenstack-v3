@@ -45,6 +45,28 @@
                 // Ignore all dependencies (optional)
                 "${workspaceFolder}/node_modules/**"
             ]
+        },
+        {
+            "name": "Run Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/packages/ide/vscode"
+            ],
+            "sourceMaps": true,
+            "outFiles": ["${workspaceFolder}/packages/ide/vscode/dist/**/*.js"]
+        },
+        {
+            "name": "Attach to Language Server",
+            "type": "node",
+            "port": 6009,
+            "request": "attach",
+            "skipFiles": ["<node_internals>/**"],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/packages/ide/vscode/dist/**/*.js",
+                "${workspaceFolder}/packages/ide/vscode/node_modules/langium"
+            ]
         }
     ]
 }

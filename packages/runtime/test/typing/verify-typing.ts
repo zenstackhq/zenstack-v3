@@ -1,7 +1,17 @@
 import { ZenStackClient } from '../../dist';
 import { schema } from './schema';
 
-const client = new ZenStackClient(schema);
+const client = new ZenStackClient(schema, {
+    computedFields: {
+        User: {
+            postCount: (eb) =>
+                eb
+                    .selectFrom('Post')
+                    .whereRef('Post.authorId', '=', 'User.id')
+                    .select(({ fn }) => fn.countAll<number>().as('postCount')),
+        },
+    },
+});
 
 async function main() {
     await find();
@@ -11,6 +21,7 @@ async function main() {
     await count();
     await aggregate();
     await groupBy();
+    await queryBuilder();
 }
 
 async function find() {
@@ -20,16 +31,19 @@ async function find() {
         },
     });
     console.log(user1?.name);
+    console.log(user1?.postCount);
 
     const users = await client.user.findMany({
         include: { posts: true },
-        omit: { email: true },
+        omit: { email: true, postCount: true },
     });
     console.log(users.length);
     console.log(users[0]?.name);
     console.log(users[0]?.posts.length);
     // @ts-expect-error
     console.log(users[0]?.email);
+    // @ts-expect-error
+    console.log(users[0]?.postCount);
 
     // @ts-expect-error select/omit are not allowed together
     await client.user.findMany({
@@ -44,7 +58,7 @@ async function find() {
     });
 
     const user2 = await client.user.findUniqueOrThrow({
-        where: { email: 'alex@zenstack.dev' },
+        where: { email: 'alex@zenstack.dev', postCount: { gt: 0 } },
         select: { email: true, profile: true },
     });
     console.log(user2.email);
@@ -530,6 +544,18 @@ async function groupBy() {
     console.log(r[0]?.regionCity);
     // @ts-expect-error age is not in the groupBy
     console.log(r[0]?.age);
+}
+
+async function queryBuilder() {
+    const r = await client.$qb
+        .selectFrom('User')
+        .where('name', '=', 'Alex')
+        .select(['id', 'email'])
+        .executeTakeFirstOrThrow();
+    console.log(r.id);
+    console.log(r.email);
+    // @ts-expect-error
+    console.log(r.name);
 }
 
 main();

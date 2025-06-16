@@ -5,7 +5,8 @@
     "license": "MIT",
     "author": "ZenStack Team",
     "files": [
-        "dist"
+        "dist",
+        "res"
     ],
     "type": "module",
     "scripts": {
@@ -20,12 +21,24 @@
     },
     "exports": {
         ".": {
-            "import": "./dist/index.js",
-            "types": "./dist/index.d.ts"
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
         },
         "./ast": {
-            "import": "./dist/ast.js",
-            "types": "./dist/ast.d.ts"
+            "import": {
+                "types": "./dist/ast.d.ts",
+                "default": "./dist/ast.js"
+            },
+            "require": {
+                "types": "./dist/ast.d.cts",
+                "default": "./dist/ast.cjs"
+            }
         },
         "./package.json": {
             "import": "./package.json",

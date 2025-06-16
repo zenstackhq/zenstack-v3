@@ -13,7 +13,7 @@
     },
     "keywords": [],
     "author": "",
-    "license": "ISC",
+    "license": "MIT",
     "devDependencies": {
         "@swc/core": "^1.10.15",
         "@typescript-eslint/eslint-plugin": "~7.3.1",

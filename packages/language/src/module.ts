@@ -1,4 +1,4 @@
-import { inject, type Module } from 'langium';
+import { inject, type DeepPartial, type Module } from 'langium';
 import {
     createDefaultModule,
     createDefaultSharedModule,
@@ -13,8 +13,9 @@ import {
     ZModelLanguageMetaData,
 } from './generated/module';
 import { ZModelValidator, registerValidationChecks } from './validator';
-import { ZModelScopeComputation, ZModelScopeProvider } from './zmodel-scope';
 import { ZModelLinker } from './zmodel-linker';
+import { ZModelScopeComputation, ZModelScopeProvider } from './zmodel-scope';
+import { ZModelWorkspaceManager } from './zmodel-workspace-manager';
 export { ZModelLanguageMetaData };
 
 /**
@@ -51,6 +52,17 @@ export const ZModelLanguageModule: Module<
     },
 };
 
+export type ZModelSharedServices = LangiumSharedServices;
+
+export const ZModelSharedModule: Module<
+    ZModelSharedServices,
+    DeepPartial<ZModelSharedServices>
+> = {
+    workspace: {
+        WorkspaceManager: (services) => new ZModelWorkspaceManager(services),
+    },
+};
+
 /**
  * Create the full set of services required by Langium.
  *
@@ -74,7 +86,8 @@ export function createZModelLanguageServices(
 } {
     const shared = inject(
         createDefaultSharedModule(context),
-        ZModelGeneratedSharedModule
+        ZModelGeneratedSharedModule,
+        ZModelSharedModule
     );
     const ZModelLanguage = inject(
         createDefaultModule({ shared }),

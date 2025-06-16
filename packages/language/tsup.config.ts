@@ -1,5 +1,4 @@
 import { defineConfig } from 'tsup';
-import fs from 'node:fs';
 
 export default defineConfig({
     entry: {
@@ -11,8 +10,5 @@ export default defineConfig({
     sourcemap: true,
     clean: true,
     dts: true,
-    format: ['esm'],
-    async onSuccess() {
-        fs.cpSync('./res', './dist/res', { recursive: true });
-    },
+    format: ['esm', 'cjs'],
 });

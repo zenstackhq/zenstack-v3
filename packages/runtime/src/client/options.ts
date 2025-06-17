@@ -47,7 +47,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
     /**
      * Database dialect configuration.
      */
-    dialectConfig?: DialectConfig<Schema['provider']>;
+    dialectConfig: DialectConfig<Schema['provider']>;
 
     /**
      * Custom function definitions.

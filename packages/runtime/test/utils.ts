@@ -1,7 +1,7 @@
 import { loadDocument } from '@zenstackhq/language';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import { generateTsSchema } from '@zenstackhq/testtools';
-import Sqlite from 'better-sqlite3';
+import SQLite from 'better-sqlite3';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,7 +20,7 @@ export async function makeSqliteClient<Schema extends SqliteSchema>(
 ) {
     const client = new ZenStackClient(schema, {
         ...extraOptions,
-        dialectConfig: { database: new Sqlite(':memory:') },
+        dialectConfig: { database: new SQLite(':memory:') },
     } as unknown as ClientOptions<Schema>);
     await client.$pushSchema();
     return client;
@@ -59,12 +59,14 @@ export async function makePostgresClient<Schema extends PostgresSchema>(
     return client;
 }
 
-export type CreateTestClientOptions<Schema extends SchemaDef> =
-    ClientOptions<Schema> & {
-        provider?: 'sqlite' | 'postgresql';
-        dbName?: string;
-        usePrismaPush?: boolean;
-    };
+export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<
+    ClientOptions<Schema>,
+    'dialectConfig'
+> & {
+    provider?: 'sqlite' | 'postgresql';
+    dbName?: string;
+    usePrismaPush?: boolean;
+};
 
 export async function createTestClient<Schema extends SchemaDef>(
     schema: Schema,
@@ -92,6 +94,11 @@ export async function createTestClient<Schema extends SchemaDef>(
     } else {
         _schema = schema;
     }
+
+    const { plugins, ...rest } = options ?? {};
+    const _options: ClientOptions<Schema> = {
+        ...rest,
+    } as ClientOptions<Schema>;
 
     if (options?.usePrismaPush) {
         invariant(typeof schema === 'string', 'schema must be a string');
@@ -126,19 +133,49 @@ export async function createTestClient<Schema extends SchemaDef>(
         }
     }
 
-    const { plugins, usePrismaPush, ...rest } = options ?? {};
+    if (options?.provider === 'postgresql') {
+        _options.dialectConfig = {
+            pool: new Pool({
+                ...TEST_PG_CONFIG,
+                database: options!.dbName,
+            }),
+        } as unknown as ClientOptions<Schema>['dialectConfig'];
+    } else {
+        _options.dialectConfig = {
+            database: new SQLite(
+                options?.usePrismaPush
+                    ? getDbPath(path.join(workDir!, 'schema.prisma'))
+                    : ':memory:'
+            ),
+        } as unknown as ClientOptions<Schema>['dialectConfig'];
+    }
 
-    let client = new ZenStackClient(_schema, rest as ClientOptions<Schema>);
+    let client = new ZenStackClient(_schema, _options);
 
-    if (!usePrismaPush) {
+    if (!options?.usePrismaPush) {
         await client.$pushSchema();
     }
 
-    if (options?.plugins) {
-        for (const plugin of options.plugins) {
+    if (plugins) {
+        for (const plugin of plugins) {
             client = client.$use(plugin);
         }
     }
 
     return client;
+}
+
+function getDbPath(prismaSchemaPath: string) {
+    const content = fs.readFileSync(prismaSchemaPath, 'utf-8');
+    const found = content.match(/^\s*url\s*=(\s|")*([^"]+)(\s|")*$/m);
+    if (!found) {
+        throw new Error('No url found in prisma schema');
+    }
+    const dbPath = found[2]!;
+    // convert 'file:./dev.db' to './dev.db'
+    const r = path.join(
+        path.dirname(prismaSchemaPath),
+        dbPath.replace(/^file:/, '')
+    );
+    return r;
 }

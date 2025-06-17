@@ -124,87 +124,6 @@ export class TsSchemaGenerator {
         );
         statements.push(runtimeImportDecl);
 
-        const { type: providerType } = this.getDataSourceProvider(model);
-        switch (providerType) {
-            case 'sqlite': {
-                // add imports for calculating the path of sqlite database file
-
-                // `import path from 'node:path';`
-                const pathImportDecl = ts.factory.createImportDeclaration(
-                    undefined,
-                    ts.factory.createImportClause(
-                        false,
-                        ts.factory.createIdentifier('path'),
-                        undefined
-                    ),
-                    ts.factory.createStringLiteral('node:path')
-                );
-                statements.push(pathImportDecl);
-
-                // `import url from 'node:url';`
-                const urlImportDecl = ts.factory.createImportDeclaration(
-                    undefined,
-                    ts.factory.createImportClause(
-                        false,
-                        ts.factory.createIdentifier('url'),
-                        undefined
-                    ),
-                    ts.factory.createStringLiteral('node:url')
-                );
-                statements.push(urlImportDecl);
-
-                // `import { toDialectConfig } from '@zenstackhq/runtime/utils/sqlite-utils';`
-                const dialectConfigImportDecl =
-                    ts.factory.createImportDeclaration(
-                        undefined,
-                        ts.factory.createImportClause(
-                            false,
-                            undefined,
-                            ts.factory.createNamedImports([
-                                ts.factory.createImportSpecifier(
-                                    false,
-                                    undefined,
-                                    ts.factory.createIdentifier(
-                                        'toDialectConfig'
-                                    )
-                                ),
-                            ])
-                        ),
-                        ts.factory.createStringLiteral(
-                            '@zenstackhq/runtime/utils/sqlite-utils'
-                        )
-                    );
-                statements.push(dialectConfigImportDecl);
-                break;
-            }
-
-            case 'postgresql': {
-                // `import { toDialectConfig } from '@zenstackhq/runtime/utils/pg-utils';`
-                const dialectConfigImportDecl =
-                    ts.factory.createImportDeclaration(
-                        undefined,
-                        ts.factory.createImportClause(
-                            false,
-                            undefined,
-                            ts.factory.createNamedImports([
-                                ts.factory.createImportSpecifier(
-                                    false,
-                                    undefined,
-                                    ts.factory.createIdentifier(
-                                        'toDialectConfig'
-                                    )
-                                ),
-                            ])
-                        ),
-                        ts.factory.createStringLiteral(
-                            '@zenstackhq/runtime/utils/pg-utils'
-                        )
-                    );
-                statements.push(dialectConfigImportDecl);
-                break;
-            }
-        }
-
         const declaration = ts.factory.createVariableStatement(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             ts.factory.createVariableDeclarationList(
@@ -311,10 +230,6 @@ export class TsSchemaGenerator {
                 ts.factory.createPropertyAssignment(
                     'type',
                     ts.factory.createStringLiteral(dsProvider.type)
-                ),
-                ts.factory.createPropertyAssignment(
-                    'dialectConfigProvider',
-                    this.createDialectConfigProvider(dsProvider)
                 ),
             ],
             true
@@ -1015,102 +930,6 @@ export class TsSchemaGenerator {
             : arg === false
             ? ts.factory.createFalse()
             : undefined;
-    }
-
-    private createDialectConfigProvider(
-        dsProvider:
-            | { type: string; env: undefined; url: string }
-            | { type: string; env: string; url: undefined }
-    ) {
-        const type = dsProvider.type;
-
-        let urlExpr: ts.Expression;
-        if (dsProvider.env !== undefined) {
-            urlExpr = ts.factory.createIdentifier(
-                `process.env['${dsProvider.env}']`
-            );
-        } else {
-            urlExpr = ts.factory.createStringLiteral(dsProvider.url);
-
-            if (type === 'sqlite') {
-                // convert file: URL to a regular path
-                let parsedUrl: URL | undefined;
-                try {
-                    parsedUrl = new URL(dsProvider.url);
-                } catch {
-                    // ignore
-                }
-
-                if (parsedUrl) {
-                    if (parsedUrl.protocol !== 'file:') {
-                        throw new Error(
-                            'Invalid SQLite URL: only file protocol is supported'
-                        );
-                    }
-                    urlExpr = ts.factory.createStringLiteral(
-                        dsProvider.url.replace(/^file:/, '')
-                    );
-                }
-            }
-        }
-
-        return match(type)
-            .with('sqlite', () => {
-                return ts.factory.createFunctionExpression(
-                    undefined,
-                    undefined,
-                    undefined,
-                    undefined,
-                    undefined,
-                    undefined,
-                    ts.factory.createBlock(
-                        [
-                            ts.factory.createReturnStatement(
-                                ts.factory.createCallExpression(
-                                    ts.factory.createIdentifier(
-                                        'toDialectConfig'
-                                    ),
-                                    undefined,
-                                    [
-                                        urlExpr,
-                                        ts.factory.createIdentifier(
-                                            `typeof __dirname !== 'undefined' ? __dirname : path.dirname(url.fileURLToPath(import.meta.url))`
-                                        ),
-                                    ]
-                                )
-                            ),
-                        ],
-                        true
-                    )
-                );
-            })
-            .with('postgresql', () => {
-                return ts.factory.createFunctionExpression(
-                    undefined,
-                    undefined,
-                    undefined,
-                    undefined,
-                    undefined,
-                    undefined,
-                    ts.factory.createBlock(
-                        [
-                            ts.factory.createReturnStatement(
-                                ts.factory.createCallExpression(
-                                    ts.factory.createIdentifier(
-                                        'toDialectConfig'
-                                    ),
-                                    undefined,
-                                    [urlExpr]
-                                )
-                            ),
-                        ],
-                        true
-                    )
-                );
-            })
-            .otherwise(() => {
-                throw new Error(`Unsupported provider: ${type}`);
-            });
     }
 
     private createProceduresObject(procedures: Procedure[]) {

@@ -1,3 +1,4 @@
+import type { SqliteDialectConfig } from 'kysely';
 import {
     DefaultConnectionProvider,
     DefaultQueryExecutor,
@@ -7,7 +8,6 @@ import {
     SqliteDialect,
     type KyselyProps,
     type PostgresDialectConfig,
-    type SqliteDialectConfig,
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
@@ -41,7 +41,7 @@ import { ResultProcessor } from './result-processor';
 export const ZenStackClient = function <Schema extends SchemaDef>(
     this: any,
     schema: any,
-    options?: ClientOptions<Schema>
+    options: ClientOptions<Schema>
 ) {
     return new ClientImpl<Schema>(schema, options);
 } as unknown as ClientConstructor;
@@ -56,7 +56,7 @@ export class ClientImpl<Schema extends SchemaDef> {
 
     constructor(
         private readonly schema: Schema,
-        private options?: ClientOptions<Schema>,
+        private options: ClientOptions<Schema>,
         baseClient?: ClientImpl<Schema>
     ) {
         this.$schema = schema;
@@ -140,21 +140,15 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 
     private makePostgresKyselyDialect(): PostgresDialect {
-        const { dialectConfigProvider } = this.schema.provider;
-        const mergedConfig = {
-            ...dialectConfigProvider(),
-            ...this.options?.dialectConfig,
-        } as PostgresDialectConfig;
-        return new PostgresDialect(mergedConfig);
+        return new PostgresDialect(
+            this.options.dialectConfig as PostgresDialectConfig
+        );
     }
 
     private makeSqliteKyselyDialect(): SqliteDialect {
-        const { dialectConfigProvider } = this.schema.provider;
-        const mergedConfig = {
-            ...dialectConfigProvider(),
-            ...this.options?.dialectConfig,
-        } as SqliteDialectConfig;
-        return new SqliteDialect(mergedConfig);
+        return new SqliteDialect(
+            this.options.dialectConfig as SqliteDialectConfig
+        );
     }
 
     async $transaction<T>(

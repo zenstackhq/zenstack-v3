@@ -28,9 +28,14 @@ model Post {
 
 export const STARTER_MAIN_TS = `import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from './zenstack/schema';
+import SQLite from 'better-sqlite3';
 
 async function main() {
-    const client = new ZenStackClient(schema);
+    const client = new ZenStackClient(schema, {
+        dialectConfig: {
+            database: new SQLite('./zenstack/dev.db'),
+        },
+    });
     const user = await client.user.create({
         data: {
             email: 'test@zenstack.dev',

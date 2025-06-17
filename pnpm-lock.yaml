@@ -106,6 +106,25 @@ importers:
         specifier: ^0.2.3
         version: 0.2.3
 
+  packages/create-zenstack:
+    dependencies:
+      colors:
+        specifier: 1.4.0
+        version: 1.4.0
+      commander:
+        specifier: ^8.3.0
+        version: 8.3.0
+      ora:
+        specifier: ^5.4.1
+        version: 5.4.1
+    devDependencies:
+      '@types/colors':
+        specifier: ^1.2.4
+        version: 1.2.4
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.17.24
+
   packages/ide/vscode:
     dependencies:
       '@zenstackhq/language':
@@ -1049,6 +1068,10 @@ packages:
 
   '@types/better-sqlite3@7.6.13':
     resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
+
+  '@types/colors@1.2.4':
+    resolution: {integrity: sha512-oSQxEVIDcYisAzWLa+wr50GSIPu8ml4PsKNJzgrDX3SmEHVBBqbaUurqsUceFauNlCRxNtENKkQm3yOe3m3nfg==}
+    deprecated: This is a stub types definition. colors provides its own type definitions, so you do not need this installed.
 
   '@types/estree@1.0.6':
     resolution: {integrity: sha512-AYnb1nQyY49te+VRAVgmzfcgjYS91mY5P0TKUDCLEM+gNnA+3T6rWITXRLYCpahpqSQbN5cE+gHpnPyXjHWxcw==}
@@ -3463,6 +3486,10 @@ snapshots:
   '@types/better-sqlite3@7.6.13':
     dependencies:
       '@types/node': 20.17.24
+
+  '@types/colors@1.2.4':
+    dependencies:
+      colors: 1.4.0
 
   '@types/estree@1.0.6': {}
 

@@ -22,7 +22,10 @@
     ```ts
     import { ZenStackClient } from '@zenstackhq/runtime';
     import { schema } from './zenstack/schema';
-    const db = ZenStackClient(schema);
+    import SQLite from 'better-sqlite3';
+    const db = ZenStackClient(schema, {
+        dialectConfig: { database: new SQLite('./zenstack/dev.db') },
+    });
     ```
 -   Run `zenstack migrate dev` to generate and apply database migrations. It internally calls `prisma migrate dev`. Same for `zenstack migrate deploy`.
 -   ZenStack v3 doesn't generate into "node_modules" anymore. The generated TypeScript schema file can be checked in to source control, and you decide how to build or bundle it with your application.
@@ -36,7 +39,6 @@ Replicating PrismaClient's CRUD API is around 80% done, including typing and run
 
 Not supported yet:
 
--   `$transaction`
 -   `$extends`
 
 ### 2. Using Kysely expression builder to express complex queries in `where`

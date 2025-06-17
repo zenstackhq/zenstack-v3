@@ -9,10 +9,6 @@ import { ExpressionUtils, type SchemaDef } from '../../src/schema';
 const schema = {
     provider: {
         type: 'sqlite',
-        dialectConfigProvider: () =>
-            ({
-                database: new SQLite(':memory:'),
-            } as any),
     },
     models: {
         Model: {
@@ -68,7 +64,9 @@ const schema = {
 
 describe('default values tests', () => {
     it('supports generators', async () => {
-        const client = new ZenStackClient(schema);
+        const client = new ZenStackClient(schema, {
+            dialectConfig: { database: new SQLite(':memory:') },
+        });
         await client.$pushSchema();
 
         const entity = await client.model.create({ data: {} });

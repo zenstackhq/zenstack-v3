@@ -1,13 +1,18 @@
+import SQLite from 'better-sqlite3';
 import { DeleteQueryNode, InsertQueryNode, UpdateQueryNode } from 'kysely';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ZenStackClient, type ClientContract } from '../../src';
 import { schema } from '../test-schema';
 
-describe('Entity lifecycle tests', () => {
+describe('Entity  lifecycle tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = await new ZenStackClient(schema);
+        _client = new ZenStackClient(schema, {
+            dialectConfig: {
+                database: new SQLite(':memory:'),
+            },
+        });
         await _client.$pushSchema();
     });
 

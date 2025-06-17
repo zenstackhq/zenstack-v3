@@ -48,6 +48,8 @@ Even without using advanced features, ZenStack offers the following benefits as 
 
 # Get started
 
+> You can also check the [blog sample](./samples/blog) for a complete example.
+
 ## Installation
 
 ### 1. Creating a new project
@@ -136,7 +138,9 @@ Now you can use the compiled TypeScript schema to instantiate a database client:
 import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from './zenstack/schema';
 
-const client = new ZenStackClient(schema);
+const client = new ZenStackClient(schema, {
+    dialectConfig: { ... }
+});
 ```
 
 ## Using `ZenStackClient`
@@ -207,7 +211,7 @@ ZenStack v3 allows you to define database-evaluated computed fields with the fol
     model User {
         ...
         /// number of posts owned by the user
-        postCount   Int      @computed
+        postCount Int @computed
     }
     ```
 
@@ -215,6 +219,7 @@ ZenStack v3 allows you to define database-evaluated computed fields with the fol
 
     ```ts
     const client = new ZenStackClient(schema, {
+        ...
         computedFields: {
             User: {
                 postCount: (eb) =>
@@ -367,7 +372,7 @@ See [Prisma Migrate](https://www.prisma.io/docs/orm/prisma-migrate) documentatio
 1. Install "better-sqlite3" or "pg" based on database type
 1. Move "schema.prisma" to "zenstack" folder and rename it to "schema.zmodel"
 1. Run `npx zenstack generate`
-1. Replace `new PrismaClient()` with `new ZenStackClient(schema)`
+1. Replace `new PrismaClient()` with `new ZenStackClient(schema, { ... })`
 
 # Limitations
 

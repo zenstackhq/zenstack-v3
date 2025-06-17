@@ -1,7 +1,11 @@
 import { ZenStackClient } from '../../dist';
 import { schema } from './schema';
+import SQLite from 'better-sqlite3';
 
 const client = new ZenStackClient(schema, {
+    dialectConfig: {
+        database: new SQLite('./zenstack/test.db'),
+    },
     computedFields: {
         User: {
             postCount: (eb) =>

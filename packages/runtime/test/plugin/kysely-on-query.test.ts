@@ -1,3 +1,4 @@
+import SQLite from 'better-sqlite3';
 import {
     InsertQueryNode,
     Kysely,
@@ -13,7 +14,9 @@ describe('Kysely onQuery tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = new ZenStackClient(schema);
+        _client = new ZenStackClient(schema, {
+            dialectConfig: { database: new SQLite(':memory:') },
+        });
         await _client.$pushSchema();
     });
 
@@ -21,11 +24,11 @@ describe('Kysely onQuery tests', () => {
         let called = false;
         const client = _client.$use({
             id: 'test-plugin',
-            onKyselyQuery(args) {
-                if (args.query.kind === 'InsertQueryNode') {
+            onKyselyQuery({ query, proceed }) {
+                if (query.kind === 'InsertQueryNode') {
                     called = true;
                 }
-                return args.proceed(args.query);
+                return proceed(query);
             },
         });
         await expect(

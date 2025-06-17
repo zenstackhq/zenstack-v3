@@ -9,22 +9,18 @@ import { STARTER_MAIN_TS, STARTER_ZMODEL } from './templates';
 const npmAgent = process.env['npm_config_user_agent'];
 let agent = 'npm';
 let agentExec = 'npx';
-let initCommand = 'npm init -y';
 let saveDev = '--save-dev';
 
 if (npmAgent?.includes('pnpm')) {
     agent = 'pnpm';
-    initCommand = 'pnpm init';
     agentExec = 'pnpm';
 } else if (npmAgent?.includes('yarn')) {
     agent = 'yarn';
-    initCommand = 'yarn init';
     agentExec = 'npx';
     saveDev = '--dev';
 } else if (npmAgent?.includes('bun')) {
     agent = 'bun';
     agentExec = 'bun';
-    initCommand = 'bun init -y -m';
 }
 
 const program = new Command('create-zenstack');
@@ -46,19 +42,59 @@ function initProject(name: string) {
 
     console.log(colors.gray(`Using package manager: ${agent}`));
 
-    // initialize project
-    execSync(initCommand);
+    // create package.json
+    fs.writeFileSync(
+        'package.json',
+        JSON.stringify(
+            {
+                name: 'zenstack-app',
+                version: '1.0.0',
+                description: 'Scaffolded with create-zenstack',
+                type: 'module',
+                scripts: {
+                    dev: 'tsx main.ts',
+                },
+                license: 'ISC',
+            },
+            null,
+            2
+        )
+    );
 
     // install packages
     const packages = [
         { name: '@zenstackhq/cli@next', dev: true },
         { name: '@zenstackhq/runtime@next', dev: false },
         { name: 'better-sqlite3', dev: false },
+        { name: '@types/better-sqlite3', dev: true },
+        { name: 'typescript', dev: true },
         { name: 'tsx', dev: true },
+        { name: '@types/node', dev: true },
     ];
     for (const pkg of packages) {
         installPackage(pkg);
     }
+
+    // create tsconfig.json
+    fs.writeFileSync(
+        'tsconfig.json',
+        JSON.stringify(
+            {
+                compilerOptions: {
+                    module: 'esnext',
+                    target: 'esnext',
+                    moduleResolution: 'bundler',
+                    sourceMap: true,
+                    outDir: 'dist',
+                    strict: true,
+                    skipLibCheck: true,
+                    esModuleInterop: true,
+                },
+            },
+            null,
+            2
+        )
+    );
 
     // create schema.zmodel
     fs.mkdirSync('zenstack');

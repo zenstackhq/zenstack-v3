@@ -1,3 +1,4 @@
+import SQLite from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ZenStackClient, type ClientContract } from '../../src/client';
 import { schema } from '../test-schema';
@@ -6,7 +7,11 @@ describe('Query interception tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = await new ZenStackClient(schema);
+        _client = new ZenStackClient(schema, {
+            dialectConfig: {
+                database: new SQLite(':memory:'),
+            },
+        });
         await _client.$pushSchema();
     });
 

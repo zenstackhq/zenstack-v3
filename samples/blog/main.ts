@@ -1,8 +1,12 @@
 import { ZenStackClient } from '@zenstackhq/runtime';
+import SQLite from 'better-sqlite3';
 import { schema } from './zenstack/schema';
 
 async function main() {
     const db = new ZenStackClient(schema, {
+        dialectConfig: {
+            database: new SQLite('./zenstack/dev.db'),
+        },
         computedFields: {
             User: {
                 postCount: (eb) =>
@@ -12,12 +16,6 @@ async function main() {
                         .select(({ fn }) =>
                             fn.countAll<number>().as('postCount')
                         ),
-            },
-        },
-        procedures: {
-            signUp: async (client, email, name) => {
-                console.log('Calling "signUp" proc:', email, name);
-                return client.user.create({ data: { email, name } });
             },
         },
     }).$use({
@@ -96,13 +94,6 @@ async function main() {
         },
     });
     console.log('User found with computed field:', userWithMorePosts);
-
-    // create with custom procedure
-    const newUser = await db.$procedures.signUp(
-        'marvin@zenstack.dev',
-        'Marvin'
-    );
-    console.log('User signed up:', newUser);
 }
 
 main();

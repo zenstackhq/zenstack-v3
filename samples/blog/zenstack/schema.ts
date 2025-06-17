@@ -4,15 +4,9 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 import { type SchemaDef, type OperandExpression, ExpressionUtils } from "@zenstackhq/runtime/schema";
-import path from "node:path";
-import url from "node:url";
-import { toDialectConfig } from "@zenstackhq/runtime/utils/sqlite-utils";
 export const schema = {
     provider: {
-        type: "sqlite",
-        dialectConfigProvider: function () {
-            return toDialectConfig("./dev.db", typeof __dirname !== 'undefined' ? __dirname : path.dirname(url.fileURLToPath(import.meta.url)));
-        }
+        type: "sqlite"
     },
     models: {
         User: {
@@ -166,26 +160,6 @@ export const schema = {
         }
     },
     authType: "User",
-    procedures: {
-        signUp: {
-            params: [
-                { name: "email", type: "String" },
-                { name: "name", optional: true, type: "String" }
-            ] as [
-                email: {
-                    "name": "email";
-                    "type": "String";
-                },
-                name: {
-                    "name": "name";
-                    "type": "String";
-                    "optional": true;
-                }
-            ],
-            returnType: "User",
-            mutation: true
-        }
-    },
     plugins: {}
 } as const satisfies SchemaDef;
 export type SchemaType = typeof schema;

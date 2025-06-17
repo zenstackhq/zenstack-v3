@@ -6,8 +6,11 @@ export function createPolicyTestClient(
     schema: string | SchemaDef,
     options?: CreateTestClientOptions<SchemaDef>
 ) {
-    return createTestClient(schema as any, {
-        ...options,
-        plugins: [new PolicyPlugin()],
-    });
+    return createTestClient(
+        schema as any,
+        {
+            ...options,
+            plugins: [new PolicyPlugin()],
+        } as CreateTestClientOptions<SchemaDef>
+    );
 }

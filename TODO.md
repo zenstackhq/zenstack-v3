@@ -66,6 +66,7 @@
         -   [x] Custom table name
         -   [x] Custom field name
         -   [ ] Strict undefined check
+        -   [ ] Implement changesets
 -   [ ] Polymorphism
 -   [ ] Validation
 -   [ ] Access Policy

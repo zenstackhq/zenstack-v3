@@ -27,7 +27,6 @@ model Post {
 
         expect(schema.provider).toMatchObject({
             type: 'sqlite',
-            dialectConfigProvider: expect.any(Function),
         });
 
         expect(schema.models).toMatchObject({

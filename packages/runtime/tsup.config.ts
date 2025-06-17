@@ -6,8 +6,6 @@ export default defineConfig({
         client: 'src/client/index.ts',
         schema: 'src/schema/index.ts',
         'plugins/policy': 'src/plugins/policy/index.ts',
-        'utils/pg-utils': 'src/utils/pg-utils.ts',
-        'utils/sqlite-utils': 'src/utils/sqlite-utils.ts',
     },
     outDir: 'dist',
     splitting: false,

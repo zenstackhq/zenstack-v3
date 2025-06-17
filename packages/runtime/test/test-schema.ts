@@ -1,4 +1,3 @@
-import Sqlite from 'better-sqlite3';
 import {
     ExpressionUtils,
     type DataSourceProviderType,
@@ -8,10 +7,6 @@ import {
 export const schema = {
     provider: {
         type: 'sqlite',
-        dialectConfigProvider: () =>
-            ({
-                database: new Sqlite(':memory:'),
-            } as object),
     },
     models: {
         User: {
@@ -339,7 +334,6 @@ export function getSchema<ProviderType extends DataSourceProviderType>(
         ...schema,
         provider: {
             type,
-            dialectConfigProvider: () => ({}),
         },
     };
 }

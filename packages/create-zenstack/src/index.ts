@@ -51,8 +51,8 @@ function initProject(name: string) {
 
     // install packages
     const packages = [
-        { name: '@zenstackhq/cli', dev: true },
-        { name: '@zenstackhq/runtime', dev: false },
+        { name: '@zenstackhq/cli@next', dev: true },
+        { name: '@zenstackhq/runtime@next', dev: false },
         { name: 'better-sqlite3', dev: false },
         { name: 'tsx', dev: true },
     ];

@@ -36,7 +36,7 @@ export async function run(options: Options) {
         console.log(colors.green('Generation completed successfully.'));
         console.log(`You can now create a ZenStack client with it.
 
-\`\`\`
+\`\`\`ts
 import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from '${outputPath}/schema';
 

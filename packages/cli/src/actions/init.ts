@@ -12,8 +12,8 @@ import { STARTER_ZMODEL } from './templates';
  */
 export async function run(projectPath: string) {
     const packages = [
-        { name: '@zenstackhq/cli', dev: true },
-        { name: '@zenstackhq/runtime', dev: false },
+        { name: '@zenstackhq/cli@next', dev: true },
+        { name: '@zenstackhq/runtime@next', dev: false },
     ];
     let pm = await detect();
     if (!pm) {

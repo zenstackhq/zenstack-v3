@@ -284,17 +284,6 @@ export class PrismaSchemaGenerator {
             docs,
             addToFront
         );
-
-        // if (
-        //     field.attributes.some((attr) =>
-        //         this.isDefaultWithPluginInvocation(attr)
-        //     )
-        // ) {
-        //     // field has `@default` from a plugin function call, turn it into a dummy default value, and the
-        //     // real default value setting is handled outside Prisma
-        //     this.setDummyDefault(result, field);
-        // }
-
         return result;
     }
 

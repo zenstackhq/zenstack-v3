@@ -153,7 +153,9 @@ describe('Query interception tests', () => {
             await client.user.create({
                 data: { id: '1', email: 'u1@test.com' },
             });
-        } catch {}
+        } catch {
+            // no-op
+        }
 
         expect(hooksCalled).toBe(true);
         await expect(
@@ -180,7 +182,9 @@ describe('Query interception tests', () => {
             await client.user.create({
                 data: { id: '1', email: 'u1@test.com' },
             });
-        } catch {}
+        } catch {
+            // no-op
+        }
 
         expect(hooksCalled).toBe(true);
         await expect(

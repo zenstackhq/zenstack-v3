@@ -66,13 +66,14 @@
         -   [x] Custom table name
         -   [x] Custom field name
         -   [ ] Strict undefined check
+-   [ ] Polymorphism
+-   [ ] Validation
 -   [ ] Access Policy
     -   [ ] Short-circuit pre-create check for scalar-field only policies
     -   [ ] Inject "replace into"
     -   [ ] Inject "on conflict do update"
--   [ ] Polymorphism
 -   [x] Migration
 -   [ ] Databases
     -   [x] SQLite
     -   [x] PostgreSQL
-        -   [x] Multi-schema
+        -   [ ] Multi-schema

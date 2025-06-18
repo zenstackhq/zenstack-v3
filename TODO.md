@@ -6,7 +6,7 @@
     -   [x] generate
     -   [x] migrate
     -   [x] info
-    -   [ ] init
+    -   [x] init
 -   [ ] ORM
     -   [x] Create
         -   [x] Input validation
@@ -36,6 +36,7 @@
             -   [x] Sorting
             -   [x] Pagination
         -   [x] Distinct
+        -   [ ] JSON filtering
     -   [x] Update
         -   [x] Input validation
         -   [x] Top-level
@@ -65,7 +66,6 @@
         -   [ ] Error system
         -   [x] Custom table name
         -   [x] Custom field name
-        -   [ ] Strict undefined check
         -   [ ] Implement changesets
 -   [ ] Polymorphism
 -   [ ] Validation

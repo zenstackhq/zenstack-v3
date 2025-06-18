@@ -100,12 +100,14 @@ For SQLite:
 
 ```bash
 npm install better-sqlite3
+npm install -D @types/better-sqlite3
 ```
 
 For Postgres:
 
 ```bash
-npm install pg
+npm install pg pg-connection-string
+npm install -D @types/pg
 ```
 
 ## Pushing schema to the database
@@ -132,14 +134,32 @@ A `schema.ts` file will be created inside the `zenstack` folder. The file should
 
 ## Creating ZenStack client
 
-Now you can use the compiled TypeScript schema to instantiate a database client:
+Now you can use the compiled TypeScript schema to instantiate a database client.
+
+### SQLite
 
 ```ts
 import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from './zenstack/schema';
+import SQLite from 'better-sqlite3';
 
 const client = new ZenStackClient(schema, {
-    dialectConfig: { ... }
+    dialectConfig: { database: new SQLite('./dev.db') },
+});
+```
+
+### Postgres
+
+```ts
+import { ZenStackClient } from '@zenstackhq/runtime';
+import { schema } from './zenstack/schema';
+import { Pool } from 'pg';
+import { parseIntoClientConfig } from 'pg-connection-string';
+
+const client = new ZenStackClient(schema, {
+    dialectConfig: {
+        pool: new Pool(parseIntoClientConfig(process.env.DATABASE_URL)),
+    },
 });
 ```
 
@@ -376,6 +396,7 @@ See [Prisma Migrate](https://www.prisma.io/docs/orm/prisma-migrate) documentatio
 
 # Limitations
 
-1. Only SQLite (better-sqlite3) and Postgres (pg) database providers are supported.
+1. Only SQLite (better-sqlite3) and Postgres (pg) database providers are supported for now.
 1. Prisma client extensions are not supported.
 1. Prisma custom generators are not supported (may add support in the future).
+1. [Filtering on JSON fields](https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types/working-with-json-fields#filter-on-a-json-field-advanced) is not supported yet.

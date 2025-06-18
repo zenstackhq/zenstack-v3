@@ -549,6 +549,13 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             ).toResolveTruthy();
         });
 
+        it('ignores undefined filters', async () => {
+            await createUser();
+            await expect(
+                client.user.findMany({ where: { id: undefined } })
+            ).toResolveWithLength(1);
+        });
+
         // TODO: filter for bigint, decimal, bytes
     }
 );

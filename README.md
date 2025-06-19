@@ -400,3 +400,4 @@ See [Prisma Migrate](https://www.prisma.io/docs/orm/prisma-migrate) documentatio
 1. Prisma client extensions are not supported.
 1. Prisma custom generators are not supported (may add support in the future).
 1. [Filtering on JSON fields](https://www.prisma.io/docs/orm/prisma-client/special-fields-and-types/working-with-json-fields#filter-on-a-json-field-advanced) is not supported yet.
+1. Raw SQL query APIs (`$queryRaw`, `$executeRaw`) are not supported.

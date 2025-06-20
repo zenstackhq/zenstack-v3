@@ -24,7 +24,7 @@ import type { ToKyselySchema } from './query-builder';
 type DialectConfig<Provider extends DataSourceProvider> =
     Provider['type'] extends 'sqlite'
         ? Optional<SqliteDialectConfig, 'database'>
-        : Provider extends 'postgresql'
+        : Provider['type'] extends 'postgresql'
         ? Optional<PostgresDialectConfig, 'pool'>
         : never;
 

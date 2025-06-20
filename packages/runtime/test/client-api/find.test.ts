@@ -30,6 +30,7 @@ describe.each(createClientSpecs(PG_DB_NAME))(
             r = await client.user.findMany();
             expect(r).toHaveLength(1);
             expect(r[0]?.createdAt).toBeInstanceOf(Date);
+
             r = await client.user.findMany({ where: { id: user.id } });
             expect(r).toHaveLength(1);
 

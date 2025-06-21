@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
-import { z, ZodSchema } from 'zod';
+import { z, ZodType } from 'zod/v4';
 import type {
     BuiltinType,
     EnumDef,
@@ -38,10 +38,10 @@ import {
 type GetSchemaFunc<Schema extends SchemaDef, Options> = (
     model: GetModels<Schema>,
     options: Options
-) => ZodSchema;
+) => ZodType;
 
 export class InputValidator<Schema extends SchemaDef> {
-    private schemaCache = new Map<string, ZodSchema>();
+    private schemaCache = new Map<string, ZodType>();
 
     constructor(private readonly schema: Schema) {}
 
@@ -246,7 +246,7 @@ export class InputValidator<Schema extends SchemaDef> {
             ).optional();
         }
 
-        let result: ZodSchema = z.object(fields).strict();
+        let result: ZodType = z.object(fields).strict();
         result = this.refineForSelectIncludeMutuallyExclusive(result);
         result = this.refineForSelectOmitMutuallyExclusive(result);
 
@@ -275,7 +275,7 @@ export class InputValidator<Schema extends SchemaDef> {
         model: string,
         unique: boolean,
         withoutRelationFields = false
-    ): ZodSchema {
+    ): ZodType {
         const modelDef = getModel(this.schema, model);
         if (!modelDef) {
             throw new QueryError(`Model "${model}" not found`);
@@ -284,7 +284,7 @@ export class InputValidator<Schema extends SchemaDef> {
         const fields: Record<string, any> = {};
         for (const field of Object.keys(modelDef.fields)) {
             const fieldDef = requireField(this.schema, model, field);
-            let fieldSchema: ZodSchema | undefined;
+            let fieldSchema: ZodType | undefined;
 
             if (fieldDef.relation) {
                 if (withoutRelationFields) {
@@ -374,7 +374,7 @@ export class InputValidator<Schema extends SchemaDef> {
         }
 
         // expression builder
-        fields['$expr'] = z.function().optional();
+        fields['$expr'] = z.custom((v) => typeof v === 'function').optional();
 
         // logical operators
         fields['AND'] = this.orArray(
@@ -397,7 +397,7 @@ export class InputValidator<Schema extends SchemaDef> {
         ).optional();
 
         const baseWhere = z.object(fields).strict();
-        let result: ZodSchema = baseWhere;
+        let result: ZodType = baseWhere;
 
         if (unique) {
             // requires at least one unique field (field set) is required
@@ -471,7 +471,7 @@ export class InputValidator<Schema extends SchemaDef> {
             .exhaustive();
     }
 
-    private makeDateTimeFilterSchema(optional: boolean): ZodSchema {
+    private makeDateTimeFilterSchema(optional: boolean): ZodType {
         return this.makeCommonPrimitiveFilterSchema(
             z.union([z.string().datetime(), z.date()]),
             optional,
@@ -479,7 +479,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    private makeBooleanFilterSchema(optional: boolean): ZodSchema {
+    private makeBooleanFilterSchema(optional: boolean): ZodType {
         return z.union([
             this.nullableIf(z.boolean(), optional),
             z.object({
@@ -491,7 +491,7 @@ export class InputValidator<Schema extends SchemaDef> {
         ]);
     }
 
-    private makeBytesFilterSchema(optional: boolean): ZodSchema {
+    private makeBytesFilterSchema(optional: boolean): ZodType {
         const baseSchema = z.instanceof(Uint8Array);
         const components = this.makeCommonPrimitiveFilterComponents(
             baseSchema,
@@ -510,9 +510,9 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeCommonPrimitiveFilterComponents(
-        baseSchema: ZodSchema,
+        baseSchema: ZodType,
         optional: boolean,
-        makeThis: () => ZodSchema
+        makeThis: () => ZodType
     ) {
         return {
             equals: this.nullableIf(baseSchema.optional(), optional),
@@ -528,9 +528,9 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeCommonPrimitiveFilterSchema(
-        baseSchema: ZodSchema,
+        baseSchema: ZodType,
         optional: boolean,
-        makeThis: () => ZodSchema
+        makeThis: () => ZodType
     ) {
         return z.union([
             this.nullableIf(baseSchema, optional),
@@ -545,15 +545,15 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeNumberFilterSchema(
-        baseSchema: ZodSchema,
+        baseSchema: ZodType,
         optional: boolean
-    ): ZodSchema {
+    ): ZodType {
         return this.makeCommonPrimitiveFilterSchema(baseSchema, optional, () =>
             z.lazy(() => this.makeNumberFilterSchema(baseSchema, optional))
         );
     }
 
-    private makeStringFilterSchema(optional: boolean): ZodSchema {
+    private makeStringFilterSchema(optional: boolean): ZodType {
         return this.makeCommonPrimitiveFilterSchema(z.string(), optional, () =>
             z.lazy(() => this.makeStringFilterSchema(optional))
         );
@@ -561,7 +561,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeSelectSchema(model: string) {
         const modelDef = requireModel(this.schema, model);
-        const fields: Record<string, ZodSchema> = {};
+        const fields: Record<string, ZodType> = {};
         for (const field of Object.keys(modelDef.fields)) {
             const fieldDef = requireField(this.schema, model, field);
             if (fieldDef.relation) {
@@ -612,7 +612,7 @@ export class InputValidator<Schema extends SchemaDef> {
                                     ])
                                     .optional(),
                             }),
-                            {} as Record<string, ZodSchema>
+                            {} as Record<string, ZodType>
                         )
                     ),
                 ])
@@ -624,7 +624,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeOmitSchema(model: string) {
         const modelDef = requireModel(this.schema, model);
-        const fields: Record<string, ZodSchema> = {};
+        const fields: Record<string, ZodType> = {};
         for (const field of Object.keys(modelDef.fields)) {
             const fieldDef = requireField(this.schema, model, field);
             if (!fieldDef.relation) {
@@ -636,7 +636,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeIncludeSchema(model: string) {
         const modelDef = requireModel(this.schema, model);
-        const fields: Record<string, ZodSchema> = {};
+        const fields: Record<string, ZodType> = {};
         for (const field of Object.keys(modelDef.fields)) {
             const fieldDef = requireField(this.schema, model, field);
             if (fieldDef.relation) {
@@ -674,7 +674,7 @@ export class InputValidator<Schema extends SchemaDef> {
         WithAggregation: boolean
     ) {
         const modelDef = requireModel(this.schema, model);
-        const fields: Record<string, ZodSchema> = {};
+        const fields: Record<string, ZodType> = {};
         const sort = z.union([z.literal('asc'), z.literal('desc')]);
         for (const field of Object.keys(modelDef.fields)) {
             const fieldDef = requireField(this.schema, model, field);
@@ -815,7 +815,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     }
                 }
 
-                let fieldSchema: ZodSchema = z.lazy(() =>
+                let fieldSchema: ZodType = z.lazy(() =>
                     this.makeRelationManipulationSchema(
                         fieldDef,
                         excludeFields,
@@ -848,7 +848,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 }
                 regularAndRelationFields[field] = fieldSchema;
             } else {
-                let fieldSchema: ZodSchema = this.makePrimitiveSchema(
+                let fieldSchema: ZodType = this.makePrimitiveSchema(
                     fieldDef.type
                 );
 
@@ -904,7 +904,7 @@ export class InputValidator<Schema extends SchemaDef> {
     ) {
         const fieldType = fieldDef.type;
         const array = !!fieldDef.array;
-        const fields: Record<string, ZodSchema> = {
+        const fields: Record<string, ZodType> = {
             create: this.makeCreateDataSchema(
                 fieldDef.type,
                 !!fieldDef.array,
@@ -1168,7 +1168,7 @@ export class InputValidator<Schema extends SchemaDef> {
                         excludeFields.push(...oppositeFieldDef.relation.fields);
                     }
                 }
-                let fieldSchema: ZodSchema = z
+                let fieldSchema: ZodType = z
                     .lazy(() =>
                         this.makeRelationManipulationSchema(
                             fieldDef,
@@ -1183,7 +1183,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 }
                 regularAndRelationFields[field] = fieldSchema;
             } else {
-                let fieldSchema: ZodSchema = this.makePrimitiveSchema(
+                let fieldSchema: ZodType = this.makePrimitiveSchema(
                     fieldDef.type
                 ).optional();
 
@@ -1304,7 +1304,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     ...Object.keys(modelDef.fields).reduce((acc, field) => {
                         acc[field] = z.literal(true).optional();
                         return acc;
-                    }, {} as Record<string, ZodSchema>),
+                    }, {} as Record<string, ZodType>),
                 })
                 .strict(),
         ]);
@@ -1343,7 +1343,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     acc[field] = z.literal(true).optional();
                 }
                 return acc;
-            }, {} as Record<string, ZodSchema>)
+            }, {} as Record<string, ZodType>)
         );
     }
 
@@ -1356,7 +1356,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     acc[field] = z.literal(true).optional();
                 }
                 return acc;
-            }, {} as Record<string, ZodSchema>)
+            }, {} as Record<string, ZodType>)
         );
     }
 
@@ -1366,14 +1366,14 @@ export class InputValidator<Schema extends SchemaDef> {
             (field) => !modelDef.fields[field]?.relation
         );
 
-        let schema: ZodSchema = z
+        let schema = z
             .object({
                 where: this.makeWhereSchema(model, false).optional(),
                 orderBy: this.orArray(
                     this.makeOrderBySchema(model, false, true),
                     true
                 ).optional(),
-                by: this.orArray(z.enum(nonRelationFields as any), true),
+                by: this.orArray(z.enum(nonRelationFields), true),
                 having: this.makeWhereSchema(model, false, true).optional(),
                 skip: z.number().int().nonnegative().optional(),
                 take: z.number().int().optional(),
@@ -1420,25 +1420,25 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Helpers
 
-    private refineForSelectIncludeMutuallyExclusive(schema: ZodSchema) {
+    private refineForSelectIncludeMutuallyExclusive(schema: ZodType) {
         return schema.refine(
-            (value) => !(value['select'] && value['include']),
+            (value: any) => !(value['select'] && value['include']),
             '"select" and "include" cannot be used together'
         );
     }
 
-    private refineForSelectOmitMutuallyExclusive(schema: ZodSchema) {
+    private refineForSelectOmitMutuallyExclusive(schema: ZodType) {
         return schema.refine(
-            (value) => !(value['select'] && value['omit']),
+            (value: any) => !(value['select'] && value['omit']),
             '"select" and "omit" cannot be used together'
         );
     }
 
-    private nullableIf(schema: ZodSchema, nullable: boolean) {
+    private nullableIf(schema: ZodType, nullable: boolean) {
         return nullable ? schema.nullable() : schema;
     }
 
-    private orArray(schema: ZodSchema, canBeArray: boolean) {
+    private orArray<T extends ZodType>(schema: T, canBeArray: boolean) {
         return canBeArray ? z.union([schema, z.array(schema)]) : schema;
     }
 

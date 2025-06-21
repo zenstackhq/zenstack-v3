@@ -10,7 +10,7 @@ import type {
     ZodObject,
     ZodString,
     ZodUnknown,
-} from 'zod';
+} from 'zod/v4';
 
 export type SelectSchema<
     Schema extends SchemaDef,

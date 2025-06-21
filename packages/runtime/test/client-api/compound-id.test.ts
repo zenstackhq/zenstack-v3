@@ -110,7 +110,7 @@ describe('Compound ID tests', () => {
                         id1: 1,
                     },
                 })
-            ).rejects.toThrow(/Required/);
+            ).rejects.toThrow(/id1_id2/);
         });
 
         it('works with update', async () => {

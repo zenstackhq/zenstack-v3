@@ -4,7 +4,7 @@ import type {
     SchemaDef,
 } from '@zenstackhq/runtime/schema';
 import { match, P } from 'ts-pattern';
-import { z, ZodSchema } from 'zod';
+import { z, ZodType } from 'zod/v4';
 import type { SelectSchema } from './types';
 
 export function makeSelectSchema<
@@ -28,20 +28,18 @@ function mapFields<Schema extends SchemaDef>(
     const scalarFields = Object.entries(modelDef.fields).filter(
         ([_, fieldDef]) => !fieldDef.relation
     );
-    const result: Record<string, ZodSchema> = {};
+    const result: Record<string, ZodType> = {};
     for (const [field, fieldDef] of scalarFields) {
         result[field] = makeScalarSchema(fieldDef);
     }
     return result;
 }
 
-function makeScalarSchema(
-    fieldDef: FieldDef
-): z.ZodType<any, z.ZodTypeDef, any> {
+function makeScalarSchema(fieldDef: FieldDef): ZodType {
     return match(fieldDef.type)
         .with('String', () => z.string())
         .with(P.union('Int', 'BigInt', 'Float', 'Decimal'), () => z.number())
         .with('Boolean', () => z.boolean())
-        .with('DateTime', () => z.string().datetime())
+        .with('DateTime', () => z.iso.datetime())
         .otherwise(() => z.unknown());
 }

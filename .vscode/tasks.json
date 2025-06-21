@@ -4,16 +4,40 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build z-model-language",
-            "command": "npm run langium:generate && npm run build",
+            "label": "Build all",
+            "command": "pnpm build",
             "type": "shell",
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "detail": "Langium: Generate grammar and build the z-model-language language",
             "icon": {
                 "color": "terminal.ansiGreen",
+                "id": "server-process"
+            }
+        },
+        {
+            "label": "Build all - watch",
+            "command": "pnpm watch",
+            "type": "shell",
+            "group": {
+                "kind": "build"
+            },
+            "icon": {
+                "color": "terminal.ansiBlue",
+                "id": "server-process"
+            }
+        },
+        {
+            "label": "Test all",
+            "command": "pnpm test",
+            "type": "shell",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "icon": {
+                "color": "terminal.ansiMagenta",
                 "id": "server-process"
             }
         }

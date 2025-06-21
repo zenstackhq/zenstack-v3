@@ -24,13 +24,13 @@
 
 ZenStack is a TypeScript database toolkit for developing full-stack or backend Node.js/Bun applications. It provides a unified data modeling and access solution with the following features:
 
--   A modern schema-first ORM that's compatible with [Prisma](https://github.com/prisma/prisma)'s schema and API
--   Versatile data access APIs: high-level (Prisma-style) ORM queries + low-level ([Kysely](https://github.com/kysely-org/kysely)) query builder
--   Built-in access control and data validation
--   Advanced data modeling patterns like [polymorphism](https://zenstack.dev/blog/polymorphism)
--   Designed for extensibility and flexibility: plugins, life-cycle hooks, etc.
--   Automatic CRUD web APIs with adapters for popular frameworks
--   Automatic [TanStack Query](https://github.com/TanStack/query) hooks for easy CRUD from the frontend
+- A modern schema-first ORM that's compatible with [Prisma](https://github.com/prisma/prisma)'s schema and API
+- Versatile data access APIs: high-level (Prisma-style) ORM queries + low-level ([Kysely](https://github.com/kysely-org/kysely)) query builder
+- Built-in access control and data validation
+- Advanced data modeling patterns like [polymorphism](https://zenstack.dev/blog/polymorphism)
+- Designed for extensibility and flexibility: plugins, life-cycle hooks, etc.
+- Automatic CRUD web APIs with adapters for popular frameworks
+- Automatic [TanStack Query](https://github.com/TanStack/query) hooks for easy CRUD from the frontend
 
 # What's new with V3
 
@@ -83,10 +83,10 @@ Then create a `zenstack` folder and a `schema.zmodel` file in it.
 
 ZenStack uses a DSL named ZModel to model different aspects of database:
 
--   Tables and fields
--   Validation rules (coming soon)
--   Access control policies (coming soon)
--   ...
+- Tables and fields
+- Validation rules (coming soon)
+- Access control policies (coming soon)
+- ...
 
 ZModel is a super set of [Prisma Schema Language](https://www.prisma.io/docs/orm/prisma-schema/overview), i.e., every valid Prisma schema is a valid ZModel.
 
@@ -288,9 +288,7 @@ client.$use({
     async onQuery({ model, operation, proceed, queryArgs }) {
         const start = Date.now();
         const result = await proceed(queryArgs);
-        console.log(
-            `[cost] ${model} ${operation} took ${Date.now() - start}ms`
-        );
+        console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
         return result;
     },
 });
@@ -365,19 +363,19 @@ client.$use({
 
 ZenStack v3 delegates database schema migration to Prisma. The CLI provides Prisma CLI wrappers for managing migrations.
 
--   Sync schema to dev database and create a migration record:
+- Sync schema to dev database and create a migration record:
 
     ```bash
     npx zenstack migrate dev
     ```
 
--   Deploy new migrations:
+- Deploy new migrations:
 
     ```bash
     npx zenstack migrate deploy
     ```
 
--   Reset dev database
+- Reset dev database
 
     ```bash
     npx zenstack migrate reset

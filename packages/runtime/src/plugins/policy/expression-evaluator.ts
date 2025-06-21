@@ -23,27 +23,13 @@ type ExpressionEvaluatorContext = {
 export class ExpressionEvaluator {
     evaluate(expression: Expression, context: ExpressionEvaluatorContext): any {
         const result = match(expression)
-            .when(ExpressionUtils.isArray, (expr) =>
-                this.evaluateArray(expr, context)
-            )
-            .when(ExpressionUtils.isBinary, (expr) =>
-                this.evaluateBinary(expr, context)
-            )
-            .when(ExpressionUtils.isField, (expr) =>
-                this.evaluateField(expr, context)
-            )
-            .when(ExpressionUtils.isLiteral, (expr) =>
-                this.evaluateLiteral(expr)
-            )
-            .when(ExpressionUtils.isMember, (expr) =>
-                this.evaluateMember(expr, context)
-            )
-            .when(ExpressionUtils.isUnary, (expr) =>
-                this.evaluateUnary(expr, context)
-            )
-            .when(ExpressionUtils.isCall, (expr) =>
-                this.evaluateCall(expr, context)
-            )
+            .when(ExpressionUtils.isArray, (expr) => this.evaluateArray(expr, context))
+            .when(ExpressionUtils.isBinary, (expr) => this.evaluateBinary(expr, context))
+            .when(ExpressionUtils.isField, (expr) => this.evaluateField(expr, context))
+            .when(ExpressionUtils.isLiteral, (expr) => this.evaluateLiteral(expr))
+            .when(ExpressionUtils.isMember, (expr) => this.evaluateMember(expr, context))
+            .when(ExpressionUtils.isUnary, (expr) => this.evaluateUnary(expr, context))
+            .when(ExpressionUtils.isCall, (expr) => this.evaluateCall(expr, context))
             .when(ExpressionUtils.isThis, () => context.thisValue)
             .when(ExpressionUtils.isNull, () => null)
             .exhaustive();
@@ -51,32 +37,21 @@ export class ExpressionEvaluator {
         return result ?? null;
     }
 
-    private evaluateCall(
-        expr: CallExpression,
-        context: ExpressionEvaluatorContext
-    ): any {
+    private evaluateCall(expr: CallExpression, context: ExpressionEvaluatorContext): any {
         if (expr.function === 'auth') {
             return context.auth;
         } else {
-            throw new Error(
-                `Unsupported call expression function: ${expr.function}`
-            );
+            throw new Error(`Unsupported call expression function: ${expr.function}`);
         }
     }
 
-    private evaluateUnary(
-        expr: UnaryExpression,
-        context: ExpressionEvaluatorContext
-    ) {
+    private evaluateUnary(expr: UnaryExpression, context: ExpressionEvaluatorContext) {
         return match(expr.op)
             .with('!', () => !this.evaluate(expr.operand, context))
             .exhaustive();
     }
 
-    private evaluateMember(
-        expr: MemberExpression,
-        context: ExpressionEvaluatorContext
-    ) {
+    private evaluateMember(expr: MemberExpression, context: ExpressionEvaluatorContext) {
         let val = this.evaluate(expr.receiver, context);
         for (const member of expr.members) {
             val = val?.[member];
@@ -88,24 +63,15 @@ export class ExpressionEvaluator {
         return expr.value;
     }
 
-    private evaluateField(
-        expr: FieldExpression,
-        context: ExpressionEvaluatorContext
-    ): any {
+    private evaluateField(expr: FieldExpression, context: ExpressionEvaluatorContext): any {
         return context.thisValue?.[expr.field];
     }
 
-    private evaluateArray(
-        expr: ArrayExpression,
-        context: ExpressionEvaluatorContext
-    ) {
+    private evaluateArray(expr: ArrayExpression, context: ExpressionEvaluatorContext) {
         return expr.items.map((item) => this.evaluate(item, context));
     }
 
-    private evaluateBinary(
-        expr: BinaryExpression,
-        context: ExpressionEvaluatorContext
-    ) {
+    private evaluateBinary(expr: BinaryExpression, context: ExpressionEvaluatorContext) {
         if (expr.op === '?' || expr.op === '!' || expr.op === '^') {
             return this.evaluateCollectionPredicate(expr, context);
         }
@@ -124,24 +90,15 @@ export class ExpressionEvaluator {
             .with('||', () => left || right)
             .with('in', () => {
                 const _right = right ?? [];
-                invariant(
-                    Array.isArray(_right),
-                    'expected array for "in" operator'
-                );
+                invariant(Array.isArray(_right), 'expected array for "in" operator');
                 return _right.includes(left);
             })
             .exhaustive();
     }
 
-    private evaluateCollectionPredicate(
-        expr: BinaryExpression,
-        context: ExpressionEvaluatorContext
-    ) {
+    private evaluateCollectionPredicate(expr: BinaryExpression, context: ExpressionEvaluatorContext) {
         const op = expr.op;
-        invariant(
-            op === '?' || op === '!' || op === '^',
-            'expected "?" or "!" or "^" operator'
-        );
+        invariant(op === '?' || op === '!' || op === '^', 'expected "?" or "!" or "^" operator');
 
         const left = this.evaluate(expr.left, context);
         if (!left) {
@@ -151,16 +108,8 @@ export class ExpressionEvaluator {
         invariant(Array.isArray(left), 'expected array');
 
         return match(op)
-            .with('?', () =>
-                left.some((item: any) =>
-                    this.evaluate(expr.right, { ...context, thisValue: item })
-                )
-            )
-            .with('!', () =>
-                left.every((item: any) =>
-                    this.evaluate(expr.right, { ...context, thisValue: item })
-                )
-            )
+            .with('?', () => left.some((item: any) => this.evaluate(expr.right, { ...context, thisValue: item })))
+            .with('!', () => left.every((item: any) => this.evaluate(expr.right, { ...context, thisValue: item })))
             .with(
                 '^',
                 () =>
@@ -168,8 +117,8 @@ export class ExpressionEvaluator {
                         this.evaluate(expr.right, {
                             ...context,
                             thisValue: item,
-                        })
-                    )
+                        }),
+                    ),
             )
             .exhaustive();
     }

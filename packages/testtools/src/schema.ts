@@ -31,21 +31,16 @@ datasource db {
 export async function generateTsSchema(
     schemaText: string,
     provider: 'sqlite' | 'postgresql' = 'sqlite',
-    dbName?: string
+    dbName?: string,
 ) {
     const { name: workDir } = tmp.dirSync({ unsafeCleanup: true });
     console.log(`Working directory: ${workDir}`);
 
     const zmodelPath = path.join(workDir, 'schema.zmodel');
     const noPrelude = schemaText.includes('datasource ');
-    fs.writeFileSync(
-        zmodelPath,
-        `${noPrelude ? '' : makePrelude(provider, dbName)}\n\n${schemaText}`
-    );
+    fs.writeFileSync(zmodelPath, `${noPrelude ? '' : makePrelude(provider, dbName)}\n\n${schemaText}`);
 
-    const pluginModelFiles = glob.sync(
-        path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel')
-    );
+    const pluginModelFiles = glob.sync(path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel'));
 
     const generator = new TsSchemaGenerator();
     const tsPath = path.join(workDir, 'schema.ts');
@@ -62,7 +57,7 @@ export async function generateTsSchema(
         fs.symlinkSync(
             path.join(__dirname, '../node_modules', entry),
             path.join(workDir, 'node_modules', entry),
-            'dir'
+            'dir',
         );
     }
 
@@ -73,7 +68,7 @@ export async function generateTsSchema(
         fs.symlinkSync(
             path.join(__dirname, `../../${pkg}/dist`),
             path.join(workDir, `node_modules/@zenstackhq/${pkg}`),
-            'dir'
+            'dir',
         );
     }
 
@@ -83,7 +78,7 @@ export async function generateTsSchema(
             name: 'test',
             version: '1.0.0',
             type: 'module',
-        })
+        }),
     );
 
     fs.writeFileSync(
@@ -96,7 +91,7 @@ export async function generateTsSchema(
                 esModuleInterop: true,
                 skipLibCheck: true,
             },
-        })
+        }),
     );
 
     // compile the generated TS schema

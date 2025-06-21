@@ -34,7 +34,7 @@ describe.each([
             {
                 provider,
                 dbName: TEST_DB,
-            }
+            },
         );
 
         await expect(
@@ -44,7 +44,7 @@ describe.each([
                     profile: { create: { age: 20 } },
                 },
                 include: { profile: true },
-            })
+            }),
         ).resolves.toMatchObject({
             name: 'User',
             profile: { age: 20 },
@@ -73,7 +73,7 @@ describe.each([
             {
                 provider,
                 dbName: TEST_DB,
-            }
+            },
         );
 
         await expect(
@@ -84,7 +84,7 @@ describe.each([
                     profile2: { create: { age: 21 } },
                 },
                 include: { profile1: true, profile2: true },
-            })
+            }),
         ).resolves.toMatchObject({
             name: 'User',
             profile1: { age: 20 },
@@ -111,7 +111,7 @@ describe.each([
             {
                 provider,
                 dbName: TEST_DB,
-            }
+            },
         );
 
         await expect(
@@ -123,13 +123,10 @@ describe.each([
                     },
                 },
                 include: { posts: true },
-            })
+            }),
         ).resolves.toMatchObject({
             name: 'User',
-            posts: [
-                expect.objectContaining({ title: 'Post 1' }),
-                expect.objectContaining({ title: 'Post 2' }),
-            ],
+            posts: [expect.objectContaining({ title: 'Post 1' }), expect.objectContaining({ title: 'Post 2' })],
         });
     });
 
@@ -155,7 +152,7 @@ describe.each([
             {
                 provider,
                 dbName: TEST_DB,
-            }
+            },
         );
 
         await expect(
@@ -170,17 +167,11 @@ describe.each([
                     },
                 },
                 include: { posts1: true, posts2: true },
-            })
+            }),
         ).resolves.toMatchObject({
             name: 'User',
-            posts1: [
-                expect.objectContaining({ title: 'Post 1' }),
-                expect.objectContaining({ title: 'Post 2' }),
-            ],
-            posts2: [
-                expect.objectContaining({ title: 'Post 3' }),
-                expect.objectContaining({ title: 'Post 4' }),
-            ],
+            posts1: [expect.objectContaining({ title: 'Post 1' }), expect.objectContaining({ title: 'Post 2' })],
+            posts2: [expect.objectContaining({ title: 'Post 3' }), expect.objectContaining({ title: 'Post 4' })],
         });
     });
 
@@ -211,7 +202,7 @@ describe.each([
             {
                 provider,
                 dbName: TEST_DB,
-            }
+            },
         );
 
         await client.user.create({ data: { id: 1, name: 'User1' } });
@@ -226,7 +217,7 @@ describe.each([
         await expect(
             client.user.findMany({
                 include: { tags: { include: { tag: true } } },
-            })
+            }),
         ).resolves.toMatchObject([
             expect.objectContaining({
                 name: 'User1',
@@ -260,17 +251,13 @@ describe.each([
                     id Int @id @default(autoincrement())
                     name String
                     profile Profile?
-                    tags Tag[] ${
-                        relationName ? `@relation("${relationName}")` : ''
-                    }
+                    tags Tag[] ${relationName ? `@relation("${relationName}")` : ''}
                 }
 
                 model Tag {
                     id Int @id @default(autoincrement())
                     name String
-                    users User[] ${
-                        relationName ? `@relation("${relationName}")` : ''
-                    }
+                    users User[] ${relationName ? `@relation("${relationName}")` : ''}
                 }
 
                 model Profile {
@@ -282,10 +269,9 @@ describe.each([
                 `,
                     {
                         provider,
-                        dbName:
-                            provider === 'sqlite' ? 'file:./dev.db' : TEST_DB,
+                        dbName: provider === 'sqlite' ? 'file:./dev.db' : TEST_DB,
                         usePrismaPush: true,
-                    }
+                    },
                 );
             });
 
@@ -320,12 +306,9 @@ describe.each([
                 await expect(
                     client.user.findFirst({
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
-                    tags: [
-                        expect.objectContaining({ name: 'Tag1' }),
-                        expect.objectContaining({ name: 'Tag2' }),
-                    ],
+                    tags: [expect.objectContaining({ name: 'Tag1' }), expect.objectContaining({ name: 'Tag2' })],
                 });
 
                 await expect(
@@ -335,13 +318,10 @@ describe.each([
                                 include: { tags: true },
                             },
                         },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     user: expect.objectContaining({
-                        tags: [
-                            expect.objectContaining({ name: 'Tag1' }),
-                            expect.objectContaining({ name: 'Tag2' }),
-                        ],
+                        tags: [expect.objectContaining({ name: 'Tag1' }), expect.objectContaining({ name: 'Tag2' })],
                     }),
                 });
 
@@ -349,7 +329,7 @@ describe.each([
                     client.user.findUnique({
                         where: { id: 2 },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [],
                 });
@@ -359,7 +339,7 @@ describe.each([
                     client.user.findFirst({
                         where: { id: 1 },
                         include: { tags: { where: { name: 'Tag1' } } },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [expect.objectContaining({ name: 'Tag1' })],
                 });
@@ -368,7 +348,7 @@ describe.each([
                 await expect(
                     client.user.findMany({
                         where: { tags: { some: { name: 'Tag1' } } },
-                    })
+                    }),
                 ).resolves.toEqual([
                     expect.objectContaining({
                         name: 'User1',
@@ -377,7 +357,7 @@ describe.each([
                 await expect(
                     client.user.findMany({
                         where: { tags: { none: { name: 'Tag1' } } },
-                    })
+                    }),
                 ).resolves.toEqual([
                     expect.objectContaining({
                         name: 'User2',
@@ -406,12 +386,9 @@ describe.each([
                             },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
-                    tags: [
-                        expect.objectContaining({ name: 'Tag1' }),
-                        expect.objectContaining({ name: 'Tag2' }),
-                    ],
+                    tags: [expect.objectContaining({ name: 'Tag1' }), expect.objectContaining({ name: 'Tag2' })],
                 });
 
                 // connect
@@ -423,7 +400,7 @@ describe.each([
                             tags: { connect: { id: 1 } },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [expect.objectContaining({ name: 'Tag1' })],
                 });
@@ -442,7 +419,7 @@ describe.each([
                             },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [expect.objectContaining({ id: 1, name: 'Tag1' })],
                 });
@@ -460,7 +437,7 @@ describe.each([
                             },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [expect.objectContaining({ id: 3, name: 'Tag3' })],
                 });
@@ -499,12 +476,9 @@ describe.each([
                             },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
-                    tags: [
-                        expect.objectContaining({ id: 1 }),
-                        expect.objectContaining({ id: 2 }),
-                    ],
+                    tags: [expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 2 })],
                 });
 
                 await client.tag.create({
@@ -520,7 +494,7 @@ describe.each([
                         where: { id: 1 },
                         data: { tags: { connect: { id: 3 } } },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [
                         expect.objectContaining({ id: 1 }),
@@ -534,7 +508,7 @@ describe.each([
                         where: { id: 1 },
                         data: { tags: { connect: { id: 3 } } },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [
                         expect.objectContaining({ id: 1 }),
@@ -551,7 +525,7 @@ describe.each([
                             tags: { disconnect: { id: 3, name: 'not found' } },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [
                         expect.objectContaining({ id: 1 }),
@@ -566,23 +540,18 @@ describe.each([
                         where: { id: 1 },
                         data: { tags: { disconnect: { id: 3 } } },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
-                    tags: [
-                        expect.objectContaining({ id: 1 }),
-                        expect.objectContaining({ id: 2 }),
-                    ],
+                    tags: [expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 2 })],
                 });
 
                 await expect(
                     client.$qbRaw
-                        .selectFrom(
-                            relationName ? `_${relationName}` : '_TagToUser'
-                        )
+                        .selectFrom(relationName ? `_${relationName}` : '_TagToUser')
                         .selectAll()
                         .where('B', '=', 1) // user id
                         .where('A', '=', 3) // tag id
-                        .execute()
+                        .execute(),
                 ).resolves.toHaveLength(0);
 
                 await expect(
@@ -590,12 +559,9 @@ describe.each([
                         where: { id: 1 },
                         data: { tags: { set: [{ id: 2 }, { id: 3 }] } },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
-                    tags: [
-                        expect.objectContaining({ id: 2 }),
-                        expect.objectContaining({ id: 3 }),
-                    ],
+                    tags: [expect.objectContaining({ id: 2 }), expect.objectContaining({ id: 3 })],
                 });
 
                 // update - not found
@@ -610,7 +576,7 @@ describe.each([
                                 },
                             },
                         },
-                    })
+                    }),
                 ).toBeRejectedNotFound();
 
                 // update - found
@@ -626,7 +592,7 @@ describe.each([
                             },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: expect.arrayContaining([
                         expect.objectContaining({
@@ -650,7 +616,7 @@ describe.each([
                             },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [
                         expect.objectContaining({
@@ -664,9 +630,7 @@ describe.each([
                     ],
                 });
 
-                await expect(
-                    client.tag.findUnique({ where: { id: 1 } })
-                ).resolves.toMatchObject({
+                await expect(client.tag.findUnique({ where: { id: 1 } })).resolves.toMatchObject({
                     name: 'Tag1',
                 });
 
@@ -684,7 +648,7 @@ describe.each([
                             },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [
                         expect.objectContaining({
@@ -712,11 +676,9 @@ describe.each([
                             },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
-                    tags: expect.arrayContaining([
-                        expect.objectContaining({ id: 4, name: 'Tag4' }),
-                    ]),
+                    tags: expect.arrayContaining([expect.objectContaining({ id: 4, name: 'Tag4' })]),
                 });
 
                 // delete - not found
@@ -724,7 +686,7 @@ describe.each([
                     client.user.update({
                         where: { id: 1 },
                         data: { tags: { delete: { id: 1 } } },
-                    })
+                    }),
                 ).toBeRejectedNotFound();
 
                 // delete - found
@@ -733,16 +695,11 @@ describe.each([
                         where: { id: 1 },
                         data: { tags: { delete: { id: 2 } } },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
-                    tags: [
-                        expect.objectContaining({ id: 3 }),
-                        expect.objectContaining({ id: 4 }),
-                    ],
+                    tags: [expect.objectContaining({ id: 3 }), expect.objectContaining({ id: 4 })],
                 });
-                await expect(
-                    client.tag.findUnique({ where: { id: 2 } })
-                ).toResolveNull();
+                await expect(client.tag.findUnique({ where: { id: 2 } })).toResolveNull();
 
                 // deleteMany
                 await expect(
@@ -752,16 +709,12 @@ describe.each([
                             tags: { deleteMany: { id: { in: [1, 2, 3] } } },
                         },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [expect.objectContaining({ id: 4 })],
                 });
-                await expect(
-                    client.tag.findUnique({ where: { id: 3 } })
-                ).toResolveNull();
-                await expect(
-                    client.tag.findUnique({ where: { id: 1 } })
-                ).toResolveTruthy();
+                await expect(client.tag.findUnique({ where: { id: 3 } })).toResolveNull();
+                await expect(client.tag.findUnique({ where: { id: 1 } })).toResolveTruthy();
             });
 
             it('works with delete', async () => {
@@ -786,7 +739,7 @@ describe.each([
                     client.user.findUnique({
                         where: { id: 1 },
                         include: { tags: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     tags: [expect.objectContaining({ id: 2 })],
                 });
@@ -799,11 +752,11 @@ describe.each([
                     client.tag.findUnique({
                         where: { id: 2 },
                         include: { users: true },
-                    })
+                    }),
                 ).resolves.toMatchObject({
                     users: [],
                 });
             });
-        }
+        },
     );
 });

@@ -14,21 +14,14 @@ export default class TypeDefValidator implements AstValidator<TypeDef> {
     }
 
     private validateAttributes(typeDef: TypeDef, accept: ValidationAcceptor) {
-        typeDef.attributes.forEach((attr) =>
-            validateAttributeApplication(attr, accept)
-        );
+        typeDef.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
     }
 
     private validateFields(typeDef: TypeDef, accept: ValidationAcceptor) {
         typeDef.fields.forEach((field) => this.validateField(field, accept));
     }
 
-    private validateField(
-        field: TypeDefField,
-        accept: ValidationAcceptor
-    ): void {
-        field.attributes.forEach((attr) =>
-            validateAttributeApplication(attr, accept)
-        );
+    private validateField(field: TypeDefField, accept: ValidationAcceptor): void {
+        field.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
     }
 }

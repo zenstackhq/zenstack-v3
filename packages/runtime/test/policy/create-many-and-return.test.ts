@@ -23,7 +23,7 @@ describe('createManyAndReturn tests', () => {
             @@allow('read', published)
             @@allow('create', contains(title, 'hello'))
         }
-        `
+        `,
         );
         const rawDb = db.$unuseAll();
 
@@ -38,11 +38,11 @@ describe('createManyAndReturn tests', () => {
         await expect(
             db.post.createManyAndReturn({
                 data: [{ title: 'foo', userId: 1 }],
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // success
-        let r = await db.post.createManyAndReturn({
+        const r = await db.post.createManyAndReturn({
             data: [{ id: 1, title: 'hello1', userId: 1, published: true }],
         });
         expect(r.length).toBe(1);
@@ -54,7 +54,7 @@ describe('createManyAndReturn tests', () => {
                     { id: 2, title: 'hello2', userId: 1, published: true },
                     { id: 3, title: 'hello3', userId: 1, published: false },
                 ],
-            })
+            }),
         ).toResolveWithLength(1);
         // two are created indeed
         await expect(rawDb.post.findMany()).resolves.toHaveLength(3);
@@ -71,7 +71,7 @@ describe('createManyAndReturn tests', () => {
 
             @@allow('all', true)
         }
-        `
+        `,
         );
         const rawDb = db.$unuseAll();
         // create should succeed but one result's title field can't be read back

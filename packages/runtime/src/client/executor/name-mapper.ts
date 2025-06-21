@@ -32,15 +32,10 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 this.modelToTableMap.set(modelName, mappedName);
             }
 
-            for (const [fieldName, fieldDef] of Object.entries(
-                modelDef.fields
-            )) {
+            for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
                 const mappedName = this.getMappedName(fieldDef);
                 if (mappedName) {
-                    this.fieldToColumnMap.set(
-                        `${modelName}.${fieldName}`,
-                        mappedName
-                    );
+                    this.fieldToColumnMap.set(`${modelName}.${fieldName}`, mappedName);
                 }
             }
         }
@@ -73,9 +68,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
     }
 
     protected override transformReturning(node: ReturningNode) {
-        return ReturningNode.create(
-            this.transformSelections(node.selections, node)
-        );
+        return ReturningNode.create(this.transformSelections(node.selections, node));
     }
 
     protected override transformUpdateQuery(node: UpdateQueryNode) {
@@ -93,15 +86,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    protected override transformDeleteQuery(
-        node: DeleteQueryNode
-    ): DeleteQueryNode {
+    protected override transformDeleteQuery(node: DeleteQueryNode): DeleteQueryNode {
         let pushed = false;
-        if (
-            node.from?.froms &&
-            node.from.froms.length === 1 &&
-            node.from.froms[0]
-        ) {
+        if (node.from?.froms && node.from.froms.length === 1 && node.from.froms[0]) {
             const from = node.from.froms[0];
             if (TableNode.is(from)) {
                 this.modelStack.push(from.table.identifier.name);
@@ -126,9 +113,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
 
         if (node.from.froms.length > 1) {
-            throw new InternalError(
-                `SelectQueryNode must have a single table in from clause`
-            );
+            throw new InternalError(`SelectQueryNode must have a single table in from clause`);
         }
 
         let pushed = false;
@@ -141,9 +126,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
             pushed = true;
         }
 
-        const selections = node.selections
-            ? this.transformSelections(node.selections, node)
-            : node.selections;
+        const selections = node.selections ? this.transformSelections(node.selections, node) : node.selections;
 
         try {
             return {
@@ -157,10 +140,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    private transformSelections(
-        selections: readonly SelectionNode[],
-        contextNode: OperationNode
-    ) {
+    private transformSelections(selections: readonly SelectionNode[], contextNode: OperationNode) {
         const result: SelectionNode[] = [];
 
         for (const selection of selections) {
@@ -170,13 +150,8 @@ export class QueryNameMapper extends OperationNodeTransformer {
             if (SelectAllNode.is(selection.selection)) {
                 selectAllFromModel = this.currentModel;
                 isSelectAll = true;
-            } else if (
-                ReferenceNode.is(selection.selection) &&
-                SelectAllNode.is(selection.selection.column)
-            ) {
-                selectAllFromModel =
-                    selection.selection.table?.table.identifier.name ??
-                    this.currentModel;
+            } else if (ReferenceNode.is(selection.selection) && SelectAllNode.is(selection.selection.column)) {
+                selectAllFromModel = selection.selection.table?.table.identifier.name ?? this.currentModel;
                 isSelectAll = true;
             }
 
@@ -184,31 +159,21 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 if (!selectAllFromModel) {
                     continue;
                 } else {
-                    const scalarFields = this.getModelScalarFields(
-                        contextNode,
-                        selectAllFromModel
-                    );
-                    const fromModelDef = requireModel(
-                        this.schema,
-                        selectAllFromModel
-                    );
-                    const mappedTableName =
-                        this.getMappedName(fromModelDef) ?? selectAllFromModel;
+                    const scalarFields = this.getModelScalarFields(contextNode, selectAllFromModel);
+                    const fromModelDef = requireModel(this.schema, selectAllFromModel);
+                    const mappedTableName = this.getMappedName(fromModelDef) ?? selectAllFromModel;
                     result.push(
                         ...scalarFields.map((fieldName) => {
                             const fieldRef = ReferenceNode.create(
                                 ColumnNode.create(this.mapFieldName(fieldName)),
-                                TableNode.create(mappedTableName)
+                                TableNode.create(mappedTableName),
                             );
                             return SelectionNode.create(
                                 this.fieldHasMappedName(fieldName)
-                                    ? AliasNode.create(
-                                          fieldRef,
-                                          IdentifierNode.create(fieldName)
-                                      )
-                                    : fieldRef
+                                    ? AliasNode.create(fieldRef, IdentifierNode.create(fieldName))
+                                    : fieldRef,
                             );
-                        })
+                        }),
                     );
                 }
             } else {
@@ -220,29 +185,22 @@ export class QueryNameMapper extends OperationNodeTransformer {
     }
 
     private transformSelectionWithAlias(node: SelectionNode) {
-        if (
-            ColumnNode.is(node.selection) &&
-            this.fieldHasMappedName(node.selection.column.name)
-        ) {
+        if (ColumnNode.is(node.selection) && this.fieldHasMappedName(node.selection.column.name)) {
             return SelectionNode.create(
                 AliasNode.create(
                     this.transformColumn(node.selection),
-                    IdentifierNode.create(node.selection.column.name)
-                )
+                    IdentifierNode.create(node.selection.column.name),
+                ),
             );
         } else if (
             ReferenceNode.is(node.selection) &&
-            this.fieldHasMappedName(
-                (node.selection.column as ColumnNode).column.name
-            )
+            this.fieldHasMappedName((node.selection.column as ColumnNode).column.name)
         ) {
             return SelectionNode.create(
                 AliasNode.create(
                     this.transformReference(node.selection),
-                    IdentifierNode.create(
-                        (node.selection.column as ColumnNode).column.name
-                    )
-                )
+                    IdentifierNode.create((node.selection.column as ColumnNode).column.name),
+                ),
             );
         } else {
             return this.transformSelection(node);
@@ -272,9 +230,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
     }
 
     private getMappedName(def: ModelDef | FieldDef) {
-        const mapAttr = def.attributes?.find(
-            (attr) => attr.name === '@@map' || attr.name === '@map'
-        );
+        const mapAttr = def.attributes?.find((attr) => attr.name === '@@map' || attr.name === '@map');
         if (mapAttr) {
             const nameArg = mapAttr.args?.find((arg) => arg.name === 'name');
             if (nameArg && nameArg.value.kind === 'literal') {
@@ -288,9 +244,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         if (!this.currentModel) {
             return fieldName;
         }
-        const mappedName = this.fieldToColumnMap.get(
-            `${this.currentModel}.${fieldName}`
-        );
+        const mappedName = this.fieldToColumnMap.get(`${this.currentModel}.${fieldName}`);
         if (mappedName) {
             return mappedName;
         } else {
@@ -304,10 +258,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    private getModelScalarFields(
-        contextNode: OperationNode,
-        model: string | undefined
-    ) {
+    private getModelScalarFields(contextNode: OperationNode, model: string | undefined) {
         this.requireCurrentModel(contextNode);
         model = model ?? this.currentModel;
         const modelDef = requireModel(this.schema, model!);

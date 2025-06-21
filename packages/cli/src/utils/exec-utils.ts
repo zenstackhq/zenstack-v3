@@ -3,10 +3,7 @@ import { execSync as _exec, type ExecSyncOptions } from 'child_process';
 /**
  * Utility for executing command synchronously and prints outputs on current console
  */
-export function execSync(
-    cmd: string,
-    options?: Omit<ExecSyncOptions, 'env'> & { env?: Record<string, string> }
-): void {
+export function execSync(cmd: string, options?: Omit<ExecSyncOptions, 'env'> & { env?: Record<string, string> }): void {
     const { env, ...restOptions } = options ?? {};
     const mergedEnv = env ? { ...process.env, ...env } : undefined;
     _exec(cmd, {
@@ -22,7 +19,7 @@ export function execSync(
  */
 export function execPackage(
     cmd: string,
-    options?: Omit<ExecSyncOptions, 'env'> & { env?: Record<string, string> }
+    options?: Omit<ExecSyncOptions, 'env'> & { env?: Record<string, string> },
 ): void {
     const packageManager = process?.versions?.['bun'] ? 'bunx' : 'npx';
     execSync(`${packageManager} ${cmd}`, options);

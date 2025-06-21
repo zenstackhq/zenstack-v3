@@ -15,13 +15,11 @@ describe('currentOperation tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentOperation() == 'read')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('works with all rule', async () => {
@@ -37,13 +35,11 @@ describe('currentOperation tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentOperation() == 'read')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('works with upper case', async () => {
@@ -59,13 +55,11 @@ describe('currentOperation tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentOperation('upper') == 'READ')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('works with lower case', async () => {
@@ -81,13 +75,11 @@ describe('currentOperation tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentOperation('lower') == 'read')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('works with capitalization', async () => {
@@ -103,13 +95,11 @@ describe('currentOperation tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentOperation('capitalize') == 'create')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('works with uncapitalization', async () => {
@@ -125,13 +115,11 @@ describe('currentOperation tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentOperation('uncapitalize') == 'read')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('complains when used outside policies', async () => {
@@ -141,11 +129,9 @@ describe('currentOperation tests', () => {
             model User {
                 id String @default(currentOperation())
             }
-            `
-            )
-        ).rejects.toThrow(
-            'function "currentOperation" is not allowed in the current context: DefaultValue'
-        );
+            `,
+            ),
+        ).rejects.toThrow('function "currentOperation" is not allowed in the current context: DefaultValue');
     });
 
     it('complains when casing argument is invalid', async () => {
@@ -156,10 +142,8 @@ describe('currentOperation tests', () => {
                 id String @id
                 @@allow('create', currentOperation('foo') == 'User')
             }
-            `
-            )
-        ).rejects.toThrow(
-            'argument must be one of: "original", "upper", "lower", "capitalize", "uncapitalize"'
-        );
+            `,
+            ),
+        ).rejects.toThrow('argument must be one of: "original", "upper", "lower", "capitalize", "uncapitalize"');
     });
 });

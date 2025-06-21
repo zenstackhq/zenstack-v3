@@ -20,9 +20,7 @@ const schema = {
                 },
                 uuid7: {
                     type: 'String',
-                    default: ExpressionUtils.call('uuid', [
-                        ExpressionUtils.literal(7),
-                    ]),
+                    default: ExpressionUtils.call('uuid', [ExpressionUtils.literal(7)]),
                 },
                 cuid: {
                     type: 'String',
@@ -30,9 +28,7 @@ const schema = {
                 },
                 cuid2: {
                     type: 'String',
-                    default: ExpressionUtils.call('cuid', [
-                        ExpressionUtils.literal(2),
-                    ]),
+                    default: ExpressionUtils.call('cuid', [ExpressionUtils.literal(2)]),
                 },
                 nanoid: {
                     type: 'String',
@@ -40,9 +36,7 @@ const schema = {
                 },
                 nanoid8: {
                     type: 'String',
-                    default: ExpressionUtils.call('nanoid', [
-                        ExpressionUtils.literal(8),
-                    ]),
+                    default: ExpressionUtils.call('nanoid', [ExpressionUtils.literal(8)]),
                 },
                 ulid: {
                     type: 'String',

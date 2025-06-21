@@ -84,20 +84,12 @@ export class ZModelLinker extends DefaultLinker {
 
     //#region Reference linking
 
-    override async link(
-        document: LangiumDocument,
-        cancelToken = Cancellation.CancellationToken.None
-    ): Promise<void> {
-        if (
-            document.parseResult.lexerErrors?.length > 0 ||
-            document.parseResult.parserErrors?.length > 0
-        ) {
+    override async link(document: LangiumDocument, cancelToken = Cancellation.CancellationToken.None): Promise<void> {
+        if (document.parseResult.lexerErrors?.length > 0 || document.parseResult.parserErrors?.length > 0) {
             return;
         }
 
-        for (const node of AstUtils.streamContents(
-            document.parseResult.value
-        )) {
+        for (const node of AstUtils.streamContents(document.parseResult.value)) {
             await interruptAndCheck(cancelToken);
             this.resolve(node, document);
         }
@@ -108,20 +100,12 @@ export class ZModelLinker extends DefaultLinker {
         container: AstNode,
         property: string,
         document: LangiumDocument,
-        extraScopes: ScopeProvider[]
+        extraScopes: ScopeProvider[],
     ) {
-        if (
-            this.resolveFromScopeProviders(
-                container,
-                property,
-                document,
-                extraScopes
-            )
-        ) {
+        if (this.resolveFromScopeProviders(container, property, document, extraScopes)) {
             return;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const reference: DefaultReference = (container as any)[property];
         this.doLink({ reference, container, property }, document);
     }
@@ -134,20 +118,14 @@ export class ZModelLinker extends DefaultLinker {
         node: AstNode,
         property: string,
         document: LangiumDocument,
-        providers: ScopeProvider[]
+        providers: ScopeProvider[],
     ) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const reference: DefaultReference = (node as any)[property];
         for (const provider of providers) {
             const target = provider(reference.$refText);
             if (target) {
                 reference._ref = target;
-                reference._nodeDescription =
-                    this.descriptions.createDescription(
-                        target,
-                        target.name,
-                        document
-                    );
+                reference._nodeDescription = this.descriptions.createDescription(target, target.name, document);
 
                 // Add the reference to the document's array of references
                 document.references.push(reference);
@@ -158,11 +136,7 @@ export class ZModelLinker extends DefaultLinker {
         return null;
     }
 
-    private resolve(
-        node: AstNode,
-        document: LangiumDocument,
-        extraScopes: ScopeProvider[] = []
-    ) {
+    private resolve(node: AstNode, document: LangiumDocument, extraScopes: ScopeProvider[] = []) {
         switch (node.$type) {
             case StringLiteral:
             case NumberLiteral:
@@ -171,11 +145,7 @@ export class ZModelLinker extends DefaultLinker {
                 break;
 
             case InvocationExpr:
-                this.resolveInvocation(
-                    node as InvocationExpr,
-                    document,
-                    extraScopes
-                );
+                this.resolveInvocation(node as InvocationExpr, document, extraScopes);
                 break;
 
             case ArrayExpr:
@@ -183,19 +153,11 @@ export class ZModelLinker extends DefaultLinker {
                 break;
 
             case ReferenceExpr:
-                this.resolveReference(
-                    node as ReferenceExpr,
-                    document,
-                    extraScopes
-                );
+                this.resolveReference(node as ReferenceExpr, document, extraScopes);
                 break;
 
             case MemberAccessExpr:
-                this.resolveMemberAccess(
-                    node as MemberAccessExpr,
-                    document,
-                    extraScopes
-                );
+                this.resolveMemberAccess(node as MemberAccessExpr, document, extraScopes);
                 break;
 
             case UnaryExpr:
@@ -219,11 +181,7 @@ export class ZModelLinker extends DefaultLinker {
                 break;
 
             case AttributeArg:
-                this.resolveAttributeArg(
-                    node as AttributeArg,
-                    document,
-                    extraScopes
-                );
+                this.resolveAttributeArg(node as AttributeArg, document, extraScopes);
                 break;
 
             case DataModel:
@@ -231,11 +189,7 @@ export class ZModelLinker extends DefaultLinker {
                 break;
 
             case DataModelField:
-                this.resolveDataModelField(
-                    node as DataModelField,
-                    document,
-                    extraScopes
-                );
+                this.resolveDataModelField(node as DataModelField, document, extraScopes);
                 break;
 
             default:
@@ -244,11 +198,7 @@ export class ZModelLinker extends DefaultLinker {
         }
     }
 
-    private resolveBinary(
-        node: BinaryExpr,
-        document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveBinary(node: BinaryExpr, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         switch (node.operator) {
             // TODO: support arithmetics?
             // case '+':
@@ -285,11 +235,7 @@ export class ZModelLinker extends DefaultLinker {
         }
     }
 
-    private resolveUnary(
-        node: UnaryExpr,
-        document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveUnary(node: UnaryExpr, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         this.resolve(node.operand, document, extraScopes);
         switch (node.operator) {
             case '!':
@@ -300,45 +246,25 @@ export class ZModelLinker extends DefaultLinker {
         }
     }
 
-    private resolveObject(
-        node: ObjectExpr,
-        document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
-    ) {
-        node.fields.forEach((field) =>
-            this.resolve(field.value, document, extraScopes)
-        );
+    private resolveObject(node: ObjectExpr, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
+        node.fields.forEach((field) => this.resolve(field.value, document, extraScopes));
         this.resolveToBuiltinTypeOrDecl(node, 'Object');
     }
 
-    private resolveReference(
-        node: ReferenceExpr,
-        document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveReference(node: ReferenceExpr, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         this.resolveDefault(node, document, extraScopes);
 
         if (node.target.ref) {
             // resolve type
             if (node.target.ref.$type === EnumField) {
-                this.resolveToBuiltinTypeOrDecl(
-                    node,
-                    node.target.ref.$container
-                );
+                this.resolveToBuiltinTypeOrDecl(node, node.target.ref.$container);
             } else {
-                this.resolveToDeclaredType(
-                    node,
-                    (node.target.ref as DataModelField | FunctionParam).type
-                );
+                this.resolveToDeclaredType(node, (node.target.ref as DataModelField | FunctionParam).type);
             }
         }
     }
 
-    private resolveArray(
-        node: ArrayExpr,
-        document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveArray(node: ArrayExpr, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         node.items.forEach((item) => this.resolve(item, document, extraScopes));
 
         if (node.items.length > 0) {
@@ -351,15 +277,10 @@ export class ZModelLinker extends DefaultLinker {
         }
     }
 
-    private resolveInvocation(
-        node: InvocationExpr,
-        document: LangiumDocument,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveInvocation(node: InvocationExpr, document: LangiumDocument, extraScopes: ScopeProvider[]) {
         this.linkReference(node, 'function', document, extraScopes);
         node.args.forEach((arg) => this.resolve(arg, document, extraScopes));
         if (node.function.ref) {
-            // eslint-disable-next-line @typescript-eslint/ban-types
             const funcDecl = node.function.ref as FunctionDecl;
 
             if (isAuthInvocation(node)) {
@@ -368,7 +289,7 @@ export class ZModelLinker extends DefaultLinker {
                 // get all data models from loaded and reachable documents
                 const allDecls = getAllLoadedAndReachableDataModelsAndTypeDefs(
                     this.langiumDocuments(),
-                    AstUtils.getContainerOfType(node, isDataModel)
+                    AstUtils.getContainerOfType(node, isDataModel),
                 );
 
                 const authDecl = getAuthDecl(allDecls);
@@ -399,16 +320,12 @@ export class ZModelLinker extends DefaultLinker {
     private resolveMemberAccess(
         node: MemberAccessExpr,
         document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
+        extraScopes: ScopeProvider[],
     ) {
         this.resolveDefault(node, document, extraScopes);
         const operandResolved = node.operand.$resolvedType;
 
-        if (
-            operandResolved &&
-            !operandResolved.array &&
-            isMemberContainer(operandResolved.decl)
-        ) {
+        if (operandResolved && !operandResolved.array && isMemberContainer(operandResolved.decl)) {
             // member access is resolved only in the context of the operand type
             if (node.member.ref) {
                 this.resolveToDeclaredType(node, node.member.ref.type);
@@ -421,30 +338,18 @@ export class ZModelLinker extends DefaultLinker {
         }
     }
 
-    private resolveCollectionPredicate(
-        node: BinaryExpr,
-        document: LangiumDocument,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveCollectionPredicate(node: BinaryExpr, document: LangiumDocument, extraScopes: ScopeProvider[]) {
         this.resolveDefault(node, document, extraScopes);
 
         const resolvedType = node.left.$resolvedType;
-        if (
-            resolvedType &&
-            isMemberContainer(resolvedType.decl) &&
-            resolvedType.array
-        ) {
+        if (resolvedType && isMemberContainer(resolvedType.decl) && resolvedType.array) {
             this.resolveToBuiltinTypeOrDecl(node, 'Boolean');
         } else {
             // error is reported in validation pass
         }
     }
 
-    private resolveThis(
-        node: ThisExpr,
-        _document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveThis(node: ThisExpr, _document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         // resolve from scopes first
         for (const scope of extraScopes) {
             const r = scope('this');
@@ -465,27 +370,16 @@ export class ZModelLinker extends DefaultLinker {
         }
     }
 
-    private resolveNull(
-        node: NullExpr,
-        _document: LangiumDocument<AstNode>,
-        _extraScopes: ScopeProvider[]
-    ) {
+    private resolveNull(node: NullExpr, _document: LangiumDocument<AstNode>, _extraScopes: ScopeProvider[]) {
         // TODO: how to really resolve null?
         this.resolveToBuiltinTypeOrDecl(node, 'Null');
     }
 
-    private resolveAttributeArg(
-        node: AttributeArg,
-        document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveAttributeArg(node: AttributeArg, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         const attrParam = this.findAttrParamForArg(node);
         const attrAppliedOn = node.$container.$container;
 
-        if (
-            attrParam?.type.type === 'TransitiveFieldReference' &&
-            isDataModelField(attrAppliedOn)
-        ) {
+        if (attrParam?.type.type === 'TransitiveFieldReference' && isDataModelField(attrAppliedOn)) {
             // "TransitiveFieldReference" is resolved in the context of the containing model of the field
             // where the attribute is applied
             //
@@ -502,28 +396,17 @@ export class ZModelLinker extends DefaultLinker {
             //
             // In model B, the attribute argument "myId" is resolved to the field "myId" in model A
 
-            const transitiveDataModel = attrAppliedOn.type.reference
-                ?.ref as DataModel;
+            const transitiveDataModel = attrAppliedOn.type.reference?.ref as DataModel;
             if (transitiveDataModel) {
                 // resolve references in the context of the transitive data model
                 const scopeProvider = (name: string) =>
-                    getModelFieldsWithBases(transitiveDataModel).find(
-                        (f) => f.name === name
-                    );
+                    getModelFieldsWithBases(transitiveDataModel).find((f) => f.name === name);
                 if (isArrayExpr(node.value)) {
                     node.value.items.forEach((item) => {
                         if (isReferenceExpr(item)) {
-                            const resolved = this.resolveFromScopeProviders(
-                                item,
-                                'target',
-                                document,
-                                [scopeProvider]
-                            );
+                            const resolved = this.resolveFromScopeProviders(item, 'target', document, [scopeProvider]);
                             if (resolved) {
-                                this.resolveToDeclaredType(
-                                    item,
-                                    (resolved as DataModelField).type
-                                );
+                                this.resolveToDeclaredType(item, (resolved as DataModelField).type);
                             } else {
                                 // mark unresolvable
                                 this.unresolvableRefExpr(item);
@@ -531,24 +414,12 @@ export class ZModelLinker extends DefaultLinker {
                         }
                     });
                     if (node.value.items[0]?.$resolvedType?.decl) {
-                        this.resolveToBuiltinTypeOrDecl(
-                            node.value,
-                            node.value.items[0].$resolvedType.decl,
-                            true
-                        );
+                        this.resolveToBuiltinTypeOrDecl(node.value, node.value.items[0].$resolvedType.decl, true);
                     }
                 } else if (isReferenceExpr(node.value)) {
-                    const resolved = this.resolveFromScopeProviders(
-                        node.value,
-                        'target',
-                        document,
-                        [scopeProvider]
-                    );
+                    const resolved = this.resolveFromScopeProviders(node.value, 'target', document, [scopeProvider]);
                     if (resolved) {
-                        this.resolveToDeclaredType(
-                            node.value,
-                            (resolved as DataModelField).type
-                        );
+                        this.resolveToDeclaredType(node.value, (resolved as DataModelField).type);
                     } else {
                         // mark unresolvable
                         this.unresolvableRefExpr(node.value);
@@ -583,18 +454,14 @@ export class ZModelLinker extends DefaultLinker {
         }
     }
 
-    private resolveDataModel(
-        node: DataModel,
-        document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveDataModel(node: DataModel, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         return this.resolveDefault(node, document, extraScopes);
     }
 
     private resolveDataModelField(
         node: DataModelField,
         document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
+        extraScopes: ScopeProvider[],
     ) {
         // Field declaration may contain enum references, and enum fields are pushed to the global
         // scope, so if there're enums with fields with the same name, an arbitrary one will be
@@ -627,19 +494,14 @@ export class ZModelLinker extends DefaultLinker {
         // if the field has enum declaration type, resolve the rest with that enum's fields on top of the scopes
         if (node.type.reference?.ref && isEnum(node.type.reference.ref)) {
             const contextEnum = node.type.reference.ref as Enum;
-            const enumScope: ScopeProvider = (name) =>
-                contextEnum.fields.find((f) => f.name === name);
+            const enumScope: ScopeProvider = (name) => contextEnum.fields.find((f) => f.name === name);
             scopes = [enumScope, ...scopes];
         }
 
         this.resolveDefault(node, document, scopes);
     }
 
-    private resolveDefault(
-        node: AstNode,
-        document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[]
-    ) {
+    private resolveDefault(node: AstNode, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         for (const [property, value] of Object.entries(node)) {
             if (!property.startsWith('$')) {
                 if (isReference(value)) {
@@ -656,10 +518,7 @@ export class ZModelLinker extends DefaultLinker {
 
     //#region Utils
 
-    private resolveToDeclaredType(
-        node: AstNode,
-        type: FunctionParamType | DataModelFieldType | TypeDefFieldType
-    ) {
+    private resolveToDeclaredType(node: AstNode, type: FunctionParamType | DataModelFieldType | TypeDefFieldType) {
         let nullable = false;
         if (isDataModelFieldType(type) || isTypeDefField(type)) {
             nullable = type.optional;
@@ -691,12 +550,7 @@ export class ZModelLinker extends DefaultLinker {
         }
     }
 
-    private resolveToBuiltinTypeOrDecl(
-        node: AstNode,
-        type: ResolvedShape,
-        array = false,
-        nullable = false
-    ) {
+    private resolveToBuiltinTypeOrDecl(node: AstNode, type: ResolvedShape, array = false, nullable = false) {
         node.$resolvedType = { decl: type, array, nullable };
     }
 

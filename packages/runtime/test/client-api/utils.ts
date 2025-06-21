@@ -10,7 +10,7 @@ export async function createUser(
         name: 'User1',
         role: 'ADMIN',
         profile: { create: { bio: 'My bio' } },
-    }
+    },
 ) {
     return client.user.create({
         data: {

@@ -48,6 +48,7 @@
         "@types/tmp": "^0.2.6",
         "decimal.js": "^10.4.3",
         "kysely": "catalog:",
-        "@zenstackhq/typescript-config": "workspace:*"
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/eslint-config": "workspace:*"
     }
 }

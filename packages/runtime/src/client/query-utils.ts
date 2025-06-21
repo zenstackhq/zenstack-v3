@@ -15,9 +15,7 @@ export function getModel(schema: SchemaDef, model: string) {
 }
 
 export function requireModel(schema: SchemaDef, model: string) {
-    const matchedName = Object.keys(schema.models).find(
-        (k) => k.toLowerCase() === model.toLowerCase()
-    );
+    const matchedName = Object.keys(schema.models).find((k) => k.toLowerCase() === model.toLowerCase());
     if (!matchedName) {
         throw new QueryError(`Model "${model}" not found`);
     }
@@ -37,10 +35,7 @@ export function requireField(schema: SchemaDef, model: string, field: string) {
     return modelDef.fields[field];
 }
 
-export function getIdFields<Schema extends SchemaDef>(
-    schema: SchemaDef,
-    model: GetModels<Schema>
-) {
+export function getIdFields<Schema extends SchemaDef>(schema: SchemaDef, model: GetModels<Schema>) {
     const modelDef = requireModel(schema, model);
     return modelDef?.idFields as GetModels<Schema>[];
 }
@@ -54,11 +49,7 @@ export function requireIdFields(schema: SchemaDef, model: string) {
     return result;
 }
 
-export function getRelationForeignKeyFieldPairs(
-    schema: SchemaDef,
-    model: string,
-    relationField: string
-) {
+export function getRelationForeignKeyFieldPairs(schema: SchemaDef, model: string, relationField: string) {
     const fieldDef = requireField(schema, model, relationField);
 
     if (!fieldDef?.relation) {
@@ -67,9 +58,7 @@ export function getRelationForeignKeyFieldPairs(
 
     if (fieldDef.relation.fields) {
         if (!fieldDef.relation.references) {
-            throw new InternalError(
-                `Relation references not defined for field "${relationField}"`
-            );
+            throw new InternalError(`Relation references not defined for field "${relationField}"`);
         }
         // this model owns the fk
         return {
@@ -81,31 +70,19 @@ export function getRelationForeignKeyFieldPairs(
         };
     } else {
         if (!fieldDef.relation.opposite) {
-            throw new InternalError(
-                `Opposite relation not defined for field "${relationField}"`
-            );
+            throw new InternalError(`Opposite relation not defined for field "${relationField}"`);
         }
 
-        const oppositeField = requireField(
-            schema,
-            fieldDef.type,
-            fieldDef.relation.opposite
-        );
+        const oppositeField = requireField(schema, fieldDef.type, fieldDef.relation.opposite);
 
         if (!oppositeField.relation) {
-            throw new InternalError(
-                `Field "${fieldDef.relation.opposite}" is not a relation`
-            );
+            throw new InternalError(`Field "${fieldDef.relation.opposite}" is not a relation`);
         }
         if (!oppositeField.relation.fields) {
-            throw new InternalError(
-                `Relation fields not defined for field "${relationField}"`
-            );
+            throw new InternalError(`Relation fields not defined for field "${relationField}"`);
         }
         if (!oppositeField.relation.references) {
-            throw new InternalError(
-                `Relation references not defined for field "${relationField}"`
-            );
+            throw new InternalError(`Relation references not defined for field "${relationField}"`);
         }
 
         // the opposite model owns the fk
@@ -119,29 +96,17 @@ export function getRelationForeignKeyFieldPairs(
     }
 }
 
-export function isScalarField(
-    schema: SchemaDef,
-    model: string,
-    field: string
-): boolean {
+export function isScalarField(schema: SchemaDef, model: string, field: string): boolean {
     const fieldDef = requireField(schema, model, field);
     return !fieldDef.relation && !fieldDef.foreignKeyFor;
 }
 
-export function isForeignKeyField(
-    schema: SchemaDef,
-    model: string,
-    field: string
-): boolean {
+export function isForeignKeyField(schema: SchemaDef, model: string, field: string): boolean {
     const fieldDef = requireField(schema, model, field);
     return !!fieldDef.foreignKeyFor;
 }
 
-export function isRelationField(
-    schema: SchemaDef,
-    model: string,
-    field: string
-): boolean {
+export function isRelationField(schema: SchemaDef, model: string, field: string): boolean {
     const fieldDef = requireField(schema, model, field);
     return !!fieldDef.relation;
 }
@@ -156,9 +121,7 @@ export function getUniqueFields(schema: SchemaDef, model: string) {
     > = [];
     for (const [key, value] of Object.entries(modelDef.uniqueFields)) {
         if (typeof value !== 'object') {
-            throw new InternalError(
-                `Invalid unique field definition for "${key}"`
-            );
+            throw new InternalError(`Invalid unique field definition for "${key}"`);
         }
 
         if (typeof value.type === 'string') {
@@ -168,31 +131,19 @@ export function getUniqueFields(schema: SchemaDef, model: string) {
             // compound unique field
             result.push({
                 name: key,
-                defs: Object.fromEntries(
-                    Object.keys(value).map((k) => [
-                        k,
-                        requireField(schema, model, k),
-                    ])
-                ),
+                defs: Object.fromEntries(Object.keys(value).map((k) => [k, requireField(schema, model, k)])),
             });
         }
     }
     return result;
 }
 
-export function getIdValues(
-    schema: SchemaDef,
-    model: string,
-    data: any
-): Record<string, any> {
+export function getIdValues(schema: SchemaDef, model: string, data: any): Record<string, any> {
     const idFields = getIdFields(schema, model);
     if (!idFields) {
         throw new InternalError(`ID fields not defined for model "${model}"`);
     }
-    return idFields.reduce(
-        (acc, field) => ({ ...acc, [field]: data[field] }),
-        {}
-    );
+    return idFields.reduce((acc, field) => ({ ...acc, [field]: data[field] }), {});
 }
 
 export function buildFieldRef<Schema extends SchemaDef>(
@@ -201,25 +152,19 @@ export function buildFieldRef<Schema extends SchemaDef>(
     field: string,
     options: ClientOptions<Schema>,
     eb: ExpressionBuilder<any, any>,
-    modelAlias?: string
+    modelAlias?: string,
 ): ExpressionWrapper<any, any, unknown> {
     const fieldDef = requireField(schema, model, field);
     if (!fieldDef.computed) {
         return eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
     } else {
-        // eslint-disable-next-line @typescript-eslint/ban-types
         let computer: Function | undefined;
         if ('computedFields' in options) {
-            const computedFields = options.computedFields as Record<
-                string,
-                any
-            >;
+            const computedFields = options.computedFields as Record<string, any>;
             computer = computedFields?.[model]?.[field];
         }
         if (!computer) {
-            throw new QueryError(
-                `Computed field "${field}" implementation not provided`
-            );
+            throw new QueryError(`Computed field "${field}" implementation not provided`);
         }
         return computer(eb);
     }
@@ -242,13 +187,9 @@ export function buildJoinPairs(
     model: string,
     modelAlias: string,
     relationField: string,
-    relationModelAlias: string
+    relationModelAlias: string,
 ): [string, string][] {
-    const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(
-        schema,
-        model,
-        relationField
-    );
+    const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(schema, model, relationField);
 
     return keyPairs.map(({ fk, pk }) => {
         if (ownedByModel) {
@@ -261,31 +202,17 @@ export function buildJoinPairs(
     });
 }
 
-export function makeDefaultOrderBy<Schema extends SchemaDef>(
-    schema: SchemaDef,
-    model: string
-) {
+export function makeDefaultOrderBy<Schema extends SchemaDef>(schema: SchemaDef, model: string) {
     const idFields = getIdFields(schema, model);
-    return idFields.map(
-        (f) =>
-            ({ [f]: 'asc' } as OrderBy<Schema, GetModels<Schema>, true, false>)
-    );
+    return idFields.map((f) => ({ [f]: 'asc' }) as OrderBy<Schema, GetModels<Schema>, true, false>);
 }
 
-export function getManyToManyRelation(
-    schema: SchemaDef,
-    model: string,
-    field: string
-) {
+export function getManyToManyRelation(schema: SchemaDef, model: string, field: string) {
     const fieldDef = requireField(schema, model, field);
     if (!fieldDef.array || !fieldDef.relation?.opposite) {
         return undefined;
     }
-    const oppositeFieldDef = requireField(
-        schema,
-        fieldDef.type,
-        fieldDef.relation.opposite
-    );
+    const oppositeFieldDef = requireField(schema, fieldDef.type, fieldDef.relation.opposite);
     if (oppositeFieldDef.array) {
         // Prisma's convention for many-to-many relation:
         // - model are sorted alphabetically by name
@@ -309,11 +236,7 @@ export function getManyToManyRelation(
 /**
  * Convert filter like `{ id1_id2: { id1: 1, id2: 1 } }` to `{ id1: 1, id2: 1 }`
  */
-export function flattenCompoundUniqueFilters(
-    schema: SchemaDef,
-    model: string,
-    filter: unknown
-) {
+export function flattenCompoundUniqueFilters(schema: SchemaDef, model: string, filter: unknown) {
     if (typeof filter !== 'object' || !filter) {
         return filter;
     }

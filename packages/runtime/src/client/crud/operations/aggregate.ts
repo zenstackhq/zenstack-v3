@@ -4,14 +4,9 @@ import type { SchemaDef } from '../../../schema';
 import { getField } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 
-export class AggregateOperationHandler<
-    Schema extends SchemaDef
-> extends BaseOperationHandler<Schema> {
+export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(_operation: 'aggregate', args: unknown | undefined) {
-        const validatedArgs = this.inputValidator.validateAggregateArgs(
-            this.model,
-            args
-        );
+        const validatedArgs = this.inputValidator.validateAggregateArgs(this.model, args);
 
         let query = this.kysely.selectFrom((eb) => {
             // nested query for filtering and pagination
@@ -20,14 +15,7 @@ export class AggregateOperationHandler<
             let subQuery = eb
                 .selectFrom(this.model)
                 .selectAll(this.model as any) // TODO: check typing
-                .where((eb1) =>
-                    this.dialect.buildFilter(
-                        eb1,
-                        this.model,
-                        this.model,
-                        validatedArgs?.where
-                    )
-                );
+                .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, validatedArgs?.where));
 
             // skip & take
             const skip = validatedArgs?.skip;
@@ -46,7 +34,7 @@ export class AggregateOperationHandler<
                 this.model,
                 validatedArgs.orderBy,
                 skip !== undefined || take !== undefined,
-                negateOrderBy
+                negateOrderBy,
             );
 
             return subQuery.as('$sub');
@@ -57,28 +45,17 @@ export class AggregateOperationHandler<
             switch (key) {
                 case '_count': {
                     if (value === true) {
-                        query = query.select((eb) =>
-                            eb.cast(eb.fn.countAll(), 'integer').as('_count')
-                        );
+                        query = query.select((eb) => eb.cast(eb.fn.countAll(), 'integer').as('_count'));
                     } else {
                         Object.entries(value).forEach(([field, val]) => {
                             if (val === true) {
                                 if (field === '_all') {
                                     query = query.select((eb) =>
-                                        eb
-                                            .cast(eb.fn.countAll(), 'integer')
-                                            .as(`_count._all`)
+                                        eb.cast(eb.fn.countAll(), 'integer').as(`_count._all`),
                                     );
                                 } else {
                                     query = query.select((eb) =>
-                                        eb
-                                            .cast(
-                                                eb.fn.count(
-                                                    sql.ref(`$sub.${field}`)
-                                                ),
-                                                'integer'
-                                            )
-                                            .as(`${key}.${field}`)
+                                        eb.cast(eb.fn.count(sql.ref(`$sub.${field}`)), 'integer').as(`${key}.${field}`),
                                     );
                                 }
                             }
@@ -100,9 +77,7 @@ export class AggregateOperationHandler<
                                     .with('_max', () => eb.fn.max)
                                     .with('_min', () => eb.fn.min)
                                     .exhaustive();
-                                return fn(sql.ref(`$sub.${field}`)).as(
-                                    `${key}.${field}`
-                                );
+                                return fn(sql.ref(`$sub.${field}`)).as(`${key}.${field}`);
                             });
                         }
                     });

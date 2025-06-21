@@ -29,73 +29,35 @@ import type { CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base';
 import { InternalError } from '../../client/errors';
-import type {
-    OnKyselyQueryTransaction,
-    ProceedKyselyQueryFunction,
-} from '../../client/plugin';
-import {
-    getIdFields,
-    requireField,
-    requireModel,
-} from '../../client/query-utils';
-import {
-    ExpressionUtils,
-    type BuiltinType,
-    type Expression,
-    type GetModels,
-    type SchemaDef,
-} from '../../schema';
+import type { OnKyselyQueryTransaction, ProceedKyselyQueryFunction } from '../../client/plugin';
+import { getIdFields, requireField, requireModel } from '../../client/query-utils';
+import { ExpressionUtils, type BuiltinType, type Expression, type GetModels, type SchemaDef } from '../../schema';
 import { ColumnCollector } from './column-collector';
 import { RejectedByPolicyError } from './errors';
 import { ExpressionTransformer } from './expression-transformer';
 import type { Policy, PolicyOperation } from './types';
-import {
-    buildIsFalse,
-    conjunction,
-    disjunction,
-    falseNode,
-    getTableName,
-} from './utils';
+import { buildIsFalse, conjunction, disjunction, falseNode, getTableName } from './utils';
 
-export type CrudQueryNode =
-    | SelectQueryNode
-    | InsertQueryNode
-    | UpdateQueryNode
-    | DeleteQueryNode;
+export type CrudQueryNode = SelectQueryNode | InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
 
-export type MutationQueryNode =
-    | InsertQueryNode
-    | UpdateQueryNode
-    | DeleteQueryNode;
+export type MutationQueryNode = InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
 
-export class PolicyHandler<
-    Schema extends SchemaDef
-> extends OperationNodeTransformer {
+export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransformer {
     private readonly dialect: BaseCrudDialect<Schema>;
 
     constructor(private readonly client: ClientContract<Schema>) {
         super();
-        this.dialect = getCrudDialect(
-            this.client.$schema,
-            this.client.$options
-        );
+        this.dialect = getCrudDialect(this.client.$schema, this.client.$options);
     }
 
     get kysely() {
         return this.client.$qb;
     }
 
-    async handle(
-        node: RootOperationNode,
-        proceed: ProceedKyselyQueryFunction,
-        transaction: OnKyselyQueryTransaction
-    ) {
+    async handle(node: RootOperationNode, proceed: ProceedKyselyQueryFunction, transaction: OnKyselyQueryTransaction) {
         if (!this.isCrudQueryNode(node)) {
             // non CRUD queries are not allowed
-            throw new RejectedByPolicyError(
-                undefined,
-                'non-CRUD queries are not allowed'
-            );
+            throw new RejectedByPolicyError(undefined, 'non-CRUD queries are not allowed');
         }
 
         if (!this.isMutationQueryNode(node)) {
@@ -108,10 +70,7 @@ export class PolicyHandler<
 
         if (InsertQueryNode.is(node)) {
             // reject create if unconditional deny
-            const constCondition = this.tryGetConstantPolicy(
-                mutationModel,
-                'create'
-            );
+            const constCondition = this.tryGetConstantPolicy(mutationModel, 'create');
             if (constCondition === false) {
                 throw new RejectedByPolicyError(mutationModel);
             } else if (constCondition === undefined) {
@@ -135,11 +94,7 @@ export class PolicyHandler<
             const result = await txProceed(transformedNode);
 
             if (!this.onlyReturningId(node)) {
-                const readBackResult = await this.processReadBack(
-                    node,
-                    result,
-                    txProceed
-                );
+                const readBackResult = await this.processReadBack(node, result, txProceed);
                 if (readBackResult.rows.length !== result.rows.length) {
                     readBackError = true;
                 }
@@ -150,10 +105,7 @@ export class PolicyHandler<
         });
 
         if (readBackError) {
-            throw new RejectedByPolicyError(
-                mutationModel,
-                'result is not allowed to be read back'
-            );
+            throw new RejectedByPolicyError(mutationModel, 'result is not allowed to be read back');
         }
 
         return result;
@@ -163,37 +115,27 @@ export class PolicyHandler<
         if (!node.returning) {
             return true;
         }
-        const idFields = getIdFields(
-            this.client.$schema,
-            this.getMutationModel(node)
-        );
+        const idFields = getIdFields(this.client.$schema, this.getMutationModel(node));
         const collector = new ColumnCollector();
         const selectedColumns = collector.collect(node.returning);
         return selectedColumns.every((c) => idFields.includes(c));
     }
 
-    private async enforcePreCreatePolicy(
-        node: InsertQueryNode,
-        proceed: ProceedKyselyQueryFunction
-    ) {
+    private async enforcePreCreatePolicy(node: InsertQueryNode, proceed: ProceedKyselyQueryFunction) {
         if (!node.columns || !node.values) {
             return;
         }
 
         const model = this.getMutationModel(node);
         const fields = node.columns.map((c) => c.column.name);
-        const valueRows = this.unwrapCreateValueRows(
-            node.values,
-            model,
-            fields
-        );
+        const valueRows = this.unwrapCreateValueRows(node.values, model, fields);
         for (const values of valueRows) {
             await this.enforcePreCreatePolicyForOne(
                 model,
                 fields,
                 values.map((v) => v.node),
                 values.map((v) => v.raw),
-                proceed
+                proceed,
             );
         }
     }
@@ -203,7 +145,7 @@ export class PolicyHandler<
         fields: string[],
         values: OperationNode[],
         valuesRaw: unknown[],
-        proceed: ProceedKyselyQueryFunction
+        proceed: ProceedKyselyQueryFunction,
     ) {
         const thisEntity: Record<string, OperationNode> = {};
         const thisEntityRaw: Record<string, unknown> = {};
@@ -212,23 +154,10 @@ export class PolicyHandler<
             thisEntityRaw[fields[i]!] = valuesRaw[i]!;
         }
 
-        const filter = this.buildPolicyFilter(
-            model,
-            undefined,
-            'create',
-            thisEntity,
-            thisEntityRaw
-        );
+        const filter = this.buildPolicyFilter(model, undefined, 'create', thisEntity, thisEntityRaw);
         const preCreateCheck: SelectQueryNode = {
             kind: 'SelectQueryNode',
-            selections: [
-                SelectionNode.create(
-                    AliasNode.create(
-                        filter,
-                        IdentifierNode.create('$condition')
-                    )
-                ),
-            ],
+            selections: [SelectionNode.create(AliasNode.create(filter, IdentifierNode.create('$condition')))],
         };
         const result = await proceed(preCreateCheck);
         if (!(result.rows[0] as any)?.$condition) {
@@ -236,62 +165,35 @@ export class PolicyHandler<
         }
     }
 
-    private unwrapCreateValueRows(
-        node: OperationNode,
-        model: GetModels<Schema>,
-        fields: string[]
-    ) {
+    private unwrapCreateValueRows(node: OperationNode, model: GetModels<Schema>, fields: string[]) {
         if (ValuesNode.is(node)) {
-            return node.values.map((v) =>
-                this.unwrapCreateValueRow(v.values, model, fields)
-            );
+            return node.values.map((v) => this.unwrapCreateValueRow(v.values, model, fields));
         } else if (PrimitiveValueListNode.is(node)) {
             return [this.unwrapCreateValueRow(node.values, model, fields)];
         } else {
-            throw new InternalError(
-                `Unexpected node kind: ${node.kind} for unwrapping create values`
-            );
+            throw new InternalError(`Unexpected node kind: ${node.kind} for unwrapping create values`);
         }
     }
 
-    private unwrapCreateValueRow(
-        data: readonly unknown[],
-        model: GetModels<Schema>,
-        fields: string[]
-    ) {
-        invariant(
-            data.length === fields.length,
-            'data length must match fields length'
-        );
+    private unwrapCreateValueRow(data: readonly unknown[], model: GetModels<Schema>, fields: string[]) {
+        invariant(data.length === fields.length, 'data length must match fields length');
         const result: { node: OperationNode; raw: unknown }[] = [];
         for (let i = 0; i < data.length; i++) {
             const item = data[i]!;
-            const fieldDef = requireField(
-                this.client.$schema,
-                model,
-                fields[i]!
-            );
+            const fieldDef = requireField(this.client.$schema, model, fields[i]!);
             if (typeof item === 'object' && item && 'kind' in item) {
                 invariant(item.kind === 'ValueNode', 'expecting a ValueNode');
                 result.push({
                     node: ValueNode.create(
-                        this.dialect.transformPrimitive(
-                            (item as ValueNode).value,
-                            fieldDef.type as BuiltinType
-                        )
+                        this.dialect.transformPrimitive((item as ValueNode).value, fieldDef.type as BuiltinType),
                     ),
                     raw: (item as ValueNode).value,
                 });
             } else {
-                const value = this.dialect.transformPrimitive(
-                    item,
-                    fieldDef.type as BuiltinType
-                );
+                const value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType);
                 if (Array.isArray(value)) {
                     result.push({
-                        node: RawNode.createWithSql(
-                            this.dialect.buildArrayLiteralSQL(value)
-                        ),
+                        node: RawNode.createWithSql(this.dialect.buildArrayLiteralSQL(value)),
                         raw: value,
                     });
                 } else {
@@ -302,27 +204,20 @@ export class PolicyHandler<
         return result;
     }
 
-    private tryGetConstantPolicy(
-        model: GetModels<Schema>,
-        operation: PolicyOperation
-    ) {
+    private tryGetConstantPolicy(model: GetModels<Schema>, operation: PolicyOperation) {
         const policies = this.getModelPolicies(model, operation);
         if (!policies.some((p) => p.kind === 'allow')) {
             // no allow -> unconditional deny
             return false;
         } else if (
             // unconditional deny
-            policies.some(
-                (p) => p.kind === 'deny' && this.isTrueExpr(p.condition)
-            )
+            policies.some((p) => p.kind === 'deny' && this.isTrueExpr(p.condition))
         ) {
             return false;
         } else if (
             // unconditional allow
             !policies.some((p) => p.kind === 'deny') &&
-            policies.some(
-                (p) => p.kind === 'allow' && this.isTrueExpr(p.condition)
-            )
+            policies.some((p) => p.kind === 'allow' && this.isTrueExpr(p.condition))
         ) {
             return true;
         } else {
@@ -334,11 +229,7 @@ export class PolicyHandler<
         return ExpressionUtils.isLiteral(expr) && expr.value === true;
     }
 
-    private async processReadBack(
-        node: CrudQueryNode,
-        result: QueryResult<any>,
-        proceed: ProceedKyselyQueryFunction
-    ) {
+    private async processReadBack(node: CrudQueryNode, result: QueryResult<any>, proceed: ProceedKyselyQueryFunction) {
         if (result.rows.length === 0) {
             return result;
         }
@@ -350,9 +241,7 @@ export class PolicyHandler<
         // do a select (with policy) in place of returning
         const table = this.getMutationModel(node);
         if (!table) {
-            throw new InternalError(
-                `Unable to get table name for query node: ${node}`
-            );
+            throw new InternalError(`Unable to get table name for query node: ${node}`);
         }
 
         const idConditions = this.buildIdConditions(table, result.rows);
@@ -361,9 +250,7 @@ export class PolicyHandler<
         const select: SelectQueryNode = {
             kind: 'SelectQueryNode',
             from: FromNode.create([TableNode.create(table)]),
-            where: WhereNode.create(
-                conjunction(this.dialect, [idConditions, policyFilter])
-            ),
+            where: WhereNode.create(conjunction(this.dialect, [idConditions, policyFilter])),
             selections: node.returning.selections,
         };
         const selectResult = await proceed(select);
@@ -381,60 +268,39 @@ export class PolicyHandler<
                         BinaryOperationNode.create(
                             ColumnNode.create(field),
                             OperatorNode.create('='),
-                            ValueNode.create(row[field])
-                        )
-                    )
-                )
-            )
+                            ValueNode.create(row[field]),
+                        ),
+                    ),
+                ),
+            ),
         );
     }
 
-    private getMutationModel(
-        node: InsertQueryNode | UpdateQueryNode | DeleteQueryNode
-    ) {
+    private getMutationModel(node: InsertQueryNode | UpdateQueryNode | DeleteQueryNode) {
         const r = match(node)
-            .when(
-                InsertQueryNode.is,
-                (node) => getTableName(node.into) as GetModels<Schema>
-            )
-            .when(
-                UpdateQueryNode.is,
-                (node) => getTableName(node.table) as GetModels<Schema>
-            )
+            .when(InsertQueryNode.is, (node) => getTableName(node.into) as GetModels<Schema>)
+            .when(UpdateQueryNode.is, (node) => getTableName(node.table) as GetModels<Schema>)
             .when(DeleteQueryNode.is, (node) => {
                 if (node.from.froms.length !== 1) {
-                    throw new InternalError(
-                        'Only one from table is supported for delete'
-                    );
+                    throw new InternalError('Only one from table is supported for delete');
                 }
                 return getTableName(node.from.froms[0]) as GetModels<Schema>;
             })
             .exhaustive();
         if (!r) {
-            throw new InternalError(
-                `Unable to get table name for query node: ${node}`
-            );
+            throw new InternalError(`Unable to get table name for query node: ${node}`);
         }
         return r;
     }
 
     private isCrudQueryNode(node: RootOperationNode): node is CrudQueryNode {
         return (
-            SelectQueryNode.is(node) ||
-            InsertQueryNode.is(node) ||
-            UpdateQueryNode.is(node) ||
-            DeleteQueryNode.is(node)
+            SelectQueryNode.is(node) || InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node)
         );
     }
 
-    private isMutationQueryNode(
-        node: RootOperationNode
-    ): node is MutationQueryNode {
-        return (
-            InsertQueryNode.is(node) ||
-            UpdateQueryNode.is(node) ||
-            DeleteQueryNode.is(node)
-        );
+    private isMutationQueryNode(node: RootOperationNode): node is MutationQueryNode {
+        return InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node);
     }
 
     private buildPolicyFilter(
@@ -442,7 +308,7 @@ export class PolicyHandler<
         alias: string | undefined,
         operation: CRUD,
         thisEntity?: Record<string, OperationNode>,
-        thisEntityRaw?: Record<string, unknown>
+        thisEntityRaw?: Record<string, unknown>,
     ) {
         const policies = this.getModelPolicies(model, operation);
         if (policies.length === 0) {
@@ -451,29 +317,11 @@ export class PolicyHandler<
 
         const allows = policies
             .filter((policy) => policy.kind === 'allow')
-            .map((policy) =>
-                this.transformPolicyCondition(
-                    model,
-                    alias,
-                    operation,
-                    policy,
-                    thisEntity,
-                    thisEntityRaw
-                )
-            );
+            .map((policy) => this.transformPolicyCondition(model, alias, operation, policy, thisEntity, thisEntityRaw));
 
         const denies = policies
             .filter((policy) => policy.kind === 'deny')
-            .map((policy) =>
-                this.transformPolicyCondition(
-                    model,
-                    alias,
-                    operation,
-                    policy,
-                    thisEntity,
-                    thisEntityRaw
-                )
-            );
+            .map((policy) => this.transformPolicyCondition(model, alias, operation, policy, thisEntity, thisEntityRaw));
 
         let combinedPolicy: OperationNode;
 
@@ -488,13 +336,10 @@ export class PolicyHandler<
             if (denies.length !== 0) {
                 const combinedDenies = conjunction(
                     this.dialect,
-                    denies.map((d) => buildIsFalse(d, this.dialect))
+                    denies.map((d) => buildIsFalse(d, this.dialect)),
                 );
                 // or(...allows) && and(...!denies)
-                combinedPolicy = conjunction(this.dialect, [
-                    combinedPolicy,
-                    combinedDenies,
-                ]);
+                combinedPolicy = conjunction(this.dialect, [combinedPolicy, combinedDenies]);
             }
         }
         return combinedPolicy;
@@ -509,9 +354,7 @@ export class PolicyHandler<
                 const { model, alias } = extractResult;
                 const filter = this.buildPolicyFilter(model, alias, 'read');
                 whereNode = WhereNode.create(
-                    whereNode?.where
-                        ? conjunction(this.dialect, [whereNode.where, filter])
-                        : filter
+                    whereNode?.where ? conjunction(this.dialect, [whereNode.where, filter]) : filter,
                 );
             }
         });
@@ -536,16 +379,11 @@ export class PolicyHandler<
             return result;
         } else {
             // only return ID fields, that's enough for reading back the inserted row
-            const idFields = getIdFields(
-                this.client.$schema,
-                this.getMutationModel(node)
-            );
+            const idFields = getIdFields(this.client.$schema, this.getMutationModel(node));
             return {
                 ...result,
                 returning: ReturningNode.create(
-                    idFields.map((field) =>
-                        SelectionNode.create(ColumnNode.create(field))
-                    )
+                    idFields.map((field) => SelectionNode.create(ColumnNode.create(field))),
                 ),
             };
         }
@@ -554,42 +392,24 @@ export class PolicyHandler<
     protected override transformUpdateQuery(node: UpdateQueryNode) {
         const result = super.transformUpdateQuery(node);
         const mutationModel = this.getMutationModel(node);
-        const filter = this.buildPolicyFilter(
-            mutationModel,
-            undefined,
-            'update'
-        );
+        const filter = this.buildPolicyFilter(mutationModel, undefined, 'update');
         return {
             ...result,
-            where: WhereNode.create(
-                result.where
-                    ? conjunction(this.dialect, [result.where.where, filter])
-                    : filter
-            ),
+            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
         };
     }
 
     protected override transformDeleteQuery(node: DeleteQueryNode) {
         const result = super.transformDeleteQuery(node);
         const mutationModel = this.getMutationModel(node);
-        const filter = this.buildPolicyFilter(
-            mutationModel,
-            undefined,
-            'delete'
-        );
+        const filter = this.buildPolicyFilter(mutationModel, undefined, 'delete');
         return {
             ...result,
-            where: WhereNode.create(
-                result.where
-                    ? conjunction(this.dialect, [result.where.where, filter])
-                    : filter
-            ),
+            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
         };
     }
 
-    private extractTableName(
-        from: OperationNode
-    ): { model: GetModels<Schema>; alias?: string } | undefined {
+    private extractTableName(from: OperationNode): { model: GetModels<Schema>; alias?: string } | undefined {
         if (TableNode.is(from)) {
             return { model: from.table.identifier.name as GetModels<Schema> };
         }
@@ -600,9 +420,7 @@ export class PolicyHandler<
             }
             return {
                 model: inner.model,
-                alias: IdentifierNode.is(from.alias)
-                    ? from.alias.name
-                    : undefined,
+                alias: IdentifierNode.is(from.alias) ? from.alias.name : undefined,
             };
         } else {
             // this can happen for subqueries, which will be handled when nested
@@ -617,20 +435,19 @@ export class PolicyHandler<
         operation: CRUD,
         policy: Policy,
         thisEntity?: Record<string, OperationNode>,
-        thisEntityRaw?: Record<string, unknown>
+        thisEntityRaw?: Record<string, unknown>,
     ) {
-        return new ExpressionTransformer(
-            this.client.$schema,
-            this.client.$options,
-            this.client.$auth
-        ).transform(policy.condition, {
-            model,
-            alias,
-            operation,
-            thisEntity,
-            thisEntityRaw,
-            auth: this.client.$auth,
-        });
+        return new ExpressionTransformer(this.client.$schema, this.client.$options, this.client.$auth).transform(
+            policy.condition,
+            {
+                model,
+                alias,
+                operation,
+                thisEntity,
+                thisEntityRaw,
+                auth: this.client.$auth,
+            },
+        );
     }
 
     private getModelPolicies(modelName: string, operation: PolicyOperation) {
@@ -639,10 +456,7 @@ export class PolicyHandler<
 
         const extractOperations = (expr: Expression) => {
             invariant(ExpressionUtils.isLiteral(expr), 'expecting a literal');
-            invariant(
-                typeof expr.value === 'string',
-                'expecting a string literal'
-            );
+            invariant(typeof expr.value === 'string', 'expecting a string literal');
             return expr.value
                 .split(',')
                 .filter((v) => !!v)
@@ -652,26 +466,16 @@ export class PolicyHandler<
         if (modelDef.attributes) {
             result.push(
                 ...modelDef.attributes
-                    .filter(
-                        (attr) =>
-                            attr.name === '@@allow' || attr.name === '@@deny'
-                    )
+                    .filter((attr) => attr.name === '@@allow' || attr.name === '@@deny')
                     .map(
                         (attr) =>
                             ({
-                                kind:
-                                    attr.name === '@@allow' ? 'allow' : 'deny',
-                                operations: extractOperations(
-                                    attr.args![0]!.value
-                                ),
+                                kind: attr.name === '@@allow' ? 'allow' : 'deny',
+                                operations: extractOperations(attr.args![0]!.value),
                                 condition: attr.args![1]!.value,
-                            } as const)
+                            }) as const,
                     )
-                    .filter(
-                        (policy) =>
-                            policy.operations.includes('all') ||
-                            policy.operations.includes(operation)
-                    )
+                    .filter((policy) => policy.operations.includes('all') || policy.operations.includes(operation)),
             );
         }
         return result;

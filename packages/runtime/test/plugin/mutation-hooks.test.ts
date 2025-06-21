@@ -117,10 +117,7 @@ describe('Entity  lifecycle tests', () => {
                 if (args.action === 'update' || args.action === 'delete') {
                     expect(args.entities).toEqual([
                         expect.objectContaining({
-                            email:
-                                args.action === 'update'
-                                    ? 'u1@test.com'
-                                    : 'u3@test.com',
+                            email: args.action === 'update' ? 'u1@test.com' : 'u3@test.com',
                         }),
                     ]);
                 } else {
@@ -131,10 +128,7 @@ describe('Entity  lifecycle tests', () => {
                 if (args.action === 'update' || args.action === 'delete') {
                     expect(args.beforeMutationEntities).toEqual([
                         expect.objectContaining({
-                            email:
-                                args.action === 'update'
-                                    ? 'u1@test.com'
-                                    : 'u3@test.com',
+                            email: args.action === 'update' ? 'u1@test.com' : 'u3@test.com',
                         }),
                     ]);
                 }
@@ -177,12 +171,9 @@ describe('Entity  lifecycle tests', () => {
                     expect(args.afterMutationEntities).toEqual(
                         expect.arrayContaining([
                             expect.objectContaining({
-                                email:
-                                    args.action === 'create'
-                                        ? 'u1@test.com'
-                                        : 'u2@test.com',
+                                email: args.action === 'create' ? 'u1@test.com' : 'u2@test.com',
                             }),
-                        ])
+                        ]),
                     );
                 } else {
                     expect(args.afterMutationEntities).toBeUndefined();
@@ -222,7 +213,7 @@ describe('Entity  lifecycle tests', () => {
                         expect.arrayContaining([
                             expect.objectContaining({ email: 'u1@test.com' }),
                             expect.objectContaining({ email: 'u2@test.com' }),
-                        ])
+                        ]),
                     );
                 } else if (args.action === 'update') {
                     userUpdateIntercepted = true;
@@ -236,7 +227,7 @@ describe('Entity  lifecycle tests', () => {
                                 email: 'u1@test.com',
                                 name: 'A user',
                             }),
-                        ])
+                        ]),
                     );
                 } else if (args.action === 'delete') {
                     userDeleteIntercepted = true;
@@ -244,7 +235,7 @@ describe('Entity  lifecycle tests', () => {
                         expect.arrayContaining([
                             expect.objectContaining({ email: 'u1@test.com' }),
                             expect.objectContaining({ email: 'u2@test.com' }),
-                        ])
+                        ]),
                     );
                 }
             },
@@ -269,24 +260,17 @@ describe('Entity  lifecycle tests', () => {
             id: 'test',
             mutationInterceptionFilter: (args) => {
                 return {
-                    intercept:
-                        args.action === 'create' || args.action === 'update',
+                    intercept: args.action === 'create' || args.action === 'update',
                     loadAfterMutationEntity: true,
                 };
             },
             afterEntityMutation(args) {
                 if (args.action === 'create') {
                     if (args.model === 'Post') {
-                        if (
-                            (args.afterMutationEntities![0] as any).title ===
-                            'Post1'
-                        ) {
+                        if ((args.afterMutationEntities![0] as any).title === 'Post1') {
                             post1Intercepted = true;
                         }
-                        if (
-                            (args.afterMutationEntities![0] as any).title ===
-                            'Post2'
-                        ) {
+                        if ((args.afterMutationEntities![0] as any).title === 'Post2') {
                             post2Intercepted = true;
                         }
                     }

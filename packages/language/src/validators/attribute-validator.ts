@@ -8,8 +8,6 @@ import type { AstValidator } from './common';
  */
 export default class AttributeValidator implements AstValidator<Attribute> {
     validate(attr: Attribute, accept: ValidationAcceptor): void {
-        attr.attributes.forEach((attr) =>
-            validateAttributeApplication(attr, accept)
-        );
+        attr.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
     }
 }

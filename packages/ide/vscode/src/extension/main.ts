@@ -1,9 +1,6 @@
 import * as path from 'node:path';
 import type * as vscode from 'vscode';
-import type {
-    LanguageClientOptions,
-    ServerOptions,
-} from 'vscode-languageclient/node.js';
+import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node.js';
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node.js';
 
 let client: LanguageClient;
@@ -22,18 +19,14 @@ export function deactivate(): Thenable<void> | undefined {
 }
 
 function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
-    const serverModule = context.asAbsolutePath(
-        path.join('dist', 'language-server.js')
-    );
+    const serverModule = context.asAbsolutePath(path.join('dist', 'language-server.js'));
     // The debug options for the server
     // --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging.
     // By setting `process.env.DEBUG_BREAK` to a truthy value, the language server will wait until a debugger is attached.
     const debugOptions = {
         execArgv: [
             '--nolazy',
-            `--inspect${process.env['DEBUG_BREAK'] ? '-brk' : ''}=${
-                process.env['DEBUG_SOCKET'] || '6009'
-            }`,
+            `--inspect${process.env['DEBUG_BREAK'] ? '-brk' : ''}=${process.env['DEBUG_SOCKET'] || '6009'}`,
         ],
     };
 
@@ -54,12 +47,7 @@ function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
     };
 
     // Create the language client and start the client.
-    const client = new LanguageClient(
-        'zmodel',
-        'ZModel',
-        serverOptions,
-        clientOptions
-    );
+    const client = new LanguageClient('zmodel', 'ZModel', serverOptions, clientOptions);
 
     // Start the client. This will also launch the server
     client.start();

@@ -2,9 +2,7 @@
  * Creates a promise that only executes when it's awaited or .then() is called.
  * @see https://github.com/prisma/prisma/blob/main/packages/client/src/runtime/core/request/createPrismaPromise.ts
  */
-export function createDeferredPromise<T>(
-    callback: () => Promise<T>
-): Promise<T> {
+export function createDeferredPromise<T>(callback: () => Promise<T>): Promise<T> {
     let promise: Promise<T> | undefined;
     const cb = () => {
         try {

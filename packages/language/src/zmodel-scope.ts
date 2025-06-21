@@ -51,24 +51,21 @@ export class ZModelScopeComputation extends DefaultScopeComputation {
 
     override async computeExports(
         document: LangiumDocument<AstNode>,
-        cancelToken?: Cancellation.CancellationToken | undefined
+        cancelToken?: Cancellation.CancellationToken | undefined,
     ): Promise<AstNodeDescription[]> {
         const result = await super.computeExports(document, cancelToken);
 
         // add enum fields so they can be globally resolved across modules
-        for (const node of AstUtils.streamAllContents(
-            document.parseResult.value
-        )) {
+        for (const node of AstUtils.streamAllContents(document.parseResult.value)) {
             if (cancelToken) {
                 await interruptAndCheck(cancelToken);
             }
             if (isEnumField(node)) {
-                const desc =
-                    this.services.workspace.AstNodeDescriptionProvider.createDescription(
-                        node,
-                        node.name,
-                        document
-                    );
+                const desc = this.services.workspace.AstNodeDescriptionProvider.createDescription(
+                    node,
+                    node.name,
+                    document,
+                );
                 result.push(desc);
             }
         }
@@ -76,11 +73,7 @@ export class ZModelScopeComputation extends DefaultScopeComputation {
         return result;
     }
 
-    override processNode(
-        node: AstNode,
-        document: LangiumDocument<AstNode>,
-        scopes: PrecomputedScopes
-    ) {
+    override processNode(node: AstNode, document: LangiumDocument<AstNode>, scopes: PrecomputedScopes) {
         super.processNode(node, document, scopes);
         // TODO: merge base
         // if (isDataModel(node) && !node.$baseMerged) {
@@ -106,59 +99,38 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         super(services);
     }
 
-    protected override getGlobalScope(
-        referenceType: string,
-        context: ReferenceInfo
-    ): Scope {
+    protected override getGlobalScope(referenceType: string, context: ReferenceInfo): Scope {
         const model = AstUtils.getContainerOfType(context.container, isModel);
         if (!model) {
             return EMPTY_SCOPE;
         }
 
-        const importedUris = model.imports
-            .map(resolveImportUri)
-            .filter((url) => !!url);
+        const importedUris = model.imports.map(resolveImportUri).filter((url) => !!url);
 
-        const importedElements = this.indexManager
-            .allElements(referenceType)
-            .filter(
-                (des) =>
-                    // allow current document
-                    UriUtils.equals(des.documentUri, model.$document?.uri) ||
-                    // allow stdlib
-                    des.documentUri.path.endsWith(STD_LIB_MODULE_NAME) ||
-                    // allow plugin models
-                    des.documentUri.path.endsWith(PLUGIN_MODULE_NAME) ||
-                    // allow imported documents
-                    importedUris.some((importedUri) =>
-                        UriUtils.equals(des.documentUri, importedUri)
-                    )
-            );
+        const importedElements = this.indexManager.allElements(referenceType).filter(
+            (des) =>
+                // allow current document
+                UriUtils.equals(des.documentUri, model.$document?.uri) ||
+                // allow stdlib
+                des.documentUri.path.endsWith(STD_LIB_MODULE_NAME) ||
+                // allow plugin models
+                des.documentUri.path.endsWith(PLUGIN_MODULE_NAME) ||
+                // allow imported documents
+                importedUris.some((importedUri) => UriUtils.equals(des.documentUri, importedUri)),
+        );
         return new StreamScope(importedElements);
     }
 
     override getScope(context: ReferenceInfo): Scope {
-        if (
-            isMemberAccessExpr(context.container) &&
-            context.container.operand &&
-            context.property === 'member'
-        ) {
+        if (isMemberAccessExpr(context.container) && context.container.operand && context.property === 'member') {
             return this.getMemberAccessScope(context);
         }
 
-        if (
-            isReferenceExpr(context.container) &&
-            context.property === 'target'
-        ) {
+        if (isReferenceExpr(context.container) && context.property === 'target') {
             // when reference expression is resolved inside a collection predicate, the scope is the collection
-            const containerCollectionPredicate = getCollectionPredicateContext(
-                context.container
-            );
+            const containerCollectionPredicate = getCollectionPredicateContext(context.container);
             if (containerCollectionPredicate) {
-                return this.getCollectionPredicateScope(
-                    context,
-                    containerCollectionPredicate as BinaryExpr
-                );
+                return this.getCollectionPredicateScope(context, containerCollectionPredicate as BinaryExpr);
             }
         }
 
@@ -181,11 +153,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
                 // operand is a reference, it can only be a model/type-def field
                 const ref = operand.target.ref;
                 if (isDataModelField(ref) || isTypeDefField(ref)) {
-                    return this.createScopeForContainer(
-                        ref.type.reference?.ref,
-                        globalScope,
-                        allowTypeDefScope
-                    );
+                    return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
                 return EMPTY_SCOPE;
             })
@@ -193,18 +161,10 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
                 // operand is a member access, it must be resolved to a non-array model/typedef type
                 const ref = operand.member.ref;
                 if (isDataModelField(ref) && !ref.type.array) {
-                    return this.createScopeForContainer(
-                        ref.type.reference?.ref,
-                        globalScope,
-                        allowTypeDefScope
-                    );
+                    return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
                 if (isTypeDefField(ref) && !ref.type.array) {
-                    return this.createScopeForContainer(
-                        ref.type.reference?.ref,
-                        globalScope,
-                        allowTypeDefScope
-                    );
+                    return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
                 return EMPTY_SCOPE;
             })
@@ -222,20 +182,14 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
 
                 if (isFutureInvocation(operand)) {
                     // resolve `future()` to the containing model
-                    return this.createScopeForContainingModel(
-                        node,
-                        globalScope
-                    );
+                    return this.createScopeForContainingModel(node, globalScope);
                 }
                 return EMPTY_SCOPE;
             })
             .otherwise(() => EMPTY_SCOPE);
     }
 
-    private getCollectionPredicateScope(
-        context: ReferenceInfo,
-        collectionPredicate: BinaryExpr
-    ) {
+    private getCollectionPredicateScope(context: ReferenceInfo, collectionPredicate: BinaryExpr) {
         const referenceType = this.reflection.getReferenceType(context);
         const globalScope = this.getGlobalScope(referenceType, context);
         const collection = collectionPredicate.left;
@@ -250,11 +204,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
                 // collection is a reference - model or typedef field
                 const ref = expr.target.ref;
                 if (isDataModelField(ref) || isTypeDefField(ref)) {
-                    return this.createScopeForContainer(
-                        ref.type.reference?.ref,
-                        globalScope,
-                        allowTypeDefScope
-                    );
+                    return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
                 return EMPTY_SCOPE;
             })
@@ -262,23 +212,14 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
                 // collection is a member access, it can only be resolved to a model or typedef field
                 const ref = expr.member.ref;
                 if (isDataModelField(ref) || isTypeDefField(ref)) {
-                    return this.createScopeForContainer(
-                        ref.type.reference?.ref,
-                        globalScope,
-                        allowTypeDefScope
-                    );
+                    return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
                 return EMPTY_SCOPE;
             })
             .when(isInvocationExpr, (expr) => {
-                const returnTypeDecl =
-                    expr.function.ref?.returnType.reference?.ref;
+                const returnTypeDecl = expr.function.ref?.returnType.reference?.ref;
                 if (isDataModel(returnTypeDecl)) {
-                    return this.createScopeForContainer(
-                        returnTypeDecl,
-                        globalScope,
-                        allowTypeDefScope
-                    );
+                    return this.createScopeForContainer(returnTypeDecl, globalScope, allowTypeDefScope);
                 } else {
                     return EMPTY_SCOPE;
                 }
@@ -298,16 +239,9 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         }
     }
 
-    private createScopeForContainer(
-        node: AstNode | undefined,
-        globalScope: Scope,
-        includeTypeDefScope = false
-    ) {
+    private createScopeForContainer(node: AstNode | undefined, globalScope: Scope, includeTypeDefScope = false) {
         if (isDataModel(node)) {
-            return this.createScopeForNodes(
-                getModelFieldsWithBases(node),
-                globalScope
-            );
+            return this.createScopeForNodes(getModelFieldsWithBases(node), globalScope);
         } else if (includeTypeDefScope && isTypeDef(node)) {
             return this.createScopeForNodes(node.fields, globalScope);
         } else {
@@ -319,7 +253,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         // get all data models and type defs from loaded and reachable documents
         const decls = getAllLoadedAndReachableDataModelsAndTypeDefs(
             this.services.shared.workspace.LangiumDocuments,
-            AstUtils.getContainerOfType(node, isDataModel)
+            AstUtils.getContainerOfType(node, isDataModel),
         );
 
         const authDecl = getAuthDecl(decls);
@@ -334,11 +268,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
 function getCollectionPredicateContext(node: AstNode) {
     let curr: AstNode | undefined = node;
     while (curr) {
-        if (
-            curr.$container &&
-            isCollectionPredicate(curr.$container) &&
-            curr.$containerProperty === 'right'
-        ) {
+        if (curr.$container && isCollectionPredicate(curr.$container) && curr.$containerProperty === 'right') {
             return curr.$container;
         }
         curr = curr.$container;

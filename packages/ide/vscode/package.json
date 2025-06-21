@@ -37,7 +37,8 @@
     },
     "devDependencies": {
         "@types/vscode": "^1.63.0",
-        "@zenstackhq/typescript-config": "workspace:*"
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/eslint-config": "workspace:*"
     },
     "files": [
         "dist",

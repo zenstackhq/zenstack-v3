@@ -36,11 +36,7 @@ export const ExpressionUtils = {
         };
     },
 
-    binary: (
-        left: Expression,
-        op: BinaryOperator,
-        right: Expression
-    ): BinaryExpression => {
+    binary: (left: Expression, op: BinaryOperator, right: Expression): BinaryExpression => {
         return {
             kind: 'binary',
             op,
@@ -85,52 +81,32 @@ export const ExpressionUtils = {
     },
 
     and: (expr: Expression, ...expressions: Expression[]) => {
-        return expressions.reduce(
-            (acc, exp) => ExpressionUtils.binary(acc, '&&', exp),
-            expr
-        );
+        return expressions.reduce((acc, exp) => ExpressionUtils.binary(acc, '&&', exp), expr);
     },
 
     or: (expr: Expression, ...expressions: Expression[]) => {
-        return expressions.reduce(
-            (acc, exp) => ExpressionUtils.binary(acc, '||', exp),
-            expr
-        );
+        return expressions.reduce((acc, exp) => ExpressionUtils.binary(acc, '||', exp), expr);
     },
 
     is: (value: unknown, kind: Expression['kind']): value is Expression => {
-        return (
-            !!value &&
-            typeof value === 'object' &&
-            'kind' in value &&
-            value.kind === kind
-        );
+        return !!value && typeof value === 'object' && 'kind' in value && value.kind === kind;
     },
 
-    isLiteral: (value: unknown): value is LiteralExpression =>
-        ExpressionUtils.is(value, 'literal'),
+    isLiteral: (value: unknown): value is LiteralExpression => ExpressionUtils.is(value, 'literal'),
 
-    isArray: (value: unknown): value is ArrayExpression =>
-        ExpressionUtils.is(value, 'array'),
+    isArray: (value: unknown): value is ArrayExpression => ExpressionUtils.is(value, 'array'),
 
-    isCall: (value: unknown): value is CallExpression =>
-        ExpressionUtils.is(value, 'call'),
+    isCall: (value: unknown): value is CallExpression => ExpressionUtils.is(value, 'call'),
 
-    isNull: (value: unknown): value is NullExpression =>
-        ExpressionUtils.is(value, 'null'),
+    isNull: (value: unknown): value is NullExpression => ExpressionUtils.is(value, 'null'),
 
-    isThis: (value: unknown): value is ThisExpression =>
-        ExpressionUtils.is(value, 'this'),
+    isThis: (value: unknown): value is ThisExpression => ExpressionUtils.is(value, 'this'),
 
-    isUnary: (value: unknown): value is UnaryExpression =>
-        ExpressionUtils.is(value, 'unary'),
+    isUnary: (value: unknown): value is UnaryExpression => ExpressionUtils.is(value, 'unary'),
 
-    isBinary: (value: unknown): value is BinaryExpression =>
-        ExpressionUtils.is(value, 'binary'),
+    isBinary: (value: unknown): value is BinaryExpression => ExpressionUtils.is(value, 'binary'),
 
-    isField: (value: unknown): value is FieldExpression =>
-        ExpressionUtils.is(value, 'field'),
+    isField: (value: unknown): value is FieldExpression => ExpressionUtils.is(value, 'field'),
 
-    isMember: (value: unknown): value is MemberExpression =>
-        ExpressionUtils.is(value, 'member'),
+    isMember: (value: unknown): value is MemberExpression => ExpressionUtils.is(value, 'member'),
 };

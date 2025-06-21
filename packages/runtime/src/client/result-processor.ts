@@ -34,8 +34,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
 
             if (key === '_count') {
                 // underlying database provider may return string for count
-                data[key] =
-                    typeof value === 'string' ? JSON.parse(value) : value;
+                data[key] = typeof value === 'string' ? JSON.parse(value) : value;
                 continue;
             }
 
@@ -81,10 +80,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 return value;
             }
         }
-        return this.doProcessResult(
-            relationData,
-            fieldDef.type as GetModels<Schema>
-        );
+        return this.doProcessResult(relationData, fieldDef.type as GetModels<Schema>);
     }
 
     private transformScalar(value: unknown, type: BuiltinType) {
@@ -102,10 +98,8 @@ export class ResultProcessor<Schema extends SchemaDef> {
             return value;
         }
         invariant(
-            typeof value === 'string' ||
-                typeof value === 'number' ||
-                value instanceof Decimal,
-            `Expected string, number or Decimal, got ${typeof value}`
+            typeof value === 'string' || typeof value === 'number' || value instanceof Decimal,
+            `Expected string, number or Decimal, got ${typeof value}`,
         );
         return new Decimal(value);
     }
@@ -116,7 +110,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
         }
         invariant(
             typeof value === 'string' || typeof value === 'number',
-            `Expected string or number, got ${typeof value}`
+            `Expected string or number, got ${typeof value}`,
         );
         return BigInt(value);
     }
@@ -140,13 +134,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
     }
 
     private fixReversedResult(data: any, model: GetModels<Schema>, args: any) {
-        if (
-            Array.isArray(data) &&
-            typeof args === 'object' &&
-            args &&
-            args.take !== undefined &&
-            args.take < 0
-        ) {
+        if (Array.isArray(data) && typeof args === 'object' && args && args.take !== undefined && args.take < 0) {
             data.reverse();
         }
 
@@ -164,11 +152,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 if (!fieldDef?.relation) {
                     continue;
                 }
-                this.fixReversedResult(
-                    row[field],
-                    fieldDef.type as GetModels<Schema>,
-                    value
-                );
+                this.fixReversedResult(row[field], fieldDef.type as GetModels<Schema>, value);
             }
         }
     }

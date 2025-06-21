@@ -6,12 +6,8 @@ import type { AstValidator } from './common';
 /**
  * Validates function declarations.
  */
-export default class FunctionDeclValidator
-    implements AstValidator<FunctionDecl>
-{
+export default class FunctionDeclValidator implements AstValidator<FunctionDecl> {
     validate(funcDecl: FunctionDecl, accept: ValidationAcceptor) {
-        funcDecl.attributes.forEach((attr) =>
-            validateAttributeApplication(attr, accept)
-        );
+        funcDecl.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
     }
 }

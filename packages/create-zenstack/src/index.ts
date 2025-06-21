@@ -57,8 +57,8 @@ function initProject(name: string) {
                 license: 'ISC',
             },
             null,
-            2
-        )
+            2,
+        ),
     );
 
     // install packages
@@ -92,8 +92,8 @@ function initProject(name: string) {
                 },
             },
             null,
-            2
-        )
+            2,
+        ),
     );
 
     // create schema.zmodel
@@ -111,10 +111,7 @@ function initProject(name: string) {
 }
 
 function installPackage(pkg: { name: string; dev: boolean }) {
-    runCommand(
-        `${agent} install ${pkg.name} ${pkg.dev ? saveDev : ''}`,
-        `Installing "${pkg.name}"`
-    );
+    runCommand(`${agent} install ${pkg.name} ${pkg.dev ? saveDev : ''}`, `Installing "${pkg.name}"`);
 }
 
 function runCommand(cmd: string, status: string) {

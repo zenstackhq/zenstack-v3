@@ -49,6 +49,7 @@
         "@zenstackhq/runtime": "workspace:*",
         "@zenstackhq/testtools": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/eslint-config": "workspace:*",
         "better-sqlite3": "^11.8.1",
         "tmp": "^0.2.3"
     }

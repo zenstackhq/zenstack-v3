@@ -1,2 +1,2 @@
--   Cross-field comparison (for read and mutations)
--   Computed fields
+- Cross-field comparison (for read and mutations)
+- Computed fields

@@ -1,80 +1,80 @@
 ## V3 Alpha Todo
 
--   [ ] Infra
-    -   [ ] Dependency injection
--   [ ] CLI
-    -   [x] generate
-    -   [x] migrate
-    -   [x] info
-    -   [x] init
--   [ ] ORM
-    -   [x] Create
-        -   [x] Input validation
-        -   [x] Simple create
-        -   [x] Nested create
-        -   [x] Relation connection
-        -   [x] Create many
-        -   [x] ID generation
-        -   [x] CreateManyAndReturn
-    -   [x] Find
-        -   [x] Input validation
-        -   [x] Field selection
-            -   [x] Omit
-            -   [x] Counting relation
-        -   [x] Pagination
-            -   [x] Skip and limit
-            -   [x] Cursor
-        -   [x] Filtering
-            -   [x] Unique fields
-            -   [x] Scalar fields
-            -   [x] Relation fields
-        -   [x] Sort
-            -   [x] Scalar fields
-            -   [x] Relation fields
-        -   [x] Relation inclusion
-            -   [x] Filtering
-            -   [x] Sorting
-            -   [x] Pagination
-        -   [x] Distinct
-        -   [ ] JSON filtering
-    -   [x] Update
-        -   [x] Input validation
-        -   [x] Top-level
-        -   [x] Nested to-many
-        -   [x] Nested to-one
-        -   [x] Incremental update for numeric fields
-        -   [x] Array update
-    -   [x] Upsert
-        -   [ ] Implement with "on conflict"
-    -   [x] Delete
-    -   [x] Aggregation
-        -   [x] Count
-        -   [x] Aggregate
-        -   [x] Group by
-    -   [ ] Extensions
-        -   [x] Query builder API
-        -   [x] Computed fields
-        -   [ ] Prisma client extension
-    -   [ ] Misc
-        -   [x] JSDoc for CRUD methods
-        -   [x] Cache validation schemas
-        -   [x] Compound ID
-        -   [ ] Cross field comparison
-        -   [x] Many-to-many relation
-        -   [ ] Empty AND/OR/NOT behavior
-        -   [?] Logging
-        -   [ ] Error system
-        -   [x] Custom table name
-        -   [x] Custom field name
-        -   [ ] Implement changesets
--   [ ] Polymorphism
--   [ ] Validation
--   [ ] Access Policy
-    -   [ ] Short-circuit pre-create check for scalar-field only policies
-    -   [ ] Inject "replace into"
-    -   [ ] Inject "on conflict do update"
--   [x] Migration
--   [ ] Databases
-    -   [x] SQLite
-    -   [x] PostgreSQL
-        -   [ ] Multi-schema
+- [ ] Infra
+    - [ ] Dependency injection
+- [ ] CLI
+    - [x] generate
+    - [x] migrate
+    - [x] info
+    - [x] init
+- [ ] ORM
+    - [x] Create
+        - [x] Input validation
+        - [x] Simple create
+        - [x] Nested create
+        - [x] Relation connection
+        - [x] Create many
+        - [x] ID generation
+        - [x] CreateManyAndReturn
+    - [x] Find
+        - [x] Input validation
+        - [x] Field selection
+            - [x] Omit
+            - [x] Counting relation
+        - [x] Pagination
+            - [x] Skip and limit
+            - [x] Cursor
+        - [x] Filtering
+            - [x] Unique fields
+            - [x] Scalar fields
+            - [x] Relation fields
+        - [x] Sort
+            - [x] Scalar fields
+            - [x] Relation fields
+        - [x] Relation inclusion
+            - [x] Filtering
+            - [x] Sorting
+            - [x] Pagination
+        - [x] Distinct
+        - [ ] JSON filtering
+    - [x] Update
+        - [x] Input validation
+        - [x] Top-level
+        - [x] Nested to-many
+        - [x] Nested to-one
+        - [x] Incremental update for numeric fields
+        - [x] Array update
+    - [x] Upsert
+        - [ ] Implement with "on conflict"
+    - [x] Delete
+    - [x] Aggregation
+        - [x] Count
+        - [x] Aggregate
+        - [x] Group by
+    - [ ] Extensions
+        - [x] Query builder API
+        - [x] Computed fields
+        - [ ] Prisma client extension
+    - [ ] Misc
+        - [x] JSDoc for CRUD methods
+        - [x] Cache validation schemas
+        - [x] Compound ID
+        - [ ] Cross field comparison
+        - [x] Many-to-many relation
+        - [ ] Empty AND/OR/NOT behavior
+        - [?] Logging
+        - [ ] Error system
+        - [x] Custom table name
+        - [x] Custom field name
+        - [ ] Implement changesets
+- [ ] Polymorphism
+- [ ] Validation
+- [ ] Access Policy
+    - [ ] Short-circuit pre-create check for scalar-field only policies
+    - [ ] Inject "replace into"
+    - [ ] Inject "on conflict do update"
+- [x] Migration
+- [ ] Databases
+    - [x] SQLite
+    - [x] PostgreSQL
+        - [ ] Multi-schema

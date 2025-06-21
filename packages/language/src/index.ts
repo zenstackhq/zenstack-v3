@@ -19,10 +19,9 @@ export class DocumentLoadError extends Error {
 
 export async function loadDocument(
     fileName: string,
-    pluginModelFiles: string[] = []
+    pluginModelFiles: string[] = [],
 ): Promise<
-    | { success: true; model: Model; warnings: string[] }
-    | { success: false; errors: string[]; warnings: string[] }
+    { success: true; model: Model; warnings: string[] } | { success: false; errors: string[]; warnings: string[] }
 > {
     const { ZModelLanguage: services } = createZModelServices();
     const extensions = services.LanguageMetaData.fileExtensions;
@@ -45,44 +44,29 @@ export async function loadDocument(
     // load standard library
 
     // isomorphic __dirname
-    const _dirname =
-        typeof __dirname !== 'undefined'
-            ? __dirname
-            : path.dirname(fileURLToPath(import.meta.url));
-    const stdLib =
-        await services.shared.workspace.LangiumDocuments.getOrCreateDocument(
-            URI.file(
-                path.resolve(path.join(_dirname, '../res', STD_LIB_MODULE_NAME))
-            )
-        );
+    const _dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+    const stdLib = await services.shared.workspace.LangiumDocuments.getOrCreateDocument(
+        URI.file(path.resolve(path.join(_dirname, '../res', STD_LIB_MODULE_NAME))),
+    );
 
     // load plugin model files
     const pluginDocs = await Promise.all(
         pluginModelFiles.map((file) =>
-            services.shared.workspace.LangiumDocuments.getOrCreateDocument(
-                URI.file(path.resolve(file))
-            )
-        )
+            services.shared.workspace.LangiumDocuments.getOrCreateDocument(URI.file(path.resolve(file))),
+        ),
     );
 
     // load the document
     const langiumDocuments = services.shared.workspace.LangiumDocuments;
-    const document = await langiumDocuments.getOrCreateDocument(
-        URI.file(path.resolve(fileName))
-    );
+    const document = await langiumDocuments.getOrCreateDocument(URI.file(path.resolve(fileName)));
 
     // build the document together with standard library, plugin modules, and imported documents
-    await services.shared.workspace.DocumentBuilder.build(
-        [stdLib, ...pluginDocs, document],
-        {
-            validation: true,
-        }
-    );
+    await services.shared.workspace.DocumentBuilder.build([stdLib, ...pluginDocs, document], {
+        validation: true,
+    });
 
     const diagnostics = langiumDocuments.all
-        .flatMap((doc) =>
-            (doc.diagnostics ?? []).map((diag) => ({ doc, diag }))
-        )
+        .flatMap((doc) => (doc.diagnostics ?? []).map((diag) => ({ doc, diag })))
         .filter(({ diag }) => diag.severity === 1 || diag.severity === 2)
         .toArray();
 

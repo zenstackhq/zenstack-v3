@@ -32,10 +32,10 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
         } else if (!SUPPORTED_PROVIDERS.includes(value)) {
             accept(
                 'error',
-                `Provider "${value}" is not supported. Choose from ${SUPPORTED_PROVIDERS.map(
-                    (p) => '"' + p + '"'
-                ).join(' | ')}.`,
-                { node: provider.value }
+                `Provider "${value}" is not supported. Choose from ${SUPPORTED_PROVIDERS.map((p) => '"' + p + '"').join(
+                    ' | ',
+                )}.`,
+                { node: provider.value },
             );
         }
     }
@@ -54,20 +54,10 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
                 continue;
             }
             const value = getStringLiteral(field.value);
-            if (
-                !value &&
-                !(
-                    isInvocationExpr(field.value) &&
-                    field.value.function.ref?.name === 'env'
-                )
-            ) {
-                accept(
-                    'error',
-                    `"${fieldName}" must be set to a string literal or an invocation of "env" function`,
-                    {
-                        node: field.value,
-                    }
-                );
+            if (!value && !(isInvocationExpr(field.value) && field.value.function.ref?.name === 'env')) {
+                accept('error', `"${fieldName}" must be set to a string literal or an invocation of "env" function`, {
+                    node: field.value,
+                });
             }
         }
     }
@@ -77,11 +67,7 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
         if (field) {
             const val = getStringLiteral(field.value);
             if (!val || !['foreignKeys', 'prisma'].includes(val)) {
-                accept(
-                    'error',
-                    '"relationMode" must be set to "foreignKeys" or "prisma"',
-                    { node: field.value }
-                );
+                accept('error', '"relationMode" must be set to "foreignKeys" or "prisma"', { node: field.value });
             }
         }
     }

@@ -168,7 +168,7 @@ describe('deep nested operations tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         const r = await db.m1.create({
@@ -218,7 +218,7 @@ describe('deep nested operations tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // deep create violation due to deep policy
@@ -234,7 +234,7 @@ describe('deep nested operations tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // deep connect violation via deep policy: @@deny('create', m2.m4?[value == 100])
@@ -256,7 +256,7 @@ describe('deep nested operations tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // create read-back filter: M4 @@deny('read', value == 200)
@@ -318,7 +318,7 @@ describe('deep nested operations tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         // deep update with connect/disconnect/delete success
@@ -361,7 +361,7 @@ describe('deep nested operations tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         // deep update violation
@@ -377,7 +377,7 @@ describe('deep nested operations tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // deep update violation via deep policy: @@deny('update', m2.m4?[value == 101])
@@ -398,7 +398,7 @@ describe('deep nested operations tests', () => {
             db.m1.update({
                 where: { myId: '2' },
                 data: { value: 1 },
-            })
+            }),
         ).toBeRejectedNotFound();
 
         // update read-back filter: M4 @@deny('read', value == 200)
@@ -481,7 +481,7 @@ describe('deep nested operations tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).rejects.toThrow('constraint failed');
 
         // createMany skip duplicate
@@ -527,13 +527,7 @@ describe('deep nested operations tests', () => {
         });
         const allM4 = await db.m4.findMany({ select: { value: true } });
         await expect(allM4).toHaveLength(3);
-        await expect(allM4).toEqual(
-            expect.arrayContaining([
-                { value: 21 },
-                { value: 21 },
-                { value: 22 },
-            ])
-        );
+        await expect(allM4).toEqual(expect.arrayContaining([{ value: 21 }, { value: 21 }, { value: 22 }]));
 
         // updateMany, filtered out by policy
         await db.m1.update({
@@ -555,12 +549,8 @@ describe('deep nested operations tests', () => {
                 },
             },
         });
-        await expect(
-            db.m4.findUnique({ where: { id: 'm4-1' } })
-        ).resolves.toMatchObject({ value: 21 });
-        await expect(
-            db.m4.findUnique({ where: { id: 'm4-2' } })
-        ).resolves.toMatchObject({ value: 22 });
+        await expect(db.m4.findUnique({ where: { id: 'm4-1' } })).resolves.toMatchObject({ value: 21 });
+        await expect(db.m4.findUnique({ where: { id: 'm4-2' } })).resolves.toMatchObject({ value: 22 });
 
         // updateMany, success
         await db.m1.update({
@@ -582,12 +572,8 @@ describe('deep nested operations tests', () => {
                 },
             },
         });
-        await expect(
-            db.m4.findUnique({ where: { id: 'm4-1' } })
-        ).resolves.toMatchObject({ value: 21 });
-        await expect(
-            db.m4.findUnique({ where: { id: 'm4-2' } })
-        ).resolves.toMatchObject({ value: 220 });
+        await expect(db.m4.findUnique({ where: { id: 'm4-1' } })).resolves.toMatchObject({ value: 21 });
+        await expect(db.m4.findUnique({ where: { id: 'm4-2' } })).resolves.toMatchObject({ value: 220 });
 
         // deleteMany, filtered out by policy
         await db.m1.update({

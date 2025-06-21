@@ -1,9 +1,4 @@
-import {
-    CreateTableBuilder,
-    sql,
-    type ColumnDataType,
-    type OnModifyForeignAction,
-} from 'kysely';
+import { CreateTableBuilder, sql, type ColumnDataType, type OnModifyForeignAction } from 'kysely';
 import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import {
@@ -21,58 +16,35 @@ import { requireModel } from '../query-utils';
 export class SchemaDbPusher<Schema extends SchemaDef> {
     constructor(
         private readonly schema: Schema,
-        private readonly kysely: ToKysely<Schema>
+        private readonly kysely: ToKysely<Schema>,
     ) {}
 
     async push() {
         await this.kysely.transaction().execute(async (tx) => {
-            if (
-                this.schema.enums &&
-                this.schema.provider.type === 'postgresql'
-            ) {
-                for (const [name, enumDef] of Object.entries(
-                    this.schema.enums
-                )) {
-                    const createEnum = tx.schema
-                        .createType(name)
-                        .asEnum(Object.values(enumDef));
+            if (this.schema.enums && this.schema.provider.type === 'postgresql') {
+                for (const [name, enumDef] of Object.entries(this.schema.enums)) {
+                    const createEnum = tx.schema.createType(name).asEnum(Object.values(enumDef));
                     // console.log('Creating enum:', createEnum.compile().sql);
                     await createEnum.execute();
                 }
             }
 
             for (const model of Object.keys(this.schema.models)) {
-                const createTable = this.createModelTable(
-                    tx,
-                    model as GetModels<Schema>
-                );
+                const createTable = this.createModelTable(tx, model as GetModels<Schema>);
                 // console.log('Creating table:', createTable.compile().sql);
                 await createTable.execute();
             }
         });
     }
 
-    private createModelTable(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>
-    ) {
+    private createModelTable(kysely: ToKysely<Schema>, model: GetModels<Schema>) {
         let table = kysely.schema.createTable(model).ifNotExists();
         const modelDef = requireModel(this.schema, model);
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
             if (fieldDef.relation) {
-                table = this.addForeignKeyConstraint(
-                    table,
-                    model,
-                    fieldName,
-                    fieldDef
-                );
+                table = this.addForeignKeyConstraint(table, model, fieldName, fieldDef);
             } else {
-                table = this.createModelField(
-                    table,
-                    fieldName,
-                    fieldDef,
-                    modelDef
-                );
+                table = this.createModelField(table, fieldName, fieldDef, modelDef);
             }
         }
 
@@ -85,7 +57,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
     private addPrimaryKeyConstraint(
         table: CreateTableBuilder<string, any>,
         model: GetModels<Schema>,
-        modelDef: ModelDef
+        modelDef: ModelDef,
     ) {
         if (modelDef.idFields.length === 1) {
             if (Object.values(modelDef.fields).some((f) => f.id)) {
@@ -95,19 +67,13 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         }
 
         if (modelDef.idFields.length > 0) {
-            table = table.addPrimaryKeyConstraint(
-                `pk_${model}`,
-                modelDef.idFields
-            );
+            table = table.addPrimaryKeyConstraint(`pk_${model}`, modelDef.idFields);
         }
 
         return table;
     }
 
-    private addUniqueConstraint(
-        table: CreateTableBuilder<string, any>,
-        modelDef: ModelDef
-    ) {
+    private addUniqueConstraint(table: CreateTableBuilder<string, any>, modelDef: ModelDef) {
         for (const [key, value] of Object.entries(modelDef.uniqueFields)) {
             invariant(typeof value === 'object', 'expecting an object');
             if ('type' in value) {
@@ -118,10 +84,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 }
             } else {
                 // multi-field constraint
-                table = table.addUniqueConstraint(
-                    `unique_${key}`,
-                    Object.keys(value)
-                );
+                table = table.addUniqueConstraint(`unique_${key}`, Object.keys(value));
             }
         }
         return table;
@@ -131,67 +94,49 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         table: CreateTableBuilder<any>,
         fieldName: string,
         fieldDef: FieldDef,
-        modelDef: ModelDef
+        modelDef: ModelDef,
     ) {
-        return table.addColumn(
-            fieldName,
-            this.mapFieldType(fieldDef),
-            (col) => {
-                // @id
-                if (fieldDef.id && modelDef.idFields.length === 1) {
-                    col = col.primaryKey();
-                }
-
-                // @default
-                if (fieldDef.default !== undefined) {
-                    if (
-                        typeof fieldDef.default === 'object' &&
-                        'kind' in fieldDef.default
-                    ) {
-                        if (
-                            ExpressionUtils.isCall(fieldDef.default) &&
-                            fieldDef.default.function === 'now'
-                        ) {
-                            col = col.defaultTo(sql`CURRENT_TIMESTAMP`);
-                        }
-                    } else {
-                        col = col.defaultTo(fieldDef.default);
-                    }
-                }
-
-                // @unique
-                if (fieldDef.unique) {
-                    col = col.unique();
-                }
-
-                // nullable
-                if (!fieldDef.optional && !fieldDef.array) {
-                    col = col.notNull();
-                }
-
-                if (
-                    this.isAutoIncrement(fieldDef) &&
-                    this.schema.provider.type === 'sqlite'
-                ) {
-                    col = col.autoIncrement();
-                }
-
-                return col;
+        return table.addColumn(fieldName, this.mapFieldType(fieldDef), (col) => {
+            // @id
+            if (fieldDef.id && modelDef.idFields.length === 1) {
+                col = col.primaryKey();
             }
-        );
+
+            // @default
+            if (fieldDef.default !== undefined) {
+                if (typeof fieldDef.default === 'object' && 'kind' in fieldDef.default) {
+                    if (ExpressionUtils.isCall(fieldDef.default) && fieldDef.default.function === 'now') {
+                        col = col.defaultTo(sql`CURRENT_TIMESTAMP`);
+                    }
+                } else {
+                    col = col.defaultTo(fieldDef.default);
+                }
+            }
+
+            // @unique
+            if (fieldDef.unique) {
+                col = col.unique();
+            }
+
+            // nullable
+            if (!fieldDef.optional && !fieldDef.array) {
+                col = col.notNull();
+            }
+
+            if (this.isAutoIncrement(fieldDef) && this.schema.provider.type === 'sqlite') {
+                col = col.autoIncrement();
+            }
+
+            return col;
+        });
     }
 
     private mapFieldType(fieldDef: FieldDef) {
         if (this.schema.enums?.[fieldDef.type]) {
-            return this.schema.provider.type === 'postgresql'
-                ? sql.ref(fieldDef.type)
-                : 'text';
+            return this.schema.provider.type === 'postgresql' ? sql.ref(fieldDef.type) : 'text';
         }
 
-        if (
-            this.isAutoIncrement(fieldDef) &&
-            this.schema.provider.type === 'postgresql'
-        ) {
+        if (this.isAutoIncrement(fieldDef) && this.schema.provider.type === 'postgresql') {
             return 'serial';
         }
 
@@ -204,9 +149,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             .with('BigInt', () => 'bigint')
             .with('Decimal', () => 'decimal')
             .with('DateTime', () => 'timestamp')
-            .with('Bytes', () =>
-                this.schema.provider.type === 'postgresql' ? 'bytea' : 'blob'
-            )
+            .with('Bytes', () => (this.schema.provider.type === 'postgresql' ? 'bytea' : 'blob'))
             .otherwise(() => {
                 throw new Error(`Unsupported field type: ${type}`);
             });
@@ -231,7 +174,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         table: CreateTableBuilder<string, any>,
         model: GetModels<Schema>,
         fieldName: string,
-        fieldDef: FieldDef
+        fieldDef: FieldDef,
     ) {
         invariant(fieldDef.relation, 'field must be a relation');
 
@@ -247,17 +190,13 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             fieldDef.relation.references,
             (cb) => {
                 if (fieldDef.relation?.onDelete) {
-                    cb = cb.onDelete(
-                        this.mapCascadeAction(fieldDef.relation.onDelete)
-                    );
+                    cb = cb.onDelete(this.mapCascadeAction(fieldDef.relation.onDelete));
                 }
                 if (fieldDef.relation?.onUpdate) {
-                    cb = cb.onUpdate(
-                        this.mapCascadeAction(fieldDef.relation.onUpdate)
-                    );
+                    cb = cb.onUpdate(this.mapCascadeAction(fieldDef.relation.onUpdate));
                 }
                 return cb;
-            }
+            },
         );
         return table;
     }

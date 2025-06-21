@@ -7,7 +7,7 @@ import { SqliteCrudDialect } from './sqlite';
 
 export function getCrudDialect<Schema extends SchemaDef>(
     schema: Schema,
-    options: ClientOptions<Schema>
+    options: ClientOptions<Schema>,
 ): BaseCrudDialect<Schema> {
     return match(schema.provider.type)
         .with('sqlite', () => new SqliteCrudDialect(schema, options))

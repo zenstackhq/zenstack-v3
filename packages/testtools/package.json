@@ -32,7 +32,8 @@
         "glob": "^11.0.2",
         "tmp": "^0.2.3",
         "ts-pattern": "catalog:",
-        "prisma": "^6.9.0"
+        "prisma": "catalog:",
+        "typescript": "catalog:"
     },
     "peerDependencies": {
         "better-sqlite3": "^11.8.1",

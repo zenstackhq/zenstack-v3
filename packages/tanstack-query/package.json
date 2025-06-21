@@ -4,9 +4,9 @@
     "description": "",
     "main": "index.js",
     "type": "module",
+    "private": true,
     "scripts": {
-        "build": "tsup-node",
-        "watch": "tsup-node --watch"
+        "build": "tsup-node"
     },
     "keywords": [],
     "author": "",
@@ -25,6 +25,9 @@
     },
     "dependencies": {
         "@zenstackhq/runtime": "workspace:*"
+    },
+    "devDependencies": {
+        "@zenstackhq/typescript-config": "workspace:*"
     },
     "peerDependencies": {
         "@tanstack/react-query": "^5.0.0"

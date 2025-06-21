@@ -325,7 +325,7 @@ importers:
         specifier: ^8.13.1
         version: 8.13.1
       prisma:
-        specifier: ^6.9.0
+        specifier: 'catalog:'
         version: 6.9.0(typescript@5.8.3)
       tmp:
         specifier: ^0.2.3
@@ -333,6 +333,9 @@ importers:
       ts-pattern:
         specifier: 'catalog:'
         version: 5.7.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.8.3
     devDependencies:
       '@types/tmp':
         specifier: ^0.2.6

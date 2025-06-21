@@ -212,7 +212,7 @@ importers:
         version: 11.0.5
       zod:
         specifier: ^3.0.0
-        version: 3.24.1
+        version: 3.25.67
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.0.0
@@ -309,6 +309,18 @@ importers:
       '@types/tmp':
         specifier: ^0.2.6
         version: 0.2.6
+
+  packages/zod:
+    dependencies:
+      '@zenstackhq/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      ts-pattern:
+        specifier: ^5.6.0
+        version: 5.7.1
+      zod:
+        specifier: ^3.0.0
+        version: 3.25.67
 
   samples/blog:
     dependencies:
@@ -2995,8 +3007,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@3.24.1:
-    resolution: {integrity: sha512-muH7gBL9sI1nciMZV67X5fTKKBLtwpZ5VBp1vsOQzj1MhrBZ4wlVCm3gedKZWLp0Oyel8sIGfeiz54Su+OVT+A==}
+  zod@3.25.67:
+    resolution: {integrity: sha512-idA2YXwpCdqUSKRCACDE6ItZD9TZzy3OZMtpfLoh6oPR47lipysRrJfjzMqFxQ3uJuUPyUeWe1r9vLH33xO/Qw==}
 
 snapshots:
 
@@ -5657,4 +5669,4 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod@3.24.1: {}
+  zod@3.25.67: {}

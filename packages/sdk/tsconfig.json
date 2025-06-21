@@ -1,5 +1,5 @@
 {
-    "extends": "../../tsconfig.json",
+    "extends": "@zenstackhq/typescript-config/base.json",
     "compilerOptions": {
         "outDir": "dist",
         "noUnusedLocals": false

@@ -5,9 +5,7 @@
     "type": "module",
     "scripts": {
         "build": "tsup-node",
-        "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
-        "test": "vitest",
         "pack": "pnpm pack"
     },
     "keywords": [],
@@ -29,13 +27,11 @@
         }
     },
     "dependencies": {
-        "@types/node": "^20.0.0",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "glob": "^11.0.2",
         "tmp": "^0.2.3",
-        "ts-pattern": "^5.7.1",
-        "typescript": "^5.8.3",
+        "ts-pattern": "catalog:",
         "prisma": "^6.9.0"
     },
     "peerDependencies": {
@@ -43,6 +39,7 @@
         "pg": "^8.13.1"
     },
     "devDependencies": {
-        "@types/tmp": "^0.2.6"
+        "@types/tmp": "^0.2.6",
+        "@zenstackhq/typescript-config": "workspace:*"
     }
 }

@@ -58,16 +58,4 @@ export type NullExpression = {
 };
 
 export type UnaryOperator = '!';
-export type BinaryOperator =
-    | '&&'
-    | '||'
-    | '=='
-    | '!='
-    | '<'
-    | '<='
-    | '>'
-    | '>='
-    | '?'
-    | '!'
-    | '^'
-    | 'in';
+export type BinaryOperator = '&&' | '||' | '==' | '!=' | '<' | '<=' | '>' | '>=' | '?' | '!' | '^' | 'in';

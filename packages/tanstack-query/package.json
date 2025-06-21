@@ -6,7 +6,8 @@
     "type": "module",
     "private": true,
     "scripts": {
-        "build": "tsup-node"
+        "build": "tsup-node",
+        "lint": "eslint src --ext ts"
     },
     "keywords": [],
     "author": "",
@@ -27,7 +28,8 @@
         "@zenstackhq/runtime": "workspace:*"
     },
     "devDependencies": {
-        "@zenstackhq/typescript-config": "workspace:*"
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/eslint-config": "workspace:*"
     },
     "peerDependencies": {
         "@tanstack/react-query": "^5.0.0"

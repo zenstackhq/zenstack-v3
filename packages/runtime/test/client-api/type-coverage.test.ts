@@ -20,7 +20,7 @@ describe('zmodel type coverage tests', () => {
             
                 @@allow('all', true)
             }
-            `
+            `,
         );
 
         const date = new Date();

@@ -18,23 +18,15 @@ import type { SchemaDef } from '../../schema';
 /**
  * Creates a `true` value node.
  */
-export function trueNode<Schema extends SchemaDef>(
-    dialect: BaseCrudDialect<Schema>
-) {
-    return ValueNode.createImmediate(
-        dialect.transformPrimitive(true, 'Boolean')
-    );
+export function trueNode<Schema extends SchemaDef>(dialect: BaseCrudDialect<Schema>) {
+    return ValueNode.createImmediate(dialect.transformPrimitive(true, 'Boolean'));
 }
 
 /**
  * Creates a `false` value node.
  */
-export function falseNode<Schema extends SchemaDef>(
-    dialect: BaseCrudDialect<Schema>
-) {
-    return ValueNode.createImmediate(
-        dialect.transformPrimitive(false, 'Boolean')
-    );
+export function falseNode<Schema extends SchemaDef>(dialect: BaseCrudDialect<Schema>) {
+    return ValueNode.createImmediate(dialect.transformPrimitive(false, 'Boolean'));
 }
 
 /**
@@ -56,7 +48,7 @@ export function isFalseNode(node: OperationNode): boolean {
  */
 export function conjunction<Schema extends SchemaDef>(
     dialect: BaseCrudDialect<Schema>,
-    nodes: OperationNode[]
+    nodes: OperationNode[],
 ): OperationNode {
     if (nodes.some(isFalseNode)) {
         return falseNode(dialect);
@@ -68,13 +60,13 @@ export function conjunction<Schema extends SchemaDef>(
     return items.reduce((acc, node) =>
         OrNode.is(node)
             ? AndNode.create(acc, ParensNode.create(node)) // wraps parentheses
-            : AndNode.create(acc, node)
+            : AndNode.create(acc, node),
     );
 }
 
 export function disjunction<Schema extends SchemaDef>(
     dialect: BaseCrudDialect<Schema>,
-    nodes: OperationNode[]
+    nodes: OperationNode[],
 ): OperationNode {
     if (nodes.some(isTrueNode)) {
         return trueNode(dialect);
@@ -86,7 +78,7 @@ export function disjunction<Schema extends SchemaDef>(
     return items.reduce((acc, node) =>
         AndNode.is(node)
             ? OrNode.create(acc, ParensNode.create(node)) // wraps parentheses
-            : OrNode.create(acc, node)
+            : OrNode.create(acc, node),
     );
 }
 
@@ -98,36 +90,26 @@ export function logicalNot(node: OperationNode): OperationNode {
         OperatorNode.create('not'),
         AndNode.is(node) || OrNode.is(node)
             ? ParensNode.create(node) // wraps parentheses
-            : node
+            : node,
     );
 }
 
 /**
  * Builds an expression node that checks if a node is true.
  */
-export function buildIsTrue<Schema extends SchemaDef>(
-    node: OperationNode,
-    dialect: BaseCrudDialect<Schema>
-) {
+export function buildIsTrue<Schema extends SchemaDef>(node: OperationNode, dialect: BaseCrudDialect<Schema>) {
     if (isTrueNode(node)) {
         return trueNode(dialect);
     } else if (isFalseNode(node)) {
         return falseNode(dialect);
     }
-    return BinaryOperationNode.create(
-        node,
-        OperatorNode.create('='),
-        trueNode(dialect)
-    );
+    return BinaryOperationNode.create(node, OperatorNode.create('='), trueNode(dialect));
 }
 
 /**
  * Builds an expression node that checks if a node is false.
  */
-export function buildIsFalse<Schema extends SchemaDef>(
-    node: OperationNode,
-    dialect: BaseCrudDialect<Schema>
-) {
+export function buildIsFalse<Schema extends SchemaDef>(node: OperationNode, dialect: BaseCrudDialect<Schema>) {
     if (isFalseNode(node)) {
         return trueNode(dialect);
     } else if (isTrueNode(node)) {
@@ -137,7 +119,7 @@ export function buildIsFalse<Schema extends SchemaDef>(
         // coalesce so null is treated as false
         FunctionNode.create('coalesce', [node, falseNode(dialect)]),
         OperatorNode.create('='),
-        falseNode(dialect)
+        falseNode(dialect),
     );
 }
 

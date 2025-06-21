@@ -45,40 +45,37 @@ export class PrismaModel {
     }
 
     toString(): string {
-        return [
-            ...this.datasources,
-            ...this.generators,
-            ...this.enums,
-            ...this.models,
-        ]
+        return [...this.datasources, ...this.generators, ...this.enums, ...this.models]
             .map((d) => d.toString())
             .join('\n\n');
     }
 }
 
 export class DataSource {
-    constructor(public name: string, public fields: SimpleField[] = []) {}
+    constructor(
+        public name: string,
+        public fields: SimpleField[] = [],
+    ) {}
 
     toString(): string {
         return (
             `datasource ${this.name} {\n` +
-            this.fields
-                .map((f) => indentString(`${f.name} = ${f.text}`))
-                .join('\n') +
+            this.fields.map((f) => indentString(`${f.name} = ${f.text}`)).join('\n') +
             `\n}`
         );
     }
 }
 
 export class Generator {
-    constructor(public name: string, public fields: SimpleField[]) {}
+    constructor(
+        public name: string,
+        public fields: SimpleField[],
+    ) {}
 
     toString(): string {
         return (
             `generator ${this.name} {\n` +
-            this.fields
-                .map((f) => indentString(`${f.name} = ${f.text}`))
-                .join('\n') +
+            this.fields.map((f) => indentString(`${f.name} = ${f.text}`)).join('\n') +
             `\n}`
         );
     }
@@ -100,7 +97,7 @@ export class DeclarationBase {
 export class ContainerDeclaration extends DeclarationBase {
     constructor(
         documentations: string[] = [],
-        public attributes: (ContainerAttribute | PassThroughAttribute)[] = []
+        public attributes: (ContainerAttribute | PassThroughAttribute)[] = [],
     ) {
         super(documentations);
     }
@@ -109,7 +106,7 @@ export class ContainerDeclaration extends DeclarationBase {
 export class FieldDeclaration extends DeclarationBase {
     constructor(
         documentations: string[] = [],
-        public attributes: (FieldAttribute | PassThroughAttribute)[] = []
+        public attributes: (FieldAttribute | PassThroughAttribute)[] = [],
     ) {
         super(documentations);
     }
@@ -120,7 +117,7 @@ export class Model extends ContainerDeclaration {
     constructor(
         public name: string,
         public isView: boolean,
-        documentations: string[] = []
+        documentations: string[] = [],
     ) {
         super(documentations);
     }
@@ -130,7 +127,7 @@ export class Model extends ContainerDeclaration {
         type: ModelFieldType | string,
         attributes: (FieldAttribute | PassThroughAttribute)[] = [],
         documentations: string[] = [],
-        addToFront = false
+        addToFront = false,
     ): ModelField {
         const field = new ModelField(name, type, attributes, documentations);
         if (addToFront) {
@@ -148,7 +145,7 @@ export class Model extends ContainerDeclaration {
     }
 
     override toString(): string {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const result: any[] = [...this.fields];
 
         if (this.attributes.length > 0) {
@@ -183,13 +180,11 @@ export class ModelFieldType {
     constructor(
         public type: ScalarTypes | string,
         public array?: boolean,
-        public optional?: boolean
+        public optional?: boolean,
     ) {}
 
     toString(): string {
-        return `${this.type}${this.array ? '[]' : ''}${
-            this.optional ? '?' : ''
-        }`;
+        return `${this.type}${this.array ? '[]' : ''}${this.optional ? '?' : ''}`;
     }
 }
 
@@ -198,7 +193,7 @@ export class ModelField extends FieldDeclaration {
         public name: string,
         public type: ModelFieldType | string,
         attributes: (FieldAttribute | PassThroughAttribute)[] = [],
-        documentations: string[] = []
+        documentations: string[] = [],
     ) {
         super(documentations, attributes);
     }
@@ -213,34 +208,30 @@ export class ModelField extends FieldDeclaration {
         return (
             super.toString() +
             `${this.name} ${this.type}` +
-            (this.attributes.length > 0
-                ? ' ' + this.attributes.map((a) => a.toString()).join(' ')
-                : '')
+            (this.attributes.length > 0 ? ' ' + this.attributes.map((a) => a.toString()).join(' ') : '')
         );
     }
 }
 
 export class FieldAttribute {
-    constructor(public name: string, public args: AttributeArg[] = []) {}
+    constructor(
+        public name: string,
+        public args: AttributeArg[] = [],
+    ) {}
 
     toString(): string {
-        return (
-            `${this.name}(` +
-            this.args.map((a) => a.toString()).join(', ') +
-            `)`
-        );
+        return `${this.name}(` + this.args.map((a) => a.toString()).join(', ') + `)`;
     }
 }
 
 export class ContainerAttribute {
-    constructor(public name: string, public args: AttributeArg[] = []) {}
+    constructor(
+        public name: string,
+        public args: AttributeArg[] = [],
+    ) {}
 
     toString(): string {
-        return (
-            `${this.name}(` +
-            this.args.map((a) => a.toString()).join(', ') +
-            `)`
-        );
+        return `${this.name}(` + this.args.map((a) => a.toString()).join(', ') + `)`;
     }
 }
 
@@ -258,60 +249,39 @@ export class PassThroughAttribute {
 export class AttributeArg {
     constructor(
         public name: string | undefined,
-        public value: AttributeArgValue
+        public value: AttributeArgValue,
     ) {}
 
     toString(): string {
-        return this.name
-            ? `${this.name}: ${this.value}`
-            : this.value.toString();
+        return this.name ? `${this.name}: ${this.value}` : this.value.toString();
     }
 }
 
 export class AttributeArgValue {
     constructor(
-        public type:
-            | 'String'
-            | 'FieldReference'
-            | 'Number'
-            | 'Boolean'
-            | 'Array'
-            | 'FunctionCall',
-        public value:
-            | string
-            | number
-            | boolean
-            | FieldReference
-            | FunctionCall
-            | AttributeArgValue[]
+        public type: 'String' | 'FieldReference' | 'Number' | 'Boolean' | 'Array' | 'FunctionCall',
+        public value: string | number | boolean | FieldReference | FunctionCall | AttributeArgValue[],
     ) {
         switch (type) {
             case 'String':
-                if (typeof value !== 'string')
-                    throw new Error('Value must be string');
+                if (typeof value !== 'string') throw new Error('Value must be string');
                 break;
             case 'Number':
                 if (typeof value !== 'number' && typeof value !== 'string')
                     throw new Error('Value must be number or string');
                 break;
             case 'Boolean':
-                if (typeof value !== 'boolean')
-                    throw new Error('Value must be boolean');
+                if (typeof value !== 'boolean') throw new Error('Value must be boolean');
                 break;
             case 'Array':
-                if (!Array.isArray(value))
-                    throw new Error('Value must be array');
+                if (!Array.isArray(value)) throw new Error('Value must be array');
                 break;
             case 'FieldReference':
-                if (
-                    typeof value !== 'string' &&
-                    !(value instanceof FieldReference)
-                )
+                if (typeof value !== 'string' && !(value instanceof FieldReference))
                     throw new Error('Value must be string or FieldReference');
                 break;
             case 'FunctionCall':
-                if (!(value instanceof FunctionCall))
-                    throw new Error('Value must be FunctionCall');
+                if (!(value instanceof FunctionCall)) throw new Error('Value must be FunctionCall');
                 break;
         }
     }
@@ -330,10 +300,7 @@ export class AttributeArgValue {
                     const fr = this.value as FieldReference;
                     let r = fr.field;
                     if (fr.args.length > 0) {
-                        r +=
-                            '(' +
-                            fr.args.map((a) => a.toString()).join(',') +
-                            ')';
+                        r += '(' + fr.args.map((a) => a.toString()).join(',') + ')';
                     }
                     return r;
                 }
@@ -343,13 +310,7 @@ export class AttributeArgValue {
             case 'Boolean':
                 return this.value ? 'true' : 'false';
             case 'Array':
-                return (
-                    '[' +
-                    (this.value as AttributeArgValue[])
-                        .map((v) => v.toString())
-                        .join(', ') +
-                    ']'
-                );
+                return '[' + (this.value as AttributeArgValue[]).map((v) => v.toString()).join(', ') + ']';
             default:
                 throw new Error(`Unknown attribute value type ${this.type}`);
         }
@@ -357,11 +318,17 @@ export class AttributeArgValue {
 }
 
 export class FieldReference {
-    constructor(public field: string, public args: FieldReferenceArg[] = []) {}
+    constructor(
+        public field: string,
+        public args: FieldReferenceArg[] = [],
+    ) {}
 }
 
 export class FieldReferenceArg {
-    constructor(public name: string, public value: string) {}
+    constructor(
+        public name: string,
+        public value: string,
+    ) {}
 
     toString(): string {
         return `${this.name}: ${this.value}`;
@@ -369,15 +336,13 @@ export class FieldReferenceArg {
 }
 
 export class FunctionCall {
-    constructor(public func: string, public args: FunctionCallArg[] = []) {}
+    constructor(
+        public func: string,
+        public args: FunctionCallArg[] = [],
+    ) {}
 
     toString(): string {
-        return (
-            `${this.func}` +
-            '(' +
-            this.args.map((a) => a.toString()).join(', ') +
-            ')'
-        );
+        return `${this.func}` + '(' + this.args.map((a) => a.toString()).join(', ') + ')';
     }
 }
 
@@ -392,13 +357,16 @@ export class FunctionCallArg {
 export class Enum extends ContainerDeclaration {
     public fields: EnumField[] = [];
 
-    constructor(public name: string, documentations: string[] = []) {
+    constructor(
+        public name: string,
+        documentations: string[] = [],
+    ) {
         super(documentations);
     }
     addField(
         name: string,
         attributes: (FieldAttribute | PassThroughAttribute)[] = [],
-        documentations: string[] = []
+        documentations: string[] = [],
     ): EnumField {
         const field = new EnumField(name, attributes, documentations);
         this.fields.push(field);
@@ -420,11 +388,7 @@ export class Enum extends ContainerDeclaration {
         return (
             super.toString() +
             `enum ${this.name} {\n` +
-            indentString(
-                [...this.fields, ...this.attributes]
-                    .map((d) => d.toString())
-                    .join('\n')
-            ) +
+            indentString([...this.fields, ...this.attributes].map((d) => d.toString()).join('\n')) +
             '\n}'
         );
     }
@@ -434,7 +398,7 @@ export class EnumField extends DeclarationBase {
     constructor(
         public name: string,
         public attributes: (FieldAttribute | PassThroughAttribute)[] = [],
-        documentations: string[] = []
+        documentations: string[] = [],
     ) {
         super(documentations);
     }
@@ -449,9 +413,7 @@ export class EnumField extends DeclarationBase {
         return (
             super.toString() +
             this.name +
-            (this.attributes.length > 0
-                ? ' ' + this.attributes.map((a) => a.toString()).join(' ')
-                : '')
+            (this.attributes.length > 0 ? ' ' + this.attributes.map((a) => a.toString()).join(' ') : '')
         );
     }
 }

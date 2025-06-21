@@ -38,18 +38,13 @@ export function isIdField(field: DataModelField) {
         return true;
     }
 
-    if (
-        model.fields.some((f) => hasAttribute(f, '@id')) ||
-        modelLevelIds.length > 0
-    ) {
+    if (model.fields.some((f) => hasAttribute(f, '@id')) || modelLevelIds.length > 0) {
         // the model already has id field, don't check @unique and @@unique
         return false;
     }
 
     // then, the first field with @unique can be used as id
-    const firstUniqueField = model.fields.find((f) =>
-        hasAttribute(f, '@unique')
-    );
+    const firstUniqueField = model.fields.find((f) => hasAttribute(f, '@unique'));
     if (firstUniqueField) {
         return firstUniqueField.name === field.name;
     }
@@ -64,16 +59,8 @@ export function isIdField(field: DataModelField) {
 }
 
 export function hasAttribute(
-    decl:
-        | DataModel
-        | TypeDef
-        | DataModelField
-        | Enum
-        | EnumField
-        | FunctionDecl
-        | Attribute
-        | AttributeParam,
-    name: string
+    decl: DataModel | TypeDef | DataModelField | Enum | EnumField | FunctionDecl | Attribute | AttributeParam,
+    name: string,
 ) {
     return !!getAttribute(decl, name);
 }
@@ -89,31 +76,25 @@ export function getAttribute(
         | FunctionDecl
         | Attribute
         | AttributeParam,
-    name: string
+    name: string,
 ) {
-    return (
-        decl.attributes as (DataModelAttribute | DataModelFieldAttribute)[]
-    ).find((attr) => attr.decl.$refText === name);
+    return (decl.attributes as (DataModelAttribute | DataModelFieldAttribute)[]).find(
+        (attr) => attr.decl.$refText === name,
+    );
 }
 
 /**
  * Gets `@@id` fields declared at the data model level (including search in base models)
  */
 export function getModelIdFields(model: DataModel) {
-    const modelsToCheck = model.$baseMerged
-        ? [model]
-        : [model, ...getRecursiveBases(model)];
+    const modelsToCheck = model.$baseMerged ? [model] : [model, ...getRecursiveBases(model)];
 
     for (const modelToCheck of modelsToCheck) {
-        const idAttr = modelToCheck.attributes.find(
-            (attr) => attr.decl.$refText === '@@id'
-        );
+        const idAttr = modelToCheck.attributes.find((attr) => attr.decl.$refText === '@@id');
         if (!idAttr) {
             continue;
         }
-        const fieldsArg = idAttr.args.find(
-            (a) => a.$resolvedParam?.name === 'fields'
-        );
+        const fieldsArg = idAttr.args.find((a) => a.$resolvedParam?.name === 'fields');
         if (!fieldsArg || !isArrayExpr(fieldsArg.value)) {
             continue;
         }
@@ -130,20 +111,14 @@ export function getModelIdFields(model: DataModel) {
  * Gets `@@unique` fields declared at the data model level (including search in base models)
  */
 export function getModelUniqueFields(model: DataModel) {
-    const modelsToCheck = model.$baseMerged
-        ? [model]
-        : [model, ...getRecursiveBases(model)];
+    const modelsToCheck = model.$baseMerged ? [model] : [model, ...getRecursiveBases(model)];
 
     for (const modelToCheck of modelsToCheck) {
-        const uniqueAttr = modelToCheck.attributes.find(
-            (attr) => attr.decl.$refText === '@@unique'
-        );
+        const uniqueAttr = modelToCheck.attributes.find((attr) => attr.decl.$refText === '@@unique');
         if (!uniqueAttr) {
             continue;
         }
-        const fieldsArg = uniqueAttr.args.find(
-            (a) => a.$resolvedParam?.name === 'fields'
-        );
+        const fieldsArg = uniqueAttr.args.find((a) => a.$resolvedParam?.name === 'fields');
         if (!fieldsArg || !isArrayExpr(fieldsArg.value)) {
             continue;
         }
@@ -159,7 +134,7 @@ export function getModelUniqueFields(model: DataModel) {
 export function getRecursiveBases(
     dataModel: DataModel,
     includeDelegate = true,
-    seen = new Set<DataModel>()
+    seen = new Set<DataModel>(),
 ): DataModel[] {
     const result: DataModel[] = [];
     if (seen.has(dataModel)) {
@@ -188,12 +163,7 @@ export function isUniqueField(field: DataModelField) {
         return true;
     }
     const modelIds = getAttribute(field.$container, '@@unique');
-    if (
-        modelIds &&
-        modelIds.args.some(
-            (arg) => isLiteralExpr(arg.value) && arg.value.value === field.name
-        )
-    ) {
+    if (modelIds && modelIds.args.some((arg) => isLiteralExpr(arg.value) && arg.value.value === field.name)) {
         return true;
     }
     return false;
@@ -201,11 +171,7 @@ export function isUniqueField(field: DataModelField) {
 
 export function isFromStdlib(node: AstNode) {
     const model = getContainingModel(node);
-    return (
-        !!model &&
-        !!model.$document &&
-        model.$document.uri.path.endsWith('stdlib.zmodel')
-    );
+    return !!model && !!model.$document && model.$document.uri.path.endsWith('stdlib.zmodel');
 }
 
 export function getContainingModel(node: AstNode | undefined): Model | null {
@@ -224,14 +190,10 @@ export function resolved<T extends AstNode>(ref: Reference<T>): T {
 
 export function getAuthDecl(model: Model) {
     let found = model.declarations.find(
-        (d) =>
-            isDataModel(d) &&
-            d.attributes.some((attr) => attr.decl.$refText === '@@auth')
+        (d) => isDataModel(d) && d.attributes.some((attr) => attr.decl.$refText === '@@auth'),
     );
     if (!found) {
-        found = model.declarations.find(
-            (d) => isDataModel(d) && d.name === 'User'
-        );
+        found = model.declarations.find((d) => isDataModel(d) && d.name === 'User');
     }
     return found;
 }

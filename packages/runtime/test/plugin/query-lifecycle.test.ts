@@ -37,7 +37,7 @@ describe('Query interception tests', () => {
         await expect(
             client.user.findFirst({
                 where: { id: user.id },
-            })
+            }),
         ).resolves.toMatchObject(user);
         expect(hooksCalled).toBe(true);
     });
@@ -59,7 +59,7 @@ describe('Query interception tests', () => {
         await expect(
             client.user.findFirst({
                 where: { id: user.id },
-            })
+            }),
         ).toResolveNull();
         expect(hooksCalled).toBe(true);
     });
@@ -83,7 +83,7 @@ describe('Query interception tests', () => {
         await expect(
             client.user.findFirst({
                 where: { id: user.id },
-            })
+            }),
         ).resolves.toMatchObject({
             ...user,
             happy: true,
@@ -137,7 +137,7 @@ describe('Query interception tests', () => {
         await expect(
             client.user.findFirst({
                 where: { id: user1.id },
-            })
+            }),
         ).resolves.toMatchObject({ ...user2, happy: true, source: 'plugin2' });
         expect(hooks1Called).toBe(true);
         expect(hooks2Called).toBe(true);
@@ -166,7 +166,7 @@ describe('Query interception tests', () => {
         await expect(
             _client.user.findFirst({
                 where: { id: '1' },
-            })
+            }),
         ).toResolveTruthy();
     });
 
@@ -195,7 +195,7 @@ describe('Query interception tests', () => {
         await expect(
             _client.user.findFirst({
                 where: { id: '1' },
-            })
+            }),
         ).toResolveNull();
     });
 });

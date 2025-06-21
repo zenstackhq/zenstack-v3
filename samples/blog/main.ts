@@ -13,9 +13,7 @@ async function main() {
                     eb
                         .selectFrom('Post')
                         .whereRef('Post.authorId', '=', 'User.id')
-                        .select(({ fn }) =>
-                            fn.countAll<number>().as('postCount')
-                        ),
+                        .select(({ fn }) => fn.countAll<number>().as('postCount')),
             },
         },
     }).$use({
@@ -23,9 +21,7 @@ async function main() {
         async onQuery({ model, operation, proceed, queryArgs }) {
             const start = Date.now();
             const result = await proceed(queryArgs);
-            console.log(
-                `[cost] ${model} ${operation} took ${Date.now() - start}ms`
-            );
+            console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
             return result;
         },
     });

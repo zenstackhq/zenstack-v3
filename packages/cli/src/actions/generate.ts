@@ -48,18 +48,11 @@ const client = new ZenStackClient(schema, {
     }
 }
 
-async function runPlugins(
-    model: Model,
-    outputPath: string,
-    tsSchemaFile: string
-) {
+async function runPlugins(model: Model, outputPath: string, tsSchemaFile: string) {
     const plugins = model.declarations.filter(isPlugin);
     for (const plugin of plugins) {
         const providerField = plugin.fields.find((f) => f.name === 'provider');
-        invariant(
-            providerField,
-            `Plugin ${plugin.name} does not have a provider field`
-        );
+        invariant(providerField, `Plugin ${plugin.name} does not have a provider field`);
         const provider = (providerField.value as LiteralExpr).value as string;
         let useProvider = provider;
         if (useProvider.startsWith('@core/')) {

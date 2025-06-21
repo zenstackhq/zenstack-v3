@@ -27,11 +27,7 @@ describe('Client API tests', () => {
             })
             .execute();
 
-        const u1 = await kysely
-            .selectFrom('User')
-            .select('email')
-            .where('id', '=', uid)
-            .executeTakeFirst();
+        const u1 = await kysely.selectFrom('User').select('email').where('id', '=', uid).executeTakeFirst();
         expect(u1).toBeTruthy();
 
         await kysely
@@ -52,10 +48,7 @@ describe('Client API tests', () => {
             .executeTakeFirstOrThrow();
         expect(u2).toMatchObject({ title: 'Post1', email: 'a@b.com' });
 
-        const u3 = await kysely
-            .selectFrom('User')
-            .selectAll()
-            .executeTakeFirstOrThrow();
+        const u3 = await kysely.selectFrom('User').selectAll().executeTakeFirstOrThrow();
         expect(u3).toMatchObject({ email: 'a@b.com', role: 'USER' });
     });
 });

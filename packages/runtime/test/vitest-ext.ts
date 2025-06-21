@@ -3,9 +3,7 @@ import { NotFoundError } from '../src/client/errors';
 import { RejectedByPolicyError } from '../src/plugins/policy/errors';
 
 function isPromise(value: any) {
-    return (
-        typeof value.then === 'function' && typeof value.catch === 'function'
-    );
+    return typeof value.then === 'function' && typeof value.catch === 'function';
 }
 
 function expectError(err: any, errorType: any) {
@@ -30,8 +28,7 @@ expect.extend({
         const r = await received;
         return {
             pass: !!r,
-            message: () =>
-                `Expected promise to resolve to a truthy value, but got ${r}`,
+            message: () => `Expected promise to resolve to a truthy value, but got ${r}`,
         };
     },
 
@@ -42,8 +39,7 @@ expect.extend({
         const r = await received;
         return {
             pass: !r,
-            message: () =>
-                `Expected promise to resolve to a falsy value, but got ${r}`,
+            message: () => `Expected promise to resolve to a falsy value, but got ${r}`,
         };
     },
 
@@ -54,8 +50,7 @@ expect.extend({
         const r = await received;
         return {
             pass: r === null,
-            message: () =>
-                `Expected promise to resolve to a null value, but got ${r}`,
+            message: () => `Expected promise to resolve to a null value, but got ${r}`,
         };
     },
 
@@ -63,8 +58,7 @@ expect.extend({
         const r = await received;
         return {
             pass: Array.isArray(r) && r.length === length,
-            message: () =>
-                `Expected promise to resolve with an array with length ${length}, but got ${r}`,
+            message: () => `Expected promise to resolve with an array with length ${length}, but got ${r}`,
         };
     },
 
@@ -83,10 +77,7 @@ expect.extend({
         };
     },
 
-    async toBeRejectedByPolicy(
-        received: Promise<unknown>,
-        expectedMessages?: string[]
-    ) {
+    async toBeRejectedByPolicy(received: Promise<unknown>, expectedMessages?: string[]) {
         if (!isPromise(received)) {
             return { message: () => 'a promise is expected', pass: false };
         }
@@ -98,8 +89,7 @@ expect.extend({
                 for (const m of expectedMessages) {
                     if (!message.includes(m)) {
                         return {
-                            message: () =>
-                                `expected message not found in error: ${m}, got message: ${message}`,
+                            message: () => `expected message not found in error: ${m}, got message: ${message}`,
                             pass: false,
                         };
                     }

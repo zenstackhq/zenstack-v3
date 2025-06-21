@@ -9,7 +9,7 @@ describe('empty policy tests', () => {
             id String @id @default(uuid())
             value Int
         }
-        `
+        `,
         );
 
         const rawDb = db.$unuseAll();
@@ -18,47 +18,31 @@ describe('empty policy tests', () => {
         expect(await db.model.findMany()).toHaveLength(0);
         expect(await db.model.findUnique({ where: { id: '1' } })).toBeNull();
         expect(await db.model.findFirst({ where: { id: '1' } })).toBeNull();
-        await expect(
-            db.model.findUniqueOrThrow({ where: { id: '1' } })
-        ).toBeRejectedNotFound();
-        await expect(
-            db.model.findFirstOrThrow({ where: { id: '1' } })
-        ).toBeRejectedNotFound();
+        await expect(db.model.findUniqueOrThrow({ where: { id: '1' } })).toBeRejectedNotFound();
+        await expect(db.model.findFirstOrThrow({ where: { id: '1' } })).toBeRejectedNotFound();
 
-        await expect(
-            db.model.create({ data: { value: 1 } })
-        ).toBeRejectedByPolicy();
-        await expect(
-            db.model.createMany({ data: [{ value: 1 }] })
-        ).toBeRejectedByPolicy();
+        await expect(db.model.create({ data: { value: 1 } })).toBeRejectedByPolicy();
+        await expect(db.model.createMany({ data: [{ value: 1 }] })).toBeRejectedByPolicy();
 
-        await expect(
-            db.model.update({ where: { id: '1' }, data: { value: 1 } })
-        ).toBeRejectedNotFound();
-        await expect(
-            db.model.updateMany({ data: { value: 1 } })
-        ).resolves.toMatchObject({ count: 0 });
+        await expect(db.model.update({ where: { id: '1' }, data: { value: 1 } })).toBeRejectedNotFound();
+        await expect(db.model.updateMany({ data: { value: 1 } })).resolves.toMatchObject({ count: 0 });
         await expect(
             db.model.upsert({
                 where: { id: '1' },
                 create: { value: 1 },
                 update: { value: 1 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
-        await expect(
-            db.model.delete({ where: { id: '1' } })
-        ).toBeRejectedNotFound();
+        await expect(db.model.delete({ where: { id: '1' } })).toBeRejectedNotFound();
         await expect(db.model.deleteMany()).resolves.toMatchObject({
             count: 0,
         });
 
-        await expect(
-            db.model.aggregate({ _avg: { value: true } })
-        ).resolves.toEqual(expect.objectContaining({ _avg: { value: null } }));
-        await expect(
-            db.model.groupBy({ by: ['id'], _avg: { value: true } })
-        ).resolves.toHaveLength(0);
+        await expect(db.model.aggregate({ _avg: { value: true } })).resolves.toEqual(
+            expect.objectContaining({ _avg: { value: null } }),
+        );
+        await expect(db.model.groupBy({ by: ['id'], _avg: { value: true } })).resolves.toHaveLength(0);
         await expect(db.model.count()).resolves.toEqual(0);
     });
 
@@ -77,7 +61,7 @@ describe('empty policy tests', () => {
             m1 M1 @relation(fields: [m1Id], references:[id])
             m1Id String
         }
-        `
+        `,
         );
 
         await expect(
@@ -87,7 +71,7 @@ describe('empty policy tests', () => {
                         create: [{}],
                     },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
     });
 
@@ -106,7 +90,7 @@ describe('empty policy tests', () => {
             m1 M1 @relation(fields: [m1Id], references:[id])
             m1Id String @unique
         }
-        `
+        `,
         );
 
         await expect(
@@ -116,7 +100,7 @@ describe('empty policy tests', () => {
                         create: {},
                     },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
     });
 });

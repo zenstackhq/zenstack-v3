@@ -7,9 +7,7 @@ import path from 'node:path';
 export async function run(projectPath: string) {
     const packages = await getZenStackPackages(projectPath);
     if (!packages) {
-        console.error(
-            'Unable to locate package.json. Are you in a valid project directory?'
-        );
+        console.error('Unable to locate package.json. Are you in a valid project directory?');
         return;
     }
 
@@ -23,17 +21,11 @@ export async function run(projectPath: string) {
     }
 
     if (versions.size > 1) {
-        console.warn(
-            colors.yellow(
-                'WARNING: Multiple versions of Zenstack packages detected. This may cause issues.'
-            )
-        );
+        console.warn(colors.yellow('WARNING: Multiple versions of Zenstack packages detected. This may cause issues.'));
     }
 }
 
-async function getZenStackPackages(
-    projectPath: string
-): Promise<Array<{ pkg: string; version: string | undefined }>> {
+async function getZenStackPackages(projectPath: string): Promise<Array<{ pkg: string; version: string | undefined }>> {
     let pkgJson: {
         dependencies: Record<string, unknown>;
         devDependencies: Record<string, unknown>;
@@ -45,17 +37,16 @@ async function getZenStackPackages(
                 with: { type: 'json' },
             })
         ).default;
-    } catch (err) {
+    } catch {
         return [];
     }
 
     const packages = Array.from(
         new Set(
-            [
-                ...Object.keys(pkgJson.dependencies ?? {}),
-                ...Object.keys(pkgJson.devDependencies ?? {}),
-            ].filter((p) => p.startsWith('@zenstackhq/') || p === 'zenstack')
-        )
+            [...Object.keys(pkgJson.dependencies ?? {}), ...Object.keys(pkgJson.devDependencies ?? {})].filter(
+                (p) => p.startsWith('@zenstackhq/') || p === 'zenstack',
+            ),
+        ),
     ).sort();
 
     const result = await Promise.all(
@@ -70,7 +61,7 @@ async function getZenStackPackages(
             } catch {
                 return { pkg, version: undefined };
             }
-        })
+        }),
     );
 
     return result;

@@ -7,11 +7,7 @@ import {
     type LangiumSharedServices,
     type PartialLangiumServices,
 } from 'langium/lsp';
-import {
-    ZModelGeneratedModule,
-    ZModelGeneratedSharedModule,
-    ZModelLanguageMetaData,
-} from './generated/module';
+import { ZModelGeneratedModule, ZModelGeneratedSharedModule, ZModelLanguageMetaData } from './generated/module';
 import { ZModelValidator, registerValidationChecks } from './validator';
 import { ZModelLinker } from './zmodel-linker';
 import { ZModelScopeComputation, ZModelScopeProvider } from './zmodel-scope';
@@ -38,10 +34,7 @@ export type ZModelServices = LangiumServices & ZModelAddedServices;
  * declared custom services. The Langium defaults can be partially specified to override only
  * selected services, while the custom services must be fully specified.
  */
-export const ZModelLanguageModule: Module<
-    ZModelServices,
-    PartialLangiumServices & ZModelAddedServices
-> = {
+export const ZModelLanguageModule: Module<ZModelServices, PartialLangiumServices & ZModelAddedServices> = {
     references: {
         ScopeComputation: (services) => new ZModelScopeComputation(services),
         ScopeProvider: (services) => new ZModelScopeProvider(services),
@@ -54,10 +47,7 @@ export const ZModelLanguageModule: Module<
 
 export type ZModelSharedServices = LangiumSharedServices;
 
-export const ZModelSharedModule: Module<
-    ZModelSharedServices,
-    DeepPartial<ZModelSharedServices>
-> = {
+export const ZModelSharedModule: Module<ZModelSharedServices, DeepPartial<ZModelSharedServices>> = {
     workspace: {
         WorkspaceManager: (services) => new ZModelWorkspaceManager(services),
     },
@@ -78,22 +68,12 @@ export const ZModelSharedModule: Module<
  * @param context Optional module context with the LSP connection
  * @returns An object wrapping the shared services and the language-specific services
  */
-export function createZModelLanguageServices(
-    context: DefaultSharedModuleContext
-): {
+export function createZModelLanguageServices(context: DefaultSharedModuleContext): {
     shared: LangiumSharedServices;
     ZModelLanguage: ZModelServices;
 } {
-    const shared = inject(
-        createDefaultSharedModule(context),
-        ZModelGeneratedSharedModule,
-        ZModelSharedModule
-    );
-    const ZModelLanguage = inject(
-        createDefaultModule({ shared }),
-        ZModelGeneratedModule,
-        ZModelLanguageModule
-    );
+    const shared = inject(createDefaultSharedModule(context), ZModelGeneratedSharedModule, ZModelSharedModule);
+    const ZModelLanguage = inject(createDefaultModule({ shared }), ZModelGeneratedModule, ZModelLanguageModule);
     shared.ServiceRegistry.register(ZModelLanguage);
     registerValidationChecks(ZModelLanguage);
     if (!context.connection) {

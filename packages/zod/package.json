@@ -6,7 +6,8 @@
     "main": "index.js",
     "private": true,
     "scripts": {
-        "build": "tsup-node"
+        "build": "tsup-node",
+        "lint": "eslint src --ext ts"
     },
     "keywords": [],
     "author": "",
@@ -28,7 +29,8 @@
         "ts-pattern": "catalog:"
     },
     "devDependencies": {
-        "@zenstackhq/typescript-config": "workspace:*"
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/eslint-config": "workspace:*"
     },
     "peerDependencies": {
         "zod": "catalog:"

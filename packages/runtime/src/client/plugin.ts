@@ -1,10 +1,5 @@
 import type { Model } from '@zenstackhq/language/ast';
-import type {
-    OperationNode,
-    QueryResult,
-    RootOperationNode,
-    UnknownRow,
-} from 'kysely';
+import type { OperationNode, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
 import type { ClientContract, ToKysely } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
@@ -78,29 +73,23 @@ export type OnQueryArgs<Schema extends SchemaDef> = QueryContext<Schema> & {
     proceed: ProceedQueryFunction<Schema>;
 };
 
-export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> =
-    MutationHooksArgs<Schema> & {
-        entities?: Record<string, unknown>[];
-    };
+export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
+    entities?: Record<string, unknown>[];
+};
 
-export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> =
-    MutationHooksArgs<Schema> & {
-        beforeMutationEntities?: Record<string, unknown>[];
-        afterMutationEntities?: Record<string, unknown>[];
-    };
+export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
+    beforeMutationEntities?: Record<string, unknown>[];
+    afterMutationEntities?: Record<string, unknown>[];
+};
 
 export type ProceedQueryFunction<Schema extends SchemaDef> = (
     queryArgs: unknown,
-    tx?: ClientContract<Schema>
+    tx?: ClientContract<Schema>,
 ) => Promise<unknown>;
 
-export type OnKyselyQueryTransactionCallback = (
-    proceed: ProceedKyselyQueryFunction
-) => Promise<QueryResult<any>>;
+export type OnKyselyQueryTransactionCallback = (proceed: ProceedKyselyQueryFunction) => Promise<QueryResult<any>>;
 
-export type OnKyselyQueryTransaction = (
-    callback: OnKyselyQueryTransactionCallback
-) => Promise<QueryResult<any>>;
+export type OnKyselyQueryTransaction = (callback: OnKyselyQueryTransactionCallback) => Promise<QueryResult<any>>;
 
 export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
     kysely: ToKysely<Schema>;
@@ -111,9 +100,7 @@ export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
     transaction: OnKyselyQueryTransaction;
 };
 
-export type ProceedKyselyQueryFunction = (
-    query: RootOperationNode
-) => Promise<QueryResult<any>>;
+export type ProceedKyselyQueryFunction = (query: RootOperationNode) => Promise<QueryResult<any>>;
 
 /**
  * ZenStack runtime plugin.
@@ -142,26 +129,20 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     /**
      * Intercepts a Kysely query.
      */
-    onKyselyQuery?: (
-        args: OnKyselyQueryArgs<Schema>
-    ) => Promise<QueryResult<UnknownRow>>;
+    onKyselyQuery?: (args: OnKyselyQueryArgs<Schema>) => Promise<QueryResult<UnknownRow>>;
 
     /**
      * This callback determines whether a mutation should be intercepted, and if so,
      * what data should be loaded before and after the mutation.
      */
-    mutationInterceptionFilter?: (
-        args: MutationHooksArgs<Schema>
-    ) => MaybePromise<MutationInterceptionFilterResult>;
+    mutationInterceptionFilter?: (args: MutationHooksArgs<Schema>) => MaybePromise<MutationInterceptionFilterResult>;
 
     /**
      * Called before an entity is mutated.
      * @param args.entity Only available if `loadBeforeMutationEntity` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
-    beforeEntityMutation?: (
-        args: PluginBeforeEntityMutationArgs<Schema>
-    ) => MaybePromise<void>;
+    beforeEntityMutation?: (args: PluginBeforeEntityMutationArgs<Schema>) => MaybePromise<void>;
 
     /**
      * Called after an entity is mutated.
@@ -170,9 +151,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
      * @param args.afterMutationEntity Only available if `loadAfterMutationEntity` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
-    afterEntityMutation?: (
-        args: PluginAfterEntityMutationArgs<Schema>
-    ) => MaybePromise<void>;
+    afterEntityMutation?: (args: PluginAfterEntityMutationArgs<Schema>) => MaybePromise<void>;
 }
 
 // TODO: move to SDK

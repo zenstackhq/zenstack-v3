@@ -16,17 +16,13 @@ model Post {
     @@allow('read', true)
     @@allow('create', auth() != null)
 }
-`
+`,
         );
 
-        await expect(
-            db.post.create({ data: { title: 'abc' } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { title: 'abc' } })).toBeRejectedByPolicy();
 
         const authDb = db.$setAuth({ id: 'user1' });
-        await expect(
-            authDb.post.create({ data: { title: 'abc' } })
-        ).toResolveTruthy();
+        await expect(authDb.post.create({ data: { title: 'abc' } })).toResolveTruthy();
     });
 
     it('works with string id id test', async () => {
@@ -43,17 +39,13 @@ model Post {
             @@allow('read', true)
             @@allow('create', auth().id != null)
         }
-        `
+        `,
         );
 
-        await expect(
-            db.post.create({ data: { title: 'abc' } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { title: 'abc' } })).toBeRejectedByPolicy();
 
         const authDb = db.$setAuth({ id: 'user1' });
-        await expect(
-            authDb.post.create({ data: { title: 'abc' } })
-        ).toResolveTruthy();
+        await expect(authDb.post.create({ data: { title: 'abc' } })).toResolveTruthy();
     });
 
     it('works with int id', async () => {
@@ -70,17 +62,13 @@ model Post {
             @@allow('read', true)
             @@allow('create', auth() != null)
         }
-        `
+        `,
         );
 
-        await expect(
-            db.post.create({ data: { title: 'abc' } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { title: 'abc' } })).toBeRejectedByPolicy();
 
         const authDb = db.$setAuth({ id: 'user1' });
-        await expect(
-            authDb.post.create({ data: { title: 'abc' } })
-        ).toResolveTruthy();
+        await expect(authDb.post.create({ data: { title: 'abc' } })).toResolveTruthy();
     });
 
     it('works with field comparison', async () => {
@@ -102,26 +90,20 @@ model Post {
             @@allow('create,read', true)
             @@allow('update', auth().id == author.id)
         }
-        `
+        `,
         );
 
-        await expect(
-            db.user.create({ data: { id: 'user1' } })
-        ).toResolveTruthy();
+        await expect(db.user.create({ data: { id: 'user1' } })).toResolveTruthy();
         await expect(
             db.post.create({
                 data: { id: '1', title: 'abc', authorId: 'user1' },
-            })
+            }),
         ).toResolveTruthy();
 
-        await expect(
-            db.post.update({ where: { id: '1' }, data: { title: 'bcd' } })
-        ).toBeRejectedNotFound();
+        await expect(db.post.update({ where: { id: '1' }, data: { title: 'bcd' } })).toBeRejectedNotFound();
 
         const authDb2 = db.$setAuth({ id: 'user1' });
-        await expect(
-            authDb2.post.update({ where: { id: '1' }, data: { title: 'bcd' } })
-        ).toResolveTruthy();
+        await expect(authDb2.post.update({ where: { id: '1' }, data: { title: 'bcd' } })).toResolveTruthy();
     });
 
     it('works with undefined user non-id field', async () => {
@@ -144,30 +126,22 @@ model Post {
             @@allow('create,read', true)
             @@allow('update', auth().role == 'ADMIN')
         }
-        `
+        `,
         );
 
-        await expect(
-            db.user.create({ data: { id: 'user1', role: 'USER' } })
-        ).toResolveTruthy();
+        await expect(db.user.create({ data: { id: 'user1', role: 'USER' } })).toResolveTruthy();
         await expect(
             db.post.create({
                 data: { id: '1', title: 'abc', authorId: 'user1' },
-            })
+            }),
         ).toResolveTruthy();
-        await expect(
-            db.post.update({ where: { id: '1' }, data: { title: 'bcd' } })
-        ).toBeRejectedNotFound();
+        await expect(db.post.update({ where: { id: '1' }, data: { title: 'bcd' } })).toBeRejectedNotFound();
 
         const authDb = db.$setAuth({ id: 'user1', role: 'USER' });
-        await expect(
-            authDb.post.update({ where: { id: '1' }, data: { title: 'bcd' } })
-        ).toBeRejectedNotFound();
+        await expect(authDb.post.update({ where: { id: '1' }, data: { title: 'bcd' } })).toBeRejectedNotFound();
 
         const authDb1 = db.$setAuth({ id: 'user2', role: 'ADMIN' });
-        await expect(
-            authDb1.post.update({ where: { id: '1' }, data: { title: 'bcd' } })
-        ).toResolveTruthy();
+        await expect(authDb1.post.update({ where: { id: '1' }, data: { title: 'bcd' } })).toResolveTruthy();
     });
 
     it('works with non User auth model', async () => {
@@ -187,18 +161,14 @@ model Post {
             @@allow('read', true)
             @@allow('create', auth().role == 'ADMIN')
         }
-        `
+        `,
         );
 
         const userDb = db.$setAuth({ id: 'user1', role: 'USER' });
-        await expect(
-            userDb.post.create({ data: { title: 'abc' } })
-        ).toBeRejectedByPolicy();
+        await expect(userDb.post.create({ data: { title: 'abc' } })).toBeRejectedByPolicy();
 
         const adminDb = db.$setAuth({ id: 'user1', role: 'ADMIN' });
-        await expect(
-            adminDb.post.create({ data: { title: 'abc' } })
-        ).toResolveTruthy();
+        await expect(adminDb.post.create({ data: { title: 'abc' } })).toResolveTruthy();
     });
 
     it('works with collection predicate', async () => {
@@ -231,7 +201,7 @@ model Post {
 
             @@allow('all', true)
         }
-        `
+        `,
         );
 
         const rawDb = db.$unuseAll();
@@ -243,9 +213,7 @@ model Post {
         };
 
         // no post
-        await expect(
-            db.$setAuth({ id: '1' }).post.create(createPayload)
-        ).toBeRejectedByPolicy();
+        await expect(db.$setAuth({ id: '1' }).post.create(createPayload)).toBeRejectedByPolicy();
 
         // post not published
         await expect(
@@ -254,7 +222,7 @@ model Post {
                     id: '1',
                     posts: [{ id: '1', published: false }],
                 })
-                .post.create(createPayload)
+                .post.create(createPayload),
         ).toBeRejectedByPolicy();
 
         // no comments
@@ -264,7 +232,7 @@ model Post {
                     id: '1',
                     posts: [{ id: '1', published: true }],
                 })
-                .post.create(createPayload)
+                .post.create(createPayload),
         ).toBeRejectedByPolicy();
 
         // not all comments published
@@ -283,7 +251,7 @@ model Post {
                         },
                     ],
                 })
-                .post.create(createPayload)
+                .post.create(createPayload),
         ).toBeRejectedByPolicy();
 
         // comments published but parent post is not
@@ -300,7 +268,7 @@ model Post {
                         { id: '2', published: true },
                     ],
                 })
-                .post.create(createPayload)
+                .post.create(createPayload),
         ).toBeRejectedByPolicy();
 
         await expect(
@@ -316,7 +284,7 @@ model Post {
                         { id: '2', published: false },
                     ],
                 })
-                .post.create(createPayload)
+                .post.create(createPayload),
         ).toResolveTruthy();
 
         // no comments ("every" evaluates to true in this case)
@@ -326,7 +294,7 @@ model Post {
                     id: '1',
                     posts: [{ id: '1', published: true, comments: [] }],
                 })
-                .post.create(createPayload)
+                .post.create(createPayload),
         ).toResolveTruthy();
     });
 
@@ -348,21 +316,15 @@ model Post {
 
             @@allow('all', true)
         }
-        `
+        `,
         );
 
         const userDb = db.$setAuth({ id: '1', name: 'user1', score: 10 });
-        await expect(
-            userDb.post.create({ data: { title: 'abc' } })
-        ).toResolveTruthy();
+        await expect(userDb.post.create({ data: { title: 'abc' } })).toResolveTruthy();
         await expect(userDb.post.findMany()).resolves.toHaveLength(1);
-        await expect(
-            userDb.post.count({ where: { authorName: 'user1', score: 10 } })
-        ).resolves.toBe(1);
+        await expect(userDb.post.count({ where: { authorName: 'user1', score: 10 } })).resolves.toBe(1);
 
-        await expect(
-            userDb.post.createMany({ data: [{ title: 'def' }] })
-        ).resolves.toMatchObject({ count: 1 });
+        await expect(userDb.post.createMany({ data: [{ title: 'def' }] })).resolves.toMatchObject({ count: 1 });
         const r = await userDb.post.createManyAndReturn({
             data: [{ title: 'xxx' }, { title: 'yyy' }],
         });
@@ -370,7 +332,7 @@ model Post {
             expect.arrayContaining([
                 expect.objectContaining({ title: 'xxx', score: 10 }),
                 expect.objectContaining({ title: 'yyy', score: 10 }),
-            ])
+            ]),
         );
     });
 
@@ -389,25 +351,17 @@ model Post {
 
             @@allow('all', true)
         }
-        `
+        `,
         );
 
         const userContextName = 'user1';
         const overrideName = 'no-default-auth-name';
         const userDb = db.$setAuth({ id: '1', name: userContextName });
-        await expect(
-            userDb.post.create({ data: { authorName: overrideName } })
-        ).toResolveTruthy();
-        await expect(
-            userDb.post.count({ where: { authorName: overrideName } })
-        ).resolves.toBe(1);
+        await expect(userDb.post.create({ data: { authorName: overrideName } })).toResolveTruthy();
+        await expect(userDb.post.count({ where: { authorName: overrideName } })).resolves.toBe(1);
 
-        await expect(
-            userDb.post.createMany({ data: [{ authorName: overrideName }] })
-        ).toResolveTruthy();
-        await expect(
-            userDb.post.count({ where: { authorName: overrideName } })
-        ).resolves.toBe(2);
+        await expect(userDb.post.createMany({ data: [{ authorName: overrideName }] })).toResolveTruthy();
+        await expect(userDb.post.count({ where: { authorName: overrideName } })).resolves.toBe(2);
 
         const r = await userDb.post.createManyAndReturn({
             data: [{ authorName: overrideName }],
@@ -435,7 +389,7 @@ model Post {
 
             @@allow('all', true)
         }
-        `
+        `,
         );
 
         const rawDb = anonDb.$unuseAll();
@@ -449,9 +403,7 @@ model Post {
         const db = anonDb.$setAuth({ id: 'userId-1' });
 
         // default auth effective
-        await expect(
-            db.post.create({ data: { title: 'post1' } })
-        ).resolves.toMatchObject({ authorId: 'userId-1' });
+        await expect(db.post.create({ data: { title: 'post1' } })).resolves.toMatchObject({ authorId: 'userId-1' });
 
         // default auth ineffective due to explicit connect
         await expect(
@@ -460,7 +412,7 @@ model Post {
                     title: 'post2',
                     author: { connect: { email: 'user1@abc.com' } },
                 },
-            })
+            }),
         ).resolves.toMatchObject({ authorId: 'userId-1' });
 
         // default auth ineffective due to explicit connect
@@ -470,7 +422,7 @@ model Post {
                     title: 'post3',
                     author: { connect: { email: 'user2@abc.com' } },
                 },
-            })
+            }),
         ).resolves.toMatchObject({ authorId: 'userId-2' });
 
         // TODO: upsert
@@ -483,9 +435,7 @@ model Post {
         // ).resolves.toMatchObject({ authorId: 'userId-1' });
 
         // default auth effective for createMany
-        await expect(
-            db.post.createMany({ data: { title: 'post5' } })
-        ).resolves.toMatchObject({ count: 1 });
+        await expect(db.post.createMany({ data: { title: 'post5' } })).resolves.toMatchObject({ count: 1 });
         const r = await db.post.findFirst({ where: { title: 'post5' } });
         expect(r).toMatchObject({ authorId: 'userId-1' });
 
@@ -530,7 +480,7 @@ model Post {
 
             @@allow('all', true)
         }
-        `
+        `,
         );
         const url = 'https://zenstack.dev';
         const db = anonDb.$setAuth({
@@ -539,17 +489,15 @@ model Post {
         });
 
         // top-level create
-        await expect(
-            db.user.create({ data: { id: 'userId-1' } })
-        ).toResolveTruthy();
+        await expect(db.user.create({ data: { id: 'userId-1' } })).toResolveTruthy();
         await expect(
             db.post.create({
                 data: { title: 'abc', author: { connect: { id: 'userId-1' } } },
-            })
+            }),
         ).resolves.toMatchObject({ defaultImageUrl: url });
 
         // nested create
-        let result = await db.user.create({
+        const result = await db.user.create({
             data: {
                 id: 'userId-2',
                 posts: {
@@ -562,7 +510,7 @@ model Post {
             expect.arrayContaining([
                 expect.objectContaining({ title: 'p1', defaultImageUrl: url }),
                 expect.objectContaining({ title: 'p2', defaultImageUrl: url }),
-            ])
+            ]),
         );
     });
 
@@ -584,15 +532,11 @@ model Post {
 
             @@allow('all', true)
         }
-        `
+        `,
         );
 
-        await expect(
-            db.user.create({ data: { id: 'userId-1' } })
-        ).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { title: 'title' } })
-        ).rejects.toThrow('constraint failed');
+        await expect(db.user.create({ data: { id: 'userId-1' } })).toResolveTruthy();
+        await expect(db.post.create({ data: { title: 'title' } })).rejects.toThrow('constraint failed');
         await expect(db.post.findMany({})).toResolveTruthy();
     });
 
@@ -625,7 +569,7 @@ model Post {
 
             @@allow('all', true)
         }
-        `
+        `,
         );
 
         const db = anonDb.$setAuth({ id: 'userId-1' });
@@ -633,15 +577,13 @@ model Post {
 
         // unchecked context
         await db.stats.create({ data: { id: 'stats-1', viewCount: 10 } });
-        await expect(
-            db.post.create({ data: { title: 'title1', statsId: 'stats-1' } })
-        ).toResolveTruthy();
+        await expect(db.post.create({ data: { title: 'title1', statsId: 'stats-1' } })).toResolveTruthy();
 
         await db.stats.create({ data: { id: 'stats-2', viewCount: 10 } });
         await expect(
             db.post.createMany({
                 data: [{ title: 'title2', statsId: 'stats-2' }],
-            })
+            }),
         ).resolves.toMatchObject({
             count: 1,
         });
@@ -660,7 +602,7 @@ model Post {
                     title: 'title4',
                     stats: { connect: { id: 'stats-4' } },
                 },
-            })
+            }),
         ).toResolveTruthy();
     });
 });

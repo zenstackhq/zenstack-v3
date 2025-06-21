@@ -32,7 +32,7 @@ describe('Scalar list tests', () => {
                 data: {
                     name: 'user',
                 },
-            })
+            }),
         ).resolves.toMatchObject({
             tags: [],
         });
@@ -43,7 +43,7 @@ describe('Scalar list tests', () => {
                     name: 'user',
                     tags: [],
                 },
-            })
+            }),
         ).resolves.toMatchObject({
             tags: [],
         });
@@ -54,7 +54,7 @@ describe('Scalar list tests', () => {
                     name: 'user',
                     tags: ['tag1', 'tag2'],
                 },
-            })
+            }),
         ).resolves.toMatchObject({
             tags: ['tag1', 'tag2'],
         });
@@ -65,7 +65,7 @@ describe('Scalar list tests', () => {
                     name: 'user',
                     tags: { set: ['tag1', 'tag2'] },
                 },
-            })
+            }),
         ).resolves.toMatchObject({
             tags: ['tag1', 'tag2'],
         });
@@ -76,7 +76,7 @@ describe('Scalar list tests', () => {
                     name: 'user',
                     flags: [true, false],
                 },
-            })
+            }),
         ).resolves.toMatchObject({ flags: [true, false] });
 
         await expect(
@@ -85,7 +85,7 @@ describe('Scalar list tests', () => {
                     name: 'user',
                     flags: { set: [true, false] },
                 },
-            })
+            }),
         ).resolves.toMatchObject({ flags: [true, false] });
     });
 
@@ -101,42 +101,42 @@ describe('Scalar list tests', () => {
             client.user.update({
                 where: { id: user.id },
                 data: { tags: ['tag3', 'tag4'] },
-            })
+            }),
         ).resolves.toMatchObject({ tags: ['tag3', 'tag4'] });
 
         await expect(
             client.user.update({
                 where: { id: user.id },
                 data: { tags: { set: ['tag5'] } },
-            })
+            }),
         ).resolves.toMatchObject({ tags: ['tag5'] });
 
         await expect(
             client.user.update({
                 where: { id: user.id },
                 data: { tags: { push: 'tag6' } },
-            })
+            }),
         ).resolves.toMatchObject({ tags: ['tag5', 'tag6'] });
 
         await expect(
             client.user.update({
                 where: { id: user.id },
                 data: { tags: { push: [] } },
-            })
+            }),
         ).resolves.toMatchObject({ tags: ['tag5', 'tag6'] });
 
         await expect(
             client.user.update({
                 where: { id: user.id },
                 data: { tags: { push: ['tag7', 'tag8'] } },
-            })
+            }),
         ).resolves.toMatchObject({ tags: ['tag5', 'tag6', 'tag7', 'tag8'] });
 
         await expect(
             client.user.update({
                 where: { id: user.id },
                 data: { tags: { set: [] } },
-            })
+            }),
         ).resolves.toMatchObject({ tags: [] });
     });
 
@@ -147,8 +147,7 @@ describe('Scalar list tests', () => {
                 tags: ['tag1', 'tag2'],
             },
         });
-        // @ts-ignore
-        const user2 = await client.user.create({
+        await client.user.create({
             data: {
                 name: 'user2',
             },
@@ -163,73 +162,73 @@ describe('Scalar list tests', () => {
         await expect(
             client.user.findMany({
                 where: { tags: { equals: ['tag1', 'tag2'] } },
-            })
+            }),
         ).resolves.toMatchObject([user1]);
 
         await expect(
             client.user.findFirst({
                 where: { tags: { equals: ['tag1'] } },
-            })
+            }),
         ).toResolveNull();
 
         await expect(
             client.user.findMany({
                 where: { tags: { has: 'tag1' } },
-            })
+            }),
         ).resolves.toMatchObject([user1]);
 
         await expect(
             client.user.findFirst({
                 where: { tags: { has: 'tag3' } },
-            })
+            }),
         ).toResolveNull();
 
         await expect(
             client.user.findMany({
                 where: { tags: { hasSome: ['tag1'] } },
-            })
+            }),
         ).resolves.toMatchObject([user1]);
 
         await expect(
             client.user.findMany({
                 where: { tags: { hasSome: ['tag1', 'tag3'] } },
-            })
+            }),
         ).resolves.toMatchObject([user1]);
 
         await expect(
             client.user.findFirst({
                 where: { tags: { hasSome: [] } },
-            })
+            }),
         ).toResolveNull();
 
         await expect(
             client.user.findFirst({
                 where: { tags: { hasEvery: ['tag3', 'tag4'] } },
-            })
+            }),
         ).toResolveNull();
 
         await expect(
             client.user.findMany({
                 where: { tags: { hasEvery: ['tag1', 'tag2'] } },
-            })
+            }),
         ).resolves.toMatchObject([user1]);
 
         await expect(
             client.user.findFirst({
                 where: { tags: { hasEvery: ['tag1', 'tag3'] } },
-            })
+            }),
         ).toResolveNull();
 
         await expect(
             client.user.findMany({
                 where: { tags: { isEmpty: true } },
-            })
+            }),
         ).resolves.toEqual([user3]);
 
         await expect(
             client.user.findMany({
                 where: { tags: { isEmpty: false } },
-            })
+            }),
         ).resolves.toEqual([user1]);
     });
 });

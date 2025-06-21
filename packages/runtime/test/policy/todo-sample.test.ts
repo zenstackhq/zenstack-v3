@@ -8,9 +8,7 @@ describe('todo sample tests', () => {
     let schema: SchemaDef;
 
     beforeAll(async () => {
-        const r = await generateTsSchemaFromFile(
-            path.join(__dirname, '../schemas/todo.zmodel')
-        );
+        const r = await generateTsSchemaFromFile(path.join(__dirname, '../schemas/todo.zmodel'));
         schema = r.schema;
     });
 
@@ -37,17 +35,11 @@ describe('todo sample tests', () => {
         await expect(anonDb.user.create({ data: user1 })).toBeRejectedByPolicy([
             'result is not allowed to be read back',
         ]);
-        await expect(
-            user1Db.user.findUnique({ where: { id: user1.id } })
-        ).toResolveTruthy();
-        await expect(
-            user2Db.user.findUnique({ where: { id: user1.id } })
-        ).toResolveNull();
+        await expect(user1Db.user.findUnique({ where: { id: user1.id } })).toResolveTruthy();
+        await expect(user2Db.user.findUnique({ where: { id: user1.id } })).toResolveNull();
 
         // create user2
-        await expect(
-            anonDb.user.create({ data: user2 })
-        ).toBeRejectedByPolicy();
+        await expect(anonDb.user.create({ data: user2 })).toBeRejectedByPolicy();
         await expect(rawDb.user.count()).resolves.toBe(2);
 
         // find with user1 should only get user1
@@ -56,9 +48,7 @@ describe('todo sample tests', () => {
         expect(r[0]).toEqual(expect.objectContaining(user1));
 
         // get user2 as user1
-        await expect(
-            user1Db.user.findUnique({ where: { id: user2.id } })
-        ).toResolveNull();
+        await expect(user1Db.user.findUnique({ where: { id: user2.id } })).toResolveNull();
 
         await expect(
             user1Db.space.create({
@@ -74,7 +64,7 @@ describe('todo sample tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         // user2 can't add himself into space1 by setting himself as admin
@@ -86,14 +76,14 @@ describe('todo sample tests', () => {
                     userId: user2.id,
                     role: 'ADMIN',
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // user1 can add user2 as a member
         await expect(
             user1Db.spaceUser.create({
                 data: { spaceId: 'space1', userId: user2.id, role: 'USER' },
-            })
+            }),
         ).toResolveTruthy();
 
         // now both user1 and user2 should be visible
@@ -105,7 +95,7 @@ describe('todo sample tests', () => {
             user2Db.user.update({
                 where: { id: user1.id },
                 data: { name: 'hello' },
-            })
+            }),
         ).toBeRejectedNotFound();
 
         // update user1 as user1
@@ -113,21 +103,15 @@ describe('todo sample tests', () => {
             user1Db.user.update({
                 where: { id: user1.id },
                 data: { name: 'hello' },
-            })
+            }),
         ).toResolveTruthy();
 
         // delete user2 as user1
-        await expect(
-            user1Db.user.delete({ where: { id: user2.id } })
-        ).toBeRejectedNotFound();
+        await expect(user1Db.user.delete({ where: { id: user2.id } })).toBeRejectedNotFound();
 
         // delete user1 as user1
-        await expect(
-            user1Db.user.delete({ where: { id: user1.id } })
-        ).toResolveTruthy();
-        await expect(
-            user1Db.user.findUnique({ where: { id: user1.id } })
-        ).toResolveNull();
+        await expect(user1Db.user.delete({ where: { id: user1.id } })).toResolveTruthy();
+        await expect(user1Db.user.findUnique({ where: { id: user1.id } })).toResolveNull();
     });
 
     it('works with todo list CRUD', async () => {
@@ -149,7 +133,7 @@ describe('todo sample tests', () => {
                     owner: { connect: { id: user1.id } },
                     space: { connect: { id: space1.id } },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         await expect(
@@ -160,32 +144,24 @@ describe('todo sample tests', () => {
                     owner: { connect: { id: user1.id } },
                     space: { connect: { id: space1.id } },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         await expect(user1Db.list.findMany()).resolves.toHaveLength(1);
         await expect(anonDb.list.findMany()).resolves.toHaveLength(0);
         await expect(emptyUIDDb.list.findMany()).resolves.toHaveLength(0);
-        await expect(
-            anonDb.list.findUnique({ where: { id: 'list1' } })
-        ).toResolveNull();
+        await expect(anonDb.list.findUnique({ where: { id: 'list1' } })).toResolveNull();
 
         // accessible to owner
-        await expect(
-            user1Db.list.findUnique({ where: { id: 'list1' } })
-        ).resolves.toEqual(
-            expect.objectContaining({ id: 'list1', title: 'List 1' })
+        await expect(user1Db.list.findUnique({ where: { id: 'list1' } })).resolves.toEqual(
+            expect.objectContaining({ id: 'list1', title: 'List 1' }),
         );
 
         // accessible to user in the space
-        await expect(
-            user2Db.list.findUnique({ where: { id: 'list1' } })
-        ).toResolveTruthy();
+        await expect(user2Db.list.findUnique({ where: { id: 'list1' } })).toResolveTruthy();
 
         // inaccessible to user not in the space
-        await expect(
-            user3Db.list.findUnique({ where: { id: 'list1' } })
-        ).toResolveNull();
+        await expect(user3Db.list.findUnique({ where: { id: 'list1' } })).toResolveNull();
 
         // make a private list
         await user1Db.list.create({
@@ -199,14 +175,10 @@ describe('todo sample tests', () => {
         });
 
         // accessible to owner
-        await expect(
-            user1Db.list.findUnique({ where: { id: 'list2' } })
-        ).toResolveTruthy();
+        await expect(user1Db.list.findUnique({ where: { id: 'list2' } })).toResolveTruthy();
 
         // inaccessible to other user in the space
-        await expect(
-            user2Db.list.findUnique({ where: { id: 'list2' } })
-        ).toResolveNull();
+        await expect(user2Db.list.findUnique({ where: { id: 'list2' } })).toResolveNull();
 
         // create a list which doesn't match credential should fail
         await expect(
@@ -217,7 +189,7 @@ describe('todo sample tests', () => {
                     owner: { connect: { id: user2.id } },
                     space: { connect: { id: space1.id } },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // create a list which doesn't match credential's space should fail
@@ -229,7 +201,7 @@ describe('todo sample tests', () => {
                     owner: { connect: { id: user1.id } },
                     space: { connect: { id: space2.id } },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // update list
@@ -239,10 +211,8 @@ describe('todo sample tests', () => {
                 data: {
                     title: 'List 1 updated',
                 },
-            })
-        ).resolves.toEqual(
-            expect.objectContaining({ title: 'List 1 updated' })
-        );
+            }),
+        ).resolves.toEqual(expect.objectContaining({ title: 'List 1 updated' }));
 
         await expect(
             user2Db.list.update({
@@ -250,19 +220,13 @@ describe('todo sample tests', () => {
                 data: {
                     title: 'List 1 updated',
                 },
-            })
+            }),
         ).toBeRejectedNotFound();
 
         // delete list
-        await expect(
-            user2Db.list.delete({ where: { id: 'list1' } })
-        ).toBeRejectedNotFound();
-        await expect(
-            user1Db.list.delete({ where: { id: 'list1' } })
-        ).toResolveTruthy();
-        await expect(
-            user1Db.list.findUnique({ where: { id: 'list1' } })
-        ).toResolveNull();
+        await expect(user2Db.list.delete({ where: { id: 'list1' } })).toBeRejectedNotFound();
+        await expect(user1Db.list.delete({ where: { id: 'list1' } })).toResolveTruthy();
+        await expect(user1Db.list.findUnique({ where: { id: 'list1' } })).toResolveNull();
     });
 
     it('works with todo CRUD', async () => {
@@ -293,7 +257,7 @@ describe('todo sample tests', () => {
                         connect: { id: 'list1' },
                     },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         await expect(
@@ -306,7 +270,7 @@ describe('todo sample tests', () => {
                         connect: { id: 'list1' },
                     },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         // read
@@ -320,7 +284,7 @@ describe('todo sample tests', () => {
                 data: {
                     title: 'Todo 1 updated',
                 },
-            })
+            }),
         ).toResolveTruthy();
         await expect(
             user1Db.todo.update({
@@ -328,7 +292,7 @@ describe('todo sample tests', () => {
                 data: {
                     title: 'Todo 2 updated',
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         // create a private list
@@ -353,7 +317,7 @@ describe('todo sample tests', () => {
                         connect: { id: 'list2' },
                     },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         // reject because list2 is private
@@ -367,7 +331,7 @@ describe('todo sample tests', () => {
                         connect: { id: 'list2' },
                     },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // update, only owner can update todo in a private list
@@ -377,7 +341,7 @@ describe('todo sample tests', () => {
                 data: {
                     title: 'Todo 3 updated',
                 },
-            })
+            }),
         ).toResolveTruthy();
         await expect(
             user2Db.todo.update({
@@ -385,7 +349,7 @@ describe('todo sample tests', () => {
                 data: {
                     title: 'Todo 3 updated',
                 },
-            })
+            }),
         ).toBeRejectedNotFound();
     });
 
@@ -458,7 +422,7 @@ describe('todo sample tests', () => {
                 data: {
                     owner: { connect: { id: user2.id } },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // change todo's owner
@@ -468,7 +432,7 @@ describe('todo sample tests', () => {
                 data: {
                     owner: { connect: { id: user2.id } },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
 
         // nested change todo's owner
@@ -485,7 +449,7 @@ describe('todo sample tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
     });
 });

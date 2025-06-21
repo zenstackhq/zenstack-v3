@@ -5,64 +5,57 @@ import { createClientSpecs } from './client-specs';
 
 const PG_DB_NAME = 'client-api-create-many-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME))(
-    'Client createMany tests',
-    ({ createClient }) => {
-        let client: ClientContract<typeof schema>;
+describe.each(createClientSpecs(PG_DB_NAME))('Client createMany tests', ({ createClient }) => {
+    let client: ClientContract<typeof schema>;
 
-        beforeEach(async () => {
-            client = await createClient();
+    beforeEach(async () => {
+        client = await createClient();
+    });
+
+    afterEach(async () => {
+        await client?.$disconnect();
+    });
+
+    it('works with toplevel createMany', async () => {
+        // empty
+        await expect(client.user.createMany()).resolves.toMatchObject({
+            count: 0,
         });
 
-        afterEach(async () => {
-            await client?.$disconnect();
+        // single
+        await expect(
+            client.user.createMany({
+                data: {
+                    email: 'u1@test.com',
+                    name: 'name',
+                },
+            }),
+        ).resolves.toMatchObject({
+            count: 1,
         });
 
-        it('works with toplevel createMany', async () => {
-            // empty
-            await expect(client.user.createMany()).resolves.toMatchObject({
-                count: 0,
-            });
+        // multiple
+        await expect(
+            client.user.createMany({
+                data: [{ email: 'u2@test.com' }, { email: 'u3@test.com' }],
+            }),
+        ).resolves.toMatchObject({ count: 2 });
 
-            // single
-            await expect(
-                client.user.createMany({
-                    data: {
-                        email: 'u1@test.com',
-                        name: 'name',
-                    },
-                })
-            ).resolves.toMatchObject({
-                count: 1,
-            });
+        // conflict
+        await expect(
+            client.user.createMany({
+                data: [{ email: 'u3@test.com' }, { email: 'u4@test.com' }],
+            }),
+        ).rejects.toThrow();
+        await expect(client.user.findUnique({ where: { email: 'u4@test.com' } })).toResolveNull();
 
-            // multiple
-            await expect(
-                client.user.createMany({
-                    data: [{ email: 'u2@test.com' }, { email: 'u3@test.com' }],
-                })
-            ).resolves.toMatchObject({ count: 2 });
-
-            // conflict
-            await expect(
-                client.user.createMany({
-                    data: [{ email: 'u3@test.com' }, { email: 'u4@test.com' }],
-                })
-            ).rejects.toThrow();
-            await expect(
-                client.user.findUnique({ where: { email: 'u4@test.com' } })
-            ).toResolveNull();
-
-            // skip duplicates
-            await expect(
-                client.user.createMany({
-                    data: [{ email: 'u3@test.com' }, { email: 'u4@test.com' }],
-                    skipDuplicates: true,
-                })
-            ).resolves.toMatchObject({ count: 1 });
-            await expect(
-                client.user.findUnique({ where: { email: 'u4@test.com' } })
-            ).toResolveTruthy();
-        });
-    }
-);
+        // skip duplicates
+        await expect(
+            client.user.createMany({
+                data: [{ email: 'u3@test.com' }, { email: 'u4@test.com' }],
+                skipDuplicates: true,
+            }),
+        ).resolves.toMatchObject({ count: 1 });
+        await expect(client.user.findUnique({ where: { email: 'u4@test.com' } })).toResolveTruthy();
+    });
+});

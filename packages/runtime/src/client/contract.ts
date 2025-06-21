@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-types */
-
 import { type GetModels, type ProcedureDef, type SchemaDef } from '../schema';
 import type { Decimal } from 'decimal.js';
 import type { AuthType } from '../schema/auth';
@@ -43,9 +41,7 @@ export type ClientContract<Schema extends SchemaDef> = {
     /**
      * Starts a transaction.
      */
-    $transaction<T>(
-        callback: (tx: ClientContract<Schema>) => Promise<T>
-    ): Promise<T>;
+    $transaction<T>(callback: (tx: ClientContract<Schema>) => Promise<T>): Promise<T>;
 
     /**
      * Returns a new client with the specified plugin installed.
@@ -68,55 +64,43 @@ export type ClientContract<Schema extends SchemaDef> = {
      */
     $pushSchema(): Promise<void>;
 } & {
-    [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<
-        Schema,
-        Key
-    >;
+    [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<Schema, Key>;
 } & Procedures<Schema>;
 
 type MapType<Schema extends SchemaDef, T extends string> = T extends 'String'
     ? string
     : T extends 'Int'
-    ? number
-    : T extends 'Float'
-    ? number
-    : T extends 'BigInt'
-    ? bigint
-    : T extends 'Decimal'
-    ? Decimal
-    : T extends 'Boolean'
-    ? boolean
-    : T extends 'DateTime'
-    ? Date
-    : T extends GetModels<Schema>
-    ? ModelResult<Schema, T>
-    : unknown;
+      ? number
+      : T extends 'Float'
+        ? number
+        : T extends 'BigInt'
+          ? bigint
+          : T extends 'Decimal'
+            ? Decimal
+            : T extends 'Boolean'
+              ? boolean
+              : T extends 'DateTime'
+                ? Date
+                : T extends GetModels<Schema>
+                  ? ModelResult<Schema, T>
+                  : unknown;
 
 export type Procedures<Schema extends SchemaDef> =
     Schema['procedures'] extends Record<string, ProcedureDef>
         ? {
               $procedures: {
-                  [Key in keyof Schema['procedures']]: ProcedureFunc<
-                      Schema,
-                      Schema['procedures'][Key]
-                  >;
+                  [Key in keyof Schema['procedures']]: ProcedureFunc<Schema, Schema['procedures'][Key]>;
               };
           }
         : {};
 
-export type ProcedureFunc<
-    Schema extends SchemaDef,
-    Proc extends ProcedureDef
-> = (
+export type ProcedureFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
     ...args: MapProcedureParams<Schema, Proc['params']>
 ) => Promise<MapType<Schema, Proc['returnType']>>;
 
 type MapProcedureParams<Schema extends SchemaDef, Params> = {
     [P in keyof Params]: Params[P] extends { type: infer U }
-        ? OrUndefinedIf<
-              MapType<Schema, U & string>,
-              Params[P] extends { optional: true } ? true : false
-          >
+        ? OrUndefinedIf<MapType<Schema, U & string>, Params[P] extends { optional: true } ? true : false>
         : never;
 };
 
@@ -125,12 +109,9 @@ type MapProcedureParams<Schema extends SchemaDef, Params> = {
  */
 export interface ClientConstructor {
     new <Schema extends SchemaDef>(
-        schema: HasComputedFields<Schema> extends false ? Schema : never
+        schema: HasComputedFields<Schema> extends false ? Schema : never,
     ): ClientContract<Schema>;
-    new <Schema extends SchemaDef>(
-        schema: Schema,
-        options: ClientOptions<Schema>
-    ): ClientContract<Schema>;
+    new <Schema extends SchemaDef>(schema: Schema, options: ClientOptions<Schema>): ClientContract<Schema>;
 }
 
 /**

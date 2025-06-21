@@ -2,23 +2,23 @@
 
 ## Prerequisites
 
--   Clone the repo
--   `pnpm install` from the root
--   `pnpm build` from the root
+- Clone the repo
+- `pnpm install` from the root
+- `pnpm build` from the root
 
 ## Running the sample
 
--   `cd samples/blog`
--   `pnpm generate`
--   `pnpm db:migrate`
--   `pnpm dev`
+- `cd samples/blog`
+- `pnpm generate`
+- `pnpm db:migrate`
+- `pnpm dev`
 
 ## Overview
 
--   ZModel is located in [zenstack/schema.zmodel](./zenstack/schema.zmodel).
--   When you run `zenstack generate`, a TypeScript version of the schema is generated to [zenstack/schema.ts](./zenstack/schema.ts).
--   A Prisma schema [zenstack/schema.prisma](./zenstack/schema.prisma) is also generated. It's used for generating and running database migrations, and you can also use it for other purposes as needed.
--   You can create a database client with the TypeScript schema like:
+- ZModel is located in [zenstack/schema.zmodel](./zenstack/schema.zmodel).
+- When you run `zenstack generate`, a TypeScript version of the schema is generated to [zenstack/schema.ts](./zenstack/schema.ts).
+- A Prisma schema [zenstack/schema.prisma](./zenstack/schema.prisma) is also generated. It's used for generating and running database migrations, and you can also use it for other purposes as needed.
+- You can create a database client with the TypeScript schema like:
     ```ts
     import { ZenStackClient } from '@zenstackhq/runtime';
     import { schema } from './zenstack/schema';
@@ -27,9 +27,9 @@
         dialectConfig: { database: new SQLite('./zenstack/dev.db') },
     });
     ```
--   Run `zenstack migrate dev` to generate and apply database migrations. It internally calls `prisma migrate dev`. Same for `zenstack migrate deploy`.
--   ZenStack v3 doesn't generate into "node_modules" anymore. The generated TypeScript schema file can be checked in to source control, and you decide how to build or bundle it with your application.
--   The TS schema will also serve as the foundation of inferring types of other artifacts, e.g., zod schemas, frontend hooks, etc.
+- Run `zenstack migrate dev` to generate and apply database migrations. It internally calls `prisma migrate dev`. Same for `zenstack migrate deploy`.
+- ZenStack v3 doesn't generate into "node_modules" anymore. The generated TypeScript schema file can be checked in to source control, and you decide how to build or bundle it with your application.
+- The TS schema will also serve as the foundation of inferring types of other artifacts, e.g., zod schemas, frontend hooks, etc.
 
 ## Features
 
@@ -39,7 +39,7 @@ Replicating PrismaClient's CRUD API is around 80% done, including typing and run
 
 Not supported yet:
 
--   `$extends`
+- `$extends`
 
 ### 2. Using Kysely expression builder to express complex queries in `where`
 
@@ -81,10 +81,7 @@ const db = createClient({
         User: {
             emailDomain: (eb) =>
                 // build SQL expression: substr(email, instr(email, '@') + 1)
-                eb.fn('substr', [
-                    eb.ref('email'),
-                    eb(eb.fn('instr', [eb.ref('email'), eb.val('@')]), '+', 1),
-                ]),
+                eb.fn('substr', [eb.ref('email'), eb(eb.fn('instr', [eb.ref('email'), eb.val('@')]), '+', 1)]),
         },
     },
 });

@@ -14,7 +14,7 @@ export function clone<T>(value: T): T {
             return value;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const result: any = {};
         for (const key of Object.keys(value)) {
             result[key] = clone(value[key as keyof T]);

@@ -11,10 +11,7 @@ async function main() {
     await generator.generate(zmodelPath, [], tsPath);
 
     const content = fs.readFileSync(tsPath, 'utf-8');
-    fs.writeFileSync(
-        tsPath,
-        content.replace(/@zenstackhq\/runtime/g, '../../dist')
-    );
+    fs.writeFileSync(tsPath, content.replace(/@zenstackhq\/runtime/g, '../../dist'));
 
     console.log('TS schema generated at:', tsPath);
 }

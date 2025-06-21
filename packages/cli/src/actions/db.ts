@@ -20,10 +20,7 @@ export async function run(command: string, options: CommonOptions) {
         silent: true,
     });
 
-    const prismaSchemaFile = path.join(
-        path.dirname(schemaFile),
-        'schema.prisma'
-    );
+    const prismaSchemaFile = path.join(path.dirname(schemaFile), 'schema.prisma');
 
     switch (command) {
         case 'push':

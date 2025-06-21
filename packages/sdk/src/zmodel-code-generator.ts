@@ -60,11 +60,7 @@ const generationHandlers = new Map<string, PropertyDescriptor>();
 
 // generation handler decorator
 function gen(name: string) {
-    return function (
-        _target: unknown,
-        _propertyKey: string,
-        descriptor: PropertyDescriptor
-    ) {
+    return function (_target: unknown, _propertyKey: string, descriptor: PropertyDescriptor) {
         if (!generationHandlers.get(name)) {
             generationHandlers.set(name, descriptor);
         }
@@ -120,9 +116,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
     @gen(EnumField)
     private _generateEnumField(ast: EnumField) {
         return `${ast.name}${
-            ast.attributes.length > 0
-                ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ')
-                : ''
+            ast.attributes.length > 0 ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ') : ''
         }`;
     }
 
@@ -149,10 +143,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
             return ast.name;
         } else {
             return `${ast.name}(${ast.args
-                .map(
-                    (x) =>
-                        (x.name ? x.name + ': ' : '') + this.generate(x.value)
-                )
+                .map((x) => (x.name ? x.name + ': ' : '') + this.generate(x.value))
                 .join(', ')})`;
         }
     }
@@ -171,20 +162,12 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 
     @gen(DataModel)
     private _generateDataModel(ast: DataModel) {
-        return `${ast.isAbstract ? 'abstract ' : ''}${
-            ast.isView ? 'view' : 'model'
-        } ${ast.name}${
-            ast.superTypes.length > 0
-                ? ' extends ' +
-                  ast.superTypes.map((x) => x.ref?.name).join(', ')
-                : ''
+        return `${ast.isAbstract ? 'abstract ' : ''}${ast.isView ? 'view' : 'model'} ${ast.name}${
+            ast.superTypes.length > 0 ? ' extends ' + ast.superTypes.map((x) => x.ref?.name).join(', ') : ''
         } {
 ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
             ast.attributes.length > 0
-                ? '\n\n' +
-                  ast.attributes
-                      .map((x) => this.indent + this.generate(x))
-                      .join('\n')
+                ? '\n\n' + ast.attributes.map((x) => this.indent + this.generate(x)).join('\n')
                 : ''
         }
 }`;
@@ -193,9 +176,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
     @gen(DataModelField)
     private _generateDataModelField(ast: DataModelField) {
         return `${ast.name} ${this.fieldType(ast.type)}${
-            ast.attributes.length > 0
-                ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ')
-                : ''
+            ast.attributes.length > 0 ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ') : ''
         }`;
     }
 
@@ -203,11 +184,9 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
         const baseType = type.type
             ? type.type
             : type.$type == 'DataModelFieldType' && type.unsupported
-            ? 'Unsupported(' + this.generate(type.unsupported.value) + ')'
-            : type.reference?.$refText;
-        return `${baseType}${type.array ? '[]' : ''}${
-            type.optional ? '?' : ''
-        }`;
+              ? 'Unsupported(' + this.generate(type.unsupported.value) + ')'
+              : type.reference?.$refText;
+        return `${baseType}${type.array ? '[]' : ''}${type.optional ? '?' : ''}`;
     }
 
     @gen(DataModelAttribute)
@@ -221,9 +200,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
     }
 
     private attribute(ast: DataModelAttribute | DataModelFieldAttribute) {
-        const args = ast.args.length
-            ? `(${ast.args.map((x) => this.generate(x)).join(', ')})`
-            : '';
+        const args = ast.args.length ? `(${ast.args.map((x) => this.generate(x)).join(', ')})` : '';
         return `${resolved(ast.decl).name}${args}`;
     }
 
@@ -238,9 +215,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(ObjectExpr)
     private _generateObjectExpr(ast: ObjectExpr) {
-        return `{ ${ast.fields
-            .map((field) => this.objectField(field))
-            .join(', ')} }`;
+        return `{ ${ast.fields.map((field) => this.objectField(field)).join(', ')} }`;
     }
 
     private objectField(field: FieldInitializer) {
@@ -254,9 +229,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(StringLiteral)
     private _generateLiteralExpr(ast: LiteralExpr) {
-        return this.options.quote === 'single'
-            ? `'${ast.value}'`
-            : `"${ast.value}"`;
+        return this.options.quote === 'single' ? `'${ast.value}'` : `"${ast.value}"`;
     }
 
     @gen(NumberLiteral)
@@ -271,20 +244,16 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(UnaryExpr)
     private _generateUnaryExpr(ast: UnaryExpr) {
-        return `${ast.operator}${this.unaryExprSpace}${this.generate(
-            ast.operand
-        )}`;
+        return `${ast.operator}${this.unaryExprSpace}${this.generate(ast.operand)}`;
     }
 
     @gen(BinaryExpr)
     private _generateBinaryExpr(ast: BinaryExpr) {
         const operator = ast.operator;
-        const isCollectionPredicate =
-            this.isCollectionPredicateOperator(operator);
+        const isCollectionPredicate = this.isCollectionPredicateOperator(operator);
         const rightExpr = this.generate(ast.right);
 
-        const { left: isLeftParenthesis, right: isRightParenthesis } =
-            this.isParenthesesNeededForBinaryExpr(ast);
+        const { left: isLeftParenthesis, right: isRightParenthesis } = this.isParenthesesNeededForBinaryExpr(ast);
 
         return `${isLeftParenthesis ? '(' : ''}${this.generate(ast.left)}${
             isLeftParenthesis ? ')' : ''
@@ -297,9 +266,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(ReferenceExpr)
     private _generateReferenceExpr(ast: ReferenceExpr) {
-        const args = ast.args.length
-            ? `(${ast.args.map((x) => this.generate(x)).join(', ')})`
-            : '';
+        const args = ast.args.length ? `(${ast.args.map((x) => this.generate(x)).join(', ')})` : '';
         return `${ast.target.ref?.name}${args}`;
     }
 
@@ -315,9 +282,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(InvocationExpr)
     private _generateInvocationExpr(ast: InvocationExpr) {
-        return `${ast.function.ref?.name}(${ast.args
-            .map((x) => this.argument(x))
-            .join(', ')})`;
+        return `${ast.function.ref?.name}(${ast.args.map((x) => this.argument(x)).join(', ')})`;
     }
 
     @gen(NullExpr)
@@ -332,30 +297,22 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(Attribute)
     private _generateAttribute(ast: Attribute) {
-        return `attribute ${ast.name}(${ast.params
-            .map((x) => this.generate(x))
-            .join(', ')})`;
+        return `attribute ${ast.name}(${ast.params.map((x) => this.generate(x)).join(', ')})`;
     }
 
     @gen(AttributeParam)
     private _generateAttributeParam(ast: AttributeParam) {
-        return `${ast.default ? '_ ' : ''}${ast.name}: ${this.generate(
-            ast.type
-        )}`;
+        return `${ast.default ? '_ ' : ''}${ast.name}: ${this.generate(ast.type)}`;
     }
 
     @gen(AttributeParamType)
     private _generateAttributeParamType(ast: AttributeParamType) {
-        return `${ast.type ?? ast.reference?.$refText}${ast.array ? '[]' : ''}${
-            ast.optional ? '?' : ''
-        }`;
+        return `${ast.type ?? ast.reference?.$refText}${ast.array ? '[]' : ''}${ast.optional ? '?' : ''}`;
     }
 
     @gen(FunctionDecl)
     private _generateFunctionDecl(ast: FunctionDecl) {
-        return `function ${ast.name}(${ast.params
-            .map((x) => this.generate(x))
-            .join(', ')}) ${
+        return `function ${ast.name}(${ast.params.map((x) => this.generate(x)).join(', ')}) ${
             ast.returnType ? ': ' + this.generate(ast.returnType) : ''
         } {}`;
     }
@@ -375,10 +332,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
         return `type ${ast.name} {
 ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
             ast.attributes.length > 0
-                ? '\n\n' +
-                  ast.attributes
-                      .map((x) => this.indent + this.generate(x))
-                      .join('\n')
+                ? '\n\n' + ast.attributes.map((x) => this.indent + this.generate(x)).join('\n')
                 : ''
         }
 }`;
@@ -387,9 +341,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
     @gen(TypeDefField)
     private _generateTypeDefField(ast: TypeDefField) {
         return `${ast.name} ${this.fieldType(ast.type)}${
-            ast.attributes.length > 0
-                ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ')
-                : ''
+            ast.attributes.length > 0 ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ') : ''
         }`;
     }
 
@@ -415,15 +367,13 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
     } {
         const result = { left: false, right: false };
         const operator = ast.operator;
-        const isCollectionPredicate =
-            this.isCollectionPredicateOperator(operator);
+        const isCollectionPredicate = this.isCollectionPredicateOperator(operator);
 
         const currentPriority = BinaryExprOperatorPriority[operator];
 
         if (
             ast.left.$type === BinaryExpr &&
-            BinaryExprOperatorPriority[(ast.left as BinaryExpr)['operator']] <
-                currentPriority
+            BinaryExprOperatorPriority[(ast.left as BinaryExpr)['operator']] < currentPriority
         ) {
             result.left = true;
         }
@@ -434,8 +384,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
         if (
             !isCollectionPredicate &&
             ast.right.$type === BinaryExpr &&
-            BinaryExprOperatorPriority[(ast.right as BinaryExpr)['operator']] <=
-                currentPriority
+            BinaryExprOperatorPriority[(ast.right as BinaryExpr)['operator']] <= currentPriority
         ) {
             result.right = true;
         }

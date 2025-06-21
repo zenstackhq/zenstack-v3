@@ -28,9 +28,7 @@ export async function run(projectPath: string) {
             ...(pkg.dev ? [pm.agent === 'yarn' ? '--dev' : '--save-dev'] : []),
         ]);
         if (!resolved) {
-            throw new CliError(
-                `Unable to determine how to install package "${pkg.name}". Please install it manually.`
-            );
+            throw new CliError(`Unable to determine how to install package "${pkg.name}". Please install it manually.`);
         }
 
         const spinner = ora(`Installing "${pkg.name}"`).start();
@@ -51,32 +49,13 @@ export async function run(projectPath: string) {
         fs.mkdirSync(path.join(projectPath, generationFolder));
     }
 
-    if (
-        !fs.existsSync(
-            path.join(projectPath, generationFolder, 'schema.zmodel')
-        )
-    ) {
-        fs.writeFileSync(
-            path.join(projectPath, generationFolder, 'schema.zmodel'),
-            STARTER_ZMODEL
-        );
+    if (!fs.existsSync(path.join(projectPath, generationFolder, 'schema.zmodel'))) {
+        fs.writeFileSync(path.join(projectPath, generationFolder, 'schema.zmodel'), STARTER_ZMODEL);
     } else {
-        console.log(
-            colors.yellow(
-                'Schema file already exists. Skipping generation of sample.'
-            )
-        );
+        console.log(colors.yellow('Schema file already exists. Skipping generation of sample.'));
     }
 
     console.log(colors.green('ZenStack project initialized successfully!'));
-    console.log(
-        colors.gray(
-            `See "${generationFolder}/schema.zmodel" for your database schema.`
-        )
-    );
-    console.log(
-        colors.gray(
-            'Run `zenstack generate` to compile the the schema into a TypeScript file.'
-        )
-    );
+    console.log(colors.gray(`See "${generationFolder}/schema.zmodel" for your database schema.`));
+    console.log(colors.gray('Run `zenstack generate` to compile the the schema into a TypeScript file.'));
 }

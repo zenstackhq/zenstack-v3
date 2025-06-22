@@ -1,5 +1,5 @@
+import { invariant } from '@zenstackhq/sdk/local-helpers';
 import { CreateTableBuilder, sql, type ColumnDataType, type OnModifyForeignAction } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import {
     ExpressionUtils,

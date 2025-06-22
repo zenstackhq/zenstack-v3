@@ -1,4 +1,4 @@
-import type { OperandExpression } from 'kysely';
+import { invariant } from '@zenstackhq/sdk/local-helpers';
 import {
     AliasNode,
     BinaryOperationNode,
@@ -16,9 +16,9 @@ import {
     ValueNode,
     WhereNode,
     type ExpressionBuilder,
+    type OperandExpression,
     type OperationNode,
 } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';

@@ -1,5 +1,7 @@
 import type Decimal from 'decimal.js';
 
+export type Optional<T extends object, K extends keyof T = keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+
 export type NullableIf<T, Condition extends boolean> = Condition extends true ? T | null : T;
 
 export type PartialRecord<K extends string | number | symbol, T> = Partial<Record<K, T>>;

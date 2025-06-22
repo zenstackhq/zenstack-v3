@@ -34,10 +34,10 @@ import {
 } from '@zenstackhq/language/ast';
 import fs from 'node:fs';
 import path from 'node:path';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import * as ts from 'typescript';
 import { ModelUtils } from '.';
+import { invariant } from './local-helpers';
 import { getAttribute, getAuthDecl, hasAttribute, isIdField, isUniqueField } from './model-utils';
 
 export class TsSchemaGenerator {

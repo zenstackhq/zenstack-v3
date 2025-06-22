@@ -41,7 +41,7 @@
     },
     "devDependencies": {
         "@types/tmp": "^0.2.6",
-        "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/eslint-config": "workspace:*"
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*"
     }
 }

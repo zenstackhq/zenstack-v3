@@ -1,7 +1,6 @@
 import type { Expression, ExpressionBuilder, KyselyConfig, PostgresDialectConfig, SqliteDialectConfig } from 'kysely';
-import type { Optional } from 'utility-types';
 import type { DataSourceProvider, GetModel, GetModels, ProcedureDef, SchemaDef } from '../schema';
-import type { PrependParameter } from '../utils/type-utils';
+import type { Optional, PrependParameter } from '../utils/type-utils';
 import type { ClientContract, CRUD, ProcedureFunc } from './contract';
 import type { BaseCrudDialect } from './crud/dialects/base';
 import type { RuntimePlugin } from './plugin';

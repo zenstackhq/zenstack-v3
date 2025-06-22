@@ -30,15 +30,15 @@
     "license": "MIT",
     "packageManager": "pnpm@10.12.1",
     "dependencies": {
+        "@zenstackhq/language": "workspace:*",
         "langium": "catalog:",
         "vscode-languageclient": "^9.0.1",
-        "vscode-languageserver": "^9.0.1",
-        "@zenstackhq/language": "workspace:*"
+        "vscode-languageserver": "^9.0.1"
     },
     "devDependencies": {
         "@types/vscode": "^1.63.0",
-        "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/eslint-config": "workspace:*"
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*"
     },
     "files": [
         "dist",

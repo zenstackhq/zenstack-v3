@@ -1,5 +1,5 @@
+import { invariant, capitalize, uncapitalize } from '@zenstackhq/sdk/local-helpers';
 import { sql, ValueNode, type Expression, type ExpressionBuilder } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { ZModelFunction, ZModelFunctionContext } from './options';
 
@@ -132,8 +132,8 @@ function processCasing(casing: Expression<any>, result: string, model: string) {
         .with('original', () => model)
         .with('upper', () => result.toUpperCase())
         .with('lower', () => result.toLowerCase())
-        .with('capitalize', () => `${result.charAt(0).toUpperCase() + result.slice(1)}`)
-        .with('uncapitalize', () => `${result.charAt(0).toLowerCase() + result.slice(1)}`)
+        .with('capitalize', () => capitalize(result))
+        .with('uncapitalize', () => uncapitalize(result))
         .otherwise(() => {
             throw new Error(
                 `Invalid casing value: ${opNode.value}. Must be "original", "upper", "lower", "capitalize", or "uncapitalize".`,

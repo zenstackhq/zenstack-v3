@@ -1,10 +1,10 @@
 import { isPlugin, LiteralExpr, type Model } from '@zenstackhq/language/ast';
 import type { CliGenerator } from '@zenstackhq/runtime/client';
 import { PrismaSchemaGenerator, TsSchemaGenerator } from '@zenstackhq/sdk';
+import { invariant } from '@zenstackhq/sdk/local-helpers';
 import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
-import invariant from 'tiny-invariant';
 import { getSchemaFile, loadSchemaDocument } from './action-utils';
 
 type Options = {
@@ -41,7 +41,7 @@ import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from '${outputPath}/schema';
 
 const client = new ZenStackClient(schema, {
-    dialectConfig: { ... } 
+    dialectConfig: { ... }
 });
 \`\`\`
 `);

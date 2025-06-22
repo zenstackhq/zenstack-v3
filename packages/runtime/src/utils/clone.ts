@@ -1,5 +1,4 @@
-// @ts-expect-error
-import { isPlainObject } from 'is-plain-object';
+import { isPlainObject } from '@zenstackhq/sdk/local-helpers';
 
 /**
  * Clones the given object. Only arrays and plain objects are cloned. Other values are returned as is.
@@ -14,7 +13,6 @@ export function clone<T>(value: T): T {
             return value;
         }
 
-         
         const result: any = {};
         for (const key of Object.keys(value)) {
             result[key] = clone(value[key as keyof T]);

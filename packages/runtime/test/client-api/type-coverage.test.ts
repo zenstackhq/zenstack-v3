@@ -8,7 +8,7 @@ describe('zmodel type coverage tests', () => {
             `
             model Foo {
                 id String @id @default(cuid())
-                
+
                 String String
                 Int Int
                 BigInt BigInt
@@ -17,7 +17,7 @@ describe('zmodel type coverage tests', () => {
                 Decimal Decimal
                 Boolean Boolean
                 Bytes Bytes
-            
+
                 @@allow('all', true)
             }
             `,

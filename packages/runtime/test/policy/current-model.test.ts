@@ -10,7 +10,7 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel() == 'User')
             }
-            
+
             model Post {
                 id Int @id
                 @@allow('read', true)
@@ -31,7 +31,7 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel('upper') == 'USER')
             }
-            
+
             model Post {
                 id Int @id
                 @@allow('read', true)
@@ -52,7 +52,7 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel('lower') == 'user')
             }
-            
+
             model Post {
                 id Int @id
                 @@allow('read', true)
@@ -73,7 +73,7 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel('capitalize') == 'User')
             }
-            
+
             model post {
                 id Int @id
                 @@allow('read', true)
@@ -94,7 +94,7 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel('uncapitalize') == 'uSER')
             }
-            
+
             model POST {
                 id Int @id
                 @@allow('read', true)
@@ -119,7 +119,7 @@ describe('currentModel tests', () => {
 
             model User extends Base {
             }
-            
+
             model Post extends Base {
             }
             `,
@@ -144,7 +144,7 @@ describe('currentModel tests', () => {
 
             model User extends Base {
             }
-            
+
             model Post extends Base {
             }
             `,

@@ -52,10 +52,10 @@ describe('empty policy tests', () => {
         model M1 {
             id String @id @default(uuid())
             m2 M2[]
-        
+
             @@allow('all', true)
         }
-        
+
         model M2 {
             id String @id @default(uuid())
             m1 M1 @relation(fields: [m1Id], references:[id])
@@ -81,10 +81,10 @@ describe('empty policy tests', () => {
         model M1 {
             id String @id @default(uuid())
             m2 M2?
-        
+
             @@allow('all', true)
         }
-        
+
         model M2 {
             id String @id @default(uuid())
             m1 M1 @relation(fields: [m1Id], references:[id])

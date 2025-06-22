@@ -34,6 +34,16 @@
                 "types": "./dist/schema.d.cts",
                 "default": "./dist/schema.cjs"
             }
+        },
+        "./local-helpers": {
+            "import": {
+                "types": "./dist/local-helpers.d.ts",
+                "default": "./dist/local-helpers.js"
+            },
+            "require": {
+                "types": "./dist/local-helpers.d.cts",
+                "default": "./dist/local-helpers.cjs"
+            }
         }
     },
     "dependencies": {

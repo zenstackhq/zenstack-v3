@@ -1,5 +1,5 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { sql, ValueNode, type Expression, type ExpressionBuilder } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { ZModelFunction, ZModelFunctionContext } from './options';
 

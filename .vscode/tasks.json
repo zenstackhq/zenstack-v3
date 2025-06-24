@@ -18,7 +18,7 @@
         },
         {
             "label": "Build all - watch",
-            "command": "pnpm watch",
+            "command": "turbo watch build",
             "type": "shell",
             "group": {
                 "kind": "build"
@@ -27,6 +27,16 @@
                 "color": "terminal.ansiBlue",
                 "id": "server-process"
             }
+        },
+        {
+            "label": "Lint all",
+            "command": "pnpm lint",
+            "type": "shell",
+            "icon": {
+                "color": "terminal.ansiYellow",
+                "id": "server-process"
+            },
+            "problemMatcher": []
         },
         {
             "label": "Test all",

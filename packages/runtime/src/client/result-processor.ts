@@ -1,5 +1,5 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../schema';
 import { ensureArray, getField } from './query-utils';

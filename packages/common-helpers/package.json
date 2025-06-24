@@ -1,10 +1,11 @@
 {
-    "name": "@zenstackhq/testtools",
+    "name": "@zenstackhq/common-helpers",
     "version": "3.0.0-alpha.5",
-    "description": "ZenStack Test Tools",
+    "description": "ZenStack Common Helpers",
     "type": "module",
     "scripts": {
         "build": "tsup-node",
+        "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "pack": "pnpm pack"
     },
@@ -26,21 +27,7 @@
             }
         }
     },
-    "dependencies": {
-        "@zenstackhq/language": "workspace:*",
-        "@zenstackhq/sdk": "workspace:*",
-        "glob": "^11.0.2",
-        "tmp": "^0.2.3",
-        "ts-pattern": "catalog:",
-        "prisma": "catalog:",
-        "typescript": "catalog:"
-    },
-    "peerDependencies": {
-        "better-sqlite3": "^11.8.1",
-        "pg": "^8.13.1"
-    },
     "devDependencies": {
-        "@types/tmp": "^0.2.6",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/eslint-config": "workspace:*"
     }

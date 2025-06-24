@@ -280,16 +280,20 @@ You can use a plugin to achieve the following goals:
 
 #### 1. ORM query interception
 
-ORM query interception allows you to intercept the high-level ORM API calls.
+ORM query interception allows you to intercept the high-level ORM API calls. The interceptor's configuration is compatible with Prisma's [query client extension](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query).
 
 ```ts
 client.$use({
     id: 'cost-logger',
-    async onQuery({ model, operation, proceed, queryArgs }) {
-        const start = Date.now();
-        const result = await proceed(queryArgs);
-        console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
-        return result;
+    onQuery: {
+        $allModels: {
+            $allOperations: async ({ model, operation, args, query }) => {
+                const start = Date.now();
+                const result = await query(args);
+                console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
+                return result;
+            },
+        },
     },
 });
 ```

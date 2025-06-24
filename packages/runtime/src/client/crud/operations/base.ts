@@ -1,4 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
+import { invariant } from '@zenstackhq/common-helpers';
 import {
     DeleteResult,
     expressionBuilder,
@@ -10,7 +11,6 @@ import {
     type SelectQueryBuilder,
 } from 'kysely';
 import { nanoid } from 'nanoid';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';

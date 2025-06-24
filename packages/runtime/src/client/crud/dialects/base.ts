@@ -1,11 +1,9 @@
+import { invariant, isPlainObject } from '@zenstackhq/common-helpers';
 import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { sql, type SelectQueryBuilder } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match, P } from 'ts-pattern';
 import type { BuiltinType, DataSourceProviderType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { enumerate } from '../../../utils/enumerate';
-// @ts-expect-error
-import { isPlainObject } from 'is-plain-object';
 import type { OrArray } from '../../../utils/type-utils';
 import type {
     BooleanFilter,

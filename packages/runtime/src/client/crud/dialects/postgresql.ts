@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import {
     sql,
     type Expression,
@@ -6,7 +7,6 @@ import {
     type RawBuilder,
     type SelectQueryBuilder,
 } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import type { FindArgs } from '../../crud-types';

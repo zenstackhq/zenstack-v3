@@ -5,6 +5,7 @@
     "type": "module",
     "scripts": {
         "build": "tsup-node",
+        "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "pack": "pnpm pack"
     },
@@ -38,8 +39,8 @@
     },
     "dependencies": {
         "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/common-helpers": "workspace:*",
         "langium": "catalog:",
-        "tiny-invariant": "^1.3.3",
         "tmp": "^0.2.3",
         "ts-pattern": "catalog:",
         "typescript": "catalog:"

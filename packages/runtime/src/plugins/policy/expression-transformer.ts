@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import type { OperandExpression } from 'kysely';
 import {
     AliasNode,
@@ -18,7 +19,6 @@ import {
     type ExpressionBuilder,
     type OperationNode,
 } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
@@ -26,6 +26,16 @@ import type { BaseCrudDialect } from '../../client/crud/dialects/base';
 import { InternalError, QueryError } from '../../client/errors';
 import type { ClientOptions } from '../../client/options';
 import { getRelationForeignKeyFieldPairs, requireField } from '../../client/query-utils';
+import type {
+    BinaryExpression,
+    BinaryOperator,
+    BuiltinType,
+    FieldDef,
+    GetModels,
+    LiteralExpression,
+    MemberExpression,
+    UnaryExpression,
+} from '../../schema';
 import {
     ExpressionUtils,
     type ArrayExpression,
@@ -33,16 +43,6 @@ import {
     type Expression,
     type FieldExpression,
     type SchemaDef,
-} from '../../schema';
-import type {
-    BinaryExpression,
-    BinaryOperator,
-    LiteralExpression,
-    MemberExpression,
-    UnaryExpression,
-    BuiltinType,
-    FieldDef,
-    GetModels,
 } from '../../schema';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { conjunction, disjunction, logicalNot, trueNode } from './utils';

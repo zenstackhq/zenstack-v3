@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import { generateTsSchema } from '@zenstackhq/testtools';
@@ -6,7 +7,6 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client as PGClient, Pool } from 'pg';
-import invariant from 'tiny-invariant';
 import type { ClientOptions } from '../src/client';
 import { ZenStackClient } from '../src/client';
 import type { SchemaDef } from '../src/schema';

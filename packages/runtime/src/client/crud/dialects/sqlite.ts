@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import type Decimal from 'decimal.js';
 import {
     ExpressionWrapper,
@@ -7,7 +8,6 @@ import {
     type RawBuilder,
     type SelectQueryBuilder,
 } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { BuiltinType, GetModels, SchemaDef } from '../../../schema';
 import type { FindArgs } from '../../crud-types';

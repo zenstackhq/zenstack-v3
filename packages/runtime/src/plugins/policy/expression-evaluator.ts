@@ -1,4 +1,4 @@
-import invariant from 'tiny-invariant';
+import { invariant } from '@zenstackhq/common-helpers';
 import { match } from 'ts-pattern';
 import {
     ExpressionUtils,

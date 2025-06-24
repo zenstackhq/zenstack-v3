@@ -1,6 +1,6 @@
 import SQLite from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ZenStackClient, type ClientContract } from '../../src/client';
+import { definePlugin, ZenStackClient, type ClientContract } from '../../src/client';
 import { schema } from '../test-schema';
 
 describe('Query interception tests', () => {
@@ -20,20 +20,84 @@ describe('Query interception tests', () => {
             data: { email: 'u1@test.com' },
         });
 
-        let hooksCalled = false;
+        let findHookCalled = false;
+        let updateHookCalled = false;
+
         const client = _client.$use({
             id: 'test-plugin',
-            onQuery(args) {
-                hooksCalled = true;
-                expect(args).toMatchObject({
-                    model: 'User',
-                    operation: 'findFirst',
-                    queryArgs: { where: { id: user.id } },
-                });
-                return args.proceed(args.queryArgs);
+            onQuery: {
+                user: {
+                    findFirst: (ctx) => {
+                        findHookCalled = true;
+                        expect(ctx).toMatchObject({
+                            model: 'User',
+                            operation: 'findFirst',
+                            args: { where: { id: user.id } },
+                        });
+                        return ctx.query(ctx.args);
+                    },
+                    update: (ctx) => {
+                        updateHookCalled = true;
+                        return ctx.query(ctx.args);
+                    },
+                },
             },
         });
 
+        await expect(
+            client.user.findFirst({
+                where: { id: user.id },
+            }),
+        ).resolves.toMatchObject(user);
+        expect(findHookCalled).toBe(true);
+        expect(updateHookCalled).toBe(false);
+    });
+
+    it('supports all models interception', async () => {
+        const user = await _client.user.create({
+            data: { email: 'u1@test.com' },
+        });
+
+        let hooksCalled = false;
+        const client = _client.$use({
+            id: 'test-plugin',
+            onQuery: {
+                $allModels: {
+                    findFirst: (ctx) => {
+                        hooksCalled = true;
+                        expect(ctx.model).toBe('User');
+                        return ctx.query(ctx.args);
+                    },
+                },
+            },
+        });
+        await expect(
+            client.user.findFirst({
+                where: { id: user.id },
+            }),
+        ).resolves.toMatchObject(user);
+        expect(hooksCalled).toBe(true);
+    });
+
+    it('supports all operations interception', async () => {
+        const user = await _client.user.create({
+            data: { email: 'u1@test.com' },
+        });
+
+        let hooksCalled = false;
+        const client = _client.$use({
+            id: 'test-plugin',
+            onQuery: {
+                $allModels: {
+                    $allOperations: (ctx) => {
+                        hooksCalled = true;
+                        expect(ctx.model).toBe('User');
+                        expect(ctx.operation).toBe('findFirst');
+                        return ctx.query(ctx.args);
+                    },
+                },
+            },
+        });
         await expect(
             client.user.findFirst({
                 where: { id: user.id },
@@ -50,9 +114,13 @@ describe('Query interception tests', () => {
         let hooksCalled = false;
         const client = _client.$use({
             id: 'test-plugin',
-            onQuery(args) {
-                hooksCalled = true;
-                return args.proceed({ where: { id: 'non-exist' } });
+            onQuery: {
+                user: {
+                    findFirst: async (ctx) => {
+                        hooksCalled = true;
+                        return ctx.query({ where: { id: 'non-exist' } });
+                    },
+                },
             },
         });
 
@@ -72,11 +140,15 @@ describe('Query interception tests', () => {
         let hooksCalled = false;
         const client = _client.$use({
             id: 'test-plugin',
-            async onQuery({ proceed, queryArgs }) {
-                hooksCalled = true;
-                const result = await proceed(queryArgs);
-                (result as any).happy = true;
-                return result;
+            onQuery: {
+                user: {
+                    findFirst: async (ctx) => {
+                        hooksCalled = true;
+                        const result = await ctx.query(ctx.args);
+                        (result as any).happy = true;
+                        return result;
+                    },
+                },
             },
         });
 
@@ -107,25 +179,33 @@ describe('Query interception tests', () => {
         const client = _client
             .$use({
                 id: 'test-plugin',
-                async onQuery(args) {
-                    hooks1Called = true;
-                    console.log('Plugin1 ready to proceed');
-                    const r = await args.proceed({ where: { id: user2.id } });
-                    (r as any).happy = true;
-                    (r as any).source = 'plugin1';
-                    console.log('Plugin1 ready to return', r);
-                    return r;
+                onQuery: {
+                    user: {
+                        findFirst: async (ctx) => {
+                            hooks1Called = true;
+                            console.log('Plugin1 ready to proceed');
+                            const r = await ctx.query({ where: { id: user2.id } });
+                            (r as any).happy = true;
+                            (r as any).source = 'plugin1';
+                            console.log('Plugin1 ready to return', r);
+                            return r;
+                        },
+                    },
                 },
             })
             .$use({
                 id: 'test-plugin-2',
-                async onQuery(args) {
-                    hooks2Called = true;
-                    console.log('Plugin2 ready to proceed');
-                    const r = await args.proceed({ where: { id: user3.id } });
-                    (r as any).source = 'plugin2';
-                    console.log('Plugin2 ready to return', r);
-                    return r;
+                onQuery: {
+                    user: {
+                        findFirst: async (ctx) => {
+                            hooks2Called = true;
+                            console.log('Plugin2 ready to proceed');
+                            const r = await ctx.query({ where: { id: user3.id } });
+                            (r as any).source = 'plugin2';
+                            console.log('Plugin2 ready to return', r);
+                            return r;
+                        },
+                    },
                 },
             });
 
@@ -147,10 +227,14 @@ describe('Query interception tests', () => {
         let hooksCalled = false;
         const client = _client.$use({
             id: 'test-plugin',
-            async onQuery(args) {
-                hooksCalled = true;
-                await args.proceed(args.queryArgs);
-                throw new Error('trigger error');
+            onQuery: {
+                user: {
+                    create: async (ctx) => {
+                        hooksCalled = true;
+                        await ctx.query(ctx.args);
+                        throw new Error('trigger error');
+                    },
+                },
             },
         });
 
@@ -174,12 +258,16 @@ describe('Query interception tests', () => {
         let hooksCalled = false;
         const client = _client.$use({
             id: 'test-plugin',
-            async onQuery(args) {
-                hooksCalled = true;
-                return args.client.$transaction(async (tx) => {
-                    await args.proceed(args.queryArgs, tx);
-                    throw new Error('trigger error');
-                });
+            onQuery: {
+                user: {
+                    create: async (ctx) => {
+                        hooksCalled = true;
+                        return ctx.client.$transaction(async (tx) => {
+                            await ctx.query(ctx.args, tx);
+                            throw new Error('trigger error');
+                        });
+                    },
+                },
             },
         });
 
@@ -197,5 +285,34 @@ describe('Query interception tests', () => {
                 where: { id: '1' },
             }),
         ).toResolveNull();
+    });
+
+    it('supports plugin encapsulation', async () => {
+        const user = await _client.user.create({
+            data: { email: 'u1@test.com' },
+        });
+
+        let findHookCalled = false;
+
+        const plugin = definePlugin<typeof schema>({
+            id: 'test-plugin',
+            onQuery: {
+                user: {
+                    findFirst: (ctx) => {
+                        findHookCalled = true;
+                        return ctx.query(ctx.args);
+                    },
+                },
+            },
+        });
+
+        const client = _client.$use(plugin);
+
+        await expect(
+            client.user.findFirst({
+                where: { id: user.id },
+            }),
+        ).resolves.toMatchObject(user);
+        expect(findHookCalled).toBe(true);
     });
 });

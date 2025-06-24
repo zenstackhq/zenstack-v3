@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import {
     AliasNode,
     BinaryOperationNode,
@@ -22,7 +23,6 @@ import {
     type QueryResult,
     type RootOperationNode,
 } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { ClientContract } from '../../client';
 import type { CRUD } from '../../client/contract';

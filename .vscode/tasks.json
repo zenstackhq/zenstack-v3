@@ -29,6 +29,16 @@
             }
         },
         {
+            "label": "Lint all",
+            "command": "pnpm lint",
+            "type": "shell",
+            "icon": {
+                "color": "terminal.ansiYellow",
+                "id": "server-process"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Test all",
             "command": "pnpm test",
             "type": "shell",

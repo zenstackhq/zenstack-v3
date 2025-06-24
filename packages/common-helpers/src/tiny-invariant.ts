@@ -1,10 +1,7 @@
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = process.env['NODE_ENV'] === 'production';
 const prefix = 'Invariant failed';
 
-export function invariant(
-    condition: unknown,
-    message?: string,
-): asserts condition {
+export function invariant(condition: unknown, message?: string): asserts condition {
     if (condition) {
         return;
     }

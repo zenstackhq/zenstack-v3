@@ -133,7 +133,14 @@ importers:
         specifier: ^0.2.3
         version: 0.2.3
 
-  packages/common-helpers: {}
+  packages/common-helpers:
+    devDependencies:
+      '@zenstackhq/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@zenstackhq/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
 
   packages/create-zenstack:
     dependencies:

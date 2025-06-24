@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/common-helpers",
-    "version": "3.0.0-alpha.4",
+    "version": "3.0.0-alpha.5",
     "description": "ZenStack Common Helpers",
     "type": "module",
     "scripts": {
@@ -26,5 +26,9 @@
                 "default": "./dist/index.cjs"
             }
         }
+    },
+    "devDependencies": {
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/eslint-config": "workspace:*"
     }
 }

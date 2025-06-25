@@ -1,5 +1,4 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import type { OperandExpression } from 'kysely';
 import {
     AliasNode,
     BinaryOperationNode,

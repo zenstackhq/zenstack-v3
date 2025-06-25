@@ -1,7 +1,6 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
-import { invariant } from '@zenstackhq/sdk/local-helpers';
 import { generateTsSchema } from '@zenstackhq/testtools';
 import SQLite from 'better-sqlite3';
 import { execSync } from 'node:child_process';

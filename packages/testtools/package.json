@@ -5,6 +5,7 @@
     "type": "module",
     "scripts": {
         "build": "tsup-node",
+        "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "pack": "pnpm pack"
     },

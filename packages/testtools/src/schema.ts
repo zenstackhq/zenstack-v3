@@ -32,6 +32,7 @@ export async function generateTsSchema(
     schemaText: string,
     provider: 'sqlite' | 'postgresql' = 'sqlite',
     dbName?: string,
+    extraSourceFiles?: Record<string, string>,
 ) {
     const { name: workDir } = tmp.dirSync({ unsafeCleanup: true });
     console.log(`Working directory: ${workDir}`);
@@ -90,9 +91,19 @@ export async function generateTsSchema(
                 moduleResolution: 'Bundler',
                 esModuleInterop: true,
                 skipLibCheck: true,
+                strict: true,
             },
+            include: ['**/*.ts'],
         }),
     );
+
+    if (extraSourceFiles) {
+        for (const [fileName, content] of Object.entries(extraSourceFiles)) {
+            const filePath = path.resolve(workDir, `${fileName}.ts`);
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+            fs.writeFileSync(filePath, content);
+        }
+    }
 
     // compile the generated TS schema
     execSync('npx tsc', {

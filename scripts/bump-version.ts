@@ -1,0 +1,43 @@
+import * as fs from 'node:fs';
+import { glob } from 'glob';
+import * as path from 'node:path';
+import * as yaml from 'yaml';
+
+function getWorkspacePackageJsonFiles(workspaceFile: string): string[] {
+    const workspaceYaml = fs.readFileSync(workspaceFile, 'utf8');
+    const workspace = yaml.parse(workspaceYaml) as { packages?: string[] };
+    if (!workspace.packages) throw new Error('No "packages" key found in pnpm-workspace.yaml');
+    const rootDir = path.dirname(workspaceFile);
+    const files = new Set<string>();
+    for (const pattern of workspace.packages) {
+        const matches = glob.sync(path.join(pattern, 'package.json'), {
+            cwd: rootDir,
+            absolute: true,
+        });
+        matches.forEach((f) => files.add(f));
+    }
+    return Array.from(files);
+}
+
+function incrementVersion(version: string): string {
+    const parts = version.split('.');
+    const last = parts.length - 1;
+    const lastNum = parseInt(parts[last], 10);
+    if (isNaN(lastNum)) throw new Error(`Invalid version: ${version}`);
+    parts[last] = (lastNum + 1).toString();
+    return parts.join('.');
+}
+
+const workspaceFile = path.resolve(__dirname, '../pnpm-workspace.yaml');
+const packageFiles = getWorkspacePackageJsonFiles(workspaceFile);
+
+for (const file of packageFiles) {
+    const content = fs.readFileSync(file, 'utf8');
+    const pkg = JSON.parse(content) as { version?: string };
+    if (pkg.version) {
+        const oldVersion = pkg.version;
+        pkg.version = incrementVersion(pkg.version);
+        fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');
+        console.log(`Updated ${file}: ${oldVersion} -> ${pkg.version}`);
+    }
+}

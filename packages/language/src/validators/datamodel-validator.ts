@@ -259,7 +259,6 @@ export default class DataModelValidator implements AstValidator<DataModel> {
             return;
         }
 
-         
         const oppositeModel = field.type.reference!.ref! as DataModel;
 
         // Use name because the current document might be updated

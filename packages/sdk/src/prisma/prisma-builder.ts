@@ -145,7 +145,6 @@ export class Model extends ContainerDeclaration {
     }
 
     override toString(): string {
-         
         const result: any[] = [...this.fields];
 
         if (this.attributes.length > 0) {

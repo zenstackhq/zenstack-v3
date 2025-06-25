@@ -10,16 +10,16 @@ describe('cross-model field comparison tests', () => {
             profile Profile @relation(fields: [profileId], references: [id])
             profileId Int  @unique
             age Int
-                  
+
             @@allow('all', age == profile.age)
             @@deny('update', age > 100)
         }
-        
+
         model Profile {
             id Int @id
             age Int
             user User?
-        
+
             @@allow('all', true)
         }
         `,

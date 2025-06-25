@@ -7,11 +7,11 @@ describe('connect and disconnect tests', () => {
         id String @id @default(uuid())
         m2 M2[]
         value Int @default(0)
-    
+
         @@deny('read', value < 0)
         @@allow('all', true)
     }
-    
+
     model M2 {
         id String @id @default(uuid())
         value Int
@@ -19,7 +19,7 @@ describe('connect and disconnect tests', () => {
         m1 M1? @relation(fields: [m1Id], references:[id])
         m1Id String?
         m3 M3[]
-    
+
         @@allow('read,create', true)
         @@allow('update', !deleted)
     }
@@ -183,17 +183,17 @@ describe('connect and disconnect tests', () => {
     model M1 {
         id String @id @default(uuid())
         m2 M2?
-    
+
         @@allow('all', true)
     }
-    
+
     model M2 {
         id String @id @default(uuid())
         value Int
         deleted Boolean @default(false)
         m1 M1? @relation(fields: [m1Id], references:[id])
         m1Id String? @unique
-    
+
         @@allow('read,create', true)
         @@allow('update', !deleted)
     }
@@ -285,17 +285,17 @@ describe('connect and disconnect tests', () => {
         id String @id @default(uuid())
         value Int @default(0)
         m2 M2[]
-    
+
         @@deny('read', value < 0)
         @@allow('all', true)
     }
-    
+
     model M2 {
         id String @id @default(uuid())
         value Int
         deleted Boolean @default(false)
         m1 M1[]
-    
+
         @@deny('read', value < 0)
         @@allow('read,create', true)
         @@allow('update', !deleted)
@@ -325,16 +325,16 @@ describe('connect and disconnect tests', () => {
         id String @id @default(uuid())
         value Int @default(0)
         m2 M1OnM2[]
-    
+
         @@allow('all', true)
     }
-    
+
     model M2 {
         id String @id @default(uuid())
         value Int
         deleted Boolean @default(false)
         m1 M1OnM2[]
-    
+
         @@allow('read,create', true)
     }
 

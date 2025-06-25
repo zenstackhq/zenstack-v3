@@ -23,14 +23,14 @@ describe('field comparison tests', () => {
     it('works with "in" operator', async () => {
         const db = await createPolicyTestClient(
             `
-    model Model {
-        id String @id @default(uuid())
-        x String
-        y String[]
-        @@allow('create', x in y)
-        @@allow('read', x in y)
-    }                
-    `,
+        model Model {
+            id String @id @default(uuid())
+            x String
+            y String[]
+            @@allow('create', x in y)
+            @@allow('read', x in y)
+        }
+        `,
             {
                 provider: 'postgresql',
                 dbName: 'field-comparison-tests-operator',

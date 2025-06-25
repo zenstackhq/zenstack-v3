@@ -1,5 +1,4 @@
 import type { ExpressionBuilder, OperandExpression, SqlBool } from 'kysely';
-import type { Optional } from 'utility-types';
 import type {
     BuiltinType,
     FieldDef,
@@ -29,6 +28,7 @@ import type {
     MapBaseType,
     NonEmptyArray,
     NullableIf,
+    Optional,
     OrArray,
     ValueOfPotentialTuple,
     WrapType,

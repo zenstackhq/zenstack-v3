@@ -39,6 +39,7 @@ import path from 'node:path';
 import { match } from 'ts-pattern';
 import * as ts from 'typescript';
 import { ModelUtils } from '.';
+import { invariant } from './local-helpers';
 import { getAttribute, getAuthDecl, hasAttribute, isIdField, isUniqueField } from './model-utils';
 
 export class TsSchemaGenerator {

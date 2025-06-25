@@ -31,7 +31,6 @@
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/common-helpers": "workspace:*",
-        "async-exit-hook": "^2.0.1",
         "colors": "1.4.0",
         "commander": "^8.3.0",
         "langium": "catalog:",
@@ -43,15 +42,11 @@
         "prisma": "catalog:"
     },
     "devDependencies": {
-        "@types/async-exit-hook": "^2.0.0",
         "@types/better-sqlite3": "^7.6.13",
-        "@types/semver": "^7.3.13",
-        "@types/tmp": "^0.2.6",
+        "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
         "@zenstackhq/testtools": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/eslint-config": "workspace:*",
-        "better-sqlite3": "^11.8.1",
-        "tmp": "^0.2.3"
+        "better-sqlite3": "^11.8.1"
     }
 }

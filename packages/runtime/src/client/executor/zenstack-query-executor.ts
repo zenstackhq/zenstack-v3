@@ -22,7 +22,6 @@ import {
 } from 'kysely';
 import { nanoid } from 'nanoid';
 import { match } from 'ts-pattern';
-import type { PromiseType } from 'utility-types';
 import type { GetModels, SchemaDef } from '../../schema';
 import type { ClientImpl } from '../client-impl';
 import type { ClientContract } from '../contract';
@@ -58,7 +57,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
 
     override async executeQuery(compiledQuery: CompiledQuery, queryId: QueryId) {
         let queryNode = compiledQuery.query;
-        let mutationInterceptionInfo: PromiseType<ReturnType<typeof this.callMutationInterceptionFilters>>;
+        let mutationInterceptionInfo: Awaited<ReturnType<typeof this.callMutationInterceptionFilters>>;
         if (this.isMutationNode(queryNode) && this.hasMutationHooks) {
             mutationInterceptionInfo = await this.callMutationInterceptionFilters(queryNode);
         }
@@ -291,7 +290,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
 
     private callBeforeMutationHooks(
         queryNode: OperationNode,
-        mutationInterceptionInfo: PromiseType<ReturnType<typeof this.callMutationInterceptionFilters>>,
+        mutationInterceptionInfo: Awaited<ReturnType<typeof this.callMutationInterceptionFilters>>,
     ) {
         if (!mutationInterceptionInfo?.intercept) {
             return;
@@ -315,7 +314,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     private async callAfterQueryInterceptionFilters(
         queryResult: QueryResult<unknown>,
         queryNode: OperationNode,
-        mutationInterceptionInfo: PromiseType<ReturnType<typeof this.callMutationInterceptionFilters>>,
+        mutationInterceptionInfo: Awaited<ReturnType<typeof this.callMutationInterceptionFilters>>,
     ) {
         if (!mutationInterceptionInfo?.intercept) {
             return;

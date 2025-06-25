@@ -17,6 +17,7 @@ import {
     ValueNode,
     WhereNode,
     type ExpressionBuilder,
+    type OperandExpression,
     type OperationNode,
 } from 'kysely';
 import { match } from 'ts-pattern';

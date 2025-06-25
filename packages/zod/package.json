@@ -29,8 +29,8 @@
         "ts-pattern": "catalog:"
     },
     "devDependencies": {
-        "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/eslint-config": "workspace:*"
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*"
     },
     "peerDependencies": {
         "zod": "catalog:"

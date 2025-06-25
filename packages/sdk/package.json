@@ -35,21 +35,29 @@
                 "types": "./dist/schema.d.cts",
                 "default": "./dist/schema.cjs"
             }
+        },
+        "./local-helpers": {
+            "import": {
+                "types": "./dist/local-helpers.d.ts",
+                "default": "./dist/local-helpers.js"
+            },
+            "require": {
+                "types": "./dist/local-helpers.d.cts",
+                "default": "./dist/local-helpers.cjs"
+            }
         }
     },
     "dependencies": {
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/common-helpers": "workspace:*",
         "langium": "catalog:",
-        "tmp": "^0.2.3",
         "ts-pattern": "catalog:",
         "typescript": "catalog:"
     },
     "devDependencies": {
-        "@types/tmp": "^0.2.6",
-        "decimal.js": "^10.4.3",
-        "kysely": "catalog:",
+        "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/eslint-config": "workspace:*"
+        "decimal.js": "^10.4.3",
+        "kysely": "catalog:"
     }
 }

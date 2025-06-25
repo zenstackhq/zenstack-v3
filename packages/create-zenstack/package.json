@@ -35,7 +35,7 @@
         "ora": "^5.4.1"
     },
     "devDependencies": {
-        "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/eslint-config": "workspace:*"
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*"
     }
 }

@@ -109,7 +109,7 @@ model List {
     // require login
     @@deny('all', auth() == null)
 
-    // can be read by owner or space members (only if not private) 
+    // can be read by owner or space members (only if not private)
     @@allow('read', ownerId == auth().id || (space.members?[userId == auth().id] && !private))
 
     // when create, owner must be set to current user, and user must be in the space
@@ -117,7 +117,7 @@ model List {
 
     // when create, owner must be set to current user, and user must be in the space
     // update is not allowed to change owner
-    @@allow('update', ownerId == auth().id && space.members?[userId == auth().id] 
+    @@allow('update', ownerId == auth().id && space.members?[userId == auth().id]
     // TODO: future() support
     //   && future().ownerId == ownerId
     )

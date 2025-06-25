@@ -132,9 +132,7 @@ function processCasing(casing: Expression<any>, result: string, model: string) {
         .with('original', () => model)
         .with('upper', () => result.toUpperCase())
         .with('lower', () => result.toLowerCase())
-        .with('
-              
-              ', () => capitalize(result))
+        .with('capitalize', () => capitalize(result))
         .with('uncapitalize', () => uncapitalize(result))
         .otherwise(() => {
             throw new Error(

@@ -4,7 +4,6 @@ export default defineConfig({
     entry: {
         index: 'src/index.ts',
         schema: 'src/schema/index.ts',
-        'local-helpers': 'src/local-helpers/index.ts',
     },
     outDir: 'dist',
     splitting: false,

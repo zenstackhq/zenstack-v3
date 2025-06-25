@@ -1,4 +1,4 @@
-import { invariant, isPlainObject } from '@zenstackhq/sdk/local-helpers';
+import { invariant, isPlainObject } from '@zenstackhq/common-helpers';
 import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';

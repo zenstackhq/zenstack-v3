@@ -1,4 +1,4 @@
-import { invariant } from '@zenstackhq/sdk/local-helpers';
+import { invariant } from '@zenstackhq/common-helpers';
 import { CreateTableBuilder, sql, type ColumnDataType, type OnModifyForeignAction } from 'kysely';
 import { match } from 'ts-pattern';
 import {
@@ -43,7 +43,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
             if (fieldDef.relation) {
                 table = this.addForeignKeyConstraint(table, model, fieldName, fieldDef);
-            } else {
+            } else if (!this.isComputedField(fieldDef)) {
                 table = this.createModelField(table, fieldName, fieldDef, modelDef);
             }
         }
@@ -52,6 +52,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         table = this.addUniqueConstraint(table, modelDef);
 
         return table;
+    }
+
+    private isComputedField(fieldDef: FieldDef) {
+        return fieldDef.attributes?.some((a) => a.name === '@computed');
     }
 
     private addPrimaryKeyConstraint(

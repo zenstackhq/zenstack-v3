@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import { invariant } from '@zenstackhq/sdk/local-helpers';
@@ -61,6 +62,7 @@ export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptio
     provider?: 'sqlite' | 'postgresql';
     dbName?: string;
     usePrismaPush?: boolean;
+    extraSourceFiles?: Record<string, string>;
 };
 
 export async function createTestClient<Schema extends SchemaDef>(
@@ -79,11 +81,14 @@ export async function createTestClient<Schema extends SchemaDef>(
     let _schema: Schema;
 
     if (typeof schema === 'string') {
-        const generated = await generateTsSchema(schema, options?.provider, options?.dbName);
+        const generated = await generateTsSchema(schema, options?.provider, options?.dbName, options?.extraSourceFiles);
         workDir = generated.workDir;
         _schema = generated.schema as Schema;
     } else {
         _schema = schema;
+        if (options?.extraSourceFiles) {
+            throw new Error('`extraSourceFiles` is not supported when schema is a SchemaDef object');
+        }
     }
 
     const { plugins, ...rest } = options ?? {};

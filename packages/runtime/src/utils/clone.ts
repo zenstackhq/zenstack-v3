@@ -1,4 +1,4 @@
-import { isPlainObject } from '@zenstackhq/sdk/local-helpers';
+import { isPlainObject } from '@zenstackhq/common-helpers';
 
 /**
  * Clones the given object. Only arrays and plain objects are cloned. Other values are returned as is.

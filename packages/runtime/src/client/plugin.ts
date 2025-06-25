@@ -1,8 +1,8 @@
-import type { Model } from '@zenstackhq/language/ast';
 import type { OperationNode, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
 import type { ClientContract, ToKysely } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
+import type { ModelOperations } from './contract';
 import type { CrudOperation } from './crud/operations/base';
 
 export type QueryContext<Schema extends SchemaDef> = {
@@ -124,7 +124,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     /**
      * Intercepts an ORM query.
      */
-    onQuery?: (args: OnQueryArgs<Schema>) => Promise<unknown>;
+    onQuery?: OnQueryHooks<Schema>;
 
     /**
      * Intercepts a Kysely query.
@@ -154,14 +154,68 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     afterEntityMutation?: (args: PluginAfterEntityMutationArgs<Schema>) => MaybePromise<void>;
 }
 
-// TODO: move to SDK
-export type CliGeneratorContext = {
-    model: Model;
-    outputPath: string;
-    tsSchemaFile: string;
+type OnQueryHooks<Schema extends SchemaDef = SchemaDef> = {
+    [Model in GetModels<Schema> as Uncapitalize<Model>]?: OnQueryOperationHooks<Schema, Model>;
+} & {
+    $allModels?: OnQueryOperationHooks<Schema, GetModels<Schema>>;
 };
 
-// TODO: move to SDK
-export type CliGenerator = (context: CliGeneratorContext) => MaybePromise<void>;
+type OnQueryOperationHooks<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    [Operation in keyof ModelOperations<Schema, Model>]?: (
+        ctx: OnQueryHookContext<Schema, Model, Operation>,
+    ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
+} & {
+    $allOperations?: (ctx: {
+        model: Model;
+        operation: CrudOperation;
+        args: unknown;
+        query: (args: unknown) => Promise<unknown>;
+    }) => MaybePromise<unknown>;
+};
+
+type OnQueryHookContext<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Operation extends keyof ModelOperations<Schema, Model>,
+> = {
+    /**
+     * The model that is being queried.
+     */
+    model: Model;
+
+    /**
+     * The operation that is being performed.
+     */
+    operation: Operation;
+
+    /**
+     * The query arguments.
+     */
+    args: Parameters<ModelOperations<Schema, Model>[Operation]>[0];
+
+    /**
+     * The query function to proceed with the original query.
+     * It takes the same arguments as the operation method.
+     *
+     * @param args The query arguments.
+     * @param tx Optional transaction client to use for the query.
+     */
+    query: (
+        args: Parameters<ModelOperations<Schema, Model>[Operation]>[0],
+        tx?: ClientContract<Schema>,
+    ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
+
+    /**
+     * The ZenStack client that is performing the operation.
+     */
+    client: ClientContract<Schema>;
+};
+
+/**
+ * Defines a ZenStack runtime plugin.
+ */
+export function definePlugin<Schema extends SchemaDef>(plugin: RuntimePlugin<Schema>) {
+    return plugin;
+}
 
 export { type CrudOperation } from './crud/operations/base';

@@ -1,4 +1,4 @@
-import { invariant, capitalize, uncapitalize } from '@zenstackhq/sdk/local-helpers';
+import { invariant, capitalize, uncapitalize } from '@zenstackhq/common-helpers';
 import { sql, ValueNode, type Expression, type ExpressionBuilder } from 'kysely';
 import { match } from 'ts-pattern';
 import type { ZModelFunction, ZModelFunctionContext } from './options';
@@ -132,7 +132,9 @@ function processCasing(casing: Expression<any>, result: string, model: string) {
         .with('original', () => model)
         .with('upper', () => result.toUpperCase())
         .with('lower', () => result.toLowerCase())
-        .with('capitalize', () => capitalize(result))
+        .with('
+              
+              ', () => capitalize(result))
         .with('uncapitalize', () => uncapitalize(result))
         .otherwise(() => {
             throw new Error(

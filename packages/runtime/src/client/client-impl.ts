@@ -1,3 +1,4 @@
+import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import type { SqliteDialectConfig } from 'kysely';
 import {
     DefaultConnectionProvider,
@@ -12,8 +13,7 @@ import {
 import { match } from 'ts-pattern';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
 import type { AuthType } from '../schema/auth';
-import type { ClientConstructor, ClientContract } from './contract';
-import type { ModelOperations } from './crud-types';
+import type { ClientConstructor, ClientContract, ModelOperations } from './contract';
 import { AggregateOperationHandler } from './crud/operations/aggregate';
 import type { CrudOperation } from './crud/operations/base';
 import { BaseOperationHandler } from './crud/operations/base';
@@ -40,7 +40,7 @@ import { ResultProcessor } from './result-processor';
  */
 export const ZenStackClient = function <Schema extends SchemaDef>(
     this: any,
-    schema: any,
+    schema: Schema,
     options: ClientOptions<Schema>,
 ) {
     return new ClientImpl<Schema>(schema, options);
@@ -107,7 +107,7 @@ export class ClientImpl<Schema extends SchemaDef> {
 
         this.kysely = new Kysely(this.kyselyProps);
 
-        return createClientProxy(this as unknown as ClientContract<Schema>);
+        return createClientProxy(this);
     }
 
     public get $qb() {
@@ -176,8 +176,16 @@ export class ClientImpl<Schema extends SchemaDef> {
     $use(plugin: RuntimePlugin<Schema>) {
         const newOptions = {
             ...this.options,
-            plugins: [...(this.options?.plugins ?? []), plugin],
-        } as ClientOptions<Schema>;
+            plugins: [...(this.options.plugins ?? []), plugin],
+        };
+        return new ClientImpl<Schema>(this.schema, newOptions, this);
+    }
+
+    $unuse(pluginId: string) {
+        const newOptions = {
+            ...this.options,
+            plugins: this.options.plugins?.filter((p) => p.id !== pluginId),
+        };
         return new ClientImpl<Schema>(this.schema, newOptions, this);
     }
 
@@ -185,7 +193,7 @@ export class ClientImpl<Schema extends SchemaDef> {
         const newOptions = {
             ...this.options,
             plugins: [] as RuntimePlugin<Schema>[],
-        } as ClientOptions<Schema>;
+        };
         return new ClientImpl<Schema>(this.schema, newOptions, this);
     }
 
@@ -203,7 +211,7 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 }
 
-function createClientProxy<Schema extends SchemaDef>(client: ClientContract<Schema>): ClientImpl<Schema> {
+function createClientProxy<Schema extends SchemaDef>(client: ClientImpl<Schema>): ClientImpl<Schema> {
     const inputValidator = new InputValidator(client.$schema);
     const resultProcessor = new ResultProcessor(client.$schema);
 
@@ -216,7 +224,12 @@ function createClientProxy<Schema extends SchemaDef>(client: ClientContract<Sche
             if (typeof prop === 'string') {
                 const model = Object.keys(client.$schema.models).find((m) => m.toLowerCase() === prop.toLowerCase());
                 if (model) {
-                    return createModelCrudHandler(client, model as GetModels<Schema>, inputValidator, resultProcessor);
+                    return createModelCrudHandler(
+                        client as ClientContract<Schema>,
+                        model as GetModels<Schema>,
+                        inputValidator,
+                        resultProcessor,
+                    );
                 }
             }
 
@@ -254,18 +267,27 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 return result;
             };
 
-            const context = {
-                client,
-                model,
-                operation,
-                queryArgs: args,
-            };
-
+            // apply plugins
             const plugins = [...(client.$options.plugins ?? [])];
             for (const plugin of plugins) {
-                if (plugin.onQuery) {
-                    const _proceed = proceed;
-                    proceed = () => plugin.onQuery!({ ...context, proceed: _proceed });
+                if (plugin.onQuery && typeof plugin.onQuery === 'object') {
+                    // for each model key or "$allModels"
+                    for (const [_model, modelHooks] of Object.entries(plugin.onQuery)) {
+                        if (_model === lowerCaseFirst(model) || _model === '$allModels') {
+                            if (modelHooks && typeof modelHooks === 'object') {
+                                // for each operation key or "$allOperations"
+                                for (const [op, opHooks] of Object.entries(modelHooks)) {
+                                    if (op === operation || op === '$allOperations') {
+                                        if (typeof opHooks === 'function') {
+                                            const _proceed = proceed;
+                                            proceed = () =>
+                                                opHooks({ client, model, operation, args, query: _proceed });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

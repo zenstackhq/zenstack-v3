@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import {
     ArrayExpr,
@@ -7,6 +8,7 @@ import {
     DataModelAttribute,
     DataModelField,
     DataModelFieldAttribute,
+    DataModelFieldType,
     Enum,
     Expression,
     InvocationExpr,
@@ -246,7 +248,7 @@ export class TsSchemaGenerator {
                     undefined,
                     [],
                     ts.factory.createTypeReferenceNode('OperandExpression', [
-                        ts.factory.createKeywordTypeNode(this.mapTypeToTSSyntaxKeyword(field.type.type!)),
+                        ts.factory.createTypeReferenceNode(this.mapFieldTypeToTSType(field.type)),
                     ]),
                     ts.factory.createBlock(
                         [
@@ -264,15 +266,22 @@ export class TsSchemaGenerator {
         );
     }
 
-    private mapTypeToTSSyntaxKeyword(type: string) {
-        return match<string, ts.KeywordTypeSyntaxKind>(type)
-            .with('String', () => ts.SyntaxKind.StringKeyword)
-            .with('Boolean', () => ts.SyntaxKind.BooleanKeyword)
-            .with('Int', () => ts.SyntaxKind.NumberKeyword)
-            .with('Float', () => ts.SyntaxKind.NumberKeyword)
-            .with('BigInt', () => ts.SyntaxKind.BigIntKeyword)
-            .with('Decimal', () => ts.SyntaxKind.NumberKeyword)
-            .otherwise(() => ts.SyntaxKind.UnknownKeyword);
+    private mapFieldTypeToTSType(type: DataModelFieldType) {
+        let result = match(type.type)
+            .with('String', () => 'string')
+            .with('Boolean', () => 'boolean')
+            .with('Int', () => 'number')
+            .with('Float', () => 'number')
+            .with('BigInt', () => 'bigint')
+            .with('Decimal', () => 'number')
+            .otherwise(() => 'unknown');
+        if (type.array) {
+            result = `${result}[]`;
+        }
+        if (type.optional) {
+            result = `${result} | null`;
+        }
+        return result;
     }
 
     private createDataModelFieldObject(field: DataModelField) {

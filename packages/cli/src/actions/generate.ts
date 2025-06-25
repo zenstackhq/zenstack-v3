@@ -1,7 +1,6 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { isPlugin, LiteralExpr, type Model } from '@zenstackhq/language/ast';
-import type { CliGenerator } from '@zenstackhq/runtime/client';
-import { PrismaSchemaGenerator, TsSchemaGenerator } from '@zenstackhq/sdk';
-import { invariant } from '@zenstackhq/sdk/local-helpers';
+import { PrismaSchemaGenerator, TsSchemaGenerator, type CliGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -1,4 +1,4 @@
-import { invariant } from '@zenstackhq/sdk/local-helpers';
+import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../schema';

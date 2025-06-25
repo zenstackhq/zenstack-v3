@@ -51,10 +51,11 @@
         - [x] Count
         - [x] Aggregate
         - [x] Group by
+    - [ ] Raw queries
     - [ ] Extensions
         - [x] Query builder API
         - [x] Computed fields
-        - [ ] Prisma client extension
+        - [x] Prisma client extension
     - [ ] Misc
         - [x] JSDoc for CRUD methods
         - [x] Cache validation schemas
@@ -66,7 +67,8 @@
         - [ ] Error system
         - [x] Custom table name
         - [x] Custom field name
-        - [ ] Implement changesets
+        - [ ] Strict undefined checks
+    - [ ] Benchmark
 - [ ] Polymorphism
 - [ ] Validation
 - [ ] Access Policy

@@ -1,4 +1,4 @@
-import { invariant } from '@zenstackhq/sdk/local-helpers';
+import { invariant } from '@zenstackhq/common-helpers';
 import {
     AliasNode,
     BinaryOperationNode,

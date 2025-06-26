@@ -9,6 +9,7 @@
         "lint": "turbo run lint",
         "test": "turbo run test",
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+        "bump-version": "npx tsx scripts/bump-version.ts",
         "publish-all": "pnpm --filter \"./packages/**\" -r publish --tag next",
         "publish-preview": "pnpm --filter \"./packages/**\" -r publish --tag next --force --registry https://preview.registry.zenstack.dev/",
         "unpublish-preview": "pnpm --filter \"./packages/**\" -r --shell-mode exec -- npm unpublish -f --registry https://preview.registry.zenstack.dev/ \"\\$PNPM_PACKAGE_NAME\""
@@ -20,13 +21,15 @@
         "@eslint/js": "^9.29.0",
         "@types/node": "^20.17.24",
         "eslint": "~9.29.0",
+        "glob": "^11.0.2",
         "prettier": "^3.5.3",
         "tsup": "^8.5.0",
         "tsx": "^4.20.3",
         "turbo": "^2.5.4",
         "typescript": "catalog:",
         "typescript-eslint": "^8.34.1",
-        "vitest": "^3.2.4"
+        "vitest": "^3.2.4",
+        "yaml": "^2.8.0"
     },
     "pnpm": {
         "onlyBuiltDependencies": [

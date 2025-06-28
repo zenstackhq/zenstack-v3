@@ -34,7 +34,7 @@ jobs:
 
             - name: Bump version
               id: bump
-              run: pnpm run bump-version >> "$GITHUB_OUTPUT"
+              run: pnpm run bump-version
 
             - name: Create PR
               uses: peter-evans/create-pull-request@v7

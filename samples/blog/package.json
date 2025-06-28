@@ -1,25 +1,25 @@
 {
-    "name": "sample-blog",
-    "version": "3.0.0-alpha.5",
-    "description": "",
-    "main": "index.js",
-    "scripts": {
-        "generate": "zenstack generate",
-        "db:migrate": "zenstack migrate dev",
-        "build": "pnpm generate && tsc --noEmit",
-        "dev": "tsx main.ts"
-    },
-    "keywords": [],
-    "author": "",
-    "license": "MIT",
-    "dependencies": {
-        "@zenstackhq/runtime": "workspace:*",
-        "better-sqlite3": "^11.8.1"
-    },
-    "devDependencies": {
-        "@types/better-sqlite3": "^7.6.12",
-        "prisma": "^6.0.0",
-        "@zenstackhq/cli": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*"
-    }
+  "name": "sample-blog",
+  "version": "3.0.0-alpha.6",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "generate": "zenstack generate",
+    "db:migrate": "zenstack migrate dev",
+    "build": "pnpm generate && tsc --noEmit",
+    "dev": "tsx main.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@zenstackhq/runtime": "workspace:*",
+    "better-sqlite3": "^11.8.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "prisma": "^6.0.0",
+    "@zenstackhq/cli": "workspace:*",
+    "@zenstackhq/typescript-config": "workspace:*"
+  }
 }

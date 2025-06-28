@@ -1,52 +1,52 @@
 {
-    "name": "@zenstackhq/cli",
-    "publisher": "zenstack",
-    "displayName": "ZenStack CLI",
-    "description": "FullStack database toolkit with built-in access control and automatic API generation.",
-    "version": "3.0.0-alpha.5",
-    "type": "module",
-    "author": {
-        "name": "ZenStack Team"
-    },
-    "homepage": "https://zenstack.dev",
-    "license": "MIT",
-    "keywords": [
-        "orm",
-        "fullstack",
-        "react",
-        "typescript",
-        "data modeling"
-    ],
-    "bin": {
-        "zenstack": "bin/cli"
-    },
-    "scripts": {
-        "build": "tsup-node",
-        "watch": "tsup-node --watch",
-        "lint": "eslint src --ext ts",
-        "test": "vitest run",
-        "pack": "pnpm pack"
-    },
-    "dependencies": {
-        "@zenstackhq/language": "workspace:*",
-        "@zenstackhq/sdk": "workspace:*",
-        "@zenstackhq/common-helpers": "workspace:*",
-        "colors": "1.4.0",
-        "commander": "^8.3.0",
-        "langium": "catalog:",
-        "ora": "^5.4.1",
-        "package-manager-detector": "^1.3.0",
-        "ts-pattern": "catalog:"
-    },
-    "peerDependencies": {
-        "prisma": "catalog:"
-    },
-    "devDependencies": {
-        "@types/better-sqlite3": "^7.6.13",
-        "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/runtime": "workspace:*",
-        "@zenstackhq/testtools": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*",
-        "better-sqlite3": "^11.8.1"
-    }
+  "name": "@zenstackhq/cli",
+  "publisher": "zenstack",
+  "displayName": "ZenStack CLI",
+  "description": "FullStack database toolkit with built-in access control and automatic API generation.",
+  "version": "3.0.0-alpha.7",
+  "type": "module",
+  "author": {
+    "name": "ZenStack Team"
+  },
+  "homepage": "https://zenstack.dev",
+  "license": "MIT",
+  "keywords": [
+    "orm",
+    "fullstack",
+    "react",
+    "typescript",
+    "data modeling"
+  ],
+  "bin": {
+    "zenstack": "bin/cli"
+  },
+  "scripts": {
+    "build": "tsup-node",
+    "watch": "tsup-node --watch",
+    "lint": "eslint src --ext ts",
+    "test": "vitest run",
+    "pack": "pnpm pack"
+  },
+  "dependencies": {
+    "@zenstackhq/language": "workspace:*",
+    "@zenstackhq/sdk": "workspace:*",
+    "@zenstackhq/common-helpers": "workspace:*",
+    "colors": "1.4.0",
+    "commander": "^8.3.0",
+    "langium": "catalog:",
+    "ora": "^5.4.1",
+    "package-manager-detector": "^1.3.0",
+    "ts-pattern": "catalog:"
+  },
+  "peerDependencies": {
+    "prisma": "catalog:"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@zenstackhq/eslint-config": "workspace:*",
+    "@zenstackhq/runtime": "workspace:*",
+    "@zenstackhq/testtools": "workspace:*",
+    "@zenstackhq/typescript-config": "workspace:*",
+    "better-sqlite3": "^11.8.1"
+  }
 }

@@ -1,42 +1,42 @@
 {
-    "name": "@zenstackhq/tanstack-query",
-    "version": "3.0.0-alpha.5",
-    "description": "",
-    "main": "index.js",
-    "type": "module",
-    "private": true,
-    "scripts": {
-        "build": "tsup-node",
-        "lint": "eslint src --ext ts"
-    },
-    "keywords": [],
-    "author": "",
-    "license": "MIT",
-    "exports": {
-        "./react": {
-            "import": {
-                "types": "./dist/react.d.ts",
-                "default": "./dist/react.js"
-            },
-            "require": {
-                "types": "./dist/react.d.cts",
-                "default": "./dist/react.cjs"
-            }
-        }
-    },
-    "dependencies": {
-        "@zenstackhq/runtime": "workspace:*"
-    },
-    "devDependencies": {
-        "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*"
-    },
-    "peerDependencies": {
-        "@tanstack/react-query": "^5.0.0"
-    },
-    "peerDependenciesMeta": {
-        "@tanstack/react-query": {
-            "optional": true
-        }
+  "name": "@zenstackhq/tanstack-query",
+  "version": "3.0.0-alpha.6",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsup-node",
+    "lint": "eslint src --ext ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "exports": {
+    "./react": {
+      "import": {
+        "types": "./dist/react.d.ts",
+        "default": "./dist/react.js"
+      },
+      "require": {
+        "types": "./dist/react.d.cts",
+        "default": "./dist/react.cjs"
+      }
     }
+  },
+  "dependencies": {
+    "@zenstackhq/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@zenstackhq/eslint-config": "workspace:*",
+    "@zenstackhq/typescript-config": "workspace:*"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-query": {
+      "optional": true
+    }
+  }
 }

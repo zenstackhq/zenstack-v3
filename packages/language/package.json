@@ -1,60 +1,60 @@
 {
-    "name": "@zenstackhq/language",
-    "description": "ZenStack ZModel language specification",
-    "version": "3.0.0-alpha.5",
-    "license": "MIT",
-    "author": "ZenStack Team",
-    "files": [
-        "dist",
-        "res"
-    ],
-    "type": "module",
-    "scripts": {
-        "build": "pnpm langium:generate && tsup-node",
-        "lint": "eslint src --ext ts",
-        "langium:generate": "langium generate",
-        "langium:generate:production": "langium generate --mode=production",
-        "pack": "pnpm pack"
+  "name": "@zenstackhq/language",
+  "description": "ZenStack ZModel language specification",
+  "version": "3.0.0-alpha.11",
+  "license": "MIT",
+  "author": "ZenStack Team",
+  "files": [
+    "dist",
+    "res"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "pnpm langium:generate && tsup-node",
+    "lint": "eslint src --ext ts",
+    "langium:generate": "langium generate",
+    "langium:generate:production": "langium generate --mode=production",
+    "pack": "pnpm pack"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
-    "exports": {
-        ".": {
-            "import": {
-                "types": "./dist/index.d.ts",
-                "default": "./dist/index.js"
-            },
-            "require": {
-                "types": "./dist/index.d.cts",
-                "default": "./dist/index.cjs"
-            }
-        },
-        "./ast": {
-            "import": {
-                "types": "./dist/ast.d.ts",
-                "default": "./dist/ast.js"
-            },
-            "require": {
-                "types": "./dist/ast.d.cts",
-                "default": "./dist/ast.cjs"
-            }
-        },
-        "./package.json": {
-            "import": "./package.json",
-            "require": "./package.json"
-        }
+    "./ast": {
+      "import": {
+        "types": "./dist/ast.d.ts",
+        "default": "./dist/ast.js"
+      },
+      "require": {
+        "types": "./dist/ast.d.cts",
+        "default": "./dist/ast.cjs"
+      }
     },
-    "dependencies": {
-        "langium": "catalog:",
-        "pluralize": "^8.0.0",
-        "ts-pattern": "catalog:"
-    },
-    "devDependencies": {
-        "@types/pluralize": "^0.0.33",
-        "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*",
-        "langium-cli": "~3.3.0"
-    },
-    "volta": {
-        "node": "18.19.1",
-        "npm": "10.2.4"
+    "./package.json": {
+      "import": "./package.json",
+      "require": "./package.json"
     }
+  },
+  "dependencies": {
+    "langium": "catalog:",
+    "pluralize": "^8.0.0",
+    "ts-pattern": "catalog:"
+  },
+  "devDependencies": {
+    "@types/pluralize": "^0.0.33",
+    "@zenstackhq/eslint-config": "workspace:*",
+    "@zenstackhq/typescript-config": "workspace:*",
+    "langium-cli": "~3.3.0"
+  },
+  "volta": {
+    "node": "18.19.1",
+    "npm": "10.2.4"
+  }
 }

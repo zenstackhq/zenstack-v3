@@ -1,38 +1,38 @@
 {
-    "name": "@zenstackhq/zod",
-    "version": "3.0.0-alpha.5",
-    "description": "",
-    "type": "module",
-    "main": "index.js",
-    "private": true,
-    "scripts": {
-        "build": "tsup-node",
-        "lint": "eslint src --ext ts"
-    },
-    "keywords": [],
-    "author": "",
-    "license": "MIT",
-    "exports": {
-        ".": {
-            "import": {
-                "types": "./dist/index.d.ts",
-                "default": "./dist/index.js"
-            },
-            "require": {
-                "types": "./dist/index.d.cts",
-                "default": "./dist/index.cjs"
-            }
-        }
-    },
-    "dependencies": {
-        "@zenstackhq/runtime": "workspace:*",
-        "ts-pattern": "catalog:"
-    },
-    "devDependencies": {
-        "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*"
-    },
-    "peerDependencies": {
-        "zod": "catalog:"
+  "name": "@zenstackhq/zod",
+  "version": "3.0.0-alpha.6",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "build": "tsup-node",
+    "lint": "eslint src --ext ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
+  },
+  "dependencies": {
+    "@zenstackhq/runtime": "workspace:*",
+    "ts-pattern": "catalog:"
+  },
+  "devDependencies": {
+    "@zenstackhq/eslint-config": "workspace:*",
+    "@zenstackhq/typescript-config": "workspace:*"
+  },
+  "peerDependencies": {
+    "zod": "catalog:"
+  }
 }

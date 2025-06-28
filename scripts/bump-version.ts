@@ -7,8 +7,11 @@ function getWorkspacePackageJsonFiles(workspaceFile: string): string[] {
     const workspaceYaml = fs.readFileSync(workspaceFile, 'utf8');
     const workspace = yaml.parse(workspaceYaml) as { packages?: string[] };
     if (!workspace.packages) throw new Error('No "packages" key found in pnpm-workspace.yaml');
-    const rootDir = path.dirname(workspaceFile);
+
     const files = new Set<string>();
+
+    // include all package.json files in the workspace
+    const rootDir = path.dirname(workspaceFile);
     for (const pattern of workspace.packages) {
         const matches = glob.sync(path.join(pattern, 'package.json'), {
             cwd: rootDir,
@@ -16,6 +19,10 @@ function getWorkspacePackageJsonFiles(workspaceFile: string): string[] {
         });
         matches.filter((f) => !f.includes('node_modules')).forEach((f) => files.add(f));
     }
+
+    // include root package.json
+    files.add(path.resolve(__dirname, '../package.json'));
+
     return Array.from(files);
 }
 

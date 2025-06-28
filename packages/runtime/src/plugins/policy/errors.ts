@@ -4,10 +4,8 @@
 export class RejectedByPolicyError extends Error {
     constructor(
         public readonly model: string | undefined,
-        public readonly reason?: string
+        public readonly reason?: string,
     ) {
-        super(
-            reason ?? `Operation rejected by policy${model ? ': ' + model : ''}`
-        );
+        super(reason ?? `Operation rejected by policy${model ? ': ' + model : ''}`);
     }
 }

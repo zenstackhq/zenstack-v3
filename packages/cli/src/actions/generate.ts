@@ -1,10 +1,9 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { isPlugin, LiteralExpr, type Model } from '@zenstackhq/language/ast';
-import type { CliGenerator } from '@zenstackhq/runtime/client';
-import { PrismaSchemaGenerator, TsSchemaGenerator } from '@zenstackhq/sdk';
+import { PrismaSchemaGenerator, TsSchemaGenerator, type CliGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
-import invariant from 'tiny-invariant';
 import { getSchemaFile, loadSchemaDocument } from './action-utils';
 
 type Options = {
@@ -41,25 +40,18 @@ import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from '${outputPath}/schema';
 
 const client = new ZenStackClient(schema, {
-    dialectConfig: { ... } 
+    dialectConfig: { ... }
 });
 \`\`\`
 `);
     }
 }
 
-async function runPlugins(
-    model: Model,
-    outputPath: string,
-    tsSchemaFile: string
-) {
+async function runPlugins(model: Model, outputPath: string, tsSchemaFile: string) {
     const plugins = model.declarations.filter(isPlugin);
     for (const plugin of plugins) {
         const providerField = plugin.fields.find((f) => f.name === 'provider');
-        invariant(
-            providerField,
-            `Plugin ${plugin.name} does not have a provider field`
-        );
+        invariant(providerField, `Plugin ${plugin.name} does not have a provider field`);
         const provider = (providerField.value as LiteralExpr).value as string;
         let useProvider = provider;
         if (useProvider.startsWith('@core/')) {

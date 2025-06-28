@@ -1,3 +1,4 @@
+import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import type { SqliteDialectConfig } from 'kysely';
 import {
     DefaultConnectionProvider,
@@ -12,8 +13,7 @@ import {
 import { match } from 'ts-pattern';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
 import type { AuthType } from '../schema/auth';
-import type { ClientConstructor, ClientContract } from './contract';
-import type { ModelOperations } from './crud-types';
+import type { ClientConstructor, ClientContract, ModelOperations } from './contract';
 import { AggregateOperationHandler } from './crud/operations/aggregate';
 import type { CrudOperation } from './crud/operations/base';
 import { BaseOperationHandler } from './crud/operations/base';
@@ -40,8 +40,8 @@ import { ResultProcessor } from './result-processor';
  */
 export const ZenStackClient = function <Schema extends SchemaDef>(
     this: any,
-    schema: any,
-    options: ClientOptions<Schema>
+    schema: Schema,
+    options: ClientOptions<Schema>,
 ) {
     return new ClientImpl<Schema>(schema, options);
 } as unknown as ClientConstructor;
@@ -57,7 +57,7 @@ export class ClientImpl<Schema extends SchemaDef> {
     constructor(
         private readonly schema: Schema,
         private options: ClientOptions<Schema>,
-        baseClient?: ClientImpl<Schema>
+        baseClient?: ClientImpl<Schema>,
     ) {
         this.$schema = schema;
         this.$options = options ?? ({} as ClientOptions<Schema>);
@@ -76,26 +76,17 @@ export class ClientImpl<Schema extends SchemaDef> {
                     baseClient.kyselyProps.driver as ZenStackDriver,
                     baseClient.kyselyProps.dialect.createQueryCompiler(),
                     baseClient.kyselyProps.dialect.createAdapter(),
-                    new DefaultConnectionProvider(baseClient.kyselyProps.driver)
+                    new DefaultConnectionProvider(baseClient.kyselyProps.driver),
                 ),
             };
             this.kyselyRaw = baseClient.kyselyRaw;
         } else {
             const dialect = this.getKyselyDialect();
-            const driver = new ZenStackDriver(
-                dialect.createDriver(),
-                new Log(this.$options.log ?? [])
-            );
+            const driver = new ZenStackDriver(dialect.createDriver(), new Log(this.$options.log ?? []));
             const compiler = dialect.createQueryCompiler();
             const adapter = dialect.createAdapter();
             const connectionProvider = new DefaultConnectionProvider(driver);
-            const executor = new ZenStackQueryExecutor(
-                this,
-                driver,
-                compiler,
-                adapter,
-                connectionProvider
-            );
+            const executor = new ZenStackQueryExecutor(this, driver, compiler, adapter, connectionProvider);
 
             this.kyselyProps = {
                 config: {
@@ -110,18 +101,13 @@ export class ClientImpl<Schema extends SchemaDef> {
             // raw kysely instance with default executor
             this.kyselyRaw = new Kysely({
                 ...this.kyselyProps,
-                executor: new DefaultQueryExecutor(
-                    compiler,
-                    adapter,
-                    connectionProvider,
-                    []
-                ),
+                executor: new DefaultQueryExecutor(compiler, adapter, connectionProvider, []),
             });
         }
 
         this.kysely = new Kysely(this.kyselyProps);
 
-        return createClientProxy(this as unknown as ClientContract<Schema>);
+        return createClientProxy(this);
     }
 
     public get $qb() {
@@ -140,20 +126,14 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 
     private makePostgresKyselyDialect(): PostgresDialect {
-        return new PostgresDialect(
-            this.options.dialectConfig as PostgresDialectConfig
-        );
+        return new PostgresDialect(this.options.dialectConfig as PostgresDialectConfig);
     }
 
     private makeSqliteKyselyDialect(): SqliteDialect {
-        return new SqliteDialect(
-            this.options.dialectConfig as SqliteDialectConfig
-        );
+        return new SqliteDialect(this.options.dialectConfig as SqliteDialectConfig);
     }
 
-    async $transaction<T>(
-        callback: (tx: ClientContract<Schema>) => Promise<T>
-    ): Promise<T> {
+    async $transaction<T>(callback: (tx: ClientContract<Schema>) => Promise<T>): Promise<T> {
         return this.kysely.transaction().execute((tx) => {
             const txClient = new ClientImpl<Schema>(this.schema, this.$options);
             txClient.kysely = tx;
@@ -162,24 +142,15 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 
     get $procedures() {
-        return Object.keys(this.$schema.procedures ?? {}).reduce(
-            (acc, name) => {
-                acc[name] = (...args: unknown[]) => this.handleProc(name, args);
-                return acc;
-            },
-            {} as any
-        );
+        return Object.keys(this.$schema.procedures ?? {}).reduce((acc, name) => {
+            acc[name] = (...args: unknown[]) => this.handleProc(name, args);
+            return acc;
+        }, {} as any);
     }
 
     private async handleProc(name: string, args: unknown[]) {
-        if (
-            !('procedures' in this.$options) ||
-            !this.$options ||
-            typeof this.$options.procedures !== 'object'
-        ) {
-            throw new QueryError(
-                'Procedures are not configured for the client.'
-            );
+        if (!('procedures' in this.$options) || !this.$options || typeof this.$options.procedures !== 'object') {
+            throw new QueryError('Procedures are not configured for the client.');
         }
 
         const procOptions = this.$options.procedures as ProceduresOptions<
@@ -188,12 +159,9 @@ export class ClientImpl<Schema extends SchemaDef> {
             }
         >;
         if (!procOptions[name] || typeof procOptions[name] !== 'function') {
-            throw new Error(
-                `Procedure "${name}" does not have a handler configured.`
-            );
+            throw new Error(`Procedure "${name}" does not have a handler configured.`);
         }
 
-        // eslint-disable-next-line @typescript-eslint/ban-types
         return (procOptions[name] as Function).apply(this, [this, ...args]);
     }
 
@@ -208,8 +176,16 @@ export class ClientImpl<Schema extends SchemaDef> {
     $use(plugin: RuntimePlugin<Schema>) {
         const newOptions = {
             ...this.options,
-            plugins: [...(this.options?.plugins ?? []), plugin],
-        } as ClientOptions<Schema>;
+            plugins: [...(this.options.plugins ?? []), plugin],
+        };
+        return new ClientImpl<Schema>(this.schema, newOptions, this);
+    }
+
+    $unuse(pluginId: string) {
+        const newOptions = {
+            ...this.options,
+            plugins: this.options.plugins?.filter((p) => p.id !== pluginId),
+        };
         return new ClientImpl<Schema>(this.schema, newOptions, this);
     }
 
@@ -217,7 +193,7 @@ export class ClientImpl<Schema extends SchemaDef> {
         const newOptions = {
             ...this.options,
             plugins: [] as RuntimePlugin<Schema>[],
-        } as ClientOptions<Schema>;
+        };
         return new ClientImpl<Schema>(this.schema, newOptions, this);
     }
 
@@ -225,11 +201,7 @@ export class ClientImpl<Schema extends SchemaDef> {
         if (auth !== undefined && typeof auth !== 'object') {
             throw new Error('Invalid auth object');
         }
-        const newClient = new ClientImpl<Schema>(
-            this.schema,
-            this.$options,
-            this
-        );
+        const newClient = new ClientImpl<Schema>(this.schema, this.$options, this);
         newClient.auth = auth;
         return newClient;
     }
@@ -239,9 +211,7 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 }
 
-function createClientProxy<Schema extends SchemaDef>(
-    client: ClientContract<Schema>
-): ClientImpl<Schema> {
+function createClientProxy<Schema extends SchemaDef>(client: ClientImpl<Schema>): ClientImpl<Schema> {
     const inputValidator = new InputValidator(client.$schema);
     const resultProcessor = new ResultProcessor(client.$schema);
 
@@ -252,15 +222,13 @@ function createClientProxy<Schema extends SchemaDef>(
             }
 
             if (typeof prop === 'string') {
-                const model = Object.keys(client.$schema.models).find(
-                    (m) => m.toLowerCase() === prop.toLowerCase()
-                );
+                const model = Object.keys(client.$schema.models).find((m) => m.toLowerCase() === prop.toLowerCase());
                 if (model) {
                     return createModelCrudHandler(
-                        client,
+                        client as ClientContract<Schema>,
                         model as GetModels<Schema>,
                         inputValidator,
-                        resultProcessor
+                        resultProcessor,
                     );
                 }
             }
@@ -270,27 +238,21 @@ function createClientProxy<Schema extends SchemaDef>(
     }) as unknown as ClientImpl<Schema>;
 }
 
-function createModelCrudHandler<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>
->(
+function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModels<Schema>>(
     client: ClientContract<Schema>,
     model: Model,
     inputValidator: InputValidator<Schema>,
-    resultProcessor: ResultProcessor<Schema>
+    resultProcessor: ResultProcessor<Schema>,
 ): ModelOperations<Schema, Model> {
     const createPromise = (
         operation: CrudOperation,
         args: unknown,
         handler: BaseOperationHandler<Schema>,
         postProcess = false,
-        throwIfNoResult = false
+        throwIfNoResult = false,
     ) => {
         return createDeferredPromise(async () => {
-            let proceed = async (
-                _args?: unknown,
-                tx?: ClientContract<Schema>
-            ) => {
+            let proceed = async (_args?: unknown, tx?: ClientContract<Schema>) => {
                 const _handler = tx ? handler.withClient(tx) : handler;
                 const r = await _handler.handle(operation, _args ?? args);
                 if (!r && throwIfNoResult) {
@@ -305,19 +267,27 @@ function createModelCrudHandler<
                 return result;
             };
 
-            const context = {
-                client,
-                model,
-                operation,
-                queryArgs: args,
-            };
-
+            // apply plugins
             const plugins = [...(client.$options.plugins ?? [])];
             for (const plugin of plugins) {
-                if (plugin.onQuery) {
-                    const _proceed = proceed;
-                    proceed = () =>
-                        plugin.onQuery!({ ...context, proceed: _proceed });
+                if (plugin.onQuery && typeof plugin.onQuery === 'object') {
+                    // for each model key or "$allModels"
+                    for (const [_model, modelHooks] of Object.entries(plugin.onQuery)) {
+                        if (_model === lowerCaseFirst(model) || _model === '$allModels') {
+                            if (modelHooks && typeof modelHooks === 'object') {
+                                // for each operation key or "$allOperations"
+                                for (const [op, opHooks] of Object.entries(modelHooks)) {
+                                    if (op === operation || op === '$allOperations') {
+                                        if (typeof opHooks === 'function') {
+                                            const _proceed = proceed;
+                                            proceed = () =>
+                                                opHooks({ client, model, operation, args, query: _proceed });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -327,12 +297,7 @@ function createModelCrudHandler<
 
     return {
         findUnique: (args: unknown) => {
-            return createPromise(
-                'findUnique',
-                args,
-                new FindOperationHandler(client, model, inputValidator),
-                true
-            );
+            return createPromise('findUnique', args, new FindOperationHandler(client, model, inputValidator), true);
         },
 
         findUniqueOrThrow: (args: unknown) => {
@@ -341,17 +306,12 @@ function createModelCrudHandler<
                 args,
                 new FindOperationHandler(client, model, inputValidator),
                 true,
-                true
+                true,
             );
         },
 
         findFirst: (args: unknown) => {
-            return createPromise(
-                'findFirst',
-                args,
-                new FindOperationHandler(client, model, inputValidator),
-                true
-            );
+            return createPromise('findFirst', args, new FindOperationHandler(client, model, inputValidator), true);
         },
 
         findFirstOrThrow: (args: unknown) => {
@@ -360,35 +320,20 @@ function createModelCrudHandler<
                 args,
                 new FindOperationHandler(client, model, inputValidator),
                 true,
-                true
+                true,
             );
         },
 
         findMany: (args: unknown) => {
-            return createPromise(
-                'findMany',
-                args,
-                new FindOperationHandler(client, model, inputValidator),
-                true
-            );
+            return createPromise('findMany', args, new FindOperationHandler(client, model, inputValidator), true);
         },
 
         create: (args: unknown) => {
-            return createPromise(
-                'create',
-                args,
-                new CreateOperationHandler(client, model, inputValidator),
-                true
-            );
+            return createPromise('create', args, new CreateOperationHandler(client, model, inputValidator), true);
         },
 
         createMany: (args: unknown) => {
-            return createPromise(
-                'createMany',
-                args,
-                new CreateOperationHandler(client, model, inputValidator),
-                false
-            );
+            return createPromise('createMany', args, new CreateOperationHandler(client, model, inputValidator), false);
         },
 
         createManyAndReturn: (args: unknown) => {
@@ -396,26 +341,16 @@ function createModelCrudHandler<
                 'createManyAndReturn',
                 args,
                 new CreateOperationHandler(client, model, inputValidator),
-                true
+                true,
             );
         },
 
         update: (args: unknown) => {
-            return createPromise(
-                'update',
-                args,
-                new UpdateOperationHandler(client, model, inputValidator),
-                true
-            );
+            return createPromise('update', args, new UpdateOperationHandler(client, model, inputValidator), true);
         },
 
         updateMany: (args: unknown) => {
-            return createPromise(
-                'updateMany',
-                args,
-                new UpdateOperationHandler(client, model, inputValidator),
-                false
-            );
+            return createPromise('updateMany', args, new UpdateOperationHandler(client, model, inputValidator), false);
         },
 
         updateManyAndReturn: (args: unknown) => {
@@ -423,44 +358,24 @@ function createModelCrudHandler<
                 'updateManyAndReturn',
                 args,
                 new UpdateOperationHandler(client, model, inputValidator),
-                true
+                true,
             );
         },
 
         upsert: (args: unknown) => {
-            return createPromise(
-                'upsert',
-                args,
-                new UpdateOperationHandler(client, model, inputValidator),
-                true
-            );
+            return createPromise('upsert', args, new UpdateOperationHandler(client, model, inputValidator), true);
         },
 
         delete: (args: unknown) => {
-            return createPromise(
-                'delete',
-                args,
-                new DeleteOperationHandler(client, model, inputValidator),
-                true
-            );
+            return createPromise('delete', args, new DeleteOperationHandler(client, model, inputValidator), true);
         },
 
         deleteMany: (args: unknown) => {
-            return createPromise(
-                'deleteMany',
-                args,
-                new DeleteOperationHandler(client, model, inputValidator),
-                false
-            );
+            return createPromise('deleteMany', args, new DeleteOperationHandler(client, model, inputValidator), false);
         },
 
         count: (args: unknown) => {
-            return createPromise(
-                'count',
-                args,
-                new CountOperationHandler(client, model, inputValidator),
-                false
-            );
+            return createPromise('count', args, new CountOperationHandler(client, model, inputValidator), false);
         },
 
         aggregate: (args: unknown) => {
@@ -468,16 +383,12 @@ function createModelCrudHandler<
                 'aggregate',
                 args,
                 new AggregateOperationHandler(client, model, inputValidator),
-                false
+                false,
             );
         },
 
         groupBy: (args: unknown) => {
-            return createPromise(
-                'groupBy',
-                args,
-                new GroupByeOperationHandler(client, model, inputValidator)
-            );
+            return createPromise('groupBy', args, new GroupByeOperationHandler(client, model, inputValidator));
         },
     } as ModelOperations<Schema, Model>;
 }

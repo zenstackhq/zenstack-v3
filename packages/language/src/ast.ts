@@ -1,10 +1,5 @@
 import type { AstNode } from 'langium';
-import {
-    AbstractDeclaration,
-    BinaryExpr,
-    DataModel,
-    type ExpressionType,
-} from './generated/ast';
+import { AbstractDeclaration, BinaryExpr, DataModel, type ExpressionType } from './generated/ast';
 
 export type { AstNode, Reference } from 'langium';
 export * from './generated/ast';
@@ -23,10 +18,7 @@ export type ResolvedType = {
     nullable?: boolean;
 };
 
-export const BinaryExprOperatorPriority: Record<
-    BinaryExpr['operator'],
-    number
-> = {
+export const BinaryExprOperatorPriority: Record<BinaryExpr['operator'], number> = {
     //LogicalExpr
     '||': 1,
     '&&': 1,

@@ -10,19 +10,17 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel() == 'User')
             }
-            
+
             model Post {
                 id Int @id
                 @@allow('read', true)
                 @@allow('create', currentModel() == 'User')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('works with upper case', async () => {
@@ -33,19 +31,17 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel('upper') == 'USER')
             }
-            
+
             model Post {
                 id Int @id
                 @@allow('read', true)
                 @@allow('create', currentModel('upper') == 'Post')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('works with lower case', async () => {
@@ -56,19 +52,17 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel('lower') == 'user')
             }
-            
+
             model Post {
                 id Int @id
                 @@allow('read', true)
                 @@allow('create', currentModel('lower') == 'Post')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('works with capitalization', async () => {
@@ -79,19 +73,17 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel('capitalize') == 'User')
             }
-            
+
             model post {
                 id Int @id
                 @@allow('read', true)
                 @@allow('create', currentModel('capitalize') == 'post')
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('works with uncapitalization', async () => {
@@ -102,19 +94,17 @@ describe('currentModel tests', () => {
                 @@allow('read', true)
                 @@allow('create', currentModel('uncapitalize') == 'uSER')
             }
-            
+
             model POST {
                 id Int @id
                 @@allow('read', true)
                 @@allow('create', currentModel('uncapitalize') == 'POST')
             }
-            `
+            `,
         );
 
         await expect(db.USER.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.POST.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.POST.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     // TODO: abstract base support
@@ -129,16 +119,14 @@ describe('currentModel tests', () => {
 
             model User extends Base {
             }
-            
+
             model Post extends Base {
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     // TODO: delegate support
@@ -156,16 +144,14 @@ describe('currentModel tests', () => {
 
             model User extends Base {
             }
-            
+
             model Post extends Base {
             }
-            `
+            `,
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(
-            db.post.create({ data: { id: 1 } })
-        ).toBeRejectedByPolicy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
     });
 
     it('complains when used outside policies', async () => {
@@ -175,11 +161,9 @@ describe('currentModel tests', () => {
             model User {
                 id String @default(currentModel())
             }
-            `
-            )
-        ).rejects.toThrow(
-            'function "currentModel" is not allowed in the current context: DefaultValue'
-        );
+            `,
+            ),
+        ).rejects.toThrow('function "currentModel" is not allowed in the current context: DefaultValue');
     });
 
     it('complains when casing argument is invalid', async () => {
@@ -190,10 +174,8 @@ describe('currentModel tests', () => {
                 id String @id
                 @@allow('create', currentModel('foo') == 'User')
             }
-            `
-            )
-        ).rejects.toThrow(
-            'argument must be one of: "original", "upper", "lower", "capitalize", "uncapitalize"'
-        );
+            `,
+            ),
+        ).rejects.toThrow('argument must be one of: "original", "upper", "lower", "capitalize", "uncapitalize"');
     });
 });

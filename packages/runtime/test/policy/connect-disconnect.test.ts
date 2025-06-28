@@ -7,11 +7,11 @@ describe('connect and disconnect tests', () => {
         id String @id @default(uuid())
         m2 M2[]
         value Int @default(0)
-    
+
         @@deny('read', value < 0)
         @@allow('all', true)
     }
-    
+
     model M2 {
         id String @id @default(uuid())
         value Int
@@ -19,7 +19,7 @@ describe('connect and disconnect tests', () => {
         m1 M1? @relation(fields: [m1Id], references:[id])
         m1Id String?
         m3 M3[]
-    
+
         @@allow('read,create', true)
         @@allow('update', !deleted)
     }
@@ -65,7 +65,7 @@ describe('connect and disconnect tests', () => {
                     },
                 },
                 include: { m2: true },
-            })
+            }),
         ).resolves.toMatchObject({
             m2: [expect.objectContaining({ id: 'm2-1' })],
         });
@@ -93,7 +93,7 @@ describe('connect and disconnect tests', () => {
                         connect: { id: 'm2-2' },
                     },
                 },
-            })
+            }),
         ).toBeRejectedNotFound();
 
         // mixed create and connect
@@ -116,7 +116,7 @@ describe('connect and disconnect tests', () => {
                         create: { value: 1, deleted: false },
                     },
                 },
-            })
+            }),
         ).toBeRejectedNotFound();
 
         // connectOrCreate
@@ -142,7 +142,7 @@ describe('connect and disconnect tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toBeRejectedNotFound();
     });
 
@@ -161,7 +161,7 @@ describe('connect and disconnect tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         await db.m3.create({ data: { id: 'm3-2', value: 1, deleted: true } });
@@ -175,7 +175,7 @@ describe('connect and disconnect tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toBeRejectedNotFound();
     });
 
@@ -183,17 +183,17 @@ describe('connect and disconnect tests', () => {
     model M1 {
         id String @id @default(uuid())
         m2 M2?
-    
+
         @@allow('all', true)
     }
-    
+
     model M2 {
         id String @id @default(uuid())
         value Int
         deleted Boolean @default(false)
         m1 M1? @relation(fields: [m1Id], references:[id])
         m1Id String? @unique
-    
+
         @@allow('read,create', true)
         @@allow('update', !deleted)
     }
@@ -225,7 +225,7 @@ describe('connect and disconnect tests', () => {
                     },
                 },
                 include: { m2: true },
-            })
+            }),
         ).resolves.toMatchObject({
             m2: expect.objectContaining({ id: 'm2-1' }),
         });
@@ -250,7 +250,7 @@ describe('connect and disconnect tests', () => {
                         connect: { id: 'm2-2' },
                     },
                 },
-            })
+            }),
         ).toBeRejectedNotFound();
 
         // connectOrCreate
@@ -276,7 +276,7 @@ describe('connect and disconnect tests', () => {
                         },
                     },
                 },
-            })
+            }),
         ).toBeRejectedNotFound();
     });
 
@@ -285,17 +285,17 @@ describe('connect and disconnect tests', () => {
         id String @id @default(uuid())
         value Int @default(0)
         m2 M2[]
-    
+
         @@deny('read', value < 0)
         @@allow('all', true)
     }
-    
+
     model M2 {
         id String @id @default(uuid())
         value Int
         deleted Boolean @default(false)
         m1 M1[]
-    
+
         @@deny('read', value < 0)
         @@allow('read,create', true)
         @@allow('update', !deleted)
@@ -316,7 +316,7 @@ describe('connect and disconnect tests', () => {
             db.m1.update({
                 where: { id: 'm1-2' },
                 data: { m2: { connect: { id: 'm2-2' } } },
-            })
+            }),
         ).toBeRejectedByPolicy();
     });
 
@@ -325,16 +325,16 @@ describe('connect and disconnect tests', () => {
         id String @id @default(uuid())
         value Int @default(0)
         m2 M1OnM2[]
-    
+
         @@allow('all', true)
     }
-    
+
     model M2 {
         id String @id @default(uuid())
         value Int
         deleted Boolean @default(false)
         m1 M1OnM2[]
-    
+
         @@allow('read,create', true)
     }
 
@@ -363,7 +363,7 @@ describe('connect and disconnect tests', () => {
                     m1: { connect: { id: 'm1-1' } },
                     m2: { connect: { id: 'm2-1' } },
                 },
-            })
+            }),
         ).toResolveTruthy();
 
         await rawDb.m1.create({ data: { id: 'm1-2', value: 1 } });
@@ -376,7 +376,7 @@ describe('connect and disconnect tests', () => {
                     m1: { connect: { id: 'm1-2' } },
                     m2: { connect: { id: 'm2-2' } },
                 },
-            })
+            }),
         ).toBeRejectedByPolicy();
     });
 });

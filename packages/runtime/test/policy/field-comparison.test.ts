@@ -13,41 +13,33 @@ describe('field comparison tests', () => {
             @@allow('create', x > y)
             @@allow('read', true)
         }
-        `
+        `,
         );
 
-        await expect(
-            db.model.create({ data: { x: 1, y: 2 } })
-        ).toBeRejectedByPolicy();
-        await expect(
-            db.model.create({ data: { x: 2, y: 1 } })
-        ).toResolveTruthy();
+        await expect(db.model.create({ data: { x: 1, y: 2 } })).toBeRejectedByPolicy();
+        await expect(db.model.create({ data: { x: 2, y: 1 } })).toResolveTruthy();
     });
 
     it('works with "in" operator', async () => {
         const db = await createPolicyTestClient(
             `
-    model Model {
-        id String @id @default(uuid())
-        x String
-        y String[]
-        @@allow('create', x in y)
-        @@allow('read', x in y)
-    }                
-    `,
+        model Model {
+            id String @id @default(uuid())
+            x String
+            y String[]
+            @@allow('create', x in y)
+            @@allow('read', x in y)
+        }
+        `,
             {
                 provider: 'postgresql',
                 dbName: 'field-comparison-tests-operator',
-            }
+            },
         );
 
         try {
-            await expect(
-                db.model.create({ data: { x: 'a', y: ['b', 'c'] } })
-            ).toBeRejectedByPolicy();
-            await expect(
-                db.model.create({ data: { x: 'a', y: ['a', 'c'] } })
-            ).toResolveTruthy();
+            await expect(db.model.create({ data: { x: 'a', y: ['b', 'c'] } })).toBeRejectedByPolicy();
+            await expect(db.model.create({ data: { x: 'a', y: ['a', 'c'] } })).toResolveTruthy();
         } finally {
             await db.$disconnect();
         }
@@ -67,16 +59,12 @@ describe('field comparison tests', () => {
             {
                 provider: 'postgresql',
                 dbName: 'field-comparison-tests-operator-2',
-            }
+            },
         );
 
         try {
-            await expect(
-                db.model.create({ data: { x: 'a', y: ['b', 'c'] } })
-            ).toBeRejectedByPolicy();
-            await expect(
-                db.model.create({ data: { x: 'a', y: ['a', 'c'] } })
-            ).toResolveTruthy();
+            await expect(db.model.create({ data: { x: 'a', y: ['b', 'c'] } })).toBeRejectedByPolicy();
+            await expect(db.model.create({ data: { x: 'a', y: ['a', 'c'] } })).toResolveTruthy();
         } finally {
             await db.$disconnect();
         }
@@ -94,8 +82,8 @@ describe('field comparison tests', () => {
             @@allow('create', x > y)
             @@allow('read', true)
         }
-        `
-            )
+        `,
+            ),
         ).rejects.toThrow(/invalid operand type/);
     });
 });

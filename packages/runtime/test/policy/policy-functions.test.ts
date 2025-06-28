@@ -10,15 +10,11 @@ describe('policy functions tests', () => {
                 string String
                 @@allow('all', contains(string, 'a'))
             }
-            `
+            `,
         );
 
-        await expect(
-            db.foo.create({ data: { string: 'bcd' } })
-        ).toBeRejectedByPolicy();
-        await expect(
-            db.foo.create({ data: { string: 'bac' } })
-        ).toResolveTruthy();
+        await expect(db.foo.create({ data: { string: 'bcd' } })).toBeRejectedByPolicy();
+        await expect(db.foo.create({ data: { string: 'bac' } })).toResolveTruthy();
     });
 
     it('supports contains with case-sensitive non-field', async () => {
@@ -33,16 +29,12 @@ describe('policy functions tests', () => {
                 id String @id @default(cuid())
                 @@allow('all', contains(auth().name, 'a'))
             }
-            `
+            `,
         );
 
         await expect(db.foo.create({ data: {} })).toBeRejectedByPolicy();
-        await expect(
-            db.$setAuth({ id: 'user1', name: 'bcd' }).foo.create({ data: {} })
-        ).toBeRejectedByPolicy();
-        await expect(
-            db.$setAuth({ id: 'user1', name: 'bac' }).foo.create({ data: {} })
-        ).toResolveTruthy();
+        await expect(db.$setAuth({ id: 'user1', name: 'bcd' }).foo.create({ data: {} })).toBeRejectedByPolicy();
+        await expect(db.$setAuth({ id: 'user1', name: 'bac' }).foo.create({ data: {} })).toResolveTruthy();
     });
 
     it('supports contains with auth()', async () => {
@@ -58,20 +50,14 @@ describe('policy functions tests', () => {
                 string String
                 @@allow('all', contains(string, auth().name))
             }
-            `
+            `,
         );
 
         // 'abc' contains null
-        await expect(
-            anonDb.foo.create({ data: { string: 'abc' } })
-        ).toResolveTruthy();
+        await expect(anonDb.foo.create({ data: { string: 'abc' } })).toResolveTruthy();
         const db = anonDb.$setAuth({ id: '1', name: 'a' });
-        await expect(
-            db.foo.create({ data: { string: 'bcd' } })
-        ).toBeRejectedByPolicy();
-        await expect(
-            db.foo.create({ data: { string: 'bac' } })
-        ).toResolveTruthy();
+        await expect(db.foo.create({ data: { string: 'bcd' } })).toBeRejectedByPolicy();
+        await expect(db.foo.create({ data: { string: 'bac' } })).toResolveTruthy();
     });
 
     it('supports startsWith with field', async () => {
@@ -82,15 +68,11 @@ describe('policy functions tests', () => {
                 string String
                 @@allow('all', startsWith(string, 'a'))
             }
-            `
+            `,
         );
 
-        await expect(
-            db.foo.create({ data: { string: 'bac' } })
-        ).toBeRejectedByPolicy();
-        await expect(
-            db.foo.create({ data: { string: 'abc' } })
-        ).toResolveTruthy();
+        await expect(db.foo.create({ data: { string: 'bac' } })).toBeRejectedByPolicy();
+        await expect(db.foo.create({ data: { string: 'abc' } })).toResolveTruthy();
     });
 
     it('supports startsWith with non-field', async () => {
@@ -105,16 +87,12 @@ describe('policy functions tests', () => {
                 id String @id @default(cuid())
                 @@allow('all', startsWith(auth().name, 'a'))
             }
-            `
+            `,
         );
 
         await expect(anonDb.foo.create({ data: {} })).toBeRejectedByPolicy();
         await expect(anonDb.foo.create({ data: {} })).toBeRejectedByPolicy();
-        await expect(
-            anonDb
-                .$setAuth({ id: 'user1', name: 'abc' })
-                .foo.create({ data: {} })
-        ).toResolveTruthy();
+        await expect(anonDb.$setAuth({ id: 'user1', name: 'abc' }).foo.create({ data: {} })).toResolveTruthy();
     });
 
     it('supports endsWith with field', async () => {
@@ -125,15 +103,11 @@ describe('policy functions tests', () => {
                 string String
                 @@allow('all', endsWith(string, 'a'))
             }
-            `
+            `,
         );
 
-        await expect(
-            db.foo.create({ data: { string: 'bac' } })
-        ).toBeRejectedByPolicy();
-        await expect(
-            db.foo.create({ data: { string: 'bca' } })
-        ).toResolveTruthy();
+        await expect(db.foo.create({ data: { string: 'bac' } })).toBeRejectedByPolicy();
+        await expect(db.foo.create({ data: { string: 'bca' } })).toResolveTruthy();
     });
 
     it('supports endsWith with non-field', async () => {
@@ -148,20 +122,12 @@ describe('policy functions tests', () => {
                 id String @id @default(cuid())
                 @@allow('all', endsWith(auth().name, 'a'))
             }
-            `
+            `,
         );
 
         await expect(anonDb.foo.create({ data: {} })).toBeRejectedByPolicy();
-        await expect(
-            anonDb
-                .$setAuth({ id: 'user1', name: 'bac' })
-                .foo.create({ data: {} })
-        ).toBeRejectedByPolicy();
-        await expect(
-            anonDb
-                .$setAuth({ id: 'user1', name: 'bca' })
-                .foo.create({ data: {} })
-        ).toResolveTruthy();
+        await expect(anonDb.$setAuth({ id: 'user1', name: 'bac' }).foo.create({ data: {} })).toBeRejectedByPolicy();
+        await expect(anonDb.$setAuth({ id: 'user1', name: 'bca' }).foo.create({ data: {} })).toResolveTruthy();
     });
 
     it('supports in with field', async () => {
@@ -172,15 +138,11 @@ describe('policy functions tests', () => {
                 string String
                 @@allow('all', string in ['a', 'b'])
             }
-            `
+            `,
         );
 
-        await expect(
-            db.foo.create({ data: { string: 'c' } })
-        ).toBeRejectedByPolicy();
-        await expect(
-            db.foo.create({ data: { string: 'b' } })
-        ).toResolveTruthy();
+        await expect(db.foo.create({ data: { string: 'c' } })).toBeRejectedByPolicy();
+        await expect(db.foo.create({ data: { string: 'b' } })).toResolveTruthy();
     });
 
     it('supports in with non-field', async () => {
@@ -195,20 +157,12 @@ describe('policy functions tests', () => {
                 id String @id @default(cuid())
                 @@allow('all', auth().name in ['abc', 'bcd'])
             }
-            `
+            `,
         );
 
         await expect(anonDb.foo.create({ data: {} })).toBeRejectedByPolicy();
-        await expect(
-            anonDb
-                .$setAuth({ id: 'user1', name: 'abd' })
-                .foo.create({ data: {} })
-        ).toBeRejectedByPolicy();
-        await expect(
-            anonDb
-                .$setAuth({ id: 'user1', name: 'abc' })
-                .foo.create({ data: {} })
-        ).toResolveTruthy();
+        await expect(anonDb.$setAuth({ id: 'user1', name: 'abd' }).foo.create({ data: {} })).toBeRejectedByPolicy();
+        await expect(anonDb.$setAuth({ id: 'user1', name: 'abc' }).foo.create({ data: {} })).toResolveTruthy();
     });
 
     it('supports now', async () => {
@@ -220,7 +174,7 @@ describe('policy functions tests', () => {
                 @@allow('create,read', true)
                 @@allow('update', now() >= dt)
             }
-            `
+            `,
         );
 
         const now = new Date();
@@ -231,8 +185,6 @@ describe('policy functions tests', () => {
         console.log(created);
 
         // violates `dt <= now()`
-        await expect(
-            db.foo.update({ where: { id: '1' }, data: { dt: now } })
-        ).toBeRejectedNotFound();
+        await expect(db.foo.update({ where: { id: '1' }, data: { dt: now } })).toBeRejectedNotFound();
     });
 });

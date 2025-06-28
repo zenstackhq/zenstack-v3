@@ -1,13 +1,12 @@
 {
     "name": "@zenstackhq/sdk",
-    "version": "3.0.0-alpha.4",
+    "version": "3.0.0-alpha.5",
     "description": "ZenStack SDK",
     "type": "module",
     "scripts": {
         "build": "tsup-node",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
-        "test": "vitest",
         "pack": "pnpm pack"
     },
     "keywords": [],
@@ -40,16 +39,15 @@
     },
     "dependencies": {
         "@zenstackhq/language": "workspace:*",
-        "langium": "~3.3.0",
-        "tiny-invariant": "^1.3.3",
-        "tmp": "^0.2.3",
-        "ts-pattern": "^5.7.0",
-        "typescript": "^5.8.3"
+        "@zenstackhq/common-helpers": "workspace:*",
+        "langium": "catalog:",
+        "ts-pattern": "catalog:",
+        "typescript": "catalog:"
     },
     "devDependencies": {
-        "@types/node": "^20.0.0",
-        "@types/tmp": "^0.2.6",
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*",
         "decimal.js": "^10.4.3",
-        "kysely": "^0.27.6"
+        "kysely": "catalog:"
     }
 }

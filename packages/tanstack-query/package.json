@@ -1,12 +1,13 @@
 {
     "name": "@zenstackhq/tanstack-query",
-    "version": "3.0.0-alpha.4",
+    "version": "3.0.0-alpha.5",
     "description": "",
     "main": "index.js",
     "type": "module",
+    "private": true,
     "scripts": {
         "build": "tsup-node",
-        "watch": "tsup-node --watch"
+        "lint": "eslint src --ext ts"
     },
     "keywords": [],
     "author": "",
@@ -25,6 +26,10 @@
     },
     "dependencies": {
         "@zenstackhq/runtime": "workspace:*"
+    },
+    "devDependencies": {
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*"
     },
     "peerDependencies": {
         "@tanstack/react-query": "^5.0.0"

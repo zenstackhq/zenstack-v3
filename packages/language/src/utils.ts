@@ -1,10 +1,4 @@
-import {
-    AstUtils,
-    URI,
-    type AstNode,
-    type LangiumDocuments,
-    type Reference,
-} from 'langium';
+import { AstUtils, URI, type AstNode, type LangiumDocuments, type Reference } from 'langium';
 import path from 'path';
 import { STD_LIB_MODULE_NAME, type ExpressionContext } from './constants';
 import {
@@ -62,55 +56,35 @@ export function hasAttribute(decl: AttributeTarget, name: string) {
 }
 
 export function getAttribute(decl: AttributeTarget, name: string) {
-    return (
-        decl.attributes as (DataModelAttribute | DataModelFieldAttribute)[]
-    ).find((attr) => attr.decl.$refText === name);
+    return (decl.attributes as (DataModelAttribute | DataModelFieldAttribute)[]).find(
+        (attr) => attr.decl.$refText === name,
+    );
 }
 
 export function isFromStdlib(node: AstNode) {
     const model = AstUtils.getContainerOfType(node, isModel);
-    return (
-        !!model &&
-        !!model.$document &&
-        model.$document.uri.path.endsWith(STD_LIB_MODULE_NAME)
-    );
+    return !!model && !!model.$document && model.$document.uri.path.endsWith(STD_LIB_MODULE_NAME);
 }
 
 export function isAuthInvocation(node: AstNode) {
-    return (
-        isInvocationExpr(node) &&
-        node.function.ref?.name === 'auth' &&
-        isFromStdlib(node.function.ref)
-    );
+    return isInvocationExpr(node) && node.function.ref?.name === 'auth' && isFromStdlib(node.function.ref);
 }
 
 /**
  * Try getting string value from a potential string literal expression
  */
-export function getStringLiteral(
-    node: AstNode | undefined
-): string | undefined {
+export function getStringLiteral(node: AstNode | undefined): string | undefined {
     return isStringLiteral(node) ? node.value : undefined;
 }
 
-const isoDateTimeRegex =
-    /^\d{4}(-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?)?$/i;
+const isoDateTimeRegex = /^\d{4}(-\d\d(-\d\d(T\d\d:\d\d(:\d\d)?(\.\d+)?(([+-]\d\d:\d\d)|Z)?)?)?)?$/i;
 
 /**
  * Determines if the given sourceType is assignable to a destination of destType
  */
-export function typeAssignable(
-    destType: ExpressionType,
-    sourceType: ExpressionType,
-    sourceExpr?: Expression
-): boolean {
+export function typeAssignable(destType: ExpressionType, sourceType: ExpressionType, sourceExpr?: Expression): boolean {
     // implicit conversion from ISO datetime string to datetime
-    if (
-        destType === 'DateTime' &&
-        sourceType === 'String' &&
-        sourceExpr &&
-        isStringLiteral(sourceExpr)
-    ) {
+    if (destType === 'DateTime' && sourceType === 'String' && sourceExpr && isStringLiteral(sourceExpr)) {
         const literal = getStringLiteral(sourceExpr);
         if (literal && isoDateTimeRegex.test(literal)) {
             // implicitly convert to DateTime
@@ -122,11 +96,7 @@ export function typeAssignable(
         case 'Any':
             return true;
         case 'Float':
-            return (
-                sourceType === 'Any' ||
-                sourceType === 'Int' ||
-                sourceType === 'Float'
-            );
+            return sourceType === 'Any' || sourceType === 'Int' || sourceType === 'Float';
         default:
             return sourceType === 'Any' || sourceType === destType;
     }
@@ -136,7 +106,7 @@ export function typeAssignable(
  * Maps a ZModel builtin type to expression type
  */
 export function mapBuiltinTypeToExpressionType(
-    type: BuiltinType | 'Any' | 'Object' | 'Null' | 'Unsupported'
+    type: BuiltinType | 'Any' | 'Object' | 'Null' | 'Unsupported',
 ): ExpressionType | 'Any' {
     switch (type) {
         case 'Any':
@@ -162,19 +132,14 @@ export function mapBuiltinTypeToExpressionType(
 }
 
 export function isAuthOrAuthMemberAccess(expr: Expression): boolean {
-    return (
-        isAuthInvocation(expr) ||
-        (isMemberAccessExpr(expr) && isAuthOrAuthMemberAccess(expr.operand))
-    );
+    return isAuthInvocation(expr) || (isMemberAccessExpr(expr) && isAuthOrAuthMemberAccess(expr.operand));
 }
 
 export function isEnumFieldReference(node: AstNode): node is ReferenceExpr {
     return isReferenceExpr(node) && isEnumField(node.target.ref);
 }
 
-export function isDataModelFieldReference(
-    node: AstNode
-): node is ReferenceExpr {
+export function isDataModelFieldReference(node: AstNode): node is ReferenceExpr {
     return isReferenceExpr(node) && isDataModelField(node.target.ref);
 }
 
@@ -186,11 +151,7 @@ export function isRelationshipField(field: DataModelField) {
 }
 
 export function isFutureExpr(node: AstNode) {
-    return (
-        isInvocationExpr(node) &&
-        node.function.ref?.name === 'future' &&
-        isFromStdlib(node.function.ref)
-    );
+    return isInvocationExpr(node) && node.function.ref?.name === 'future' && isFromStdlib(node.function.ref);
 }
 
 export function isDelegateModel(node: AstNode) {
@@ -207,10 +168,7 @@ export function resolved<T extends AstNode>(ref: Reference<T>): T {
 /**
  * Walk up the inheritance chain to find the path from the start model to the target model
  */
-export function findUpInheritance(
-    start: DataModel,
-    target: DataModel
-): DataModel[] | undefined {
+export function findUpInheritance(start: DataModel, target: DataModel): DataModel[] | undefined {
     for (const base of start.superTypes) {
         if (base.ref === target) {
             return [base.ref];
@@ -223,26 +181,18 @@ export function findUpInheritance(
     return undefined;
 }
 
-export function getModelFieldsWithBases(
-    model: DataModel,
-    includeDelegate = true
-) {
+export function getModelFieldsWithBases(model: DataModel, includeDelegate = true) {
     if (model.$baseMerged) {
         return model.fields;
     } else {
-        return [
-            ...model.fields,
-            ...getRecursiveBases(model, includeDelegate).flatMap(
-                (base) => base.fields
-            ),
-        ];
+        return [...model.fields, ...getRecursiveBases(model, includeDelegate).flatMap((base) => base.fields)];
     }
 }
 
 export function getRecursiveBases(
     dataModel: DataModel,
     includeDelegate = true,
-    seen = new Set<DataModel>()
+    seen = new Set<DataModel>(),
 ): DataModel[] {
     const result: DataModel[] = [];
     if (seen.has(dataModel)) {
@@ -266,20 +216,14 @@ export function getRecursiveBases(
  * Gets `@@id` fields declared at the data model level (including search in base models)
  */
 export function getModelIdFields(model: DataModel) {
-    const modelsToCheck = model.$baseMerged
-        ? [model]
-        : [model, ...getRecursiveBases(model)];
+    const modelsToCheck = model.$baseMerged ? [model] : [model, ...getRecursiveBases(model)];
 
     for (const modelToCheck of modelsToCheck) {
-        const idAttr = modelToCheck.attributes.find(
-            (attr) => attr.decl.$refText === '@@id'
-        );
+        const idAttr = modelToCheck.attributes.find((attr) => attr.decl.$refText === '@@id');
         if (!idAttr) {
             continue;
         }
-        const fieldsArg = idAttr.args.find(
-            (a) => a.$resolvedParam?.name === 'fields'
-        );
+        const fieldsArg = idAttr.args.find((a) => a.$resolvedParam?.name === 'fields');
         if (!fieldsArg || !isArrayExpr(fieldsArg.value)) {
             continue;
         }
@@ -296,20 +240,14 @@ export function getModelIdFields(model: DataModel) {
  * Gets `@@unique` fields declared at the data model level (including search in base models)
  */
 export function getModelUniqueFields(model: DataModel) {
-    const modelsToCheck = model.$baseMerged
-        ? [model]
-        : [model, ...getRecursiveBases(model)];
+    const modelsToCheck = model.$baseMerged ? [model] : [model, ...getRecursiveBases(model)];
 
     for (const modelToCheck of modelsToCheck) {
-        const uniqueAttr = modelToCheck.attributes.find(
-            (attr) => attr.decl.$refText === '@@unique'
-        );
+        const uniqueAttr = modelToCheck.attributes.find((attr) => attr.decl.$refText === '@@unique');
         if (!uniqueAttr) {
             continue;
         }
-        const fieldsArg = uniqueAttr.args.find(
-            (a) => a.$resolvedParam?.name === 'fields'
-        );
+        const fieldsArg = uniqueAttr.args.find((a) => a.$resolvedParam?.name === 'fields');
         if (!fieldsArg || !isArrayExpr(fieldsArg.value)) {
             continue;
         }
@@ -329,13 +267,10 @@ export function getModelUniqueFields(model: DataModel) {
  */
 export function getUniqueFields(model: DataModel) {
     const uniqueAttrs = model.attributes.filter(
-        (attr) =>
-            attr.decl.ref?.name === '@@unique' || attr.decl.ref?.name === '@@id'
+        (attr) => attr.decl.ref?.name === '@@unique' || attr.decl.ref?.name === '@@id',
     );
     return uniqueAttrs.map((uniqueAttr) => {
-        const fieldsArg = uniqueAttr.args.find(
-            (a) => a.$resolvedParam?.name === 'fields'
-        );
+        const fieldsArg = uniqueAttr.args.find((a) => a.$resolvedParam?.name === 'fields');
         if (!fieldsArg || !isArrayExpr(fieldsArg.value)) {
             return [];
         }
@@ -346,10 +281,7 @@ export function getUniqueFields(model: DataModel) {
     });
 }
 
-export function findUpAst(
-    node: AstNode,
-    predicate: (node: AstNode) => boolean
-): AstNode | undefined {
+export function findUpAst(node: AstNode, predicate: (node: AstNode) => boolean): AstNode | undefined {
     let curr: AstNode | undefined = node;
     while (curr) {
         if (predicate(curr)) {
@@ -361,7 +293,7 @@ export function findUpAst(
 }
 
 export function getLiteral<T extends string | number | boolean | any = any>(
-    expr: Expression | ConfigExpr | undefined
+    expr: Expression | ConfigExpr | undefined,
 ): T | undefined {
     switch (expr?.$type) {
         case 'ObjectExpr':
@@ -376,9 +308,7 @@ export function getLiteral<T extends string | number | boolean | any = any>(
     }
 }
 
-export function getObjectLiteral<T>(
-    expr: Expression | ConfigExpr | undefined
-): T | undefined {
+export function getObjectLiteral<T>(expr: Expression | ConfigExpr | undefined): T | undefined {
     if (!expr || !isObjectExpr(expr)) {
         return undefined;
     }
@@ -402,27 +332,22 @@ export function getObjectLiteral<T>(
 }
 
 export function getLiteralArray<
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    T extends string | number | boolean | any = any
+    T extends string | number | boolean | any = any,
 >(expr: Expression | ConfigExpr | undefined): T[] | undefined {
     const arr = getArray(expr);
     if (!arr) {
         return undefined;
     }
-    return arr
-        .map((item) => isExpression(item) && getLiteral<T>(item))
-        .filter((v): v is T => v !== undefined);
+    return arr.map((item) => isExpression(item) && getLiteral<T>(item)).filter((v): v is T => v !== undefined);
 }
 
 function getArray(expr: Expression | ConfigExpr | undefined) {
-    return isArrayExpr(expr) || isConfigArrayExpr(expr)
-        ? expr.items
-        : undefined;
+    return isArrayExpr(expr) || isConfigArrayExpr(expr) ? expr.items : undefined;
 }
 
 export function getAttributeArgLiteral<T extends string | number | boolean>(
     attr: DataModelAttribute | DataModelFieldAttribute,
-    name: string
+    name: string,
 ): T | undefined {
     for (const arg of attr.args) {
         if (arg.$resolvedParam?.name === name) {
@@ -434,17 +359,13 @@ export function getAttributeArgLiteral<T extends string | number | boolean>(
 
 export function getFunctionExpressionContext(funcDecl: FunctionDecl) {
     const funcAllowedContext: ExpressionContext[] = [];
-    const funcAttr = funcDecl.attributes.find(
-        (attr) => attr.decl.$refText === '@@@expressionContext'
-    );
+    const funcAttr = funcDecl.attributes.find((attr) => attr.decl.$refText === '@@@expressionContext');
     if (funcAttr) {
         const contextArg = funcAttr.args[0]?.value;
         if (isArrayExpr(contextArg)) {
             contextArg.items.forEach((item) => {
                 if (isEnumFieldReference(item)) {
-                    funcAllowedContext.push(
-                        item.target.$refText as ExpressionContext
-                    );
+                    funcAllowedContext.push(item.target.$refText as ExpressionContext);
                 }
             });
         }
@@ -452,18 +373,10 @@ export function getFunctionExpressionContext(funcDecl: FunctionDecl) {
     return funcAllowedContext;
 }
 
-export function getFieldReference(
-    expr: Expression
-): DataModelField | TypeDefField | undefined {
-    if (
-        isReferenceExpr(expr) &&
-        (isDataModelField(expr.target.ref) || isTypeDefField(expr.target.ref))
-    ) {
+export function getFieldReference(expr: Expression): DataModelField | TypeDefField | undefined {
+    if (isReferenceExpr(expr) && (isDataModelField(expr.target.ref) || isTypeDefField(expr.target.ref))) {
         return expr.target.ref;
-    } else if (
-        isMemberAccessExpr(expr) &&
-        (isDataModelField(expr.member.ref) || isTypeDefField(expr.member.ref))
-    ) {
+    } else if (isMemberAccessExpr(expr) && (isDataModelField(expr.member.ref) || isTypeDefField(expr.member.ref))) {
         return expr.member.ref;
     } else {
         return undefined;
@@ -471,17 +384,10 @@ export function getFieldReference(
 }
 
 export function isCheckInvocation(node: AstNode) {
-    return (
-        isInvocationExpr(node) &&
-        node.function.ref?.name === 'check' &&
-        isFromStdlib(node.function.ref)
-    );
+    return isInvocationExpr(node) && node.function.ref?.name === 'check' && isFromStdlib(node.function.ref);
 }
 
-export function resolveTransitiveImports(
-    documents: LangiumDocuments,
-    model: Model
-) {
+export function resolveTransitiveImports(documents: LangiumDocuments, model: Model) {
     return resolveTransitiveImportsInternal(documents, model);
 }
 
@@ -490,7 +396,7 @@ function resolveTransitiveImportsInternal(
     model: Model,
     initialModel = model,
     visited: Set<string> = new Set(),
-    models: Set<Model> = new Set()
+    models: Set<Model> = new Set(),
 ) {
     const doc = AstUtils.getDocument(model);
     const initialDoc = AstUtils.getDocument(initialModel);
@@ -505,13 +411,7 @@ function resolveTransitiveImportsInternal(
         for (const imp of model.imports) {
             const importedModel = resolveImport(documents, imp);
             if (importedModel) {
-                resolveTransitiveImportsInternal(
-                    documents,
-                    importedModel,
-                    initialModel,
-                    visited,
-                    models
-                );
+                resolveTransitiveImportsInternal(documents, importedModel, initialModel, visited, models);
             }
         }
     }
@@ -525,10 +425,7 @@ export function resolveImport(documents: LangiumDocuments, imp: ModelImport) {
             let resolvedDocument = documents.getDocument(resolvedUri);
             if (!resolvedDocument) {
                 const content = fs.readFileSync(resolvedUri.fsPath, 'utf-8');
-                resolvedDocument = documents.createDocument(
-                    resolvedUri,
-                    content
-                );
+                resolvedDocument = documents.createDocument(resolvedUri, content);
             }
             const node = resolvedDocument.parseResult.value;
             if (isModel(node)) {
@@ -570,7 +467,7 @@ export function findNodeModulesFile(name: string, cwd: string = process.cwd()) {
         // Use require.resolve to find the module/file. The paths option allows specifying the directory to start from.
         const resolvedPath = require.resolve(name, { paths: [cwd] });
         return resolvedPath;
-    } catch (error) {
+    } catch {
         // If require.resolve fails to find the module/file, it will throw an error.
         return undefined;
     }
@@ -580,9 +477,7 @@ export function findNodeModulesFile(name: string, cwd: string = process.cwd()) {
  * Gets data models and type defs in the ZModel schema.
  */
 export function getDataModelAndTypeDefs(model: Model, includeIgnored = false) {
-    const r = model.declarations.filter(
-        (d): d is DataModel | TypeDef => isDataModel(d) || isTypeDef(d)
-    );
+    const r = model.declarations.filter((d): d is DataModel | TypeDef => isDataModel(d) || isTypeDef(d));
     if (includeIgnored) {
         return r;
     } else {
@@ -590,10 +485,7 @@ export function getDataModelAndTypeDefs(model: Model, includeIgnored = false) {
     }
 }
 
-export function getAllDeclarationsIncludingImports(
-    documents: LangiumDocuments,
-    model: Model
-) {
+export function getAllDeclarationsIncludingImports(documents: LangiumDocuments, model: Model) {
     const imports = resolveTransitiveImports(documents, model);
     return model.declarations.concat(...imports.map((imp) => imp.declarations));
 }
@@ -607,42 +499,27 @@ export function getAuthDecl(decls: (DataModel | TypeDef)[]) {
 }
 
 export function isFutureInvocation(node: AstNode) {
-    return (
-        isInvocationExpr(node) &&
-        node.function.ref?.name === 'future' &&
-        isFromStdlib(node.function.ref)
-    );
+    return isInvocationExpr(node) && node.function.ref?.name === 'future' && isFromStdlib(node.function.ref);
 }
 
 export function isCollectionPredicate(node: AstNode): node is BinaryExpr {
     return isBinaryExpr(node) && ['?', '!', '^'].includes(node.operator);
 }
 
-export function getAllLoadedDataModelsAndTypeDefs(
-    langiumDocuments: LangiumDocuments
-) {
+export function getAllLoadedDataModelsAndTypeDefs(langiumDocuments: LangiumDocuments) {
     return langiumDocuments.all
         .map((doc) => doc.parseResult.value as Model)
-        .flatMap((model) =>
-            model.declarations.filter(
-                (d): d is DataModel | TypeDef => isDataModel(d) || isTypeDef(d)
-            )
-        )
+        .flatMap((model) => model.declarations.filter((d): d is DataModel | TypeDef => isDataModel(d) || isTypeDef(d)))
         .toArray();
 }
 
-export function getAllDataModelsIncludingImports(
-    documents: LangiumDocuments,
-    model: Model
-) {
-    return getAllDeclarationsIncludingImports(documents, model).filter(
-        isDataModel
-    );
+export function getAllDataModelsIncludingImports(documents: LangiumDocuments, model: Model) {
+    return getAllDeclarationsIncludingImports(documents, model).filter(isDataModel);
 }
 
 export function getAllLoadedAndReachableDataModelsAndTypeDefs(
     langiumDocuments: LangiumDocuments,
-    fromModel?: DataModel
+    fromModel?: DataModel,
 ) {
     // get all data models from loaded documents
     const allDataModels = getAllLoadedDataModelsAndTypeDefs(langiumDocuments);
@@ -651,10 +528,7 @@ export function getAllLoadedAndReachableDataModelsAndTypeDefs(
         // merge data models transitively reached from the current model
         const model = AstUtils.getContainerOfType(fromModel, isModel);
         if (model) {
-            const transitiveDataModels = getAllDataModelsIncludingImports(
-                langiumDocuments,
-                model
-            );
+            const transitiveDataModels = getAllDataModelsIncludingImports(langiumDocuments, model);
             transitiveDataModels.forEach((dm) => {
                 if (!allDataModels.includes(dm)) {
                     allDataModels.push(dm);
@@ -666,9 +540,7 @@ export function getAllLoadedAndReachableDataModelsAndTypeDefs(
     return allDataModels;
 }
 
-export function getContainingDataModel(
-    node: Expression
-): DataModel | undefined {
+export function getContainingDataModel(node: Expression): DataModel | undefined {
     let curr: AstNode | undefined = node.$container;
     while (curr) {
         if (isDataModel(curr)) {

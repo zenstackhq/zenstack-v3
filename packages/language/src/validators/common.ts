@@ -17,11 +17,9 @@ export interface AstValidator<T extends AstNode> {
 export function validateDuplicatedDeclarations(
     container: AstNode,
     decls: Array<AstNode & { name: string }>,
-    accept: ValidationAcceptor
+    accept: ValidationAcceptor,
 ): void {
-    const groupByName = decls.reduce<
-        Record<string, Array<AstNode & { name: string }>>
-    >((group, decl) => {
+    const groupByName = decls.reduce<Record<string, Array<AstNode & { name: string }>>>((group, decl) => {
         group[decl.name] = group[decl.name] ?? [];
         group[decl.name]!.push(decl);
         return group;
@@ -31,9 +29,7 @@ export function validateDuplicatedDeclarations(
         if (decls.length > 1) {
             let errorField = decls[1]!;
             if (isDataModelField(decls[0])) {
-                const nonInheritedFields = decls.filter(
-                    (x) => !(isDataModelField(x) && x.$container !== container)
-                );
+                const nonInheritedFields = decls.filter((x) => !(isDataModelField(x) && x.$container !== container));
                 if (nonInheritedFields.length > 0) {
                     errorField = nonInheritedFields.slice(-1)[0]!;
                 }

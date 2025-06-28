@@ -105,11 +105,7 @@ export class DefaultOperationNodeVisitor extends OperationNodeVisitor {
             if (Array.isArray(value)) {
                 value.forEach((el) => this.defaultVisit(el));
             }
-            if (
-                typeof value === 'object' &&
-                'kind' in value &&
-                typeof value.kind === 'string'
-            ) {
+            if (typeof value === 'object' && 'kind' in value && typeof value.kind === 'string') {
                 this.visitNode(value);
             }
         });
@@ -220,17 +216,13 @@ export class DefaultOperationNodeVisitor extends OperationNodeVisitor {
     protected override visitIdentifier(node: IdentifierNode): void {
         this.defaultVisit(node);
     }
-    protected override visitSchemableIdentifier(
-        node: SchemableIdentifierNode
-    ): void {
+    protected override visitSchemableIdentifier(node: SchemableIdentifierNode): void {
         this.defaultVisit(node);
     }
     protected override visitValue(node: ValueNode): void {
         this.defaultVisit(node);
     }
-    protected override visitPrimitiveValueList(
-        node: PrimitiveValueListNode
-    ): void {
+    protected override visitPrimitiveValueList(node: PrimitiveValueListNode): void {
         this.defaultVisit(node);
     }
     protected override visitOperator(node: OperatorNode): void {
@@ -245,9 +237,7 @@ export class DefaultOperationNodeVisitor extends OperationNodeVisitor {
     protected override visitList(node: ListNode): void {
         this.defaultVisit(node);
     }
-    protected override visitPrimaryKeyConstraint(
-        node: PrimaryKeyConstraintNode
-    ): void {
+    protected override visitPrimaryKeyConstraint(node: PrimaryKeyConstraintNode): void {
         this.defaultVisit(node);
     }
     protected override visitUniqueConstraint(node: UniqueConstraintNode): void {
@@ -259,14 +249,10 @@ export class DefaultOperationNodeVisitor extends OperationNodeVisitor {
     protected override visitWith(node: WithNode): void {
         this.defaultVisit(node);
     }
-    protected override visitCommonTableExpression(
-        node: CommonTableExpressionNode
-    ): void {
+    protected override visitCommonTableExpression(node: CommonTableExpressionNode): void {
         this.defaultVisit(node);
     }
-    protected override visitCommonTableExpressionName(
-        node: CommonTableExpressionNameNode
-    ): void {
+    protected override visitCommonTableExpressionName(node: CommonTableExpressionNameNode): void {
         this.defaultVisit(node);
     }
     protected override visitHaving(node: HavingNode): void {
@@ -299,9 +285,7 @@ export class DefaultOperationNodeVisitor extends OperationNodeVisitor {
     protected override visitDropConstraint(node: DropConstraintNode): void {
         this.defaultVisit(node);
     }
-    protected override visitForeignKeyConstraint(
-        node: ForeignKeyConstraintNode
-    ): void {
+    protected override visitForeignKeyConstraint(node: ForeignKeyConstraintNode): void {
         this.defaultVisit(node);
     }
     protected override visitCreateView(node: CreateViewNode): void {
@@ -334,14 +318,10 @@ export class DefaultOperationNodeVisitor extends OperationNodeVisitor {
     protected override visitExplain(node: ExplainNode): void {
         this.defaultVisit(node);
     }
-    protected override visitDefaultInsertValue(
-        node: DefaultInsertValueNode
-    ): void {
+    protected override visitDefaultInsertValue(node: DefaultInsertValueNode): void {
         this.defaultVisit(node);
     }
-    protected override visitAggregateFunction(
-        node: AggregateFunctionNode
-    ): void {
+    protected override visitAggregateFunction(node: AggregateFunctionNode): void {
         this.defaultVisit(node);
     }
     protected override visitOver(node: OverNode): void {
@@ -383,9 +363,7 @@ export class DefaultOperationNodeVisitor extends OperationNodeVisitor {
     protected override visitJSONPathLeg(node: JSONPathLegNode): void {
         this.defaultVisit(node);
     }
-    protected override visitJSONOperatorChain(
-        node: JSONOperatorChainNode
-    ): void {
+    protected override visitJSONOperatorChain(node: JSONOperatorChainNode): void {
         this.defaultVisit(node);
     }
     protected override visitTuple(node: TupleNode): void {

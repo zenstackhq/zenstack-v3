@@ -1,7 +1,7 @@
 {
     "name": "@zenstackhq/language",
     "description": "ZenStack ZModel language specification",
-    "version": "3.0.0-alpha.4",
+    "version": "3.0.0-alpha.5",
     "license": "MIT",
     "author": "ZenStack Team",
     "files": [
@@ -11,9 +11,6 @@
     "type": "module",
     "scripts": {
         "build": "pnpm langium:generate && tsup-node",
-        "watch": "run-p watch:*",
-        "watch:ts": "tsup-node --watch",
-        "watch:langium": "langium generate --watch",
         "lint": "eslint src --ext ts",
         "langium:generate": "langium generate",
         "langium:generate:production": "langium generate --mode=production",
@@ -46,15 +43,15 @@
         }
     },
     "dependencies": {
-        "langium": "~3.3.0",
+        "langium": "catalog:",
         "pluralize": "^8.0.0",
-        "ts-pattern": "^5.6.0"
+        "ts-pattern": "catalog:"
     },
     "devDependencies": {
-        "@types/node": "^20.0.0",
         "@types/pluralize": "^0.0.33",
-        "langium-cli": "~3.3.0",
-        "typescript": "~5.1.6"
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "langium-cli": "~3.3.0"
     },
     "volta": {
         "node": "18.19.1",

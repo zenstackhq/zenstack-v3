@@ -1,11 +1,4 @@
-import type {
-    CompiledQuery,
-    DatabaseConnection,
-    Driver,
-    Log,
-    QueryResult,
-    TransactionSettings,
-} from 'kysely';
+import type { CompiledQuery, DatabaseConnection, Driver, Log, QueryResult, TransactionSettings } from 'kysely';
 
 /**
  * Copied from kysely's RuntimeDriver
@@ -72,14 +65,8 @@ export class ZenStackDriver implements Driver {
         await this.#driver.releaseConnection(connection);
     }
 
-    async beginTransaction(
-        connection: DatabaseConnection,
-        settings: TransactionSettings
-    ): Promise<void> {
-        const result = await this.#driver.beginTransaction(
-            connection,
-            settings
-        );
+    async beginTransaction(connection: DatabaseConnection, settings: TransactionSettings): Promise<void> {
+        const result = await this.#driver.beginTransaction(connection, settings);
         this.txConnection = connection;
         return result;
     }
@@ -118,10 +105,7 @@ export class ZenStackDriver implements Driver {
     }
 
     #needsLogging(): boolean {
-        return (
-            this.#log.isLevelEnabled('query') ||
-            this.#log.isLevelEnabled('error')
-        );
+        return this.#log.isLevelEnabled('query') || this.#log.isLevelEnabled('error');
     }
 
     // This method monkey patches the database connection's executeQuery method
@@ -133,9 +117,7 @@ export class ZenStackDriver implements Driver {
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const dis = this;
 
-        connection.executeQuery = async (
-            compiledQuery
-        ): Promise<QueryResult<any>> => {
+        connection.executeQuery = async (compiledQuery): Promise<QueryResult<any>> => {
             let caughtError: unknown;
             const startTime = performanceNow();
 
@@ -152,19 +134,12 @@ export class ZenStackDriver implements Driver {
             }
         };
 
-        connection.streamQuery = async function* (
-            compiledQuery,
-            chunkSize
-        ): AsyncIterableIterator<QueryResult<any>> {
+        connection.streamQuery = async function* (compiledQuery, chunkSize): AsyncIterableIterator<QueryResult<any>> {
             let caughtError: unknown;
             const startTime = performanceNow();
 
             try {
-                for await (const result of streamQuery.call(
-                    connection,
-                    compiledQuery,
-                    chunkSize
-                )) {
+                for await (const result of streamQuery.call(connection, compiledQuery, chunkSize)) {
                     yield result;
                 }
             } catch (error) {
@@ -179,11 +154,7 @@ export class ZenStackDriver implements Driver {
         };
     }
 
-    async #logError(
-        error: unknown,
-        compiledQuery: CompiledQuery,
-        startTime: number
-    ): Promise<void> {
+    async #logError(error: unknown, compiledQuery: CompiledQuery, startTime: number): Promise<void> {
         await this.#log.error(() => ({
             level: 'error',
             error,
@@ -192,11 +163,7 @@ export class ZenStackDriver implements Driver {
         }));
     }
 
-    async #logQuery(
-        compiledQuery: CompiledQuery,
-        startTime: number,
-        isStream = false
-    ): Promise<void> {
+    async #logQuery(compiledQuery: CompiledQuery, startTime: number, isStream = false): Promise<void> {
         await this.#log.query(() => ({
             level: 'query',
             isStream,
@@ -211,10 +178,7 @@ export class ZenStackDriver implements Driver {
 }
 
 export function performanceNow() {
-    if (
-        typeof performance !== 'undefined' &&
-        typeof performance.now === 'function'
-    ) {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
         return performance.now();
     } else {
         return Date.now();

@@ -13,16 +13,7 @@ export const SUPPORTED_PROVIDERS = [
 /**
  * All scalar types
  */
-export const SCALAR_TYPES = [
-    'String',
-    'Int',
-    'Float',
-    'Decimal',
-    'BigInt',
-    'Boolean',
-    'Bytes',
-    'DateTime',
-];
+export const SCALAR_TYPES = ['String', 'Int', 'Float', 'Decimal', 'BigInt', 'Boolean', 'Bytes', 'DateTime'];
 
 /**
  * Name of standard library module

@@ -8,5 +8,5 @@ export default mergeConfig(
         test: {
             setupFiles: [path.resolve(__dirname, './test/vitest-ext.ts')],
         },
-    })
+    }),
 );

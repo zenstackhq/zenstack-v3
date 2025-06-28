@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import type Decimal from 'decimal.js';
 import {
     ExpressionWrapper,
@@ -7,7 +8,6 @@ import {
     type RawBuilder,
     type SelectQueryBuilder,
 } from 'kysely';
-import invariant from 'tiny-invariant';
 import { match } from 'ts-pattern';
 import type { BuiltinType, GetModels, SchemaDef } from '../../../schema';
 import type { FindArgs } from '../../crud-types';
@@ -21,9 +21,7 @@ import {
 } from '../../query-utils';
 import { BaseCrudDialect } from './base';
 
-export class SqliteCrudDialect<
-    Schema extends SchemaDef
-> extends BaseCrudDialect<Schema> {
+export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
     override get provider() {
         return 'sqlite' as const;
     }
@@ -38,9 +36,7 @@ export class SqliteCrudDialect<
         } else {
             return match(type)
                 .with('Boolean', () => (value ? 1 : 0))
-                .with('DateTime', () =>
-                    value instanceof Date ? value.toISOString() : value
-                )
+                .with('DateTime', () => (value instanceof Date ? value.toISOString() : value))
                 .with('Decimal', () => (value as Decimal).toString())
                 .with('Bytes', () => Buffer.from(value as Uint8Array))
                 .otherwise(() => value);
@@ -52,16 +48,10 @@ export class SqliteCrudDialect<
         model: string,
         relationField: string,
         parentAlias: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>
+        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
     ): SelectQueryBuilder<any, any, any> {
         return query.select((eb) =>
-            this.buildRelationJSON(
-                model,
-                eb,
-                relationField,
-                parentAlias,
-                payload
-            ).as(relationField)
+            this.buildRelationJSON(model, eb, relationField, parentAlias, payload).as(relationField),
         );
     }
 
@@ -70,13 +60,9 @@ export class SqliteCrudDialect<
         eb: ExpressionBuilder<any, any>,
         relationField: string,
         parentName: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>
+        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
     ) {
-        const relationFieldDef = requireField(
-            this.schema,
-            model,
-            relationField
-        );
+        const relationFieldDef = requireField(this.schema, model, relationField);
         const relationModel = relationFieldDef.type as GetModels<Schema>;
         const relationModelDef = requireModel(this.schema, relationModel);
 
@@ -88,12 +74,7 @@ export class SqliteCrudDialect<
             if (payload && typeof payload === 'object') {
                 if (payload.where) {
                     subQuery = subQuery.where((eb) =>
-                        this.buildFilter(
-                            eb,
-                            relationModel,
-                            relationModel,
-                            payload.where
-                        )
+                        this.buildFilter(eb, relationModel, relationModel, payload.where),
                     );
                 }
 
@@ -114,29 +95,19 @@ export class SqliteCrudDialect<
                     relationModel,
                     payload.orderBy,
                     skip !== undefined || take !== undefined,
-                    negateOrderBy
+                    negateOrderBy,
                 );
             }
 
             // join conditions
 
-            const m2m = getManyToManyRelation(
-                this.schema,
-                model,
-                relationField
-            );
+            const m2m = getManyToManyRelation(this.schema, model, relationField);
             if (m2m) {
                 // many-to-many relation
                 const parentIds = getIdFields(this.schema, model);
                 const relationIds = getIdFields(this.schema, relationModel);
-                invariant(
-                    parentIds.length === 1,
-                    'many-to-many relation must have exactly one id field'
-                );
-                invariant(
-                    relationIds.length === 1,
-                    'many-to-many relation must have exactly one id field'
-                );
+                invariant(parentIds.length === 1, 'many-to-many relation must have exactly one id field');
+                invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
                 subQuery = subQuery.where(
                     eb(
                         eb.ref(`${relationModel}.${relationIds[0]}`),
@@ -144,35 +115,18 @@ export class SqliteCrudDialect<
                         eb
                             .selectFrom(m2m.joinTable)
                             .select(`${m2m.joinTable}.${m2m.otherFkName}`)
-                            .whereRef(
-                                `${parentName}.${parentIds[0]}`,
-                                '=',
-                                `${m2m.joinTable}.${m2m.parentFkName}`
-                            )
-                    )
+                            .whereRef(`${parentName}.${parentIds[0]}`, '=', `${m2m.joinTable}.${m2m.parentFkName}`),
+                    ),
                 );
             } else {
-                const { keyPairs, ownedByModel } =
-                    getRelationForeignKeyFieldPairs(
-                        this.schema,
-                        model,
-                        relationField
-                    );
+                const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(this.schema, model, relationField);
                 keyPairs.forEach(({ fk, pk }) => {
                     if (ownedByModel) {
                         // the parent model owns the fk
-                        subQuery = subQuery.whereRef(
-                            `${relationModel}.${pk}`,
-                            '=',
-                            `${parentName}.${fk}`
-                        );
+                        subQuery = subQuery.whereRef(`${relationModel}.${pk}`, '=', `${parentName}.${fk}`);
                     } else {
                         // the relation side owns the fk
-                        subQuery = subQuery.whereRef(
-                            `${relationModel}.${fk}`,
-                            '=',
-                            `${parentName}.${pk}`
-                        );
+                        subQuery = subQuery.whereRef(`${relationModel}.${fk}`, '=', `${parentName}.${pk}`);
                     }
                 });
             }
@@ -180,10 +134,7 @@ export class SqliteCrudDialect<
         });
 
         tbl = tbl.select(() => {
-            type ArgsType =
-                | Expression<any>
-                | RawBuilder<any>
-                | SelectQueryBuilder<any, any, any>;
+            type ArgsType = Expression<any> | RawBuilder<any> | SelectQueryBuilder<any, any, any>;
             const objArgs: ArgsType[] = [];
 
             if (payload === true || !payload.select) {
@@ -191,24 +142,12 @@ export class SqliteCrudDialect<
                 objArgs.push(
                     ...Object.entries(relationModelDef.fields)
                         .filter(([, value]) => !value.relation)
-                        .filter(
-                            ([name]) =>
-                                !(
-                                    typeof payload === 'object' &&
-                                    (payload.omit as any)?.[name] === true
-                                )
-                        )
+                        .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
                         .map(([field]) => [
                             sql.lit(field),
-                            buildFieldRef(
-                                this.schema,
-                                relationModel,
-                                field,
-                                this.options,
-                                eb
-                            ),
+                            buildFieldRef(this.schema, relationModel, field, this.options, eb),
                         ])
-                        .flatMap((v) => v)
+                        .flatMap((v) => v),
                 );
             } else if (payload.select) {
                 // select specific fields
@@ -216,42 +155,28 @@ export class SqliteCrudDialect<
                     ...Object.entries<any>(payload.select)
                         .filter(([, value]) => value)
                         .map(([field, value]) => {
-                            const fieldDef = requireField(
-                                this.schema,
-                                relationModel,
-                                field
-                            );
+                            const fieldDef = requireField(this.schema, relationModel, field);
                             if (fieldDef.relation) {
                                 const subJson = this.buildRelationJSON(
                                     relationModel as GetModels<Schema>,
                                     eb,
                                     field,
                                     `${parentName}$${relationField}`,
-                                    value
+                                    value,
                                 );
                                 return [sql.lit(field), subJson as ArgsType];
                             } else {
                                 return [
                                     sql.lit(field),
-                                    buildFieldRef(
-                                        this.schema,
-                                        relationModel,
-                                        field,
-                                        this.options,
-                                        eb
-                                    ) as ArgsType,
+                                    buildFieldRef(this.schema, relationModel, field, this.options, eb) as ArgsType,
                                 ];
                             }
                         })
-                        .flatMap((v) => v)
+                        .flatMap((v) => v),
                 );
             }
 
-            if (
-                typeof payload === 'object' &&
-                payload.include &&
-                typeof payload.include === 'object'
-            ) {
+            if (typeof payload === 'object' && payload.include && typeof payload.include === 'object') {
                 // include relation fields
                 objArgs.push(
                     ...Object.entries<any>(payload.include)
@@ -262,22 +187,17 @@ export class SqliteCrudDialect<
                                 eb,
                                 field,
                                 `${parentName}$${relationField}`,
-                                value
+                                value,
                             );
                             return [sql.lit(field), subJson];
                         })
-                        .flatMap((v) => v)
+                        .flatMap((v) => v),
                 );
             }
 
             if (relationFieldDef.array) {
                 return eb.fn
-                    .coalesce(
-                        sql`json_group_array(json_object(${sql.join(
-                            objArgs
-                        )}))`,
-                        sql`json_array()`
-                    )
+                    .coalesce(sql`json_group_array(json_object(${sql.join(objArgs)}))`, sql`json_array()`)
                     .as('$j');
             } else {
                 return sql`json_object(${sql.join(objArgs)})`.as('data');
@@ -290,7 +210,7 @@ export class SqliteCrudDialect<
     override buildSkipTake(
         query: SelectQueryBuilder<any, any, any>,
         skip: number | undefined,
-        take: number | undefined
+        take: number | undefined,
     ) {
         if (take !== undefined) {
             query = query.limit(take);
@@ -305,16 +225,10 @@ export class SqliteCrudDialect<
         return query;
     }
 
-    override buildJsonObject(
-        eb: ExpressionBuilder<any, any>,
-        value: Record<string, Expression<unknown>>
-    ) {
+    override buildJsonObject(eb: ExpressionBuilder<any, any>, value: Record<string, Expression<unknown>>) {
         return eb.fn(
             'json_object',
-            Object.entries(value).flatMap(([key, value]) => [
-                sql.lit(key),
-                value,
-            ])
+            Object.entries(value).flatMap(([key, value]) => [sql.lit(key), value]),
         );
     }
 
@@ -332,7 +246,7 @@ export class SqliteCrudDialect<
 
     override buildArrayLength(
         eb: ExpressionBuilder<any, any>,
-        array: Expression<unknown>
+        array: Expression<unknown>,
     ): ExpressionWrapper<any, any, number> {
         return eb.fn('json_array_length', [array]);
     }

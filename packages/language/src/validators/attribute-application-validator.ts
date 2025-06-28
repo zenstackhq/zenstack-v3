@@ -37,11 +37,7 @@ const attributeCheckers = new Map<string, PropertyDescriptor>();
 
 // function handler decorator
 function check(name: string) {
-    return function (
-        _target: unknown,
-        _propertyKey: string,
-        descriptor: PropertyDescriptor
-    ) {
+    return function (_target: unknown, _propertyKey: string, descriptor: PropertyDescriptor) {
         if (!attributeCheckers.get(name)) {
             attributeCheckers.set(name, descriptor);
         }
@@ -49,17 +45,12 @@ function check(name: string) {
     };
 }
 
-type AttributeApplication =
-    | DataModelAttribute
-    | DataModelFieldAttribute
-    | InternalAttribute;
+type AttributeApplication = DataModelAttribute | DataModelFieldAttribute | InternalAttribute;
 
 /**
  * Validates function declarations.
  */
-export default class AttributeApplicationValidator
-    implements AstValidator<AttributeApplication>
-{
+export default class AttributeApplicationValidator implements AstValidator<AttributeApplication> {
     validate(attr: AttributeApplication, accept: ValidationAcceptor) {
         const decl = attr.decl.ref;
         if (!decl) {
@@ -68,42 +59,20 @@ export default class AttributeApplicationValidator
 
         const targetDecl = attr.$container;
         if (decl.name === '@@@targetField' && !isAttribute(targetDecl)) {
-            accept(
-                'error',
-                `attribute "${decl.name}" can only be used on attribute declarations`,
-                { node: attr }
-            );
+            accept('error', `attribute "${decl.name}" can only be used on attribute declarations`, { node: attr });
             return;
         }
 
-        if (
-            isDataModelField(targetDecl) &&
-            !isValidAttributeTarget(decl, targetDecl)
-        ) {
-            accept(
-                'error',
-                `attribute "${decl.name}" cannot be used on this type of field`,
-                { node: attr }
-            );
+        if (isDataModelField(targetDecl) && !isValidAttributeTarget(decl, targetDecl)) {
+            accept('error', `attribute "${decl.name}" cannot be used on this type of field`, { node: attr });
         }
 
-        if (
-            isTypeDefField(targetDecl) &&
-            !hasAttribute(decl, '@@@supportTypeDef')
-        ) {
-            accept(
-                'error',
-                `attribute "${decl.name}" cannot be used on type declaration fields`,
-                { node: attr }
-            );
+        if (isTypeDefField(targetDecl) && !hasAttribute(decl, '@@@supportTypeDef')) {
+            accept('error', `attribute "${decl.name}" cannot be used on type declaration fields`, { node: attr });
         }
 
         if (isTypeDef(targetDecl) && !hasAttribute(decl, '@@@supportTypeDef')) {
-            accept(
-                'error',
-                `attribute "${decl.name}" cannot be used on type declarations`,
-                { node: attr }
-            );
+            accept('error', `attribute "${decl.name}" cannot be used on type declarations`, { node: attr });
         }
 
         const filledParams = new Set<AttributeParam>();
@@ -111,9 +80,7 @@ export default class AttributeApplicationValidator
         for (const arg of attr.args) {
             let paramDecl: AttributeParam | undefined;
             if (!arg.name) {
-                paramDecl = decl.params.find(
-                    (p) => p.default && !filledParams.has(p)
-                );
+                paramDecl = decl.params.find((p) => p.default && !filledParams.has(p));
                 if (!paramDecl) {
                     accept('error', `Unexpected unnamed argument`, {
                         node: arg,
@@ -123,13 +90,9 @@ export default class AttributeApplicationValidator
             } else {
                 paramDecl = decl.params.find((p) => p.name === arg.name);
                 if (!paramDecl) {
-                    accept(
-                        'error',
-                        `Attribute "${decl.name}" doesn't have a parameter named "${arg.name}"`,
-                        {
-                            node: arg,
-                        }
-                    );
+                    accept('error', `Attribute "${decl.name}" doesn't have a parameter named "${arg.name}"`, {
+                        node: arg,
+                    });
                     return;
                 }
             }
@@ -142,30 +105,21 @@ export default class AttributeApplicationValidator
             }
 
             if (filledParams.has(paramDecl)) {
-                accept(
-                    'error',
-                    `Parameter "${paramDecl.name}" is already provided`,
-                    { node: arg }
-                );
+                accept('error', `Parameter "${paramDecl.name}" is already provided`, { node: arg });
                 return;
             }
             filledParams.add(paramDecl);
             arg.$resolvedParam = paramDecl;
         }
 
-        const missingParams = decl.params.filter(
-            (p) => !p.type.optional && !filledParams.has(p)
-        );
+        const missingParams = decl.params.filter((p) => !p.type.optional && !filledParams.has(p));
         if (missingParams.length > 0) {
             accept(
                 'error',
-                `Required ${pluralize(
-                    'parameter',
-                    missingParams.length
-                )} not provided: ${missingParams
+                `Required ${pluralize('parameter', missingParams.length)} not provided: ${missingParams
                     .map((p) => p.name)
                     .join(', ')}`,
-                { node: attr }
+                { node: attr },
             );
             return;
         }
@@ -180,10 +134,7 @@ export default class AttributeApplicationValidator
     @check('@@allow')
     @check('@@deny')
     // @ts-expect-error
-    private _checkModelLevelPolicy(
-        attr: AttributeApplication,
-        accept: ValidationAcceptor
-    ) {
+    private _checkModelLevelPolicy(attr: AttributeApplication, accept: ValidationAcceptor) {
         const kind = getStringLiteral(attr.args[0]?.value);
         if (!kind) {
             accept('error', `expects a string literal`, {
@@ -191,12 +142,7 @@ export default class AttributeApplicationValidator
             });
             return;
         }
-        this.validatePolicyKinds(
-            kind,
-            ['create', 'read', 'update', 'delete', 'all'],
-            attr,
-            accept
-        );
+        this.validatePolicyKinds(kind, ['create', 'read', 'update', 'delete', 'all'], attr, accept);
 
         // @encrypted fields cannot be used in policy rules
         this.rejectEncryptedFields(attr, accept);
@@ -205,10 +151,7 @@ export default class AttributeApplicationValidator
     @check('@allow')
     @check('@deny')
     // @ts-expect-error
-    private _checkFieldLevelPolicy(
-        attr: AttributeApplication,
-        accept: ValidationAcceptor
-    ) {
+    private _checkFieldLevelPolicy(attr: AttributeApplication, accept: ValidationAcceptor) {
         const kind = getStringLiteral(attr.args[0]?.value);
         if (!kind) {
             accept('error', `expects a string literal`, {
@@ -216,23 +159,11 @@ export default class AttributeApplicationValidator
             });
             return;
         }
-        const kindItems = this.validatePolicyKinds(
-            kind,
-            ['read', 'update', 'all'],
-            attr,
-            accept
-        );
+        const kindItems = this.validatePolicyKinds(kind, ['read', 'update', 'all'], attr, accept);
 
         const expr = attr.args[1]?.value;
-        if (
-            expr &&
-            AstUtils.streamAst(expr).some((node) => isFutureExpr(node))
-        ) {
-            accept(
-                'error',
-                `"future()" is not allowed in field-level policy rules`,
-                { node: expr }
-            );
+        if (expr && AstUtils.streamAst(expr).some((node) => isFutureExpr(node))) {
+            accept('error', `"future()" is not allowed in field-level policy rules`, { node: expr });
         }
 
         // 'update' rules are not allowed for relation fields
@@ -242,7 +173,7 @@ export default class AttributeApplicationValidator
                 accept(
                     'error',
                     `Field-level policy rules with "update" or "all" kind are not allowed for relation fields. Put rules on foreign-key fields instead.`,
-                    { node: attr }
+                    { node: attr },
                 );
             }
         }
@@ -253,33 +184,21 @@ export default class AttributeApplicationValidator
 
     @check('@@validate')
     // @ts-expect-error
-    private _checkValidate(
-        attr: AttributeApplication,
-        accept: ValidationAcceptor
-    ) {
+    private _checkValidate(attr: AttributeApplication, accept: ValidationAcceptor) {
         const condition = attr.args[0]?.value;
         if (
             condition &&
             AstUtils.streamAst(condition).some(
-                (node) =>
-                    isDataModelFieldReference(node) &&
-                    isDataModel(node.$resolvedType?.decl)
+                (node) => isDataModelFieldReference(node) && isDataModel(node.$resolvedType?.decl),
             )
         ) {
-            accept(
-                'error',
-                `\`@@validate\` condition cannot use relation fields`,
-                { node: condition }
-            );
+            accept('error', `\`@@validate\` condition cannot use relation fields`, { node: condition });
         }
     }
 
     @check('@@unique')
     // @ts-expect-error
-    private _checkUnique(
-        attr: AttributeApplication,
-        accept: ValidationAcceptor
-    ) {
+    private _checkUnique(attr: AttributeApplication, accept: ValidationAcceptor) {
         const fields = attr.args[0]?.value;
         if (!fields) {
             return;
@@ -299,17 +218,10 @@ export default class AttributeApplicationValidator
                     return;
                 }
 
-                if (
-                    item.target.ref.$container !== attr.$container &&
-                    isDelegateModel(item.target.ref.$container)
-                ) {
-                    accept(
-                        'error',
-                        `Cannot use fields inherited from a polymorphic base model in \`@@unique\``,
-                        {
-                            node: item,
-                        }
-                    );
+                if (item.target.ref.$container !== attr.$container && isDelegateModel(item.target.ref.$container)) {
+                    accept('error', `Cannot use fields inherited from a polymorphic base model in \`@@unique\``, {
+                        node: item,
+                    });
                 }
             });
         } else {
@@ -319,20 +231,10 @@ export default class AttributeApplicationValidator
         }
     }
 
-    private rejectEncryptedFields(
-        attr: AttributeApplication,
-        accept: ValidationAcceptor
-    ) {
+    private rejectEncryptedFields(attr: AttributeApplication, accept: ValidationAcceptor) {
         AstUtils.streamAllContents(attr).forEach((node) => {
-            if (
-                isDataModelFieldReference(node) &&
-                hasAttribute(node.target.ref as DataModelField, '@encrypted')
-            ) {
-                accept(
-                    'error',
-                    `Encrypted fields cannot be used in policy rules`,
-                    { node }
-                );
+            if (isDataModelFieldReference(node) && hasAttribute(node.target.ref as DataModelField, '@encrypted')) {
+                accept('error', `Encrypted fields cannot be used in policy rules`, { node });
             }
         });
     }
@@ -341,17 +243,15 @@ export default class AttributeApplicationValidator
         kind: string,
         candidates: string[],
         attr: AttributeApplication,
-        accept: ValidationAcceptor
+        accept: ValidationAcceptor,
     ) {
         const items = kind.split(',').map((x) => x.trim());
         items.forEach((item) => {
             if (!candidates.includes(item)) {
                 accept(
                     'error',
-                    `Invalid policy rule kind: "${item}", allowed: ${candidates
-                        .map((c) => '"' + c + '"')
-                        .join(', ')}`,
-                    { node: attr }
+                    `Invalid policy rule kind: "${item}", allowed: ${candidates.map((c) => '"' + c + '"').join(', ')}`,
+                    { node: attr },
                 );
             }
         });
@@ -359,11 +259,7 @@ export default class AttributeApplicationValidator
     }
 }
 
-function assignableToAttributeParam(
-    arg: AttributeArg,
-    param: AttributeParam,
-    attr: AttributeApplication
-): boolean {
+function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, attr: AttributeApplication): boolean {
     const argResolvedType = arg.$resolvedType;
     if (!argResolvedType) {
         return false;
@@ -398,24 +294,14 @@ function assignableToAttributeParam(
 
     // destination is field reference or transitive field reference, check if
     // argument is reference or array or reference
-    if (
-        dstType === 'FieldReference' ||
-        dstType === 'TransitiveFieldReference'
-    ) {
+    if (dstType === 'FieldReference' || dstType === 'TransitiveFieldReference') {
         if (dstIsArray) {
             return (
                 isArrayExpr(arg.value) &&
-                !arg.value.items.find(
-                    (item) =>
-                        !isReferenceExpr(item) ||
-                        !isDataModelField(item.target.ref)
-                )
+                !arg.value.items.find((item) => !isReferenceExpr(item) || !isDataModelField(item.target.ref))
             );
         } else {
-            return (
-                isReferenceExpr(arg.value) &&
-                isDataModelField(arg.value.target.ref)
-            );
+            return isReferenceExpr(arg.value) && isDataModelField(arg.value.target.ref);
         }
     }
 
@@ -423,20 +309,13 @@ function assignableToAttributeParam(
         // enum type
 
         let attrArgDeclType = dstRef?.ref;
-        if (
-            dstType === 'ContextType' &&
-            isDataModelField(attr.$container) &&
-            attr.$container?.type?.reference
-        ) {
+        if (dstType === 'ContextType' && isDataModelField(attr.$container) && attr.$container?.type?.reference) {
             // attribute parameter type is ContextType, need to infer type from
             // the attribute's container
             attrArgDeclType = resolved(attr.$container.type.reference);
             dstIsArray = attr.$container.type.array;
         }
-        return (
-            attrArgDeclType === argResolvedType.decl &&
-            dstIsArray === argResolvedType.array
-        );
+        return attrArgDeclType === argResolvedType.decl && dstIsArray === argResolvedType.array;
     } else if (dstType) {
         // scalar type
 
@@ -452,42 +331,29 @@ function assignableToAttributeParam(
                 if (!attr.$container?.type?.type) {
                     return false;
                 }
-                dstType = mapBuiltinTypeToExpressionType(
-                    attr.$container.type.type
-                );
+                dstType = mapBuiltinTypeToExpressionType(attr.$container.type.type);
                 dstIsArray = attr.$container.type.array;
             } else {
                 dstType = 'Any';
             }
         }
 
-        return (
-            typeAssignable(dstType, argResolvedType.decl, arg.value) &&
-            dstIsArray === argResolvedType.array
-        );
+        return typeAssignable(dstType, argResolvedType.decl, arg.value) && dstIsArray === argResolvedType.array;
     } else {
         // reference type
-        return (
-            (dstRef?.ref === argResolvedType.decl || dstType === 'Any') &&
-            dstIsArray === argResolvedType.array
-        );
+        return (dstRef?.ref === argResolvedType.decl || dstType === 'Any') && dstIsArray === argResolvedType.array;
     }
 }
 
-function isValidAttributeTarget(
-    attrDecl: Attribute,
-    targetDecl: DataModelField
-) {
-    const targetField = attrDecl.attributes.find(
-        (attr) => attr.decl.ref?.name === '@@@targetField'
-    );
+function isValidAttributeTarget(attrDecl: Attribute, targetDecl: DataModelField) {
+    const targetField = attrDecl.attributes.find((attr) => attr.decl.ref?.name === '@@@targetField');
     if (!targetField?.args[0]) {
         // no field type constraint
         return true;
     }
 
     const fieldTypes = (targetField.args[0].value as ArrayExpr).items.map(
-        (item) => (item as ReferenceExpr).target.ref?.name
+        (item) => (item as ReferenceExpr).target.ref?.name,
     );
 
     let allowed = false;
@@ -521,8 +387,7 @@ function isValidAttributeTarget(
                 allowed = allowed || targetDecl.type.type === 'Bytes';
                 break;
             case 'ModelField':
-                allowed =
-                    allowed || isDataModel(targetDecl.type.reference?.ref);
+                allowed = allowed || isDataModel(targetDecl.type.reference?.ref);
                 break;
             case 'TypeDefField':
                 allowed = allowed || isTypeDef(targetDecl.type.reference?.ref);
@@ -538,9 +403,6 @@ function isValidAttributeTarget(
     return allowed;
 }
 
-export function validateAttributeApplication(
-    attr: AttributeApplication,
-    accept: ValidationAcceptor
-) {
+export function validateAttributeApplication(attr: AttributeApplication, accept: ValidationAcceptor) {
     new AttributeApplicationValidator().validate(attr, accept);
 }

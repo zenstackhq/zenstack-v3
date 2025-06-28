@@ -1,13 +1,8 @@
-import type { Model } from '@zenstackhq/language/ast';
-import type {
-    OperationNode,
-    QueryResult,
-    RootOperationNode,
-    UnknownRow,
-} from 'kysely';
+import type { OperationNode, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
 import type { ClientContract, ToKysely } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
+import type { ModelOperations } from './contract';
 import type { CrudOperation } from './crud/operations/base';
 
 export type QueryContext<Schema extends SchemaDef> = {
@@ -78,29 +73,23 @@ export type OnQueryArgs<Schema extends SchemaDef> = QueryContext<Schema> & {
     proceed: ProceedQueryFunction<Schema>;
 };
 
-export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> =
-    MutationHooksArgs<Schema> & {
-        entities?: Record<string, unknown>[];
-    };
+export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
+    entities?: Record<string, unknown>[];
+};
 
-export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> =
-    MutationHooksArgs<Schema> & {
-        beforeMutationEntities?: Record<string, unknown>[];
-        afterMutationEntities?: Record<string, unknown>[];
-    };
+export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
+    beforeMutationEntities?: Record<string, unknown>[];
+    afterMutationEntities?: Record<string, unknown>[];
+};
 
 export type ProceedQueryFunction<Schema extends SchemaDef> = (
     queryArgs: unknown,
-    tx?: ClientContract<Schema>
+    tx?: ClientContract<Schema>,
 ) => Promise<unknown>;
 
-export type OnKyselyQueryTransactionCallback = (
-    proceed: ProceedKyselyQueryFunction
-) => Promise<QueryResult<any>>;
+export type OnKyselyQueryTransactionCallback = (proceed: ProceedKyselyQueryFunction) => Promise<QueryResult<any>>;
 
-export type OnKyselyQueryTransaction = (
-    callback: OnKyselyQueryTransactionCallback
-) => Promise<QueryResult<any>>;
+export type OnKyselyQueryTransaction = (callback: OnKyselyQueryTransactionCallback) => Promise<QueryResult<any>>;
 
 export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
     kysely: ToKysely<Schema>;
@@ -111,9 +100,7 @@ export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
     transaction: OnKyselyQueryTransaction;
 };
 
-export type ProceedKyselyQueryFunction = (
-    query: RootOperationNode
-) => Promise<QueryResult<any>>;
+export type ProceedKyselyQueryFunction = (query: RootOperationNode) => Promise<QueryResult<any>>;
 
 /**
  * ZenStack runtime plugin.
@@ -137,31 +124,25 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     /**
      * Intercepts an ORM query.
      */
-    onQuery?: (args: OnQueryArgs<Schema>) => Promise<unknown>;
+    onQuery?: OnQueryHooks<Schema>;
 
     /**
      * Intercepts a Kysely query.
      */
-    onKyselyQuery?: (
-        args: OnKyselyQueryArgs<Schema>
-    ) => Promise<QueryResult<UnknownRow>>;
+    onKyselyQuery?: (args: OnKyselyQueryArgs<Schema>) => Promise<QueryResult<UnknownRow>>;
 
     /**
      * This callback determines whether a mutation should be intercepted, and if so,
      * what data should be loaded before and after the mutation.
      */
-    mutationInterceptionFilter?: (
-        args: MutationHooksArgs<Schema>
-    ) => MaybePromise<MutationInterceptionFilterResult>;
+    mutationInterceptionFilter?: (args: MutationHooksArgs<Schema>) => MaybePromise<MutationInterceptionFilterResult>;
 
     /**
      * Called before an entity is mutated.
      * @param args.entity Only available if `loadBeforeMutationEntity` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
-    beforeEntityMutation?: (
-        args: PluginBeforeEntityMutationArgs<Schema>
-    ) => MaybePromise<void>;
+    beforeEntityMutation?: (args: PluginBeforeEntityMutationArgs<Schema>) => MaybePromise<void>;
 
     /**
      * Called after an entity is mutated.
@@ -170,19 +151,71 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
      * @param args.afterMutationEntity Only available if `loadAfterMutationEntity` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
-    afterEntityMutation?: (
-        args: PluginAfterEntityMutationArgs<Schema>
-    ) => MaybePromise<void>;
+    afterEntityMutation?: (args: PluginAfterEntityMutationArgs<Schema>) => MaybePromise<void>;
 }
 
-// TODO: move to SDK
-export type CliGeneratorContext = {
-    model: Model;
-    outputPath: string;
-    tsSchemaFile: string;
+type OnQueryHooks<Schema extends SchemaDef = SchemaDef> = {
+    [Model in GetModels<Schema> as Uncapitalize<Model>]?: OnQueryOperationHooks<Schema, Model>;
+} & {
+    $allModels?: OnQueryOperationHooks<Schema, GetModels<Schema>>;
 };
 
-// TODO: move to SDK
-export type CliGenerator = (context: CliGeneratorContext) => MaybePromise<void>;
+type OnQueryOperationHooks<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    [Operation in keyof ModelOperations<Schema, Model>]?: (
+        ctx: OnQueryHookContext<Schema, Model, Operation>,
+    ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
+} & {
+    $allOperations?: (ctx: {
+        model: Model;
+        operation: CrudOperation;
+        args: unknown;
+        query: (args: unknown) => Promise<unknown>;
+    }) => MaybePromise<unknown>;
+};
+
+type OnQueryHookContext<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Operation extends keyof ModelOperations<Schema, Model>,
+> = {
+    /**
+     * The model that is being queried.
+     */
+    model: Model;
+
+    /**
+     * The operation that is being performed.
+     */
+    operation: Operation;
+
+    /**
+     * The query arguments.
+     */
+    args: Parameters<ModelOperations<Schema, Model>[Operation]>[0];
+
+    /**
+     * The query function to proceed with the original query.
+     * It takes the same arguments as the operation method.
+     *
+     * @param args The query arguments.
+     * @param tx Optional transaction client to use for the query.
+     */
+    query: (
+        args: Parameters<ModelOperations<Schema, Model>[Operation]>[0],
+        tx?: ClientContract<Schema>,
+    ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
+
+    /**
+     * The ZenStack client that is performing the operation.
+     */
+    client: ClientContract<Schema>;
+};
+
+/**
+ * Defines a ZenStack runtime plugin.
+ */
+export function definePlugin<Schema extends SchemaDef>(plugin: RuntimePlugin<Schema>) {
+    return plugin;
+}
 
 export { type CrudOperation } from './crud/operations/base';

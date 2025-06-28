@@ -29,11 +29,7 @@ const invocationCheckers = new Map<string, PropertyDescriptor>();
 
 // function handler decorator
 function func(name: string) {
-    return function (
-        _target: unknown,
-        _propertyKey: string,
-        descriptor: PropertyDescriptor
-    ) {
+    return function (_target: unknown, _propertyKey: string, descriptor: PropertyDescriptor) {
         if (!invocationCheckers.get(name)) {
             invocationCheckers.set(name, descriptor);
         }
@@ -43,9 +39,7 @@ function func(name: string) {
 /**
  * InvocationExpr validation
  */
-export default class FunctionInvocationValidator
-    implements AstValidator<Expression>
-{
+export default class FunctionInvocationValidator implements AstValidator<Expression> {
     validate(expr: InvocationExpr, accept: ValidationAcceptor): void {
         const funcDecl = expr.function.ref;
         if (!funcDecl) {
@@ -62,15 +56,9 @@ export default class FunctionInvocationValidator
 
             // find the containing attribute context for the invocation
             let curr: AstNode | undefined = expr.$container;
-            let containerAttribute:
-                | DataModelAttribute
-                | DataModelFieldAttribute
-                | undefined;
+            let containerAttribute: DataModelAttribute | DataModelFieldAttribute | undefined;
             while (curr) {
-                if (
-                    isDataModelAttribute(curr) ||
-                    isDataModelFieldAttribute(curr)
-                ) {
+                if (isDataModelAttribute(curr) || isDataModelFieldAttribute(curr)) {
                     containerAttribute = curr;
                     break;
                 }
@@ -80,10 +68,7 @@ export default class FunctionInvocationValidator
             // validate the context allowed for the function
             const exprContext = match(containerAttribute?.decl.$refText)
                 .with('@default', () => ExpressionContext.DefaultValue)
-                .with(
-                    P.union('@@allow', '@@deny', '@allow', '@deny'),
-                    () => ExpressionContext.AccessPolicy
-                )
+                .with(P.union('@@allow', '@@deny', '@allow', '@deny'), () => ExpressionContext.AccessPolicy)
                 .with('@@validate', () => ExpressionContext.ValidationRule)
                 .with('@@index', () => ExpressionContext.Index)
                 .otherwise(() => undefined);
@@ -92,37 +77,21 @@ export default class FunctionInvocationValidator
             const funcAllowedContext = getFunctionExpressionContext(funcDecl);
 
             if (exprContext && !funcAllowedContext.includes(exprContext)) {
-                accept(
-                    'error',
-                    `function "${funcDecl.name}" is not allowed in the current context: ${exprContext}`,
-                    {
-                        node: expr,
-                    }
-                );
+                accept('error', `function "${funcDecl.name}" is not allowed in the current context: ${exprContext}`, {
+                    node: expr,
+                });
                 return;
             }
 
             // TODO: express function validation rules declaratively in ZModel
 
-            const allCasing = [
-                'original',
-                'upper',
-                'lower',
-                'capitalize',
-                'uncapitalize',
-            ];
+            const allCasing = ['original', 'upper', 'lower', 'capitalize', 'uncapitalize'];
             if (['currentModel', 'currentOperation'].includes(funcDecl.name)) {
                 const arg = getLiteral<string>(expr.args[0]?.value);
                 if (arg && !allCasing.includes(arg)) {
-                    accept(
-                        'error',
-                        `argument must be one of: ${allCasing
-                            .map((c) => '"' + c + '"')
-                            .join(', ')}`,
-                        {
-                            node: expr.args[0]!,
-                        }
-                    );
+                    accept('error', `argument must be one of: ${allCasing.map((c) => '"' + c + '"').join(', ')}`, {
+                        node: expr.args[0]!,
+                    });
                 }
             }
         }
@@ -134,11 +103,7 @@ export default class FunctionInvocationValidator
         }
     }
 
-    private validateArgs(
-        funcDecl: FunctionDecl,
-        args: Argument[],
-        accept: ValidationAcceptor
-    ) {
+    private validateArgs(funcDecl: FunctionDecl, args: Argument[], accept: ValidationAcceptor) {
         let success = true;
         for (let i = 0; i < funcDecl.params.length; i++) {
             const param = funcDecl.params[i];
@@ -148,11 +113,7 @@ export default class FunctionInvocationValidator
             const arg = args[i];
             if (!arg) {
                 if (!param.optional) {
-                    accept(
-                        'error',
-                        `missing argument for parameter "${param.name}"`,
-                        { node: funcDecl }
-                    );
+                    accept('error', `missing argument for parameter "${param.name}"`, { node: funcDecl });
                     success = false;
                 }
             } else {
@@ -165,11 +126,7 @@ export default class FunctionInvocationValidator
         return success;
     }
 
-    private validateInvocationArg(
-        arg: Argument,
-        param: FunctionParam,
-        accept: ValidationAcceptor
-    ) {
+    private validateInvocationArg(arg: Argument, param: FunctionParam, accept: ValidationAcceptor) {
         const argResolvedType = arg?.value?.$resolvedType;
         if (!argResolvedType) {
             accept('error', 'argument type cannot be resolved', { node: arg });
@@ -194,10 +151,7 @@ export default class FunctionInvocationValidator
 
         if (typeof argResolvedType.decl === 'string') {
             // scalar type
-            if (
-                !typeAssignable(dstType, argResolvedType.decl, arg.value) ||
-                dstIsArray !== argResolvedType.array
-            ) {
+            if (!typeAssignable(dstType, argResolvedType.decl, arg.value) || dstIsArray !== argResolvedType.array) {
                 accept('error', `argument is not assignable to parameter`, {
                     node: arg,
                 });
@@ -205,10 +159,7 @@ export default class FunctionInvocationValidator
             }
         } else {
             // enum or model type
-            if (
-                (dstRef?.ref !== argResolvedType.decl && dstType !== 'Any') ||
-                dstIsArray !== argResolvedType.array
-            ) {
+            if ((dstRef?.ref !== argResolvedType.decl && dstType !== 'Any') || dstIsArray !== argResolvedType.array) {
                 accept('error', `argument is not assignable to parameter`, {
                     node: arg,
                 });
@@ -225,10 +176,7 @@ export default class FunctionInvocationValidator
         let valid = true;
 
         const fieldArg = expr.args[0]!.value;
-        if (
-            !isDataModelFieldReference(fieldArg) ||
-            !isDataModel(fieldArg.$resolvedType?.decl)
-        ) {
+        if (!isDataModelFieldReference(fieldArg) || !isDataModel(fieldArg.$resolvedType?.decl)) {
             accept('error', 'argument must be a relation field', {
                 node: expr.args[0]!,
             });
@@ -245,15 +193,8 @@ export default class FunctionInvocationValidator
         const opArg = expr.args[1]?.value;
         if (opArg) {
             const operation = getLiteral<string>(opArg);
-            if (
-                !operation ||
-                !['read', 'create', 'update', 'delete'].includes(operation)
-            ) {
-                accept(
-                    'error',
-                    'argument must be a "read", "create", "update", or "delete"',
-                    { node: expr.args[1]! }
-                );
+            if (!operation || !['read', 'create', 'update', 'delete'].includes(operation)) {
+                accept('error', 'argument must be a "read", "create", "update", or "delete"', { node: expr.args[1]! });
                 valid = false;
             }
         }
@@ -279,11 +220,7 @@ export default class FunctionInvocationValidator
 
             if (seen.has(currModel)) {
                 if (currModel === start) {
-                    accept(
-                        'error',
-                        'cyclic dependency detected when following the `check()` call',
-                        { node: expr }
-                    );
+                    accept('error', 'cyclic dependency detected when following the `check()` call', { node: expr });
                 } else {
                     // a cycle is detected but it doesn't start from the invocation expression we're checking,
                     // just break here and the cycle will be reported when we validate the start of it
@@ -294,9 +231,7 @@ export default class FunctionInvocationValidator
             }
 
             const policyAttrs = currModel.attributes.filter(
-                (attr) =>
-                    attr.decl.$refText === '@@allow' ||
-                    attr.decl.$refText === '@@deny'
+                (attr) => attr.decl.$refText === '@@allow' || attr.decl.$refText === '@@deny',
             );
             for (const attr of policyAttrs) {
                 const rule = attr.args[1];

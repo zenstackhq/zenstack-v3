@@ -1,11 +1,10 @@
 {
     "name": "create-zenstack",
-    "version": "3.0.0-alpha.4",
+    "version": "3.0.0-alpha.5",
     "description": "Create a new ZenStack project",
     "type": "module",
     "scripts": {
         "build": "tsup-node",
-        "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "pack": "pnpm pack"
     },
@@ -36,7 +35,7 @@
         "ora": "^5.4.1"
     },
     "devDependencies": {
-        "@types/colors": "^1.2.4",
-        "@types/node": "^20.0.0"
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*"
     }
 }

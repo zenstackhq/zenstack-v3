@@ -1,6 +1,6 @@
 {
-    "name": "sample-todo",
-    "version": "3.0.0-alpha.4",
+    "name": "sample-blog",
+    "version": "3.0.0-alpha.5",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -19,6 +19,7 @@
     "devDependencies": {
         "@types/better-sqlite3": "^7.6.12",
         "prisma": "^6.0.0",
-        "@zenstackhq/cli": "workspace:*"
+        "@zenstackhq/cli": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*"
     }
 }

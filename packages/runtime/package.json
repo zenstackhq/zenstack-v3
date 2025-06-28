@@ -1,13 +1,13 @@
 {
     "name": "@zenstackhq/runtime",
-    "version": "3.0.0-alpha.4",
+    "version": "3.0.0-alpha.5",
     "description": "ZenStack Runtime",
     "type": "module",
     "scripts": {
         "build": "tsup-node",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
-        "test": "vitest && pnpm test:generate && pnpm test:typecheck",
+        "test": "vitest run && pnpm test:generate && pnpm test:typecheck",
         "test:generate": "tsx test/typing/generate.ts",
         "test:typecheck": "tsc --project tsconfig.test.json",
         "pack": "pnpm pack"
@@ -65,22 +65,20 @@
         }
     },
     "dependencies": {
+        "@zenstackhq/common-helpers": "workspace:*",
         "@paralleldrive/cuid2": "^2.2.2",
         "decimal.js": "^10.4.3",
-        "is-plain-object": "^5.0.0",
         "json-stable-stringify": "^1.3.0",
-        "kysely": "^0.27.5",
+        "kysely": "catalog:",
         "nanoid": "^5.0.9",
-        "tiny-invariant": "^1.3.3",
-        "ts-pattern": "^5.6.0",
+        "ts-pattern": "catalog:",
         "ulid": "^3.0.0",
-        "utility-types": "^3.11.0",
         "uuid": "^11.0.5"
     },
     "peerDependencies": {
         "better-sqlite3": "^11.8.1",
         "pg": "^8.13.1",
-        "zod": "^3.0.0"
+        "zod": "catalog:"
     },
     "peerDependenciesMeta": {
         "better-sqlite3": {
@@ -93,11 +91,11 @@
     "devDependencies": {
         "@types/better-sqlite3": "^7.0.0",
         "@types/pg": "^8.0.0",
-        "@types/tmp": "^0.2.6",
+        "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/testtools": "workspace:*",
-        "tmp": "^0.2.3",
+        "@zenstackhq/typescript-config": "workspace:*",
         "tsx": "^4.19.2"
     }
 }

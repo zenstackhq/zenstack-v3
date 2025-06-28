@@ -1,13 +1,8 @@
-import {
-    type OnKyselyQueryArgs,
-    type RuntimePlugin,
-} from '../../client/plugin';
+import { type OnKyselyQueryArgs, type RuntimePlugin } from '../../client/plugin';
 import type { SchemaDef } from '../../schema';
 import { PolicyHandler } from './policy-handler';
 
-export class PolicyPlugin<Schema extends SchemaDef>
-    implements RuntimePlugin<Schema>
-{
+export class PolicyPlugin<Schema extends SchemaDef> implements RuntimePlugin<Schema> {
     get id() {
         return 'policy';
     }
@@ -20,12 +15,7 @@ export class PolicyPlugin<Schema extends SchemaDef>
         return 'Enforces access policies defined in the schema.';
     }
 
-    onKyselyQuery({
-        query,
-        client,
-        proceed,
-        transaction,
-    }: OnKyselyQueryArgs<Schema>) {
+    onKyselyQuery({ query, client, proceed, transaction }: OnKyselyQueryArgs<Schema>) {
         const handler = new PolicyHandler<Schema>(client);
         return handler.handle(query, proceed, transaction);
     }

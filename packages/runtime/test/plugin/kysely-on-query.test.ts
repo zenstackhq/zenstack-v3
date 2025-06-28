@@ -1,11 +1,5 @@
 import SQLite from 'better-sqlite3';
-import {
-    InsertQueryNode,
-    Kysely,
-    PrimitiveValueListNode,
-    ValuesNode,
-    type QueryResult,
-} from 'kysely';
+import { InsertQueryNode, Kysely, PrimitiveValueListNode, ValuesNode, type QueryResult } from 'kysely';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ZenStackClient, type ClientContract } from '../../src/client';
 import { schema } from '../test-schema';
@@ -34,7 +28,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             client.user.create({
                 data: { email: 'u1@test.com' },
-            })
+            }),
         ).resolves.toMatchObject({
             email: 'u1@test.com',
         });
@@ -53,7 +47,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             _client.user.create({
                 data: { email: 'u1@test.com' },
-            })
+            }),
         ).resolves.toMatchObject({
             email: 'u1@test.com',
         });
@@ -68,20 +62,12 @@ describe('Kysely onQuery tests', () => {
                     return proceed(query);
                 }
                 const valueList = [
-                    ...(
-                        ((query as InsertQueryNode).values as ValuesNode)
-                            .values[0] as PrimitiveValueListNode
-                    ).values,
+                    ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode).values,
                 ];
                 valueList[0] = 'u2@test.com';
-                const newQuery = InsertQueryNode.cloneWith(
-                    query as InsertQueryNode,
-                    {
-                        values: ValuesNode.create([
-                            PrimitiveValueListNode.create(valueList),
-                        ]),
-                    }
-                );
+                const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                    values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                });
                 return proceed(newQuery);
             },
         });
@@ -89,7 +75,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             client.user.create({
                 data: { email: 'u1@test.com' },
-            })
+            }),
         ).resolves.toMatchObject({
             email: 'u2@test.com',
         });
@@ -115,7 +101,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             client.user.create({
                 data: { id: '1', email: 'u1@test.com' },
-            })
+            }),
         ).resolves.toMatchObject({
             email: 'u1@test.com',
         });
@@ -155,7 +141,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             client.user.create({
                 data: { id: '1', email: 'u1@test.com' },
-            })
+            }),
         ).rejects.toThrow('constraint failed');
 
         await expect(client.user.findFirst()).toResolveNull();
@@ -175,20 +161,13 @@ describe('Kysely onQuery tests', () => {
                     }
                     called1 = true;
                     const valueList = [
-                        ...(
-                            ((query as InsertQueryNode).values as ValuesNode)
-                                .values[0] as PrimitiveValueListNode
-                        ).values,
+                        ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode)
+                            .values,
                     ];
                     valueList[1] = 'Marvin2';
-                    const newQuery = InsertQueryNode.cloneWith(
-                        query as InsertQueryNode,
-                        {
-                            values: ValuesNode.create([
-                                PrimitiveValueListNode.create(valueList),
-                            ]),
-                        }
-                    );
+                    const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                        values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                    });
                     return proceed(newQuery);
                 },
             })
@@ -200,21 +179,14 @@ describe('Kysely onQuery tests', () => {
                     }
                     called2 = true;
                     const valueList = [
-                        ...(
-                            ((query as InsertQueryNode).values as ValuesNode)
-                                .values[0] as PrimitiveValueListNode
-                        ).values,
+                        ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode)
+                            .values,
                     ];
                     valueList[0] = 'u2@test.com';
                     valueList[1] = 'Marvin1';
-                    const newQuery = InsertQueryNode.cloneWith(
-                        query as InsertQueryNode,
-                        {
-                            values: ValuesNode.create([
-                                PrimitiveValueListNode.create(valueList),
-                            ]),
-                        }
-                    );
+                    const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                        values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                    });
                     return proceed(newQuery);
                 },
             });
@@ -222,7 +194,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             client.user.create({
                 data: { email: 'u1@test.com', name: 'Marvin' },
-            })
+            }),
         ).resolves.toMatchObject({
             email: 'u2@test.com',
             name: 'Marvin2',
@@ -257,23 +229,14 @@ describe('Kysely onQuery tests', () => {
                     called2 = true;
                     return transaction(async (txProceed) => {
                         const valueList = [
-                            ...(
-                                (
-                                    (query as InsertQueryNode)
-                                        .values as ValuesNode
-                                ).values[0] as PrimitiveValueListNode
-                            ).values,
+                            ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode)
+                                .values,
                         ];
                         valueList[0] = 'u2@test.com';
                         valueList[1] = 'Marvin1';
-                        const newQuery = InsertQueryNode.cloneWith(
-                            query as InsertQueryNode,
-                            {
-                                values: ValuesNode.create([
-                                    PrimitiveValueListNode.create(valueList),
-                                ]),
-                            }
-                        );
+                        const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                            values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                        });
                         return txProceed(newQuery);
                     });
                 },
@@ -282,7 +245,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             client.user.create({
                 data: { email: 'u1@test.com', name: 'Marvin' },
-            })
+            }),
         ).rejects.toThrow('test error');
 
         await expect(called1).toBe(true);
@@ -317,21 +280,14 @@ describe('Kysely onQuery tests', () => {
                     }
                     called2 = true;
                     const valueList = [
-                        ...(
-                            ((query as InsertQueryNode).values as ValuesNode)
-                                .values[0] as PrimitiveValueListNode
-                        ).values,
+                        ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode)
+                            .values,
                     ];
                     valueList[0] = 'u2@test.com';
                     valueList[1] = 'Marvin1';
-                    const newQuery = InsertQueryNode.cloneWith(
-                        query as InsertQueryNode,
-                        {
-                            values: ValuesNode.create([
-                                PrimitiveValueListNode.create(valueList),
-                            ]),
-                        }
-                    );
+                    const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                        values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                    });
                     return proceed(newQuery);
                 },
             });
@@ -339,7 +295,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             client.user.create({
                 data: { email: 'u1@test.com', name: 'Marvin' },
-            })
+            }),
         ).rejects.toThrow('test error');
 
         await expect(called1).toBe(true);
@@ -371,21 +327,14 @@ describe('Kysely onQuery tests', () => {
                     }
                     called2 = true;
                     const valueList = [
-                        ...(
-                            ((query as InsertQueryNode).values as ValuesNode)
-                                .values[0] as PrimitiveValueListNode
-                        ).values,
+                        ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode)
+                            .values,
                     ];
                     valueList[0] = 'u2@test.com';
                     valueList[1] = 'Marvin1';
-                    const newQuery = InsertQueryNode.cloneWith(
-                        query as InsertQueryNode,
-                        {
-                            values: ValuesNode.create([
-                                PrimitiveValueListNode.create(valueList),
-                            ]),
-                        }
-                    );
+                    const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                        values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                    });
                     return proceed(newQuery);
                 },
             });
@@ -394,8 +343,8 @@ describe('Kysely onQuery tests', () => {
             client.$transaction((tx) =>
                 tx.user.create({
                     data: { email: 'u1@test.com', name: 'Marvin' },
-                })
-            )
+                }),
+            ),
         ).rejects.toThrow('test error');
 
         await expect(called1).toBe(true);
@@ -417,22 +366,13 @@ describe('Kysely onQuery tests', () => {
                     called1 = true;
                     return transaction(async (txProceed) => {
                         const valueList = [
-                            ...(
-                                (
-                                    (query as InsertQueryNode)
-                                        .values as ValuesNode
-                                ).values[0] as PrimitiveValueListNode
-                            ).values,
+                            ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode)
+                                .values,
                         ];
                         valueList[1] = 'Marvin2';
-                        const newQuery = InsertQueryNode.cloneWith(
-                            query as InsertQueryNode,
-                            {
-                                values: ValuesNode.create([
-                                    PrimitiveValueListNode.create(valueList),
-                                ]),
-                            }
-                        );
+                        const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                            values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                        });
                         return txProceed(newQuery);
                     });
                 },
@@ -446,23 +386,14 @@ describe('Kysely onQuery tests', () => {
                     called2 = true;
                     return transaction(async (txProceed) => {
                         const valueList = [
-                            ...(
-                                (
-                                    (query as InsertQueryNode)
-                                        .values as ValuesNode
-                                ).values[0] as PrimitiveValueListNode
-                            ).values,
+                            ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode)
+                                .values,
                         ];
                         valueList[0] = 'u2@test.com';
                         valueList[1] = 'Marvin1';
-                        const newQuery = InsertQueryNode.cloneWith(
-                            query as InsertQueryNode,
-                            {
-                                values: ValuesNode.create([
-                                    PrimitiveValueListNode.create(valueList),
-                                ]),
-                            }
-                        );
+                        const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                            values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                        });
                         return txProceed(newQuery);
                     });
                 },
@@ -471,7 +402,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             client.user.create({
                 data: { email: 'u1@test.com', name: 'Marvin' },
-            })
+            }),
         ).resolves.toMatchObject({
             email: 'u2@test.com',
             name: 'Marvin2',
@@ -494,22 +425,13 @@ describe('Kysely onQuery tests', () => {
                     called1 = true;
                     return transaction(async (txProceed) => {
                         const valueList = [
-                            ...(
-                                (
-                                    (query as InsertQueryNode)
-                                        .values as ValuesNode
-                                ).values[0] as PrimitiveValueListNode
-                            ).values,
+                            ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode)
+                                .values,
                         ];
                         valueList[1] = 'Marvin2';
-                        const newQuery = InsertQueryNode.cloneWith(
-                            query as InsertQueryNode,
-                            {
-                                values: ValuesNode.create([
-                                    PrimitiveValueListNode.create(valueList),
-                                ]),
-                            }
-                        );
+                        const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                            values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                        });
                         const result = await txProceed(newQuery);
 
                         // create a post for the user
@@ -528,23 +450,14 @@ describe('Kysely onQuery tests', () => {
                     called2 = true;
                     return transaction(async (txProceed) => {
                         const valueList = [
-                            ...(
-                                (
-                                    (query as InsertQueryNode)
-                                        .values as ValuesNode
-                                ).values[0] as PrimitiveValueListNode
-                            ).values,
+                            ...(((query as InsertQueryNode).values as ValuesNode).values[0] as PrimitiveValueListNode)
+                                .values,
                         ];
                         valueList[0] = 'u2@test.com';
                         valueList[1] = 'Marvin1';
-                        const newQuery = InsertQueryNode.cloneWith(
-                            query as InsertQueryNode,
-                            {
-                                values: ValuesNode.create([
-                                    PrimitiveValueListNode.create(valueList),
-                                ]),
-                            }
-                        );
+                        const newQuery = InsertQueryNode.cloneWith(query as InsertQueryNode, {
+                            values: ValuesNode.create([PrimitiveValueListNode.create(valueList)]),
+                        });
                         return txProceed(newQuery);
                     });
                 },
@@ -553,7 +466,7 @@ describe('Kysely onQuery tests', () => {
         await expect(
             client.user.create({
                 data: { email: 'u1@test.com', name: 'Marvin' },
-            })
+            }),
         ).rejects.toThrow('test error');
         await expect(called1).toBe(true);
         await expect(called2).toBe(true);

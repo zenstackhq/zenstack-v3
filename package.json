@@ -1,13 +1,15 @@
 {
     "name": "zenstack-v3",
-    "version": "3.0.0-alpha.4",
+    "version": "3.0.0-alpha.5",
     "description": "ZenStack",
     "packageManager": "pnpm@10.12.1",
     "scripts": {
-        "build": "pnpm -r build",
-        "watch": "pnpm -r --parallel watch",
-        "lint": "pnpm -r lint",
-        "test": "pnpm vitest",
+        "build": "turbo run build",
+        "watch": "turbo run watch build",
+        "lint": "turbo run lint",
+        "test": "turbo run test",
+        "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+        "bump-version": "npx tsx scripts/bump-version.ts",
         "publish-all": "pnpm --filter \"./packages/**\" -r publish --tag next",
         "publish-preview": "pnpm --filter \"./packages/**\" -r publish --tag next --force --registry https://preview.registry.zenstack.dev/",
         "unpublish-preview": "pnpm --filter \"./packages/**\" -r --shell-mode exec -- npm unpublish -f --registry https://preview.registry.zenstack.dev/ \"\\$PNPM_PACKAGE_NAME\""
@@ -16,16 +18,18 @@
     "author": "",
     "license": "MIT",
     "devDependencies": {
-        "@swc/core": "^1.10.15",
-        "@typescript-eslint/eslint-plugin": "~7.3.1",
-        "@typescript-eslint/parser": "~7.3.1",
-        "eslint": "~8.57.1",
-        "npm-run-all": "^4.1.5",
-        "tsup": "^8.3.5",
-        "tsx": "^4.19.2",
-        "turbo": "^2.3.3",
-        "typescript": "~5.7.3",
-        "vitest": "^3.1.1"
+        "@eslint/js": "^9.29.0",
+        "@types/node": "^20.17.24",
+        "eslint": "~9.29.0",
+        "glob": "^11.0.2",
+        "prettier": "^3.5.3",
+        "tsup": "^8.5.0",
+        "tsx": "^4.20.3",
+        "turbo": "^2.5.4",
+        "typescript": "catalog:",
+        "typescript-eslint": "^8.34.1",
+        "vitest": "^3.2.4",
+        "yaml": "^2.8.0"
     },
     "pnpm": {
         "onlyBuiltDependencies": [

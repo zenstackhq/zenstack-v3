@@ -121,13 +121,7 @@ export class PrismaSchemaGenerator {
                         return (
                             item.name +
                             (item.args.length > 0
-                                ? '(' +
-                                  item.args
-                                      .map((arg) =>
-                                          this.configInvocationArgToText(arg)
-                                      )
-                                      .join(', ') +
-                                  ')'
+                                ? '(' + item.args.map((arg) => this.configInvocationArgToText(arg)).join(', ') + ')'
                                 : '')
                         );
                     }
@@ -151,14 +145,12 @@ export class PrismaSchemaGenerator {
             decl.fields.map((f) => ({
                 name: f.name,
                 text: this.configExprToText(f.value),
-            }))
+            })),
         );
     }
 
     private generateModel(prisma: PrismaModel, decl: DataModel) {
-        const model = decl.isView
-            ? prisma.addView(decl.name)
-            : prisma.addModel(decl.name);
+        const model = decl.isView ? prisma.addView(decl.name) : prisma.addModel(decl.name);
         for (const field of decl.fields) {
             if (ModelUtils.hasAttribute(field, '@computed')) {
                 continue; // skip computed fields
@@ -167,9 +159,7 @@ export class PrismaSchemaGenerator {
             this.generateModelField(model, field);
         }
 
-        for (const attr of decl.attributes.filter((attr) =>
-            this.isPrismaAttribute(attr)
-        )) {
+        for (const attr of decl.attributes.filter((attr) => this.isPrismaAttribute(attr))) {
             this.generateContainerAttribute(model, attr);
         }
 
@@ -193,15 +183,11 @@ export class PrismaSchemaGenerator {
         // this.ensureRelationsInheritedFromDelegate(model, decl);
     }
 
-    private isPrismaAttribute(
-        attr: DataModelAttribute | DataModelFieldAttribute
-    ) {
+    private isPrismaAttribute(attr: DataModelAttribute | DataModelFieldAttribute) {
         if (!attr.decl.ref) {
             return false;
         }
-        return attr.decl.ref.attributes.some(
-            (a) => a.decl.ref?.name === '@@@prisma'
-        );
+        return attr.decl.ref.attributes.some((a) => a.decl.ref?.name === '@@@prisma');
     }
 
     private getUnsupportedFieldType(fieldType: DataModelFieldType) {
@@ -221,11 +207,7 @@ export class PrismaSchemaGenerator {
         return isStringLiteral(node) ? node.value : undefined;
     }
 
-    private generateModelField(
-        model: PrismaDataModel,
-        field: DataModelField,
-        addToFront = false
-    ) {
+    private generateModelField(model: PrismaDataModel, field: DataModelField, addToFront = false) {
         let fieldType: string | undefined;
 
         if (field.type.type) {
@@ -247,19 +229,13 @@ export class PrismaSchemaGenerator {
         }
 
         if (!fieldType) {
-            throw new Error(
-                `Field type is not resolved: ${field.$container.name}.${field.name}`
-            );
+            throw new Error(`Field type is not resolved: ${field.$container.name}.${field.name}`);
         }
 
         const isArray =
             // typed-JSON fields should be translated to scalar Json type
             isTypeDef(field.type.reference?.ref) ? false : field.type.array;
-        const type = new ModelFieldType(
-            fieldType,
-            isArray,
-            field.type.optional
-        );
+        const type = new ModelFieldType(fieldType, isArray, field.type.optional);
 
         const attributes = field.attributes
             .filter((attr) => this.isPrismaAttribute(attr))
@@ -272,18 +248,12 @@ export class PrismaSchemaGenerator {
                         ModelUtils.isIdField(field) &&
                         this.isInheritedFromDelegate(field) &&
                         attr.decl.$refText === '@default'
-                    )
+                    ),
             )
             .map((attr) => this.makeFieldAttribute(attr));
 
         const docs = [...field.comments];
-        const result = model.addField(
-            field.name,
-            type,
-            attributes,
-            docs,
-            addToFront
-        );
+        const result = model.addField(field.name, type, attributes, docs, addToFront);
         return result;
     }
 
@@ -297,72 +267,45 @@ export class PrismaSchemaGenerator {
             return false;
         }
 
-        return AstUtils.streamAst(expr).some(
-            (node) =>
-                isInvocationExpr(node) && this.isFromPlugin(node.function.ref)
-        );
+        return AstUtils.streamAst(expr).some((node) => isInvocationExpr(node) && this.isFromPlugin(node.function.ref));
     }
 
     private isFromPlugin(node: AstNode | undefined) {
         const model = AstUtils.getContainerOfType(node, isModel);
-        return (
-            !!model &&
-            !!model.$document &&
-            model.$document.uri.path.endsWith('plugin.zmodel')
-        );
+        return !!model && !!model.$document && model.$document.uri.path.endsWith('plugin.zmodel');
     }
 
     private setDummyDefault(result: ModelField, field: DataModelField) {
         const dummyDefaultValue = match(field.type.type)
             .with('String', () => new AttributeArgValue('String', ''))
-            .with(
-                P.union('Int', 'BigInt', 'Float', 'Decimal'),
-                () => new AttributeArgValue('Number', '0')
-            )
+            .with(P.union('Int', 'BigInt', 'Float', 'Decimal'), () => new AttributeArgValue('Number', '0'))
             .with('Boolean', () => new AttributeArgValue('Boolean', 'false'))
-            .with(
-                'DateTime',
-                () =>
-                    new AttributeArgValue(
-                        'FunctionCall',
-                        new PrismaFunctionCall('now')
-                    )
-            )
+            .with('DateTime', () => new AttributeArgValue('FunctionCall', new PrismaFunctionCall('now')))
             .with('Json', () => new AttributeArgValue('String', '{}'))
             .with('Bytes', () => new AttributeArgValue('String', ''))
             .otherwise(() => {
-                throw new Error(
-                    `Unsupported field type with default value: ${field.type.type}`
-                );
+                throw new Error(`Unsupported field type with default value: ${field.type.type}`);
             });
 
         result.attributes.push(
-            new PrismaFieldAttribute('@default', [
-                new PrismaAttributeArg(undefined, dummyDefaultValue),
-            ])
+            new PrismaFieldAttribute('@default', [new PrismaAttributeArg(undefined, dummyDefaultValue)]),
         );
     }
 
     private isInheritedFromDelegate(field: DataModelField) {
-        return (
-            field.$inheritedFrom &&
-            ModelUtils.isDelegateModel(field.$inheritedFrom)
-        );
+        return field.$inheritedFrom && ModelUtils.isDelegateModel(field.$inheritedFrom);
     }
 
     private makeFieldAttribute(attr: DataModelFieldAttribute) {
         const attrName = attr.decl.ref!.name;
         return new PrismaFieldAttribute(
             attrName,
-            attr.args.map((arg) => this.makeAttributeArg(arg))
+            attr.args.map((arg) => this.makeAttributeArg(arg)),
         );
     }
 
     private makeAttributeArg(arg: AttributeArg): PrismaAttributeArg {
-        return new PrismaAttributeArg(
-            arg.name,
-            this.makeAttributeArgValue(arg.value)
-        );
+        return new PrismaAttributeArg(arg.name, this.makeAttributeArgValue(arg.value));
     }
 
     private makeAttributeArgValue(node: Expression): PrismaAttributeArgValue {
@@ -376,36 +319,21 @@ export class PrismaSchemaGenerator {
         } else if (isArrayExpr(node)) {
             return new PrismaAttributeArgValue(
                 'Array',
-                new Array(
-                    ...node.items.map((item) =>
-                        this.makeAttributeArgValue(item)
-                    )
-                )
+                new Array(...node.items.map((item) => this.makeAttributeArgValue(item))),
             );
         } else if (isReferenceExpr(node)) {
             return new PrismaAttributeArgValue(
                 'FieldReference',
                 new PrismaFieldReference(
                     node.target.ref!.name,
-                    node.args.map(
-                        (arg) =>
-                            new PrismaFieldReferenceArg(
-                                arg.name,
-                                this.exprToText(arg.value)
-                            )
-                    )
-                )
+                    node.args.map((arg) => new PrismaFieldReferenceArg(arg.name, this.exprToText(arg.value))),
+                ),
             );
         } else if (isInvocationExpr(node)) {
             // invocation
-            return new PrismaAttributeArgValue(
-                'FunctionCall',
-                this.makeFunctionCall(node)
-            );
+            return new PrismaAttributeArgValue('FunctionCall', this.makeFunctionCall(node));
         } else {
-            throw Error(
-                `Unsupported attribute argument expression type: ${node.$type}`
-            );
+            throw Error(`Unsupported attribute argument expression type: ${node.$type}`);
         }
     }
 
@@ -422,26 +350,21 @@ export class PrismaSchemaGenerator {
                     .when(isLiteralExpr, (v) => v.value.toString())
                     .when(isNullExpr, () => 'null')
                     .otherwise(() => {
-                        throw new Error(
-                            'Function call argument must be literal or null'
-                        );
+                        throw new Error('Function call argument must be literal or null');
                     });
 
                 return new PrismaFunctionCallArg(val);
-            })
+            }),
         );
     }
 
-    private generateContainerAttribute(
-        container: PrismaContainerDeclaration,
-        attr: DataModelAttribute
-    ) {
+    private generateContainerAttribute(container: PrismaContainerDeclaration, attr: DataModelAttribute) {
         const attrName = attr.decl.ref!.name;
         container.attributes.push(
             new PrismaModelAttribute(
                 attrName,
-                attr.args.map((arg) => this.makeAttributeArg(arg))
-            )
+                attr.args.map((arg) => this.makeAttributeArg(arg)),
+            ),
         );
     }
 
@@ -452,9 +375,7 @@ export class PrismaSchemaGenerator {
             this.generateEnumField(_enum, field);
         }
 
-        for (const attr of decl.attributes.filter((attr) =>
-            this.isPrismaAttribute(attr)
-        )) {
+        for (const attr of decl.attributes.filter((attr) => this.isPrismaAttribute(attr))) {
             this.generateContainerAttribute(_enum, attr);
         }
 

@@ -30,7 +30,7 @@ describe('Compound ID tests', () => {
                         id2: 1,
                         name: 'User1',
                     },
-                })
+                }),
             ).resolves.toMatchObject({
                 id1: 1,
                 id2: 1,
@@ -46,7 +46,7 @@ describe('Compound ID tests', () => {
                             connect: { id1_id2: { id1: 1, id2: 2 } },
                         },
                     },
-                })
+                }),
             ).toBeRejectedNotFound();
 
             await expect(
@@ -58,7 +58,7 @@ describe('Compound ID tests', () => {
                             connect: { id1_id2: { id1: 1, id2: 1 } },
                         },
                     },
-                })
+                }),
             ).resolves.toMatchObject({
                 authorId1: 1,
                 authorId2: 1,
@@ -90,7 +90,7 @@ describe('Compound ID tests', () => {
                             id2: 2,
                         },
                     },
-                })
+                }),
             ).toResolveNull();
 
             await expect(
@@ -101,7 +101,7 @@ describe('Compound ID tests', () => {
                             id2: 1,
                         },
                     },
-                })
+                }),
             ).toResolveTruthy();
 
             await expect(
@@ -109,8 +109,8 @@ describe('Compound ID tests', () => {
                     where: {
                         id1: 1,
                     },
-                })
-            ).rejects.toThrow(/Required/);
+                }),
+            ).rejects.toThrow(/id1_id2/);
         });
 
         it('works with update', async () => {
@@ -125,7 +125,7 @@ describe('Compound ID tests', () => {
                 client.user.update({
                     where: { id1_id2: { id1: 1, id2: 1 } },
                     data: { name: 'User1-1' },
-                })
+                }),
             ).resolves.toMatchObject({ name: 'User1-1' });
 
             // toplevel, not found
@@ -133,7 +133,7 @@ describe('Compound ID tests', () => {
                 client.user.update({
                     where: { id1_id2: { id1: 1, id2: 1 }, id1: 2 },
                     data: { name: 'User1-1' },
-                })
+                }),
             ).toBeRejectedNotFound();
 
             await client.post.create({
@@ -152,7 +152,7 @@ describe('Compound ID tests', () => {
                             connect: { id1_id2: { id1: 1, id2: 1 } },
                         },
                     },
-                })
+                }),
             ).resolves.toMatchObject({ authorId1: 1, authorId2: 1 });
 
             // disconnect not found
@@ -160,7 +160,7 @@ describe('Compound ID tests', () => {
                 client.post.update({
                     where: { id: 1 },
                     data: { author: { disconnect: { id1: 1, id2: 2 } } },
-                })
+                }),
             ).resolves.toMatchObject({ authorId1: 1, authorId2: 1 });
 
             // disconnect found
@@ -168,7 +168,7 @@ describe('Compound ID tests', () => {
                 client.post.update({
                     where: { id: 1 },
                     data: { author: { disconnect: { id1: 1, id2: 1 } } },
-                })
+                }),
             ).resolves.toMatchObject({ authorId1: null, authorId2: null });
 
             // reconnect
@@ -186,7 +186,7 @@ describe('Compound ID tests', () => {
                 client.post.update({
                     where: { id: 1 },
                     data: { author: { disconnect: true } },
-                })
+                }),
             ).resolves.toMatchObject({ authorId1: null, authorId2: null });
 
             // connectOrCreate - connect
@@ -208,7 +208,7 @@ describe('Compound ID tests', () => {
                     include: {
                         author: true,
                     },
-                })
+                }),
             ).resolves.toMatchObject({
                 author: {
                     id1: 1,
@@ -236,7 +236,7 @@ describe('Compound ID tests', () => {
                     include: {
                         author: true,
                     },
-                })
+                }),
             ).resolves.toMatchObject({
                 author: {
                     id1: 2,
@@ -259,7 +259,7 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { author: true },
-                })
+                }),
             ).resolves.toMatchObject({ author: { name: 'User3' } });
 
             // upsert - update
@@ -276,7 +276,7 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { author: true },
-                })
+                }),
             ).resolves.toMatchObject({ author: { name: 'User3-1' } });
 
             // delete, and post is cascade deleted
@@ -284,7 +284,7 @@ describe('Compound ID tests', () => {
                 client.post.update({
                     where: { id: 1 },
                     data: { author: { delete: true } },
-                })
+                }),
             ).toResolveNull();
 
             // delete not found
@@ -292,7 +292,7 @@ describe('Compound ID tests', () => {
                 client.post.update({
                     where: { id: 1 },
                     data: { author: { delete: true } },
-                })
+                }),
             ).toBeRejectedNotFound();
         });
 
@@ -305,7 +305,7 @@ describe('Compound ID tests', () => {
                     where: { id1_id2: { id1: 1, id2: 1 } },
                     create: { id1: 1, id2: 1, name: 'User1' },
                     update: { name: 'User1-1' },
-                })
+                }),
             ).resolves.toMatchObject({ name: 'User1' });
 
             // toplevel, update
@@ -314,7 +314,7 @@ describe('Compound ID tests', () => {
                     where: { id1_id2: { id1: 1, id2: 1 } },
                     create: { id1: 1, id2: 1, name: 'User1' },
                     update: { name: 'User1-1' },
-                })
+                }),
             ).resolves.toMatchObject({ name: 'User1-1' });
         });
 
@@ -329,14 +329,14 @@ describe('Compound ID tests', () => {
             await expect(
                 client.user.delete({
                     where: { id1_id2: { id1: 1, id2: 1 } },
-                })
+                }),
             ).resolves.toMatchObject({ name: 'User1' });
 
             // toplevel
             await expect(
                 client.user.delete({
                     where: { id1_id2: { id1: 1, id2: 1 } },
-                })
+                }),
             ).toBeRejectedNotFound();
         });
     });
@@ -377,7 +377,7 @@ describe('Compound ID tests', () => {
                         posts: { connect: { id1_id2: { id1: 1, id2: 1 } } },
                     },
                     include: { posts: true },
-                })
+                }),
             ).resolves.toMatchObject({
                 posts: [expect.objectContaining({ id1: 1, id2: 1 })],
             });
@@ -390,7 +390,7 @@ describe('Compound ID tests', () => {
                         posts: { connect: { id1_id2: { id1: 1, id2: 2 } } },
                     },
                     include: { posts: true },
-                })
+                }),
             ).toBeRejectedNotFound();
 
             // connectOrCreate - connect
@@ -411,7 +411,7 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { posts: true },
-                })
+                }),
             ).resolves.toMatchObject({
                 posts: [expect.objectContaining({ title: 'Post1' })],
             });
@@ -434,7 +434,7 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { posts: true },
-                })
+                }),
             ).resolves.toMatchObject({
                 posts: [expect.objectContaining({ title: 'Post2' })],
             });
@@ -464,7 +464,7 @@ describe('Compound ID tests', () => {
                     data: {
                         title: 'Post1-1',
                     },
-                })
+                }),
             ).resolves.toMatchObject({ title: 'Post1-1' });
 
             // create
@@ -481,12 +481,9 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { posts: true },
-                })
+                }),
             ).resolves.toMatchObject({
-                posts: [
-                    expect.objectContaining({ title: 'Post1-1' }),
-                    expect.objectContaining({ title: 'Post2' }),
-                ],
+                posts: [expect.objectContaining({ title: 'Post1-1' }), expect.objectContaining({ title: 'Post2' })],
             });
 
             // connect - not found
@@ -499,7 +496,7 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { posts: true },
-                })
+                }),
             ).toBeRejectedNotFound();
 
             await client.post.create({
@@ -520,7 +517,7 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { posts: true },
-                })
+                }),
             ).resolves.toMatchObject({
                 posts: [
                     expect.objectContaining({ title: 'Post1-1' }),
@@ -538,7 +535,7 @@ describe('Compound ID tests', () => {
                             disconnect: { id1: 1, id2: 1 },
                         },
                     },
-                })
+                }),
             ).rejects.toThrow(/Invalid/);
 
             // disconnect
@@ -551,12 +548,9 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { posts: true },
-                })
+                }),
             ).resolves.toMatchObject({
-                posts: [
-                    expect.objectContaining({ title: 'Post2' }),
-                    expect.objectContaining({ title: 'Post3' }),
-                ],
+                posts: [expect.objectContaining({ title: 'Post2' }), expect.objectContaining({ title: 'Post3' })],
             });
 
             // disconnect not found
@@ -568,7 +562,7 @@ describe('Compound ID tests', () => {
                             disconnect: { id1_id2: { id1: 10, id2: 10 } },
                         },
                     },
-                })
+                }),
             ).toResolveTruthy();
 
             // update
@@ -586,11 +580,9 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { posts: true },
-                })
+                }),
             ).resolves.toMatchObject({
-                posts: expect.arrayContaining([
-                    expect.objectContaining({ title: 'Post2-new' }),
-                ]),
+                posts: expect.arrayContaining([expect.objectContaining({ title: 'Post2-new' })]),
             });
 
             // delete
@@ -603,7 +595,7 @@ describe('Compound ID tests', () => {
                         },
                     },
                     include: { posts: true },
-                })
+                }),
             ).resolves.toMatchObject({
                 posts: expect.not.arrayContaining([{ title: 'Post3' }]),
             });
@@ -614,19 +606,13 @@ describe('Compound ID tests', () => {
                     where: { id: 1 },
                     data: {
                         posts: {
-                            set: [
-                                { id1_id2: { id1: 1, id2: 1 } },
-                                { id1_id2: { id1: 2, id2: 2 } },
-                            ],
+                            set: [{ id1_id2: { id1: 1, id2: 1 } }, { id1_id2: { id1: 2, id2: 2 } }],
                         },
                     },
                     include: { posts: true },
-                })
+                }),
             ).resolves.toMatchObject({
-                posts: [
-                    expect.objectContaining({ id1: 1, id2: 1 }),
-                    expect.objectContaining({ id1: 2, id2: 2 }),
-                ],
+                posts: [expect.objectContaining({ id1: 1, id2: 1 }), expect.objectContaining({ id1: 2, id2: 2 })],
             });
         });
 
@@ -639,7 +625,7 @@ describe('Compound ID tests', () => {
                     where: { id1_id2: { id1: 1, id2: 1 } },
                     create: { id1: 1, id2: 1, title: 'Post1' },
                     update: { title: 'Post1-1' },
-                })
+                }),
             ).resolves.toMatchObject({ title: 'Post1' });
 
             // update
@@ -648,7 +634,7 @@ describe('Compound ID tests', () => {
                     where: { id1_id2: { id1: 1, id2: 1 } },
                     create: { id1: 1, id2: 1, title: 'Post1' },
                     update: { title: 'Post1-1' },
-                })
+                }),
             ).resolves.toMatchObject({ title: 'Post1-1' });
         });
 
@@ -663,14 +649,14 @@ describe('Compound ID tests', () => {
             await expect(
                 client.post.delete({
                     where: { id1_id2: { id1: 1, id2: 1 } },
-                })
+                }),
             ).resolves.toMatchObject({ title: 'Post1' });
 
             // toplevel
             await expect(
                 client.post.delete({
                     where: { id1_id2: { id1: 1, id2: 1 } },
-                })
+                }),
             ).toBeRejectedNotFound();
         });
     });

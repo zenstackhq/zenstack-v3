@@ -17,7 +17,7 @@ export function getSchemaFile(file?: string) {
         return './schema.zmodel';
     } else {
         throw new CliError(
-            'Schema file not found in default locations ("./zenstack/schema.zmodel" or "./schema.zmodel").'
+            'Schema file not found in default locations ("./zenstack/schema.zmodel" or "./schema.zmodel").',
         );
     }
 }
@@ -35,11 +35,7 @@ export async function loadSchemaDocument(schemaFile: string) {
 }
 
 export function handleSubProcessError(err: unknown) {
-    if (
-        err instanceof Error &&
-        'status' in err &&
-        typeof err.status === 'number'
-    ) {
+    if (err instanceof Error && 'status' in err && typeof err.status === 'number') {
         process.exit(err.status);
     } else {
         process.exit(1);

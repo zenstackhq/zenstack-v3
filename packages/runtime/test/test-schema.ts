@@ -1,8 +1,4 @@
-import {
-    ExpressionUtils,
-    type DataSourceProviderType,
-    type SchemaDef,
-} from '../src/schema';
+import { ExpressionUtils, type DataSourceProviderType, type SchemaDef } from '../src/schema';
 
 export const schema = {
     provider: {
@@ -105,12 +101,9 @@ export const schema = {
                         {
                             name: 'condition',
                             value: ExpressionUtils.binary(
-                                ExpressionUtils.member(
-                                    ExpressionUtils.call('auth'),
-                                    ['id']
-                                ),
+                                ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
                                 '==',
-                                ExpressionUtils.field('id')
+                                ExpressionUtils.field('id'),
                             ),
                         },
                     ],
@@ -125,11 +118,7 @@ export const schema = {
                         },
                         {
                             name: 'condition',
-                            value: ExpressionUtils.binary(
-                                ExpressionUtils.call('auth'),
-                                '!=',
-                                ExpressionUtils._null()
-                            ),
+                            value: ExpressionUtils.binary(ExpressionUtils.call('auth'), '!=', ExpressionUtils._null()),
                         },
                     ],
                 },
@@ -198,11 +187,7 @@ export const schema = {
                         },
                         {
                             name: 'condition',
-                            value: ExpressionUtils.binary(
-                                ExpressionUtils.call('auth'),
-                                '==',
-                                ExpressionUtils._null()
-                            ),
+                            value: ExpressionUtils.binary(ExpressionUtils.call('auth'), '==', ExpressionUtils._null()),
                         },
                     ],
                 },
@@ -217,12 +202,9 @@ export const schema = {
                         {
                             name: 'condition',
                             value: ExpressionUtils.binary(
-                                ExpressionUtils.member(
-                                    ExpressionUtils.call('auth'),
-                                    ['id']
-                                ),
+                                ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
                                 '==',
-                                ExpressionUtils.field('authorId')
+                                ExpressionUtils.field('authorId'),
                             ),
                         },
                     ],
@@ -327,9 +309,7 @@ export const schema = {
     plugins: {},
 } as const satisfies SchemaDef;
 
-export function getSchema<ProviderType extends DataSourceProviderType>(
-    type: ProviderType
-) {
+export function getSchema<ProviderType extends DataSourceProviderType>(type: ProviderType) {
     return {
         ...schema,
         provider: {

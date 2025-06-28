@@ -3,7 +3,7 @@
     "publisher": "zenstack",
     "displayName": "ZenStack CLI",
     "description": "FullStack database toolkit with built-in access control and automatic API generation.",
-    "version": "3.0.0-alpha.4",
+    "version": "3.0.0-alpha.5",
     "type": "module",
     "author": {
         "name": "ZenStack Team"
@@ -24,34 +24,29 @@
         "build": "tsup-node",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
-        "test": "vitest",
+        "test": "vitest run",
         "pack": "pnpm pack"
     },
     "dependencies": {
-        "@types/node": "^20.0.0",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
-        "async-exit-hook": "^2.0.1",
+        "@zenstackhq/common-helpers": "workspace:*",
         "colors": "1.4.0",
         "commander": "^8.3.0",
-        "langium": "~3.3.0",
+        "langium": "catalog:",
         "ora": "^5.4.1",
         "package-manager-detector": "^1.3.0",
-        "tiny-invariant": "^1.3.3",
-        "ts-pattern": "^4.3.0"
+        "ts-pattern": "catalog:"
     },
     "peerDependencies": {
-        "prisma": "^6.0.0",
-        "typescript": "^5.0.0"
+        "prisma": "catalog:"
     },
     "devDependencies": {
-        "@types/async-exit-hook": "^2.0.0",
         "@types/better-sqlite3": "^7.6.13",
-        "@types/semver": "^7.3.13",
-        "@types/tmp": "^0.2.6",
+        "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
         "@zenstackhq/testtools": "workspace:*",
-        "better-sqlite3": "^11.8.1",
-        "tmp": "^0.2.3"
+        "@zenstackhq/typescript-config": "workspace:*",
+        "better-sqlite3": "^11.8.1"
     }
 }

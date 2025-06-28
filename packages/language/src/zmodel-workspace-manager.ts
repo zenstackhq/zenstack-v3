@@ -22,7 +22,7 @@ export class ZModelWorkspaceManager extends DefaultWorkspaceManager {
 
     protected override async loadAdditionalDocuments(
         folders: WorkspaceFolder[],
-        collector: (document: LangiumDocument<AstNode>) => void
+        collector: (document: LangiumDocument<AstNode>) => void,
     ): Promise<void> {
         await super.loadAdditionalDocuments(folders, collector);
 
@@ -36,28 +36,19 @@ export class ZModelWorkspaceManager extends DefaultWorkspaceManager {
             const folderPath = this.getRootFolder(folder).fsPath;
             try {
                 // Try to resolve zenstack from the workspace folder
-                const languagePackagePath = require.resolve(
-                    '@zenstackhq/language/package.json',
-                    {
-                        paths: [folderPath],
-                    }
-                );
+                const languagePackagePath = require.resolve('@zenstackhq/language/package.json', {
+                    paths: [folderPath],
+                });
                 const languagePackageDir = path.dirname(languagePackagePath);
-                const candidateStdlibPath = path.join(
-                    languagePackageDir,
-                    'res',
-                    STD_LIB_MODULE_NAME
-                );
+                const candidateStdlibPath = path.join(languagePackageDir, 'res', STD_LIB_MODULE_NAME);
 
                 // Check if the stdlib file exists in the installed package
                 if (fs.existsSync(candidateStdlibPath)) {
                     installedStdlibPath = candidateStdlibPath;
-                    console.log(
-                        `Found installed zenstack package stdlib at: ${installedStdlibPath}`
-                    );
+                    console.log(`Found installed zenstack package stdlib at: ${installedStdlibPath}`);
                     break;
                 }
-            } catch (error) {
+            } catch {
                 // Package not found or other error, continue to next folder
                 continue;
             }
@@ -69,9 +60,7 @@ export class ZModelWorkspaceManager extends DefaultWorkspaceManager {
             // Fallback to bundled stdlib
             // isomorphic __dirname
             const _dirname =
-                typeof __dirname !== 'undefined'
-                    ? __dirname
-                    : path.dirname(fileURLToPath(import.meta.url));
+                typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
             stdLibPath = path.join(_dirname, '../res', STD_LIB_MODULE_NAME);
             console.log(`Using bundled stdlib in extension:`, stdLibPath);

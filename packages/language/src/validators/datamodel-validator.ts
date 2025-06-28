@@ -1,9 +1,4 @@
-import {
-    AstUtils,
-    type AstNode,
-    type DiagnosticInfo,
-    type ValidationAcceptor,
-} from 'langium';
+import { AstUtils, type AstNode, type DiagnosticInfo, type ValidationAcceptor } from 'langium';
 import { IssueCodes, SCALAR_TYPES } from '../constants';
 import {
     ArrayExpr,
@@ -49,12 +44,8 @@ export default class DataModelValidator implements AstValidator<DataModel> {
 
     private validateFields(dm: DataModel, accept: ValidationAcceptor) {
         const allFields = getModelFieldsWithBases(dm);
-        const idFields = allFields.filter((f) =>
-            f.attributes.find((attr) => attr.decl.ref?.name === '@id')
-        );
-        const uniqueFields = allFields.filter((f) =>
-            f.attributes.find((attr) => attr.decl.ref?.name === '@unique')
-        );
+        const idFields = allFields.filter((f) => f.attributes.find((attr) => attr.decl.ref?.name === '@id'));
+        const uniqueFields = allFields.filter((f) => f.attributes.find((attr) => attr.decl.ref?.name === '@unique'));
         const modelLevelIds = getModelIdFields(dm);
         const modelUniqueFields = getModelUniqueFields(dm);
 
@@ -70,49 +61,29 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                 'Model must have at least one unique criteria. Either mark a single field with `@id`, `@unique` or add a multi field criterion with `@@id([])` or `@@unique([])` to the model.',
                 {
                     node: dm,
-                }
+                },
             );
         } else if (idFields.length > 0 && modelLevelIds.length > 0) {
-            accept(
-                'error',
-                'Model cannot have both field-level @id and model-level @@id attributes',
-                {
-                    node: dm,
-                }
-            );
+            accept('error', 'Model cannot have both field-level @id and model-level @@id attributes', {
+                node: dm,
+            });
         } else if (idFields.length > 1) {
-            accept(
-                'error',
-                'Model can include at most one field with @id attribute',
-                {
-                    node: dm,
-                }
-            );
+            accept('error', 'Model can include at most one field with @id attribute', {
+                node: dm,
+            });
         } else {
-            const fieldsToCheck =
-                idFields.length > 0 ? idFields : modelLevelIds;
+            const fieldsToCheck = idFields.length > 0 ? idFields : modelLevelIds;
             fieldsToCheck.forEach((idField) => {
                 if (idField.type.optional) {
-                    accept(
-                        'error',
-                        'Field with @id attribute must not be optional',
-                        { node: idField }
-                    );
+                    accept('error', 'Field with @id attribute must not be optional', { node: idField });
                 }
 
                 const isArray = idField.type.array;
-                const isScalar = SCALAR_TYPES.includes(
-                    idField.type.type as (typeof SCALAR_TYPES)[number]
-                );
-                const isValidType =
-                    isScalar || isEnum(idField.type.reference?.ref);
+                const isScalar = SCALAR_TYPES.includes(idField.type.type as (typeof SCALAR_TYPES)[number]);
+                const isValidType = isScalar || isEnum(idField.type.reference?.ref);
 
                 if (isArray || !isValidType) {
-                    accept(
-                        'error',
-                        'Field with @id attribute must be of scalar or enum type',
-                        { node: idField }
-                    );
+                    accept('error', 'Field with @id attribute must be of scalar or enum type', { node: idField });
                 }
             });
         }
@@ -128,53 +99,27 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         }
     }
 
-    private validateField(
-        field: DataModelField,
-        accept: ValidationAcceptor
-    ): void {
+    private validateField(field: DataModelField, accept: ValidationAcceptor): void {
         if (field.type.array && field.type.optional) {
-            accept(
-                'error',
-                'Optional lists are not supported. Use either `Type[]` or `Type?`',
-                { node: field.type }
-            );
+            accept('error', 'Optional lists are not supported. Use either `Type[]` or `Type?`', { node: field.type });
         }
 
-        if (
-            field.type.unsupported &&
-            !isStringLiteral(field.type.unsupported.value)
-        ) {
-            accept(
-                'error',
-                'Unsupported type argument must be a string literal',
-                { node: field.type.unsupported }
-            );
+        if (field.type.unsupported && !isStringLiteral(field.type.unsupported.value)) {
+            accept('error', 'Unsupported type argument must be a string literal', { node: field.type.unsupported });
         }
 
         if (field.type.array && !isDataModel(field.type.reference?.ref)) {
-            const provider = this.getDataSourceProvider(
-                AstUtils.getContainerOfType(field, isModel)!
-            );
+            const provider = this.getDataSourceProvider(AstUtils.getContainerOfType(field, isModel)!);
             if (provider === 'sqlite') {
-                accept(
-                    'error',
-                    `Array type is not supported for "${provider}" provider.`,
-                    { node: field.type }
-                );
+                accept('error', `Array type is not supported for "${provider}" provider.`, { node: field.type });
             }
         }
 
-        field.attributes.forEach((attr) =>
-            validateAttributeApplication(attr, accept)
-        );
+        field.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
 
         if (isTypeDef(field.type.reference?.ref)) {
             if (!hasAttribute(field, '@json')) {
-                accept(
-                    'error',
-                    'Custom-typed field must have @json attribute',
-                    { node: field }
-                );
+                accept('error', 'Custom-typed field must have @json attribute', { node: field });
             }
         }
     }
@@ -192,15 +137,11 @@ export default class DataModelValidator implements AstValidator<DataModel> {
     }
 
     private validateAttributes(dm: DataModel, accept: ValidationAcceptor) {
-        dm.attributes.forEach((attr) =>
-            validateAttributeApplication(attr, accept)
-        );
+        dm.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
     }
 
     private parseRelation(field: DataModelField, accept?: ValidationAcceptor) {
-        const relAttr = field.attributes.find(
-            (attr) => attr.decl.ref?.name === '@relation'
-        );
+        const relAttr = field.attributes.find((attr) => attr.decl.ref?.name === '@relation');
 
         let name: string | undefined;
         let fields: ReferenceExpr[] | undefined;
@@ -245,21 +186,13 @@ export default class DataModelValidator implements AstValidator<DataModel> {
 
         if (!fields || !references) {
             if (accept) {
-                accept(
-                    'error',
-                    `"fields" and "references" must be provided together`,
-                    { node: relAttr }
-                );
+                accept('error', `"fields" and "references" must be provided together`, { node: relAttr });
             }
         } else {
             // validate "fields" and "references" typing consistency
             if (fields.length !== references.length) {
                 if (accept) {
-                    accept(
-                        'error',
-                        `"references" and "fields" must have the same length`,
-                        { node: relAttr }
-                    );
+                    accept('error', `"references" and "fields" must have the same length`, { node: relAttr });
                 }
             } else {
                 for (let i = 0; i < fields.length; i++) {
@@ -268,16 +201,13 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                         continue;
                     }
 
-                    if (
-                        !field.type.optional &&
-                        fieldRef.$resolvedType?.nullable
-                    ) {
+                    if (!field.type.optional && fieldRef.$resolvedType?.nullable) {
                         // if relation is not optional, then fk field must not be nullable
                         if (accept) {
                             accept(
                                 'error',
                                 `relation "${field.name}" is not optional, but field "${fieldRef.target.$refText}" is optional`,
-                                { node: fieldRef.target.ref! }
+                                { node: fieldRef.target.ref! },
                             );
                         }
                     }
@@ -298,19 +228,13 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                     }
 
                     if (
-                        fieldRef.$resolvedType?.decl !==
-                            references[i]?.$resolvedType?.decl ||
-                        fieldRef.$resolvedType?.array !==
-                            references[i]?.$resolvedType?.array
+                        fieldRef.$resolvedType?.decl !== references[i]?.$resolvedType?.decl ||
+                        fieldRef.$resolvedType?.array !== references[i]?.$resolvedType?.array
                     ) {
                         if (accept) {
-                            accept(
-                                'error',
-                                `values of "references" and "fields" must have the same type`,
-                                {
-                                    node: relAttr,
-                                }
-                            );
+                            accept('error', `values of "references" and "fields" must have the same type`, {
+                                node: relAttr,
+                            });
                         }
                     }
                 }
@@ -324,11 +248,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         return field.type.reference?.ref === field.$container;
     }
 
-    private validateRelationField(
-        contextModel: DataModel,
-        field: DataModelField,
-        accept: ValidationAcceptor
-    ) {
+    private validateRelationField(contextModel: DataModel, field: DataModelField, accept: ValidationAcceptor) {
         const thisRelation = this.parseRelation(field, accept);
         if (!thisRelation.valid) {
             return;
@@ -339,14 +259,12 @@ export default class DataModelValidator implements AstValidator<DataModel> {
             return;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const oppositeModel = field.type.reference!.ref! as DataModel;
 
         // Use name because the current document might be updated
-        let oppositeFields = getModelFieldsWithBases(
-            oppositeModel,
-            false
-        ).filter((f) => f.type.reference?.ref?.name === contextModel.name);
+        let oppositeFields = getModelFieldsWithBases(oppositeModel, false).filter(
+            (f) => f.type.reference?.ref?.name === contextModel.name,
+        );
         oppositeFields = oppositeFields.filter((f) => {
             const fieldRel = this.parseRelation(f);
             return fieldRel.valid && fieldRel.name === thisRelation.name;
@@ -361,8 +279,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
             info.property = 'name';
             const container = field.$container;
 
-            const relationFieldDocUri =
-                AstUtils.getDocument(container).textDocument.uri;
+            const relationFieldDocUri = AstUtils.getDocument(container).textDocument.uri;
             const relationDataModelName = container.name;
 
             const data: MissingOppositeRelationData = {
@@ -377,7 +294,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
             accept(
                 'error',
                 `The relation field "${field.name}" on model "${contextModel.name}" is missing an opposite relation field on model "${oppositeModel.name}"`,
-                info
+                info,
             );
             return;
         } else if (oppositeFields.length > 1) {
@@ -390,14 +307,10 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                     } else {
                         accept(
                             'error',
-                            `Fields ${oppositeFields
-                                .map((f) => '"' + f.name + '"')
-                                .join(', ')} on model "${
+                            `Fields ${oppositeFields.map((f) => '"' + f.name + '"').join(', ')} on model "${
                                 oppositeModel.name
-                            }" refer to the same relation to model "${
-                                field.$container.name
-                            }"`,
-                            { node: f }
+                            }" refer to the same relation to model "${field.$container.name}"`,
+                            { node: f },
                         );
                     }
                 });
@@ -411,29 +324,18 @@ export default class DataModelValidator implements AstValidator<DataModel> {
 
         if (thisRelation?.references?.length && thisRelation.fields?.length) {
             if (oppositeRelation?.references || oppositeRelation?.fields) {
-                accept(
-                    'error',
-                    '"fields" and "references" must be provided only on one side of relation field',
-                    {
-                        node: oppositeField,
-                    }
-                );
+                accept('error', '"fields" and "references" must be provided only on one side of relation field', {
+                    node: oppositeField,
+                });
                 return;
             } else {
                 relationOwner = oppositeField;
             }
-        } else if (
-            oppositeRelation?.references?.length &&
-            oppositeRelation.fields?.length
-        ) {
+        } else if (oppositeRelation?.references?.length && oppositeRelation.fields?.length) {
             if (thisRelation?.references || thisRelation?.fields) {
-                accept(
-                    'error',
-                    '"fields" and "references" must be provided only on one side of relation field',
-                    {
-                        node: field,
-                    }
-                );
+                accept('error', '"fields" and "references" must be provided only on one side of relation field', {
+                    node: field,
+                });
                 return;
             } else {
                 relationOwner = field;
@@ -446,7 +348,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                         accept(
                             'error',
                             'Field for one side of relation must carry @relation attribute with both "fields" and "references"',
-                            { node: f }
+                            { node: f },
                         );
                     }
                 });
@@ -487,24 +389,16 @@ export default class DataModelValidator implements AstValidator<DataModel> {
             thisRelation.fields?.forEach((ref) => {
                 const refField = ref.target.ref as DataModelField;
                 if (refField) {
-                    if (
-                        refField.attributes.find(
-                            (a) =>
-                                a.decl.ref?.name === '@id' ||
-                                a.decl.ref?.name === '@unique'
-                        )
-                    ) {
+                    if (refField.attributes.find((a) => a.decl.ref?.name === '@id' || a.decl.ref?.name === '@unique')) {
                         return;
                     }
-                    if (
-                        uniqueFieldList.some((list) => list.includes(refField))
-                    ) {
+                    if (uniqueFieldList.some((list) => list.includes(refField))) {
                         return;
                     }
                     accept(
                         'error',
                         `Field "${refField.name}" on model "${containingModel.name}" is part of a one-to-one relation and must be marked as @unique or be part of a model-level @@unique attribute`,
-                        { node: refField }
+                        { node: refField },
                     );
                 }
             });
@@ -512,14 +406,8 @@ export default class DataModelValidator implements AstValidator<DataModel> {
     }
 
     // checks if the given field is inherited directly or indirectly from a delegate model
-    private isFieldInheritedFromDelegateModel(
-        field: DataModelField,
-        contextModel: DataModel
-    ) {
-        const basePath = findUpInheritance(
-            contextModel,
-            field.$container as DataModel
-        );
+    private isFieldInheritedFromDelegateModel(field: DataModelField, contextModel: DataModel) {
+        const basePath = findUpInheritance(contextModel, field.$container as DataModel);
         if (basePath && basePath.some(isDelegateModel)) {
             return true;
         } else {
@@ -527,16 +415,11 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         }
     }
 
-    private validateBaseAbstractModel(
-        model: DataModel,
-        accept: ValidationAcceptor
-    ) {
+    private validateBaseAbstractModel(model: DataModel, accept: ValidationAcceptor) {
         model.superTypes.forEach((superType, index) => {
             if (
                 !superType.ref?.isAbstract &&
-                !superType.ref?.attributes.some(
-                    (attr) => attr.decl.ref?.name === '@@delegate'
-                )
+                !superType.ref?.attributes.some((attr) => attr.decl.ref?.name === '@@delegate')
             )
                 accept(
                     'error',
@@ -545,47 +428,32 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                         node: model,
                         property: 'superTypes',
                         index,
-                    }
+                    },
                 );
         });
     }
 
-    private validateBaseDelegateModel(
-        model: DataModel,
-        accept: ValidationAcceptor
-    ) {
-        if (
-            model.superTypes.filter(
-                (base) => base.ref && isDelegateModel(base.ref)
-            ).length > 1
-        ) {
-            accept(
-                'error',
-                'Extending from multiple delegate models is not supported',
-                {
-                    node: model,
-                    property: 'superTypes',
-                }
-            );
+    private validateBaseDelegateModel(model: DataModel, accept: ValidationAcceptor) {
+        if (model.superTypes.filter((base) => base.ref && isDelegateModel(base.ref)).length > 1) {
+            accept('error', 'Extending from multiple delegate models is not supported', {
+                node: model,
+                property: 'superTypes',
+            });
         }
     }
 
     private validateInheritance(dm: DataModel, accept: ValidationAcceptor) {
         const seen = [dm];
-        const todo: DataModel[] = dm.superTypes.map(
-            (superType) => superType.ref!
-        );
+        const todo: DataModel[] = dm.superTypes.map((superType) => superType.ref!);
         while (todo.length > 0) {
             const current = todo.shift()!;
             if (seen.includes(current)) {
                 accept(
                     'error',
-                    `Circular inheritance detected: ${seen
-                        .map((m) => m.name)
-                        .join(' -> ')} -> ${current.name}`,
+                    `Circular inheritance detected: ${seen.map((m) => m.name).join(' -> ')} -> ${current.name}`,
                     {
                         node: dm,
-                    }
+                    },
                 );
                 return;
             }

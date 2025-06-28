@@ -36,12 +36,10 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                 accept(
                     'error',
                     'auth() cannot be resolved because no model marked with "@@auth()" or named "User" is found',
-                    { node: expr }
+                    { node: expr },
                 );
             } else {
-                const hasReferenceResolutionError = AstUtils.streamAst(
-                    expr
-                ).some((node) => {
+                const hasReferenceResolutionError = AstUtils.streamAst(expr).some((node) => {
                     if (isMemberAccessExpr(node)) {
                         return !!node.member.error;
                     }
@@ -70,15 +68,8 @@ export default class ExpressionValidator implements AstValidator<Expression> {
     private validateBinaryExpr(expr: BinaryExpr, accept: ValidationAcceptor) {
         switch (expr.operator) {
             case 'in': {
-                if (
-                    typeof expr.left.$resolvedType?.decl !== 'string' &&
-                    !isEnum(expr.left.$resolvedType?.decl)
-                ) {
-                    accept(
-                        'error',
-                        'left operand of "in" must be of scalar type',
-                        { node: expr.left }
-                    );
+                if (typeof expr.left.$resolvedType?.decl !== 'string' && !isEnum(expr.left.$resolvedType?.decl)) {
+                    accept('error', 'left operand of "in" must be of scalar type', { node: expr.left });
                 }
 
                 if (!expr.right.$resolvedType?.array) {
@@ -121,34 +112,23 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                     typeof expr.left.$resolvedType?.decl !== 'string' ||
                     !supportedShapes.includes(expr.left.$resolvedType.decl)
                 ) {
-                    accept(
-                        'error',
-                        `invalid operand type for "${expr.operator}" operator`,
-                        {
-                            node: expr.left,
-                        }
-                    );
+                    accept('error', `invalid operand type for "${expr.operator}" operator`, {
+                        node: expr.left,
+                    });
                     return;
                 }
                 if (
                     typeof expr.right.$resolvedType?.decl !== 'string' ||
                     !supportedShapes.includes(expr.right.$resolvedType.decl)
                 ) {
-                    accept(
-                        'error',
-                        `invalid operand type for "${expr.operator}" operator`,
-                        {
-                            node: expr.right,
-                        }
-                    );
+                    accept('error', `invalid operand type for "${expr.operator}" operator`, {
+                        node: expr.right,
+                    });
                     return;
                 }
 
                 // DateTime comparison is only allowed between two DateTime values
-                if (
-                    expr.left.$resolvedType.decl === 'DateTime' &&
-                    expr.right.$resolvedType.decl !== 'DateTime'
-                ) {
+                if (expr.left.$resolvedType.decl === 'DateTime' && expr.right.$resolvedType.decl !== 'DateTime') {
                     accept('error', 'incompatible operand types', {
                         node: expr,
                     });
@@ -169,19 +149,14 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                     // in validation context, all fields are optional, so we should allow
                     // comparing any field against null
                     if (
-                        (isDataModelFieldReference(expr.left) &&
-                            isNullExpr(expr.right)) ||
-                        (isDataModelFieldReference(expr.right) &&
-                            isNullExpr(expr.left))
+                        (isDataModelFieldReference(expr.left) && isNullExpr(expr.right)) ||
+                        (isDataModelFieldReference(expr.right) && isNullExpr(expr.left))
                     ) {
                         return;
                     }
                 }
 
-                if (
-                    !!expr.left.$resolvedType?.array !==
-                    !!expr.right.$resolvedType?.array
-                ) {
+                if (!!expr.left.$resolvedType?.array !== !!expr.right.$resolvedType?.array) {
                     accept('error', 'incompatible operand types', {
                         node: expr,
                     });
@@ -189,10 +164,8 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                 }
 
                 if (
-                    (expr.left.$resolvedType?.nullable &&
-                        isNullExpr(expr.right)) ||
-                    (expr.right.$resolvedType?.nullable &&
-                        isNullExpr(expr.left))
+                    (expr.left.$resolvedType?.nullable && isNullExpr(expr.right)) ||
+                    (expr.right.$resolvedType?.nullable && isNullExpr(expr.left))
                 ) {
                     // comparing nullable field with null
                     return;
@@ -204,14 +177,8 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                 ) {
                     // scalar types assignability
                     if (
-                        !typeAssignable(
-                            expr.left.$resolvedType.decl,
-                            expr.right.$resolvedType.decl
-                        ) &&
-                        !typeAssignable(
-                            expr.right.$resolvedType.decl,
-                            expr.left.$resolvedType.decl
-                        )
+                        !typeAssignable(expr.left.$resolvedType.decl, expr.right.$resolvedType.decl) &&
+                        !typeAssignable(expr.right.$resolvedType.decl, expr.left.$resolvedType.decl)
                     ) {
                         accept('error', 'incompatible operand types', {
                             node: expr,
@@ -238,24 +205,14 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                     //   - foo == this
                     if (
                         isDataModelFieldReference(expr.left) &&
-                        (isThisExpr(expr.right) ||
-                            isDataModelFieldReference(expr.right))
+                        (isThisExpr(expr.right) || isDataModelFieldReference(expr.right))
                     ) {
-                        accept(
-                            'error',
-                            'comparison between model-typed fields are not supported',
-                            { node: expr }
-                        );
+                        accept('error', 'comparison between model-typed fields are not supported', { node: expr });
                     } else if (
                         isDataModelFieldReference(expr.right) &&
-                        (isThisExpr(expr.left) ||
-                            isDataModelFieldReference(expr.left))
+                        (isThisExpr(expr.left) || isDataModelFieldReference(expr.left))
                     ) {
-                        accept(
-                            'error',
-                            'comparison between model-typed fields are not supported',
-                            { node: expr }
-                        );
+                        accept('error', 'comparison between model-typed fields are not supported', { node: expr });
                     }
                 } else if (
                     (isDataModel(leftType) && !isNullExpr(expr.right)) ||
@@ -277,25 +234,15 @@ export default class ExpressionValidator implements AstValidator<Expression> {
         }
     }
 
-    private validateCollectionPredicate(
-        expr: BinaryExpr,
-        accept: ValidationAcceptor
-    ) {
+    private validateCollectionPredicate(expr: BinaryExpr, accept: ValidationAcceptor) {
         if (!expr.$resolvedType) {
-            accept(
-                'error',
-                'collection predicate can only be used on an array of model type',
-                { node: expr }
-            );
+            accept('error', 'collection predicate can only be used on an array of model type', { node: expr });
             return;
         }
     }
 
     private isInValidationContext(node: AstNode) {
-        return findUpAst(
-            node,
-            (n) => isDataModelAttribute(n) && n.decl.$refText === '@@validate'
-        );
+        return findUpAst(node, (n) => isDataModelAttribute(n) && n.decl.$refText === '@@validate');
     }
 
     private isNotModelFieldExpr(expr: Expression): boolean {
@@ -309,8 +256,7 @@ export default class ExpressionValidator implements AstValidator<Expression> {
             // `auth()` access
             isAuthOrAuthMemberAccess(expr) ||
             // array
-            (isArrayExpr(expr) &&
-                expr.items.every((item) => this.isNotModelFieldExpr(item)))
+            (isArrayExpr(expr) && expr.items.every((item) => this.isNotModelFieldExpr(item)))
         );
     }
 }

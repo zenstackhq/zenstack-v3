@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import { generateTsSchema } from '@zenstackhq/testtools';
@@ -6,7 +7,6 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client as PGClient, Pool } from 'pg';
-import invariant from 'tiny-invariant';
 import type { ClientOptions } from '../src/client';
 import { ZenStackClient } from '../src/client';
 import type { SchemaDef } from '../src/schema';
@@ -16,7 +16,7 @@ type PostgresSchema = SchemaDef & { provider: { type: 'postgresql' } };
 
 export async function makeSqliteClient<Schema extends SqliteSchema>(
     schema: Schema,
-    extraOptions?: Partial<ClientOptions<Schema>>
+    extraOptions?: Partial<ClientOptions<Schema>>,
 ) {
     const client = new ZenStackClient(schema, {
         ...extraOptions,
@@ -28,9 +28,7 @@ export async function makeSqliteClient<Schema extends SqliteSchema>(
 
 const TEST_PG_CONFIG = {
     host: process.env['TEST_PG_HOST'] ?? 'localhost',
-    port: process.env['TEST_PG_PORT']
-        ? parseInt(process.env['TEST_PG_PORT'])
-        : 5432,
+    port: process.env['TEST_PG_PORT'] ? parseInt(process.env['TEST_PG_PORT']) : 5432,
     user: process.env['TEST_PG_USER'] ?? 'postgres',
     password: process.env['TEST_PG_PASSWORD'] ?? 'postgres',
 };
@@ -38,7 +36,7 @@ const TEST_PG_CONFIG = {
 export async function makePostgresClient<Schema extends PostgresSchema>(
     schema: Schema,
     dbName: string,
-    extraOptions?: Partial<ClientOptions<Schema>>
+    extraOptions?: Partial<ClientOptions<Schema>>,
 ) {
     invariant(dbName, 'dbName is required');
     const pgClient = new PGClient(TEST_PG_CONFIG);
@@ -59,40 +57,37 @@ export async function makePostgresClient<Schema extends PostgresSchema>(
     return client;
 }
 
-export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<
-    ClientOptions<Schema>,
-    'dialectConfig'
-> & {
+export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptions<Schema>, 'dialectConfig'> & {
     provider?: 'sqlite' | 'postgresql';
     dbName?: string;
     usePrismaPush?: boolean;
+    extraSourceFiles?: Record<string, string>;
 };
 
 export async function createTestClient<Schema extends SchemaDef>(
     schema: Schema,
-    options?: CreateTestClientOptions<Schema>
+    options?: CreateTestClientOptions<Schema>,
 ): Promise<any>;
 export async function createTestClient<Schema extends SchemaDef>(
     schema: string,
-    options?: CreateTestClientOptions<Schema>
+    options?: CreateTestClientOptions<Schema>,
 ): Promise<any>;
 export async function createTestClient<Schema extends SchemaDef>(
     schema: Schema | string,
-    options?: CreateTestClientOptions<Schema>
+    options?: CreateTestClientOptions<Schema>,
 ): Promise<any> {
     let workDir: string | undefined;
     let _schema: Schema;
 
     if (typeof schema === 'string') {
-        const generated = await generateTsSchema(
-            schema,
-            options?.provider,
-            options?.dbName
-        );
+        const generated = await generateTsSchema(schema, options?.provider, options?.dbName, options?.extraSourceFiles);
         workDir = generated.workDir;
         _schema = generated.schema as Schema;
     } else {
         _schema = schema;
+        if (options?.extraSourceFiles) {
+            throw new Error('`extraSourceFiles` is not supported when schema is a SchemaDef object');
+        }
     }
 
     const { plugins, ...rest } = options ?? {};
@@ -109,25 +104,17 @@ export async function createTestClient<Schema extends SchemaDef>(
         }
         const prismaSchema = new PrismaSchemaGenerator(r.model);
         const prismaSchemaText = await prismaSchema.generate();
-        fs.writeFileSync(
-            path.resolve(workDir, 'schema.prisma'),
-            prismaSchemaText
-        );
-        execSync(
-            'npx prisma db push --schema ./schema.prisma --skip-generate --force-reset',
-            {
-                cwd: workDir!,
-                stdio: 'inherit',
-            }
-        );
+        fs.writeFileSync(path.resolve(workDir, 'schema.prisma'), prismaSchemaText);
+        execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {
+            cwd: workDir!,
+            stdio: 'inherit',
+        });
     } else {
         if (options?.provider === 'postgresql') {
             invariant(options?.dbName, 'dbName is required');
             const pgClient = new PGClient(TEST_PG_CONFIG);
             await pgClient.connect();
-            await pgClient.query(
-                `DROP DATABASE IF EXISTS "${options!.dbName}"`
-            );
+            await pgClient.query(`DROP DATABASE IF EXISTS "${options!.dbName}"`);
             await pgClient.query(`CREATE DATABASE "${options!.dbName}"`);
             await pgClient.end();
         }
@@ -142,11 +129,7 @@ export async function createTestClient<Schema extends SchemaDef>(
         } as unknown as ClientOptions<Schema>['dialectConfig'];
     } else {
         _options.dialectConfig = {
-            database: new SQLite(
-                options?.usePrismaPush
-                    ? getDbPath(path.join(workDir!, 'schema.prisma'))
-                    : ':memory:'
-            ),
+            database: new SQLite(options?.usePrismaPush ? getDbPath(path.join(workDir!, 'schema.prisma')) : ':memory:'),
         } as unknown as ClientOptions<Schema>['dialectConfig'];
     }
 
@@ -173,9 +156,6 @@ function getDbPath(prismaSchemaPath: string) {
     }
     const dbPath = found[2]!;
     // convert 'file:./dev.db' to './dev.db'
-    const r = path.join(
-        path.dirname(prismaSchemaPath),
-        dbPath.replace(/^file:/, '')
-    );
+    const r = path.join(path.dirname(prismaSchemaPath), dbPath.replace(/^file:/, ''));
     return r;
 }

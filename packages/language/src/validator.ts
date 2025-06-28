@@ -1,9 +1,6 @@
-import type {
-    AstNode,
-    LangiumDocument,
-    ValidationAcceptor,
-    ValidationChecks,
-} from 'langium';
+/* eslint-disable @typescript-eslint/no-unused-expressions */
+
+import type { AstNode, LangiumDocument, ValidationAcceptor, ValidationChecks } from 'langium';
 import type {
     Attribute,
     DataModel,
@@ -64,27 +61,20 @@ export class ZModelValidator {
             currNode = currNode.$container;
         }
 
-        return (
-            doc?.parseResult.lexerErrors.length === 0 &&
-            doc?.parseResult.parserErrors.length === 0
-        );
+        return doc?.parseResult.lexerErrors.length === 0 && doc?.parseResult.parserErrors.length === 0;
     }
 
     checkModel(node: Model, accept: ValidationAcceptor): void {
         this.shouldCheck(node) &&
-            new SchemaValidator(
-                this.services.shared.workspace.LangiumDocuments
-            ).validate(node, accept);
+            new SchemaValidator(this.services.shared.workspace.LangiumDocuments).validate(node, accept);
     }
 
     checkDataSource(node: DataSource, accept: ValidationAcceptor): void {
-        this.shouldCheck(node) &&
-            new DataSourceValidator().validate(node, accept);
+        this.shouldCheck(node) && new DataSourceValidator().validate(node, accept);
     }
 
     checkDataModel(node: DataModel, accept: ValidationAcceptor): void {
-        this.shouldCheck(node) &&
-            new DataModelValidator().validate(node, accept);
+        this.shouldCheck(node) && new DataModelValidator().validate(node, accept);
     }
 
     checkTypeDef(node: TypeDef, accept: ValidationAcceptor): void {
@@ -96,25 +86,18 @@ export class ZModelValidator {
     }
 
     checkAttribute(node: Attribute, accept: ValidationAcceptor): void {
-        this.shouldCheck(node) &&
-            new AttributeValidator().validate(node, accept);
+        this.shouldCheck(node) && new AttributeValidator().validate(node, accept);
     }
 
     checkExpression(node: Expression, accept: ValidationAcceptor): void {
-        this.shouldCheck(node) &&
-            new ExpressionValidator().validate(node, accept);
+        this.shouldCheck(node) && new ExpressionValidator().validate(node, accept);
     }
 
-    checkFunctionInvocation(
-        node: InvocationExpr,
-        accept: ValidationAcceptor
-    ): void {
-        this.shouldCheck(node) &&
-            new FunctionInvocationValidator().validate(node, accept);
+    checkFunctionInvocation(node: InvocationExpr, accept: ValidationAcceptor): void {
+        this.shouldCheck(node) && new FunctionInvocationValidator().validate(node, accept);
     }
 
     checkFunctionDecl(node: FunctionDecl, accept: ValidationAcceptor): void {
-        this.shouldCheck(node) &&
-            new FunctionDeclValidator().validate(node, accept);
+        this.shouldCheck(node) && new FunctionDeclValidator().validate(node, accept);
     }
 }

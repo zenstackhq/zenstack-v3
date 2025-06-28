@@ -22,23 +22,17 @@ import {
 } from 'kysely';
 import { nanoid } from 'nanoid';
 import { match } from 'ts-pattern';
-import type { PromiseType } from 'utility-types';
 import type { GetModels, SchemaDef } from '../../schema';
 import type { ClientImpl } from '../client-impl';
 import type { ClientContract } from '../contract';
 import { InternalError, QueryError } from '../errors';
-import type {
-    MutationInterceptionFilterResult,
-    OnKyselyQueryTransactionCallback,
-} from '../plugin';
+import type { MutationInterceptionFilterResult, OnKyselyQueryTransactionCallback } from '../plugin';
 import { QueryNameMapper } from './name-mapper';
 import type { ZenStackDriver } from './zenstack-driver';
 
 type QueryId = { queryId: string };
 
-export class ZenStackQueryExecutor<
-    Schema extends SchemaDef
-> extends DefaultQueryExecutor {
+export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQueryExecutor {
     private readonly nameMapper: QueryNameMapper;
 
     constructor(
@@ -47,7 +41,7 @@ export class ZenStackQueryExecutor<
         private readonly compiler: QueryCompiler,
         adapter: DialectAdapter,
         private readonly connectionProvider: ConnectionProvider,
-        plugins: KyselyPlugin[] = []
+        plugins: KyselyPlugin[] = [],
     ) {
         super(compiler, adapter, connectionProvider, plugins);
         this.nameMapper = new QueryNameMapper(client.$schema);
@@ -61,55 +55,36 @@ export class ZenStackQueryExecutor<
         return this.client.$options;
     }
 
-    override async executeQuery(
-        compiledQuery: CompiledQuery,
-        queryId: QueryId
-    ) {
+    override async executeQuery(compiledQuery: CompiledQuery, queryId: QueryId) {
         let queryNode = compiledQuery.query;
-        let mutationInterceptionInfo: PromiseType<
-            ReturnType<typeof this.callMutationInterceptionFilters>
-        >;
+        let mutationInterceptionInfo: Awaited<ReturnType<typeof this.callMutationInterceptionFilters>>;
         if (this.isMutationNode(queryNode) && this.hasMutationHooks) {
-            mutationInterceptionInfo =
-                await this.callMutationInterceptionFilters(queryNode);
+            mutationInterceptionInfo = await this.callMutationInterceptionFilters(queryNode);
         }
 
         const task = async () => {
             // call before mutation hooks
-            await this.callBeforeMutationHooks(
-                queryNode,
-                mutationInterceptionInfo
-            );
+            await this.callBeforeMutationHooks(queryNode, mutationInterceptionInfo);
 
             // TODO: make sure insert and delete return rows
             const oldQueryNode = queryNode;
             if (
-                (InsertQueryNode.is(queryNode) ||
-                    DeleteQueryNode.is(queryNode)) &&
+                (InsertQueryNode.is(queryNode) || DeleteQueryNode.is(queryNode)) &&
                 mutationInterceptionInfo?.loadAfterMutationEntity
             ) {
                 // need to make sure the query node has "returnAll"
                 // for insert and delete queries
                 queryNode = {
                     ...queryNode,
-                    returning: ReturningNode.create([
-                        SelectionNode.createSelectAll(),
-                    ]),
+                    returning: ReturningNode.create([SelectionNode.createSelectAll()]),
                 };
             }
 
             // proceed with the query with kysely interceptors
-            const result = await this.proceedQueryWithKyselyInterceptors(
-                queryNode,
-                queryId
-            );
+            const result = await this.proceedQueryWithKyselyInterceptors(queryNode, queryId);
 
             // call after mutation hooks
-            await this.callAfterQueryInterceptionFilters(
-                result,
-                queryNode,
-                mutationInterceptionInfo
-            );
+            await this.callAfterQueryInterceptionFilters(result, queryNode, mutationInterceptionInfo);
 
             if (oldQueryNode !== queryNode) {
                 // TODO: trim the result to the original query node
@@ -118,23 +93,15 @@ export class ZenStackQueryExecutor<
             return result;
         };
 
-        return this.executeWithTransaction(
-            task,
-            !!mutationInterceptionInfo?.useTransactionForMutation
-        );
+        return this.executeWithTransaction(task, !!mutationInterceptionInfo?.useTransactionForMutation);
     }
 
-    private proceedQueryWithKyselyInterceptors(
-        queryNode: RootOperationNode,
-        queryId: QueryId
-    ) {
+    private proceedQueryWithKyselyInterceptors(queryNode: RootOperationNode, queryId: QueryId) {
         let proceed = (q: RootOperationNode) => this.proceedQuery(q, queryId);
 
-        const makeTx =
-            (p: typeof proceed) =>
-            (callback: OnKyselyQueryTransactionCallback) => {
-                return this.executeWithTransaction(() => callback(p));
-            };
+        const makeTx = (p: typeof proceed) => (callback: OnKyselyQueryTransactionCallback) => {
+            return this.executeWithTransaction(() => callback(p));
+        };
 
         const hooks =
             this.options.plugins
@@ -165,24 +132,18 @@ export class ZenStackQueryExecutor<
         try {
             return this.driver.txConnection
                 ? await super
-                      .withConnectionProvider(
-                          new SingleConnectionProvider(this.driver.txConnection)
-                      )
+                      .withConnectionProvider(new SingleConnectionProvider(this.driver.txConnection))
                       .executeQuery<any>(compiled, queryId)
                 : await super.executeQuery<any>(compiled, queryId);
         } catch (err) {
             throw new QueryError(
-                `Failed to execute query: ${err}, sql: ${compiled.sql}, parameters: ${compiled.parameters}`
+                `Failed to execute query: ${err}, sql: ${compiled.sql}, parameters: ${compiled.parameters}`,
             );
         }
     }
 
     private isMutationNode(queryNode: RootOperationNode) {
-        return (
-            InsertQueryNode.is(queryNode) ||
-            UpdateQueryNode.is(queryNode) ||
-            DeleteQueryNode.is(queryNode)
-        );
+        return InsertQueryNode.is(queryNode) || UpdateQueryNode.is(queryNode) || DeleteQueryNode.is(queryNode);
     }
 
     override withPlugin(plugin: KyselyPlugin) {
@@ -192,7 +153,7 @@ export class ZenStackQueryExecutor<
             this.compiler,
             this.adapter,
             this.connectionProvider,
-            [...this.plugins, plugin]
+            [...this.plugins, plugin],
         );
     }
 
@@ -203,7 +164,7 @@ export class ZenStackQueryExecutor<
             this.compiler,
             this.adapter,
             this.connectionProvider,
-            [...this.plugins, ...plugins]
+            [...this.plugins, ...plugins],
         );
     }
 
@@ -214,7 +175,7 @@ export class ZenStackQueryExecutor<
             this.compiler,
             this.adapter,
             this.connectionProvider,
-            [plugin, ...this.plugins]
+            [plugin, ...this.plugins],
         );
     }
     override withoutPlugins() {
@@ -224,24 +185,15 @@ export class ZenStackQueryExecutor<
             this.compiler,
             this.adapter,
             this.connectionProvider,
-            []
+            [],
         );
     }
 
     override withConnectionProvider(connectionProvider: ConnectionProvider) {
-        return new ZenStackQueryExecutor(
-            this.client,
-            this.driver,
-            this.compiler,
-            this.adapter,
-            connectionProvider
-        );
+        return new ZenStackQueryExecutor(this.client, this.driver, this.compiler, this.adapter, connectionProvider);
     }
 
-    private async executeWithTransaction<T>(
-        callback: () => Promise<T>,
-        useTransaction = true
-    ) {
+    private async executeWithTransaction<T>(callback: () => Promise<T>, useTransaction = true) {
         if (!useTransaction || this.driver.txConnection) {
             return callback();
         } else {
@@ -261,26 +213,17 @@ export class ZenStackQueryExecutor<
 
     private get hasMutationHooks() {
         return this.client.$options.plugins?.some(
-            (plugin) =>
-                plugin.beforeEntityMutation || plugin.afterEntityMutation
+            (plugin) => plugin.beforeEntityMutation || plugin.afterEntityMutation,
         );
     }
 
     private getMutationModel(queryNode: OperationNode): GetModels<Schema> {
         return match(queryNode)
-            .when(
-                InsertQueryNode.is,
-                (node) => node.into!.table.identifier.name
-            )
-            .when(
-                UpdateQueryNode.is,
-                (node) => (node.table as TableNode).table.identifier.name
-            )
+            .when(InsertQueryNode.is, (node) => node.into!.table.identifier.name)
+            .when(UpdateQueryNode.is, (node) => (node.table as TableNode).table.identifier.name)
             .when(DeleteQueryNode.is, (node) => {
                 if (node.from.froms.length !== 1) {
-                    throw new InternalError(
-                        `Delete query must have exactly one from table`
-                    );
+                    throw new InternalError(`Delete query must have exactly one from table`);
                 }
                 return (node.from.froms[0] as TableNode).table.identifier.name;
             })
@@ -289,9 +232,7 @@ export class ZenStackQueryExecutor<
             }) as GetModels<Schema>;
     }
 
-    private async callMutationInterceptionFilters(
-        queryNode: UpdateQueryNode | InsertQueryNode | DeleteQueryNode
-    ) {
+    private async callMutationInterceptionFilters(queryNode: UpdateQueryNode | InsertQueryNode | DeleteQueryNode) {
         const plugins = this.client.$options.plugins;
         if (plugins) {
             const mutationModel = this.getMutationModel(queryNode);
@@ -318,32 +259,21 @@ export class ZenStackQueryExecutor<
                 if (!plugin.mutationInterceptionFilter) {
                     result.intercept = true;
                 } else {
-                    const filterResult =
-                        await plugin.mutationInterceptionFilter({
-                            model: mutationModel,
-                            action,
-                            queryNode,
-                        });
+                    const filterResult = await plugin.mutationInterceptionFilter({
+                        model: mutationModel,
+                        action,
+                        queryNode,
+                    });
                     result.intercept ||= filterResult.intercept;
-                    result.useTransactionForMutation ||=
-                        filterResult.useTransactionForMutation;
-                    result.loadBeforeMutationEntity ||=
-                        filterResult.loadBeforeMutationEntity;
-                    result.loadAfterMutationEntity ||=
-                        filterResult.loadAfterMutationEntity;
+                    result.useTransactionForMutation ||= filterResult.useTransactionForMutation;
+                    result.loadBeforeMutationEntity ||= filterResult.loadBeforeMutationEntity;
+                    result.loadAfterMutationEntity ||= filterResult.loadAfterMutationEntity;
                 }
             }
 
             let beforeMutationEntities: Record<string, unknown>[] | undefined;
-            if (
-                result.loadBeforeMutationEntity &&
-                (UpdateQueryNode.is(queryNode) || DeleteQueryNode.is(queryNode))
-            ) {
-                beforeMutationEntities = await this.loadEntities(
-                    this.kysely,
-                    mutationModel,
-                    where
-                );
+            if (result.loadBeforeMutationEntity && (UpdateQueryNode.is(queryNode) || DeleteQueryNode.is(queryNode))) {
+                beforeMutationEntities = await this.loadEntities(this.kysely, mutationModel, where);
             }
 
             return {
@@ -360,9 +290,7 @@ export class ZenStackQueryExecutor<
 
     private callBeforeMutationHooks(
         queryNode: OperationNode,
-        mutationInterceptionInfo: PromiseType<
-            ReturnType<typeof this.callMutationInterceptionFilters>
-        >
+        mutationInterceptionInfo: Awaited<ReturnType<typeof this.callMutationInterceptionFilters>>,
     ) {
         if (!mutationInterceptionInfo?.intercept) {
             return;
@@ -376,8 +304,7 @@ export class ZenStackQueryExecutor<
                         model: this.getMutationModel(queryNode),
                         action: mutationInterceptionInfo.action,
                         queryNode,
-                        entities:
-                            mutationInterceptionInfo.beforeMutationEntities,
+                        entities: mutationInterceptionInfo.beforeMutationEntities,
                     });
                 }
             }
@@ -387,9 +314,7 @@ export class ZenStackQueryExecutor<
     private async callAfterQueryInterceptionFilters(
         queryResult: QueryResult<unknown>,
         queryNode: OperationNode,
-        mutationInterceptionInfo: PromiseType<
-            ReturnType<typeof this.callMutationInterceptionFilters>
-        >
+        mutationInterceptionInfo: Awaited<ReturnType<typeof this.callMutationInterceptionFilters>>,
     ) {
         if (!mutationInterceptionInfo?.intercept) {
             return;
@@ -399,21 +324,16 @@ export class ZenStackQueryExecutor<
             const mutationModel = this.getMutationModel(queryNode);
             for (const plugin of this.options.plugins) {
                 if (plugin.afterEntityMutation) {
-                    let afterMutationEntities:
-                        | Record<string, unknown>[]
-                        | undefined = undefined;
+                    let afterMutationEntities: Record<string, unknown>[] | undefined = undefined;
                     if (mutationInterceptionInfo.loadAfterMutationEntity) {
                         if (UpdateQueryNode.is(queryNode)) {
                             afterMutationEntities = await this.loadEntities(
                                 this.kysely,
                                 mutationModel,
-                                mutationInterceptionInfo.where
+                                mutationInterceptionInfo.where,
                             );
                         } else {
-                            afterMutationEntities = queryResult.rows as Record<
-                                string,
-                                unknown
-                            >[];
+                            afterMutationEntities = queryResult.rows as Record<string, unknown>[];
                         }
                     }
 
@@ -421,8 +341,7 @@ export class ZenStackQueryExecutor<
                         model: this.getMutationModel(queryNode),
                         action: mutationInterceptionInfo.action,
                         queryNode,
-                        beforeMutationEntities:
-                            mutationInterceptionInfo.beforeMutationEntities,
+                        beforeMutationEntities: mutationInterceptionInfo.beforeMutationEntities,
                         afterMutationEntities,
                     });
                 }
@@ -433,7 +352,7 @@ export class ZenStackQueryExecutor<
     private async loadEntities(
         kysely: Kysely<any>,
         model: GetModels<Schema>,
-        where: WhereNode | undefined
+        where: WhereNode | undefined,
     ): Promise<Record<string, unknown>[]> {
         const selectQuery = kysely.selectFrom(model).selectAll();
         let selectQueryNode = selectQuery.toOperationNode() as SelectQueryNode;
@@ -441,17 +360,12 @@ export class ZenStackQueryExecutor<
             ...selectQueryNode,
             where: this.andNodes(selectQueryNode.where, where),
         };
-        const compiled = kysely
-            .getExecutor()
-            .compileQuery(selectQueryNode, { queryId: `zenstack-${nanoid()}` });
+        const compiled = kysely.getExecutor().compileQuery(selectQueryNode, { queryId: `zenstack-${nanoid()}` });
         const result = await kysely.executeQuery(compiled);
         return result.rows as Record<string, unknown>[];
     }
 
-    private andNodes(
-        condition1: WhereNode | undefined,
-        condition2: WhereNode | undefined
-    ) {
+    private andNodes(condition1: WhereNode | undefined, condition2: WhereNode | undefined) {
         if (condition1 && condition2) {
             return WhereNode.create(AndNode.create(condition1, condition2));
         } else if (condition1) {

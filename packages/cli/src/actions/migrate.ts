@@ -20,10 +20,7 @@ export async function run(command: string, options: CommonOptions) {
         silent: true,
     });
 
-    const prismaSchemaFile = path.join(
-        path.dirname(schemaFile),
-        'schema.prisma'
-    );
+    const prismaSchemaFile = path.join(path.dirname(schemaFile), 'schema.prisma');
 
     switch (command) {
         case 'dev':
@@ -46,12 +43,9 @@ export async function run(command: string, options: CommonOptions) {
 
 async function runDev(prismaSchemaFile: string, _options: unknown) {
     try {
-        await execPackage(
-            `prisma migrate dev --schema "${prismaSchemaFile}" --skip-generate`,
-            {
-                stdio: 'inherit',
-            }
-        );
+        await execPackage(`prisma migrate dev --schema "${prismaSchemaFile}" --skip-generate`, {
+            stdio: 'inherit',
+        });
     } catch (err) {
         handleSubProcessError(err);
     }
@@ -59,14 +53,9 @@ async function runDev(prismaSchemaFile: string, _options: unknown) {
 
 async function runReset(prismaSchemaFile: string, options: { force: boolean }) {
     try {
-        await execPackage(
-            `prisma migrate reset --schema "${prismaSchemaFile}"${
-                options.force ? ' --force' : ''
-            }`,
-            {
-                stdio: 'inherit',
-            }
-        );
+        await execPackage(`prisma migrate reset --schema "${prismaSchemaFile}"${options.force ? ' --force' : ''}`, {
+            stdio: 'inherit',
+        });
     } catch (err) {
         handleSubProcessError(err);
     }
@@ -74,12 +63,9 @@ async function runReset(prismaSchemaFile: string, options: { force: boolean }) {
 
 async function runDeploy(prismaSchemaFile: string, _options: unknown) {
     try {
-        await execPackage(
-            `prisma migrate deploy --schema "${prismaSchemaFile}"`,
-            {
-                stdio: 'inherit',
-            }
-        );
+        await execPackage(`prisma migrate deploy --schema "${prismaSchemaFile}"`, {
+            stdio: 'inherit',
+        });
     } catch (err) {
         handleSubProcessError(err);
     }
@@ -87,23 +73,16 @@ async function runDeploy(prismaSchemaFile: string, _options: unknown) {
 
 async function runStatus(prismaSchemaFile: string, _options: unknown) {
     try {
-        await execPackage(
-            `prisma migrate status --schema "${prismaSchemaFile}"`,
-            {
-                stdio: 'inherit',
-            }
-        );
+        await execPackage(`prisma migrate status --schema "${prismaSchemaFile}"`, {
+            stdio: 'inherit',
+        });
     } catch (err) {
         handleSubProcessError(err);
     }
 }
 
 function handleSubProcessError(err: unknown) {
-    if (
-        err instanceof Error &&
-        'status' in err &&
-        typeof err.status === 'number'
-    ) {
+    if (err instanceof Error && 'status' in err && typeof err.status === 'number') {
         process.exit(err.status);
     } else {
         process.exit(1);

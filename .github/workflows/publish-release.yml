@@ -1,0 +1,80 @@
+name: Publish and Release
+
+on:
+    workflow_dispatch:
+    push:
+        branches:
+            - main
+
+permissions:
+    contents: write
+
+jobs:
+    publish-and-release:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Install pnpm
+              uses: pnpm/action-setup@v2
+              with:
+                  version: 10.12.1
+
+            - name: Use Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20.x
+                  cache: 'pnpm'
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build
+              run: pnpm run build
+
+            - name: Get version from package.json
+              id: version
+              run: |
+                  VERSION=$(node -p "require('./package.json').version")
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+                  echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+            - name: Publish packages
+              run: pnpm run publish-all
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - name: Generate changelog
+              id: changelog
+              run: |
+                  PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+                  if [ -z "$PREVIOUS_TAG" ]; then
+                    CHANGELOG=$(git log --oneline --no-merges --format="* %s" HEAD)
+                  else
+                    CHANGELOG=$(git log --oneline --no-merges --format="* %s" ${PREVIOUS_TAG}..HEAD)
+                  fi
+
+                  if [ -z "$CHANGELOG" ]; then
+                    CHANGELOG="* Automated release"
+                  fi
+
+                  echo "changelog<<EOF" >> $GITHUB_OUTPUT
+                  echo "$CHANGELOG" >> $GITHUB_OUTPUT
+                  echo "EOF" >> $GITHUB_OUTPUT
+
+            - name: Create GitHub Release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ steps.version.outputs.tag }}
+                  release_name: Release ${{ steps.version.outputs.tag }}
+                  body: |
+                      ## Changes in this release
+
+                      ${{ steps.changelog.outputs.changelog }}
+                  draft: true
+                  prerelease: true

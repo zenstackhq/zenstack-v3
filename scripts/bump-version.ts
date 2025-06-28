@@ -48,7 +48,11 @@ for (const file of packageFiles) {
         // do a string replace from oldVersion to newVersion
         const newContent = content.replace(`"version": "${oldVersion}"`, `"version": "${newVersion}"`);
         fs.writeFileSync(file, newContent);
+        console.log(`Updated ${file}: ${oldVersion} -> ${newVersion}`);
     }
 }
 
-console.log(`new_version=${newVersion}`);
+if (process.env.GITHUB_OUTPUT) {
+    // CI output
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `new_version=${newVersion}\n`);
+}

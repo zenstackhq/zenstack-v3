@@ -27,6 +27,7 @@ jobs:
               with:
                   node-version: 20.x
                   cache: 'pnpm'
+                  registry-url: 'https://registry.npmjs.org'
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
@@ -66,12 +67,12 @@ jobs:
                   echo "EOF" >> $GITHUB_OUTPUT
 
             - name: Create GitHub Release
-              uses: actions/create-release@v1
+              uses: softprops/action-gh-release@v2
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   tag_name: ${{ steps.version.outputs.tag }}
-                  release_name: Release ${{ steps.version.outputs.tag }}
+                  name: ZenStack Release ${{ steps.version.outputs.tag }}
                   body: |
                       ## Changes in this release
 

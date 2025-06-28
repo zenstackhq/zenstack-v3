@@ -32,13 +32,14 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Bump version
-              run: pnpm run bump-version
+              id: bump
+              run: pnpm run bump-version >> "$GITHUB_OUTPUT"
 
             - name: Create PR
               uses: peter-evans/create-pull-request@v7
               with:
-                  commit-message: 'chore: bump version'
-                  title: '[CI] Bump version'
+                  commit-message: 'chore: bump version ${{ steps.bump.outputs.new_version }}'
+                  title: '[CI] Bump version ${{ steps.bump.outputs.new_version }}'
                   body: Automated changes for bumping version
                   branch: chore/ci-bump-version
                   branch-suffix: timestamp

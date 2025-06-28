@@ -50,9 +50,8 @@ for (const file of packageFiles) {
     const content = fs.readFileSync(file, 'utf8');
     const pkg = JSON.parse(content) as { version?: string };
     if (pkg.version) {
-        const oldVersion = pkg.version;
-        const newVersion = incrementVersion(pkg.version);
         // do a string replace from oldVersion to newVersion
+        const oldVersion = pkg.version;
         const newContent = content.replace(`"version": "${oldVersion}"`, `"version": "${newVersion}"`);
         fs.writeFileSync(file, newContent);
         console.log(`Updated ${file}: ${oldVersion} -> ${newVersion}`);

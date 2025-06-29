@@ -10,8 +10,11 @@ catalogs:
       specifier: ^0.27.6
       version: 0.27.6
     langium:
-      specifier: ^3.3.0
-      version: 3.3.0
+      specifier: 3.5.0
+      version: 3.5.0
+    langium-cli:
+      specifier: 3.5.0
+      version: 3.5.0
     prisma:
       specifier: ^6.0.0
       version: 6.9.0
@@ -85,7 +88,7 @@ importers:
         version: 8.3.0
       langium:
         specifier: 'catalog:'
-        version: 3.3.0
+        version: 3.5.0
       ora:
         specifier: ^5.4.1
         version: 5.4.1
@@ -155,7 +158,7 @@ importers:
         version: link:../../language
       langium:
         specifier: 'catalog:'
-        version: 3.3.0
+        version: 3.5.0
       vscode-languageclient:
         specifier: ^9.0.1
         version: 9.0.1
@@ -177,7 +180,7 @@ importers:
     dependencies:
       langium:
         specifier: 'catalog:'
-        version: 3.3.0
+        version: 3.5.0
       pluralize:
         specifier: ^8.0.0
         version: 8.0.0
@@ -195,8 +198,8 @@ importers:
         specifier: workspace:*
         version: link:../typescript-config
       langium-cli:
-        specifier: ~3.3.0
-        version: 3.3.0
+        specifier: 'catalog:'
+        version: 3.5.0
 
   packages/runtime:
     dependencies:
@@ -272,7 +275,7 @@ importers:
         version: link:../language
       langium:
         specifier: 'catalog:'
-        version: 3.3.0
+        version: 3.5.0
       ts-pattern:
         specifier: 'catalog:'
         version: 5.7.1
@@ -1704,17 +1707,17 @@ packages:
     resolution: {integrity: sha512-FIyV/64EkKhJmjgC0g2hygpBv5RNWVPyNCqSAD7eTCv6eFWNIi4PN1UvdSJGicN/o35bnevgis4Y0UDC0qi8jQ==}
     engines: {node: '>=14.0.0'}
 
-  langium-cli@3.3.0:
-    resolution: {integrity: sha512-QWvlOYdLbso8/lv6Ma+SBtvMN9k70JrplLx6VSIcV7gJNDTXeS+tjwC/f6T0aco1fg8uLL8GiAcaMovd1FnneA==}
-    engines: {node: '>=16.0.0'}
+  langium-cli@3.5.0:
+    resolution: {integrity: sha512-TPIzIiMAQwTPPphtHGSrFXo4t0orx3aRh0syg9jnOihvBkBDvsQdJP9fBo9hp5Qaosklpc2CfbH0wh/dkgZcJA==}
+    engines: {node: '>=18.0.0'}
     hasBin: true
 
-  langium-railroad@3.3.0:
-    resolution: {integrity: sha512-x56CU0KnLoqYLkHEPDJjFoekFoCVbbZbmHduldiXjKD8owt6t5aqgWfg31OeMeR+7XgONZTtmsO76yl6GvEkzQ==}
+  langium-railroad@3.5.0:
+    resolution: {integrity: sha512-80Enc6bOR6oHZD18IQlVTdfCh07rbrM5SOsPUPc1kyh7n3zQbmLs5P2E9hV4SoWlkhOjGKL1I9Z6uORpgy+jTQ==}
 
-  langium@3.3.0:
-    resolution: {integrity: sha512-y1n1MxeHtXvE0Ksi/HjLCvesHm3/Vr0pyyuA1fn+vmGSYR81NkxnC3bU4kd2o0CrZaz8xekz9rhm+lGfRgNFzw==}
-    engines: {node: '>=16.0.0'}
+  langium@3.5.0:
+    resolution: {integrity: sha512-tnqVzWOkUcoiY0bWlyE8diFrZjmGBCF7MesC1bjUaZM+YGQSfdPC+KkhmHM0DWFG+uLcPxidKaPP1SYGtg3J0Q==}
+    engines: {node: '>=18.0.0'}
 
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
@@ -3736,22 +3739,22 @@ snapshots:
 
   kysely@0.27.6: {}
 
-  langium-cli@3.3.0:
+  langium-cli@3.5.0:
     dependencies:
       chalk: 5.3.0
       commander: 11.0.0
       fs-extra: 11.1.1
       jsonschema: 1.4.1
-      langium: 3.3.0
-      langium-railroad: 3.3.0
+      langium: 3.5.0
+      langium-railroad: 3.5.0
       lodash: 4.17.21
 
-  langium-railroad@3.3.0:
+  langium-railroad@3.5.0:
     dependencies:
-      langium: 3.3.0
+      langium: 3.5.0
       railroad-diagrams: 1.0.0
 
-  langium@3.3.0:
+  langium@3.5.0:
     dependencies:
       chevrotain: 11.0.3
       chevrotain-allstar: 0.3.1(chevrotain@11.0.3)

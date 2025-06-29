@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { definePlugin } from '../../src/client';
 import { createPolicyTestClient } from './utils';
 
-describe('client extensions tests for polices', () => {
+describe('client extensions tests for policies', () => {
     it('query override one model', async () => {
         const db = await createPolicyTestClient(
             `

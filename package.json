@@ -9,8 +9,9 @@
         "lint": "turbo run lint",
         "test": "turbo run test",
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+        "pr": "gh pr create --fill-first",
         "bump-version": "npx tsx scripts/bump-version.ts",
-        "publish-all": "pnpm --filter \"./packages/**\" -r publish --tag next",
+        "publish-all": "pnpm --filter \"./packages/**\" -r publish --access public --tag next",
         "publish-preview": "pnpm --filter \"./packages/**\" -r publish --tag next --force --registry https://preview.registry.zenstack.dev/",
         "unpublish-preview": "pnpm --filter \"./packages/**\" -r --shell-mode exec -- npm unpublish -f --registry https://preview.registry.zenstack.dev/ \"\\$PNPM_PACKAGE_NAME\""
     },

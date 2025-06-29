@@ -51,7 +51,7 @@
         "@types/pluralize": "^0.0.33",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "langium-cli": "~3.3.0"
+        "langium-cli": "catalog:"
     },
     "volta": {
         "node": "18.19.1",

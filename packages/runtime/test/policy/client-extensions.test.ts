@@ -63,7 +63,6 @@ describe('client extensions tests for policies', () => {
                     async findMany({ args, query }: any) {
                         args = args ?? {};
                         args.where = { ...args.where, y: { lt: 300 } };
-                        console.log('findMany args:', args);
                         return query(args);
                     },
                 },

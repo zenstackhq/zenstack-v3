@@ -9,7 +9,7 @@
         "lint": "turbo run lint",
         "test": "turbo run test",
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-        "pr": "gh pr create --fill-first",
+        "pr": "gh pr create --fill-first --base dev",
         "bump-version": "npx tsx scripts/bump-version.ts",
         "publish-all": "pnpm --filter \"./packages/**\" -r publish --access public --tag next",
         "publish-preview": "pnpm --filter \"./packages/**\" -r publish --tag next --force --registry https://preview.registry.zenstack.dev/",

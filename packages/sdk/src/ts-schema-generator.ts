@@ -618,10 +618,7 @@ export class TsSchemaGenerator {
                     ts.factory.createPropertyAssignment(
                         field.name,
                         ts.factory.createObjectLiteralExpression([
-                            ts.factory.createPropertyAssignment(
-                                'type',
-                                ts.factory.createStringLiteral(field.type.type!),
-                            ),
+                            ts.factory.createPropertyAssignment('type', this.generateFieldTypeLiteral(field)),
                         ]),
                     ),
                 );
@@ -629,6 +626,10 @@ export class TsSchemaGenerator {
         }
 
         // model-level id and unique
+
+        // it's possible to have the same set of fields in both `@@id` and `@@unique`
+        // so we need to deduplicate them
+        const seenKeys = new Set<string>();
         for (const attr of dm.attributes) {
             if (attr.decl.$refText === '@@id' || attr.decl.$refText === '@@unique') {
                 const fieldNames = this.getReferenceNames(attr.args[0]!.value);
@@ -643,15 +644,17 @@ export class TsSchemaGenerator {
                         ts.factory.createPropertyAssignment(
                             fieldNames[0]!,
                             ts.factory.createObjectLiteralExpression([
-                                ts.factory.createPropertyAssignment(
-                                    'type',
-                                    ts.factory.createStringLiteral(fieldDef.type.type!),
-                                ),
+                                ts.factory.createPropertyAssignment('type', this.generateFieldTypeLiteral(fieldDef)),
                             ]),
                         ),
                     );
                 } else {
                     // multi-field unique
+                    const key = fieldNames.join('_');
+                    if (seenKeys.has(key)) {
+                        continue;
+                    }
+                    seenKeys.add(key);
                     properties.push(
                         ts.factory.createPropertyAssignment(
                             fieldNames.join('_'),
@@ -663,7 +666,7 @@ export class TsSchemaGenerator {
                                         ts.factory.createObjectLiteralExpression([
                                             ts.factory.createPropertyAssignment(
                                                 'type',
-                                                ts.factory.createStringLiteral(fieldDef.type.type!),
+                                                this.generateFieldTypeLiteral(fieldDef),
                                             ),
                                         ]),
                                     );
@@ -676,6 +679,10 @@ export class TsSchemaGenerator {
         }
 
         return ts.factory.createObjectLiteralExpression(properties, true);
+    }
+
+    private generateFieldTypeLiteral(field: DataModelField): ts.Expression {
+        return ts.factory.createStringLiteral(field.type.type ?? field.type.reference!.$refText);
     }
 
     private createEnumObject(e: Enum) {

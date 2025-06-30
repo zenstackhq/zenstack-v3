@@ -682,6 +682,7 @@ export class TsSchemaGenerator {
     }
 
     private generateFieldTypeLiteral(field: DataModelField): ts.Expression {
+        invariant(field.type.type || field.type.reference, 'Field type must be a primitive or reference');
         return ts.factory.createStringLiteral(field.type.type ?? field.type.reference!.$refText);
     }
 

@@ -2,6 +2,7 @@ packages:
     - packages/**
     - packages/ide/**
     - samples/**
+    - tests/**
 catalog:
     kysely: ^0.27.6
     zod: ^3.25.67

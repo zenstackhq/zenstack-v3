@@ -10,6 +10,7 @@ type Options = {
     schema?: string;
     output?: string;
     silent?: boolean;
+    savePrismaSchema?: string | boolean;
 };
 
 /**
@@ -28,8 +29,15 @@ export async function run(options: Options) {
     await runPlugins(model, outputPath, tsSchemaFile);
 
     // generate Prisma schema
-    const prismaSchema = await new PrismaSchemaGenerator(model).generate();
-    fs.writeFileSync(path.join(outputPath, 'schema.prisma'), prismaSchema);
+    if (options.savePrismaSchema) {
+        const prismaSchema = await new PrismaSchemaGenerator(model).generate();
+        let prismaSchemaFile = path.join(outputPath, 'schema.prisma');
+        if (typeof options.savePrismaSchema === 'string') {
+            prismaSchemaFile = path.resolve(outputPath, options.savePrismaSchema);
+            fs.mkdirSync(path.dirname(prismaSchemaFile), { recursive: true });
+        }
+        fs.writeFileSync(prismaSchemaFile, prismaSchema);
+    }
 
     if (!options.silent) {
         console.log(colors.green('Generation completed successfully.'));

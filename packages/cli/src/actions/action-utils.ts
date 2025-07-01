@@ -1,7 +1,9 @@
-import fs from 'node:fs';
-import { CliError } from '../cli-error';
 import { loadDocument } from '@zenstackhq/language';
+import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
+import fs from 'node:fs';
+import path from 'node:path';
+import { CliError } from '../cli-error';
 
 export function getSchemaFile(file?: string) {
     if (file) {
@@ -40,4 +42,12 @@ export function handleSubProcessError(err: unknown) {
     } else {
         process.exit(1);
     }
+}
+
+export async function generateTempPrismaSchema(zmodelPath: string) {
+    const model = await loadSchemaDocument(zmodelPath);
+    const prismaSchema = await new PrismaSchemaGenerator(model).generate();
+    const prismaSchemaFile = path.resolve(path.dirname(zmodelPath), '~schema.prisma');
+    fs.writeFileSync(prismaSchemaFile, prismaSchema);
+    return prismaSchemaFile;
 }

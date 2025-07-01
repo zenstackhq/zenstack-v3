@@ -680,7 +680,7 @@ export class TsSchemaGenerator {
         return ts.factory.createObjectLiteralExpression(properties, true);
     }
 
-    private generateFieldTypeLiteral(field: DataModelField | ProcedureParam): ts.Expression {
+    private generateFieldTypeLiteral(field: DataModelField): ts.Expression {
         invariant(
             field.type.type || field.type.reference || field.type.unsupported,
             'Field type must be a primitive, reference, or Unsupported',

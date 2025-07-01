@@ -18,7 +18,7 @@
     },
     "devDependencies": {
         "@types/better-sqlite3": "^7.6.12",
-        "prisma": "^6.0.0",
+        "prisma": "catalog:",
         "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*"
     }

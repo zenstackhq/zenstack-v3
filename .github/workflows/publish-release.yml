@@ -78,4 +78,3 @@ jobs:
 
                       ${{ steps.changelog.outputs.changelog }}
                   draft: true
-                  prerelease: true

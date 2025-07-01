@@ -1,57 +1,70 @@
-import path from 'node:path';
+import fs from 'node:fs';
 import { execPackage } from '../utils/exec-utils';
-import { getSchemaFile } from './action-utils';
-import { run as runGenerate } from './generate';
+import { generateTempPrismaSchema, getSchemaFile } from './action-utils';
 
 type CommonOptions = {
     schema?: string;
-    name?: string;
 };
+
+type DevOptions = CommonOptions & {
+    name?: string;
+    createOnly?: boolean;
+};
+
+type ResetOptions = CommonOptions & {
+    force?: boolean;
+};
+
+type DeployOptions = CommonOptions;
+
+type StatusOptions = CommonOptions;
 
 /**
  * CLI action for migration-related commands
  */
 export async function run(command: string, options: CommonOptions) {
     const schemaFile = getSchemaFile(options.schema);
+    const prismaSchemaFile = await generateTempPrismaSchema(schemaFile);
 
-    // run generate first
-    await runGenerate({
-        schema: schemaFile,
-        silent: true,
-    });
+    try {
+        switch (command) {
+            case 'dev':
+                await runDev(prismaSchemaFile, options as DevOptions);
+                break;
 
-    const prismaSchemaFile = path.join(path.dirname(schemaFile), 'schema.prisma');
+            case 'reset':
+                await runReset(prismaSchemaFile, options as ResetOptions);
+                break;
 
-    switch (command) {
-        case 'dev':
-            await runDev(prismaSchemaFile, options);
-            break;
+            case 'deploy':
+                await runDeploy(prismaSchemaFile, options as DeployOptions);
+                break;
 
-        case 'reset':
-            await runReset(prismaSchemaFile, options as any);
-            break;
-
-        case 'deploy':
-            await runDeploy(prismaSchemaFile, options);
-            break;
-
-        case 'status':
-            await runStatus(prismaSchemaFile, options);
-            break;
+            case 'status':
+                await runStatus(prismaSchemaFile, options as StatusOptions);
+                break;
+        }
+    } finally {
+        if (fs.existsSync(prismaSchemaFile)) {
+            fs.unlinkSync(prismaSchemaFile);
+        }
     }
 }
 
-async function runDev(prismaSchemaFile: string, _options: unknown) {
+async function runDev(prismaSchemaFile: string, options: DevOptions) {
     try {
-        await execPackage(`prisma migrate dev --schema "${prismaSchemaFile}" --skip-generate`, {
-            stdio: 'inherit',
-        });
+        await execPackage(
+            `prisma migrate dev --schema "${prismaSchemaFile}" --skip-generate${options.name ? ` --name ${options.name}` : ''}${options.createOnly ? ' --create-only' : ''}`,
+            {
+                stdio: 'inherit',
+            },
+        );
     } catch (err) {
         handleSubProcessError(err);
     }
 }
 
-async function runReset(prismaSchemaFile: string, options: { force: boolean }) {
+async function runReset(prismaSchemaFile: string, options: ResetOptions) {
     try {
         await execPackage(`prisma migrate reset --schema "${prismaSchemaFile}"${options.force ? ' --force' : ''}`, {
             stdio: 'inherit',
@@ -61,7 +74,7 @@ async function runReset(prismaSchemaFile: string, options: { force: boolean }) {
     }
 }
 
-async function runDeploy(prismaSchemaFile: string, _options: unknown) {
+async function runDeploy(prismaSchemaFile: string, _options: DeployOptions) {
     try {
         await execPackage(`prisma migrate deploy --schema "${prismaSchemaFile}"`, {
             stdio: 'inherit',
@@ -71,7 +84,7 @@ async function runDeploy(prismaSchemaFile: string, _options: unknown) {
     }
 }
 
-async function runStatus(prismaSchemaFile: string, _options: unknown) {
+async function runStatus(prismaSchemaFile: string, _options: StatusOptions) {
     try {
         await execPackage(`prisma migrate status --schema "${prismaSchemaFile}"`, {
             stdio: 'inherit',

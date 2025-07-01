@@ -1,0 +1,11 @@
+{
+    "name": "e2e",
+    "version": "3.0.0-alpha.6",
+    "private": true,
+    "scripts": {
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@zenstackhq/testtools": "workspace:*"
+    }
+}

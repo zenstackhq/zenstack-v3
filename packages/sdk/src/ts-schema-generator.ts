@@ -284,12 +284,7 @@ export class TsSchemaGenerator {
     }
 
     private createDataModelFieldObject(field: DataModelField) {
-        const objectFields = [
-            ts.factory.createPropertyAssignment(
-                'type',
-                ts.factory.createStringLiteral(field.type.type ?? field.type.reference!.$refText),
-            ),
-        ];
+        const objectFields = [ts.factory.createPropertyAssignment('type', this.generateFieldTypeLiteral(field))];
 
         if (isIdField(field)) {
             objectFields.push(ts.factory.createPropertyAssignment('id', ts.factory.createTrue()));
@@ -323,9 +318,9 @@ export class TsSchemaGenerator {
             );
         }
 
-        const defaultValue = this.getMappedDefault(field);
+        const defaultValue = this.getFieldMappedDefault(field);
         if (defaultValue !== undefined) {
-            if (typeof defaultValue === 'object') {
+            if (typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
                 if ('call' in defaultValue) {
                     objectFields.push(
                         ts.factory.createPropertyAssignment(
@@ -371,18 +366,20 @@ export class TsSchemaGenerator {
                     throw new Error(`Unsupported default value type for field ${field.name}`);
                 }
             } else {
-                objectFields.push(
-                    ts.factory.createPropertyAssignment(
-                        'default',
-                        typeof defaultValue === 'string'
-                            ? ts.factory.createStringLiteral(defaultValue)
-                            : typeof defaultValue === 'number'
-                              ? ts.factory.createNumericLiteral(defaultValue)
-                              : defaultValue === true
-                                ? ts.factory.createTrue()
-                                : ts.factory.createFalse(),
-                    ),
-                );
+                if (Array.isArray(defaultValue)) {
+                    objectFields.push(
+                        ts.factory.createPropertyAssignment(
+                            'default',
+                            ts.factory.createArrayLiteralExpression(
+                                defaultValue.map((item) => this.createLiteralNode(item as any)),
+                            ),
+                        ),
+                    );
+                } else {
+                    objectFields.push(
+                        ts.factory.createPropertyAssignment('default', this.createLiteralNode(defaultValue)),
+                    );
+                }
             }
         }
 
@@ -438,37 +435,44 @@ export class TsSchemaGenerator {
         }
     }
 
-    private getMappedDefault(
+    private getFieldMappedDefault(
         field: DataModelField,
-    ): string | number | boolean | { call: string; args: any[] } | { authMember: string[] } | undefined {
+    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
         const defaultAttr = getAttribute(field, '@default');
         if (!defaultAttr) {
             return undefined;
         }
-
         const defaultValue = defaultAttr.args[0]?.value;
         invariant(defaultValue, 'Expected a default value');
+        return this.getMappedValue(defaultValue, field.type);
+    }
 
-        if (isLiteralExpr(defaultValue)) {
-            const lit = (defaultValue as LiteralExpr).value;
-            return field.type.type === 'Boolean'
+    private getMappedValue(
+        expr: Expression,
+        fieldType: DataModelFieldType,
+    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
+        if (isLiteralExpr(expr)) {
+            const lit = (expr as LiteralExpr).value;
+            return fieldType.type === 'Boolean'
                 ? (lit as boolean)
-                : ['Int', 'Float', 'Decimal', 'BigInt'].includes(field.type.type!)
+                : ['Int', 'Float', 'Decimal', 'BigInt'].includes(fieldType.type!)
                   ? Number(lit)
                   : lit;
-        } else if (isReferenceExpr(defaultValue) && isEnumField(defaultValue.target.ref)) {
-            return defaultValue.target.ref.name;
-        } else if (isInvocationExpr(defaultValue)) {
+        } else if (isArrayExpr(expr)) {
+            return expr.items.map((item) => this.getMappedValue(item, fieldType));
+        } else if (isReferenceExpr(expr) && isEnumField(expr.target.ref)) {
+            return expr.target.ref.name;
+        } else if (isInvocationExpr(expr)) {
             return {
-                call: defaultValue.function.$refText,
-                args: defaultValue.args.map((arg) => this.getLiteral(arg.value)),
+                call: expr.function.$refText,
+                args: expr.args.map((arg) => this.getLiteral(arg.value)),
             };
-        } else if (this.isAuthMemberAccess(defaultValue)) {
+        } else if (this.isAuthMemberAccess(expr)) {
             return {
-                authMember: this.getMemberAccessChain(defaultValue),
+                authMember: this.getMemberAccessChain(expr),
             };
         } else {
-            throw new Error(`Unsupported default value type for field ${field.name}`);
+            throw new Error(`Unsupported default value type for ${expr.$type}`);
         }
     }
 
@@ -682,8 +686,16 @@ export class TsSchemaGenerator {
     }
 
     private generateFieldTypeLiteral(field: DataModelField): ts.Expression {
-        invariant(field.type.type || field.type.reference, 'Field type must be a primitive or reference');
-        return ts.factory.createStringLiteral(field.type.type ?? field.type.reference!.$refText);
+        invariant(
+            field.type.type || field.type.reference || field.type.unsupported,
+            'Field type must be a primitive, reference, or Unsupported',
+        );
+
+        return field.type.type
+            ? ts.factory.createStringLiteral(field.type.type)
+            : field.type.reference
+              ? ts.factory.createStringLiteral(field.type.reference.$refText)
+              : ts.factory.createStringLiteral('unknown');
     }
 
     private createEnumObject(e: Enum) {

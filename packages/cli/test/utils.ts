@@ -1,4 +1,5 @@
 import { createTestProject } from '@zenstackhq/testtools';
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -13,6 +14,9 @@ export function createProject(zmodel: string, addPrelude = true) {
     fs.mkdirSync(path.join(workDir, 'zenstack'), { recursive: true });
     const schemaPath = path.join(workDir, 'zenstack/schema.zmodel');
     fs.writeFileSync(schemaPath, addPrelude ? `${ZMODEL_PRELUDE}\n\n${zmodel}` : zmodel);
-    process.chdir(workDir);
     return workDir;
+}
+
+export function runCli(command: string, cwd: string) {
+    execSync(`node ${__dirname}/../bin/cli ${command}`, { cwd });
 }

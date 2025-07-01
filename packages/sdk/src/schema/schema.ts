@@ -59,7 +59,7 @@ export type FieldDef = {
     unique?: boolean;
     updatedAt?: boolean;
     attributes?: AttributeApplication[];
-    default?: MappedBuiltinType | Expression;
+    default?: MappedBuiltinType | Expression | unknown[];
     relation?: RelationInfo;
     foreignKeyFor?: string[];
     computed?: boolean;

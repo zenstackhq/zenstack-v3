@@ -18,5 +18,6 @@ export function createProject(zmodel: string, addPrelude = true) {
 }
 
 export function runCli(command: string, cwd: string) {
-    execSync(`node ${__dirname}/../bin/cli ${command}`, { cwd });
+    const cli = path.join(__dirname, '../dist/index.js');
+    execSync(`node ${cli} ${command}`, { cwd });
 }

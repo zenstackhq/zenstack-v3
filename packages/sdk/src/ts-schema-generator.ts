@@ -318,7 +318,7 @@ export class TsSchemaGenerator {
             );
         }
 
-        const defaultValue = this.getMappedDefault(field);
+        const defaultValue = this.getFieldMappedDefault(field);
         if (defaultValue !== undefined) {
             if (typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
                 if ('call' in defaultValue) {
@@ -435,39 +435,44 @@ export class TsSchemaGenerator {
         }
     }
 
-    private getMappedDefault(
+    private getFieldMappedDefault(
         field: DataModelField,
     ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
         const defaultAttr = getAttribute(field, '@default');
         if (!defaultAttr) {
             return undefined;
         }
-
         const defaultValue = defaultAttr.args[0]?.value;
         invariant(defaultValue, 'Expected a default value');
+        return this.getMappedValue(defaultValue, field.type);
+    }
 
-        if (isLiteralExpr(defaultValue)) {
-            const lit = (defaultValue as LiteralExpr).value;
-            return field.type.type === 'Boolean'
+    private getMappedValue(
+        expr: Expression,
+        fieldType: DataModelFieldType,
+    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
+        if (isLiteralExpr(expr)) {
+            const lit = (expr as LiteralExpr).value;
+            return fieldType.type === 'Boolean'
                 ? (lit as boolean)
-                : ['Int', 'Float', 'Decimal', 'BigInt'].includes(field.type.type!)
+                : ['Int', 'Float', 'Decimal', 'BigInt'].includes(fieldType.type!)
                   ? Number(lit)
                   : lit;
-        } else if (isArrayExpr(defaultValue)) {
-            return defaultValue.items.map((item) => this.getLiteral(item));
-        } else if (isReferenceExpr(defaultValue) && isEnumField(defaultValue.target.ref)) {
-            return defaultValue.target.ref.name;
-        } else if (isInvocationExpr(defaultValue)) {
+        } else if (isArrayExpr(expr)) {
+            return expr.items.map((item) => this.getMappedValue(item, fieldType));
+        } else if (isReferenceExpr(expr) && isEnumField(expr.target.ref)) {
+            return expr.target.ref.name;
+        } else if (isInvocationExpr(expr)) {
             return {
-                call: defaultValue.function.$refText,
-                args: defaultValue.args.map((arg) => this.getLiteral(arg.value)),
+                call: expr.function.$refText,
+                args: expr.args.map((arg) => this.getLiteral(arg.value)),
             };
-        } else if (this.isAuthMemberAccess(defaultValue)) {
+        } else if (this.isAuthMemberAccess(expr)) {
             return {
-                authMember: this.getMemberAccessChain(defaultValue),
+                authMember: this.getMemberAccessChain(expr),
             };
         } else {
-            throw new Error(`Unsupported default value type for field ${field.name}`);
+            throw new Error(`Unsupported default value type for ${expr.$type}`);
         }
     }
 

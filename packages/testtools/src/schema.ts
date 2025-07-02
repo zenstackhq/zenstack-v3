@@ -35,7 +35,7 @@ export async function generateTsSchema(
     extraSourceFiles?: Record<string, string>,
 ) {
     const workDir = createTestProject();
-    console.log(`Working directory: ${workDir}`);
+    console.log(`Work directory: ${workDir}`);
 
     const zmodelPath = path.join(workDir, 'schema.zmodel');
     const noPrelude = schemaText.includes('datasource ');

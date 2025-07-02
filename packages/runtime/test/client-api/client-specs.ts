@@ -3,7 +3,7 @@ import { getSchema, schema } from '../test-schema';
 import { makePostgresClient, makeSqliteClient } from '../utils';
 import type { ClientContract } from '../../src';
 
-export function createClientSpecs(dbName: string, logQueries = false, providers = ['sqlite', 'postgresql'] as const) {
+export function createClientSpecs(dbName: string, logQueries = false, providers: string[] = ['sqlite', 'postgresql']) {
     const logger = (provider: string) => (event: LogEvent) => {
         if (event.level === 'query') {
             console.log(`query(${provider}):`, event.query.sql, event.query.parameters);

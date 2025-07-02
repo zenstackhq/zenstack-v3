@@ -34,7 +34,7 @@ jobs:
 
             - name: Bump version
               id: bump
-              run: pnpm run bump-version
+              run: npx tsx scripts/bump-version.ts
 
             - name: Create PR
               uses: peter-evans/create-pull-request@v7

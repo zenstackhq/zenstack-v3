@@ -81,7 +81,9 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
             }
 
             // proceed with the query with kysely interceptors
-            const result = await this.proceedQueryWithKyselyInterceptors(queryNode, compiledQuery.parameters, queryId);
+            // if the query is a raw query, we need to carry over the parameters
+            const queryParams = (compiledQuery as any).$raw ? compiledQuery.parameters : undefined;
+            const result = await this.proceedQueryWithKyselyInterceptors(queryNode, queryParams, queryId);
 
             // call after mutation hooks
             await this.callAfterQueryInterceptionFilters(result, queryNode, mutationInterceptionInfo);
@@ -98,7 +100,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
 
     private proceedQueryWithKyselyInterceptors(
         queryNode: RootOperationNode,
-        parameters: readonly unknown[],
+        parameters: readonly unknown[] | undefined,
         queryId: QueryId,
     ) {
         let proceed = (q: RootOperationNode) => this.proceedQuery(q, parameters, queryId);
@@ -129,10 +131,13 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         return proceed(queryNode);
     }
 
-    private async proceedQuery(query: RootOperationNode, parameters: readonly unknown[], queryId: QueryId) {
+    private async proceedQuery(query: RootOperationNode, parameters: readonly unknown[] | undefined, queryId: QueryId) {
         // run built-in transformers
         const finalQuery = this.nameMapper.transformNode(query);
-        const compiled: CompiledQuery = { ...this.compileQuery(finalQuery), parameters };
+        let compiled = this.compileQuery(finalQuery);
+        if (parameters) {
+            compiled = { ...compiled, parameters };
+        }
         try {
             return this.driver.txConnection
                 ? await super

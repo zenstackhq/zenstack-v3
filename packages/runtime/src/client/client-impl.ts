@@ -221,7 +221,7 @@ export class ClientImpl<Schema extends SchemaDef> {
 
     $executeRawUnsafe(query: string, ...values: any[]) {
         return createDeferredPromise(async () => {
-            const compiledQuery = CompiledQuery.raw(query, values);
+            const compiledQuery = this.createRawCompiledQuery(query, values);
             const result = await this.kysely.executeQuery(compiledQuery);
             return Number(result.numAffectedRows ?? 0);
         });
@@ -236,10 +236,15 @@ export class ClientImpl<Schema extends SchemaDef> {
 
     $queryRawUnsafe<T = unknown>(query: string, ...values: any[]) {
         return createDeferredPromise(async () => {
-            const compiledQuery = CompiledQuery.raw(query, values);
+            const compiledQuery = this.createRawCompiledQuery(query, values);
             const result = await this.kysely.executeQuery(compiledQuery);
             return result.rows as T;
         });
+    }
+
+    private createRawCompiledQuery(query: string, values: any[]) {
+        const q = CompiledQuery.raw(query, values);
+        return { ...q, $raw: true } as CompiledQuery;
     }
 }
 

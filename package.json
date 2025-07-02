@@ -1,6 +1,6 @@
 {
     "name": "zenstack-v3",
-    "version": "3.0.0-alpha.7",
+    "version": "3.0.0-alpha.8",
     "description": "ZenStack",
     "packageManager": "pnpm@10.12.1",
     "scripts": {
@@ -10,7 +10,8 @@
         "test": "turbo run test",
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
         "pr": "gh pr create --fill-first --base dev",
-        "bump-version": "npx tsx scripts/bump-version.ts",
+        "merge-main": "gh pr create --title \"merge dev to main\" --body \"\" --base main --head dev",
+        "bump-version": "gh workflow run .github/workflows/bump-version.yml --ref dev",
         "publish-all": "pnpm --filter \"./packages/**\" -r publish --access public --tag next",
         "publish-preview": "pnpm --filter \"./packages/**\" -r publish --tag next --force --registry https://preview.registry.zenstack.dev/",
         "unpublish-preview": "pnpm --filter \"./packages/**\" -r --shell-mode exec -- npm unpublish -f --registry https://preview.registry.zenstack.dev/ \"\\$PNPM_PACKAGE_NAME\""

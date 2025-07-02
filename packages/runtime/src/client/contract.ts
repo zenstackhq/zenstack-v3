@@ -41,6 +41,44 @@ export type ClientContract<Schema extends SchemaDef> = {
     readonly $options: ClientOptions<Schema>;
 
     /**
+     * Executes a prepared raw query and returns the number of affected rows.
+     * @example
+     * ```
+     * const result = await client.$executeRaw`UPDATE User SET cool = ${true} WHERE email = ${'user@email.com'};`
+     * ```
+     */
+    $executeRaw(query: TemplateStringsArray, ...values: any[]): Promise<number>;
+
+    /**
+     * Executes a raw query and returns the number of affected rows.
+     * This method is susceptible to SQL injections.
+     * @example
+     * ```
+     * const result = await client.$executeRawUnsafe('UPDATE User SET cool = $1 WHERE email = $2 ;', true, 'user@email.com')
+     * ```
+     */
+    $executeRawUnsafe(query: string, ...values: any[]): Promise<number>;
+
+    /**
+     * Performs a prepared raw query and returns the `SELECT` data.
+     * @example
+     * ```
+     * const result = await client.$queryRaw`SELECT * FROM User WHERE id = ${1} OR email = ${'user@email.com'};`
+     * ```
+     */
+    $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: any[]): Promise<T>;
+
+    /**
+     * Performs a raw query and returns the `SELECT` data.
+     * This method is susceptible to SQL injections.
+     * @example
+     * ```
+     * const result = await client.$queryRawUnsafe('SELECT * FROM User WHERE id = $1 OR email = $2;', 1, 'user@email.com')
+     * ```
+     */
+    $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): Promise<T>;
+
+    /**
      * The current user identity.
      */
     get $auth(): AuthType<Schema> | undefined;

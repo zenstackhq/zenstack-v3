@@ -81,7 +81,9 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
             }
 
             // proceed with the query with kysely interceptors
-            const result = await this.proceedQueryWithKyselyInterceptors(queryNode, queryId);
+            // if the query is a raw query, we need to carry over the parameters
+            const queryParams = (compiledQuery as any).$raw ? compiledQuery.parameters : undefined;
+            const result = await this.proceedQueryWithKyselyInterceptors(queryNode, queryParams, queryId);
 
             // call after mutation hooks
             await this.callAfterQueryInterceptionFilters(result, queryNode, mutationInterceptionInfo);
@@ -96,8 +98,12 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         return this.executeWithTransaction(task, !!mutationInterceptionInfo?.useTransactionForMutation);
     }
 
-    private proceedQueryWithKyselyInterceptors(queryNode: RootOperationNode, queryId: QueryId) {
-        let proceed = (q: RootOperationNode) => this.proceedQuery(q, queryId);
+    private proceedQueryWithKyselyInterceptors(
+        queryNode: RootOperationNode,
+        parameters: readonly unknown[] | undefined,
+        queryId: QueryId,
+    ) {
+        let proceed = (q: RootOperationNode) => this.proceedQuery(q, parameters, queryId);
 
         const makeTx = (p: typeof proceed) => (callback: OnKyselyQueryTransactionCallback) => {
             return this.executeWithTransaction(() => callback(p));
@@ -125,10 +131,13 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         return proceed(queryNode);
     }
 
-    private async proceedQuery(query: RootOperationNode, queryId: QueryId) {
+    private async proceedQuery(query: RootOperationNode, parameters: readonly unknown[] | undefined, queryId: QueryId) {
         // run built-in transformers
         const finalQuery = this.nameMapper.transformNode(query);
-        const compiled = this.compileQuery(finalQuery);
+        let compiled = this.compileQuery(finalQuery);
+        if (parameters) {
+            compiled = { ...compiled, parameters };
+        }
         try {
             return this.driver.txConnection
                 ? await super

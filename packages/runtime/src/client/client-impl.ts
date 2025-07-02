@@ -1,11 +1,13 @@
 import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import type { SqliteDialectConfig } from 'kysely';
 import {
+    CompiledQuery,
     DefaultConnectionProvider,
     DefaultQueryExecutor,
     Kysely,
     Log,
     PostgresDialect,
+    sql,
     SqliteDialect,
     type KyselyProps,
     type PostgresDialectConfig,
@@ -208,6 +210,41 @@ export class ClientImpl<Schema extends SchemaDef> {
 
     get $auth() {
         return this.auth;
+    }
+
+    $executeRaw(query: TemplateStringsArray, ...values: any[]) {
+        return createDeferredPromise(async () => {
+            const result = await sql(query, ...values).execute(this.kysely);
+            return Number(result.numAffectedRows ?? 0);
+        });
+    }
+
+    $executeRawUnsafe(query: string, ...values: any[]) {
+        return createDeferredPromise(async () => {
+            const compiledQuery = this.createRawCompiledQuery(query, values);
+            const result = await this.kysely.executeQuery(compiledQuery);
+            return Number(result.numAffectedRows ?? 0);
+        });
+    }
+
+    $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: any[]) {
+        return createDeferredPromise(async () => {
+            const result = await sql(query, ...values).execute(this.kysely);
+            return result.rows as T;
+        });
+    }
+
+    $queryRawUnsafe<T = unknown>(query: string, ...values: any[]) {
+        return createDeferredPromise(async () => {
+            const compiledQuery = this.createRawCompiledQuery(query, values);
+            const result = await this.kysely.executeQuery(compiledQuery);
+            return result.rows as T;
+        });
+    }
+
+    private createRawCompiledQuery(query: string, values: any[]) {
+        const q = CompiledQuery.raw(query, values);
+        return { ...q, $raw: true } as CompiledQuery;
     }
 }
 

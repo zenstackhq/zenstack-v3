@@ -1,43 +1,44 @@
-import path from 'node:path';
+import fs from 'node:fs';
 import { execPackage } from '../utils/exec-utils';
-import { getSchemaFile, handleSubProcessError } from './action-utils';
-import { run as runGenerate } from './generate';
+import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError } from './action-utils';
 
-type CommonOptions = {
+type Options = {
     schema?: string;
-    name?: string;
+    acceptDataLoss?: boolean;
+    forceReset?: boolean;
 };
 
 /**
  * CLI action for db related commands
  */
-export async function run(command: string, options: CommonOptions) {
-    const schemaFile = getSchemaFile(options.schema);
-
-    // run generate first
-    await runGenerate({
-        schema: schemaFile,
-        silent: true,
-    });
-
-    const prismaSchemaFile = path.join(path.dirname(schemaFile), 'schema.prisma');
-
+export async function run(command: string, options: Options) {
     switch (command) {
         case 'push':
-            await runPush(prismaSchemaFile, options);
+            await runPush(options);
             break;
     }
 }
 
-async function runPush(prismaSchemaFile: string, options: any) {
-    const cmd = `prisma db push --schema "${prismaSchemaFile}"${
-        options.acceptDataLoss ? ' --accept-data-loss' : ''
-    }${options.forceReset ? ' --force-reset' : ''} --skip-generate`;
+async function runPush(options: Options) {
+    // generate a temp prisma schema file
+    const schemaFile = getSchemaFile(options.schema);
+    const prismaSchemaFile = await generateTempPrismaSchema(schemaFile);
+
     try {
-        await execPackage(cmd, {
-            stdio: 'inherit',
-        });
-    } catch (err) {
-        handleSubProcessError(err);
+        // run prisma db push
+        const cmd = `prisma db push --schema "${prismaSchemaFile}"${
+            options.acceptDataLoss ? ' --accept-data-loss' : ''
+        }${options.forceReset ? ' --force-reset' : ''} --skip-generate`;
+        try {
+            await execPackage(cmd, {
+                stdio: 'inherit',
+            });
+        } catch (err) {
+            handleSubProcessError(err);
+        }
+    } finally {
+        if (fs.existsSync(prismaSchemaFile)) {
+            fs.unlinkSync(prismaSchemaFile);
+        }
     }
 }

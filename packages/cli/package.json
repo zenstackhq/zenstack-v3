@@ -3,7 +3,7 @@
     "publisher": "zenstack",
     "displayName": "ZenStack CLI",
     "description": "FullStack database toolkit with built-in access control and automatic API generation.",
-    "version": "3.0.0-alpha.6",
+    "version": "3.0.0-alpha.7",
     "type": "module",
     "author": {
         "name": "ZenStack Team"
@@ -28,9 +28,9 @@
         "pack": "pnpm pack"
     },
     "dependencies": {
+        "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
-        "@zenstackhq/common-helpers": "workspace:*",
         "colors": "1.4.0",
         "commander": "^8.3.0",
         "langium": "catalog:",
@@ -43,10 +43,12 @@
     },
     "devDependencies": {
         "@types/better-sqlite3": "^7.6.13",
+        "@types/tmp": "^0.2.6",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
         "@zenstackhq/testtools": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "better-sqlite3": "^11.8.1"
+        "better-sqlite3": "^11.8.1",
+        "tmp": "^0.2.3"
     }
 }

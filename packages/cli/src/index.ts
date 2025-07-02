@@ -49,6 +49,13 @@ export function createProgram() {
         .command('generate')
         .description('Run code generation.')
         .addOption(schemaOption)
+        .addOption(new Option('--silent', 'do not print any output'))
+        .addOption(
+            new Option(
+                '--save-prisma-schema [path]',
+                'save a Prisma schema file, by default into the output directory',
+            ),
+        )
         .addOption(new Option('-o, --output <path>', 'default output directory for core plugins'))
         .action(generateAction);
 

@@ -37,7 +37,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     abstract get provider(): DataSourceProviderType;
 
-    transformPrimitive(value: unknown, _type: BuiltinType) {
+    transformPrimitive(value: unknown, _type: BuiltinType, _forArrayField: boolean) {
         return value;
     }
 
@@ -363,7 +363,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 continue;
             }
 
-            const value = this.transformPrimitive(_value, fieldType);
+            const value = this.transformPrimitive(_value, fieldType, !!fieldDef.array);
 
             switch (key) {
                 case 'equals': {
@@ -437,7 +437,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     private buildLiteralFilter(eb: ExpressionBuilder<any, any>, lhs: Expression<any>, type: BuiltinType, rhs: unknown) {
-        return eb(lhs, '=', rhs !== null && rhs !== undefined ? this.transformPrimitive(rhs, type) : rhs);
+        return eb(lhs, '=', rhs !== null && rhs !== undefined ? this.transformPrimitive(rhs, type, false) : rhs);
     }
 
     private buildStandardFilter(
@@ -588,7 +588,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             type,
             payload,
             buildFieldRef(this.schema, model, field, this.options, eb),
-            (value) => this.transformPrimitive(value, type),
+            (value) => this.transformPrimitive(value, type, false),
             (value) => this.buildNumberFilter(eb, model, table, field, type, value),
         );
         return this.and(eb, ...conditions);
@@ -605,7 +605,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             'Boolean',
             payload,
             sql.ref(`${table}.${field}`),
-            (value) => this.transformPrimitive(value, 'Boolean'),
+            (value) => this.transformPrimitive(value, 'Boolean', false),
             (value) => this.buildBooleanFilter(eb, table, field, value as BooleanFilter<true>),
             true,
             ['equals', 'not'],
@@ -624,7 +624,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             'DateTime',
             payload,
             sql.ref(`${table}.${field}`),
-            (value) => this.transformPrimitive(value, 'DateTime'),
+            (value) => this.transformPrimitive(value, 'DateTime', false),
             (value) => this.buildDateTimeFilter(eb, table, field, value as DateTimeFilter<true>),
             true,
         );
@@ -642,7 +642,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             'Bytes',
             payload,
             sql.ref(`${table}.${field}`),
-            (value) => this.transformPrimitive(value, 'Bytes'),
+            (value) => this.transformPrimitive(value, 'Bytes', false),
             (value) => this.buildBytesFilter(eb, table, field, value as BytesFilter<true>),
             true,
             ['equals', 'in', 'notIn', 'not'],
@@ -793,11 +793,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     public true(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
-        return eb.lit<SqlBool>(this.transformPrimitive(true, 'Boolean') as boolean);
+        return eb.lit<SqlBool>(this.transformPrimitive(true, 'Boolean', false) as boolean);
     }
 
     public false(eb: ExpressionBuilder<any, any>): Expression<SqlBool> {
-        return eb.lit<SqlBool>(this.transformPrimitive(false, 'Boolean') as boolean);
+        return eb.lit<SqlBool>(this.transformPrimitive(false, 'Boolean', false) as boolean);
     }
 
     public isTrue(expression: Expression<SqlBool>) {

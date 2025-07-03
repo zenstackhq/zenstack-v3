@@ -25,13 +25,20 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         return 'postgresql' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType): unknown {
+    override transformPrimitive(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
         if (value === undefined) {
             return value;
         }
 
         if (Array.isArray(value)) {
-            return value.map((v) => this.transformPrimitive(v, type));
+            if (type === 'Json' && !forArrayField) {
+                // node-pg incorrectly handles array values passed to non-array JSON fields,
+                // the workaround is to JSON stringify the value
+                // https://github.com/brianc/node-postgres/issues/374
+                return JSON.stringify(value);
+            } else {
+                return value.map((v) => this.transformPrimitive(v, type, false));
+            }
         } else {
             return match(type)
                 .with('DateTime', () =>

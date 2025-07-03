@@ -275,7 +275,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private transformValue(value: unknown, type: BuiltinType) {
-        return ValueNode.create(this.dialect.transformPrimitive(value, type) ?? null);
+        return ValueNode.create(this.dialect.transformPrimitive(value, type, false) ?? null);
     }
 
     @expr('unary')

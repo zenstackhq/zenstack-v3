@@ -185,12 +185,16 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 invariant(item.kind === 'ValueNode', 'expecting a ValueNode');
                 result.push({
                     node: ValueNode.create(
-                        this.dialect.transformPrimitive((item as ValueNode).value, fieldDef.type as BuiltinType),
+                        this.dialect.transformPrimitive(
+                            (item as ValueNode).value,
+                            fieldDef.type as BuiltinType,
+                            !!fieldDef.array,
+                        ),
                     ),
                     raw: (item as ValueNode).value,
                 });
             } else {
-                const value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType);
+                const value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType, !!fieldDef.array);
                 if (Array.isArray(value)) {
                     result.push({
                         node: RawNode.createWithSql(this.dialect.buildArrayLiteralSQL(value)),

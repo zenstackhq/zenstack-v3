@@ -464,9 +464,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     Array.isArray(value.set)
                 ) {
                     // deal with nested "set" for scalar lists
-                    createFields[field] = this.dialect.transformPrimitive(value.set, fieldDef.type as BuiltinType);
+                    createFields[field] = this.dialect.transformPrimitive(
+                        value.set,
+                        fieldDef.type as BuiltinType,
+                        true,
+                    );
                 } else {
-                    createFields[field] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType);
+                    createFields[field] = this.dialect.transformPrimitive(
+                        value,
+                        fieldDef.type as BuiltinType,
+                        !!fieldDef.array,
+                    );
                 }
             } else {
                 const subM2M = getManyToManyRelation(this.schema, model, field);
@@ -788,7 +796,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             for (const [name, value] of Object.entries(item)) {
                 const fieldDef = this.requireField(model, name);
                 invariant(!fieldDef.relation, 'createMany does not support relations');
-                newItem[name] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType);
+                newItem[name] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType, !!fieldDef.array);
             }
             if (fromRelation) {
                 for (const { fk, pk } of relationKeyPairs) {
@@ -831,7 +839,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     }
                 } else if (fields[field]?.updatedAt) {
                     // TODO: should this work at kysely level instead?
-                    values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime');
+                    values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
                 }
             }
         }
@@ -934,7 +942,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (finalData === data) {
                     finalData = clone(data);
                 }
-                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime');
+                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
             }
         }
 
@@ -972,7 +980,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     continue;
                 }
 
-                updateFields[field] = this.dialect.transformPrimitive(finalData[field], fieldDef.type as BuiltinType);
+                updateFields[field] = this.dialect.transformPrimitive(
+                    finalData[field],
+                    fieldDef.type as BuiltinType,
+                    !!fieldDef.array,
+                );
             } else {
                 if (!allowRelationUpdate) {
                     throw new QueryError(`Relation update not allowed for field "${field}"`);
@@ -1054,7 +1066,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         );
 
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType);
+        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, false);
         const eb = expressionBuilder<any, any>();
         const fieldRef = buildFieldRef(this.schema, model, field, this.options, eb);
 
@@ -1077,7 +1089,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     ) {
         invariant(Object.keys(payload).length === 1, 'Only one of "set", "push" can be provided');
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType);
+        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, true);
         const eb = expressionBuilder<any, any>();
         const fieldRef = buildFieldRef(this.schema, model, field, this.options, eb);
 
@@ -1125,7 +1137,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             if (isRelationField(this.schema, model, field)) {
                 continue;
             }
-            updateFields[field] = this.dialect.transformPrimitive(data[field], fieldDef.type as BuiltinType);
+            updateFields[field] = this.dialect.transformPrimitive(
+                data[field],
+                fieldDef.type as BuiltinType,
+                !!fieldDef.array,
+            );
         }
 
         let query = kysely.updateTable(model).set(updateFields);

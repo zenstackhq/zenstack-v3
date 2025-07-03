@@ -39,6 +39,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 .with('DateTime', () => (value instanceof Date ? value.toISOString() : value))
                 .with('Decimal', () => (value as Decimal).toString())
                 .with('Bytes', () => Buffer.from(value as Uint8Array))
+                .with('Json', () => JSON.stringify(value))
                 .otherwise(() => value);
         }
     }

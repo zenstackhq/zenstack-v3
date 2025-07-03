@@ -695,7 +695,8 @@ export class TsSchemaGenerator {
             ? ts.factory.createStringLiteral(field.type.type)
             : field.type.reference
               ? ts.factory.createStringLiteral(field.type.reference.$refText)
-              : ts.factory.createStringLiteral('unknown');
+              : // `Unsupported` type
+                ts.factory.createStringLiteral('Unsupported');
     }
 
     private createEnumObject(e: Enum) {

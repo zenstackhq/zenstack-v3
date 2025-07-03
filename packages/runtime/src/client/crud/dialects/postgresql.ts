@@ -37,6 +37,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 .with('DateTime', () =>
                     value instanceof Date ? value : typeof value === 'string' ? new Date(value) : value,
                 )
+                .with('Decimal', () => (value !== null ? value.toString() : value))
                 .otherwise(() => value);
         }
     }

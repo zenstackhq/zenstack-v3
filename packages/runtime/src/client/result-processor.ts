@@ -90,6 +90,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
             .with('Bytes', () => this.transformBytes(value))
             .with('Decimal', () => this.transformDecimal(value))
             .with('BigInt', () => this.transformBigInt(value))
+            .with('Json', () => this.transformJson(value))
             .otherwise(() => value);
     }
 
@@ -155,5 +156,15 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 this.fixReversedResult(row[field], fieldDef.type as GetModels<Schema>, value);
             }
         }
+    }
+
+    private transformJson(value: unknown) {
+        return match(this.schema.provider.type)
+            .with('sqlite', () => {
+                // better-sqlite3 returns JSON as string
+                invariant(typeof value === 'string', 'Expected string, got ' + typeof value);
+                return JSON.parse(value as string);
+            })
+            .otherwise(() => value);
     }
 }

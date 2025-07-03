@@ -154,6 +154,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             .with('Decimal', () => 'decimal')
             .with('DateTime', () => 'timestamp')
             .with('Bytes', () => (this.schema.provider.type === 'postgresql' ? 'bytea' : 'blob'))
+            .with('Json', () => 'jsonb')
             .otherwise(() => {
                 throw new Error(`Unsupported field type: ${type}`);
             });

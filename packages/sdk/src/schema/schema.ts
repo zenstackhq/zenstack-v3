@@ -73,7 +73,17 @@ export type ProcedureDef = {
     mutation?: boolean;
 };
 
-export type BuiltinType = 'String' | 'Boolean' | 'Int' | 'Float' | 'BigInt' | 'Decimal' | 'DateTime' | 'Bytes';
+export type BuiltinType =
+    | 'String'
+    | 'Boolean'
+    | 'Int'
+    | 'Float'
+    | 'BigInt'
+    | 'Decimal'
+    | 'DateTime'
+    | 'Bytes'
+    | 'Json'
+    | 'Unsupported';
 
 export type MappedBuiltinType = string | boolean | number | bigint | Decimal | Date;
 

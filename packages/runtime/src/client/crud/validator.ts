@@ -379,15 +379,20 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean) {
-        return match(type)
-            .with('String', () => this.makeStringFilterSchema(optional))
-            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                this.makeNumberFilterSchema(this.makePrimitiveSchema(type), optional),
-            )
-            .with('Boolean', () => this.makeBooleanFilterSchema(optional))
-            .with('DateTime', () => this.makeDateTimeFilterSchema(optional))
-            .with('Bytes', () => this.makeBytesFilterSchema(optional))
-            .exhaustive();
+        return (
+            match(type)
+                .with('String', () => this.makeStringFilterSchema(optional))
+                .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
+                    this.makeNumberFilterSchema(this.makePrimitiveSchema(type), optional),
+                )
+                .with('Boolean', () => this.makeBooleanFilterSchema(optional))
+                .with('DateTime', () => this.makeDateTimeFilterSchema(optional))
+                .with('Bytes', () => this.makeBytesFilterSchema(optional))
+                // TODO: JSON filters
+                .with('Json', () => z.any())
+                .with('Unsupported', () => z.never())
+                .exhaustive()
+        );
     }
 
     private makeDateTimeFilterSchema(optional: boolean): ZodType {

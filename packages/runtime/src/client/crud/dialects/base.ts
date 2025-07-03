@@ -416,15 +416,24 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             return this.buildEnumFilter(eb, modelAlias, field, fieldDef, payload);
         }
 
-        return match(fieldDef.type as BuiltinType)
-            .with('String', () => this.buildStringFilter(eb, modelAlias, field, payload))
-            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                this.buildNumberFilter(eb, model, modelAlias, field, type, payload),
-            )
-            .with('Boolean', () => this.buildBooleanFilter(eb, modelAlias, field, payload))
-            .with('DateTime', () => this.buildDateTimeFilter(eb, modelAlias, field, payload))
-            .with('Bytes', () => this.buildBytesFilter(eb, modelAlias, field, payload))
-            .exhaustive();
+        return (
+            match(fieldDef.type as BuiltinType)
+                .with('String', () => this.buildStringFilter(eb, modelAlias, field, payload))
+                .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
+                    this.buildNumberFilter(eb, model, modelAlias, field, type, payload),
+                )
+                .with('Boolean', () => this.buildBooleanFilter(eb, modelAlias, field, payload))
+                .with('DateTime', () => this.buildDateTimeFilter(eb, modelAlias, field, payload))
+                .with('Bytes', () => this.buildBytesFilter(eb, modelAlias, field, payload))
+                // TODO: JSON filters
+                .with('Json', () => {
+                    throw new InternalError('JSON filters are not supported yet');
+                })
+                .with('Unsupported', () => {
+                    throw new QueryError(`Unsupported field cannot be used in filters`);
+                })
+                .exhaustive()
+        );
     }
 
     private buildLiteralFilter(eb: ExpressionBuilder<any, any>, lhs: Expression<any>, type: BuiltinType, rhs: unknown) {

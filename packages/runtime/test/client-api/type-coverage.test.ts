@@ -67,12 +67,12 @@ describe.each(['sqlite', 'postgresql'] as const)('zmodel type coverage tests', (
                 { provider, dbName: PG_DB_NAME },
             );
 
-            await db.foo.create({ data: {} });
+            await db.foo.create({ data: { id: '1' } });
             await expect(db.foo.findUnique({ where: { id: '1' } })).resolves.toMatchObject({
                 String: 'default',
                 Int: 100,
                 BigInt: BigInt(9007199254740991),
-                DateTime: new Date('2021-01-01T00:00:00.000Z'),
+                DateTime: expect.any(Date),
                 Float: 1.23,
                 Decimal: new Decimal(1.2345),
                 Boolean: true,

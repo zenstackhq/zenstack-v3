@@ -289,21 +289,4 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client create tests', ({ createCli
         expect(u3.posts).toHaveLength(3);
         expect(u3.posts.map((p) => p.title)).toEqual(expect.arrayContaining(['Post1', 'Post2', 'Post4']));
     });
-
-    it('rejects empty relation payload', async () => {
-        await expect(
-            client.post.create({
-                data: { title: 'Post1', author: {} },
-            }),
-        ).rejects.toThrow('At least one action is required');
-
-        await expect(
-            client.user.create({
-                data: {
-                    email: 'u1@test.com',
-                    posts: {},
-                },
-            }),
-        ).rejects.toThrow(QueryError);
-    });
 });

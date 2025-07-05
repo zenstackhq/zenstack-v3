@@ -633,8 +633,8 @@ export class InputValidator<Schema extends SchemaDef> {
         withoutFields: string[] = [],
         withoutRelationFields = false,
     ) {
-        const uncheckedVariantFields: any = {};
-        const checkedVariantFields: any = {};
+        const uncheckedVariantFields: Record<string, ZodType> = {};
+        const checkedVariantFields: Record<string, ZodType> = {};
         const modelDef = requireModel(this.schema, model);
         const hasRelation =
             !withoutRelationFields &&

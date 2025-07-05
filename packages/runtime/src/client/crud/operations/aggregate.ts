@@ -6,7 +6,11 @@ import { BaseOperationHandler } from './base';
 
 export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(_operation: 'aggregate', args: unknown | undefined) {
-        const validatedArgs = this.inputValidator.validateAggregateArgs(this.model, args);
+        // normalize args to strip `undefined` fields
+        const normalizeArgs = this.normalizeArgs(args);
+
+        // parse args
+        const parsedArgs = this.inputValidator.validateAggregateArgs(this.model, normalizeArgs);
 
         let query = this.kysely.selectFrom((eb) => {
             // nested query for filtering and pagination
@@ -15,11 +19,11 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
             let subQuery = eb
                 .selectFrom(this.model)
                 .selectAll(this.model as any) // TODO: check typing
-                .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, validatedArgs?.where));
+                .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, parsedArgs?.where));
 
             // skip & take
-            const skip = validatedArgs?.skip;
-            let take = validatedArgs?.take;
+            const skip = parsedArgs?.skip;
+            let take = parsedArgs?.take;
             let negateOrderBy = false;
             if (take !== undefined && take < 0) {
                 negateOrderBy = true;
@@ -32,7 +36,7 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
                 subQuery,
                 this.model,
                 this.model,
-                validatedArgs.orderBy,
+                parsedArgs.orderBy,
                 skip !== undefined || take !== undefined,
                 negateOrderBy,
             );
@@ -41,7 +45,7 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
         });
 
         // aggregations
-        for (const [key, value] of Object.entries(validatedArgs)) {
+        for (const [key, value] of Object.entries(parsedArgs)) {
             switch (key) {
                 case '_count': {
                     if (value === true) {

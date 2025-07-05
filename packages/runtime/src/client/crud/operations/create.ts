@@ -7,14 +7,17 @@ import { BaseOperationHandler } from './base';
 
 export class CreateOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(operation: 'create' | 'createMany' | 'createManyAndReturn', args: unknown | undefined) {
+        // normalize args to strip `undefined` fields
+        const normalizeArgs = this.normalizeArgs(args);
+
         return match(operation)
-            .with('create', () => this.runCreate(this.inputValidator.validateCreateArgs(this.model, args)))
+            .with('create', () => this.runCreate(this.inputValidator.validateCreateArgs(this.model, normalizeArgs)))
             .with('createMany', () => {
-                return this.runCreateMany(this.inputValidator.validateCreateManyArgs(this.model, args));
+                return this.runCreateMany(this.inputValidator.validateCreateManyArgs(this.model, normalizeArgs));
             })
             .with('createManyAndReturn', () => {
                 return this.runCreateManyAndReturn(
-                    this.inputValidator.validateCreateManyAndReturnArgs(this.model, args),
+                    this.inputValidator.validateCreateManyAndReturnArgs(this.model, normalizeArgs),
                 );
             })
             .exhaustive();

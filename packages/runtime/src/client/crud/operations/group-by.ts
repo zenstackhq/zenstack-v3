@@ -6,7 +6,11 @@ import { BaseOperationHandler } from './base';
 
 export class GroupByeOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(_operation: 'groupBy', args: unknown | undefined) {
-        const validatedArgs = this.inputValidator.validateGroupByArgs(this.model, args);
+        // normalize args to strip `undefined` fields
+        const normalizeArgs = this.normalizeArgs(args);
+
+        // parse args
+        const parsedArgs = this.inputValidator.validateGroupByArgs(this.model, normalizeArgs);
 
         let query = this.kysely.selectFrom((eb) => {
             // nested query for filtering and pagination
@@ -15,11 +19,11 @@ export class GroupByeOperationHandler<Schema extends SchemaDef> extends BaseOper
             let subQuery = eb
                 .selectFrom(this.model)
                 .selectAll()
-                .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, validatedArgs?.where));
+                .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, parsedArgs?.where));
 
             // skip & take
-            const skip = validatedArgs?.skip;
-            let take = validatedArgs?.take;
+            const skip = parsedArgs?.skip;
+            let take = parsedArgs?.take;
             let negateOrderBy = false;
             if (take !== undefined && take < 0) {
                 negateOrderBy = true;
@@ -40,17 +44,17 @@ export class GroupByeOperationHandler<Schema extends SchemaDef> extends BaseOper
             return subQuery.as('$sub');
         });
 
-        const bys = typeof validatedArgs.by === 'string' ? [validatedArgs.by] : (validatedArgs.by as string[]);
+        const bys = typeof parsedArgs.by === 'string' ? [parsedArgs.by] : (parsedArgs.by as string[]);
 
         query = query.groupBy(bys as any);
 
         // orderBy
-        if (validatedArgs.orderBy) {
-            query = this.dialect.buildOrderBy(query, this.model, '$sub', validatedArgs.orderBy, false, false);
+        if (parsedArgs.orderBy) {
+            query = this.dialect.buildOrderBy(query, this.model, '$sub', parsedArgs.orderBy, false, false);
         }
 
-        if (validatedArgs.having) {
-            query = query.having((eb1) => this.dialect.buildFilter(eb1, this.model, '$sub', validatedArgs.having));
+        if (parsedArgs.having) {
+            query = query.having((eb1) => this.dialect.buildFilter(eb1, this.model, '$sub', parsedArgs.having));
         }
 
         // select all by fields
@@ -59,7 +63,7 @@ export class GroupByeOperationHandler<Schema extends SchemaDef> extends BaseOper
         }
 
         // aggregations
-        for (const [key, value] of Object.entries(validatedArgs)) {
+        for (const [key, value] of Object.entries(parsedArgs)) {
             switch (key) {
                 case '_count': {
                     if (value === true) {

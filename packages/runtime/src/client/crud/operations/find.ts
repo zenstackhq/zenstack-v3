@@ -4,10 +4,13 @@ import { BaseOperationHandler, type CrudOperation } from './base';
 
 export class FindOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(operation: CrudOperation, args: unknown, validateArgs = true): Promise<unknown> {
+        // normalize args to strip `undefined` fields
+        const normalizeArgs = this.normalizeArgs(args);
+
         // parse args
         const parsedArgs = validateArgs
-            ? this.inputValidator.validateFindArgs(this.model, operation === 'findUnique', args)
-            : args;
+            ? this.inputValidator.validateFindArgs(this.model, operation === 'findUnique', normalizeArgs)
+            : normalizeArgs;
 
         // run query
         const result = await this.read(

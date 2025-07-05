@@ -15,6 +15,7 @@ import {
     buildJoinPairs,
     getIdFields,
     getManyToManyRelation,
+    isRelationField,
     requireField,
     requireModel,
 } from '../../query-utils';
@@ -216,10 +217,15 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             objArgs.push(
                 ...Object.entries(payload.select)
                     .filter(([, value]) => value)
-                    .map(([field]) => [
-                        sql.lit(field),
-                        buildFieldRef(this.schema, relationModel, field, this.options, eb),
-                    ])
+                    .map(([field]) => {
+                        const fieldDef = requireField(this.schema, relationModel, field);
+                        const fieldValue = fieldDef.relation
+                            ? // reference the synthesized JSON field
+                              eb.ref(`${parentName}$${relationField}$${field}.$j`)
+                            : // reference a plain field
+                              buildFieldRef(this.schema, relationModel, field, this.options, eb);
+                        return [sql.lit(field), fieldValue];
+                    })
                     .flatMap((v) => v),
             );
         }
@@ -229,7 +235,11 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             objArgs.push(
                 ...Object.entries<any>(payload.include)
                     .filter(([, value]) => value)
-                    .map(([field]) => [sql.lit(field), eb.ref(`${parentName}$${relationField}$${field}.$j`)])
+                    .map(([field]) => [
+                        sql.lit(field),
+                        // reference the synthesized JSON field
+                        eb.ref(`${parentName}$${relationField}$${field}.$j`),
+                    ])
                     .flatMap((v) => v),
             );
         }
@@ -237,19 +247,29 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
     }
 
     private buildRelationJoins(
-        model: string,
+        relationModel: string,
         relationField: string,
         qb: SelectQueryBuilder<any, any, any>,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>,
         parentName: string,
     ) {
         let result = qb;
-        if (typeof payload === 'object' && payload.include && typeof payload.include === 'object') {
-            Object.entries<any>(payload.include)
-                .filter(([, value]) => value)
-                .forEach(([field, value]) => {
-                    result = this.buildRelationJSON(model, result, field, `${parentName}$${relationField}`, value);
-                });
+        if (typeof payload === 'object') {
+            const selectInclude = payload.include ?? payload.select;
+            if (selectInclude && typeof selectInclude === 'object') {
+                Object.entries<any>(selectInclude)
+                    .filter(([, value]) => value)
+                    .filter(([field]) => isRelationField(this.schema, relationModel, field))
+                    .forEach(([field, value]) => {
+                        result = this.buildRelationJSON(
+                            relationModel,
+                            result,
+                            field,
+                            `${parentName}$${relationField}`,
+                            value,
+                        );
+                    });
+            }
         }
         return result;
     }

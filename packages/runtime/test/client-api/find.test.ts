@@ -843,6 +843,15 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
         await expect(
             client.user.findUnique({
                 where: { id: user1.id },
+                select: { id: true, _count: { select: { posts: { where: { published: true } } } } },
+            }),
+        ).resolves.toMatchObject({
+            _count: { posts: 1 },
+        });
+
+        await expect(
+            client.user.findUnique({
+                where: { id: user1.id },
                 select: {
                     _count: {
                         select: { posts: { where: { title: 'Post1' } } },

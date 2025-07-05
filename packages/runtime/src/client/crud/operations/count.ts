@@ -4,22 +4,26 @@ import { BaseOperationHandler } from './base';
 
 export class CountOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(_operation: 'count', args: unknown | undefined) {
-        const validatedArgs = this.inputValidator.validateCountArgs(this.model, args);
+        // normalize args to strip `undefined` fields
+        const normalizeArgs = this.normalizeArgs(args);
+
+        // parse args
+        const parsedArgs = this.inputValidator.validateCountArgs(this.model, normalizeArgs);
 
         let query = this.kysely.selectFrom((eb) => {
             // nested query for filtering and pagination
             let subQuery = eb
                 .selectFrom(this.model)
                 .selectAll()
-                .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, validatedArgs?.where));
-            subQuery = this.dialect.buildSkipTake(subQuery, validatedArgs?.skip, validatedArgs?.take);
+                .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, parsedArgs?.where));
+            subQuery = this.dialect.buildSkipTake(subQuery, parsedArgs?.skip, parsedArgs?.take);
             return subQuery.as('$sub');
         });
 
-        if (validatedArgs?.select && typeof validatedArgs.select === 'object') {
+        if (parsedArgs?.select && typeof parsedArgs.select === 'object') {
             // count with field selection
             query = query.select((eb) =>
-                Object.keys(validatedArgs.select!).map((key) =>
+                Object.keys(parsedArgs.select!).map((key) =>
                     key === '_all'
                         ? eb.cast(eb.fn.countAll(), 'integer').as('_all')
                         : eb.cast(eb.fn.count(sql.ref(`$sub.${key}`)), 'integer').as(key),

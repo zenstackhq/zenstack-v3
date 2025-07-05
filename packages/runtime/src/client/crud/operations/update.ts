@@ -7,13 +7,20 @@ import { BaseOperationHandler } from './base';
 
 export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(operation: 'update' | 'updateMany' | 'updateManyAndReturn' | 'upsert', args: unknown) {
+        // normalize args to strip `undefined` fields
+        const normalizeArgs = this.normalizeArgs(args);
+
         return match(operation)
-            .with('update', () => this.runUpdate(this.inputValidator.validateUpdateArgs(this.model, args)))
-            .with('updateMany', () => this.runUpdateMany(this.inputValidator.validateUpdateManyArgs(this.model, args)))
-            .with('updateManyAndReturn', () =>
-                this.runUpdateManyAndReturn(this.inputValidator.validateUpdateManyAndReturnArgs(this.model, args)),
+            .with('update', () => this.runUpdate(this.inputValidator.validateUpdateArgs(this.model, normalizeArgs)))
+            .with('updateMany', () =>
+                this.runUpdateMany(this.inputValidator.validateUpdateManyArgs(this.model, normalizeArgs)),
             )
-            .with('upsert', () => this.runUpsert(this.inputValidator.validateUpsertArgs(this.model, args)))
+            .with('updateManyAndReturn', () =>
+                this.runUpdateManyAndReturn(
+                    this.inputValidator.validateUpdateManyAndReturnArgs(this.model, normalizeArgs),
+                ),
+            )
+            .with('upsert', () => this.runUpsert(this.inputValidator.validateUpsertArgs(this.model, normalizeArgs)))
             .exhaustive();
     }
 

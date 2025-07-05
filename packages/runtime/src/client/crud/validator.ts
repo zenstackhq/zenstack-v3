@@ -21,6 +21,7 @@ import {
 } from '../crud-types';
 import { InternalError, QueryError } from '../errors';
 import { fieldHasDefaultValue, getEnum, getModel, getUniqueFields, requireField, requireModel } from '../query-utils';
+import { invariant } from '@zenstackhq/common-helpers';
 
 type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema>, options: Options) => ZodType;
 
@@ -298,10 +299,26 @@ export class InputValidator<Schema extends SchemaDef> {
                     fields[uniqueField.name] = z
                         .object(
                             Object.fromEntries(
-                                Object.entries(uniqueField.defs).map(([key, def]) => [
-                                    key,
-                                    this.makePrimitiveFilterSchema(def.type as BuiltinType, !!def.optional),
-                                ]),
+                                Object.entries(uniqueField.defs).map(([key, def]) => {
+                                    invariant(!def.relation, 'unique field cannot be a relation');
+                                    let fieldSchema: ZodType;
+                                    const enumDef = getEnum(this.schema, def.type);
+                                    if (enumDef) {
+                                        // enum
+                                        if (Object.keys(enumDef).length > 0) {
+                                            fieldSchema = this.makeEnumFilterSchema(enumDef, !!def.optional);
+                                        } else {
+                                            fieldSchema = z.never();
+                                        }
+                                    } else {
+                                        // regular field
+                                        fieldSchema = this.makePrimitiveFilterSchema(
+                                            def.type as BuiltinType,
+                                            !!def.optional,
+                                        );
+                                    }
+                                    return [key, fieldSchema];
+                                }),
                             ),
                         )
                         .optional();
@@ -796,10 +813,7 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         }
 
-        return z
-            .object(fields)
-            .strict()
-            .refine((v) => Object.keys(v).length > 0, 'At least one action is required');
+        return z.object(fields).strict();
     }
 
     private makeSetDataSchema(model: string, canBeArray: boolean) {

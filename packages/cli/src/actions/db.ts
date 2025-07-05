@@ -26,13 +26,16 @@ async function runPush(options: Options) {
 
     try {
         // run prisma db push
-        const cmd = `prisma db push --schema "${prismaSchemaFile}"${
-            options.acceptDataLoss ? ' --accept-data-loss' : ''
-        }${options.forceReset ? ' --force-reset' : ''} --skip-generate`;
+        const cmd = [
+            'prisma db push',
+            ` --schema "${prismaSchemaFile}"`,
+            options.acceptDataLoss && ' --accept-data-loss',
+            options.forceReset && ' --force-reset',
+            ' --skip-generate',
+        ].join('');
+
         try {
-            await execPackage(cmd, {
-                stdio: 'inherit',
-            });
+            await execPackage(cmd);
         } catch (err) {
             handleSubProcessError(err);
         }

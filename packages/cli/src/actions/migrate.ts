@@ -53,12 +53,15 @@ export async function run(command: string, options: CommonOptions) {
 
 async function runDev(prismaSchemaFile: string, options: DevOptions) {
     try {
-        await execPackage(
-            `prisma migrate dev --schema "${prismaSchemaFile}" --skip-generate${options.name ? ` --name ${options.name}` : ''}${options.createOnly ? ' --create-only' : ''}`,
-            {
-                stdio: 'inherit',
-            },
-        );
+        const cmd = [
+            'prisma migrate dev',
+            ` --schema "${prismaSchemaFile}"`,
+            ' --skip-generate',
+            options.name && ` --name ${options.name}`,
+            options.createOnly && ' --create-only',
+        ].join('');
+
+        await execPackage(cmd);
     } catch (err) {
         handleSubProcessError(err);
     }
@@ -66,9 +69,13 @@ async function runDev(prismaSchemaFile: string, options: DevOptions) {
 
 async function runReset(prismaSchemaFile: string, options: ResetOptions) {
     try {
-        await execPackage(`prisma migrate reset --schema "${prismaSchemaFile}"${options.force ? ' --force' : ''}`, {
-            stdio: 'inherit',
-        });
+        const cmd = [
+            'prisma migrate reset',
+            ` --schema "${prismaSchemaFile}"`,
+            options.force && ' --force',
+        ].join('');
+
+        await execPackage(cmd);
     } catch (err) {
         handleSubProcessError(err);
     }
@@ -76,9 +83,12 @@ async function runReset(prismaSchemaFile: string, options: ResetOptions) {
 
 async function runDeploy(prismaSchemaFile: string, _options: DeployOptions) {
     try {
-        await execPackage(`prisma migrate deploy --schema "${prismaSchemaFile}"`, {
-            stdio: 'inherit',
-        });
+        const cmd = [
+            'prisma migrate deploy',
+            ` --schema "${prismaSchemaFile}"`,
+        ].join('');
+
+        await execPackage(cmd);
     } catch (err) {
         handleSubProcessError(err);
     }

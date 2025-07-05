@@ -528,12 +528,9 @@ export type CreateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>
     omit?: OmitFields<Schema, Model>;
 };
 
-export type CreateManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = CreateManyPayload<
-    Schema,
-    Model
->;
+export type CreateManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = CreateManyInput<Schema, Model>;
 
-export type CreateManyAndReturnArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = CreateManyPayload<
+export type CreateManyAndReturnArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = CreateManyInput<
     Schema,
     Model
 > & {
@@ -597,14 +594,27 @@ type CreateRelationPayload<Schema extends SchemaDef, Model extends GetModels<Sch
     }
 >;
 
-type CreateWithFKInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = CreateScalarPayload<Schema, Model> &
-    CreateFKPayload<Schema, Model>;
+type CreateWithFKInput<Schema extends SchemaDef, Model extends GetModels<Schema>> =
+    // scalar fields
+    CreateScalarPayload<Schema, Model> &
+        // fk fields
+        CreateFKPayload<Schema, Model> &
+        // non-owned relations
+        CreateWithNonOwnedRelationPayload<Schema, Model>;
 
 type CreateWithRelationInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = CreateScalarPayload<
     Schema,
     Model
 > &
     CreateRelationPayload<Schema, Model>;
+
+type CreateWithNonOwnedRelationPayload<Schema extends SchemaDef, Model extends GetModels<Schema>> = OptionalWrap<
+    Schema,
+    Model,
+    {
+        [Key in NonOwnedRelationFields<Schema, Model>]: CreateRelationFieldPayload<Schema, Model, Key>;
+    }
+>;
 
 type ConnectOrCreatePayload<
     Schema extends SchemaDef,
@@ -615,7 +625,7 @@ type ConnectOrCreatePayload<
     create: CreateInput<Schema, Model, Without>;
 };
 
-export type CreateManyPayload<
+export type CreateManyInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Without extends string = never,
@@ -643,7 +653,7 @@ type NestedCreateManyInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>,
-> = CreateManyPayload<Schema, RelationFieldType<Schema, Model, Field>, OppositeRelationAndFK<Schema, Model, Field>>;
+> = CreateManyInput<Schema, RelationFieldType<Schema, Model, Field>, OppositeRelationAndFK<Schema, Model, Field>>;
 
 //#endregion
 
@@ -1076,5 +1086,15 @@ type NestedDeleteManyInput<
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>,
 > = OrArray<WhereInput<Schema, RelationFieldType<Schema, Model, Field>, true>>;
+
+// #endregion
+
+// #region Utilities
+
+type NonOwnedRelationFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
+    [Key in RelationFields<Schema, Model> as GetField<Schema, Model, Key>['relation'] extends { references: unknown[] }
+        ? never
+        : Key]: Key;
+};
 
 // #endregion

@@ -650,8 +650,8 @@ export class InputValidator<Schema extends SchemaDef> {
         withoutFields: string[] = [],
         withoutRelationFields = false,
     ) {
-        const regularAndFkFields: any = {};
-        const regularAndRelationFields: any = {};
+        const uncheckedVariantFields: Record<string, ZodType> = {};
+        const checkedVariantFields: Record<string, ZodType> = {};
         const modelDef = requireModel(this.schema, model);
         const hasRelation =
             !withoutRelationFields &&
@@ -705,7 +705,11 @@ export class InputValidator<Schema extends SchemaDef> {
                 if (fieldDef.optional && !fieldDef.array) {
                     fieldSchema = fieldSchema.nullable();
                 }
-                regularAndRelationFields[field] = fieldSchema;
+                checkedVariantFields[field] = fieldSchema;
+                if (fieldDef.array || !fieldDef.relation.references) {
+                    // non-owned relation
+                    uncheckedVariantFields[field] = fieldSchema;
+                }
             } else {
                 let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type);
 
@@ -728,21 +732,22 @@ export class InputValidator<Schema extends SchemaDef> {
                     fieldSchema = fieldSchema.nullable();
                 }
 
-                regularAndFkFields[field] = fieldSchema;
+                uncheckedVariantFields[field] = fieldSchema;
                 if (!fieldDef.foreignKeyFor) {
-                    regularAndRelationFields[field] = fieldSchema;
+                    // non-fk field
+                    checkedVariantFields[field] = fieldSchema;
                 }
             }
         });
 
         if (!hasRelation) {
-            return this.orArray(z.object(regularAndFkFields).strict(), canBeArray);
+            return this.orArray(z.object(uncheckedVariantFields).strict(), canBeArray);
         } else {
             return z.union([
-                z.object(regularAndFkFields).strict(),
-                z.object(regularAndRelationFields).strict(),
-                ...(canBeArray ? [z.array(z.object(regularAndFkFields).strict())] : []),
-                ...(canBeArray ? [z.array(z.object(regularAndRelationFields).strict())] : []),
+                z.object(uncheckedVariantFields).strict(),
+                z.object(checkedVariantFields).strict(),
+                ...(canBeArray ? [z.array(z.object(uncheckedVariantFields).strict())] : []),
+                ...(canBeArray ? [z.array(z.object(checkedVariantFields).strict())] : []),
             ]);
         }
     }

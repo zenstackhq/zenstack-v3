@@ -645,6 +645,56 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
             email: 'u1@test.com',
             createdAt: expect.any(Date),
         });
+
+        const r2 = await client.user.findUnique({
+            where: { id: user.id },
+            select: {
+                id: true,
+                posts: {
+                    select: {
+                        id: true,
+                        author: {
+                            select: { email: true },
+                        },
+                    },
+                },
+            },
+        });
+        expect(r2).toMatchObject({
+            id: user.id,
+            posts: expect.arrayContaining([
+                expect.objectContaining({
+                    id: expect.any(String),
+                    author: {
+                        email: 'u1@test.com',
+                    },
+                }),
+            ]),
+        });
+
+        const r3 = await client.user.findUnique({
+            where: { id: user.id },
+            include: {
+                posts: {
+                    include: {
+                        author: {
+                            select: { email: true },
+                        },
+                    },
+                },
+            },
+        });
+        expect(r3).toMatchObject({
+            id: user.id,
+            posts: expect.arrayContaining([
+                expect.objectContaining({
+                    id: expect.any(String),
+                    author: {
+                        email: 'u1@test.com',
+                    },
+                }),
+            ]),
+        });
     });
 
     it('allows field omission', async () => {
@@ -775,7 +825,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
         await expect(
             client.user.findUnique({
                 where: { id: user1.id },
-                select: { _count: true },
+                select: { id: true, _count: true },
             }),
         ).resolves.toMatchObject({
             _count: { posts: 2 },
@@ -784,7 +834,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
         await expect(
             client.user.findUnique({
                 where: { id: user1.id },
-                select: { _count: { select: { posts: true } } },
+                select: { id: true, _count: { select: { posts: true } } },
             }),
         ).resolves.toMatchObject({
             _count: { posts: 2 },

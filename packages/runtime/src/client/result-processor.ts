@@ -135,6 +135,10 @@ export class ResultProcessor<Schema extends SchemaDef> {
     }
 
     private fixReversedResult(data: any, model: GetModels<Schema>, args: any) {
+        if (!data) {
+            return;
+        }
+
         if (Array.isArray(data) && typeof args === 'object' && args && args.take !== undefined && args.take < 0) {
             data.reverse();
         }
@@ -150,7 +154,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                     continue;
                 }
                 const fieldDef = getField(this.schema, model, field);
-                if (!fieldDef?.relation) {
+                if (!fieldDef || !fieldDef.relation || !fieldDef.array) {
                     continue;
                 }
                 this.fixReversedResult(row[field], fieldDef.type as GetModels<Schema>, value);

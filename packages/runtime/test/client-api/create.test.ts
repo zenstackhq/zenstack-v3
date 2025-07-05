@@ -306,4 +306,33 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client create tests', ({ createCli
             }),
         ).rejects.toThrow(QueryError);
     });
+
+    it('complies with Prisma checked/unchecked typing', async () => {
+        const user = await client.user.create({
+            data: { email: 'u1@test.com' },
+        });
+
+        // fk and owned-relation are mutually exclusive
+        client.post.create({
+            // @ts-expect-error
+            data: {
+                authorId: user.id,
+                title: 'title',
+                author: { connect: { id: user.id } },
+            },
+        });
+
+        // fk can work with non-owned relation
+        await expect(
+            client.post.create({
+                data: {
+                    authorId: user.id,
+                    title: 'title',
+                    comments: {
+                        create: { content: 'comment' },
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+    });
 });

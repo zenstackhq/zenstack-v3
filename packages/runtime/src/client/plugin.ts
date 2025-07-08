@@ -37,11 +37,6 @@ export type MutationInterceptionFilterResult = {
     intercept: boolean;
 
     /**
-     * Whether to use a transaction for the mutation.
-     */
-    useTransactionForMutation?: boolean;
-
-    /**
      * Whether entities should be loaded before the mutation.
      */
     loadBeforeMutationEntity?: boolean;
@@ -97,7 +92,6 @@ export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
     client: ClientContract<Schema>;
     query: RootOperationNode;
     proceed: ProceedKyselyQueryFunction;
-    transaction: OnKyselyQueryTransaction;
 };
 
 export type ProceedKyselyQueryFunction = (query: RootOperationNode) => Promise<QueryResult<any>>;

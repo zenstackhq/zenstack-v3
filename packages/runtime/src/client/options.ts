@@ -47,6 +47,11 @@ export type ClientOptions<Schema extends SchemaDef> = {
      * Logging configuration.
      */
     log?: KyselyConfig['log'];
+
+    /**
+     * Debug mode.
+     */
+    debug?: boolean;
 } & (HasComputedFields<Schema> extends true
     ? {
           /**

@@ -29,7 +29,7 @@ import type { CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base';
 import { InternalError } from '../../client/errors';
-import type { OnKyselyQueryTransaction, ProceedKyselyQueryFunction } from '../../client/plugin';
+import type { ProceedKyselyQueryFunction } from '../../client/plugin';
 import { getIdFields, requireField, requireModel } from '../../client/query-utils';
 import { ExpressionUtils, type BuiltinType, type Expression, type GetModels, type SchemaDef } from '../../schema';
 import { ColumnCollector } from './column-collector';
@@ -54,9 +54,12 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return this.client.$qb;
     }
 
-    async handle(node: RootOperationNode, proceed: ProceedKyselyQueryFunction, transaction: OnKyselyQueryTransaction) {
+    async handle(
+        node: RootOperationNode,
+        proceed: ProceedKyselyQueryFunction /*, transaction: OnKyselyQueryTransaction*/,
+    ) {
         if (!this.isCrudQueryNode(node)) {
-            // non CRUD queries are not allowed
+            // non-CRUD queries are not allowed
             throw new RejectedByPolicyError(undefined, 'non-CRUD queries are not allowed');
         }
 
@@ -83,32 +86,49 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             return proceed(this.transformNode(node));
         }
 
-        let readBackError = false;
+        if (InsertQueryNode.is(node)) {
+            await this.enforcePreCreatePolicy(node, proceed);
+        }
+        const transformedNode = this.transformNode(node);
+        const result = await proceed(transformedNode);
 
-        // transform and post-process in a transaction
-        const result = await transaction(async (txProceed) => {
-            if (InsertQueryNode.is(node)) {
-                await this.enforcePreCreatePolicy(node, txProceed);
+        if (!this.onlyReturningId(node)) {
+            const readBackResult = await this.processReadBack(node, result, proceed);
+            if (readBackResult.rows.length !== result.rows.length) {
+                throw new RejectedByPolicyError(mutationModel, 'result is not allowed to be read back');
             }
-            const transformedNode = this.transformNode(node);
-            const result = await txProceed(transformedNode);
-
-            if (!this.onlyReturningId(node)) {
-                const readBackResult = await this.processReadBack(node, result, txProceed);
-                if (readBackResult.rows.length !== result.rows.length) {
-                    readBackError = true;
-                }
-                return readBackResult;
-            } else {
-                return result;
-            }
-        });
-
-        if (readBackError) {
-            throw new RejectedByPolicyError(mutationModel, 'result is not allowed to be read back');
+            return readBackResult;
+        } else {
+            return result;
         }
 
-        return result;
+        // TODO: run in transaction
+        //let readBackError = false;
+
+        // transform and post-process in a transaction
+        // const result = await transaction(async (txProceed) => {
+        //     if (InsertQueryNode.is(node)) {
+        //         await this.enforcePreCreatePolicy(node, txProceed);
+        //     }
+        //     const transformedNode = this.transformNode(node);
+        //     const result = await txProceed(transformedNode);
+
+        //     if (!this.onlyReturningId(node)) {
+        //         const readBackResult = await this.processReadBack(node, result, txProceed);
+        //         if (readBackResult.rows.length !== result.rows.length) {
+        //             readBackError = true;
+        //         }
+        //         return readBackResult;
+        //     } else {
+        //         return result;
+        //     }
+        // });
+
+        // if (readBackError) {
+        //     throw new RejectedByPolicyError(mutationModel, 'result is not allowed to be read back');
+        // }
+
+        // return result;
     }
 
     private onlyReturningId(node: MutationQueryNode) {

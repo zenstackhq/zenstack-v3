@@ -15,8 +15,8 @@ export class PolicyPlugin<Schema extends SchemaDef> implements RuntimePlugin<Sch
         return 'Enforces access policies defined in the schema.';
     }
 
-    onKyselyQuery({ query, client, proceed, transaction }: OnKyselyQueryArgs<Schema>) {
+    onKyselyQuery({ query, client, proceed /*, transaction*/ }: OnKyselyQueryArgs<Schema>) {
         const handler = new PolicyHandler<Schema>(client);
-        return handler.handle(query, proceed, transaction);
+        return handler.handle(query, proceed /*, transaction*/);
     }
 }

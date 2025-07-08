@@ -51,7 +51,10 @@
         - [x] Count
         - [x] Aggregate
         - [x] Group by
-    - [ ] Raw queries
+    - [x] Raw queries
+    - [ ] Transactions
+        - [x] Interactive transaction
+        - [ ] Batch transaction
     - [ ] Extensions
         - [x] Query builder API
         - [x] Computed fields
@@ -69,6 +72,8 @@
         - [x] Custom field name
         - [ ] Strict undefined checks
     - [ ] Benchmark
+- [ ] Plugin
+    - [ ] Post-mutation hooks should be called after transaction is committed
 - [ ] Polymorphism
 - [ ] Validation
 - [ ] Access Policy

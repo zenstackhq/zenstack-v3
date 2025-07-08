@@ -1,5 +1,5 @@
 import { lowerCaseFirst } from '@zenstackhq/common-helpers';
-import type { SqliteDialectConfig } from 'kysely';
+import type { QueryExecutor, SqliteDialectConfig } from 'kysely';
 import {
     CompiledQuery,
     DefaultConnectionProvider,
@@ -60,6 +60,7 @@ export class ClientImpl<Schema extends SchemaDef> {
         private readonly schema: Schema,
         private options: ClientOptions<Schema>,
         baseClient?: ClientImpl<Schema>,
+        executor?: QueryExecutor,
     ) {
         this.$schema = schema;
         this.$options = options ?? ({} as ClientOptions<Schema>);
@@ -73,22 +74,24 @@ export class ClientImpl<Schema extends SchemaDef> {
         if (baseClient) {
             this.kyselyProps = {
                 ...baseClient.kyselyProps,
-                executor: new ZenStackQueryExecutor(
-                    this,
-                    baseClient.kyselyProps.driver as ZenStackDriver,
-                    baseClient.kyselyProps.dialect.createQueryCompiler(),
-                    baseClient.kyselyProps.dialect.createAdapter(),
-                    new DefaultConnectionProvider(baseClient.kyselyProps.driver),
-                ),
+                executor:
+                    executor ??
+                    new ZenStackQueryExecutor(
+                        this,
+                        baseClient.kyselyProps.driver as ZenStackDriver,
+                        baseClient.kyselyProps.dialect.createQueryCompiler(),
+                        baseClient.kyselyProps.dialect.createAdapter(),
+                        new DefaultConnectionProvider(baseClient.kyselyProps.driver),
+                    ),
             };
             this.kyselyRaw = baseClient.kyselyRaw;
+            this.auth = baseClient.auth;
         } else {
             const dialect = this.getKyselyDialect();
             const driver = new ZenStackDriver(dialect.createDriver(), new Log(this.$options.log ?? []));
             const compiler = dialect.createQueryCompiler();
             const adapter = dialect.createAdapter();
             const connectionProvider = new DefaultConnectionProvider(driver);
-            const executor = new ZenStackQueryExecutor(this, driver, compiler, adapter, connectionProvider);
 
             this.kyselyProps = {
                 config: {
@@ -97,7 +100,7 @@ export class ClientImpl<Schema extends SchemaDef> {
                 },
                 dialect,
                 driver,
-                executor,
+                executor: executor ?? new ZenStackQueryExecutor(this, driver, compiler, adapter, connectionProvider),
             };
 
             // raw kysely instance with default executor
@@ -112,12 +115,19 @@ export class ClientImpl<Schema extends SchemaDef> {
         return createClientProxy(this);
     }
 
-    public get $qb() {
+    get $qb() {
         return this.kysely;
     }
 
-    public get $qbRaw() {
+    get $qbRaw() {
         return this.kyselyRaw;
+    }
+
+    /**
+     * Create a new client with a new query executor.
+     */
+    withExecutor(executor: QueryExecutor) {
+        return new ClientImpl(this.schema, this.$options, this, executor);
     }
 
     private getKyselyDialect() {
@@ -136,11 +146,17 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 
     async $transaction<T>(callback: (tx: ClientContract<Schema>) => Promise<T>): Promise<T> {
-        return this.kysely.transaction().execute((tx) => {
-            const txClient = new ClientImpl<Schema>(this.schema, this.$options);
-            txClient.kysely = tx;
-            return callback(txClient as unknown as ClientContract<Schema>);
-        });
+        if (this.kysely.isTransaction) {
+            // proceed directly if already in a transaction
+            return callback(this as unknown as ClientContract<Schema>);
+        } else {
+            // otherwise, create a new transaction, clone the client, and execute the callback
+            return this.kysely.transaction().execute((tx) => {
+                const txClient = new ClientImpl<Schema>(this.schema, this.$options);
+                txClient.kysely = tx;
+                return callback(txClient as unknown as ClientContract<Schema>);
+            });
+        }
     }
 
     get $procedures() {

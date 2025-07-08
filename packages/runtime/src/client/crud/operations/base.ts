@@ -6,10 +6,12 @@ import {
     ExpressionWrapper,
     sql,
     UpdateResult,
+    type IsolationLevel,
     type Expression as KyselyExpression,
     type SelectQueryBuilder,
 } from 'kysely';
 import { nanoid } from 'nanoid';
+import { inspect } from 'node:util';
 import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
@@ -203,7 +205,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             result = await query.execute();
         } catch (err) {
             const { sql, parameters } = query.compile();
-            throw new QueryError(`Failed to execute query: ${err}, sql: ${sql}, parameters: ${parameters}`);
+            let message = `Failed to execute query: ${err}, sql: ${sql}`;
+            if (this.options.debug) {
+                message += `, parameters: \n${parameters.map((p) => inspect(p)).join('\n')}`;
+            }
+            throw new QueryError(message, err);
         }
 
         if (inMemoryDistinct) {
@@ -1181,18 +1187,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'update' }));
 
-        try {
-            if (!returnData) {
-                const result = await query.executeTakeFirstOrThrow();
-                return { count: Number(result.numUpdatedRows) } as Result;
-            } else {
-                const idFields = getIdFields(this.schema, model);
-                const result = await query.returning(idFields as any).execute();
-                return result as Result;
-            }
-        } catch (err) {
-            const { sql, parameters } = query.compile();
-            throw new QueryError(`Error during updateMany: ${err}, sql: ${sql}, parameters: ${parameters}`);
+        if (!returnData) {
+            const result = await query.executeTakeFirstOrThrow();
+            return { count: Number(result.numUpdatedRows) } as Result;
+        } else {
+            const idFields = getIdFields(this.schema, model);
+            const result = await query.returning(idFields as any).execute();
+            return result as Result;
         }
     }
 
@@ -1900,11 +1901,20 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return returnRelation;
     }
 
-    protected async safeTransaction<T>(callback: (tx: ToKysely<Schema>) => Promise<T>) {
+    protected async safeTransaction<T>(
+        callback: (tx: ToKysely<Schema>) => Promise<T>,
+        isolationLevel?: IsolationLevel,
+    ) {
         if (this.kysely.isTransaction) {
+            // proceed directly if already in a transaction
             return callback(this.kysely);
         } else {
-            return this.kysely.transaction().setIsolationLevel('repeatable read').execute(callback);
+            // otherwise, create a new transaction and execute the callback
+            let txBuilder = this.kysely.transaction();
+            if (isolationLevel) {
+                txBuilder = txBuilder.setIsolationLevel(isolationLevel);
+            }
+            return txBuilder.execute(callback);
         }
     }
 

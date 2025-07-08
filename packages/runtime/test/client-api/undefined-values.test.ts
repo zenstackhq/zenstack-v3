@@ -6,40 +6,37 @@ import { createUser } from './utils';
 
 const PG_DB_NAME = 'client-api-undefined-values-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME, true))(
-    'Client undefined values tests for $provider',
-    ({ createClient }) => {
-        let client: ClientContract<typeof schema>;
+describe.each(createClientSpecs(PG_DB_NAME))('Client undefined values tests for $provider', ({ createClient }) => {
+    let client: ClientContract<typeof schema>;
 
-        beforeEach(async () => {
-            client = await createClient();
-        });
+    beforeEach(async () => {
+        client = await createClient();
+    });
 
-        afterEach(async () => {
-            await client?.$disconnect();
-        });
+    afterEach(async () => {
+        await client?.$disconnect();
+    });
 
-        it('works with toplevel undefined args', async () => {
-            await expect(client.user.findMany(undefined)).toResolveTruthy();
-        });
+    it('works with toplevel undefined args', async () => {
+        await expect(client.user.findMany(undefined)).toResolveTruthy();
+    });
 
-        it('ignored with undefined filter values', async () => {
-            const user = await createUser(client, 'u1@test.com');
-            await expect(
-                client.user.findFirst({
-                    where: {
-                        id: undefined,
-                    },
-                }),
-            ).resolves.toMatchObject(user);
+    it('ignored with undefined filter values', async () => {
+        const user = await createUser(client, 'u1@test.com');
+        await expect(
+            client.user.findFirst({
+                where: {
+                    id: undefined,
+                },
+            }),
+        ).resolves.toMatchObject(user);
 
-            await expect(
-                client.user.findFirst({
-                    where: {
-                        email: undefined,
-                    },
-                }),
-            ).resolves.toMatchObject(user);
-        });
-    },
-);
+        await expect(
+            client.user.findFirst({
+                where: {
+                    email: undefined,
+                },
+            }),
+        ).resolves.toMatchObject(user);
+    });
+});

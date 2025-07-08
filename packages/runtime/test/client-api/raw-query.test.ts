@@ -5,7 +5,7 @@ import { createClientSpecs } from './client-specs';
 
 const PG_DB_NAME = 'client-api-raw-query-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME, true))('Client raw query tests', ({ createClient, provider }) => {
+describe.each(createClientSpecs(PG_DB_NAME))('Client raw query tests', ({ createClient, provider }) => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {

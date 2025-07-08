@@ -17,7 +17,7 @@ export function getModel(schema: SchemaDef, model: string) {
 export function requireModel(schema: SchemaDef, model: string) {
     const matchedName = Object.keys(schema.models).find((k) => k.toLowerCase() === model.toLowerCase());
     if (!matchedName) {
-        throw new QueryError(`Model "${model}" not found`);
+        throw new QueryError(`Model "${model}" not found in schema`);
     }
     return schema.models[matchedName]!;
 }
@@ -164,7 +164,7 @@ export function buildFieldRef<Schema extends SchemaDef>(
             computer = computedFields?.[model]?.[field];
         }
         if (!computer) {
-            throw new QueryError(`Computed field "${field}" implementation not provided`);
+            throw new QueryError(`Computed field "${field}" implementation not provided for model "${model}"`);
         }
         return computer(eb);
     }

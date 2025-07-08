@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
@@ -19,9 +20,8 @@ import {
     type UpdateManyArgs,
     type UpsertArgs,
 } from '../crud-types';
-import { InternalError, QueryError } from '../errors';
+import { InputValidationError, InternalError, QueryError } from '../errors';
 import { fieldHasDefaultValue, getEnum, getModel, getUniqueFields, requireField, requireModel } from '../query-utils';
-import { invariant } from '@zenstackhq/common-helpers';
 
 type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema>, options: Options) => ZodType;
 
@@ -179,7 +179,7 @@ export class InputValidator<Schema extends SchemaDef> {
         }
         const { error } = schema.safeParse(args);
         if (error) {
-            throw new QueryError(`Invalid ${operation} args: ${error.message}`);
+            throw new InputValidationError(`Invalid ${operation} args: ${error.message}`, error);
         }
         return args as T;
     }
@@ -233,7 +233,7 @@ export class InputValidator<Schema extends SchemaDef> {
     private makeWhereSchema(model: string, unique: boolean, withoutRelationFields = false): ZodType {
         const modelDef = getModel(this.schema, model);
         if (!modelDef) {
-            throw new QueryError(`Model "${model}" not found`);
+            throw new QueryError(`Model "${model}" not found in schema`);
         }
 
         const fields: Record<string, any> = {};

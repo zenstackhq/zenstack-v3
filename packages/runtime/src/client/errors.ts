@@ -19,11 +19,7 @@ export class QueryError extends Error {
 /**
  * Error thrown when an internal error occurs.
  */
-export class InternalError extends Error {
-    constructor(message: string) {
-        super(message);
-    }
-}
+export class InternalError extends Error {}
 
 /**
  * Error thrown when an entity is not found.

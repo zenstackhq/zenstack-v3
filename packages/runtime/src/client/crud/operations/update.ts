@@ -8,19 +8,19 @@ import { BaseOperationHandler } from './base';
 export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(operation: 'update' | 'updateMany' | 'updateManyAndReturn' | 'upsert', args: unknown) {
         // normalize args to strip `undefined` fields
-        const normalizeArgs = this.normalizeArgs(args);
+        const normalizedArgs = this.normalizeArgs(args);
 
         return match(operation)
-            .with('update', () => this.runUpdate(this.inputValidator.validateUpdateArgs(this.model, normalizeArgs)))
+            .with('update', () => this.runUpdate(this.inputValidator.validateUpdateArgs(this.model, normalizedArgs)))
             .with('updateMany', () =>
-                this.runUpdateMany(this.inputValidator.validateUpdateManyArgs(this.model, normalizeArgs)),
+                this.runUpdateMany(this.inputValidator.validateUpdateManyArgs(this.model, normalizedArgs)),
             )
             .with('updateManyAndReturn', () =>
                 this.runUpdateManyAndReturn(
-                    this.inputValidator.validateUpdateManyAndReturnArgs(this.model, normalizeArgs),
+                    this.inputValidator.validateUpdateManyAndReturnArgs(this.model, normalizedArgs),
                 ),
             )
-            .with('upsert', () => this.runUpsert(this.inputValidator.validateUpsertArgs(this.model, normalizeArgs)))
+            .with('upsert', () => this.runUpsert(this.inputValidator.validateUpsertArgs(this.model, normalizedArgs)))
             .exhaustive();
     }
 

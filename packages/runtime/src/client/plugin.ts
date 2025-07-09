@@ -157,7 +157,7 @@ type OnQueryHooks<Schema extends SchemaDef = SchemaDef> = {
 type OnQueryOperationHooks<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Operation in keyof ModelOperations<Schema, Model>]?: (
         ctx: OnQueryHookContext<Schema, Model, Operation>,
-    ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
+    ) => Promise<Awaited<ReturnType<ModelOperations<Schema, Model>[Operation]>>>;
 } & {
     $allOperations?: (ctx: {
         model: Model;
@@ -192,11 +192,10 @@ type OnQueryHookContext<
      * It takes the same arguments as the operation method.
      *
      * @param args The query arguments.
-     * @param tx Optional transaction client to use for the query.
      */
     query: (
         args: Parameters<ModelOperations<Schema, Model>[Operation]>[0],
-        tx?: ClientContract<Schema>,
+        // tx?: ClientContract<Schema>,
     ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
 
     /**

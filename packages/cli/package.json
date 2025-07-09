@@ -18,6 +18,7 @@
         "data modeling"
     ],
     "bin": {
+        "zen": "bin/cli",
         "zenstack": "bin/cli"
     },
     "scripts": {

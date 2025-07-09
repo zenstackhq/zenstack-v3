@@ -54,7 +54,7 @@
     - [x] Raw queries
     - [ ] Transactions
         - [x] Interactive transaction
-        - [ ] Batch transaction
+        - [x] Sequential transaction
     - [ ] Extensions
         - [x] Query builder API
         - [x] Computed fields

@@ -1,7 +1,8 @@
 import type { Decimal } from 'decimal.js';
 import { type GetModels, type ProcedureDef, type SchemaDef } from '../schema';
 import type { AuthType } from '../schema/auth';
-import type { OrUndefinedIf } from '../utils/type-utils';
+import type { OrUndefinedIf, UnwrapTuplePromises } from '../utils/type-utils';
+import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
 import type {
     AggregateArgs,
     AggregateResult,
@@ -27,7 +28,21 @@ import type {
 } from './crud-types';
 import type { ClientOptions } from './options';
 import type { RuntimePlugin } from './plugin';
+import type { ZenStackPromise } from './promise';
 import type { ToKysely } from './query-builder';
+
+type TransactionUnsupportedMethods = (typeof TRANSACTION_UNSUPPORTED_METHODS)[number];
+
+/**
+ * Transaction isolation levels.
+ */
+export enum TransactionIsolationLevel {
+    ReadUncommitted = 'read uncommitted',
+    ReadCommitted = 'read committed',
+    RepeatableRead = 'repeatable read',
+    Serializable = 'serializable',
+    Snapshot = 'snapshot',
+}
 
 /**
  * ZenStack client interface.
@@ -47,7 +62,7 @@ export type ClientContract<Schema extends SchemaDef> = {
      * const result = await client.$executeRaw`UPDATE User SET cool = ${true} WHERE email = ${'user@email.com'};`
      * ```
      */
-    $executeRaw(query: TemplateStringsArray, ...values: any[]): Promise<number>;
+    $executeRaw(query: TemplateStringsArray, ...values: any[]): ZenStackPromise<Schema, number>;
 
     /**
      * Executes a raw query and returns the number of affected rows.
@@ -57,7 +72,7 @@ export type ClientContract<Schema extends SchemaDef> = {
      * const result = await client.$executeRawUnsafe('UPDATE User SET cool = $1 WHERE email = $2 ;', true, 'user@email.com')
      * ```
      */
-    $executeRawUnsafe(query: string, ...values: any[]): Promise<number>;
+    $executeRawUnsafe(query: string, ...values: any[]): ZenStackPromise<Schema, number>;
 
     /**
      * Performs a prepared raw query and returns the `SELECT` data.
@@ -66,7 +81,7 @@ export type ClientContract<Schema extends SchemaDef> = {
      * const result = await client.$queryRaw`SELECT * FROM User WHERE id = ${1} OR email = ${'user@email.com'};`
      * ```
      */
-    $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: any[]): Promise<T>;
+    $queryRaw<T = unknown>(query: TemplateStringsArray, ...values: any[]): ZenStackPromise<Schema, T>;
 
     /**
      * Performs a raw query and returns the `SELECT` data.
@@ -76,7 +91,7 @@ export type ClientContract<Schema extends SchemaDef> = {
      * const result = await client.$queryRawUnsafe('SELECT * FROM User WHERE id = $1 OR email = $2;', 1, 'user@email.com')
      * ```
      */
-    $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): Promise<T>;
+    $queryRawUnsafe<T = unknown>(query: string, ...values: any[]): ZenStackPromise<Schema, T>;
 
     /**
      * The current user identity.
@@ -99,9 +114,20 @@ export type ClientContract<Schema extends SchemaDef> = {
     readonly $qbRaw: ToKysely<any>;
 
     /**
-     * Starts a transaction.
+     * Starts an interactive transaction.
      */
-    $transaction<T>(callback: (tx: ClientContract<Schema>) => Promise<T>): Promise<T>;
+    $transaction<T>(
+        callback: (tx: Omit<ClientContract<Schema>, TransactionUnsupportedMethods>) => Promise<T>,
+        options?: { isolationLevel?: TransactionIsolationLevel },
+    ): Promise<T>;
+
+    /**
+     * Starts a sequential transaction.
+     */
+    $transaction<P extends ZenStackPromise<Schema, any>[]>(
+        arg: [...P],
+        options?: { isolationLevel?: TransactionIsolationLevel },
+    ): Promise<UnwrapTuplePromises<P>>;
 
     /**
      * Returns a new client with the specified plugin installed.
@@ -265,7 +291,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findMany<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
-    ): Promise<ModelResult<Schema, Model, T>[]>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>[]>;
 
     /**
      * Returns a uniquely identified entity.
@@ -275,7 +301,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findUnique<T extends FindUniqueArgs<Schema, Model>>(
         args?: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
-    ): Promise<ModelResult<Schema, Model, T> | null>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T> | null>;
 
     /**
      * Returns a uniquely identified entity or throws `NotFoundError` if not found.
@@ -285,7 +311,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findUniqueOrThrow<T extends FindUniqueArgs<Schema, Model>>(
         args?: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
-    ): Promise<ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
 
     /**
      * Returns the first entity.
@@ -295,7 +321,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findFirst<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
-    ): Promise<ModelResult<Schema, Model, T> | null>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T> | null>;
 
     /**
      * Returns the first entity or throws `NotFoundError` if not found.
@@ -305,7 +331,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findFirstOrThrow<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
-    ): Promise<ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
 
     /**
      * Creates a new entity.
@@ -361,7 +387,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     create<T extends CreateArgs<Schema, Model>>(
         args: SelectSubset<T, CreateArgs<Schema, Model>>,
-    ): Promise<ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
 
     /**
      * Creates multiple entities. Only scalar fields are allowed.
@@ -390,7 +416,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     createMany<T extends CreateManyArgs<Schema, Model>>(
         args?: SelectSubset<T, CreateManyArgs<Schema, Model>>,
-    ): Promise<BatchResult>;
+    ): ZenStackPromise<Schema, BatchResult>;
 
     /**
      * Creates multiple entities and returns them.
@@ -412,7 +438,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     createManyAndReturn<T extends CreateManyAndReturnArgs<Schema, Model>>(
         args?: SelectSubset<T, CreateManyAndReturnArgs<Schema, Model>>,
-    ): Promise<ModelResult<Schema, Model, T>[]>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>[]>;
 
     /**
      * Updates a uniquely identified entity.
@@ -533,7 +559,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     update<T extends UpdateArgs<Schema, Model>>(
         args: SelectSubset<T, UpdateArgs<Schema, Model>>,
-    ): Promise<ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
 
     /**
      * Updates multiple entities.
@@ -557,7 +583,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     updateMany<T extends UpdateManyArgs<Schema, Model>>(
         args: Subset<T, UpdateManyArgs<Schema, Model>>,
-    ): Promise<BatchResult>;
+    ): ZenStackPromise<Schema, BatchResult>;
 
     /**
      * Updates multiple entities and returns them.
@@ -583,7 +609,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     updateManyAndReturn<T extends UpdateManyAndReturnArgs<Schema, Model>>(
         args: Subset<T, UpdateManyAndReturnArgs<Schema, Model>>,
-    ): Promise<ModelResult<Schema, Model, T>[]>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>[]>;
 
     /**
      * Creates or updates an entity.
@@ -607,7 +633,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     upsert<T extends UpsertArgs<Schema, Model>>(
         args: SelectSubset<T, UpsertArgs<Schema, Model>>,
-    ): Promise<ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
 
     /**
      * Deletes a uniquely identifiable entity.
@@ -630,7 +656,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     delete<T extends DeleteArgs<Schema, Model>>(
         args: SelectSubset<T, DeleteArgs<Schema, Model>>,
-    ): Promise<ModelResult<Schema, Model>>;
+    ): ZenStackPromise<Schema, ModelResult<Schema, Model>>;
 
     /**
      * Deletes multiple entities.
@@ -653,7 +679,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     deleteMany<T extends DeleteManyArgs<Schema, Model>>(
         args?: Subset<T, DeleteManyArgs<Schema, Model>>,
-    ): Promise<BatchResult>;
+    ): ZenStackPromise<Schema, BatchResult>;
 
     /**
      * Counts rows or field values.
@@ -675,7 +701,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     count<T extends CountArgs<Schema, Model>>(
         args?: Subset<T, CountArgs<Schema, Model>>,
-    ): Promise<CountResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, CountResult<Schema, Model, T>>;
 
     /**
      * Aggregates rows.
@@ -696,7 +722,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     aggregate<T extends AggregateArgs<Schema, Model>>(
         args: Subset<T, AggregateArgs<Schema, Model>>,
-    ): Promise<AggregateResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, AggregateResult<Schema, Model, T>>;
 
     /**
      * Groups rows by columns.
@@ -732,7 +758,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     groupBy<T extends GroupByArgs<Schema, Model>>(
         args: Subset<T, GroupByArgs<Schema, Model>>,
-    ): Promise<GroupByResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, GroupByResult<Schema, Model, T>>;
 }
 
 //#endregion

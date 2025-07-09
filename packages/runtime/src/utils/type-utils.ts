@@ -68,3 +68,7 @@ export type PrependParameter<Param, Func> = Func extends (...args: any[]) => inf
     : never;
 
 export type OrUndefinedIf<T, Condition extends boolean> = Condition extends true ? T | undefined : T;
+
+export type UnwrapTuplePromises<T extends readonly unknown[]> = {
+    [K in keyof T]: Awaited<T[K]>;
+};

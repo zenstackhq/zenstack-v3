@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
@@ -19,7 +20,7 @@ import {
     type UpdateManyArgs,
     type UpsertArgs,
 } from '../crud-types';
-import { InternalError, QueryError } from '../errors';
+import { InputValidationError, InternalError, QueryError } from '../errors';
 import { fieldHasDefaultValue, getEnum, getModel, getUniqueFields, requireField, requireModel } from '../query-utils';
 
 type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema>, options: Options) => ZodType;
@@ -178,7 +179,7 @@ export class InputValidator<Schema extends SchemaDef> {
         }
         const { error } = schema.safeParse(args);
         if (error) {
-            throw new QueryError(`Invalid ${operation} args: ${error.message}`);
+            throw new InputValidationError(`Invalid ${operation} args: ${error.message}`, error);
         }
         return args as T;
     }
@@ -232,7 +233,7 @@ export class InputValidator<Schema extends SchemaDef> {
     private makeWhereSchema(model: string, unique: boolean, withoutRelationFields = false): ZodType {
         const modelDef = getModel(this.schema, model);
         if (!modelDef) {
-            throw new QueryError(`Model "${model}" not found`);
+            throw new QueryError(`Model "${model}" not found in schema`);
         }
 
         const fields: Record<string, any> = {};
@@ -298,10 +299,26 @@ export class InputValidator<Schema extends SchemaDef> {
                     fields[uniqueField.name] = z
                         .object(
                             Object.fromEntries(
-                                Object.entries(uniqueField.defs).map(([key, def]) => [
-                                    key,
-                                    this.makePrimitiveFilterSchema(def.type as BuiltinType, !!def.optional),
-                                ]),
+                                Object.entries(uniqueField.defs).map(([key, def]) => {
+                                    invariant(!def.relation, 'unique field cannot be a relation');
+                                    let fieldSchema: ZodType;
+                                    const enumDef = getEnum(this.schema, def.type);
+                                    if (enumDef) {
+                                        // enum
+                                        if (Object.keys(enumDef).length > 0) {
+                                            fieldSchema = this.makeEnumFilterSchema(enumDef, !!def.optional);
+                                        } else {
+                                            fieldSchema = z.never();
+                                        }
+                                    } else {
+                                        // regular field
+                                        fieldSchema = this.makePrimitiveFilterSchema(
+                                            def.type as BuiltinType,
+                                            !!def.optional,
+                                        );
+                                    }
+                                    return [key, fieldSchema];
+                                }),
                             ),
                         )
                         .optional();
@@ -379,15 +396,20 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean) {
-        return match(type)
-            .with('String', () => this.makeStringFilterSchema(optional))
-            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                this.makeNumberFilterSchema(this.makePrimitiveSchema(type), optional),
-            )
-            .with('Boolean', () => this.makeBooleanFilterSchema(optional))
-            .with('DateTime', () => this.makeDateTimeFilterSchema(optional))
-            .with('Bytes', () => this.makeBytesFilterSchema(optional))
-            .exhaustive();
+        return (
+            match(type)
+                .with('String', () => this.makeStringFilterSchema(optional))
+                .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
+                    this.makeNumberFilterSchema(this.makePrimitiveSchema(type), optional),
+                )
+                .with('Boolean', () => this.makeBooleanFilterSchema(optional))
+                .with('DateTime', () => this.makeDateTimeFilterSchema(optional))
+                .with('Bytes', () => this.makeBytesFilterSchema(optional))
+                // TODO: JSON filters
+                .with('Json', () => z.any())
+                .with('Unsupported', () => z.never())
+                .exhaustive()
+        );
     }
 
     private makeDateTimeFilterSchema(optional: boolean): ZodType {
@@ -628,8 +650,8 @@ export class InputValidator<Schema extends SchemaDef> {
         withoutFields: string[] = [],
         withoutRelationFields = false,
     ) {
-        const regularAndFkFields: any = {};
-        const regularAndRelationFields: any = {};
+        const uncheckedVariantFields: Record<string, ZodType> = {};
+        const checkedVariantFields: Record<string, ZodType> = {};
         const modelDef = requireModel(this.schema, model);
         const hasRelation =
             !withoutRelationFields &&
@@ -683,7 +705,11 @@ export class InputValidator<Schema extends SchemaDef> {
                 if (fieldDef.optional && !fieldDef.array) {
                     fieldSchema = fieldSchema.nullable();
                 }
-                regularAndRelationFields[field] = fieldSchema;
+                checkedVariantFields[field] = fieldSchema;
+                if (fieldDef.array || !fieldDef.relation.references) {
+                    // non-owned relation
+                    uncheckedVariantFields[field] = fieldSchema;
+                }
             } else {
                 let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type);
 
@@ -706,21 +732,22 @@ export class InputValidator<Schema extends SchemaDef> {
                     fieldSchema = fieldSchema.nullable();
                 }
 
-                regularAndFkFields[field] = fieldSchema;
+                uncheckedVariantFields[field] = fieldSchema;
                 if (!fieldDef.foreignKeyFor) {
-                    regularAndRelationFields[field] = fieldSchema;
+                    // non-fk field
+                    checkedVariantFields[field] = fieldSchema;
                 }
             }
         });
 
         if (!hasRelation) {
-            return this.orArray(z.object(regularAndFkFields).strict(), canBeArray);
+            return this.orArray(z.object(uncheckedVariantFields).strict(), canBeArray);
         } else {
             return z.union([
-                z.object(regularAndFkFields).strict(),
-                z.object(regularAndRelationFields).strict(),
-                ...(canBeArray ? [z.array(z.object(regularAndFkFields).strict())] : []),
-                ...(canBeArray ? [z.array(z.object(regularAndRelationFields).strict())] : []),
+                z.object(uncheckedVariantFields).strict(),
+                z.object(checkedVariantFields).strict(),
+                ...(canBeArray ? [z.array(z.object(uncheckedVariantFields).strict())] : []),
+                ...(canBeArray ? [z.array(z.object(checkedVariantFields).strict())] : []),
             ]);
         }
     }
@@ -791,10 +818,7 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         }
 
-        return z
-            .object(fields)
-            .strict()
-            .refine((v) => Object.keys(v).length > 0, 'At least one action is required');
+        return z.object(fields).strict();
     }
 
     private makeSetDataSchema(model: string, canBeArray: boolean) {

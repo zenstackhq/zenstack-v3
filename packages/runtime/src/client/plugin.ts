@@ -37,11 +37,6 @@ export type MutationInterceptionFilterResult = {
     intercept: boolean;
 
     /**
-     * Whether to use a transaction for the mutation.
-     */
-    useTransactionForMutation?: boolean;
-
-    /**
      * Whether entities should be loaded before the mutation.
      */
     loadBeforeMutationEntity?: boolean;
@@ -97,7 +92,6 @@ export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
     client: ClientContract<Schema>;
     query: RootOperationNode;
     proceed: ProceedKyselyQueryFunction;
-    transaction: OnKyselyQueryTransaction;
 };
 
 export type ProceedKyselyQueryFunction = (query: RootOperationNode) => Promise<QueryResult<any>>;
@@ -163,7 +157,7 @@ type OnQueryHooks<Schema extends SchemaDef = SchemaDef> = {
 type OnQueryOperationHooks<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Operation in keyof ModelOperations<Schema, Model>]?: (
         ctx: OnQueryHookContext<Schema, Model, Operation>,
-    ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
+    ) => Promise<Awaited<ReturnType<ModelOperations<Schema, Model>[Operation]>>>;
 } & {
     $allOperations?: (ctx: {
         model: Model;
@@ -198,11 +192,10 @@ type OnQueryHookContext<
      * It takes the same arguments as the operation method.
      *
      * @param args The query arguments.
-     * @param tx Optional transaction client to use for the query.
      */
     query: (
         args: Parameters<ModelOperations<Schema, Model>[Operation]>[0],
-        tx?: ClientContract<Schema>,
+        // tx?: ClientContract<Schema>,
     ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
 
     /**

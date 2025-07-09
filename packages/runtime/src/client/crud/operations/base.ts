@@ -1,16 +1,17 @@
 import { createId } from '@paralleldrive/cuid2';
-import { invariant } from '@zenstackhq/common-helpers';
+import { invariant, isPlainObject } from '@zenstackhq/common-helpers';
 import {
     DeleteResult,
     expressionBuilder,
     ExpressionWrapper,
     sql,
     UpdateResult,
-    type ExpressionBuilder,
+    type IsolationLevel,
     type Expression as KyselyExpression,
     type SelectQueryBuilder,
 } from 'kysely';
 import { nanoid } from 'nanoid';
+import { inspect } from 'node:util';
 import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
@@ -204,7 +205,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             result = await query.execute();
         } catch (err) {
             const { sql, parameters } = query.compile();
-            throw new QueryError(`Failed to execute query: ${err}, sql: ${sql}, parameters: ${parameters}`);
+            let message = `Failed to execute query: ${err}, sql: ${sql}`;
+            if (this.options.debug) {
+                message += `, parameters: \n${parameters.map((p) => inspect(p)).join('\n')}`;
+            }
+            throw new QueryError(message, err);
         }
 
         if (inMemoryDistinct) {
@@ -292,43 +297,34 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         for (const [field, value] of Object.entries(selections.select)) {
             const fieldDef = requireField(this.schema, model, field);
             const fieldModel = fieldDef.type;
-            const jointTable = `${parentAlias}$${field}$count`;
-            const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field, jointTable);
+            const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field, fieldModel);
 
-            query = query.leftJoin(
-                (eb) => {
-                    let result = eb.selectFrom(fieldModel).selectAll();
-                    if (
-                        value &&
-                        typeof value === 'object' &&
-                        'where' in value &&
-                        value.where &&
-                        typeof value.where === 'object'
-                    ) {
-                        const filter = this.dialect.buildFilter(eb, fieldModel, fieldModel, value.where);
-                        result = result.where(filter);
-                    }
-                    return result.as(jointTable);
-                },
-                (join) => {
-                    for (const [left, right] of joinPairs) {
-                        join = join.onRef(left, '=', right);
-                    }
-                    return join;
-                },
-            );
+            // build a nested query to count the number of records in the relation
+            let fieldCountQuery = eb.selectFrom(fieldModel).select(eb.fn.countAll().as(`_count$${field}`));
 
-            jsonObject[field] = this.countIdDistinct(eb, fieldDef.type, jointTable);
+            // join conditions
+            for (const [left, right] of joinPairs) {
+                fieldCountQuery = fieldCountQuery.whereRef(left, '=', right);
+            }
+
+            // merge _count filter
+            if (
+                value &&
+                typeof value === 'object' &&
+                'where' in value &&
+                value.where &&
+                typeof value.where === 'object'
+            ) {
+                const filter = this.dialect.buildFilter(eb, fieldModel, fieldModel, value.where);
+                fieldCountQuery = fieldCountQuery.where(filter);
+            }
+
+            jsonObject[field] = fieldCountQuery;
         }
 
         query = query.select((eb) => this.dialect.buildJsonObject(eb, jsonObject).as('_count'));
 
         return query;
-    }
-
-    private countIdDistinct(eb: ExpressionBuilder<any, any>, model: string, table: string) {
-        const idFields = getIdFields(this.schema, model);
-        return eb.fn.count(sql.join(idFields.map((f) => sql.ref(`${table}.${f}`)))).distinct();
     }
 
     private buildSelectAllScalarFields(
@@ -464,14 +460,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     Array.isArray(value.set)
                 ) {
                     // deal with nested "set" for scalar lists
-                    createFields[field] = this.dialect.transformPrimitive(value.set, fieldDef.type as BuiltinType);
+                    createFields[field] = this.dialect.transformPrimitive(
+                        value.set,
+                        fieldDef.type as BuiltinType,
+                        true,
+                    );
                 } else {
-                    createFields[field] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType);
+                    createFields[field] = this.dialect.transformPrimitive(
+                        value,
+                        fieldDef.type as BuiltinType,
+                        !!fieldDef.array,
+                    );
                 }
             } else {
                 const subM2M = getManyToManyRelation(this.schema, model, field);
                 if (!subM2M && fieldDef.relation?.fields && fieldDef.relation?.references) {
-                    const fkValues = await this.processOwnedRelation(kysely, fieldDef, value);
+                    const fkValues = await this.processOwnedRelationForCreate(kysely, fieldDef, value);
                     for (let i = 0; i < fieldDef.relation.fields.length; i++) {
                         createFields[fieldDef.relation.fields[i]!] = fkValues[fieldDef.relation.references[i]!];
                     }
@@ -511,7 +515,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (Object.keys(postCreateRelations).length > 0) {
             // process nested creates that need to happen after the current entity is created
             const relationPromises = Object.entries(postCreateRelations).map(([field, subPayload]) => {
-                return this.processNoneOwnedRelation(kysely, model, field, subPayload, createdEntity);
+                return this.processNoneOwnedRelationForCreate(kysely, model, field, subPayload, createdEntity);
             });
 
             // await relation creation
@@ -625,7 +629,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             .execute();
     }
 
-    private async processOwnedRelation(kysely: ToKysely<Schema>, relationField: FieldDef, payload: any) {
+    private async processOwnedRelationForCreate(kysely: ToKysely<Schema>, relationField: FieldDef, payload: any) {
         if (!payload) {
             return;
         }
@@ -688,7 +692,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return result;
     }
 
-    private processNoneOwnedRelation(
+    private processNoneOwnedRelationForCreate(
         kysely: ToKysely<Schema>,
         contextModel: GetModels<Schema>,
         relationFieldName: string,
@@ -698,6 +702,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const relationFieldDef = this.requireField(contextModel, relationFieldName);
         const relationModel = relationFieldDef.type as GetModels<Schema>;
         const tasks: Promise<unknown>[] = [];
+        const fromRelationContext = {
+            model: contextModel,
+            field: relationFieldName,
+            ids: parentEntity,
+        };
 
         for (const [action, subPayload] of Object.entries<any>(payload)) {
             if (!subPayload) {
@@ -708,11 +717,21 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     // create with a parent entity
                     tasks.push(
                         ...enumerate(subPayload).map((item) =>
-                            this.create(kysely, relationModel, item, {
-                                model: contextModel,
-                                field: relationFieldName,
-                                ids: parentEntity,
-                            }),
+                            this.create(kysely, relationModel, item, fromRelationContext),
+                        ),
+                    );
+                    break;
+                }
+
+                case 'createMany': {
+                    invariant(relationFieldDef.array, 'relation must be an array for createMany');
+                    tasks.push(
+                        this.createMany(
+                            kysely,
+                            relationModel,
+                            subPayload as { data: any; skipDuplicates: boolean },
+                            false,
+                            fromRelationContext,
                         ),
                     );
                     break;
@@ -768,6 +787,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         returnData: ReturnData,
         fromRelation?: FromRelationContext<Schema>,
     ): Promise<Result> {
+        if (!input.data || (Array.isArray(input.data) && input.data.length === 0)) {
+            // nothing todo
+            return returnData ? ([] as Result) : ({ count: 0 } as Result);
+        }
+
         const modelDef = this.requireModel(model);
 
         let relationKeyPairs: { fk: string; pk: string }[] = [];
@@ -788,7 +812,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             for (const [name, value] of Object.entries(item)) {
                 const fieldDef = this.requireField(model, name);
                 invariant(!fieldDef.relation, 'createMany does not support relations');
-                newItem[name] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType);
+                newItem[name] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType, !!fieldDef.array);
             }
             if (fromRelation) {
                 for (const { fk, pk } of relationKeyPairs) {
@@ -831,7 +855,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     }
                 } else if (fields[field]?.updatedAt) {
                     // TODO: should this work at kysely level instead?
-                    values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime');
+                    values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
                 }
             }
         }
@@ -934,7 +958,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (finalData === data) {
                     finalData = clone(data);
                 }
-                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime');
+                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
             }
         }
 
@@ -972,7 +996,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     continue;
                 }
 
-                updateFields[field] = this.dialect.transformPrimitive(finalData[field], fieldDef.type as BuiltinType);
+                updateFields[field] = this.dialect.transformPrimitive(
+                    finalData[field],
+                    fieldDef.type as BuiltinType,
+                    !!fieldDef.array,
+                );
             } else {
                 if (!allowRelationUpdate) {
                     throw new QueryError(`Relation update not allowed for field "${field}"`);
@@ -1054,7 +1082,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         );
 
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType);
+        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, false);
         const eb = expressionBuilder<any, any>();
         const fieldRef = buildFieldRef(this.schema, model, field, this.options, eb);
 
@@ -1077,7 +1105,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     ) {
         invariant(Object.keys(payload).length === 1, 'Only one of "set", "push" can be provided');
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType);
+        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, true);
         const eb = expressionBuilder<any, any>();
         const fieldRef = buildFieldRef(this.schema, model, field, this.options, eb);
 
@@ -1125,7 +1153,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             if (isRelationField(this.schema, model, field)) {
                 continue;
             }
-            updateFields[field] = this.dialect.transformPrimitive(data[field], fieldDef.type as BuiltinType);
+            updateFields[field] = this.dialect.transformPrimitive(
+                data[field],
+                fieldDef.type as BuiltinType,
+                !!fieldDef.array,
+            );
         }
 
         let query = kysely.updateTable(model).set(updateFields);
@@ -1155,18 +1187,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'update' }));
 
-        try {
-            if (!returnData) {
-                const result = await query.executeTakeFirstOrThrow();
-                return { count: Number(result.numUpdatedRows) } as Result;
-            } else {
-                const idFields = getIdFields(this.schema, model);
-                const result = await query.returning(idFields as any).execute();
-                return result as Result;
-            }
-        } catch (err) {
-            const { sql, parameters } = query.compile();
-            throw new QueryError(`Error during updateMany: ${err}, sql: ${sql}, parameters: ${parameters}`);
+        if (!returnData) {
+            const result = await query.executeTakeFirstOrThrow();
+            return { count: Number(result.numUpdatedRows) } as Result;
+        } else {
+            const idFields = getIdFields(this.schema, model);
+            const result = await query.returning(idFields as any).execute();
+            return result as Result;
         }
     }
 
@@ -1874,11 +1901,20 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return returnRelation;
     }
 
-    protected async safeTransaction<T>(callback: (tx: ToKysely<Schema>) => Promise<T>) {
+    protected async safeTransaction<T>(
+        callback: (tx: ToKysely<Schema>) => Promise<T>,
+        isolationLevel?: IsolationLevel,
+    ) {
         if (this.kysely.isTransaction) {
+            // proceed directly if already in a transaction
             return callback(this.kysely);
         } else {
-            return this.kysely.transaction().setIsolationLevel('repeatable read').execute(callback);
+            // otherwise, create a new transaction and execute the callback
+            let txBuilder = this.kysely.transaction();
+            if (isolationLevel) {
+                txBuilder = txBuilder.setIsolationLevel(isolationLevel);
+            }
+            return txBuilder.execute(callback);
         }
     }
 
@@ -1899,5 +1935,29 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return this.readUnique(kysely, model, {
             where: uniqueFilter,
         });
+    }
+
+    /**
+     * Normalize input args to strip `undefined` fields
+     */
+    protected normalizeArgs(args: unknown) {
+        if (!args) {
+            return;
+        }
+        const newArgs = clone(args);
+        this.doNormalizeArgs(newArgs);
+        return newArgs;
+    }
+
+    private doNormalizeArgs(args: unknown) {
+        if (args && typeof args === 'object') {
+            for (const [key, value] of Object.entries(args)) {
+                if (value === undefined) {
+                    delete args[key as keyof typeof args];
+                } else if (value && isPlainObject(value)) {
+                    this.doNormalizeArgs(value);
+                }
+            }
+        }
     }
 }

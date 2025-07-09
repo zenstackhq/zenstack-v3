@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/runtime",
-    "version": "3.0.0-alpha.8",
+    "version": "3.0.0-alpha.9",
     "description": "ZenStack Runtime",
     "type": "module",
     "scripts": {
@@ -27,16 +27,6 @@
             "require": {
                 "types": "./dist/index.d.cts",
                 "default": "./dist/index.cjs"
-            }
-        },
-        "./client": {
-            "import": {
-                "types": "./dist/client.d.ts",
-                "default": "./dist/client.js"
-            },
-            "require": {
-                "types": "./dist/client.d.cts",
-                "default": "./dist/client.cjs"
             }
         },
         "./schema": {

@@ -26,19 +26,20 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return 'sqlite' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType): unknown {
+    override transformPrimitive(value: unknown, type: BuiltinType, _forArrayField: boolean): unknown {
         if (value === undefined) {
             return value;
         }
 
         if (Array.isArray(value)) {
-            return value.map((v) => this.transformPrimitive(v, type));
+            return value.map((v) => this.transformPrimitive(v, type, false));
         } else {
             return match(type)
                 .with('Boolean', () => (value ? 1 : 0))
                 .with('DateTime', () => (value instanceof Date ? value.toISOString() : value))
                 .with('Decimal', () => (value as Decimal).toString())
                 .with('Bytes', () => Buffer.from(value as Uint8Array))
+                .with('Json', () => JSON.stringify(value))
                 .otherwise(() => value);
         }
     }

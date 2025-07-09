@@ -4,5 +4,6 @@ early_access: false
 reviews:
     auto_review:
         enabled: true
+    sequence_diagrams: false
 chat:
     auto_reply: true

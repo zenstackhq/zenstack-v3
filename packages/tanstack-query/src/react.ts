@@ -5,7 +5,7 @@ import type {
     UseQueryOptions,
     UseQueryResult,
 } from '@tanstack/react-query';
-import type { CreateArgs, FindArgs, ModelResult, SelectSubset } from '@zenstackhq/runtime/client';
+import type { CreateArgs, FindArgs, ModelResult, SelectSubset } from '@zenstackhq/runtime';
 import type { GetModels, SchemaDef } from '@zenstackhq/runtime/schema';
 
 export type toHooks<Schema extends SchemaDef> = {

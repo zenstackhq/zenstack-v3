@@ -1,6 +1,6 @@
 import SQLite from 'better-sqlite3';
 import { DeleteQueryNode, InsertQueryNode, UpdateQueryNode } from 'kysely';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ZenStackClient, type ClientContract } from '../../src';
 import { schema } from '../test-schema';
 
@@ -14,6 +14,10 @@ describe('Entity  lifecycle tests', () => {
             },
         });
         await _client.$pushSchema();
+    });
+
+    afterEach(async () => {
+        await _client?.$disconnect();
     });
 
     it('can intercept all mutations', async () => {
@@ -296,45 +300,39 @@ describe('Entity  lifecycle tests', () => {
         expect(post2Intercepted).toBe(true);
     });
 
-    // TODO: revisit mutation hooks and transactions
-    it.skip('proceeds with mutation even when hooks throw', async () => {
-        let userIntercepted = false;
+    // // TODO: revisit mutation hooks and transactions
+    // it.skip('proceeds with mutation even when hooks throw', async () => {
+    //     let userIntercepted = false;
 
-        const client = _client.$use({
-            id: 'test',
-            afterEntityMutation() {
-                userIntercepted = true;
-                throw new Error('trigger error');
-            },
-        });
+    //     const client = _client.$use({
+    //         id: 'test',
+    //         afterEntityMutation() {
+    //             userIntercepted = true;
+    //             throw new Error('trigger error');
+    //         },
+    //     });
 
-        let gotError = false;
-        try {
-            await client.user.create({
-                data: { email: 'u1@test.com' },
-            });
-        } catch (err) {
-            gotError = true;
-            expect((err as Error).message).toContain('trigger error');
-        }
+    //     let gotError = false;
+    //     try {
+    //         await client.user.create({
+    //             data: { email: 'u1@test.com' },
+    //         });
+    //     } catch (err) {
+    //         gotError = true;
+    //         expect((err as Error).message).toContain('trigger error');
+    //     }
 
-        expect(userIntercepted).toBe(true);
-        expect(gotError).toBe(true);
-        console.log(await client.user.findMany());
-        await expect(client.user.findMany()).toResolveWithLength(1);
-    });
+    //     expect(userIntercepted).toBe(true);
+    //     expect(gotError).toBe(true);
+    //     console.log(await client.user.findMany());
+    //     await expect(client.user.findMany()).toResolveWithLength(1);
+    // });
 
     it('rolls back when hooks throw if transaction is used', async () => {
         let userIntercepted = false;
 
         const client = _client.$use({
             id: 'test',
-            mutationInterceptionFilter: () => {
-                return {
-                    intercept: true,
-                    useTransactionForMutation: true,
-                };
-            },
             afterEntityMutation() {
                 userIntercepted = true;
                 throw new Error('trigger rollback');

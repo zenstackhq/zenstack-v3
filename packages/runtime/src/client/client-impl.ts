@@ -15,6 +15,7 @@ import {
 import { match } from 'ts-pattern';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
 import type { AuthType } from '../schema/auth';
+import type { UnwrapTuplePromises } from '../utils/type-utils';
 import type { ClientConstructor, ClientContract, ModelOperations, TransactionIsolationLevel } from './contract';
 import { AggregateOperationHandler } from './crud/operations/aggregate';
 import type { CrudOperation } from './crud/operations/base';
@@ -152,12 +153,15 @@ export class ClientImpl<Schema extends SchemaDef> {
     ): Promise<T>;
 
     // overload for sequential transaction
-    $transaction<P extends Promise<any>[]>(arg: [...P], options?: { isolationLevel?: TransactionIsolationLevel }): Promise<UnwrapTuplePromises<P>>;
+    $transaction<P extends ZenStackPromise<Schema, any>[]>(
+        arg: [...P],
+        options?: { isolationLevel?: TransactionIsolationLevel },
+    ): Promise<UnwrapTuplePromises<P>>;
 
     // implementation
     async $transaction(input: any, options?: { isolationLevel?: TransactionIsolationLevel }) {
         invariant(
-            typeof input === 'function' || (Array.isArray(input) && input.every((p) => p.then)),
+            typeof input === 'function' || (Array.isArray(input) && input.every((p) => p.then && p.cb)),
             'Invalid transaction input, expected a function or an array of ZenStackClient promises',
         );
         if (typeof input === 'function') {

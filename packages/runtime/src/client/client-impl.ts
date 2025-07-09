@@ -152,7 +152,7 @@ export class ClientImpl<Schema extends SchemaDef> {
     ): Promise<T>;
 
     // overload for sequential transaction
-    $transaction<P extends Promise<any>[]>(arg: [...P], options?: { isolationLevel?: TransactionIsolationLevel }): P;
+    $transaction<P extends Promise<any>[]>(arg: [...P], options?: { isolationLevel?: TransactionIsolationLevel }): Promise<UnwrapTuplePromises<P>>;
 
     // implementation
     async $transaction(input: any, options?: { isolationLevel?: TransactionIsolationLevel }) {

@@ -1,7 +1,7 @@
 import type { Decimal } from 'decimal.js';
 import { type GetModels, type ProcedureDef, type SchemaDef } from '../schema';
 import type { AuthType } from '../schema/auth';
-import type { OrUndefinedIf } from '../utils/type-utils';
+import type { OrUndefinedIf, UnwrapTuplePromises } from '../utils/type-utils';
 import type {
     AggregateArgs,
     AggregateResult,
@@ -28,6 +28,20 @@ import type {
 import type { ClientOptions } from './options';
 import type { RuntimePlugin } from './plugin';
 import type { ToKysely } from './query-builder';
+import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
+
+type TransactionUnsupportedMethods = (typeof TRANSACTION_UNSUPPORTED_METHODS)[number];
+
+/**
+ * Transaction isolation levels.
+ */
+export enum TransactionIsolationLevel {
+    ReadUncommitted = 'read uncommitted',
+    ReadCommitted = 'read committed',
+    RepeatableRead = 'repeatable read',
+    Serializable = 'serializable',
+    Snapshot = 'snapshot',
+}
 
 /**
  * ZenStack client interface.
@@ -99,9 +113,20 @@ export type ClientContract<Schema extends SchemaDef> = {
     readonly $qbRaw: ToKysely<any>;
 
     /**
-     * Starts a transaction.
+     * Starts an interactive transaction.
      */
-    $transaction<T>(callback: (tx: ClientContract<Schema>) => Promise<T>): Promise<T>;
+    $transaction<T>(
+        callback: (tx: Omit<ClientContract<Schema>, TransactionUnsupportedMethods>) => Promise<T>,
+        options?: { isolationLevel?: TransactionIsolationLevel },
+    ): Promise<T>;
+
+    /**
+     * Starts a sequential transaction.
+     */
+    $transaction<P extends Promise<any>[]>(
+        arg: [...P],
+        options?: { isolationLevel?: TransactionIsolationLevel },
+    ): Promise<UnwrapTuplePromises<P>>;
 
     /**
      * Returns a new client with the specified plugin installed.

@@ -124,6 +124,10 @@ export class ClientImpl<Schema extends SchemaDef> {
         return this.kyselyRaw;
     }
 
+    get isTransaction() {
+        return this.kysely.isTransaction;
+    }
+
     /**
      * Create a new client with a new query executor.
      */
@@ -162,7 +166,7 @@ export class ClientImpl<Schema extends SchemaDef> {
     async $transaction(input: any, options?: { isolationLevel?: TransactionIsolationLevel }) {
         invariant(
             typeof input === 'function' || (Array.isArray(input) && input.every((p) => p.then && p.cb)),
-            'Invalid transaction input, expected a function or an array of ZenStackClient promises',
+            'Invalid transaction input, expected a function or an array of ZenStackPromise',
         );
         if (typeof input === 'function') {
             return this.interactiveTransaction(input, options);

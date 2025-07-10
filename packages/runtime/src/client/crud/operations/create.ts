@@ -8,16 +8,16 @@ import { BaseOperationHandler } from './base';
 export class CreateOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(operation: 'create' | 'createMany' | 'createManyAndReturn', args: unknown | undefined) {
         // normalize args to strip `undefined` fields
-        const normalizeArgs = this.normalizeArgs(args);
+        const normalizedArgs = this.normalizeArgs(args);
 
         return match(operation)
-            .with('create', () => this.runCreate(this.inputValidator.validateCreateArgs(this.model, normalizeArgs)))
+            .with('create', () => this.runCreate(this.inputValidator.validateCreateArgs(this.model, normalizedArgs)))
             .with('createMany', () => {
-                return this.runCreateMany(this.inputValidator.validateCreateManyArgs(this.model, normalizeArgs));
+                return this.runCreateMany(this.inputValidator.validateCreateManyArgs(this.model, normalizedArgs));
             })
             .with('createManyAndReturn', () => {
                 return this.runCreateManyAndReturn(
-                    this.inputValidator.validateCreateManyAndReturnArgs(this.model, normalizeArgs),
+                    this.inputValidator.validateCreateManyAndReturnArgs(this.model, normalizedArgs),
                 );
             })
             .exhaustive();

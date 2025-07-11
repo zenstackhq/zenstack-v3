@@ -185,6 +185,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client update tests', ({ createCli
             });
 
             // fk and owned-relation are mutually exclusive
+            // TODO: @ts-expect-error
             client.post.update({
                 where: { id: '1' },
                 data: {

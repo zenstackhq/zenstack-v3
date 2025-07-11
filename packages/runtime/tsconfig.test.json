@@ -2,7 +2,8 @@
     "extends": "@zenstackhq/typescript-config/base.json",
     "compilerOptions": {
         "noEmit": true,
-        "noImplicitAny": false
+        "noImplicitAny": false,
+        "rootDir": "."
     },
     "include": ["test/**/*.ts"]
 }

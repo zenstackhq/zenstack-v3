@@ -7,12 +7,12 @@ import { BaseOperationHandler } from './base';
 export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(operation: 'delete' | 'deleteMany', args: unknown | undefined) {
         // normalize args to strip `undefined` fields
-        const normalizeArgs = this.normalizeArgs(args);
+        const normalizedArgs = this.normalizeArgs(args);
 
         return match(operation)
-            .with('delete', () => this.runDelete(this.inputValidator.validateDeleteArgs(this.model, normalizeArgs)))
+            .with('delete', () => this.runDelete(this.inputValidator.validateDeleteArgs(this.model, normalizedArgs)))
             .with('deleteMany', () =>
-                this.runDeleteMany(this.inputValidator.validateDeleteManyArgs(this.model, normalizeArgs)),
+                this.runDeleteMany(this.inputValidator.validateDeleteManyArgs(this.model, normalizedArgs)),
             )
             .exhaustive();
     }

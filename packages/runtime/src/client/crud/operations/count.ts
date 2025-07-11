@@ -5,10 +5,10 @@ import { BaseOperationHandler } from './base';
 export class CountOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(_operation: 'count', args: unknown | undefined) {
         // normalize args to strip `undefined` fields
-        const normalizeArgs = this.normalizeArgs(args);
+        const normalizedArgs = this.normalizeArgs(args);
 
         // parse args
-        const parsedArgs = this.inputValidator.validateCountArgs(this.model, normalizeArgs);
+        const parsedArgs = this.inputValidator.validateCountArgs(this.model, normalizedArgs);
 
         let query = this.kysely.selectFrom((eb) => {
             // nested query for filtering and pagination

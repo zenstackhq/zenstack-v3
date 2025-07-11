@@ -1,3 +1,4 @@
+import { findUp } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
@@ -11,6 +12,14 @@ export function getSchemaFile(file?: string) {
             throw new CliError(`Schema file not found: ${file}`);
         }
         return file;
+    }
+
+    const pkgJsonConfig = getPkgJsonConfig(process.cwd());
+    if (pkgJsonConfig.schema) {
+        if (!fs.existsSync(pkgJsonConfig.schema)) {
+            throw new CliError(`Schema file not found: ${pkgJsonConfig.schema}`);
+        }
+        return pkgJsonConfig.schema;
     }
 
     if (fs.existsSync('./zenstack/schema.zmodel')) {
@@ -50,4 +59,27 @@ export async function generateTempPrismaSchema(zmodelPath: string) {
     const prismaSchemaFile = path.resolve(path.dirname(zmodelPath), '~schema.prisma');
     fs.writeFileSync(prismaSchemaFile, prismaSchema);
     return prismaSchemaFile;
+}
+
+export function getPkgJsonConfig(startPath: string) {
+    const result: { schema: string | undefined; output: string | undefined } = { schema: undefined, output: undefined };
+    const pkgJsonFile = findUp(['package.json'], startPath, false);
+
+    if (!pkgJsonFile) {
+        return result;
+    }
+
+    let pkgJson: any = undefined;
+    try {
+        pkgJson = JSON.parse(fs.readFileSync(pkgJsonFile, 'utf8'));
+    } catch {
+        return result;
+    }
+
+    if (pkgJson.zenstack && typeof pkgJson.zenstack === 'object') {
+        result.schema = pkgJson.zenstack.schema && path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.schema);
+        result.output = pkgJson.zenstack.output && path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.output);
+    }
+
+    return result;
 }

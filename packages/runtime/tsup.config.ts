@@ -4,6 +4,7 @@ export default defineConfig({
     entry: {
         index: 'src/index.ts',
         schema: 'src/schema/index.ts',
+        helpers: 'src/helpers.ts',
         'plugins/policy': 'src/plugins/policy/index.ts',
     },
     outDir: 'dist',

@@ -158,6 +158,14 @@ export type ClientContract<Schema extends SchemaDef> = {
     [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<Schema, Key>;
 } & Procedures<Schema>;
 
+/**
+ * The contract for a client in a transaction.
+ */
+export type TransactionClientContract<Schema extends SchemaDef> = Omit<
+    ClientContract<Schema>,
+    TransactionUnsupportedMethods
+>;
+
 type _TypeMap = {
     String: string;
     Int: number;

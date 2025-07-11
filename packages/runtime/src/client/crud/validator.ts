@@ -2,7 +2,7 @@ import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
-import { z, ZodType } from 'zod/v4';
+import { z, ZodType } from 'zod';
 import type { BuiltinType, EnumDef, FieldDef, GetModels, SchemaDef } from '../../schema';
 import { NUMERIC_FIELD_TYPES } from '../constants';
 import {

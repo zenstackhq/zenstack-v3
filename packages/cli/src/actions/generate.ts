@@ -4,7 +4,7 @@ import { PrismaSchemaGenerator, TsSchemaGenerator, type CliGenerator } from '@ze
 import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
-import { getSchemaFile, loadSchemaDocument } from './action-utils';
+import { getPkgJsonConfig, getSchemaFile, loadSchemaDocument } from './action-utils';
 
 type Options = {
     schema?: string;
@@ -20,7 +20,7 @@ export async function run(options: Options) {
     const schemaFile = getSchemaFile(options.schema);
 
     const model = await loadSchemaDocument(schemaFile);
-    const outputPath = options.output ?? path.dirname(schemaFile);
+    const outputPath = getOutputPath(options, schemaFile);
 
     // generate TS schema
     const tsSchemaFile = path.join(outputPath, 'schema.ts');
@@ -52,6 +52,18 @@ const client = new ZenStackClient(schema, {
 });
 \`\`\`
 `);
+    }
+}
+
+function getOutputPath(options: Options, schemaFile: string) {
+    if (options.output) {
+        return options.output;
+    }
+    const pkgJsonConfig = getPkgJsonConfig(process.cwd());
+    if (pkgJsonConfig.output) {
+        return pkgJsonConfig.output;
+    } else {
+        return path.dirname(schemaFile);
     }
 }
 

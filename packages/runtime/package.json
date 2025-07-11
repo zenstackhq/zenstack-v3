@@ -39,6 +39,16 @@
                 "default": "./dist/schema.cjs"
             }
         },
+        "./helpers": {
+            "import": {
+                "types": "./dist/helpers.d.ts",
+                "default": "./dist/helpers.js"
+            },
+            "require": {
+                "types": "./dist/helpers.d.cts",
+                "default": "./dist/helpers.cjs"
+            }
+        },
         "./plugins/policy": {
             "import": {
                 "types": "./dist/plugins/policy.d.ts",
@@ -63,12 +73,12 @@
         "nanoid": "^5.0.9",
         "ts-pattern": "catalog:",
         "ulid": "^3.0.0",
-        "uuid": "^11.0.5"
+        "uuid": "^11.0.5",
+        "zod": "catalog:"
     },
     "peerDependencies": {
         "better-sqlite3": "^11.8.1",
-        "pg": "^8.13.1",
-        "zod": "catalog:"
+        "pg": "^8.13.1"
     },
     "peerDependenciesMeta": {
         "better-sqlite3": {

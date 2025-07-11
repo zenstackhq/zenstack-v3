@@ -331,9 +331,9 @@ export function getObjectLiteral<T>(expr: Expression | ConfigExpr | undefined): 
     return result as T;
 }
 
-export function getLiteralArray<
-    T extends string | number | boolean | any = any,
->(expr: Expression | ConfigExpr | undefined): T[] | undefined {
+export function getLiteralArray<T extends string | number | boolean | any = any>(
+    expr: Expression | ConfigExpr | undefined,
+): T[] | undefined {
     const arr = getArray(expr);
     if (!arr) {
         return undefined;

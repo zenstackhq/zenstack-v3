@@ -60,12 +60,14 @@ export function createProgram() {
         .action(generateAction);
 
     const migrateCommand = program.command('migrate').description('Update the database schema with migrations.');
+    const migrationsOption = new Option('--migrations <path>', 'path for migrations');
 
     migrateCommand
         .command('dev')
         .addOption(schemaOption)
         .addOption(new Option('-n, --name <name>', 'migration name'))
         .addOption(new Option('--create-only', 'only create migration, do not apply'))
+        .addOption(migrationsOption)
         .description('Create a migration from changes in schema and apply it to the database.')
         .action((options) => migrateAction('dev', options));
 
@@ -73,18 +75,21 @@ export function createProgram() {
         .command('reset')
         .addOption(schemaOption)
         .addOption(new Option('--force', 'skip the confirmation prompt'))
+        .addOption(migrationsOption)
         .description('Reset your database and apply all migrations, all data will be lost.')
         .action((options) => migrateAction('reset', options));
 
     migrateCommand
         .command('deploy')
         .addOption(schemaOption)
+        .addOption(migrationsOption)
         .description('Deploy your pending migrations to your production/staging database.')
         .action((options) => migrateAction('deploy', options));
 
     migrateCommand
         .command('status')
         .addOption(schemaOption)
+        .addOption(migrationsOption)
         .description('check the status of your database migrations.')
         .action((options) => migrateAction('status', options));
 

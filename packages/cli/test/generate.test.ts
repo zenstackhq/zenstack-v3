@@ -41,4 +41,19 @@ describe('CLI generate command test', () => {
         runCli('generate --save-prisma-schema "../prisma/schema.prisma"', workDir);
         expect(fs.existsSync(path.join(workDir, 'prisma/schema.prisma'))).toBe(true);
     });
+
+    it('should respect package.json config', () => {
+        const workDir = createProject(model);
+        fs.mkdirSync(path.join(workDir, 'foo'));
+        fs.renameSync(path.join(workDir, 'zenstack/schema.zmodel'), path.join(workDir, 'foo/schema.zmodel'));
+        fs.rmdirSync(path.join(workDir, 'zenstack'));
+        const pkgJson = JSON.parse(fs.readFileSync(path.join(workDir, 'package.json'), 'utf8'));
+        pkgJson.zenstack = {
+            schema: './foo/schema.zmodel',
+            output: './bar',
+        };
+        fs.writeFileSync(path.join(workDir, 'package.json'), JSON.stringify(pkgJson, null, 2));
+        runCli('generate', workDir);
+        expect(fs.existsSync(path.join(workDir, 'bar/schema.ts'))).toBe(true);
+    });
 });

@@ -25,8 +25,8 @@ catalogs:
       specifier: ^5.0.0
       version: 5.8.3
     zod:
-      specifier: ^3.25.67
-      version: 3.25.67
+      specifier: ^4.0.0
+      version: 4.0.5
 
 importers:
 
@@ -123,15 +123,6 @@ importers:
       better-sqlite3:
         specifier: ^11.8.1
         version: 11.8.1
-      tmp:
-        specifier: ^0.2.3
-        version: 0.2.3
-
-  packages/cli/test:
-    devDependencies:
-      '@types/tmp':
-        specifier: ^0.2.6
-        version: 0.2.6
       tmp:
         specifier: ^0.2.3
         version: 0.2.3
@@ -253,7 +244,7 @@ importers:
         version: 11.0.5
       zod:
         specifier: 'catalog:'
-        version: 3.25.67
+        version: 4.0.5
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.0.0
@@ -379,7 +370,7 @@ importers:
         version: 5.7.1
       zod:
         specifier: 'catalog:'
-        version: 3.25.67
+        version: 4.0.5
     devDependencies:
       '@zenstackhq/eslint-config':
         specifier: workspace:*
@@ -2518,8 +2509,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@3.25.67:
-    resolution: {integrity: sha512-idA2YXwpCdqUSKRCACDE6ItZD9TZzy3OZMtpfLoh6oPR47lipysRrJfjzMqFxQ3uJuUPyUeWe1r9vLH33xO/Qw==}
+  zod@4.0.5:
+    resolution: {integrity: sha512-/5UuuRPStvHXu7RS+gmvRf4NXrNxpSllGwDnCBcJZtQsKrviYXm54yDGV2KYNLT5kq0lHGcl7lqWJLgSaG+tgA==}
 
 snapshots:
 
@@ -4481,4 +4472,4 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod@3.25.67: {}
+  zod@4.0.5: {}

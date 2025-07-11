@@ -1,5 +1,5 @@
 import type { FieldType, GetModels, ScalarFields, SchemaDef } from '@zenstackhq/runtime/schema';
-import type { ZodBoolean, ZodNumber, ZodObject, ZodString, ZodUnknown } from 'zod/v4';
+import type { ZodBoolean, ZodNumber, ZodObject, ZodString, ZodUnknown } from 'zod';
 
 export type SelectSchema<Schema extends SchemaDef, Model extends GetModels<Schema>> = ZodObject<{
     [Key in ScalarFields<Schema, Model>]: MapScalarType<Schema, Model, Key>;

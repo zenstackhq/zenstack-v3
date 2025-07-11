@@ -1,6 +1,6 @@
 import type { FieldDef, GetModels, SchemaDef } from '@zenstackhq/runtime/schema';
 import { match, P } from 'ts-pattern';
-import { z, ZodType } from 'zod/v4';
+import { z, ZodType } from 'zod';
 import type { SelectSchema } from './types';
 
 export function makeSelectSchema<Schema extends SchemaDef, Model extends GetModels<Schema>>(

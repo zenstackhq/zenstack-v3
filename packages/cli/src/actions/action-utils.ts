@@ -60,7 +60,6 @@ export async function generateTempPrismaSchema(zmodelPath: string, folder?: stri
         folder = path.dirname(zmodelPath);
     }
     const prismaSchemaFile = path.resolve(folder, '~schema.prisma');
-    console.log('Writing prisma schema to:', prismaSchemaFile);
     fs.writeFileSync(prismaSchemaFile, prismaSchema);
     return prismaSchemaFile;
 }

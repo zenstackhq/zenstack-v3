@@ -28,7 +28,6 @@ export async function run(command: string, options: CommonOptions) {
     const schemaFile = getSchemaFile(options.schema);
     const prismaSchemaDir = options.migrations ? path.dirname(options.migrations) : undefined;
     const prismaSchemaFile = await generateTempPrismaSchema(schemaFile, prismaSchemaDir);
-    console.log('prisma schema file:', prismaSchemaFile);
 
     try {
         switch (command) {

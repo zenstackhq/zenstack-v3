@@ -26,7 +26,7 @@ export function findUp<Multiple extends boolean = false>(
 ): FindUpResult<Multiple> {
     if (!names.some((name) => !!name)) return undefined;
     const target = names.find((name) => fs.existsSync(path.join(cwd, name)));
-    if (multiple == false && target) return path.join(cwd, target) as FindUpResult<Multiple>;
+    if (multiple === false && target) return path.join(cwd, target) as FindUpResult<Multiple>;
     if (target) result.push(path.join(cwd, target));
     const up = path.resolve(cwd, '..');
     if (up === cwd) return (multiple && result.length > 0 ? result : undefined) as FindUpResult<Multiple>; // it'll fail anyway

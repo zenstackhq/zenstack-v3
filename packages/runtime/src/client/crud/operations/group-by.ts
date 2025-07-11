@@ -4,7 +4,7 @@ import type { SchemaDef } from '../../../schema';
 import { getField } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 
-export class GroupByeOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
+export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(_operation: 'groupBy', args: unknown | undefined) {
         // normalize args to strip `undefined` fields
         const normalizedArgs = this.normalizeArgs(args);

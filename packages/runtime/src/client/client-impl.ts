@@ -24,7 +24,7 @@ import { CountOperationHandler } from './crud/operations/count';
 import { CreateOperationHandler } from './crud/operations/create';
 import { DeleteOperationHandler } from './crud/operations/delete';
 import { FindOperationHandler } from './crud/operations/find';
-import { GroupByeOperationHandler } from './crud/operations/group-by';
+import { GroupByOperationHandler } from './crud/operations/group-by';
 import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/validator';
 import { NotFoundError, QueryError } from './errors';
@@ -504,7 +504,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         },
 
         groupBy: (args: unknown) => {
-            return createPromise('groupBy', args, new GroupByeOperationHandler(client, model, inputValidator));
+            return createPromise('groupBy', args, new GroupByOperationHandler(client, model, inputValidator));
         },
     } as ModelOperations<Schema, Model>;
 }

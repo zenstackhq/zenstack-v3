@@ -29,8 +29,8 @@ async function runPush(options: Options) {
         const cmd = [
             'prisma db push',
             ` --schema "${prismaSchemaFile}"`,
-            options.acceptDataLoss && ' --accept-data-loss',
-            options.forceReset && ' --force-reset',
+            options.acceptDataLoss ? ' --accept-data-loss' : '',
+            options.forceReset ? ' --force-reset' : '',
             ' --skip-generate',
         ].join('');
 

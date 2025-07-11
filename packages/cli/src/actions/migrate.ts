@@ -1,9 +1,11 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { execPackage } from '../utils/exec-utils';
 import { generateTempPrismaSchema, getSchemaFile } from './action-utils';
 
 type CommonOptions = {
     schema?: string;
+    migrations?: string;
 };
 
 type DevOptions = CommonOptions & {
@@ -24,7 +26,8 @@ type StatusOptions = CommonOptions;
  */
 export async function run(command: string, options: CommonOptions) {
     const schemaFile = getSchemaFile(options.schema);
-    const prismaSchemaFile = await generateTempPrismaSchema(schemaFile);
+    const prismaSchemaDir = options.migrations ? path.dirname(options.migrations) : undefined;
+    const prismaSchemaFile = await generateTempPrismaSchema(schemaFile, prismaSchemaDir);
 
     try {
         switch (command) {

@@ -53,10 +53,13 @@ export function handleSubProcessError(err: unknown) {
     }
 }
 
-export async function generateTempPrismaSchema(zmodelPath: string) {
+export async function generateTempPrismaSchema(zmodelPath: string, folder?: string) {
     const model = await loadSchemaDocument(zmodelPath);
     const prismaSchema = await new PrismaSchemaGenerator(model).generate();
-    const prismaSchemaFile = path.resolve(path.dirname(zmodelPath), '~schema.prisma');
+    if (!folder) {
+        folder = path.dirname(zmodelPath);
+    }
+    const prismaSchemaFile = path.resolve(folder, '~schema.prisma');
     fs.writeFileSync(prismaSchemaFile, prismaSchema);
     return prismaSchemaFile;
 }

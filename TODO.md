@@ -44,6 +44,7 @@
         - [x] Nested to-one
         - [x] Incremental update for numeric fields
         - [x] Array update
+        - [ ] Strict typing for checked/unchecked input
     - [x] Upsert
         - [ ] Implement with "on conflict"
     - [x] Delete

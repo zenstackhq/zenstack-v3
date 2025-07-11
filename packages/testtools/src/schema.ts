@@ -44,8 +44,7 @@ export async function generateTsSchema(
     const pluginModelFiles = glob.sync(path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel'));
 
     const generator = new TsSchemaGenerator();
-    const tsPath = path.join(workDir, 'schema.ts');
-    await generator.generate(zmodelPath, pluginModelFiles, tsPath);
+    await generator.generate(zmodelPath, pluginModelFiles, workDir);
 
     if (extraSourceFiles) {
         for (const [fileName, content] of Object.entries(extraSourceFiles)) {

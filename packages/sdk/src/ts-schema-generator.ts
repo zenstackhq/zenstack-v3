@@ -42,27 +42,29 @@ import { ModelUtils } from '.';
 import { getAttribute, getAuthDecl, hasAttribute, isIdField, isUniqueField } from './model-utils';
 
 export class TsSchemaGenerator {
-    public async generate(schemaFile: string, pluginModelFiles: string[], outputFile: string) {
+    public async generate(schemaFile: string, pluginModelFiles: string[], outputDir: string) {
         const loaded = await loadDocument(schemaFile, pluginModelFiles);
         if (!loaded.success) {
             throw new Error(`Error loading schema:${loaded.errors.join('\n')}`);
         }
 
-        const { model, warnings } = loaded;
+        const { model } = loaded;
+
+        fs.mkdirSync(outputDir, { recursive: true });
+
+        this.generateSchema(model, outputDir);
+        this.generateModels(model, outputDir);
+    }
+    private generateSchema(model: Model, outputDir: string) {
         const statements: ts.Statement[] = [];
-
         this.generateSchemaStatements(model, statements);
-
         this.generateBannerComments(statements);
 
-        const sourceFile = ts.createSourceFile(outputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
+        const schemaOutputFile = path.join(outputDir, 'schema.ts');
+        const sourceFile = ts.createSourceFile(schemaOutputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
         const printer = ts.createPrinter();
         const result = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(statements), sourceFile);
-
-        fs.mkdirSync(path.dirname(outputFile), { recursive: true });
-        fs.writeFileSync(outputFile, result);
-
-        return { model, warnings };
+        fs.writeFileSync(schemaOutputFile, result);
     }
 
     private generateSchemaStatements(model: Model, statements: ts.Statement[]) {
@@ -953,5 +955,104 @@ export class TsSchemaGenerator {
             .otherwise(() => {
                 throw new Error(`Unsupported literal type: ${type}`);
             });
+    }
+
+    private generateModels(model: Model, outputDir: string) {
+        const statements: ts.Statement[] = [];
+
+        // generate: import type { ModelResult } from '@zenstackhq/runtime';
+        statements.push(
+            ts.factory.createImportDeclaration(
+                undefined,
+                ts.factory.createImportClause(
+                    false,
+                    undefined,
+                    ts.factory.createNamedImports([
+                        ts.factory.createImportSpecifier(true, undefined, ts.factory.createIdentifier('ModelResult')),
+                    ]),
+                ),
+                ts.factory.createStringLiteral('@zenstackhq/runtime'),
+            ),
+        );
+
+        // generate: import { schema } from './schema';
+        statements.push(
+            ts.factory.createImportDeclaration(
+                undefined,
+                ts.factory.createImportClause(
+                    false,
+                    undefined,
+                    ts.factory.createNamedImports([
+                        ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('schema')),
+                    ]),
+                ),
+                ts.factory.createStringLiteral('./schema'),
+            ),
+        );
+
+        // generate: type Schema = typeof schema;
+        statements.push(
+            ts.factory.createTypeAliasDeclaration(
+                [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                'Schema',
+                undefined,
+                ts.factory.createTypeReferenceNode('typeof schema'),
+            ),
+        );
+
+        const dataModels = model.declarations.filter(isDataModel);
+        for (const dm of dataModels) {
+            // generate: export type Model = ModelResult<Schema, 'Model'>;
+            let modelType = ts.factory.createTypeAliasDeclaration(
+                [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                dm.name,
+                undefined,
+                ts.factory.createTypeReferenceNode('ModelResult', [
+                    ts.factory.createTypeReferenceNode('Schema'),
+                    ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(dm.name)),
+                ]),
+            );
+            if (dm.comments.length > 0) {
+                modelType = this.generateDocs(modelType, dm);
+            }
+            statements.push(modelType);
+        }
+
+        // generate enums
+        const enums = model.declarations.filter(isEnum);
+        for (const e of enums) {
+            // generate:
+            // export const enum Enum = {
+            //   value1 = 'value1',
+            //   value2 = 'value2',
+            // }
+            let enumDecl = ts.factory.createEnumDeclaration(
+                [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                e.name,
+                e.fields.map((f) => ts.factory.createEnumMember(f.name, ts.factory.createStringLiteral(f.name))),
+            );
+            if (e.comments.length > 0) {
+                enumDecl = this.generateDocs(enumDecl, e);
+            }
+            statements.push(enumDecl);
+        }
+
+        this.generateBannerComments(statements);
+
+        // write to file
+        const outputFile = path.join(outputDir, 'models.ts');
+        const sourceFile = ts.createSourceFile(outputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
+        const printer = ts.createPrinter();
+        const result = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(statements), sourceFile);
+        fs.writeFileSync(outputFile, result);
+    }
+
+    private generateDocs<T extends ts.TypeAliasDeclaration | ts.EnumDeclaration>(tsDecl: T, decl: DataModel | Enum): T {
+        return ts.addSyntheticLeadingComment(
+            tsDecl,
+            ts.SyntaxKind.MultiLineCommentTrivia,
+            `*\n * ${decl.comments.map((c) => c.replace(/^\s*\/*\s*/, '')).join('\n * ')}\n `,
+            true,
+        );
     }
 }

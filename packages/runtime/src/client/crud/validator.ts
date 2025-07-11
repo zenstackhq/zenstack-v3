@@ -924,8 +924,8 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeUpdateDataSchema(model: string, withoutFields: string[] = [], withoutRelationFields = false) {
-        const regularAndFkFields: any = {};
-        const regularAndRelationFields: any = {};
+        const uncheckedVariantFields: Record<string, ZodType> = {};
+        const checkedVariantFields: Record<string, ZodType> = {};
         const modelDef = requireModel(this.schema, model);
         const hasRelation = Object.entries(modelDef.fields).some(
             ([key, value]) => value.relation && !withoutFields.includes(key),
@@ -957,7 +957,11 @@ export class InputValidator<Schema extends SchemaDef> {
                 if (fieldDef.optional && !fieldDef.array) {
                     fieldSchema = fieldSchema.nullable();
                 }
-                regularAndRelationFields[field] = fieldSchema;
+                checkedVariantFields[field] = fieldSchema;
+                if (fieldDef.array || !fieldDef.relation.references) {
+                    // non-owned relation
+                    uncheckedVariantFields[field] = fieldSchema;
+                }
             } else {
                 let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type).optional();
 
@@ -1000,17 +1004,18 @@ export class InputValidator<Schema extends SchemaDef> {
                     fieldSchema = fieldSchema.nullable();
                 }
 
-                regularAndFkFields[field] = fieldSchema;
+                uncheckedVariantFields[field] = fieldSchema;
                 if (!fieldDef.foreignKeyFor) {
-                    regularAndRelationFields[field] = fieldSchema;
+                    // non-fk field
+                    checkedVariantFields[field] = fieldSchema;
                 }
             }
         });
 
         if (!hasRelation) {
-            return z.object(regularAndFkFields).strict();
+            return z.object(uncheckedVariantFields).strict();
         } else {
-            return z.union([z.object(regularAndFkFields).strict(), z.object(regularAndRelationFields).strict()]);
+            return z.union([z.object(uncheckedVariantFields).strict(), z.object(checkedVariantFields).strict()]);
         }
     }
 

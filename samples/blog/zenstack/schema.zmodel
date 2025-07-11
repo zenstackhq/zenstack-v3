@@ -3,11 +3,15 @@ datasource db {
     url = 'file:./dev.db'
 }
 
+/// User roles
 enum Role {
     ADMIN
     USER
 }
 
+/// User model
+///
+/// Represents a user of the blog.
 model User {
     id        String   @id @default(cuid())
     createdAt DateTime @default(now())
@@ -20,6 +24,7 @@ model User {
     profile   Profile?
 }
 
+/// Profile model
 model Profile {
     id     String  @id @default(cuid())
     bio    String?
@@ -28,6 +33,7 @@ model Profile {
     userId String? @unique
 }
 
+/// Post model
 model Post {
     id        String   @id @default(cuid())
     createdAt DateTime @default(now())

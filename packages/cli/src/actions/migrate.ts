@@ -94,7 +94,6 @@ async function runDeploy(prismaSchemaFile: string, _options: DeployOptions) {
 
 async function runStatus(prismaSchemaFile: string, _options: StatusOptions) {
     try {
-        console.log(`prisma migrate status --schema "${prismaSchemaFile}"`);
         await execPackage(`prisma migrate status --schema "${prismaSchemaFile}"`);
     } catch (err) {
         handleSubProcessError(err);

@@ -24,7 +24,7 @@ export async function run(options: Options) {
 
     // generate TS schema
     const tsSchemaFile = path.join(outputPath, 'schema.ts');
-    await new TsSchemaGenerator().generate(schemaFile, [], tsSchemaFile);
+    await new TsSchemaGenerator().generate(schemaFile, [], outputPath);
 
     await runPlugins(model, outputPath, tsSchemaFile);
 

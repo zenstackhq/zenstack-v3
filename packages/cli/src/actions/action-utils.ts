@@ -1,4 +1,3 @@
-import { findUp } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
@@ -85,4 +84,29 @@ export function getPkgJsonConfig(startPath: string) {
     }
 
     return result;
+}
+
+type FindUpResult<Multiple extends boolean> = Multiple extends true ? string[] | undefined : string | undefined;
+
+function findUp<Multiple extends boolean = false>(
+    names: string[],
+    cwd: string = process.cwd(),
+    multiple: Multiple = false as Multiple,
+    result: string[] = [],
+): FindUpResult<Multiple> {
+    if (!names.some((name) => !!name)) {
+        return undefined;
+    }
+    const target = names.find((name) => fs.existsSync(path.join(cwd, name)));
+    if (multiple === false && target) {
+        return path.join(cwd, target) as FindUpResult<Multiple>;
+    }
+    if (target) {
+        result.push(path.join(cwd, target));
+    }
+    const up = path.resolve(cwd, '..');
+    if (up === cwd) {
+        return (multiple && result.length > 0 ? result : undefined) as FindUpResult<Multiple>;
+    }
+    return findUp(names, up, multiple, result);
 }

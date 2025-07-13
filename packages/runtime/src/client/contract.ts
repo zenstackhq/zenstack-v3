@@ -1,7 +1,7 @@
 import type { Decimal } from 'decimal.js';
 import { type GetModels, type ProcedureDef, type SchemaDef } from '../schema';
 import type { AuthType } from '../schema/auth';
-import type { OrUndefinedIf, UnwrapTuplePromises } from '../utils/type-utils';
+import type { OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
 import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
 import type {
     AggregateArgs,
@@ -299,7 +299,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findMany<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>[]>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>>[]>;
 
     /**
      * Returns a uniquely identified entity.
@@ -309,7 +309,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findUnique<T extends FindUniqueArgs<Schema, Model>>(
         args?: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T> | null>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>> | null>;
 
     /**
      * Returns a uniquely identified entity or throws `NotFoundError` if not found.
@@ -319,7 +319,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findUniqueOrThrow<T extends FindUniqueArgs<Schema, Model>>(
         args?: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>>>;
 
     /**
      * Returns the first entity.
@@ -329,7 +329,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findFirst<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T> | null>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>> | null>;
 
     /**
      * Returns the first entity or throws `NotFoundError` if not found.
@@ -339,7 +339,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     findFirstOrThrow<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>>>;
 
     /**
      * Creates a new entity.
@@ -395,7 +395,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     create<T extends CreateArgs<Schema, Model>>(
         args: SelectSubset<T, CreateArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>>>;
 
     /**
      * Creates multiple entities. Only scalar fields are allowed.
@@ -446,7 +446,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     createManyAndReturn<T extends CreateManyAndReturnArgs<Schema, Model>>(
         args?: SelectSubset<T, CreateManyAndReturnArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>[]>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>>[]>;
 
     /**
      * Updates a uniquely identified entity.
@@ -567,7 +567,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     update<T extends UpdateArgs<Schema, Model>>(
         args: SelectSubset<T, UpdateArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>>>;
 
     /**
      * Updates multiple entities.
@@ -617,7 +617,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     updateManyAndReturn<T extends UpdateManyAndReturnArgs<Schema, Model>>(
         args: Subset<T, UpdateManyAndReturnArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>[]>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>>[]>;
 
     /**
      * Creates or updates an entity.
@@ -641,7 +641,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     upsert<T extends UpsertArgs<Schema, Model>>(
         args: SelectSubset<T, UpsertArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>>>;
 
     /**
      * Deletes a uniquely identifiable entity.
@@ -664,7 +664,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     delete<T extends DeleteArgs<Schema, Model>>(
         args: SelectSubset<T, DeleteArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, ModelResult<Schema, Model>>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model>>>;
 
     /**
      * Deletes multiple entities.
@@ -709,7 +709,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     count<T extends CountArgs<Schema, Model>>(
         args?: Subset<T, CountArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, CountResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, Simplify<CountResult<Schema, Model, T>>>;
 
     /**
      * Aggregates rows.
@@ -730,7 +730,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     aggregate<T extends AggregateArgs<Schema, Model>>(
         args: Subset<T, AggregateArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, AggregateResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, Simplify<AggregateResult<Schema, Model, T>>>;
 
     /**
      * Groups rows by columns.
@@ -766,7 +766,7 @@ export interface ModelOperations<Schema extends SchemaDef, Model extends GetMode
      */
     groupBy<T extends GroupByArgs<Schema, Model>>(
         args: Subset<T, GroupByArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, GroupByResult<Schema, Model, T>>;
+    ): ZenStackPromise<Schema, Simplify<GroupByResult<Schema, Model, T>>>;
 }
 
 //#endregion

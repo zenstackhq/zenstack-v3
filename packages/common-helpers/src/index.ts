@@ -1,4 +1,3 @@
-export * from './find-up';
 export * from './is-plain-object';
 export * from './lower-case-first';
 export * from './param-case';

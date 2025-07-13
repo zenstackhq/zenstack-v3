@@ -30,6 +30,7 @@ import type {
     NullableIf,
     Optional,
     OrArray,
+    Simplify,
     ValueOfPotentialTuple,
     WrapType,
     XOR,
@@ -77,13 +78,21 @@ type ModelSelectResult<Schema extends SchemaDef, Model extends GetModels<Schema>
                   RelationFieldType<Schema, Model, Key>,
                   FieldIsArray<Schema, Model, Key>
               >
-                ? ModelResult<
-                      Schema,
-                      RelationFieldType<Schema, Model, Key>,
-                      Select[Key],
-                      FieldIsOptional<Schema, Model, Key>,
-                      FieldIsArray<Schema, Model, Key>
-                  >
+                ? 'select' extends keyof Select[Key]
+                    ? ModelResult<
+                          Schema,
+                          RelationFieldType<Schema, Model, Key>,
+                          Pick<Select[Key], 'select'>,
+                          FieldIsOptional<Schema, Model, Key>,
+                          FieldIsArray<Schema, Model, Key>
+                      >
+                    : ModelResult<
+                          Schema,
+                          RelationFieldType<Schema, Model, Key>,
+                          Pick<Select[Key], 'include' | 'omit'>,
+                          FieldIsOptional<Schema, Model, Key>,
+                          FieldIsArray<Schema, Model, Key>
+                      >
                 : DefaultModelResult<
                       Schema,
                       RelationFieldType<Schema, Model, Key>,
@@ -149,6 +158,14 @@ export type ModelResult<
     Array
 >;
 
+export type SimplifiedModelResult<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Args extends SelectIncludeOmit<Schema, Model, boolean>,
+    Optional = false,
+    Array = false,
+> = Simplify<ModelResult<Schema, Model, Args, Optional, Array>>;
+
 export type BatchResult = { count: number };
 
 //#endregion
@@ -207,11 +224,13 @@ type PrimitiveFilter<T extends string, Nullable extends boolean> = T extends 'St
         ? BooleanFilter<Nullable>
         : T extends 'DateTime'
           ? DateTimeFilter<Nullable>
-          : T extends 'Json'
-            ? 'Not implemented yet' // TODO: Json filter
-            : never;
+          : T extends 'Bytes'
+            ? BytesFilter<Nullable>
+            : T extends 'Json'
+              ? 'Not implemented yet' // TODO: Json filter
+              : never;
 
-export type CommonPrimitiveFilter<DataType, T extends BuiltinType, Nullable extends boolean> = {
+type CommonPrimitiveFilter<DataType, T extends BuiltinType, Nullable extends boolean> = {
     equals?: NullableIf<DataType, Nullable>;
     in?: DataType[];
     notIn?: DataType[];
@@ -247,6 +266,7 @@ export type BytesFilter<Nullable extends boolean> =
           notIn?: Uint8Array[];
           not?: BytesFilter<Nullable>;
       };
+
 export type BooleanFilter<Nullable extends boolean> =
     | NullableIf<boolean, Nullable>
     | {
@@ -313,14 +333,14 @@ export type WhereUniqueInput<Schema extends SchemaDef, Model extends GetModels<S
     Extract<keyof GetModel<Schema, Model>['uniqueFields'], string>
 >;
 
-type OmitFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+export type OmitInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in NonRelationFields<Schema, Model>]?: true;
 };
 
 export type SelectIncludeOmit<Schema extends SchemaDef, Model extends GetModels<Schema>, AllowCount extends boolean> = {
-    select?: Select<Schema, Model, AllowCount, boolean>;
-    include?: Include<Schema, Model>;
-    omit?: OmitFields<Schema, Model>;
+    select?: SelectInput<Schema, Model, AllowCount, boolean>;
+    include?: IncludeInput<Schema, Model>;
+    omit?: OmitInput<Schema, Model>;
 };
 
 type Distinct<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
@@ -331,14 +351,14 @@ type Cursor<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     cursor?: WhereUniqueInput<Schema, Model>;
 };
 
-type Select<
+export type SelectInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    AllowCount extends boolean,
+    AllowCount extends boolean = true,
     AllowRelation extends boolean = true,
 > = {
     [Key in NonRelationFields<Schema, Model>]?: true;
-} & (AllowRelation extends true ? Include<Schema, Model> : {}) & // relation fields
+} & (AllowRelation extends true ? IncludeInput<Schema, Model> : {}) & // relation fields
     // relation count
     (AllowCount extends true ? { _count?: SelectCount<Schema, Model> } : {});
 
@@ -354,7 +374,7 @@ type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
           };
       };
 
-type Include<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+export type IncludeInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in RelationFields<Schema, Model>]?:
         | boolean
         | FindArgs<
@@ -423,7 +443,7 @@ type RelationFilter<
 
 //#region Field utils
 
-export type MapFieldType<
+type MapFieldType<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetFields<Schema, Model>,
@@ -435,7 +455,7 @@ type MapFieldDefType<Schema extends SchemaDef, T extends Pick<FieldDef, 'type' |
     T['array']
 >;
 
-export type OptionalFieldsForCreate<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
+type OptionalFieldsForCreate<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
     [Key in GetFields<Schema, Model> as FieldIsOptional<Schema, Model, Key> extends true
         ? Key
         : FieldHasDefault<Schema, Model, Key> extends true
@@ -467,14 +487,14 @@ type OppositeRelation<
             : never
         : never;
 
-export type OppositeRelationFields<
+type OppositeRelationFields<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetFields<Schema, Model>,
     Opposite = OppositeRelation<Schema, Model, Field>,
 > = Opposite extends RelationInfo ? (Opposite['fields'] extends string[] ? Opposite['fields'] : []) : [];
 
-export type OppositeRelationAndFK<
+type OppositeRelationAndFK<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetFields<Schema, Model>,
@@ -513,6 +533,9 @@ export type FindArgs<
     Distinct<Schema, Model> &
     Cursor<Schema, Model>;
 
+export type FindManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, true>;
+export type FindFirstArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, false>;
+
 export type FindUniqueArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     where?: WhereUniqueInput<Schema, Model>;
 } & SelectIncludeOmit<Schema, Model, true>;
@@ -523,9 +546,9 @@ export type FindUniqueArgs<Schema extends SchemaDef, Model extends GetModels<Sch
 
 export type CreateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     data: CreateInput<Schema, Model>;
-    select?: Select<Schema, Model, true>;
-    include?: Include<Schema, Model>;
-    omit?: OmitFields<Schema, Model>;
+    select?: SelectInput<Schema, Model, true>;
+    include?: IncludeInput<Schema, Model>;
+    omit?: OmitInput<Schema, Model>;
 };
 
 export type CreateManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = CreateManyInput<Schema, Model>;
@@ -534,8 +557,8 @@ export type CreateManyAndReturnArgs<Schema extends SchemaDef, Model extends GetM
     Schema,
     Model
 > & {
-    select?: Select<Schema, Model, false, false>;
-    omit?: OmitFields<Schema, Model>;
+    select?: SelectInput<Schema, Model, false, false>;
+    omit?: OmitInput<Schema, Model>;
 };
 
 type OptionalWrap<Schema extends SchemaDef, Model extends GetModels<Schema>, T extends object> = Optional<
@@ -625,20 +648,15 @@ type ConnectOrCreatePayload<
     create: CreateInput<Schema, Model, Without>;
 };
 
-export type CreateManyInput<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Without extends string = never,
-> = {
+type CreateManyInput<Schema extends SchemaDef, Model extends GetModels<Schema>, Without extends string = never> = {
     data: OrArray<Omit<CreateScalarPayload<Schema, Model>, Without> & Omit<CreateFKPayload<Schema, Model>, Without>>;
     skipDuplicates?: boolean;
 };
 
-export type CreateInput<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Without extends string = never,
-> = XOR<Omit<CreateWithFKInput<Schema, Model>, Without>, Omit<CreateWithRelationInput<Schema, Model>, Without>>;
+type CreateInput<Schema extends SchemaDef, Model extends GetModels<Schema>, Without extends string = never> = XOR<
+    Omit<CreateWithFKInput<Schema, Model>, Without>,
+    Omit<CreateWithRelationInput<Schema, Model>, Without>
+>;
 
 type NestedCreateInput<
     Schema extends SchemaDef,
@@ -662,9 +680,9 @@ type NestedCreateManyInput<
 export type UpdateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     data: UpdateInput<Schema, Model>;
     where: WhereUniqueInput<Schema, Model>;
-    select?: Select<Schema, Model, true>;
-    include?: Include<Schema, Model>;
-    omit?: OmitFields<Schema, Model>;
+    select?: SelectInput<Schema, Model, true>;
+    include?: IncludeInput<Schema, Model>;
+    omit?: OmitInput<Schema, Model>;
 };
 
 export type UpdateManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = UpdateManyPayload<
@@ -676,8 +694,8 @@ export type UpdateManyAndReturnArgs<Schema extends SchemaDef, Model extends GetM
     Schema,
     Model
 > & {
-    select?: Select<Schema, Model, false, false>;
-    omit?: OmitFields<Schema, Model>;
+    select?: SelectInput<Schema, Model, false, false>;
+    omit?: OmitInput<Schema, Model>;
 };
 
 type UpdateManyPayload<Schema extends SchemaDef, Model extends GetModels<Schema>, Without extends string = never> = {
@@ -690,12 +708,12 @@ export type UpsertArgs<Schema extends SchemaDef, Model extends GetModels<Schema>
     create: CreateInput<Schema, Model>;
     update: UpdateInput<Schema, Model>;
     where: WhereUniqueInput<Schema, Model>;
-    select?: Select<Schema, Model, true>;
-    include?: Include<Schema, Model>;
-    omit?: OmitFields<Schema, Model>;
+    select?: SelectInput<Schema, Model, true>;
+    include?: IncludeInput<Schema, Model>;
+    omit?: OmitInput<Schema, Model>;
 };
 
-export type UpdateScalarInput<
+type UpdateScalarInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Without extends string = never,
@@ -728,7 +746,7 @@ type ScalarUpdatePayload<
             }
           : never);
 
-export type UpdateRelationInput<
+type UpdateRelationInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Without extends string = never,
@@ -739,7 +757,7 @@ export type UpdateRelationInput<
     Without
 >;
 
-export type UpdateInput<
+type UpdateInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Without extends string = never,
@@ -795,9 +813,9 @@ type ToOneRelationUpdateInput<
 
 export type DeleteArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     where: WhereUniqueInput<Schema, Model>;
-    select?: Select<Schema, Model, true>;
-    include?: Include<Schema, Model>;
-    omit?: OmitFields<Schema, Model>;
+    select?: SelectInput<Schema, Model, true>;
+    include?: IncludeInput<Schema, Model>;
+    omit?: OmitInput<Schema, Model>;
 };
 
 export type DeleteManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
@@ -816,7 +834,7 @@ export type CountArgs<Schema extends SchemaDef, Model extends GetModels<Schema>>
     select?: CountAggregateInput<Schema, Model> | true;
 };
 
-export type CountAggregateInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+type CountAggregateInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in NonRelationFields<Schema, Model>]?: true;
 } & { _all?: true };
 

@@ -44,6 +44,7 @@
         - [x] Nested to-one
         - [x] Incremental update for numeric fields
         - [x] Array update
+        - [ ] Strict typing for checked/unchecked input
     - [x] Upsert
         - [ ] Implement with "on conflict"
     - [x] Delete
@@ -71,6 +72,7 @@
         - [x] Custom table name
         - [x] Custom field name
         - [ ] Strict undefined checks
+        - [ ] DbNull vs JsonNull
     - [ ] Benchmark
 - [ ] Plugin
     - [ ] Post-mutation hooks should be called after transaction is committed

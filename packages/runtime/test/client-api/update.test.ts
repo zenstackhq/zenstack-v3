@@ -170,6 +170,50 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client update tests', ({ createCli
                 }),
             ).resolves.toMatchObject({ age: null });
         });
+
+        it('compiles with Prisma checked/unchecked typing', async () => {
+            const user = await client.user.create({
+                data: {
+                    email: 'u1@test.com',
+                    posts: {
+                        create: {
+                            id: '1',
+                            title: 'title',
+                        },
+                    },
+                },
+            });
+
+            // fk and owned-relation are mutually exclusive
+            // TODO: @ts-expect-error
+            client.post.update({
+                where: { id: '1' },
+                data: {
+                    authorId: user.id,
+                    title: 'title',
+                    author: { connect: { id: user.id } },
+                },
+            });
+
+            // fk can work with non-owned relation
+            const comment = await client.comment.create({
+                data: {
+                    content: 'comment',
+                },
+            });
+            await expect(
+                client.post.update({
+                    where: { id: '1' },
+                    data: {
+                        authorId: user.id,
+                        title: 'title',
+                        comments: {
+                            connect: { id: comment.id },
+                        },
+                    },
+                }),
+            ).toResolveTruthy();
+        });
     });
 
     describe('nested to-many', () => {

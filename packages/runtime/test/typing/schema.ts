@@ -37,6 +37,11 @@ export const schema = {
                     unique: true,
                     attributes: [{ name: "@unique" }]
                 },
+                role: {
+                    type: "Role",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("USER") }] }],
+                    default: "USER"
+                },
                 posts: {
                     type: "Post",
                     array: true,
@@ -239,6 +244,12 @@ export const schema = {
                 id: { type: "Int" },
                 postId: { type: "Int" }
             }
+        }
+    },
+    enums: {
+        Role: {
+            ADMIN: "ADMIN",
+            USER: "USER"
         }
     },
     authType: "User",

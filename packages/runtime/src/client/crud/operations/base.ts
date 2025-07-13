@@ -181,17 +181,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // select
-        if (args?.select) {
+        if (args && 'select' in args && args.select) {
             // select is mutually exclusive with omit
-            query = this.buildFieldSelection(model, query, args?.select, model);
+            query = this.buildFieldSelection(model, query, args.select, model);
         } else {
             // include all scalar fields except those in omit
-            query = this.buildSelectAllScalarFields(model, query, args?.omit);
+            query = this.buildSelectAllScalarFields(model, query, (args as any)?.omit);
         }
 
         // include
-        if (args?.include) {
-            query = this.buildFieldSelection(model, query, args?.include, model);
+        if (args && 'include' in args && args.include) {
+            // note that 'omit' is handled above already
+            query = this.buildFieldSelection(model, query, args.include, model);
         }
 
         if (args?.cursor) {
@@ -1878,7 +1879,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     protected trimResult(data: any, args: SelectIncludeOmit<Schema, GetModels<Schema>, boolean>) {
-        if (!args.select) {
+        if (!('select' in args) || !args.select) {
             return data;
         }
         return Object.keys(args.select).reduce((acc, field) => {
@@ -1890,9 +1891,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected needReturnRelations(model: string, args: SelectIncludeOmit<Schema, GetModels<Schema>, boolean>) {
         let returnRelation = false;
 
-        if (args.include) {
+        if ('include' in args && args.include) {
             returnRelation = Object.keys(args.include).length > 0;
-        } else if (args.select) {
+        } else if ('select' in args && args.select) {
             returnRelation = Object.entries(args.select).some(([K, v]) => {
                 const fieldDef = this.requireField(model, K);
                 return fieldDef.relation && v;

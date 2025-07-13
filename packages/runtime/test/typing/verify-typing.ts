@@ -1,6 +1,7 @@
-import { ZenStackClient } from '../../dist';
-import { schema } from './schema';
 import SQLite from 'better-sqlite3';
+import { ZenStackClient } from '../../dist';
+import { Role } from './models';
+import { schema } from './schema';
 
 const client = new ZenStackClient(schema, {
     dialectConfig: {
@@ -26,12 +27,14 @@ async function main() {
     await aggregate();
     await groupBy();
     await queryBuilder();
+    enums();
 }
 
 async function find() {
     const user1 = await client.user.findFirst({
         where: {
             name: 'Alex',
+            role: Role.USER,
         },
     });
     console.log(user1?.name);
@@ -144,6 +147,45 @@ async function find() {
             },
         })
     ).profile?.region?.city;
+
+    (
+        await client.user.findFirstOrThrow({
+            select: {
+                posts: {
+                    where: { title: 'Foo' },
+                    select: {
+                        author: {
+                            select: {
+                                id: true,
+                            },
+                        },
+                    },
+                },
+            },
+        })
+    ).posts[0]?.author?.id;
+
+    const u = await client.user.findFirstOrThrow({
+        select: {
+            posts: {
+                where: { title: 'Foo' },
+                select: {
+                    author: {
+                        include: {
+                            profile: true,
+                        },
+                        omit: {
+                            email: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+    console.log(u.posts[0]?.author?.profile?.age);
+    console.log(u.posts[0]?.author?.role);
+    // @ts-expect-error
+    console.log(u.posts[0]?.author?.email);
 }
 
 async function create() {
@@ -560,6 +602,14 @@ async function queryBuilder() {
     console.log(r.email);
     // @ts-expect-error
     console.log(r.name);
+}
+
+function enums() {
+    const a: Role = 'ADMIN';
+    console.log(a);
+    let b = Role.ADMIN;
+    b = a;
+    console.log(b);
 }
 
 main();

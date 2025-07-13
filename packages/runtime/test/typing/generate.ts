@@ -8,7 +8,7 @@ async function main() {
     const dir = path.dirname(fileURLToPath(import.meta.url));
     const zmodelPath = path.join(dir, 'typing-test.zmodel');
     const tsPath = path.join(dir, 'schema.ts');
-    await generator.generate(zmodelPath, [], tsPath);
+    await generator.generate(zmodelPath, [], dir);
 
     const content = fs.readFileSync(tsPath, 'utf-8');
     fs.writeFileSync(tsPath, content.replace(/@zenstackhq\/runtime/g, '../../dist'));

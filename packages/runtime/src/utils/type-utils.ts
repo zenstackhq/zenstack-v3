@@ -6,7 +6,7 @@ export type NullableIf<T, Condition extends boolean> = Condition extends true ? 
 
 export type PartialRecord<K extends string | number | symbol, T> = Partial<Record<K, T>>;
 
-type _Preserve = Date | Function | Decimal | Uint8Array;
+type _Preserve = Date | Function | Decimal | Uint8Array | JsonObject | JsonValue;
 type _Depth = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 export type Simplify<T, D extends number = 6> = D extends 0
     ? T

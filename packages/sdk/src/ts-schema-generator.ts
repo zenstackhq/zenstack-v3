@@ -52,9 +52,16 @@ export class TsSchemaGenerator {
 
         fs.mkdirSync(outputDir, { recursive: true });
 
+        // the schema itself
         this.generateSchema(model, outputDir);
+
+        // the model types
         this.generateModels(model, outputDir);
+
+        // the input types
+        this.generateInputTypes(model, outputDir);
     }
+
     private generateSchema(model: Model, outputDir: string) {
         const statements: ts.Statement[] = [];
         this.generateSchemaStatements(model, statements);
@@ -960,7 +967,10 @@ export class TsSchemaGenerator {
     private generateModels(model: Model, outputDir: string) {
         const statements: ts.Statement[] = [];
 
-        // generate: import type { ModelResult } from '@zenstackhq/runtime';
+        // generate: import { schema as $schema, type SchemaType as $Schema } from './schema';
+        statements.push(this.generateSchemaTypeImport(true, true));
+
+        // generate: import type { ModelResult as $ModelResult } from '@zenstackhq/runtime';
         statements.push(
             ts.factory.createImportDeclaration(
                 undefined,
@@ -968,47 +978,26 @@ export class TsSchemaGenerator {
                     false,
                     undefined,
                     ts.factory.createNamedImports([
-                        ts.factory.createImportSpecifier(true, undefined, ts.factory.createIdentifier('ModelResult')),
+                        ts.factory.createImportSpecifier(
+                            true,
+                            undefined,
+                            ts.factory.createIdentifier(`ModelResult as $ModelResult`),
+                        ),
                     ]),
                 ),
                 ts.factory.createStringLiteral('@zenstackhq/runtime'),
             ),
         );
 
-        // generate: import { schema } from './schema';
-        statements.push(
-            ts.factory.createImportDeclaration(
-                undefined,
-                ts.factory.createImportClause(
-                    false,
-                    undefined,
-                    ts.factory.createNamedImports([
-                        ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('schema')),
-                    ]),
-                ),
-                ts.factory.createStringLiteral('./schema'),
-            ),
-        );
-
-        // generate: type Schema = typeof schema;
-        statements.push(
-            ts.factory.createTypeAliasDeclaration(
-                [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-                'Schema',
-                undefined,
-                ts.factory.createTypeReferenceNode('typeof schema'),
-            ),
-        );
-
         const dataModels = model.declarations.filter(isDataModel);
         for (const dm of dataModels) {
-            // generate: export type Model = ModelResult<Schema, 'Model'>;
+            // generate: export type Model = $ModelResult<Schema, 'Model'>;
             let modelType = ts.factory.createTypeAliasDeclaration(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 dm.name,
                 undefined,
-                ts.factory.createTypeReferenceNode('ModelResult', [
-                    ts.factory.createTypeReferenceNode('Schema'),
+                ts.factory.createTypeReferenceNode('$ModelResult', [
+                    ts.factory.createTypeReferenceNode('$Schema'),
                     ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(dm.name)),
                 ]),
             );
@@ -1021,7 +1010,7 @@ export class TsSchemaGenerator {
         // generate enums
         const enums = model.declarations.filter(isEnum);
         for (const e of enums) {
-            // generate: export const Enum = schema.enums.Enum;
+            // generate: export const Enum = $schema.enums.Enum;
             let enumDecl = ts.factory.createVariableStatement(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 ts.factory.createVariableDeclarationList(
@@ -1032,7 +1021,7 @@ export class TsSchemaGenerator {
                             undefined,
                             ts.factory.createPropertyAccessExpression(
                                 ts.factory.createPropertyAccessExpression(
-                                    ts.factory.createIdentifier('schema'),
+                                    ts.factory.createIdentifier('$schema'),
                                     ts.factory.createIdentifier('enums'),
                                 ),
                                 ts.factory.createIdentifier(e.name),
@@ -1076,6 +1065,36 @@ export class TsSchemaGenerator {
         fs.writeFileSync(outputFile, result);
     }
 
+    private generateSchemaTypeImport(schemaObject: boolean, schemaType: boolean) {
+        const importSpecifiers = [];
+
+        if (schemaObject) {
+            importSpecifiers.push(
+                ts.factory.createImportSpecifier(
+                    false,
+                    ts.factory.createIdentifier('schema'),
+                    ts.factory.createIdentifier('$schema'),
+                ),
+            );
+        }
+
+        if (schemaType) {
+            importSpecifiers.push(
+                ts.factory.createImportSpecifier(
+                    true,
+                    ts.factory.createIdentifier('SchemaType'),
+                    ts.factory.createIdentifier('$Schema'),
+                ),
+            );
+        }
+
+        return ts.factory.createImportDeclaration(
+            undefined,
+            ts.factory.createImportClause(false, undefined, ts.factory.createNamedImports(importSpecifiers)),
+            ts.factory.createStringLiteral('./schema'),
+        );
+    }
+
     private generateDocs<T extends ts.TypeAliasDeclaration | ts.VariableStatement>(
         tsDecl: T,
         decl: DataModel | Enum,
@@ -1086,5 +1105,140 @@ export class TsSchemaGenerator {
             `*\n * ${decl.comments.map((c) => c.replace(/^\s*\/*\s*/, '')).join('\n * ')}\n `,
             true,
         );
+    }
+
+    private generateInputTypes(model: Model, outputDir: string) {
+        const dataModels = model.declarations.filter(isDataModel);
+        const statements: ts.Statement[] = [];
+
+        // generate: import { SchemaType as $Schema } from './schema';
+        statements.push(this.generateSchemaTypeImport(false, true));
+
+        // generate: import { CreateArgs as $CreateArgs, ... } from '@zenstackhq/runtime';
+        const inputTypes = [
+            'FindManyArgs',
+            'FindUniqueArgs',
+            'FindFirstArgs',
+            'CreateArgs',
+            'CreateManyArgs',
+            'CreateManyAndReturnArgs',
+            'UpdateArgs',
+            'UpdateManyArgs',
+            'UpdateManyAndReturnArgs',
+            'UpsertArgs',
+            'DeleteArgs',
+            'DeleteManyArgs',
+            'CountArgs',
+            'AggregateArgs',
+            'GroupByArgs',
+            'WhereInput',
+            'SelectInput',
+            'IncludeInput',
+            'OmitInput',
+        ];
+
+        const inputTypeNameFixes = {
+            SelectInput: 'Select',
+            IncludeInput: 'Include',
+            OmitInput: 'Omit',
+        };
+
+        // generate: import { CreateArgs as $CreateArgs, ... } from '@zenstackhq/runtime';
+        statements.push(
+            ts.factory.createImportDeclaration(
+                undefined,
+                ts.factory.createImportClause(
+                    true,
+                    undefined,
+                    ts.factory.createNamedImports(
+                        inputTypes.map((inputType) =>
+                            ts.factory.createImportSpecifier(
+                                false,
+                                undefined,
+                                ts.factory.createIdentifier(`${inputType} as $${inputType}`),
+                            ),
+                        ),
+                    ),
+                ),
+                ts.factory.createStringLiteral('@zenstackhq/runtime'),
+            ),
+        );
+
+        // generate: import { type SelectIncludeOmit as $SelectIncludeOmit, type SimplifiedModelResult as $SimplifiedModelResult } from '@zenstackhq/runtime';
+        statements.push(
+            ts.factory.createImportDeclaration(
+                undefined,
+                ts.factory.createImportClause(
+                    true,
+                    undefined,
+                    ts.factory.createNamedImports([
+                        ts.factory.createImportSpecifier(
+                            false,
+                            undefined,
+                            ts.factory.createIdentifier('SimplifiedModelResult as $SimplifiedModelResult'),
+                        ),
+                        ts.factory.createImportSpecifier(
+                            false,
+                            undefined,
+                            ts.factory.createIdentifier('SelectIncludeOmit as $SelectIncludeOmit'),
+                        ),
+                    ]),
+                ),
+                ts.factory.createStringLiteral('@zenstackhq/runtime'),
+            ),
+        );
+
+        for (const dm of dataModels) {
+            // generate: export type ModelCreateArgs = $CreateArgs<Schema, Model>;
+            for (const inputType of inputTypes) {
+                const exportName = inputTypeNameFixes[inputType as keyof typeof inputTypeNameFixes]
+                    ? `${dm.name}${inputTypeNameFixes[inputType as keyof typeof inputTypeNameFixes]}`
+                    : `${dm.name}${inputType}`;
+                statements.push(
+                    ts.factory.createTypeAliasDeclaration(
+                        [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                        exportName,
+                        undefined,
+                        ts.factory.createTypeReferenceNode(`$${inputType}`, [
+                            ts.factory.createTypeReferenceNode('$Schema'),
+                            ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(dm.name)),
+                        ]),
+                    ),
+                );
+            }
+
+            // generate: export type ModelGetPayload<Args extends $SelectIncludeOmit<Schema, Model, true>> = $SimplifiedModelResult<Schema, Model, Args>;
+            statements.push(
+                ts.factory.createTypeAliasDeclaration(
+                    [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                    `${dm.name}GetPayload`,
+                    [
+                        ts.factory.createTypeParameterDeclaration(
+                            undefined,
+                            'Args',
+                            ts.factory.createTypeReferenceNode('$SelectIncludeOmit', [
+                                ts.factory.createTypeReferenceNode('$Schema'),
+                                ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(dm.name)),
+                                ts.factory.createLiteralTypeNode(ts.factory.createTrue()),
+                            ]),
+                        ),
+                    ],
+                    ts.factory.createTypeReferenceNode('$SimplifiedModelResult', [
+                        ts.factory.createTypeReferenceNode('$Schema'),
+                        ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(dm.name)),
+                        ts.factory.createTypeReferenceNode('Args'),
+                    ]),
+                ),
+            );
+        }
+
+        this.generateBannerComments(statements);
+
+        // write to file
+        const outputFile = path.join(outputDir, 'input.ts');
+        const sourceFile = ts.createSourceFile(outputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
+        const printer = ts.createPrinter();
+        const result = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(statements), sourceFile);
+        fs.writeFileSync(outputFile, result);
     }
 }

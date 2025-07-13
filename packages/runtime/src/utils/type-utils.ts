@@ -6,13 +6,15 @@ export type NullableIf<T, Condition extends boolean> = Condition extends true ? 
 
 export type PartialRecord<K extends string | number | symbol, T> = Partial<Record<K, T>>;
 
-type Depth = [never, ...Depth];
-export type Simplify<T, D extends Depth = [never, never, never, never, never]> = 
-    D extends [never, ...infer Rest]
-        ? T extends object
-            ? { [K in keyof T]: Simplify<T[K], Rest> } & {}
-            : T
-        : T;
+type _Preserve = Date | Function | Decimal | Uint8Array;
+type _Depth = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+export type Simplify<T, D extends number = 6> = D extends 0
+    ? T
+    : T extends object
+      ? T extends _Preserve
+          ? T
+          : { [K in keyof T]: Simplify<T[K], _Depth[D]> } & {}
+      : T;
 
 export type WrapType<T, Optional = false, Array = false> = Optional extends true
     ? T | null
@@ -32,9 +34,11 @@ export type MapBaseType<T> = T extends 'String'
             ? Decimal
             : T extends 'DateTime'
               ? Date
-              : T extends 'Json'
-                ? JsonValue
-                : unknown;
+              : T extends 'Bytes'
+                ? Uint8Array
+                : T extends 'Json'
+                  ? JsonValue
+                  : unknown;
 
 export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
 

@@ -1066,24 +1066,31 @@ export class TsSchemaGenerator {
     }
 
     private generateSchemaTypeImport(schemaObject: boolean, schemaType: boolean) {
-        const toImport = [
-            ...(schemaObject ? ['schema as $schema'] : []),
-            ...(schemaType ? ['type SchemaType as $Schema'] : []),
-        ];
+        const importSpecifiers = [];
+
+        if (schemaObject) {
+            importSpecifiers.push(
+                ts.factory.createImportSpecifier(
+                    false,
+                    ts.factory.createIdentifier('schema'),
+                    ts.factory.createIdentifier('$schema'),
+                ),
+            );
+        }
+
+        if (schemaType) {
+            importSpecifiers.push(
+                ts.factory.createImportSpecifier(
+                    true,
+                    ts.factory.createIdentifier('SchemaType'),
+                    ts.factory.createIdentifier('$Schema'),
+                ),
+            );
+        }
 
         return ts.factory.createImportDeclaration(
             undefined,
-            ts.factory.createImportClause(
-                false,
-                undefined,
-                ts.factory.createNamedImports([
-                    ts.factory.createImportSpecifier(
-                        false,
-                        undefined,
-                        ts.factory.createIdentifier(toImport.join(', ')),
-                    ),
-                ]),
-            ),
+            ts.factory.createImportClause(false, undefined, ts.factory.createNamedImports(importSpecifiers)),
             ts.factory.createStringLiteral('./schema'),
         );
     }

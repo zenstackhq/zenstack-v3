@@ -6,6 +6,8 @@ export type NullableIf<T, Condition extends boolean> = Condition extends true ? 
 
 export type PartialRecord<K extends string | number | symbol, T> = Partial<Record<K, T>>;
 
+export type Simplify<T> = T extends object ? { [K in keyof T]: Simplify<T[K]> } & {} : T;
+
 export type WrapType<T, Optional = false, Array = false> = Optional extends true
     ? T | null
     : Array extends true
@@ -32,8 +34,6 @@ export type JsonValue = string | number | boolean | null | JsonObject | JsonArra
 
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonArray = Array<JsonValue>;
-
-export type Simplify<T> = { [Key in keyof T]: T[Key] } & {};
 
 export function call(code: string) {
     return { code };

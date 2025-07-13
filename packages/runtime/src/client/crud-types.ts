@@ -77,13 +77,21 @@ type ModelSelectResult<Schema extends SchemaDef, Model extends GetModels<Schema>
                   RelationFieldType<Schema, Model, Key>,
                   FieldIsArray<Schema, Model, Key>
               >
-                ? ModelResult<
-                      Schema,
-                      RelationFieldType<Schema, Model, Key>,
-                      Select[Key],
-                      FieldIsOptional<Schema, Model, Key>,
-                      FieldIsArray<Schema, Model, Key>
-                  >
+                ? 'select' extends keyof Select[Key]
+                    ? ModelResult<
+                          Schema,
+                          RelationFieldType<Schema, Model, Key>,
+                          Pick<Select[Key], 'select'>,
+                          FieldIsOptional<Schema, Model, Key>,
+                          FieldIsArray<Schema, Model, Key>
+                      >
+                    : ModelResult<
+                          Schema,
+                          RelationFieldType<Schema, Model, Key>,
+                          Pick<Select[Key], 'include' | 'omit'>,
+                          FieldIsOptional<Schema, Model, Key>,
+                          FieldIsArray<Schema, Model, Key>
+                      >
                 : DefaultModelResult<
                       Schema,
                       RelationFieldType<Schema, Model, Key>,

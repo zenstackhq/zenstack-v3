@@ -1,7 +1,7 @@
+import SQLite from 'better-sqlite3';
 import { ZenStackClient } from '../../dist';
 import { Role } from './models';
 import { schema } from './schema';
-import SQLite from 'better-sqlite3';
 
 const client = new ZenStackClient(schema, {
     dialectConfig: {
@@ -147,6 +147,45 @@ async function find() {
             },
         })
     ).profile?.region?.city;
+
+    (
+        await client.user.findFirstOrThrow({
+            select: {
+                posts: {
+                    where: { title: 'Foo' },
+                    select: {
+                        author: {
+                            select: {
+                                id: true,
+                            },
+                        },
+                    },
+                },
+            },
+        })
+    ).posts[0]?.author?.id;
+
+    const u = await client.user.findFirstOrThrow({
+        select: {
+            posts: {
+                where: { title: 'Foo' },
+                select: {
+                    author: {
+                        include: {
+                            profile: true,
+                        },
+                        omit: {
+                            email: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+    console.log(u.posts[0]?.author?.profile?.age);
+    console.log(u.posts[0]?.author?.role);
+    // @ts-expect-error
+    console.log(u.posts[0]?.author?.email);
 }
 
 async function create() {

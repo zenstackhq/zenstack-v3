@@ -14,3 +14,5 @@ export type Profile = ModelResult<Schema, "Profile">;
 export type Tag = ModelResult<Schema, "Tag">;
 export type Region = ModelResult<Schema, "Region">;
 export type Meta = ModelResult<Schema, "Meta">;
+export const Role = schema.enums.Role;
+export type Role = (typeof Role)[keyof typeof Role];

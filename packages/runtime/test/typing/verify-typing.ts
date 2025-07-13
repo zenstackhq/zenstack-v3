@@ -1,4 +1,5 @@
 import { ZenStackClient } from '../../dist';
+import { Role } from './models';
 import { schema } from './schema';
 import SQLite from 'better-sqlite3';
 
@@ -26,12 +27,14 @@ async function main() {
     await aggregate();
     await groupBy();
     await queryBuilder();
+    enums();
 }
 
 async function find() {
     const user1 = await client.user.findFirst({
         where: {
             name: 'Alex',
+            role: Role.USER,
         },
     });
     console.log(user1?.name);
@@ -560,6 +563,14 @@ async function queryBuilder() {
     console.log(r.email);
     // @ts-expect-error
     console.log(r.name);
+}
+
+function enums() {
+    const a: Role = 'ADMIN';
+    console.log(a);
+    let b = Role.ADMIN;
+    b = a;
+    console.log(b);
 }
 
 main();

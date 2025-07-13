@@ -6,7 +6,13 @@ export type NullableIf<T, Condition extends boolean> = Condition extends true ? 
 
 export type PartialRecord<K extends string | number | symbol, T> = Partial<Record<K, T>>;
 
-export type Simplify<T> = T extends object ? { [K in keyof T]: Simplify<T[K]> } & {} : T;
+type Depth = [never, ...Depth];
+export type Simplify<T, D extends Depth = [never, never, never, never, never]> = 
+    D extends [never, ...infer Rest]
+        ? T extends object
+            ? { [K in keyof T]: Simplify<T[K], Rest> } & {}
+            : T
+        : T;
 
 export type WrapType<T, Optional = false, Array = false> = Optional extends true
     ? T | null

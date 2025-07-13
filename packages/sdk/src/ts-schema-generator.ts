@@ -1021,20 +1021,49 @@ export class TsSchemaGenerator {
         // generate enums
         const enums = model.declarations.filter(isEnum);
         for (const e of enums) {
-            // generate:
-            // export const enum Enum = {
-            //   value1 = 'value1',
-            //   value2 = 'value2',
-            // }
-            let enumDecl = ts.factory.createEnumDeclaration(
+            // generate: export const Enum = schema.enums.Enum;
+            let enumDecl = ts.factory.createVariableStatement(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-                e.name,
-                e.fields.map((f) => ts.factory.createEnumMember(f.name, ts.factory.createStringLiteral(f.name))),
+                ts.factory.createVariableDeclarationList(
+                    [
+                        ts.factory.createVariableDeclaration(
+                            e.name,
+                            undefined,
+                            undefined,
+                            ts.factory.createPropertyAccessExpression(
+                                ts.factory.createPropertyAccessExpression(
+                                    ts.factory.createIdentifier('schema'),
+                                    ts.factory.createIdentifier('enums'),
+                                ),
+                                ts.factory.createIdentifier(e.name),
+                            ),
+                        ),
+                    ],
+                    ts.NodeFlags.Const,
+                ),
             );
             if (e.comments.length > 0) {
                 enumDecl = this.generateDocs(enumDecl, e);
             }
             statements.push(enumDecl);
+
+            // generate: export type Enum = (typeof Enum)[keyof typeof Enum];
+            let typeAlias = ts.factory.createTypeAliasDeclaration(
+                [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                e.name,
+                undefined,
+                ts.factory.createIndexedAccessTypeNode(
+                    ts.factory.createTypeQueryNode(ts.factory.createIdentifier(e.name)),
+                    ts.factory.createTypeOperatorNode(
+                        ts.SyntaxKind.KeyOfKeyword,
+                        ts.factory.createTypeQueryNode(ts.factory.createIdentifier(e.name)),
+                    ),
+                ),
+            );
+            if (e.comments.length > 0) {
+                typeAlias = this.generateDocs(typeAlias, e);
+            }
+            statements.push(typeAlias);
         }
 
         this.generateBannerComments(statements);
@@ -1047,7 +1076,10 @@ export class TsSchemaGenerator {
         fs.writeFileSync(outputFile, result);
     }
 
-    private generateDocs<T extends ts.TypeAliasDeclaration | ts.EnumDeclaration>(tsDecl: T, decl: DataModel | Enum): T {
+    private generateDocs<T extends ts.TypeAliasDeclaration | ts.VariableStatement>(
+        tsDecl: T,
+        decl: DataModel | Enum,
+    ): T {
         return ts.addSyntheticLeadingComment(
             tsDecl,
             ts.SyntaxKind.MultiLineCommentTrivia,

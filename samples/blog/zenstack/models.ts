@@ -25,7 +25,8 @@ export type Post = ModelResult<Schema, "Post">;
 /**
  * User roles
  */
-export enum Role {
-    ADMIN = "ADMIN",
-    USER = "USER"
-}
+export const Role = schema.enums.Role;
+/**
+ * User roles
+ */
+export type Role = (typeof Role)[keyof typeof Role];

@@ -45,6 +45,12 @@ export type JsonValue = string | number | boolean | null | JsonObject | JsonArra
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonArray = Array<JsonValue>;
 
+/**
+ * Returns an object containing the provided code string as the `code` property.
+ *
+ * @param code - The string to assign to the `code` property
+ * @returns An object with a single `code` property set to the input string
+ */
 export function call(code: string) {
     return { code };
 }

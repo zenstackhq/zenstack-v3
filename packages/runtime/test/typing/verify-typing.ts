@@ -30,6 +30,11 @@ async function main() {
     enums();
 }
 
+/**
+ * Demonstrates various user query operations using the ZenStackClient, including filtering, selecting, omitting, and including nested relations.
+ *
+ * Executes and logs results for single and multiple user queries, nested relation selections, computed fields, pagination, ordering, distinct, and cursor-based queries. Also verifies TypeScript type safety for invalid query combinations and field access.
+ */
 async function find() {
     const user1 = await client.user.findFirst({
         where: {
@@ -188,6 +193,11 @@ async function find() {
     console.log(u.posts[0]?.author?.email);
 }
 
+/**
+ * Demonstrates various create operations for users, profiles, regions, posts, and tags using the ZenStackClient.
+ *
+ * This includes single and batch creation, nested relation creation, compound key connections, and many-to-many associations. Also tests error scenarios for required fields and invalid relation usage.
+ */
 async function create() {
     await client.user.create({
         // @ts-expect-error email is required

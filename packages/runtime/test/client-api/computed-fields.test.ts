@@ -14,7 +14,7 @@ model User {
             {
                 computedFields: {
                     User: {
-                        upperName: (eb) => eb.fn('upper', ['name']),
+                        upperName: (eb: any) => eb.fn('upper', ['name']),
                     },
                 },
             } as any,
@@ -90,7 +90,7 @@ model User {
             {
                 computedFields: {
                     User: {
-                        upperName: (eb) => eb.lit(null),
+                        upperName: (eb: any) => eb.lit(null),
                     },
                 },
             } as any,

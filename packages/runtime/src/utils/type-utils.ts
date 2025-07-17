@@ -22,23 +22,19 @@ export type WrapType<T, Optional = false, Array = false> = Optional extends true
       ? T[]
       : T;
 
-export type MapBaseType<T> = T extends 'String'
-    ? string
-    : T extends 'Boolean'
-      ? boolean
-      : T extends 'Int' | 'Float'
-        ? number
-        : T extends 'BigInt'
-          ? bigint
-          : T extends 'Decimal'
-            ? Decimal
-            : T extends 'DateTime'
-              ? Date
-              : T extends 'Bytes'
-                ? Uint8Array
-                : T extends 'Json'
-                  ? JsonValue
-                  : unknown;
+type TypeMap = {
+    String: string;
+    Boolean: boolean;
+    Int: number;
+    Float: number;
+    BigInt: bigint;
+    Decimal: Decimal;
+    DateTime: Date;
+    Bytes: Uint8Array;
+    Json: JsonValue;
+};
+
+export type MapBaseType<T extends string> = T extends keyof TypeMap ? TypeMap[T] : unknown;
 
 export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
 

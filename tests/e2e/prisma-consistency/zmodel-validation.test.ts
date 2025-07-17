@@ -89,7 +89,7 @@ class ZenStackValidationTester {
     }
 }
 
-describe('ZenStack Validation Consistency with Prisma', () => {
+describe('ZenStack validation consistency with Prisma', () => {
     let tester: ZenStackValidationTester;
     let tempDir: string;
 

@@ -411,100 +411,156 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         });
     };
 
+    // type parameters to operation handlers are explicitly specified to improve tsc performance
     return {
         findUnique: (args: unknown) => {
-            return createPromise('findUnique', args, new FindOperationHandler(client, model, inputValidator), true);
+            return createPromise(
+                'findUnique',
+                args,
+                new FindOperationHandler<Schema>(client, model, inputValidator),
+                true,
+            );
         },
 
         findUniqueOrThrow: (args: unknown) => {
             return createPromise(
                 'findUnique',
                 args,
-                new FindOperationHandler(client, model, inputValidator),
+                new FindOperationHandler<Schema>(client, model, inputValidator),
                 true,
                 true,
             );
         },
 
         findFirst: (args: unknown) => {
-            return createPromise('findFirst', args, new FindOperationHandler(client, model, inputValidator), true);
+            return createPromise(
+                'findFirst',
+                args,
+                new FindOperationHandler<Schema>(client, model, inputValidator),
+                true,
+            );
         },
 
         findFirstOrThrow: (args: unknown) => {
             return createPromise(
                 'findFirst',
                 args,
-                new FindOperationHandler(client, model, inputValidator),
+                new FindOperationHandler<Schema>(client, model, inputValidator),
                 true,
                 true,
             );
         },
 
         findMany: (args: unknown) => {
-            return createPromise('findMany', args, new FindOperationHandler(client, model, inputValidator), true);
+            return createPromise(
+                'findMany',
+                args,
+                new FindOperationHandler<Schema>(client, model, inputValidator),
+                true,
+            );
         },
 
         create: (args: unknown) => {
-            return createPromise('create', args, new CreateOperationHandler(client, model, inputValidator), true);
+            return createPromise(
+                'create',
+                args,
+                new CreateOperationHandler<Schema>(client, model, inputValidator),
+                true,
+            );
         },
 
         createMany: (args: unknown) => {
-            return createPromise('createMany', args, new CreateOperationHandler(client, model, inputValidator), false);
+            return createPromise(
+                'createMany',
+                args,
+                new CreateOperationHandler<Schema>(client, model, inputValidator),
+                false,
+            );
         },
 
         createManyAndReturn: (args: unknown) => {
             return createPromise(
                 'createManyAndReturn',
                 args,
-                new CreateOperationHandler(client, model, inputValidator),
+                new CreateOperationHandler<Schema>(client, model, inputValidator),
                 true,
             );
         },
 
         update: (args: unknown) => {
-            return createPromise('update', args, new UpdateOperationHandler(client, model, inputValidator), true);
+            return createPromise(
+                'update',
+                args,
+                new UpdateOperationHandler<Schema>(client, model, inputValidator),
+                true,
+            );
         },
 
         updateMany: (args: unknown) => {
-            return createPromise('updateMany', args, new UpdateOperationHandler(client, model, inputValidator), false);
+            return createPromise(
+                'updateMany',
+                args,
+                new UpdateOperationHandler<Schema>(client, model, inputValidator),
+                false,
+            );
         },
 
         updateManyAndReturn: (args: unknown) => {
             return createPromise(
                 'updateManyAndReturn',
                 args,
-                new UpdateOperationHandler(client, model, inputValidator),
+                new UpdateOperationHandler<Schema>(client, model, inputValidator),
                 true,
             );
         },
 
         upsert: (args: unknown) => {
-            return createPromise('upsert', args, new UpdateOperationHandler(client, model, inputValidator), true);
+            return createPromise(
+                'upsert',
+                args,
+                new UpdateOperationHandler<Schema>(client, model, inputValidator),
+                true,
+            );
         },
 
         delete: (args: unknown) => {
-            return createPromise('delete', args, new DeleteOperationHandler(client, model, inputValidator), true);
+            return createPromise(
+                'delete',
+                args,
+                new DeleteOperationHandler<Schema>(client, model, inputValidator),
+                true,
+            );
         },
 
         deleteMany: (args: unknown) => {
-            return createPromise('deleteMany', args, new DeleteOperationHandler(client, model, inputValidator), false);
+            return createPromise(
+                'deleteMany',
+                args,
+                new DeleteOperationHandler<Schema>(client, model, inputValidator),
+                false,
+            );
         },
 
         count: (args: unknown) => {
-            return createPromise('count', args, new CountOperationHandler(client, model, inputValidator), false);
+            return createPromise(
+                'count',
+                args,
+                new CountOperationHandler<Schema>(client, model, inputValidator),
+                false,
+            );
         },
 
         aggregate: (args: unknown) => {
             return createPromise(
                 'aggregate',
                 args,
-                new AggregateOperationHandler(client, model, inputValidator),
+                new AggregateOperationHandler<Schema>(client, model, inputValidator),
                 false,
             );
         },
 
         groupBy: (args: unknown) => {
-            return createPromise('groupBy', args, new GroupByOperationHandler(client, model, inputValidator));
+            return createPromise('groupBy', args, new GroupByOperationHandler<Schema>(client, model, inputValidator));
         },
     } as ModelOperations<Schema, Model>;
 }

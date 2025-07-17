@@ -225,6 +225,11 @@ attribute @@@prisma()
 attribute @@@completionHint(_ values: String[])
 
 /**
+ * Indicates that the attribute can only be applied once to a declaration.
+ */
+attribute @@@once()
+
+/**
  * Defines a single-field ID on the model.
  *
  * @param map: The name of the underlying primary key constraint in the database.
@@ -232,7 +237,7 @@ attribute @@@completionHint(_ values: String[])
  * @param sort: Allows you to specify in what order the entries of the ID are stored in the database. The available options are Asc and Desc.
  * @param clustered: Defines whether the ID is clustered or non-clustered. Defaults to true.
  */
-attribute @id(map: String?, length: Int?, sort: SortOrder?, clustered: Boolean?) @@@prisma @@@supportTypeDef
+attribute @id(map: String?, length: Int?, sort: SortOrder?, clustered: Boolean?) @@@prisma @@@supportTypeDef @@@once
 
 /**
  * Defines a default value for a field.
@@ -247,7 +252,7 @@ attribute @default(_ value: ContextType, map: String?) @@@prisma @@@supportTypeD
  * @param sort: Allows you to specify in what order the entries of the constraint are stored in the database. The available options are Asc and Desc.
  * @param clustered: Boolean	Defines whether the constraint is clustered or non-clustered. Defaults to false.
  */
-attribute @unique(map: String?, length: Int?, sort: SortOrder?, clustered: Boolean?) @@@prisma
+attribute @unique(map: String?, length: Int?, sort: SortOrder?, clustered: Boolean?) @@@prisma @@@once
 
 /**
  * Defines a multi-field ID (composite ID) on the model.

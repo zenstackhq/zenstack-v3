@@ -259,11 +259,20 @@ export default class DataModelValidator implements AstValidator<DataModel> {
             return;
         }
 
+        if (this.isSelfRelation(field)) {
+            if (!thisRelation.name) {
+                accept('error', 'Self-relation field must have a name in @relation attribute', {
+                    node: field,
+                });
+                return;
+            }
+        }
+
         const oppositeModel = field.type.reference!.ref! as DataModel;
 
         // Use name because the current document might be updated
         let oppositeFields = getModelFieldsWithBases(oppositeModel, false).filter(
-            (f) => f.type.reference?.ref?.name === contextModel.name,
+            (f) => f !== field && f.type.reference?.ref?.name === contextModel.name,
         );
         oppositeFields = oppositeFields.filter((f) => {
             const fieldRel = this.parseRelation(f);
@@ -322,27 +331,41 @@ export default class DataModelValidator implements AstValidator<DataModel> {
 
         let relationOwner: DataModelField;
 
-        if (thisRelation?.references?.length && thisRelation.fields?.length) {
-            if (oppositeRelation?.references || oppositeRelation?.fields) {
-                accept('error', '"fields" and "references" must be provided only on one side of relation field', {
-                    node: oppositeField,
-                });
-                return;
-            } else {
-                relationOwner = oppositeField;
-            }
-        } else if (oppositeRelation?.references?.length && oppositeRelation.fields?.length) {
-            if (thisRelation?.references || thisRelation?.fields) {
-                accept('error', '"fields" and "references" must be provided only on one side of relation field', {
-                    node: field,
-                });
-                return;
-            } else {
-                relationOwner = field;
+        if (field.type.array && oppositeField.type.array) {
+            // if both the field is array, then it's an implicit many-to-many relation,
+            // neither side should have fields/references
+            for (const r of [thisRelation, oppositeRelation]) {
+                if (r.fields?.length || r.references?.length) {
+                    accept(
+                        'error',
+                        'Implicit many-to-many relation cannot have "fields" or "references" in @relation attribute',
+                        {
+                            node: r === thisRelation ? field : oppositeField,
+                        },
+                    );
+                }
             }
         } else {
-            // if both the field is array, then it's an implicit many-to-many relation
-            if (!(field.type.array && oppositeField.type.array)) {
+            if (thisRelation?.references?.length && thisRelation.fields?.length) {
+                if (oppositeRelation?.references || oppositeRelation?.fields) {
+                    accept('error', '"fields" and "references" must be provided only on one side of relation field', {
+                        node: oppositeField,
+                    });
+                    return;
+                } else {
+                    relationOwner = oppositeField;
+                }
+            } else if (oppositeRelation?.references?.length && oppositeRelation.fields?.length) {
+                if (thisRelation?.references || thisRelation?.fields) {
+                    accept('error', '"fields" and "references" must be provided only on one side of relation field', {
+                        node: field,
+                    });
+                    return;
+                } else {
+                    relationOwner = field;
+                }
+            } else {
+                // for non-M2M relations, one side must have fields/references
                 [field, oppositeField].forEach((f) => {
                     if (!this.isSelfRelation(f)) {
                         accept(
@@ -352,56 +375,60 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                         );
                     }
                 });
-            }
-            return;
-        }
-
-        if (!relationOwner.type.array && !relationOwner.type.optional) {
-            accept('error', 'Relation field needs to be list or optional', {
-                node: relationOwner,
-            });
-            return;
-        }
-
-        if (relationOwner !== field && !relationOwner.type.array) {
-            // one-to-one relation requires defining side's reference field to be @unique
-            // e.g.:
-            //     model User {
-            //         id String @id @default(cuid())
-            //         data UserData?
-            //     }
-            //     model UserData {
-            //         id String @id @default(cuid())
-            //         user User  @relation(fields: [userId], references: [id])
-            //         userId String
-            //     }
-            //
-            // UserData.userId field needs to be @unique
-
-            const containingModel = field.$container as DataModel;
-            const uniqueFieldList = getUniqueFields(containingModel);
-
-            // field is defined in the abstract base model
-            if (containingModel !== contextModel) {
-                uniqueFieldList.push(...getUniqueFields(contextModel));
+                return;
             }
 
-            thisRelation.fields?.forEach((ref) => {
-                const refField = ref.target.ref as DataModelField;
-                if (refField) {
-                    if (refField.attributes.find((a) => a.decl.ref?.name === '@id' || a.decl.ref?.name === '@unique')) {
-                        return;
-                    }
-                    if (uniqueFieldList.some((list) => list.includes(refField))) {
-                        return;
-                    }
-                    accept(
-                        'error',
-                        `Field "${refField.name}" on model "${containingModel.name}" is part of a one-to-one relation and must be marked as @unique or be part of a model-level @@unique attribute`,
-                        { node: refField },
-                    );
+            if (!relationOwner.type.array && !relationOwner.type.optional) {
+                accept('error', 'Relation field needs to be list or optional', {
+                    node: relationOwner,
+                });
+                return;
+            }
+
+            if (relationOwner !== field && !relationOwner.type.array) {
+                // one-to-one relation requires defining side's reference field to be @unique
+                // e.g.:
+                //     model User {
+                //         id String @id @default(cuid())
+                //         data UserData?
+                //     }
+                //     model UserData {
+                //         id String @id @default(cuid())
+                //         user User  @relation(fields: [userId], references: [id])
+                //         userId String
+                //     }
+                //
+                // UserData.userId field needs to be @unique
+
+                const containingModel = field.$container as DataModel;
+                const uniqueFieldList = getUniqueFields(containingModel);
+
+                // field is defined in the abstract base model
+                if (containingModel !== contextModel) {
+                    uniqueFieldList.push(...getUniqueFields(contextModel));
                 }
-            });
+
+                thisRelation.fields?.forEach((ref) => {
+                    const refField = ref.target.ref as DataModelField;
+                    if (refField) {
+                        if (
+                            refField.attributes.find(
+                                (a) => a.decl.ref?.name === '@id' || a.decl.ref?.name === '@unique',
+                            )
+                        ) {
+                            return;
+                        }
+                        if (uniqueFieldList.some((list) => list.includes(refField))) {
+                            return;
+                        }
+                        accept(
+                            'error',
+                            `Field "${refField.name}" on model "${containingModel.name}" is part of a one-to-one relation and must be marked as @unique or be part of a model-level @@unique attribute`,
+                            { node: refField },
+                        );
+                    }
+                });
+            }
         }
     }
 

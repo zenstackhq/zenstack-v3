@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import { randomUUID } from 'crypto';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
@@ -94,7 +95,7 @@ describe('ZenStack validation consistency with Prisma', () => {
     let tempDir: string;
 
     beforeEach(() => {
-        tempDir = join(tmpdir(), 'zenstack-validation-test-' + Date.now());
+        tempDir = join(tmpdir(), 'zenstack-validation-test-' + randomUUID());
         tester = new ZenStackValidationTester(tempDir);
     });
 

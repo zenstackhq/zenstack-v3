@@ -52,7 +52,7 @@ class ZenStackValidationTester {
         writeFileSync(this.schemaPath, schema);
 
         try {
-            const result = execSync(`node ${this.cliPath} generate`, {
+            execSync(`node ${this.cliPath} generate`, {
                 cwd: this.testDir,
                 stdio: 'pipe',
                 encoding: 'utf8',

@@ -7,7 +7,7 @@
     - [x] migrate
     - [x] info
     - [x] init
-    - [ ] validate
+    - [x] validate
     - [ ] format
     - [ ] db seed
 - [ ] ORM

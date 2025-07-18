@@ -24,6 +24,10 @@ const initAction = async (projectPath: string): Promise<void> => {
     await actions.init(projectPath);
 };
 
+const validateAction = async (options: Parameters<typeof actions.validate>[0]): Promise<void> => {
+    await actions.validate(options);
+};
+
 export function createProgram() {
     const program = new Command('zenstack');
 
@@ -35,7 +39,7 @@ export function createProgram() {
         .description(
             `${colors.bold.blue(
                 'ζ',
-            )} ZenStack is a Prisma power pack for building full-stack apps.\n\nDocumentation: https://zenstack.dev.`,
+            )} ZenStack is a database access toolkit for TypeScript apps.\n\nDocumentation: https://zenstack.dev.`,
         )
         .showHelpAfterError()
         .showSuggestionAfterError();
@@ -114,6 +118,8 @@ export function createProgram() {
         .description('Initialize an existing project for ZenStack.')
         .argument('[path]', 'project path', '.')
         .action(initAction);
+
+    program.command('validate').description('Validate a ZModel schema.').addOption(schemaOption).action(validateAction);
 
     return program;
 }

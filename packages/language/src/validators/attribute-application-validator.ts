@@ -75,6 +75,8 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
             accept('error', `attribute "${decl.name}" cannot be used on type declarations`, { node: attr });
         }
 
+        this.checkDuplicatedAttributes(attr, accept);
+
         const filledParams = new Set<AttributeParam>();
 
         for (const arg of attr.args) {
@@ -128,6 +130,18 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         const checker = attributeCheckers.get(decl.name);
         if (checker) {
             checker.value.call(this, attr, accept);
+        }
+    }
+
+    private checkDuplicatedAttributes(attr: AttributeApplication, accept: ValidationAcceptor) {
+        const attrDecl = attr.decl.ref;
+        if (!attrDecl?.attributes.some((a) => a.decl.ref?.name === '@@@once')) {
+            return;
+        }
+
+        const duplicates = attr.$container.attributes.filter((a) => a.decl.ref === attrDecl && a !== attr);
+        if (duplicates.length > 0) {
+            accept('error', `Attribute "${attrDecl.name}" can only be applied once`, { node: attr });
         }
     }
 
@@ -197,13 +211,21 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     }
 
     @check('@@unique')
+    @check('@@id')
     // @ts-expect-error
     private _checkUnique(attr: AttributeApplication, accept: ValidationAcceptor) {
         const fields = attr.args[0]?.value;
         if (!fields) {
+            accept('error', `expects an array of field references`, {
+                node: attr.args[0]!,
+            });
             return;
         }
         if (isArrayExpr(fields)) {
+            if (fields.items.length === 0) {
+                accept('error', `\`@@unique\` expects at least one field reference`, { node: fields });
+                return;
+            }
             fields.items.forEach((item) => {
                 if (!isReferenceExpr(item)) {
                     accept('error', `Expecting a field reference`, {

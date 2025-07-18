@@ -406,6 +406,10 @@ importers:
       '@zenstackhq/testtools':
         specifier: workspace:*
         version: link:../../packages/testtools
+    devDependencies:
+      '@zenstackhq/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
 
 packages:
 

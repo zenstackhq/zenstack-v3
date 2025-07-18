@@ -8,7 +8,7 @@
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "test": "vitest run && pnpm test:generate && pnpm test:typecheck",
-        "test:generate": "tsx test/typing/generate.ts",
+        "test:generate": "tsx test/scripts/generate.ts",
         "test:typecheck": "tsc --project tsconfig.test.json",
         "pack": "pnpm pack"
     },

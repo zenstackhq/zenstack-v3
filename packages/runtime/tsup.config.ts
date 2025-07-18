@@ -1,11 +1,12 @@
 import { defineConfig } from 'tsup';
+import fs from 'node:fs';
 
 export default defineConfig({
     entry: {
         index: 'src/index.ts',
         schema: 'src/schema/index.ts',
         helpers: 'src/helpers.ts',
-        'plugins/policy': 'src/plugins/policy/index.ts',
+        'plugins/policy/index': 'src/plugins/policy/index.ts',
     },
     outDir: 'dist',
     splitting: false,
@@ -13,4 +14,7 @@ export default defineConfig({
     clean: true,
     dts: true,
     format: ['cjs', 'esm'],
+    async onSuccess() {
+        fs.cpSync('src/plugins/policy/plugin.zmodel', 'dist/plugins/policy/plugin.zmodel');
+    },
 });

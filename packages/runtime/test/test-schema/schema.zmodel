@@ -1,0 +1,62 @@
+datasource db {
+    provider = "sqlite"
+    url      = "file:./dev.db"
+}
+
+plugin policy {
+    provider = "../../dist/plugins/policy"
+}
+
+enum Role {
+    ADMIN
+    USER
+}
+
+model User {
+    id        String   @id @default(cuid())
+    email     String   @unique
+    name      String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    role      Role     @default(USER)
+    posts     Post[]
+    profile   Profile?
+
+    // Access policies
+    @@allow('all', auth().id == id)
+    @@allow('read', auth() != null)
+}
+
+model Post {
+    id        String    @id @default(cuid())
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    title     String
+    content   String?
+    published Boolean   @default(false)
+    author    User      @relation(fields: [authorId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+    authorId  String
+    comments  Comment[]
+
+    // Access policies
+    @@deny('all', auth() == null)
+    @@allow('all', auth().id == authorId)
+    @@allow('read', published)
+}
+
+model Comment {
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    content   String
+    post      Post?    @relation(fields: [postId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+    postId    String?
+}
+
+model Profile {
+    id     String  @id @default(cuid())
+    bio    String
+    age    Int?
+    user   User?   @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+    userId String? @unique
+}

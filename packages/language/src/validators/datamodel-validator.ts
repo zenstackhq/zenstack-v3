@@ -2,10 +2,11 @@ import { AstUtils, type AstNode, type DiagnosticInfo, type ValidationAcceptor } 
 import { IssueCodes, SCALAR_TYPES } from '../constants';
 import {
     ArrayExpr,
+    DataField,
     DataModel,
-    DataModelField,
     Model,
     ReferenceExpr,
+    TypeDef,
     isDataModel,
     isDataSource,
     isEnum,
@@ -14,7 +15,7 @@ import {
     isTypeDef,
 } from '../generated/ast';
 import {
-    findUpInheritance,
+    getAllAttributes,
     getLiteral,
     getModelFieldsWithBases,
     getModelIdFields,
@@ -31,15 +32,13 @@ import { validateDuplicatedDeclarations, type AstValidator } from './common';
  */
 export default class DataModelValidator implements AstValidator<DataModel> {
     validate(dm: DataModel, accept: ValidationAcceptor): void {
-        this.validateBaseAbstractModel(dm, accept);
-        this.validateBaseDelegateModel(dm, accept);
         validateDuplicatedDeclarations(dm, getModelFieldsWithBases(dm), accept);
         this.validateAttributes(dm, accept);
         this.validateFields(dm, accept);
-
-        if (dm.superTypes.length > 0) {
-            this.validateInheritance(dm, accept);
+        if (dm.mixins.length > 0) {
+            this.validateMixins(dm, accept);
         }
+        this.validateInherits(dm, accept);
     }
 
     private validateFields(dm: DataModel, accept: ValidationAcceptor) {
@@ -50,7 +49,6 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         const modelUniqueFields = getModelUniqueFields(dm);
 
         if (
-            !dm.isAbstract &&
             idFields.length === 0 &&
             modelLevelIds.length === 0 &&
             uniqueFields.length === 0 &&
@@ -89,17 +87,14 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         }
 
         dm.fields.forEach((field) => this.validateField(field, accept));
-
-        if (!dm.isAbstract) {
-            allFields
-                .filter((x) => isDataModel(x.type.reference?.ref))
-                .forEach((y) => {
-                    this.validateRelationField(dm, y, accept);
-                });
-        }
+        allFields
+            .filter((x) => isDataModel(x.type.reference?.ref))
+            .forEach((y) => {
+                this.validateRelationField(dm, y, accept);
+            });
     }
 
-    private validateField(field: DataModelField, accept: ValidationAcceptor): void {
+    private validateField(field: DataField, accept: ValidationAcceptor): void {
         if (field.type.array && field.type.optional) {
             accept('error', 'Optional lists are not supported. Use either `Type[]` or `Type?`', { node: field.type });
         }
@@ -137,10 +132,10 @@ export default class DataModelValidator implements AstValidator<DataModel> {
     }
 
     private validateAttributes(dm: DataModel, accept: ValidationAcceptor) {
-        dm.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
+        getAllAttributes(dm).forEach((attr) => validateAttributeApplication(attr, accept, dm));
     }
 
-    private parseRelation(field: DataModelField, accept?: ValidationAcceptor) {
+    private parseRelation(field: DataField, accept?: ValidationAcceptor) {
         const relAttr = field.attributes.find((attr) => attr.decl.ref?.name === '@relation');
 
         let name: string | undefined;
@@ -244,17 +239,17 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         return { attr: relAttr, name, fields, references, valid };
     }
 
-    private isSelfRelation(field: DataModelField) {
+    private isSelfRelation(field: DataField) {
         return field.type.reference?.ref === field.$container;
     }
 
-    private validateRelationField(contextModel: DataModel, field: DataModelField, accept: ValidationAcceptor) {
+    private validateRelationField(contextModel: DataModel, field: DataField, accept: ValidationAcceptor) {
         const thisRelation = this.parseRelation(field, accept);
         if (!thisRelation.valid) {
             return;
         }
 
-        if (this.isFieldInheritedFromDelegateModel(field, contextModel)) {
+        if (this.isFieldInheritedFromDelegateModel(field)) {
             // relation fields inherited from delegate model don't need opposite relation
             return;
         }
@@ -331,7 +326,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         const oppositeField = oppositeFields[0]!;
         const oppositeRelation = this.parseRelation(oppositeField);
 
-        let relationOwner: DataModelField;
+        let relationOwner: DataField;
 
         if (field.type.array && oppositeField.type.array) {
             // if both the field is array, then it's an implicit many-to-many relation,
@@ -411,7 +406,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                 }
 
                 thisRelation.fields?.forEach((ref) => {
-                    const refField = ref.target.ref as DataModelField;
+                    const refField = ref.target.ref as DataField;
                     if (refField) {
                         if (
                             refField.attributes.find(
@@ -435,59 +430,35 @@ export default class DataModelValidator implements AstValidator<DataModel> {
     }
 
     // checks if the given field is inherited directly or indirectly from a delegate model
-    private isFieldInheritedFromDelegateModel(field: DataModelField, contextModel: DataModel) {
-        const basePath = findUpInheritance(contextModel, field.$container as DataModel);
-        if (basePath && basePath.some(isDelegateModel)) {
-            return true;
-        } else {
-            return false;
+    private isFieldInheritedFromDelegateModel(field: DataField) {
+        return isDelegateModel(field.$container);
+    }
+
+    private validateInherits(model: DataModel, accept: ValidationAcceptor) {
+        if (!model.baseModel) {
+            return;
         }
-    }
-
-    private validateBaseAbstractModel(model: DataModel, accept: ValidationAcceptor) {
-        model.superTypes.forEach((superType, index) => {
-            if (
-                !superType.ref?.isAbstract &&
-                !superType.ref?.attributes.some((attr) => attr.decl.ref?.name === '@@delegate')
-            )
-                accept(
-                    'error',
-                    `Model ${superType.$refText} cannot be extended because it's neither abstract nor marked as "@@delegate"`,
-                    {
-                        node: model,
-                        property: 'superTypes',
-                        index,
-                    },
-                );
-        });
-    }
-
-    private validateBaseDelegateModel(model: DataModel, accept: ValidationAcceptor) {
-        if (model.superTypes.filter((base) => base.ref && isDelegateModel(base.ref)).length > 1) {
-            accept('error', 'Extending from multiple delegate models is not supported', {
+        if (model.baseModel.ref && !isDelegateModel(model.baseModel.ref)) {
+            accept('error', `Model ${model.baseModel.$refText} cannot be extended because it's not a delegate model`, {
                 node: model,
-                property: 'superTypes',
+                property: 'baseModel',
             });
         }
     }
 
-    private validateInheritance(dm: DataModel, accept: ValidationAcceptor) {
-        const seen = [dm];
-        const todo: DataModel[] = dm.superTypes.map((superType) => superType.ref!);
+    private validateMixins(dm: DataModel, accept: ValidationAcceptor) {
+        const seen: TypeDef[] = [];
+        const todo: TypeDef[] = dm.mixins.map((mixin) => mixin.ref!);
         while (todo.length > 0) {
             const current = todo.shift()!;
             if (seen.includes(current)) {
-                accept(
-                    'error',
-                    `Circular inheritance detected: ${seen.map((m) => m.name).join(' -> ')} -> ${current.name}`,
-                    {
-                        node: dm,
-                    },
-                );
+                accept('error', `Cyclic mixin detected: ${seen.map((m) => m.name).join(' -> ')} -> ${current.name}`, {
+                    node: dm,
+                });
                 return;
             }
             seen.push(current);
-            todo.push(...current.superTypes.map((superType) => superType.ref!));
+            todo.push(...current.mixins.map((mixin) => mixin.ref!));
         }
     }
 }

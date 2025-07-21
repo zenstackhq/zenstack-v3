@@ -19,15 +19,6 @@ export const schema = {
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
-                email: {
-                    type: "String",
-                    unique: true,
-                    attributes: [{ name: "@unique" }]
-                },
-                name: {
-                    type: "String",
-                    optional: true
-                },
                 createdAt: {
                     type: "DateTime",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
@@ -37,6 +28,15 @@ export const schema = {
                     type: "DateTime",
                     updatedAt: true,
                     attributes: [{ name: "@updatedAt" }]
+                },
+                email: {
+                    type: "String",
+                    unique: true,
+                    attributes: [{ name: "@unique" }]
+                },
+                name: {
+                    type: "String",
+                    optional: true
                 },
                 role: {
                     type: "Role",
@@ -169,6 +169,16 @@ export const schema = {
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
+                createdAt: {
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                updatedAt: {
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                },
                 bio: {
                     type: "String"
                 },
@@ -196,6 +206,27 @@ export const schema = {
             uniqueFields: {
                 id: { type: "String" },
                 userId: { type: "String" }
+            }
+        }
+    },
+    typeDefs: {
+        CommonFields: {
+            fields: {
+                id: {
+                    type: "String",
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                createdAt: {
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                updatedAt: {
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                }
             }
         }
     },

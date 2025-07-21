@@ -46,7 +46,7 @@ declare module './ast' {
         $resolvedParam?: AttributeParam;
     }
 
-    interface DataModelField {
+    interface DataField {
         $inheritedFrom?: DataModel;
     }
 
@@ -56,14 +56,9 @@ declare module './ast' {
 
     export interface DataModel {
         /**
-         * Indicates whether the model is already merged with the base types
-         */
-        $baseMerged?: boolean;
-
-        /**
          * All fields including those marked with `@ignore`
          */
-        $allFields?: DataModelField[];
+        $allFields?: DataField[];
     }
 }
 

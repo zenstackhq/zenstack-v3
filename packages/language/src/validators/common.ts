@@ -1,5 +1,5 @@
 import type { AstNode, MaybePromise, ValidationAcceptor } from 'langium';
-import { isDataModelField } from '../generated/ast';
+import { isDataField } from '../generated/ast';
 
 /**
  * AST validator contract
@@ -28,8 +28,8 @@ export function validateDuplicatedDeclarations(
     for (const [name, decls] of Object.entries<AstNode[]>(groupByName)) {
         if (decls.length > 1) {
             let errorField = decls[1]!;
-            if (isDataModelField(decls[0])) {
-                const nonInheritedFields = decls.filter((x) => !(isDataModelField(x) && x.$container !== container));
+            if (isDataField(decls[0])) {
+                const nonInheritedFields = decls.filter((x) => !(isDataField(x) && x.$container !== container));
                 if (nonInheritedFields.length > 0) {
                     errorField = nonInheritedFields.slice(-1)[0]!;
                 }

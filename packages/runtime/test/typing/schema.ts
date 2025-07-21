@@ -246,6 +246,26 @@ export const schema = {
             }
         }
     },
+    typeDefs: {
+        Identity: {
+            fields: {
+                providers: {
+                    type: "IdentityProvider",
+                    array: true
+                }
+            }
+        },
+        IdentityProvider: {
+            fields: {
+                id: {
+                    type: "String"
+                },
+                name: {
+                    type: "String"
+                }
+            }
+        }
+    },
     enums: {
         Role: {
             ADMIN: "ADMIN",

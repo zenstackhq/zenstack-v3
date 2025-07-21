@@ -12,12 +12,15 @@ enum Role {
     USER
 }
 
-model User {
+type CommonFields {
     id        String   @id @default(cuid())
-    email     String   @unique
-    name      String?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+}
+
+model User with CommonFields {
+    email     String   @unique
+    name      String?
     role      Role     @default(USER)
     posts     Post[]
     profile   Profile?
@@ -27,10 +30,7 @@ model User {
     @@allow('read', auth() != null)
 }
 
-model Post {
-    id        String    @id @default(cuid())
-    createdAt DateTime  @default(now())
-    updatedAt DateTime  @updatedAt
+model Post with CommonFields {
     title     String
     content   String?
     published Boolean   @default(false)
@@ -44,17 +44,13 @@ model Post {
     @@allow('read', published)
 }
 
-model Comment {
-    id        String   @id @default(cuid())
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+model Comment with CommonFields {
     content   String
     post      Post?    @relation(fields: [postId], references: [id], onUpdate: Cascade, onDelete: Cascade)
     postId    String?
 }
 
-model Profile {
-    id     String  @id @default(cuid())
+model Profile with CommonFields {
     bio    String
     age    Int?
     user   User?   @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)

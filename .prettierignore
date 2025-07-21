@@ -1,2 +1,2 @@
 packages/language/src/generated/**
-**/schema.ts
+**/test/**/schema.ts

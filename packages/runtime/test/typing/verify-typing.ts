@@ -1,6 +1,6 @@
 import SQLite from 'better-sqlite3';
 import { ZenStackClient } from '../../dist';
-import { Role } from './models';
+import { Role, type Identity, type IdentityProvider } from './models';
 import { schema } from './schema';
 
 const client = new ZenStackClient(schema, {
@@ -28,6 +28,7 @@ async function main() {
     await groupBy();
     await queryBuilder();
     enums();
+    typeDefs();
 }
 
 async function find() {
@@ -610,6 +611,20 @@ function enums() {
     let b = Role.ADMIN;
     b = a;
     console.log(b);
+}
+
+function typeDefs() {
+    const identityProvider: IdentityProvider = {
+        id: '123',
+        name: 'GitHub',
+    };
+    console.log(identityProvider.id);
+    console.log(identityProvider.name);
+
+    const identity: Identity = {
+        providers: [identityProvider],
+    };
+    console.log(identity.providers[0]?.name);
 }
 
 main();

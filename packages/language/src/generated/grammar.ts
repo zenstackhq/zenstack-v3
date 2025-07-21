@@ -126,7 +126,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
           {
             "$type": "RuleCall",
             "rule": {
-              "$ref": "#/rules@40"
+              "$ref": "#/rules@42"
             },
             "arguments": []
           },
@@ -1921,16 +1921,6 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
                 "$type": "Group",
                 "elements": [
                   {
-                    "$type": "Assignment",
-                    "feature": "isAbstract",
-                    "operator": "?=",
-                    "terminal": {
-                      "$type": "Keyword",
-                      "value": "abstract"
-                    },
-                    "cardinality": "?"
-                  },
-                  {
                     "$type": "Keyword",
                     "value": "model"
                   },
@@ -1947,45 +1937,59 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
                     }
                   },
                   {
-                    "$type": "Group",
+                    "$type": "Alternatives",
                     "elements": [
                       {
-                        "$type": "Keyword",
-                        "value": "extends"
+                        "$type": "RuleCall",
+                        "rule": {
+                          "$ref": "#/rules@38"
+                        },
+                        "arguments": []
                       },
                       {
-                        "$type": "Assignment",
-                        "feature": "superTypes",
-                        "operator": "+=",
-                        "terminal": {
-                          "$type": "CrossReference",
-                          "type": {
-                            "$ref": "#/rules@37"
-                          },
-                          "deprecatedSyntax": false
-                        }
+                        "$type": "RuleCall",
+                        "rule": {
+                          "$ref": "#/rules@39"
+                        },
+                        "arguments": []
                       },
                       {
                         "$type": "Group",
                         "elements": [
                           {
-                            "$type": "Keyword",
-                            "value": ","
+                            "$type": "RuleCall",
+                            "rule": {
+                              "$ref": "#/rules@39"
+                            },
+                            "arguments": []
                           },
                           {
-                            "$type": "Assignment",
-                            "feature": "superTypes",
-                            "operator": "+=",
-                            "terminal": {
-                              "$type": "CrossReference",
-                              "type": {
-                                "$ref": "#/rules@37"
-                              },
-                              "deprecatedSyntax": false
-                            }
+                            "$type": "RuleCall",
+                            "rule": {
+                              "$ref": "#/rules@38"
+                            },
+                            "arguments": []
                           }
-                        ],
-                        "cardinality": "*"
+                        ]
+                      },
+                      {
+                        "$type": "Group",
+                        "elements": [
+                          {
+                            "$type": "RuleCall",
+                            "rule": {
+                              "$ref": "#/rules@38"
+                            },
+                            "arguments": []
+                          },
+                          {
+                            "$type": "RuleCall",
+                            "rule": {
+                              "$ref": "#/rules@39"
+                            },
+                            "arguments": []
+                          }
+                        ]
                       }
                     ],
                     "cardinality": "?"
@@ -2034,7 +2038,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@38"
+                    "$ref": "#/rules@40"
                   },
                   "arguments": []
                 }
@@ -2069,7 +2073,92 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
     },
     {
       "$type": "ParserRule",
-      "name": "DataModelField",
+      "fragment": true,
+      "name": "WithClause",
+      "definition": {
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "Keyword",
+            "value": "with"
+          },
+          {
+            "$type": "Assignment",
+            "feature": "mixins",
+            "operator": "+=",
+            "terminal": {
+              "$type": "CrossReference",
+              "type": {
+                "$ref": "#/rules@42"
+              },
+              "deprecatedSyntax": false
+            }
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Keyword",
+                "value": ",",
+                "cardinality": "?"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "mixins",
+                "operator": "+=",
+                "terminal": {
+                  "$type": "CrossReference",
+                  "type": {
+                    "$ref": "#/rules@42"
+                  },
+                  "deprecatedSyntax": false
+                }
+              }
+            ],
+            "cardinality": "*"
+          }
+        ]
+      },
+      "definesHiddenTokens": false,
+      "entry": false,
+      "hiddenTokens": [],
+      "parameters": [],
+      "wildcard": false
+    },
+    {
+      "$type": "ParserRule",
+      "fragment": true,
+      "name": "ExtendsClause",
+      "definition": {
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "Keyword",
+            "value": "inherits"
+          },
+          {
+            "$type": "Assignment",
+            "feature": "baseModel",
+            "operator": "=",
+            "terminal": {
+              "$type": "CrossReference",
+              "type": {
+                "$ref": "#/rules@37"
+              },
+              "deprecatedSyntax": false
+            }
+          }
+        ]
+      },
+      "definesHiddenTokens": false,
+      "entry": false,
+      "hiddenTokens": [],
+      "parameters": [],
+      "wildcard": false
+    },
+    {
+      "$type": "ParserRule",
+      "name": "DataField",
       "definition": {
         "$type": "Group",
         "elements": [
@@ -2105,7 +2194,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
             "terminal": {
               "$type": "RuleCall",
               "rule": {
-                "$ref": "#/rules@39"
+                "$ref": "#/rules@41"
               },
               "arguments": []
             }
@@ -2134,7 +2223,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
     },
     {
       "$type": "ParserRule",
-      "name": "DataModelFieldType",
+      "name": "DataFieldType",
       "definition": {
         "$type": "Group",
         "elements": [
@@ -2172,7 +2261,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
                 "terminal": {
                   "$type": "CrossReference",
                   "type": {
-                    "$ref": "#/types@3"
+                    "$ref": "#/types@2"
                   },
                   "terminal": {
                     "$type": "RuleCall",
@@ -2260,6 +2349,14 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
             }
           },
           {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@38"
+            },
+            "arguments": [],
+            "cardinality": "?"
+          },
+          {
             "$type": "Keyword",
             "value": "{"
           },
@@ -2273,7 +2370,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
                 "terminal": {
                   "$type": "RuleCall",
                   "rule": {
-                    "$ref": "#/rules@41"
+                    "$ref": "#/rules@40"
                   },
                   "arguments": []
                 }
@@ -2296,151 +2393,6 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
           {
             "$type": "Keyword",
             "value": "}"
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "TypeDefField",
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "Assignment",
-            "feature": "comments",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@71"
-              },
-              "arguments": []
-            },
-            "cardinality": "*"
-          },
-          {
-            "$type": "Assignment",
-            "feature": "name",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@52"
-              },
-              "arguments": []
-            }
-          },
-          {
-            "$type": "Assignment",
-            "feature": "type",
-            "operator": "=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@42"
-              },
-              "arguments": []
-            }
-          },
-          {
-            "$type": "Assignment",
-            "feature": "attributes",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@56"
-              },
-              "arguments": []
-            },
-            "cardinality": "*"
-          }
-        ]
-      },
-      "definesHiddenTokens": false,
-      "entry": false,
-      "fragment": false,
-      "hiddenTokens": [],
-      "parameters": [],
-      "wildcard": false
-    },
-    {
-      "$type": "ParserRule",
-      "name": "TypeDefFieldType",
-      "definition": {
-        "$type": "Group",
-        "elements": [
-          {
-            "$type": "Alternatives",
-            "elements": [
-              {
-                "$type": "Assignment",
-                "feature": "type",
-                "operator": "=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@62"
-                  },
-                  "arguments": []
-                }
-              },
-              {
-                "$type": "Assignment",
-                "feature": "reference",
-                "operator": "=",
-                "terminal": {
-                  "$type": "CrossReference",
-                  "type": {
-                    "$ref": "#/types@2"
-                  },
-                  "terminal": {
-                    "$type": "RuleCall",
-                    "rule": {
-                      "$ref": "#/rules@51"
-                    },
-                    "arguments": []
-                  },
-                  "deprecatedSyntax": false
-                }
-              }
-            ]
-          },
-          {
-            "$type": "Group",
-            "elements": [
-              {
-                "$type": "Assignment",
-                "feature": "array",
-                "operator": "?=",
-                "terminal": {
-                  "$type": "Keyword",
-                  "value": "["
-                }
-              },
-              {
-                "$type": "Keyword",
-                "value": "]"
-              }
-            ],
-            "cardinality": "?"
-          },
-          {
-            "$type": "Assignment",
-            "feature": "optional",
-            "operator": "?=",
-            "terminal": {
-              "$type": "Keyword",
-              "value": "?"
-            },
-            "cardinality": "?"
           }
         ]
       },
@@ -2851,7 +2803,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
                 "terminal": {
                   "$type": "CrossReference",
                   "type": {
-                    "$ref": "#/types@3"
+                    "$ref": "#/types@2"
                   },
                   "terminal": {
                     "$type": "RuleCall",
@@ -3465,7 +3417,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
                 "terminal": {
                   "$type": "CrossReference",
                   "type": {
-                    "$ref": "#/types@3"
+                    "$ref": "#/types@2"
                   },
                   "terminal": {
                     "$type": "RuleCall",
@@ -3519,7 +3471,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
     },
     {
       "$type": "ParserRule",
-      "name": "DataModelFieldAttribute",
+      "name": "DataFieldAttribute",
       "definition": {
         "$type": "Group",
         "elements": [
@@ -4036,13 +3988,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
           {
             "$type": "SimpleType",
             "typeRef": {
-              "$ref": "#/rules@38"
-            }
-          },
-          {
-            "$type": "SimpleType",
-            "typeRef": {
-              "$ref": "#/rules@41"
+              "$ref": "#/rules@40"
             }
           },
           {
@@ -4058,42 +4004,10 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
       "$type": "Type",
       "name": "MemberAccessTarget",
       "type": {
-        "$type": "UnionType",
-        "types": [
-          {
-            "$type": "SimpleType",
-            "typeRef": {
-              "$ref": "#/rules@38"
-            }
-          },
-          {
-            "$type": "SimpleType",
-            "typeRef": {
-              "$ref": "#/rules@41"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "$type": "Type",
-      "name": "TypeDefFieldTypes",
-      "type": {
-        "$type": "UnionType",
-        "types": [
-          {
-            "$type": "SimpleType",
-            "typeRef": {
-              "$ref": "#/rules@40"
-            }
-          },
-          {
-            "$type": "SimpleType",
-            "typeRef": {
-              "$ref": "#/rules@44"
-            }
-          }
-        ]
+        "$type": "SimpleType",
+        "typeRef": {
+          "$ref": "#/rules@40"
+        }
       }
     },
     {
@@ -4111,7 +4025,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
           {
             "$type": "SimpleType",
             "typeRef": {
-              "$ref": "#/rules@40"
+              "$ref": "#/rules@42"
             }
           },
           {

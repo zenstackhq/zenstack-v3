@@ -49,7 +49,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         }
 
         table = this.addPrimaryKeyConstraint(table, model, modelDef);
-        table = this.addUniqueConstraint(table, modelDef);
+        table = this.addUniqueConstraint(table, model, modelDef);
 
         return table;
     }
@@ -77,7 +77,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         return table;
     }
 
-    private addUniqueConstraint(table: CreateTableBuilder<string, any>, modelDef: ModelDef) {
+    private addUniqueConstraint(table: CreateTableBuilder<string, any>, model: string, modelDef: ModelDef) {
         for (const [key, value] of Object.entries(modelDef.uniqueFields)) {
             invariant(typeof value === 'object', 'expecting an object');
             if ('type' in value) {
@@ -86,9 +86,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 if (fieldDef.unique) {
                     continue;
                 }
+                table = table.addUniqueConstraint(`unique_${model}_${key}`, [key]);
             } else {
                 // multi-field constraint
-                table = table.addUniqueConstraint(`unique_${key}`, Object.keys(value));
+                table = table.addUniqueConstraint(`unique_${model}_${key}`, Object.keys(value));
             }
         }
         return table;

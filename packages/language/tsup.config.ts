@@ -4,6 +4,7 @@ export default defineConfig({
     entry: {
         index: 'src/index.ts',
         ast: 'src/ast.ts',
+        utils: 'src/utils.ts',
     },
     outDir: 'dist',
     splitting: false,

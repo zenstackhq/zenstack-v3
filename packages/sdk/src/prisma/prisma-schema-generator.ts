@@ -4,11 +4,11 @@ import {
     ConfigArrayExpr,
     ConfigExpr,
     ConfigInvocationArg,
+    DataField,
+    DataFieldAttribute,
+    DataFieldType,
     DataModel,
     DataModelAttribute,
-    DataModelField,
-    DataModelFieldAttribute,
-    DataModelFieldType,
     DataSource,
     Enum,
     EnumField,
@@ -30,12 +30,11 @@ import {
     type AstNode,
 } from '@zenstackhq/language/ast';
 import { AstUtils } from 'langium';
-import { match, P } from 'ts-pattern';
+import { match } from 'ts-pattern';
 
+import { getAllAttributes, getAllFields } from '@zenstackhq/language/utils';
 import { ModelUtils, ZModelCodeGenerator } from '..';
 import {
-    AttributeArgValue,
-    ModelField,
     ModelFieldType,
     AttributeArg as PrismaAttributeArg,
     AttributeArgValue as PrismaAttributeArgValue,
@@ -151,15 +150,17 @@ export class PrismaSchemaGenerator {
 
     private generateModel(prisma: PrismaModel, decl: DataModel) {
         const model = decl.isView ? prisma.addView(decl.name) : prisma.addModel(decl.name);
-        for (const field of decl.fields) {
+        const allFields = getAllFields(decl, true);
+        for (const field of allFields) {
             if (ModelUtils.hasAttribute(field, '@computed')) {
                 continue; // skip computed fields
             }
             // TODO: exclude fields inherited from delegate
-            this.generateModelField(model, field);
+            this.generateModelField(model, field, decl);
         }
 
-        for (const attr of decl.attributes.filter((attr) => this.isPrismaAttribute(attr))) {
+        const allAttributes = getAllAttributes(decl);
+        for (const attr of allAttributes.filter((attr) => this.isPrismaAttribute(attr))) {
             this.generateContainerAttribute(model, attr);
         }
 
@@ -183,14 +184,14 @@ export class PrismaSchemaGenerator {
         // this.ensureRelationsInheritedFromDelegate(model, decl);
     }
 
-    private isPrismaAttribute(attr: DataModelAttribute | DataModelFieldAttribute) {
+    private isPrismaAttribute(attr: DataModelAttribute | DataFieldAttribute) {
         if (!attr.decl.ref) {
             return false;
         }
         return attr.decl.ref.attributes.some((a) => a.decl.ref?.name === '@@@prisma');
     }
 
-    private getUnsupportedFieldType(fieldType: DataModelFieldType) {
+    private getUnsupportedFieldType(fieldType: DataFieldType) {
         if (fieldType.unsupported) {
             const value = this.getStringLiteral(fieldType.unsupported.value);
             if (value) {
@@ -207,7 +208,7 @@ export class PrismaSchemaGenerator {
         return isStringLiteral(node) ? node.value : undefined;
     }
 
-    private generateModelField(model: PrismaDataModel, field: DataModelField, addToFront = false) {
+    private generateModelField(model: PrismaDataModel, field: DataField, contextModel: DataModel, addToFront = false) {
         let fieldType: string | undefined;
 
         if (field.type.type) {
@@ -245,7 +246,7 @@ export class PrismaSchemaGenerator {
                 (attr) =>
                     // when building physical schema, exclude `@default` for id fields inherited from delegate base
                     !(
-                        ModelUtils.isIdField(field) &&
+                        ModelUtils.isIdField(field, contextModel) &&
                         this.isInheritedFromDelegate(field) &&
                         attr.decl.$refText === '@default'
                     ),
@@ -257,7 +258,7 @@ export class PrismaSchemaGenerator {
         return result;
     }
 
-    private isDefaultWithPluginInvocation(attr: DataModelFieldAttribute) {
+    private isDefaultWithPluginInvocation(attr: DataFieldAttribute) {
         if (attr.decl.ref?.name !== '@default') {
             return false;
         }
@@ -275,28 +276,11 @@ export class PrismaSchemaGenerator {
         return !!model && !!model.$document && model.$document.uri.path.endsWith('plugin.zmodel');
     }
 
-    private setDummyDefault(result: ModelField, field: DataModelField) {
-        const dummyDefaultValue = match(field.type.type)
-            .with('String', () => new AttributeArgValue('String', ''))
-            .with(P.union('Int', 'BigInt', 'Float', 'Decimal'), () => new AttributeArgValue('Number', '0'))
-            .with('Boolean', () => new AttributeArgValue('Boolean', 'false'))
-            .with('DateTime', () => new AttributeArgValue('FunctionCall', new PrismaFunctionCall('now')))
-            .with('Json', () => new AttributeArgValue('String', '{}'))
-            .with('Bytes', () => new AttributeArgValue('String', ''))
-            .otherwise(() => {
-                throw new Error(`Unsupported field type with default value: ${field.type.type}`);
-            });
-
-        result.attributes.push(
-            new PrismaFieldAttribute('@default', [new PrismaAttributeArg(undefined, dummyDefaultValue)]),
-        );
-    }
-
-    private isInheritedFromDelegate(field: DataModelField) {
+    private isInheritedFromDelegate(field: DataField) {
         return field.$inheritedFrom && ModelUtils.isDelegateModel(field.$inheritedFrom);
     }
 
-    private makeFieldAttribute(attr: DataModelFieldAttribute) {
+    private makeFieldAttribute(attr: DataFieldAttribute) {
         const attrName = attr.decl.ref!.name;
         return new PrismaFieldAttribute(
             attrName,

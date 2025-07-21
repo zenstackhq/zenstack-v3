@@ -17,6 +17,8 @@ type Options = {
  * CLI action for generating code from schema
  */
 export async function run(options: Options) {
+    const start = Date.now();
+
     const schemaFile = getSchemaFile(options.schema);
 
     const model = await loadSchemaDocument(schemaFile);
@@ -40,7 +42,7 @@ export async function run(options: Options) {
     }
 
     if (!options.silent) {
-        console.log(colors.green('Generation completed successfully.'));
+        console.log(colors.green(`Generation completed successfully in ${Date.now() - start}ms.`));
         console.log(`You can now create a ZenStack client with it.
 
 \`\`\`ts

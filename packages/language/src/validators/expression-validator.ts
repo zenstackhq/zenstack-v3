@@ -18,7 +18,7 @@ import {
     findUpAst,
     isAuthInvocation,
     isAuthOrAuthMemberAccess,
-    isDataModelFieldReference,
+    isDataFieldReference,
     isEnumFieldReference,
     typeAssignable,
 } from '../utils';
@@ -149,8 +149,8 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                     // in validation context, all fields are optional, so we should allow
                     // comparing any field against null
                     if (
-                        (isDataModelFieldReference(expr.left) && isNullExpr(expr.right)) ||
-                        (isDataModelFieldReference(expr.right) && isNullExpr(expr.left))
+                        (isDataFieldReference(expr.left) && isNullExpr(expr.right)) ||
+                        (isDataFieldReference(expr.right) && isNullExpr(expr.left))
                     ) {
                         return;
                     }
@@ -204,13 +204,13 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                     //   - foo == bar
                     //   - foo == this
                     if (
-                        isDataModelFieldReference(expr.left) &&
-                        (isThisExpr(expr.right) || isDataModelFieldReference(expr.right))
+                        isDataFieldReference(expr.left) &&
+                        (isThisExpr(expr.right) || isDataFieldReference(expr.right))
                     ) {
                         accept('error', 'comparison between model-typed fields are not supported', { node: expr });
                     } else if (
-                        isDataModelFieldReference(expr.right) &&
-                        (isThisExpr(expr.left) || isDataModelFieldReference(expr.left))
+                        isDataFieldReference(expr.right) &&
+                        (isThisExpr(expr.left) || isDataFieldReference(expr.left))
                     ) {
                         accept('error', 'comparison between model-typed fields are not supported', { node: expr });
                     }

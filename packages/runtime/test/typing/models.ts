@@ -6,12 +6,14 @@
 /* eslint-disable */
 
 import { schema as $schema, type SchemaType as $Schema } from "./schema";
-import { type ModelResult as $ModelResult } from "@zenstackhq/runtime";
+import { type ModelResult as $ModelResult, type TypeDefResult as $TypeDefResult } from "@zenstackhq/runtime";
 export type User = $ModelResult<$Schema, "User">;
 export type Post = $ModelResult<$Schema, "Post">;
 export type Profile = $ModelResult<$Schema, "Profile">;
 export type Tag = $ModelResult<$Schema, "Tag">;
 export type Region = $ModelResult<$Schema, "Region">;
 export type Meta = $ModelResult<$Schema, "Meta">;
+export type Identity = $TypeDefResult<$Schema, "Identity">;
+export type IdentityProvider = $TypeDefResult<$Schema, "IdentityProvider">;
 export const Role = $schema.enums.Role;
 export type Role = (typeof Role)[keyof typeof Role];

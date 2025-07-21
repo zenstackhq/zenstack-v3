@@ -40,6 +40,7 @@ async function find() {
     });
     console.log(user1?.name);
     console.log(user1?.postCount);
+    console.log(user1?.identity?.providers[0]?.name);
 
     const users = await client.user.findMany({
         include: { posts: true },
@@ -205,6 +206,24 @@ async function create() {
                     // @ts-expect-error userId is not allowed
                     userId: 1,
                 },
+            },
+            identity: {
+                providers: [
+                    {
+                        id: '123',
+                        name: 'GitHub',
+                        // undeclared fields are allowed
+                        otherField: 123,
+                    },
+                    {
+                        id: '234',
+                        // name is optional
+                    },
+                    // @ts-expect-error id is required
+                    {
+                        name: 'Google',
+                    },
+                ],
             },
         },
     });

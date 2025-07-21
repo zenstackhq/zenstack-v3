@@ -2,11 +2,11 @@ import type Decimal from 'decimal.js';
 import type { Generated, Kysely } from 'kysely';
 import type {
     FieldHasDefault,
-    FieldIsOptional,
     ForeignKeyFields,
     GetModelFields,
     GetModelFieldType,
     GetModels,
+    ModelFieldIsOptional,
     ScalarFields,
     SchemaDef,
 } from '../schema';
@@ -45,7 +45,7 @@ type MapType<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,
-> = WrapNull<MapBaseType<GetModelFieldType<Schema, Model, Field>>, FieldIsOptional<Schema, Model, Field>>;
+> = WrapNull<MapBaseType<GetModelFieldType<Schema, Model, Field>>, ModelFieldIsOptional<Schema, Model, Field>>;
 
 type toKyselyFieldType<
     Schema extends SchemaDef,

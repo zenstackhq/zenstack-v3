@@ -4,7 +4,6 @@ import type {
     FieldDef,
     FieldHasDefault,
     FieldIsArray,
-    FieldIsOptional,
     FieldIsRelation,
     FieldIsRelationArray,
     FieldType,
@@ -19,12 +18,14 @@ import type {
     GetTypeDefField,
     GetTypeDefFields,
     GetTypeDefs,
+    ModelFieldIsOptional,
     NonRelationFields,
     RelationFields,
     RelationFieldType,
     RelationInfo,
     ScalarFields,
     SchemaDef,
+    TypeDefFieldIsOptional,
 } from '../schema';
 import type {
     AtLeast,
@@ -86,21 +87,21 @@ type ModelSelectResult<Schema extends SchemaDef, Model extends GetModels<Schema>
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
                           Pick<Select[Key], 'select'>,
-                          FieldIsOptional<Schema, Model, Key>,
+                          ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >
                     : ModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
                           Pick<Select[Key], 'include' | 'omit'>,
-                          FieldIsOptional<Schema, Model, Key>,
+                          ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >
                 : DefaultModelResult<
                       Schema,
                       RelationFieldType<Schema, Model, Key>,
                       Omit,
-                      FieldIsOptional<Schema, Model, Key>,
+                      ModelFieldIsOptional<Schema, Model, Key>,
                       FieldIsArray<Schema, Model, Key>
                   >
             : never;
@@ -143,14 +144,14 @@ export type ModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
                           I[Key],
-                          FieldIsOptional<Schema, Model, Key>,
+                          ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >
                     : DefaultModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
                           undefined,
-                          FieldIsOptional<Schema, Model, Key>,
+                          ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >;
             }
@@ -169,9 +170,17 @@ export type SimplifiedModelResult<
     Array = false,
 > = Simplify<ModelResult<Schema, Model, Args, Optional, Array>>;
 
-export type TypeDefResult<Schema extends SchemaDef, TypeDef extends GetTypeDefs<Schema>> = {
-    [Key in GetTypeDefFields<Schema, TypeDef>]: MapTypeDefFieldType<Schema, TypeDef, Key>;
-};
+export type TypeDefResult<Schema extends SchemaDef, TypeDef extends GetTypeDefs<Schema>> = Optional<
+    {
+        [Key in GetTypeDefFields<Schema, TypeDef>]: MapTypeDefFieldType<Schema, TypeDef, Key>;
+    },
+    // optionality
+    keyof {
+        [Key in GetTypeDefFields<Schema, TypeDef> as TypeDefFieldIsOptional<Schema, TypeDef, Key> extends true
+            ? Key
+            : never]: Key;
+    }
+>;
 
 export type BatchResult = { count: number };
 
@@ -193,11 +202,11 @@ export type WhereInput<
           RelationFilter<Schema, Model, Key>
         : // enum
           GetModelFieldType<Schema, Model, Key> extends GetEnums<Schema>
-          ? EnumFilter<Schema, GetModelFieldType<Schema, Model, Key>, FieldIsOptional<Schema, Model, Key>>
+          ? EnumFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>
           : FieldIsArray<Schema, Model, Key> extends true
             ? ArrayFilter<GetModelFieldType<Schema, Model, Key>>
             : // primitive
-              PrimitiveFilter<GetModelFieldType<Schema, Model, Key>, FieldIsOptional<Schema, Model, Key>>;
+              PrimitiveFilter<GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>;
 } & {
     $expr?: (eb: ExpressionBuilder<ToKyselySchema<Schema>, Model>) => OperandExpression<SqlBool>;
 } & {
@@ -290,7 +299,7 @@ export type OrderBy<
     WithRelation extends boolean,
     WithAggregation extends boolean,
 > = {
-    [Key in NonRelationFields<Schema, Model>]?: FieldIsOptional<Schema, Model, Key> extends true
+    [Key in NonRelationFields<Schema, Model>]?: ModelFieldIsOptional<Schema, Model, Key> extends true
         ?
               | SortOrder
               | {
@@ -391,7 +400,7 @@ export type IncludeInput<Schema extends SchemaDef, Model extends GetModels<Schem
               // where clause is allowed only if the relation is array or optional
               FieldIsArray<Schema, Model, Key> extends true
                   ? true
-                  : FieldIsOptional<Schema, Model, Key> extends true
+                  : ModelFieldIsOptional<Schema, Model, Key> extends true
                     ? true
                     : false
           >;
@@ -427,14 +436,14 @@ type ToOneRelationFilter<
     WhereInput<Schema, RelationFieldType<Schema, Model, Field>> & {
         is?: NullableIf<
             WhereInput<Schema, RelationFieldType<Schema, Model, Field>>,
-            FieldIsOptional<Schema, Model, Field>
+            ModelFieldIsOptional<Schema, Model, Field>
         >;
         isNot?: NullableIf<
             WhereInput<Schema, RelationFieldType<Schema, Model, Field>>,
-            FieldIsOptional<Schema, Model, Field>
+            ModelFieldIsOptional<Schema, Model, Field>
         >;
     },
-    FieldIsOptional<Schema, Model, Field>
+    ModelFieldIsOptional<Schema, Model, Field>
 >;
 
 type RelationFilter<
@@ -460,23 +469,20 @@ type MapTypeDefFieldType<
     Schema extends SchemaDef,
     TypeDef extends GetTypeDefs<Schema>,
     Field extends GetTypeDefFields<Schema, TypeDef>,
-> =
-    GetTypeDefField<Schema, TypeDef, Field>['type'] extends GetTypeDefs<Schema>
-        ? WrapType<
-              TypeDefResult<Schema, GetTypeDefField<Schema, TypeDef, Field>['type']>,
-              GetTypeDefField<Schema, TypeDef, Field>['optional'],
-              GetTypeDefField<Schema, TypeDef, Field>['array']
-          >
-        : MapFieldDefType<Schema, GetTypeDefField<Schema, TypeDef, Field>>;
+> = MapFieldDefType<Schema, GetTypeDefField<Schema, TypeDef, Field>>;
 
 type MapFieldDefType<Schema extends SchemaDef, T extends Pick<FieldDef, 'type' | 'optional' | 'array'>> = WrapType<
-    T['type'] extends GetEnums<Schema> ? keyof GetEnum<Schema, T['type']> : MapBaseType<T['type']>,
+    T['type'] extends GetEnums<Schema>
+        ? keyof GetEnum<Schema, T['type']>
+        : T['type'] extends GetTypeDefs<Schema>
+          ? TypeDefResult<Schema, T['type']> & Record<string, unknown>
+          : MapBaseType<T['type']>,
     T['optional'],
     T['array']
 >;
 
 type OptionalFieldsForCreate<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
-    [Key in GetModelFields<Schema, Model> as FieldIsOptional<Schema, Model, Key> extends true
+    [Key in GetModelFields<Schema, Model> as ModelFieldIsOptional<Schema, Model, Key> extends true
         ? Key
         : FieldHasDefault<Schema, Model, Key> extends true
           ? Key
@@ -752,7 +758,7 @@ type ScalarUpdatePayload<
     | MapModelFieldType<Schema, Model, Field>
     | (Field extends NumericFields<Schema, Model>
           ? {
-                set?: NullableIf<number, FieldIsOptional<Schema, Model, Field>>;
+                set?: NullableIf<number, ModelFieldIsOptional<Schema, Model, Field>>;
                 increment?: number;
                 decrement?: number;
                 multiply?: number;
@@ -820,7 +826,7 @@ type ToOneRelationUpdateInput<
     connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
     update?: NestedUpdateInput<Schema, Model, Field>;
     upsert?: NestedUpsertInput<Schema, Model, Field>;
-} & (FieldIsOptional<Schema, Model, Field> extends true
+} & (ModelFieldIsOptional<Schema, Model, Field> extends true
     ? {
           disconnect?: DisconnectInput<Schema, Model, Field>;
           delete?: NestedDeleteInput<Schema, Model, Field>;

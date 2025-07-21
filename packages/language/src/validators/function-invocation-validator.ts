@@ -3,22 +3,22 @@ import { match, P } from 'ts-pattern';
 import { ExpressionContext } from '../constants';
 import {
     Argument,
+    DataFieldAttribute,
     DataModel,
     DataModelAttribute,
-    DataModelFieldAttribute,
     Expression,
     FunctionDecl,
     FunctionParam,
     InvocationExpr,
+    isDataFieldAttribute,
     isDataModel,
     isDataModelAttribute,
-    isDataModelFieldAttribute,
 } from '../generated/ast';
 import {
     getFunctionExpressionContext,
     getLiteral,
     isCheckInvocation,
-    isDataModelFieldReference,
+    isDataFieldReference,
     isFromStdlib,
     typeAssignable,
 } from '../utils';
@@ -56,9 +56,9 @@ export default class FunctionInvocationValidator implements AstValidator<Express
 
             // find the containing attribute context for the invocation
             let curr: AstNode | undefined = expr.$container;
-            let containerAttribute: DataModelAttribute | DataModelFieldAttribute | undefined;
+            let containerAttribute: DataModelAttribute | DataFieldAttribute | undefined;
             while (curr) {
-                if (isDataModelAttribute(curr) || isDataModelFieldAttribute(curr)) {
+                if (isDataModelAttribute(curr) || isDataFieldAttribute(curr)) {
                     containerAttribute = curr;
                     break;
                 }
@@ -176,7 +176,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         let valid = true;
 
         const fieldArg = expr.args[0]!.value;
-        if (!isDataModelFieldReference(fieldArg) || !isDataModel(fieldArg.$resolvedType?.decl)) {
+        if (!isDataFieldReference(fieldArg) || !isDataModel(fieldArg.$resolvedType?.decl)) {
             accept('error', 'argument must be a relation field', {
                 node: expr.args[0]!,
             });

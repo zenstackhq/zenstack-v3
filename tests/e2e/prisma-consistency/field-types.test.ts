@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ZenStackValidationTester, createTestDir, expectValidationSuccess, expectValidationFailure, baseSchema, sqliteSchema } from './test-utils';
+import {
+    ZenStackValidationTester,
+    createTestDir,
+    expectValidationSuccess,
+    expectValidationFailure,
+    baseSchema,
+    sqliteSchema,
+} from './test-utils';
 
 describe('Field Types Validation', () => {
     let tester: ZenStackValidationTester;

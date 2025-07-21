@@ -11,11 +11,11 @@ import {
     ConfigArrayExpr,
     ConfigField,
     ConfigInvocationExpr,
+    DataField,
+    DataFieldAttribute,
+    DataFieldType,
     DataModel,
     DataModelAttribute,
-    DataModelField,
-    DataModelFieldAttribute,
-    DataModelFieldType,
     DataSource,
     Enum,
     EnumField,
@@ -38,8 +38,6 @@ import {
     StringLiteral,
     ThisExpr,
     TypeDef,
-    TypeDefField,
-    TypeDefFieldType,
     UnaryExpr,
     type AstNode,
 } from '@zenstackhq/language/ast';
@@ -162,8 +160,8 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 
     @gen(DataModel)
     private _generateDataModel(ast: DataModel) {
-        return `${ast.isAbstract ? 'abstract ' : ''}${ast.isView ? 'view' : 'model'} ${ast.name}${
-            ast.superTypes.length > 0 ? ' extends ' + ast.superTypes.map((x) => x.ref?.name).join(', ') : ''
+        return `${ast.isView ? 'view' : 'model'} ${ast.name}${
+            ast.mixins.length > 0 ? ' mixes ' + ast.mixins.map((x) => x.ref?.name).join(', ') : ''
         } {
 ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
             ast.attributes.length > 0
@@ -173,17 +171,17 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 }`;
     }
 
-    @gen(DataModelField)
-    private _generateDataModelField(ast: DataModelField) {
+    @gen(DataField)
+    private _generateDataField(ast: DataField) {
         return `${ast.name} ${this.fieldType(ast.type)}${
             ast.attributes.length > 0 ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ') : ''
         }`;
     }
 
-    private fieldType(type: DataModelFieldType | TypeDefFieldType) {
+    private fieldType(type: DataFieldType) {
         const baseType = type.type
             ? type.type
-            : type.$type == 'DataModelFieldType' && type.unsupported
+            : type.$type == 'DataFieldType' && type.unsupported
               ? 'Unsupported(' + this.generate(type.unsupported.value) + ')'
               : type.reference?.$refText;
         return `${baseType}${type.array ? '[]' : ''}${type.optional ? '?' : ''}`;
@@ -194,12 +192,12 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
         return this.attribute(ast);
     }
 
-    @gen(DataModelFieldAttribute)
-    private _generateDataModelFieldAttribute(ast: DataModelFieldAttribute) {
+    @gen(DataFieldAttribute)
+    private _generateDataFieldAttribute(ast: DataFieldAttribute) {
         return this.attribute(ast);
     }
 
-    private attribute(ast: DataModelAttribute | DataModelFieldAttribute) {
+    private attribute(ast: DataModelAttribute | DataFieldAttribute) {
         const args = ast.args.length ? `(${ast.args.map((x) => this.generate(x)).join(', ')})` : '';
         return `${resolved(ast.decl).name}${args}`;
     }
@@ -336,13 +334,6 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
                 : ''
         }
 }`;
-    }
-
-    @gen(TypeDefField)
-    private _generateTypeDefField(ast: TypeDefField) {
-        return `${ast.name} ${this.fieldType(ast.type)}${
-            ast.attributes.length > 0 ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ') : ''
-        }`;
     }
 
     private argument(ast: Argument) {

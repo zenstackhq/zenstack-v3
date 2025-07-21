@@ -6,7 +6,7 @@
 /* eslint-disable */
 
 import { schema as $schema, type SchemaType as $Schema } from "./schema";
-import { type ModelResult as $ModelResult } from "@zenstackhq/runtime";
+import { type ModelResult as $ModelResult, type TypeDefResult as $TypeDefResult } from "@zenstackhq/runtime";
 /**
  * User model
  *
@@ -21,6 +21,7 @@ export type Profile = $ModelResult<$Schema, "Profile">;
  * Post model
  */
 export type Post = $ModelResult<$Schema, "Post">;
+export type CommonFields = $TypeDefResult<$Schema, "CommonFields">;
 /**
  * User roles
  */

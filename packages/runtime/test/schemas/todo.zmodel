@@ -73,7 +73,7 @@ model User {
     password      String?     @password @omit
     emailVerified DateTime?
     name          String?
-    bio           String      @ignore
+    bio           String?     @ignore
     ownedSpaces   Space[]
     spaces        SpaceUser[]
     image         String?     @url

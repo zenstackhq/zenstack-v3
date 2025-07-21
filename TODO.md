@@ -10,6 +10,8 @@
     - [x] validate
     - [ ] format
     - [ ] db seed
+- [ ] ZModel
+    - [ ] View support
 - [ ] ORM
     - [x] Create
         - [x] Input validation
@@ -56,13 +58,14 @@
         - [x] Aggregate
         - [x] Group by
     - [x] Raw queries
-    - [ ] Transactions
+    - [x] Transactions
         - [x] Interactive transaction
         - [x] Sequential transaction
     - [ ] Extensions
         - [x] Query builder API
         - [x] Computed fields
         - [x] Prisma client extension
+        - [ ] Custom procedures
     - [ ] Misc
         - [x] JSDoc for CRUD methods
         - [x] Cache validation schemas
@@ -71,7 +74,7 @@
         - [x] Many-to-many relation
         - [ ] Empty AND/OR/NOT behavior
         - [?] Logging
-        - [ ] Error system
+        - [x] Error system
         - [x] Custom table name
         - [x] Custom field name
         - [ ] Strict undefined checks
@@ -79,6 +82,8 @@
     - [ ] Benchmark
 - [ ] Plugin
     - [ ] Post-mutation hooks should be called after transaction is committed
+- [x] TypeDef and mixin
+- [ ] Strongly typed JSON
 - [ ] Polymorphism
 - [ ] Validation
 - [ ] Access Policy

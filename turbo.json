@@ -3,7 +3,7 @@
     "tasks": {
         "build": {
             "dependsOn": ["^build"],
-            "inputs": ["src/**"],
+            "inputs": ["src/**", "zenstack/*.zmodel"],
             "outputs": ["dist/**"]
         },
         "lint": {

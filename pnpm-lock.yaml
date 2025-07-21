@@ -197,6 +197,9 @@ importers:
       '@types/pluralize':
         specifier: ^0.0.33
         version: 0.0.33
+      '@zenstackhq/common-helpers':
+        specifier: workspace:*
+        version: link:../common-helpers
       '@zenstackhq/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config

@@ -4,8 +4,8 @@ import type {
     FieldHasDefault,
     FieldIsOptional,
     ForeignKeyFields,
-    GetFields,
-    GetFieldType,
+    GetModelFields,
+    GetModelFieldType,
     GetModels,
     ScalarFields,
     SchemaDef,
@@ -44,13 +44,13 @@ type WrapNull<T, Null> = Null extends true ? T | null : T;
 type MapType<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>,
-> = WrapNull<MapBaseType<GetFieldType<Schema, Model, Field>>, FieldIsOptional<Schema, Model, Field>>;
+    Field extends GetModelFields<Schema, Model>,
+> = WrapNull<MapBaseType<GetModelFieldType<Schema, Model, Field>>, FieldIsOptional<Schema, Model, Field>>;
 
 type toKyselyFieldType<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>,
+    Field extends GetModelFields<Schema, Model>,
 > =
     FieldHasDefault<Schema, Model, Field> extends true
         ? Generated<MapType<Schema, Model, Field>>

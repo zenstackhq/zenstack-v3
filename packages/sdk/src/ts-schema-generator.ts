@@ -4,18 +4,18 @@ import {
     ArrayExpr,
     AttributeArg,
     BinaryExpr,
+    DataField,
+    DataFieldAttribute,
+    DataFieldType,
     DataModel,
     DataModelAttribute,
-    DataModelField,
-    DataModelFieldAttribute,
-    DataModelFieldType,
     Enum,
     Expression,
     InvocationExpr,
     isArrayExpr,
     isBinaryExpr,
+    isDataField,
     isDataModel,
-    isDataModelField,
     isDataSource,
     isEnum,
     isEnumField,
@@ -26,20 +26,23 @@ import {
     isProcedure,
     isReferenceExpr,
     isThisExpr,
+    isTypeDef,
     isUnaryExpr,
     LiteralExpr,
     MemberAccessExpr,
     Procedure,
     ReferenceExpr,
+    TypeDef,
     UnaryExpr,
     type Model,
 } from '@zenstackhq/language/ast';
+import { getAllAttributes, getAllFields } from '@zenstackhq/language/utils';
 import fs from 'node:fs';
 import path from 'node:path';
 import { match } from 'ts-pattern';
 import * as ts from 'typescript';
 import { ModelUtils } from '.';
-import { getAttribute, getAuthDecl, hasAttribute, isIdField, isUniqueField } from './model-utils';
+import { getAttribute, getAuthDecl, hasAttribute, isUniqueField } from './model-utils';
 
 export class TsSchemaGenerator {
     public async generate(schemaFile: string, pluginModelFiles: string[], outputDir: string) {
@@ -56,7 +59,7 @@ export class TsSchemaGenerator {
         this.generateSchema(model, outputDir);
 
         // the model types
-        this.generateModels(model, outputDir);
+        this.generateModelsAndTypeDefs(model, outputDir);
 
         // the input types
         this.generateInputTypes(model, outputDir);
@@ -141,6 +144,11 @@ export class TsSchemaGenerator {
 
             // models
             ts.factory.createPropertyAssignment('models', this.createModelsObject(model)),
+
+            // typeDefs
+            ...(model.declarations.some(isTypeDef)
+                ? [ts.factory.createPropertyAssignment('typeDefs', this.createTypeDefsObject(model))]
+                : []),
         ];
 
         // enums
@@ -194,28 +202,38 @@ export class TsSchemaGenerator {
         );
     }
 
+    private createTypeDefsObject(model: Model): ts.Expression {
+        return ts.factory.createObjectLiteralExpression(
+            model.declarations
+                .filter((d): d is TypeDef => isTypeDef(d))
+                .map((td) => ts.factory.createPropertyAssignment(td.name, this.createTypeDefObject(td))),
+            true,
+        );
+    }
+
     private createDataModelObject(dm: DataModel) {
+        const allFields = getAllFields(dm);
+        const allAttributes = getAllAttributes(dm);
+
         const fields: ts.PropertyAssignment[] = [
             // fields
             ts.factory.createPropertyAssignment(
                 'fields',
                 ts.factory.createObjectLiteralExpression(
-                    dm.fields
-                        .filter((field) => !hasAttribute(field, '@ignore'))
-                        .map((field) =>
-                            ts.factory.createPropertyAssignment(field.name, this.createDataModelFieldObject(field)),
-                        ),
+                    allFields.map((field) =>
+                        ts.factory.createPropertyAssignment(field.name, this.createDataFieldObject(field, dm)),
+                    ),
                     true,
                 ),
             ),
 
             // attributes
-            ...(dm.attributes.length > 0
+            ...(allAttributes.length > 0
                 ? [
                       ts.factory.createPropertyAssignment(
                           'attributes',
                           ts.factory.createArrayLiteralExpression(
-                              dm.attributes.map((attr) => this.createAttributeObject(attr)),
+                              allAttributes.map((attr) => this.createAttributeObject(attr)),
                               true,
                           ),
                       ),
@@ -245,7 +263,40 @@ export class TsSchemaGenerator {
         return ts.factory.createObjectLiteralExpression(fields, true);
     }
 
-    private createComputedFieldsObject(fields: DataModelField[]) {
+    private createTypeDefObject(td: TypeDef): ts.Expression {
+        const allFields = getAllFields(td);
+        const allAttributes = getAllAttributes(td);
+
+        const fields: ts.PropertyAssignment[] = [
+            // fields
+            ts.factory.createPropertyAssignment(
+                'fields',
+                ts.factory.createObjectLiteralExpression(
+                    allFields.map((field) =>
+                        ts.factory.createPropertyAssignment(field.name, this.createDataFieldObject(field, undefined)),
+                    ),
+                    true,
+                ),
+            ),
+
+            // attributes
+            ...(allAttributes.length > 0
+                ? [
+                      ts.factory.createPropertyAssignment(
+                          'attributes',
+                          ts.factory.createArrayLiteralExpression(
+                              allAttributes.map((attr) => this.createAttributeObject(attr)),
+                              true,
+                          ),
+                      ),
+                  ]
+                : []),
+        ];
+
+        return ts.factory.createObjectLiteralExpression(fields, true);
+    }
+
+    private createComputedFieldsObject(fields: DataField[]) {
         return ts.factory.createObjectLiteralExpression(
             fields.map((field) =>
                 ts.factory.createMethodDeclaration(
@@ -274,7 +325,7 @@ export class TsSchemaGenerator {
         );
     }
 
-    private mapFieldTypeToTSType(type: DataModelFieldType) {
+    private mapFieldTypeToTSType(type: DataFieldType) {
         let result = match(type.type)
             .with('String', () => 'string')
             .with('Boolean', () => 'boolean')
@@ -292,10 +343,10 @@ export class TsSchemaGenerator {
         return result;
     }
 
-    private createDataModelFieldObject(field: DataModelField) {
+    private createDataFieldObject(field: DataField, contextModel: DataModel | undefined) {
         const objectFields = [ts.factory.createPropertyAssignment('type', this.generateFieldTypeLiteral(field))];
 
-        if (isIdField(field)) {
+        if (contextModel && ModelUtils.isIdField(field, contextModel)) {
             objectFields.push(ts.factory.createPropertyAssignment('id', ts.factory.createTrue()));
         }
 
@@ -445,7 +496,7 @@ export class TsSchemaGenerator {
     }
 
     private getFieldMappedDefault(
-        field: DataModelField,
+        field: DataField,
     ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
         const defaultAttr = getAttribute(field, '@default');
         if (!defaultAttr) {
@@ -458,7 +509,7 @@ export class TsSchemaGenerator {
 
     private getMappedValue(
         expr: Expression,
-        fieldType: DataModelFieldType,
+        fieldType: DataFieldType,
     ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
         if (isLiteralExpr(expr)) {
             const lit = (expr as LiteralExpr).value;
@@ -507,7 +558,7 @@ export class TsSchemaGenerator {
         );
     }
 
-    private createRelationObject(field: DataModelField) {
+    private createRelationObject(field: DataField) {
         const relationFields: ts.PropertyAssignment[] = [];
 
         const oppositeRelation = this.getOppositeRelationField(field);
@@ -558,7 +609,7 @@ export class TsSchemaGenerator {
         return isArrayExpr(expr) && expr.items.map((item) => (item as ReferenceExpr).target.$refText);
     }
 
-    private getForeignKeyFor(field: DataModelField) {
+    private getForeignKeyFor(field: DataField) {
         const result: string[] = [];
         for (const f of field.$container.fields) {
             const relation = getAttribute(f, '@relation');
@@ -577,7 +628,7 @@ export class TsSchemaGenerator {
         return result;
     }
 
-    private getOppositeRelationField(field: DataModelField) {
+    private getOppositeRelationField(field: DataField) {
         if (!field.type.reference?.ref || !isDataModel(field.type.reference?.ref)) {
             return undefined;
         }
@@ -605,7 +656,7 @@ export class TsSchemaGenerator {
         return undefined;
     }
 
-    private getRelationName(field: DataModelField) {
+    private getRelationName(field: DataField) {
         const relation = getAttribute(field, '@relation');
         if (relation) {
             const nameArg = relation.args.find((arg) => arg.$resolvedParam.name === 'name');
@@ -618,14 +669,17 @@ export class TsSchemaGenerator {
     }
 
     private getIdFields(dm: DataModel) {
-        return dm.fields.filter(isIdField).map((f) => f.name);
+        return getAllFields(dm)
+            .filter((f) => ModelUtils.isIdField(f, dm))
+            .map((f) => f.name);
     }
 
     private createUniqueFieldsObject(dm: DataModel) {
         const properties: ts.PropertyAssignment[] = [];
 
         // field-level id and unique
-        for (const field of dm.fields) {
+        const allFields = getAllFields(dm);
+        for (const field of allFields) {
             if (hasAttribute(field, '@id') || hasAttribute(field, '@unique')) {
                 properties.push(
                     ts.factory.createPropertyAssignment(
@@ -639,11 +693,12 @@ export class TsSchemaGenerator {
         }
 
         // model-level id and unique
+        const allAttributes = getAllAttributes(dm);
 
         // it's possible to have the same set of fields in both `@@id` and `@@unique`
         // so we need to deduplicate them
         const seenKeys = new Set<string>();
-        for (const attr of dm.attributes) {
+        for (const attr of allAttributes) {
             if (attr.decl.$refText === '@@id' || attr.decl.$refText === '@@unique') {
                 const fieldNames = this.getReferenceNames(attr.args[0]!.value);
                 if (!fieldNames) {
@@ -652,7 +707,7 @@ export class TsSchemaGenerator {
 
                 if (fieldNames.length === 1) {
                     // single-field unique
-                    const fieldDef = dm.fields.find((f) => f.name === fieldNames[0])!;
+                    const fieldDef = allFields.find((f) => f.name === fieldNames[0])!;
                     properties.push(
                         ts.factory.createPropertyAssignment(
                             fieldNames[0]!,
@@ -673,7 +728,7 @@ export class TsSchemaGenerator {
                             fieldNames.join('_'),
                             ts.factory.createObjectLiteralExpression(
                                 fieldNames.map((field) => {
-                                    const fieldDef = dm.fields.find((f) => f.name === field)!;
+                                    const fieldDef = allFields.find((f) => f.name === field)!;
                                     return ts.factory.createPropertyAssignment(
                                         field,
                                         ts.factory.createObjectLiteralExpression([
@@ -694,7 +749,7 @@ export class TsSchemaGenerator {
         return ts.factory.createObjectLiteralExpression(properties, true);
     }
 
-    private generateFieldTypeLiteral(field: DataModelField): ts.Expression {
+    private generateFieldTypeLiteral(field: DataField): ts.Expression {
         invariant(
             field.type.type || field.type.reference || field.type.unsupported,
             'Field type must be a primitive, reference, or Unsupported',
@@ -831,7 +886,7 @@ export class TsSchemaGenerator {
         ts.addSyntheticLeadingComment(statements[0]!, ts.SyntaxKind.SingleLineCommentTrivia, banner);
     }
 
-    private createAttributeObject(attr: DataModelAttribute | DataModelFieldAttribute): ts.Expression {
+    private createAttributeObject(attr: DataModelAttribute | DataFieldAttribute): ts.Expression {
         return ts.factory.createObjectLiteralExpression([
             ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(attr.decl.$refText)),
             ...(attr.args.length > 0
@@ -922,7 +977,7 @@ export class TsSchemaGenerator {
     }
 
     private createRefExpression(expr: ReferenceExpr): any {
-        if (isDataModelField(expr.target.ref)) {
+        if (isDataField(expr.target.ref)) {
             return ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.field'), undefined, [
                 this.createLiteralNode(expr.target.$refText),
             ]);
@@ -964,7 +1019,7 @@ export class TsSchemaGenerator {
             });
     }
 
-    private generateModels(model: Model, outputDir: string) {
+    private generateModelsAndTypeDefs(model: Model, outputDir: string) {
         const statements: ts.Statement[] = [];
 
         // generate: import { schema as $schema, type SchemaType as $Schema } from './schema';
@@ -983,15 +1038,24 @@ export class TsSchemaGenerator {
                             undefined,
                             ts.factory.createIdentifier(`ModelResult as $ModelResult`),
                         ),
+                        ...(model.declarations.some(isTypeDef)
+                            ? [
+                                  ts.factory.createImportSpecifier(
+                                      true,
+                                      undefined,
+                                      ts.factory.createIdentifier(`TypeDefResult as $TypeDefResult`),
+                                  ),
+                              ]
+                            : []),
                     ]),
                 ),
                 ts.factory.createStringLiteral('@zenstackhq/runtime'),
             ),
         );
 
+        // generate: export type Model = $ModelResult<Schema, 'Model'>;
         const dataModels = model.declarations.filter(isDataModel);
         for (const dm of dataModels) {
-            // generate: export type Model = $ModelResult<Schema, 'Model'>;
             let modelType = ts.factory.createTypeAliasDeclaration(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 dm.name,
@@ -1007,10 +1071,27 @@ export class TsSchemaGenerator {
             statements.push(modelType);
         }
 
-        // generate enums
+        // generate: export type TypeDef = $TypeDefResult<Schema, 'TypeDef'>;
+        const typeDefs = model.declarations.filter(isTypeDef);
+        for (const td of typeDefs) {
+            let typeDef = ts.factory.createTypeAliasDeclaration(
+                [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+                td.name,
+                undefined,
+                ts.factory.createTypeReferenceNode('$TypeDefResult', [
+                    ts.factory.createTypeReferenceNode('$Schema'),
+                    ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(td.name)),
+                ]),
+            );
+            if (td.comments.length > 0) {
+                typeDef = this.generateDocs(typeDef, td);
+            }
+            statements.push(typeDef);
+        }
+
+        // generate: export const Enum = $schema.enums.Enum;
         const enums = model.declarations.filter(isEnum);
         for (const e of enums) {
-            // generate: export const Enum = $schema.enums.Enum;
             let enumDecl = ts.factory.createVariableStatement(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
                 ts.factory.createVariableDeclarationList(
@@ -1097,7 +1178,7 @@ export class TsSchemaGenerator {
 
     private generateDocs<T extends ts.TypeAliasDeclaration | ts.VariableStatement>(
         tsDecl: T,
-        decl: DataModel | Enum,
+        decl: DataModel | TypeDef | Enum,
     ): T {
         return ts.addSyntheticLeadingComment(
             tsDecl,

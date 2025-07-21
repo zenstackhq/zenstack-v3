@@ -42,7 +42,7 @@ import path from 'node:path';
 import { match } from 'ts-pattern';
 import * as ts from 'typescript';
 import { ModelUtils } from '.';
-import { getAttribute, getAuthDecl, hasAttribute, isIdField, isUniqueField } from './model-utils';
+import { getAttribute, getAuthDecl, hasAttribute, isUniqueField } from './model-utils';
 
 export class TsSchemaGenerator {
     public async generate(schemaFile: string, pluginModelFiles: string[], outputDir: string) {

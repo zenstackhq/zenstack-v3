@@ -178,7 +178,7 @@ fragment WithClause:
     'with' mixins+=[TypeDef] (','? mixins+=[TypeDef])*;
 
 fragment ExtendsClause:
-    'inherits' baseModel=[DataModel];
+    'extends' baseModel=[DataModel];
 
 DataField:
     (comments+=TRIPLE_SLASH_COMMENT)*

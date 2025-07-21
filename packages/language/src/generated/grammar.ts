@@ -2134,7 +2134,7 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
         "elements": [
           {
             "$type": "Keyword",
-            "value": "inherits"
+            "value": "extends"
           },
           {
             "$type": "Assignment",

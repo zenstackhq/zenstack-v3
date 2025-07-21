@@ -187,11 +187,17 @@ export type RelationFieldType<
         ? GetModelField<Schema, Model, Field>['type']
         : never;
 
-export type FieldIsOptional<
+export type ModelFieldIsOptional<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,
 > = GetModelField<Schema, Model, Field>['optional'] extends true ? true : false;
+
+export type TypeDefFieldIsOptional<
+    Schema extends SchemaDef,
+    TypeDef extends GetTypeDefs<Schema>,
+    Field extends GetTypeDefFields<Schema, TypeDef>,
+> = GetTypeDefField<Schema, TypeDef, Field>['optional'] extends true ? true : false;
 
 export type FieldIsRelation<
     Schema extends SchemaDef,

@@ -34,13 +34,18 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         if (Array.isArray(value)) {
             return value.map((v) => this.transformPrimitive(v, type, false));
         } else {
-            return match(type)
-                .with('Boolean', () => (value ? 1 : 0))
-                .with('DateTime', () => (value instanceof Date ? value.toISOString() : value))
-                .with('Decimal', () => (value as Decimal).toString())
-                .with('Bytes', () => Buffer.from(value as Uint8Array))
-                .with('Json', () => JSON.stringify(value))
-                .otherwise(() => value);
+            if (this.schema.typeDefs && type in this.schema.typeDefs) {
+                // typed JSON field
+                return JSON.stringify(value);
+            } else {
+                return match(type)
+                    .with('Boolean', () => (value ? 1 : 0))
+                    .with('DateTime', () => (value instanceof Date ? value.toISOString() : value))
+                    .with('Decimal', () => (value as Decimal).toString())
+                    .with('Bytes', () => Buffer.from(value as Uint8Array))
+                    .with('Json', () => JSON.stringify(value))
+                    .otherwise(() => value);
+            }
         }
     }
 

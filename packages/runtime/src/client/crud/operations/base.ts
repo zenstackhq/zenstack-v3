@@ -493,7 +493,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const idFields = getIdFields(this.schema, model);
         const query = kysely
             .insertInto(model)
-            .values(updatedData)
+            .$if(Object.keys(updatedData).length === 0, (qb) => qb.defaultValues())
+            .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
             .returning(idFields as any)
             .modifyEnd(
                 this.makeContextComment({

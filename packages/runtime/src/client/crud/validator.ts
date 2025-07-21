@@ -218,16 +218,46 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makePrimitiveSchema(type: string) {
-        return match(type)
-            .with('String', () => z.string())
-            .with('Int', () => z.number())
-            .with('Float', () => z.number())
-            .with('Boolean', () => z.boolean())
-            .with('BigInt', () => z.union([z.number(), z.bigint()]))
-            .with('Decimal', () => z.union([z.number(), z.instanceof(Decimal), z.string()]))
-            .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
-            .with('Bytes', () => z.instanceof(Uint8Array))
-            .otherwise(() => z.unknown());
+        if (this.schema.typeDefs && type in this.schema.typeDefs) {
+            return this.makeTypeDefSchema(type);
+        } else {
+            return match(type)
+                .with('String', () => z.string())
+                .with('Int', () => z.number())
+                .with('Float', () => z.number())
+                .with('Boolean', () => z.boolean())
+                .with('BigInt', () => z.union([z.number(), z.bigint()]))
+                .with('Decimal', () => z.union([z.number(), z.instanceof(Decimal), z.string()]))
+                .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
+                .with('Bytes', () => z.instanceof(Uint8Array))
+                .otherwise(() => z.unknown());
+        }
+    }
+
+    private makeTypeDefSchema(type: string): z.ZodType {
+        const key = `$typedef-${type}`;
+        let schema = this.schemaCache.get(key);
+        if (schema) {
+            return schema;
+        }
+        const typeDef = this.schema.typeDefs?.[type];
+        invariant(typeDef, `Type definition "${type}" not found in schema`);
+        schema = z.looseObject(
+            Object.fromEntries(
+                Object.entries(typeDef.fields).map(([field, def]) => {
+                    let fieldSchema = this.makePrimitiveSchema(def.type);
+                    if (def.array) {
+                        fieldSchema = fieldSchema.array();
+                    }
+                    if (def.optional) {
+                        fieldSchema = fieldSchema.optional();
+                    }
+                    return [field, fieldSchema];
+                }),
+            ),
+        );
+        this.schemaCache.set(key, schema);
+        return schema;
     }
 
     private makeWhereSchema(model: string, unique: boolean, withoutRelationFields = false): ZodType {
@@ -396,6 +426,10 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean) {
+        if (this.schema.typeDefs && type in this.schema.typeDefs) {
+            // typed JSON field
+            return this.makeTypeDefFilterSchema(type, optional);
+        }
         return (
             match(type)
                 .with('String', () => this.makeStringFilterSchema(optional))
@@ -410,6 +444,11 @@ export class InputValidator<Schema extends SchemaDef> {
                 .with('Unsupported', () => z.never())
                 .exhaustive()
         );
+    }
+
+    private makeTypeDefFilterSchema(_type: string, _optional: boolean) {
+        // TODO: strong typed JSON filtering
+        return z.never();
     }
 
     private makeDateTimeFilterSchema(optional: boolean): ZodType {

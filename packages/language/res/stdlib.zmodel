@@ -701,7 +701,7 @@ function raw(value: String): Any {
 /**
  * Marks a field to be strong-typed JSON.
  */
-attribute @json() @@@targetField([TypeDefField]) @@@deprecated('The "@json" attribute is not needed anymore. ZenStack will automatically use JSON to store typed fields.')
+attribute @json() @@@targetField([TypeDefField])
 
 /**
  * Marks a field to be computed.

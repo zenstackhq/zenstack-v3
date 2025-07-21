@@ -56,6 +56,11 @@ export const schema = {
                     type: "Int",
                     attributes: [{ name: "@computed" }],
                     computed: true
+                },
+                identity: {
+                    type: "Identity",
+                    optional: true,
+                    attributes: [{ name: "@json" }]
                 }
             },
             idFields: ["id"],
@@ -261,7 +266,8 @@ export const schema = {
                     type: "String"
                 },
                 name: {
-                    type: "String"
+                    type: "String",
+                    optional: true
                 }
             }
         }

@@ -84,14 +84,19 @@ export class ResultProcessor<Schema extends SchemaDef> {
     }
 
     private transformScalar(value: unknown, type: BuiltinType) {
-        return match(type)
-            .with('Boolean', () => this.transformBoolean(value))
-            .with('DateTime', () => this.transformDate(value))
-            .with('Bytes', () => this.transformBytes(value))
-            .with('Decimal', () => this.transformDecimal(value))
-            .with('BigInt', () => this.transformBigInt(value))
-            .with('Json', () => this.transformJson(value))
-            .otherwise(() => value);
+        if (this.schema.typeDefs && type in this.schema.typeDefs) {
+            // typed JSON field
+            return this.transformJson(value);
+        } else {
+            return match(type)
+                .with('Boolean', () => this.transformBoolean(value))
+                .with('DateTime', () => this.transformDate(value))
+                .with('Bytes', () => this.transformBytes(value))
+                .with('Decimal', () => this.transformDecimal(value))
+                .with('BigInt', () => this.transformBigInt(value))
+                .with('Json', () => this.transformJson(value))
+                .otherwise(() => value);
+        }
     }
 
     private transformDecimal(value: unknown) {

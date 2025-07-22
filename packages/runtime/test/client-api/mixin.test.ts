@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createTestClient } from '../utils';
 
 describe('Client API Mixins', () => {
-    const schema = `
+    it('includes fields and attributes from mixins', async () => {
+        const schema = `
 type TimeStamped {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -27,7 +28,6 @@ model Bar with CommonFields {
 }
     `;
 
-    it('includes fields and attributes from mixins', async () => {
         const client = await createTestClient(schema, {
             usePrismaPush: true,
         });
@@ -76,5 +76,74 @@ model Bar with CommonFields {
                 },
             }),
         ).rejects.toThrow('constraint failed');
+    });
+
+    it('supports multiple-level mixins', async () => {
+        const schema = `
+        type Base1 {
+            id    String @id @default(cuid())
+        }
+
+        type Base2 with Base1 {
+            fieldA String
+        }
+          
+        model A with Base2 {
+            field String
+            b B[]
+        }
+
+        model B {
+            id    String @id @default(cuid())
+            a     A @relation(fields: [aId], references: [id])
+            aId   String
+          }
+        `;
+
+        const client = await createTestClient(schema);
+        await expect(
+            client.b.create({
+                data: {
+                    a: {
+                        create: {
+                            field: 'test',
+                            fieldA: 'testA',
+                        },
+                    },
+                },
+                include: { a: true },
+            }),
+        ).resolves.toMatchObject({
+            a: {
+                id: expect.any(String),
+                field: 'test',
+                fieldA: 'testA',
+            },
+        });
+    });
+
+    it('works with multiple id fields from base', async () => {
+        const schema = `
+        type Base {
+            id1 String
+            id2 String
+            value String
+            @@id([id1, id2])
+        }
+
+        model Item with Base {
+            x String
+        }
+        `;
+
+        const client = await createTestClient(schema);
+        await expect(
+            client.item.create({
+                data: { id1: '1', id2: '2', value: 'test', x: 'x' },
+            }),
+        ).resolves.toMatchObject({
+            id1: '1',
+            id2: '2',
+        });
     });
 });

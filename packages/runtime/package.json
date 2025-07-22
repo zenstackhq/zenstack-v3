@@ -73,12 +73,12 @@
         "nanoid": "^5.0.9",
         "ts-pattern": "catalog:",
         "ulid": "^3.0.0",
-        "uuid": "^11.0.5",
-        "zod": "catalog:"
+        "uuid": "^11.0.5"
     },
     "peerDependencies": {
         "better-sqlite3": "^11.8.1",
-        "pg": "^8.13.1"
+        "pg": "^8.13.1",
+        "zod": "catalog:"
     },
     "peerDependenciesMeta": {
         "better-sqlite3": {

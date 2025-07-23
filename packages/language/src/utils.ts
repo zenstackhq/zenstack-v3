@@ -161,10 +161,6 @@ export function resolved<T extends AstNode>(ref: Reference<T>): T {
     return ref.ref;
 }
 
-export function getModelFieldsWithBases(model: DataModel, includeDelegate = true) {
-    return [...model.fields, ...getRecursiveBases(model, includeDelegate).flatMap((base) => base.fields)];
-}
-
 export function getRecursiveBases(
     decl: DataModel | TypeDef,
     includeDelegate = true,
@@ -533,22 +529,51 @@ export function isMemberContainer(node: unknown): node is DataModel | TypeDef {
     return isDataModel(node) || isTypeDef(node);
 }
 
-export function getAllFields(decl: DataModel | TypeDef, includeIgnored = false): DataField[] {
+export function getAllFields(
+    decl: DataModel | TypeDef,
+    includeIgnored = false,
+    seen: Set<DataModel | TypeDef> = new Set(),
+): DataField[] {
+    if (seen.has(decl)) {
+        return [];
+    }
+    seen.add(decl);
+
     const fields: DataField[] = [];
     for (const mixin of decl.mixins) {
         invariant(mixin.ref, `Mixin ${mixin.$refText} is not resolved`);
-        fields.push(...getAllFields(mixin.ref));
+        fields.push(...getAllFields(mixin.ref, includeIgnored, seen));
     }
+
+    if (isDataModel(decl) && decl.baseModel) {
+        invariant(decl.baseModel.ref, `Base model ${decl.baseModel.$refText} is not resolved`);
+        fields.push(...getAllFields(decl.baseModel.ref, includeIgnored, seen));
+    }
+
     fields.push(...decl.fields.filter((f) => includeIgnored || !hasAttribute(f, '@ignore')));
     return fields;
 }
 
-export function getAllAttributes(decl: DataModel | TypeDef): DataModelAttribute[] {
+export function getAllAttributes(
+    decl: DataModel | TypeDef,
+    seen: Set<DataModel | TypeDef> = new Set(),
+): DataModelAttribute[] {
+    if (seen.has(decl)) {
+        return [];
+    }
+    seen.add(decl);
+
     const attributes: DataModelAttribute[] = [];
     for (const mixin of decl.mixins) {
         invariant(mixin.ref, `Mixin ${mixin.$refText} is not resolved`);
-        attributes.push(...getAllAttributes(mixin.ref));
+        attributes.push(...getAllAttributes(mixin.ref, seen));
     }
+
+    if (isDataModel(decl) && decl.baseModel) {
+        invariant(decl.baseModel.ref, `Base model ${decl.baseModel.$refText} is not resolved`);
+        attributes.push(...getAllAttributes(decl.baseModel.ref, seen));
+    }
+
     attributes.push(...decl.attributes);
     return attributes;
 }

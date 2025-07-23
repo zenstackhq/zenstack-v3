@@ -1,3 +1,4 @@
+import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import {
     AttributeArg,
     BooleanLiteral,
@@ -16,6 +17,7 @@ import {
     GeneratorDecl,
     InvocationExpr,
     isArrayExpr,
+    isDataModel,
     isInvocationExpr,
     isLiteralExpr,
     isModel,
@@ -29,12 +31,13 @@ import {
     StringLiteral,
     type AstNode,
 } from '@zenstackhq/language/ast';
+import { getAllAttributes, getAllFields, isDelegateModel } from '@zenstackhq/language/utils';
 import { AstUtils } from 'langium';
 import { match } from 'ts-pattern';
-
-import { getAllAttributes, getAllFields } from '@zenstackhq/language/utils';
 import { ModelUtils, ZModelCodeGenerator } from '..';
+import { DELEGATE_AUX_RELATION_PREFIX, getIdFields } from '../model-utils';
 import {
+    AttributeArgValue,
     ModelFieldType,
     AttributeArg as PrismaAttributeArg,
     AttributeArgValue as PrismaAttributeArgValue,
@@ -51,6 +54,10 @@ import {
     type SimpleField,
 } from './prisma-builder';
 
+// Some database providers like postgres and mysql have default limit to the length of identifiers
+// Here we use a conservative value that should work for most cases, and truncate names if needed
+const IDENTIFIER_NAME_MAX_LENGTH = 50 - DELEGATE_AUX_RELATION_PREFIX.length;
+
 /**
  * Generates Prisma schema file
  */
@@ -61,6 +68,9 @@ export class PrismaSchemaGenerator {
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 `;
+
+    // a mapping from full names to shortened names
+    private shortNameMap = new Map<string, string>();
 
     constructor(private readonly zmodel: Model) {}
 
@@ -155,8 +165,10 @@ export class PrismaSchemaGenerator {
             if (ModelUtils.hasAttribute(field, '@computed')) {
                 continue; // skip computed fields
             }
-            // TODO: exclude fields inherited from delegate
-            this.generateModelField(model, field, decl);
+            // exclude non-id fields inherited from delegate
+            if (ModelUtils.isIdField(field, decl) || !this.isInheritedFromDelegate(field, decl)) {
+                this.generateModelField(model, field, decl);
+            }
         }
 
         const allAttributes = getAllAttributes(decl);
@@ -167,21 +179,11 @@ export class PrismaSchemaGenerator {
         // user defined comments pass-through
         decl.comments.forEach((c) => model.addComment(c));
 
-        // TODO: delegate model handling
-        // // physical: generate relation fields on base models linking to concrete models
-        // this.generateDelegateRelationForBase(model, decl);
+        // generate relation fields on base models linking to concrete models
+        this.generateDelegateRelationForBase(model, decl);
 
-        // TODO: delegate model handling
-        // // physical: generate reverse relation fields on concrete models
-        // this.generateDelegateRelationForConcrete(model, decl);
-
-        // TODO: delegate model handling
-        // // logical: expand relations on other models that reference delegated models to concrete models
-        // this.expandPolymorphicRelations(model, decl);
-
-        // TODO: delegate model handling
-        // // logical: ensure relations inherited from delegate models
-        // this.ensureRelationsInheritedFromDelegate(model, decl);
+        // generate reverse relation fields on concrete models
+        this.generateDelegateRelationForConcrete(model, decl);
     }
 
     private isPrismaAttribute(attr: DataModelAttribute | DataFieldAttribute) {
@@ -247,7 +249,7 @@ export class PrismaSchemaGenerator {
                     // when building physical schema, exclude `@default` for id fields inherited from delegate base
                     !(
                         ModelUtils.isIdField(field, contextModel) &&
-                        this.isInheritedFromDelegate(field) &&
+                        this.isInheritedFromDelegate(field, contextModel) &&
                         attr.decl.$refText === '@default'
                     ),
             )
@@ -276,8 +278,8 @@ export class PrismaSchemaGenerator {
         return !!model && !!model.$document && model.$document.uri.path.endsWith('plugin.zmodel');
     }
 
-    private isInheritedFromDelegate(field: DataField) {
-        return field.$inheritedFrom && ModelUtils.isDelegateModel(field.$inheritedFrom);
+    private isInheritedFromDelegate(field: DataField, contextModel: DataModel) {
+        return field.$container !== contextModel && ModelUtils.isDelegateModel(field.$container);
     }
 
     private makeFieldAttribute(attr: DataFieldAttribute) {
@@ -374,5 +376,101 @@ export class PrismaSchemaGenerator {
 
         const docs = [...field.comments];
         _enum.addField(field.name, attributes, docs);
+    }
+
+    private generateDelegateRelationForBase(model: PrismaDataModel, decl: DataModel) {
+        if (!isDelegateModel(decl)) {
+            return;
+        }
+
+        // collect concrete models inheriting this model
+        const concreteModels = this.getConcreteModels(decl);
+
+        // generate an optional relation field in delegate base model to each concrete model
+        concreteModels.forEach((concrete) => {
+            const auxName = this.truncate(`${DELEGATE_AUX_RELATION_PREFIX}_${lowerCaseFirst(concrete.name)}`);
+            model.addField(auxName, new ModelFieldType(concrete.name, false, true));
+        });
+    }
+
+    private generateDelegateRelationForConcrete(model: PrismaDataModel, concreteDecl: DataModel) {
+        // generate a relation field for each delegated base model
+        const base = concreteDecl.baseModel?.ref;
+        if (!base) {
+            return;
+        }
+
+        const idFields = getIdFields(base);
+
+        // add relation fields
+        const relationField = this.truncate(`${DELEGATE_AUX_RELATION_PREFIX}_${lowerCaseFirst(base.name)}`);
+        model.addField(relationField, base.name, [
+            new PrismaFieldAttribute('@relation', [
+                new PrismaAttributeArg(
+                    'fields',
+                    new AttributeArgValue(
+                        'Array',
+                        idFields.map(
+                            (idField) => new AttributeArgValue('FieldReference', new PrismaFieldReference(idField)),
+                        ),
+                    ),
+                ),
+                new PrismaAttributeArg(
+                    'references',
+                    new AttributeArgValue(
+                        'Array',
+                        idFields.map(
+                            (idField) => new AttributeArgValue('FieldReference', new PrismaFieldReference(idField)),
+                        ),
+                    ),
+                ),
+                new PrismaAttributeArg(
+                    'onDelete',
+                    new AttributeArgValue('FieldReference', new PrismaFieldReference('Cascade')),
+                ),
+                new PrismaAttributeArg(
+                    'onUpdate',
+                    new AttributeArgValue('FieldReference', new PrismaFieldReference('Cascade')),
+                ),
+            ]),
+        ]);
+    }
+
+    private getConcreteModels(dataModel: DataModel): DataModel[] {
+        if (!isDelegateModel(dataModel)) {
+            return [];
+        }
+        return dataModel.$container.declarations.filter(
+            (d): d is DataModel => isDataModel(d) && d !== dataModel && d.baseModel?.ref === dataModel,
+        );
+    }
+
+    private truncate(name: string) {
+        if (name.length <= IDENTIFIER_NAME_MAX_LENGTH) {
+            return name;
+        }
+
+        const existing = this.shortNameMap.get(name);
+        if (existing) {
+            return existing;
+        }
+
+        const baseName = name.slice(0, IDENTIFIER_NAME_MAX_LENGTH);
+        let index = 0;
+        let shortName = `${baseName}_${index}`;
+
+        while (true) {
+            const conflict = Array.from(this.shortNameMap.values()).find((v) => v === shortName);
+            if (!conflict) {
+                this.shortNameMap.set(name, shortName);
+                break;
+            }
+
+            // try next index
+            index++;
+            shortName = `${baseName}_${index}`;
+        }
+
+        return shortName;
     }
 }

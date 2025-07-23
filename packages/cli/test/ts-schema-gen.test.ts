@@ -266,4 +266,63 @@ type Address with Base {
             },
         });
     });
+
+    it('merges fields and attributes from base models', async () => {
+        const { schema } = await generateTsSchema(`
+model Base {
+    id String @id @default(uuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    type String
+    @@delegate(type)
+}
+
+model User extends Base {
+    email String @unique
+}
+        `);
+        expect(schema).toMatchObject({
+            models: {
+                Base: {
+                    fields: {
+                        id: {
+                            type: 'String',
+                            id: true,
+                            default: expect.objectContaining({ function: 'uuid', kind: 'call' }),
+                        },
+                        createdAt: {
+                            type: 'DateTime',
+                            default: expect.objectContaining({ function: 'now', kind: 'call' }),
+                        },
+                        updatedAt: { type: 'DateTime', updatedAt: true },
+                        type: { type: 'String' },
+                    },
+                    attributes: [
+                        {
+                            name: '@@delegate',
+                            args: [{ name: 'discriminator', value: { kind: 'field', field: 'type' } }],
+                        },
+                    ],
+                    isDelegate: true,
+                },
+                User: {
+                    baseModel: 'Base',
+                    fields: {
+                        id: { type: 'String' },
+                        createdAt: {
+                            type: 'DateTime',
+                            default: expect.objectContaining({ function: 'now', kind: 'call' }),
+                            originModel: 'Base',
+                        },
+                        updatedAt: { type: 'DateTime', updatedAt: true, originModel: 'Base' },
+                        type: { type: 'String', originModel: 'Base' },
+                        email: { type: 'String' },
+                    },
+                    uniqueFields: expect.objectContaining({
+                        email: { type: 'String' },
+                    }),
+                },
+            },
+        });
+    });
 });

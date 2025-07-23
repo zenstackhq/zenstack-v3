@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { AstUtils, type AstNode, type DiagnosticInfo, type ValidationAcceptor } from 'langium';
 import { IssueCodes, SCALAR_TYPES } from '../constants';
 import {
@@ -16,8 +17,8 @@ import {
 } from '../generated/ast';
 import {
     getAllAttributes,
+    getAllFields,
     getLiteral,
-    getModelFieldsWithBases,
     getModelIdFields,
     getModelUniqueFields,
     getUniqueFields,
@@ -32,7 +33,7 @@ import { validateDuplicatedDeclarations, type AstValidator } from './common';
  */
 export default class DataModelValidator implements AstValidator<DataModel> {
     validate(dm: DataModel, accept: ValidationAcceptor): void {
-        validateDuplicatedDeclarations(dm, getModelFieldsWithBases(dm), accept);
+        validateDuplicatedDeclarations(dm, getAllFields(dm), accept);
         this.validateAttributes(dm, accept);
         this.validateFields(dm, accept);
         if (dm.mixins.length > 0) {
@@ -42,7 +43,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
     }
 
     private validateFields(dm: DataModel, accept: ValidationAcceptor) {
-        const allFields = getModelFieldsWithBases(dm);
+        const allFields = getAllFields(dm);
         const idFields = allFields.filter((f) => f.attributes.find((attr) => attr.decl.ref?.name === '@id'));
         const uniqueFields = allFields.filter((f) => f.attributes.find((attr) => attr.decl.ref?.name === '@unique'));
         const modelLevelIds = getModelIdFields(dm);
@@ -266,7 +267,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         const oppositeModel = field.type.reference!.ref! as DataModel;
 
         // Use name because the current document might be updated
-        let oppositeFields = getModelFieldsWithBases(oppositeModel, false).filter(
+        let oppositeFields = getAllFields(oppositeModel, false).filter(
             (f) =>
                 f !== field && // exclude self in case of self relation
                 f.type.reference?.ref?.name === contextModel.name,
@@ -438,11 +439,38 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         if (!model.baseModel) {
             return;
         }
-        if (model.baseModel.ref && !isDelegateModel(model.baseModel.ref)) {
+
+        invariant(model.baseModel.ref, 'baseModel must be resolved');
+
+        // check if the base model is a delegate model
+        if (!isDelegateModel(model.baseModel.ref)) {
             accept('error', `Model ${model.baseModel.$refText} cannot be extended because it's not a delegate model`, {
                 node: model,
                 property: 'baseModel',
             });
+            return;
+        }
+
+        // check for cyclic inheritance
+        const seen: DataModel[] = [];
+        const todo = [model.baseModel.ref];
+        while (todo.length > 0) {
+            const current = todo.shift()!;
+            if (seen.includes(current)) {
+                accept(
+                    'error',
+                    `Cyclic inheritance detected: ${seen.map((m) => m.name).join(' -> ')} -> ${current.name}`,
+                    {
+                        node: model,
+                    },
+                );
+                return;
+            }
+            seen.push(current);
+            if (current.baseModel) {
+                invariant(current.baseModel.ref, 'baseModel must be resolved');
+                todo.push(current.baseModel.ref);
+            }
         }
     }
 

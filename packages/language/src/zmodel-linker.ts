@@ -20,9 +20,9 @@ import {
     AttributeParam,
     BinaryExpr,
     BooleanLiteral,
-    DataModel,
     DataField,
     DataFieldType,
+    DataModel,
     Enum,
     EnumField,
     type ExpressionType,
@@ -43,19 +43,19 @@ import {
     UnaryExpr,
     isArrayExpr,
     isBooleanLiteral,
-    isDataModel,
     isDataField,
     isDataFieldType,
+    isDataModel,
     isEnum,
     isNumberLiteral,
     isReferenceExpr,
     isStringLiteral,
 } from './ast';
 import {
+    getAllFields,
     getAllLoadedAndReachableDataModelsAndTypeDefs,
     getAuthDecl,
     getContainingDataModel,
-    getModelFieldsWithBases,
     isAuthInvocation,
     isFutureExpr,
     isMemberContainer,
@@ -397,8 +397,7 @@ export class ZModelLinker extends DefaultLinker {
             const transitiveDataModel = attrAppliedOn.type.reference?.ref as DataModel;
             if (transitiveDataModel) {
                 // resolve references in the context of the transitive data model
-                const scopeProvider = (name: string) =>
-                    getModelFieldsWithBases(transitiveDataModel).find((f) => f.name === name);
+                const scopeProvider = (name: string) => getAllFields(transitiveDataModel).find((f) => f.name === name);
                 if (isArrayExpr(node.value)) {
                     node.value.items.forEach((item) => {
                         if (isReferenceExpr(item)) {

@@ -10,13 +10,16 @@ describe('Name mapping tests', () => {
         },
         models: {
             Foo: {
+                name: 'Foo',
                 fields: {
                     id: {
+                        name: 'id',
                         type: 'String',
                         id: true,
                         default: ExpressionUtils.call('uuid'),
                     },
                     x: {
+                        name: 'x',
                         type: 'Int',
                         attributes: [
                             {

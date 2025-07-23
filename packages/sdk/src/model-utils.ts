@@ -109,3 +109,14 @@ export function getAuthDecl(model: Model) {
     }
     return found;
 }
+
+export function getIdFields(dm: DataModel) {
+    return getAllFields(dm)
+        .filter((f) => isIdField(f, dm))
+        .map((f) => f.name);
+}
+
+/**
+ * Prefix for auxiliary relation fields generated for delegated models
+ */
+export const DELEGATE_AUX_RELATION_PREFIX = 'delegate_aux';

@@ -12,52 +12,63 @@ export const schema = {
     },
     models: {
         User: {
+            name: "User",
             fields: {
                 id: {
+                    name: "id",
                     type: "Int",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
                     default: ExpressionUtils.call("autoincrement")
                 },
                 createdAt: {
+                    name: "createdAt",
                     type: "DateTime",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
                     default: ExpressionUtils.call("now")
                 },
                 updatedAt: {
+                    name: "updatedAt",
                     type: "DateTime",
                     updatedAt: true,
                     attributes: [{ name: "@updatedAt" }]
                 },
                 name: {
+                    name: "name",
                     type: "String"
                 },
                 email: {
+                    name: "email",
                     type: "String",
                     unique: true,
                     attributes: [{ name: "@unique" }]
                 },
                 role: {
+                    name: "role",
                     type: "Role",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("USER") }] }],
                     default: "USER"
                 },
                 posts: {
+                    name: "posts",
                     type: "Post",
                     array: true,
                     relation: { opposite: "author" }
                 },
                 profile: {
+                    name: "profile",
                     type: "Profile",
                     optional: true,
                     relation: { opposite: "user" }
                 },
                 postCount: {
+                    name: "postCount",
                     type: "Int",
                     attributes: [{ name: "@computed" }],
                     computed: true
                 },
                 identity: {
+                    name: "identity",
                     type: "Identity",
                     optional: true,
                     attributes: [{ name: "@json" }]
@@ -75,36 +86,44 @@ export const schema = {
             }
         },
         Post: {
+            name: "Post",
             fields: {
                 id: {
+                    name: "id",
                     type: "Int",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
                     default: ExpressionUtils.call("autoincrement")
                 },
                 title: {
+                    name: "title",
                     type: "String"
                 },
                 content: {
+                    name: "content",
                     type: "String"
                 },
                 author: {
+                    name: "author",
                     type: "User",
                     attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "posts", fields: ["authorId"], references: ["id"] }
                 },
                 authorId: {
+                    name: "authorId",
                     type: "Int",
                     foreignKeyFor: [
                         "author"
                     ]
                 },
                 tags: {
+                    name: "tags",
                     type: "Tag",
                     array: true,
                     relation: { opposite: "posts" }
                 },
                 meta: {
+                    name: "meta",
                     type: "Meta",
                     optional: true,
                     relation: { opposite: "post" }
@@ -116,23 +135,28 @@ export const schema = {
             }
         },
         Profile: {
+            name: "Profile",
             fields: {
                 id: {
+                    name: "id",
                     type: "Int",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
                     default: ExpressionUtils.call("autoincrement")
                 },
                 age: {
+                    name: "age",
                     type: "Int"
                 },
                 region: {
+                    name: "region",
                     type: "Region",
                     optional: true,
                     attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("regionCountry"), ExpressionUtils.field("regionCity")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("country"), ExpressionUtils.field("city")]) }] }],
                     relation: { opposite: "profiles", fields: ["regionCountry", "regionCity"], references: ["country", "city"] }
                 },
                 regionCountry: {
+                    name: "regionCountry",
                     type: "String",
                     optional: true,
                     foreignKeyFor: [
@@ -140,6 +164,7 @@ export const schema = {
                     ]
                 },
                 regionCity: {
+                    name: "regionCity",
                     type: "String",
                     optional: true,
                     foreignKeyFor: [
@@ -147,11 +172,13 @@ export const schema = {
                     ]
                 },
                 user: {
+                    name: "user",
                     type: "User",
                     attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "profile", fields: ["userId"], references: ["id"] }
                 },
                 userId: {
+                    name: "userId",
                     type: "Int",
                     unique: true,
                     attributes: [{ name: "@unique" }],
@@ -167,17 +194,21 @@ export const schema = {
             }
         },
         Tag: {
+            name: "Tag",
             fields: {
                 id: {
+                    name: "id",
                     type: "Int",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
                     default: ExpressionUtils.call("autoincrement")
                 },
                 name: {
+                    name: "name",
                     type: "String"
                 },
                 posts: {
+                    name: "posts",
                     type: "Post",
                     array: true,
                     relation: { opposite: "tags" }
@@ -189,20 +220,25 @@ export const schema = {
             }
         },
         Region: {
+            name: "Region",
             fields: {
                 country: {
+                    name: "country",
                     type: "String",
                     id: true
                 },
                 city: {
+                    name: "city",
                     type: "String",
                     id: true
                 },
                 zip: {
+                    name: "zip",
                     type: "String",
                     optional: true
                 },
                 profiles: {
+                    name: "profiles",
                     type: "Profile",
                     array: true,
                     relation: { opposite: "region" }
@@ -217,25 +253,31 @@ export const schema = {
             }
         },
         Meta: {
+            name: "Meta",
             fields: {
                 id: {
+                    name: "id",
                     type: "Int",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
                     default: ExpressionUtils.call("autoincrement")
                 },
                 reviewed: {
+                    name: "reviewed",
                     type: "Boolean"
                 },
                 published: {
+                    name: "published",
                     type: "Boolean"
                 },
                 post: {
+                    name: "post",
                     type: "Post",
                     attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("postId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "meta", fields: ["postId"], references: ["id"] }
                 },
                 postId: {
+                    name: "postId",
                     type: "Int",
                     unique: true,
                     attributes: [{ name: "@unique" }],
@@ -253,19 +295,24 @@ export const schema = {
     },
     typeDefs: {
         Identity: {
+            name: "Identity",
             fields: {
                 providers: {
+                    name: "providers",
                     type: "IdentityProvider",
                     array: true
                 }
             }
         },
         IdentityProvider: {
+            name: "IdentityProvider",
             fields: {
                 id: {
+                    name: "id",
                     type: "String"
                 },
                 name: {
+                    name: "name",
                     type: "String",
                     optional: true
                 }

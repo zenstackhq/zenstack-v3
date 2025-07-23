@@ -12,43 +12,52 @@ export const schema = {
     },
     models: {
         User: {
+            name: "User",
             fields: {
                 id: {
+                    name: "id",
                     type: "String",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
                 createdAt: {
+                    name: "createdAt",
                     type: "DateTime",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
                     default: ExpressionUtils.call("now")
                 },
                 updatedAt: {
+                    name: "updatedAt",
                     type: "DateTime",
                     updatedAt: true,
                     attributes: [{ name: "@updatedAt" }]
                 },
                 email: {
+                    name: "email",
                     type: "String",
                     unique: true,
                     attributes: [{ name: "@unique" }]
                 },
                 name: {
+                    name: "name",
                     type: "String",
                     optional: true
                 },
                 role: {
+                    name: "role",
                     type: "Role",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("USER") }] }],
                     default: "USER"
                 },
                 posts: {
+                    name: "posts",
                     type: "Post",
                     array: true,
                     relation: { opposite: "author" }
                 },
                 profile: {
+                    name: "profile",
                     type: "Profile",
                     optional: true,
                     relation: { opposite: "user" }
@@ -65,47 +74,57 @@ export const schema = {
             }
         },
         Post: {
+            name: "Post",
             fields: {
                 id: {
+                    name: "id",
                     type: "String",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
                 createdAt: {
+                    name: "createdAt",
                     type: "DateTime",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
                     default: ExpressionUtils.call("now")
                 },
                 updatedAt: {
+                    name: "updatedAt",
                     type: "DateTime",
                     updatedAt: true,
                     attributes: [{ name: "@updatedAt" }]
                 },
                 title: {
+                    name: "title",
                     type: "String"
                 },
                 content: {
+                    name: "content",
                     type: "String",
                     optional: true
                 },
                 published: {
+                    name: "published",
                     type: "Boolean",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
                     default: false
                 },
                 author: {
+                    name: "author",
                     type: "User",
                     attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "posts", fields: ["authorId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
                 },
                 authorId: {
+                    name: "authorId",
                     type: "String",
                     foreignKeyFor: [
                         "author"
                     ]
                 },
                 comments: {
+                    name: "comments",
                     type: "Comment",
                     array: true,
                     relation: { opposite: "post" }
@@ -122,33 +141,40 @@ export const schema = {
             }
         },
         Comment: {
+            name: "Comment",
             fields: {
                 id: {
+                    name: "id",
                     type: "String",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
                 createdAt: {
+                    name: "createdAt",
                     type: "DateTime",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
                     default: ExpressionUtils.call("now")
                 },
                 updatedAt: {
+                    name: "updatedAt",
                     type: "DateTime",
                     updatedAt: true,
                     attributes: [{ name: "@updatedAt" }]
                 },
                 content: {
+                    name: "content",
                     type: "String"
                 },
                 post: {
+                    name: "post",
                     type: "Post",
                     optional: true,
                     attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("postId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "comments", fields: ["postId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
                 },
                 postId: {
+                    name: "postId",
                     type: "String",
                     optional: true,
                     foreignKeyFor: [
@@ -162,37 +188,45 @@ export const schema = {
             }
         },
         Profile: {
+            name: "Profile",
             fields: {
                 id: {
+                    name: "id",
                     type: "String",
                     id: true,
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
                 createdAt: {
+                    name: "createdAt",
                     type: "DateTime",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
                     default: ExpressionUtils.call("now")
                 },
                 updatedAt: {
+                    name: "updatedAt",
                     type: "DateTime",
                     updatedAt: true,
                     attributes: [{ name: "@updatedAt" }]
                 },
                 bio: {
+                    name: "bio",
                     type: "String"
                 },
                 age: {
+                    name: "age",
                     type: "Int",
                     optional: true
                 },
                 user: {
+                    name: "user",
                     type: "User",
                     optional: true,
                     attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "profile", fields: ["userId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
                 },
                 userId: {
+                    name: "userId",
                     type: "String",
                     unique: true,
                     optional: true,
@@ -211,18 +245,22 @@ export const schema = {
     },
     typeDefs: {
         CommonFields: {
+            name: "CommonFields",
             fields: {
                 id: {
+                    name: "id",
                     type: "String",
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
                 createdAt: {
+                    name: "createdAt",
                     type: "DateTime",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
                     default: ExpressionUtils.call("now")
                 },
                 updatedAt: {
+                    name: "updatedAt",
                     type: "DateTime",
                     updatedAt: true,
                     attributes: [{ name: "@updatedAt" }]

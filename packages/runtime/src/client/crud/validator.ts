@@ -3,7 +3,7 @@ import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
 import { z, ZodType } from 'zod';
-import type { BuiltinType, EnumDef, FieldDef, GetModels, SchemaDef } from '../../schema';
+import { type BuiltinType, type EnumDef, type FieldDef, type GetModels, type SchemaDef } from '../../schema';
 import { NUMERIC_FIELD_TYPES } from '../constants';
 import {
     type AggregateArgs,
@@ -21,7 +21,15 @@ import {
     type UpsertArgs,
 } from '../crud-types';
 import { InputValidationError, InternalError, QueryError } from '../errors';
-import { fieldHasDefaultValue, getEnum, getModel, getUniqueFields, requireField, requireModel } from '../query-utils';
+import {
+    fieldHasDefaultValue,
+    getDiscriminatorField,
+    getEnum,
+    getModel,
+    getUniqueFields,
+    requireField,
+    requireModel,
+} from '../query-utils';
 
 type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema>, options: Options) => ZodType;
 
@@ -705,6 +713,11 @@ export class InputValidator<Schema extends SchemaDef> {
                 return;
             }
 
+            if (this.isDelegateDiscriminator(fieldDef)) {
+                // discriminator field is auto-assigned
+                return;
+            }
+
             if (fieldDef.relation) {
                 if (withoutRelationFields) {
                     return;
@@ -789,6 +802,15 @@ export class InputValidator<Schema extends SchemaDef> {
                 ...(canBeArray ? [z.array(z.object(checkedVariantFields).strict())] : []),
             ]);
         }
+    }
+
+    private isDelegateDiscriminator(fieldDef: FieldDef) {
+        if (!fieldDef.originModel) {
+            // not inherited from a delegate
+            return false;
+        }
+        const discriminatorField = getDiscriminatorField(this.schema, fieldDef.originModel);
+        return discriminatorField === fieldDef.name;
     }
 
     private makeRelationManipulationSchema(fieldDef: FieldDef, withoutFields: string[], mode: 'create' | 'update') {

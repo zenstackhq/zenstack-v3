@@ -18,6 +18,8 @@ export type SchemaDef = {
 };
 
 export type ModelDef = {
+    name: string;
+    baseModel?: string;
     fields: Record<string, FieldDef>;
     attributes?: AttributeApplication[];
     uniqueFields: Record<
@@ -29,6 +31,7 @@ export type ModelDef = {
     >;
     idFields: string[];
     computedFields?: Record<string, Function>;
+    isDelegate?: boolean;
 };
 
 export type AttributeApplication = {
@@ -53,6 +56,7 @@ export type RelationInfo = {
 };
 
 export type FieldDef = {
+    name: string;
     type: string;
     id?: boolean;
     array?: boolean;
@@ -64,6 +68,7 @@ export type FieldDef = {
     relation?: RelationInfo;
     foreignKeyFor?: string[];
     computed?: boolean;
+    originModel?: string;
 };
 
 export type ProcedureParam = { name: string; type: string; optional?: boolean };
@@ -91,6 +96,7 @@ export type MappedBuiltinType = string | boolean | number | bigint | Decimal | D
 export type EnumDef = Record<string, string>;
 
 export type TypeDefDef = {
+    name: string;
     fields: Record<string, FieldDef>;
     attributes?: AttributeApplication[];
 };

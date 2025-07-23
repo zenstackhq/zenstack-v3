@@ -42,7 +42,15 @@ import path from 'node:path';
 import { match } from 'ts-pattern';
 import * as ts from 'typescript';
 import { ModelUtils } from '.';
-import { getAttribute, getAuthDecl, hasAttribute, isUniqueField } from './model-utils';
+import {
+    getAttribute,
+    getAuthDecl,
+    getIdFields,
+    hasAttribute,
+    isDelegateModel,
+    isIdField,
+    isUniqueField,
+} from './model-utils';
 
 export class TsSchemaGenerator {
     public async generate(schemaFile: string, pluginModelFiles: string[], outputDir: string) {
@@ -213,9 +221,28 @@ export class TsSchemaGenerator {
 
     private createDataModelObject(dm: DataModel) {
         const allFields = getAllFields(dm);
-        const allAttributes = getAllAttributes(dm);
+        const allAttributes = getAllAttributes(dm).filter((attr) => {
+            // exclude `@@delegate` attribute from base model
+            if (attr.decl.$refText === '@@delegate' && attr.$container !== dm) {
+                return false;
+            }
+            return true;
+        });
 
         const fields: ts.PropertyAssignment[] = [
+            // name
+            ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(dm.name)),
+
+            // baseModel
+            ...(dm.baseModel
+                ? [
+                      ts.factory.createPropertyAssignment(
+                          'baseModel',
+                          ts.factory.createStringLiteral(dm.baseModel.$refText),
+                      ),
+                  ]
+                : []),
+
             // fields
             ts.factory.createPropertyAssignment(
                 'fields',
@@ -244,12 +271,17 @@ export class TsSchemaGenerator {
             ts.factory.createPropertyAssignment(
                 'idFields',
                 ts.factory.createArrayLiteralExpression(
-                    this.getIdFields(dm).map((idField) => ts.factory.createStringLiteral(idField)),
+                    getIdFields(dm).map((idField) => ts.factory.createStringLiteral(idField)),
                 ),
             ),
 
             // uniqueFields
             ts.factory.createPropertyAssignment('uniqueFields', this.createUniqueFieldsObject(dm)),
+
+            // isDelegate
+            ...(isDelegateModel(dm)
+                ? [ts.factory.createPropertyAssignment('isDelegate', ts.factory.createTrue())]
+                : []),
         ];
 
         const computedFields = dm.fields.filter((f) => hasAttribute(f, '@computed'));
@@ -268,6 +300,9 @@ export class TsSchemaGenerator {
         const allAttributes = getAllAttributes(td);
 
         const fields: ts.PropertyAssignment[] = [
+            // name
+            ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(td.name)),
+
             // fields
             ts.factory.createPropertyAssignment(
                 'fields',
@@ -344,7 +379,28 @@ export class TsSchemaGenerator {
     }
 
     private createDataFieldObject(field: DataField, contextModel: DataModel | undefined) {
-        const objectFields = [ts.factory.createPropertyAssignment('type', this.generateFieldTypeLiteral(field))];
+        const objectFields = [
+            // name
+            ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(field.name)),
+            // type
+            ts.factory.createPropertyAssignment('type', this.generateFieldTypeLiteral(field)),
+        ];
+
+        if (
+            contextModel &&
+            // id fields are duplicated in inherited models
+            !isIdField(field, contextModel) &&
+            field.$container !== contextModel &&
+            isDelegateModel(field.$container)
+        ) {
+            // field is inherited from delegate
+            objectFields.push(
+                ts.factory.createPropertyAssignment(
+                    'originModel',
+                    ts.factory.createStringLiteral(field.$container.name),
+                ),
+            );
+        }
 
         if (contextModel && ModelUtils.isIdField(field, contextModel)) {
             objectFields.push(ts.factory.createPropertyAssignment('id', ts.factory.createTrue()));
@@ -666,12 +722,6 @@ export class TsSchemaGenerator {
             }
         }
         return undefined;
-    }
-
-    private getIdFields(dm: DataModel) {
-        return getAllFields(dm)
-            .filter((f) => ModelUtils.isIdField(f, dm))
-            .map((f) => f.name);
     }
 
     private createUniqueFieldsObject(dm: DataModel) {

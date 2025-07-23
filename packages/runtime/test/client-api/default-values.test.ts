@@ -12,37 +12,46 @@ const schema = {
     },
     models: {
         Model: {
+            name: 'Model',
             fields: {
                 uuid: {
+                    name: 'uuid',
                     type: 'String',
                     id: true,
                     default: ExpressionUtils.call('uuid'),
                 },
                 uuid7: {
+                    name: 'uuid7',
                     type: 'String',
                     default: ExpressionUtils.call('uuid', [ExpressionUtils.literal(7)]),
                 },
                 cuid: {
+                    name: 'cuid',
                     type: 'String',
                     default: ExpressionUtils.call('cuid'),
                 },
                 cuid2: {
+                    name: 'cuid2',
                     type: 'String',
                     default: ExpressionUtils.call('cuid', [ExpressionUtils.literal(2)]),
                 },
                 nanoid: {
+                    name: 'nanoid',
                     type: 'String',
                     default: ExpressionUtils.call('nanoid'),
                 },
                 nanoid8: {
+                    name: 'nanoid8',
                     type: 'String',
                     default: ExpressionUtils.call('nanoid', [ExpressionUtils.literal(8)]),
                 },
                 ulid: {
+                    name: 'ulid',
                     type: 'String',
                     default: ExpressionUtils.call('ulid'),
                 },
                 dt: {
+                    name: 'dt',
                     type: 'DateTime',
                     default: ExpressionUtils.call('now'),
                 },

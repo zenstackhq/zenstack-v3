@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createTestClient } from '../utils';
 
-describe('Client API Mixins', () => {
+describe('Mixin tests', () => {
     it('includes fields and attributes from mixins', async () => {
         const schema = `
 type TimeStamped {

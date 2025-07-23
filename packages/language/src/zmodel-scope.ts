@@ -19,8 +19,8 @@ import { match } from 'ts-pattern';
 import {
     BinaryExpr,
     MemberAccessExpr,
-    isDataModel,
     isDataField,
+    isDataModel,
     isEnumField,
     isInvocationExpr,
     isMemberAccessExpr,
@@ -31,9 +31,9 @@ import {
 } from './ast';
 import { PLUGIN_MODULE_NAME, STD_LIB_MODULE_NAME } from './constants';
 import {
+    getAllFields,
     getAllLoadedAndReachableDataModelsAndTypeDefs,
     getAuthDecl,
-    getModelFieldsWithBases,
     getRecursiveBases,
     isAuthInvocation,
     isCollectionPredicate,
@@ -231,7 +231,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
 
     private createScopeForContainer(node: AstNode | undefined, globalScope: Scope, includeTypeDefScope = false) {
         if (isDataModel(node)) {
-            return this.createScopeForNodes(getModelFieldsWithBases(node), globalScope);
+            return this.createScopeForNodes(getAllFields(node), globalScope);
         } else if (includeTypeDefScope && isTypeDef(node)) {
             return this.createScopeForNodes(node.fields, globalScope);
         } else {

@@ -1,5 +1,5 @@
 import type { ExpressionBuilder, ExpressionWrapper } from 'kysely';
-import type { FieldDef, GetModels, SchemaDef } from '../schema';
+import { ExpressionUtils, type FieldDef, type GetModels, type SchemaDef } from '../schema';
 import type { OrderBy } from './crud-types';
 import { InternalError, QueryError } from './errors';
 import type { ClientOptions } from './options';
@@ -109,6 +109,11 @@ export function isForeignKeyField(schema: SchemaDef, model: string, field: strin
 export function isRelationField(schema: SchemaDef, model: string, field: string): boolean {
     const fieldDef = requireField(schema, model, field);
     return !!fieldDef.relation;
+}
+
+export function isInheritedField(schema: SchemaDef, model: string, field: string): boolean {
+    const fieldDef = requireField(schema, model, field);
+    return !!fieldDef.originModel;
 }
 
 export function getUniqueFields(schema: SchemaDef, model: string) {
@@ -275,4 +280,36 @@ export function safeJSONStringify(value: unknown) {
             return v;
         }
     });
+}
+
+export function extractFields(object: any, fields: string[]) {
+    return fields.reduce((acc: any, field) => {
+        if (field in object) {
+            acc[field] = object[field];
+        }
+        return acc;
+    }, {});
+}
+
+export function extractIdFields(entity: any, schema: SchemaDef, model: string) {
+    const idFields = getIdFields(schema, model);
+    return idFields.reduce((acc: any, field) => {
+        if (field in entity) {
+            acc[field] = entity[field];
+        }
+        return acc;
+    }, {});
+}
+
+export function getDiscriminatorField(schema: SchemaDef, model: string) {
+    const modelDef = requireModel(schema, model);
+    const delegateAttr = modelDef.attributes?.find((attr) => attr.name === '@@delegate');
+    if (!delegateAttr) {
+        return undefined;
+    }
+    const discriminator = delegateAttr.args?.find((arg) => arg.name === 'discriminator');
+    if (!discriminator || !ExpressionUtils.isField(discriminator.value)) {
+        throw new InternalError(`Discriminator field not defined for model "${model}"`);
+    }
+    return discriminator.value.field;
 }

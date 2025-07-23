@@ -4,9 +4,15 @@ import type { GetModels, SchemaDef } from '../../../schema';
 import type { CreateArgs, CreateManyAndReturnArgs, CreateManyArgs, WhereInput } from '../../crud-types';
 import { getIdValues } from '../../query-utils';
 import { BaseOperationHandler } from './base';
+import { QueryError } from '../../errors';
 
 export class CreateOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(operation: 'create' | 'createMany' | 'createManyAndReturn', args: unknown | undefined) {
+        const modelDef = this.requireModel(this.model);
+        if (modelDef.isDelegate) {
+            throw new QueryError(`Model "${this.model}" is a delegate and cannot be created directly.`);
+        }
+
         // normalize args to strip `undefined` fields
         const normalizedArgs = this.normalizeArgs(args);
 

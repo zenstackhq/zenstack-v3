@@ -578,7 +578,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildNumberFilter(
         eb: ExpressionBuilder<any, any>,
         model: string,
-        table: string,
+        modelAlias: string,
         field: string,
         type: BuiltinType,
         payload: any,
@@ -587,9 +587,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             eb,
             type,
             payload,
-            buildFieldRef(this.schema, model, field, this.options, eb),
+            buildFieldRef(this.schema, model, field, this.options, eb, modelAlias),
             (value) => this.transformPrimitive(value, type, false),
-            (value) => this.buildNumberFilter(eb, model, table, field, type, value),
+            (value) => this.buildNumberFilter(eb, model, modelAlias, field, type, value),
         );
         return this.and(eb, ...conditions);
     }

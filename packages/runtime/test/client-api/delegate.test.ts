@@ -15,6 +15,13 @@ model User {
     ratedVideos RatedVideo[] @relation('direct')
 }
 
+model Comment {
+    id Int @id @default(autoincrement())
+    content String
+    asset Asset? @relation(fields: [assetId], references: [id])
+    assetId Int?
+}
+
 model Asset {
     id Int @id @default(autoincrement())
     createdAt DateTime @default(now())
@@ -22,6 +29,7 @@ model Asset {
     viewCount Int @default(0)
     owner User? @relation(fields: [ownerId], references: [id])
     ownerId Int?
+    comments Comment[]
     assetType String
     
     @@delegate(assetType)
@@ -267,6 +275,7 @@ model Gallery {
                         rating: 5,
                         owner: { connect: { id: u.id } },
                         user: { connect: { id: u.id } },
+                        comments: { create: { content: 'c1' } },
                     },
                 });
                 await client.ratedVideo.create({
@@ -277,6 +286,7 @@ model Gallery {
                         rating: 4,
                         owner: { connect: { id: u.id } },
                         user: { connect: { id: u.id } },
+                        comments: { create: { content: 'c2' } },
                     },
                 });
             });
@@ -423,6 +433,62 @@ model Gallery {
                         where: {
                             owner: {
                                 email: 'u2@example.com',
+                            },
+                        },
+                    }),
+                ).toResolveFalsy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            owner: { is: null },
+                        },
+                    }),
+                ).toResolveFalsy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            owner: { isNot: null },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            comments: {
+                                some: { content: 'c1' },
+                            },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            comments: {
+                                all: { content: 'c2' },
+                            },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            comments: {
+                                none: { content: 'c1' },
+                            },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            comments: {
+                                none: { content: { startsWith: 'c' } },
                             },
                         },
                     }),

@@ -9,10 +9,12 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
+import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
 import {
     buildFieldRef,
     buildJoinPairs,
+    getDelegateDescendantModels,
     getIdFields,
     getManyToManyRelation,
     isRelationField,
@@ -79,10 +81,18 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 // simple select by default
                 let result = eb.selectFrom(`${relationModel} as ${joinTableName}`);
 
+                const joinBases: string[] = [];
+
                 // however if there're filter/orderBy/take/skip,
                 // we need to build a subquery to handle them before aggregation
                 result = eb.selectFrom(() => {
-                    let subQuery = eb.selectFrom(`${relationModel}`).selectAll();
+                    let subQuery = eb.selectFrom(relationModel);
+                    subQuery = this.buildSelectAllFields(
+                        relationModel,
+                        subQuery,
+                        typeof payload === 'object' ? payload?.omit : undefined,
+                        joinBases,
+                    );
 
                     if (payload && typeof payload === 'object') {
                         if (payload.where) {
@@ -199,6 +209,20 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         const objArgs: Array<
             string | ExpressionWrapper<any, any, any> | SelectQueryBuilder<any, any, any> | RawBuilder<any>
         > = [];
+
+        // TODO: descendant JSON shouldn't be joined and selected if none of its fields are selected
+        const descendantModels = getDelegateDescendantModels(this.schema, relationModel);
+        if (descendantModels.length > 0) {
+            // select all JSONs built from delegate descendants
+            objArgs.push(
+                ...descendantModels
+                    .map((subModel) => [
+                        sql.lit(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`),
+                        eb.ref(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`),
+                    ])
+                    .flatMap((v) => v),
+            );
+        }
 
         if (payload === true || !payload.select) {
             // select all scalar fields

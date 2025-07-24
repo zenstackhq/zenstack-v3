@@ -1,5 +1,5 @@
 import type { ExpressionBuilder, ExpressionWrapper } from 'kysely';
-import { ExpressionUtils, type FieldDef, type GetModels, type SchemaDef } from '../schema';
+import { ExpressionUtils, type FieldDef, type GetModels, type ModelDef, type SchemaDef } from '../schema';
 import type { OrderBy } from './crud-types';
 import { InternalError, QueryError } from './errors';
 import type { ClientOptions } from './options';
@@ -312,4 +312,19 @@ export function getDiscriminatorField(schema: SchemaDef, model: string) {
         throw new InternalError(`Discriminator field not defined for model "${model}"`);
     }
     return discriminator.value.field;
+}
+
+export function getDelegateDescendantModels(
+    schema: SchemaDef,
+    model: string,
+    collected: Set<ModelDef> = new Set<ModelDef>(),
+): ModelDef[] {
+    const subModels = Object.values(schema.models).filter((m) => m.baseModel === model);
+    subModels.forEach((def) => {
+        if (!collected.has(def)) {
+            collected.add(def);
+            getDelegateDescendantModels(schema, def.name, collected);
+        }
+    });
+    return [...collected];
 }

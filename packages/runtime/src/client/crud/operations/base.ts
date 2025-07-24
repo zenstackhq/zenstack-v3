@@ -83,7 +83,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         protected readonly model: GetModels<Schema>,
         protected readonly inputValidator: InputValidator<Schema>,
     ) {
-        this.dialect = getCrudDialect(this.schema, this.client.$options, this);
+        this.dialect = getCrudDialect(this.schema, this.client.$options);
     }
 
     protected get schema() {

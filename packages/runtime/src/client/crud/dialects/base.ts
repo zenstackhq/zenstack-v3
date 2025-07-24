@@ -28,11 +28,13 @@ import {
     makeDefaultOrderBy,
     requireField,
 } from '../../query-utils';
+import type { BaseOperationHandler } from '../operations/base';
 
 export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     constructor(
         protected readonly schema: Schema,
         protected readonly options: ClientOptions<Schema>,
+        protected readonly handler: BaseOperationHandler<Schema>,
     ) {}
 
     abstract get provider(): DataSourceProviderType;

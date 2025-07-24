@@ -33,6 +33,7 @@ import {
     ensureArray,
     extractIdFields,
     flattenCompoundUniqueFilters,
+    getDelegateDescendantModels,
     getDiscriminatorField,
     getField,
     getIdFields,
@@ -84,7 +85,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         protected readonly model: GetModels<Schema>,
         protected readonly inputValidator: InputValidator<Schema>,
     ) {
-        this.dialect = getCrudDialect(this.schema, this.client.$options);
+        this.dialect = getCrudDialect(this.schema, this.client.$options, this);
     }
 
     protected get schema() {
@@ -183,19 +184,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
 
+        // for deduplicating base joins
+        const joinedBases: string[] = [];
+
         // select
         if (args && 'select' in args && args.select) {
             // select is mutually exclusive with omit
-            query = this.buildFieldSelection(model, query, args.select, model);
+            query = this.buildFieldSelection(model, query, args.select, model, joinedBases);
         } else {
             // include all scalar fields except those in omit
-            query = this.buildSelectAllScalarFields(model, query, (args as any)?.omit);
+            query = this.buildSelectAllFields(model, query, (args as any)?.omit, joinedBases);
         }
 
         // include
         if (args && 'include' in args && args.include) {
             // note that 'omit' is handled above already
-            query = this.buildFieldSelection(model, query, args.include, model);
+            query = this.buildFieldSelection(model, query, args.include, model, joinedBases);
         }
 
         if (args?.cursor) {
@@ -246,9 +250,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         query: SelectQueryBuilder<any, any, any>,
         selectOrInclude: Record<string, any>,
         parentAlias: string,
+        joinedBases: string[],
     ) {
         let result = query;
-        const joinedBases: string[] = [];
 
         for (const [field, payload] of Object.entries(selectOrInclude)) {
             if (!payload) {
@@ -262,12 +266,29 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             const fieldDef = this.requireField(model, field);
             if (!fieldDef.relation) {
+                // scalar field
                 result = this.selectField(result, model, parentAlias, field, joinedBases);
             } else {
                 if (!fieldDef.array && !fieldDef.optional && payload.where) {
                     throw new QueryError(`Field "${field}" doesn't support filtering`);
                 }
-                result = this.dialect.buildRelationSelection(result, model, field, parentAlias, payload);
+                if (fieldDef.originModel) {
+                    // relation is inherited from a delegate base model, need to build a join
+                    if (!joinedBases.includes(fieldDef.originModel)) {
+                        joinedBases.push(fieldDef.originModel);
+                        result = this.buildDelegateJoin(parentAlias, fieldDef.originModel, result);
+                    }
+                    result = this.dialect.buildRelationSelection(
+                        result,
+                        fieldDef.originModel,
+                        field,
+                        fieldDef.originModel,
+                        payload,
+                    );
+                } else {
+                    //  regular relation
+                    result = this.dialect.buildRelationSelection(result, model, field, parentAlias, payload);
+                }
             }
         }
 
@@ -332,14 +353,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return query;
     }
 
-    private buildSelectAllScalarFields(
+    buildSelectAllFields(
         model: string,
         query: SelectQueryBuilder<any, any, any>,
         omit?: Record<string, boolean | undefined>,
+        joinedBases: string[] = [],
     ) {
         const modelDef = this.requireModel(model);
         let result = query;
-        const joinedBases: string[] = [];
 
         for (const field of Object.keys(modelDef.fields)) {
             if (isRelationField(this.schema, model, field)) {
@@ -352,7 +373,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // select all fields from delegate descendants and pack into a JSON field `$delegate$Model`
-        const descendants = this.getDelegateDescendantModels(model);
+        const descendants = getDelegateDescendantModels(this.schema, model);
         for (const subModel of descendants) {
             if (!joinedBases.includes(subModel.name)) {
                 joinedBases.push(subModel.name);
@@ -376,17 +397,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         return result;
-    }
-
-    private getDelegateDescendantModels(model: string, collected: Set<ModelDef> = new Set<ModelDef>()): ModelDef[] {
-        const subModels = Object.values(this.schema.models).filter((m) => m.baseModel === model);
-        subModels.forEach((def) => {
-            if (!collected.has(def)) {
-                collected.add(def);
-                this.getDelegateDescendantModels(def.name, collected);
-            }
-        });
-        return [...collected];
     }
 
     private selectField(

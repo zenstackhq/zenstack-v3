@@ -10,9 +10,11 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { BuiltinType, GetModels, SchemaDef } from '../../../schema';
+import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
 import {
     buildFieldRef,
+    getDelegateDescendantModels,
     getIdFields,
     getManyToManyRelation,
     getRelationForeignKeyFieldPairs,
@@ -75,7 +77,15 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         const subQueryName = `${parentName}$${relationField}`;
 
         let tbl = eb.selectFrom(() => {
-            let subQuery = eb.selectFrom(relationModel).selectAll();
+            let subQuery = eb.selectFrom(relationModel);
+
+            const joinBases: string[] = [];
+            subQuery = this.handler.buildSelectAllFields(
+                relationModel,
+                subQuery,
+                typeof payload === 'object' ? payload?.omit : undefined,
+                joinBases,
+            );
 
             if (payload && typeof payload === 'object') {
                 if (payload.where) {
@@ -142,6 +152,20 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         tbl = tbl.select(() => {
             type ArgsType = Expression<any> | RawBuilder<any> | SelectQueryBuilder<any, any, any>;
             const objArgs: ArgsType[] = [];
+
+            // TODO: descendant JSON shouldn't be joined and selected if none of its fields are selected
+            const descendantModels = getDelegateDescendantModels(this.schema, relationModel);
+            if (descendantModels.length > 0) {
+                // select all JSONs built from delegate descendants
+                objArgs.push(
+                    ...descendantModels
+                        .map((subModel) => [
+                            sql.lit(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`),
+                            eb.ref(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`),
+                        ])
+                        .flatMap((v) => v),
+                );
+            }
 
             if (payload === true || !payload.select) {
                 // select all scalar fields

@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestClient } from '../utils';
 
-describe('Delegate model tests', () => {
-    const POLYMORPHIC_SCHEMA = `
+const DB_NAME = `client-api-delegate-tests`;
+
+describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as const }])(
+    'Delegate model tests for $provider',
+    ({ provider }) => {
+        const POLYMORPHIC_SCHEMA = `
 model User {
     id Int @id @default(autoincrement())
     email String? @unique
@@ -49,158 +53,194 @@ model Gallery {
 }
 `;
 
-    it('works with create', async () => {
-        const client = await createTestClient(POLYMORPHIC_SCHEMA, {
-            usePrismaPush: true,
+        let client: any;
+
+        beforeEach(async () => {
+            client = await createTestClient(POLYMORPHIC_SCHEMA, {
+                usePrismaPush: true,
+                provider,
+                dbName: provider === 'postgresql' ? DB_NAME : undefined,
+            });
         });
 
-        // delegate model cannot be created directly
-        await expect(
-            client.video.create({
-                data: {
-                    duration: 100,
-                    url: 'abc',
-                    videoType: 'MyVideo',
-                },
-            }),
-        ).rejects.toThrow('is a delegate');
-
-        // create entity with two levels of delegation
-        await expect(
-            client.ratedVideo.create({
-                data: {
-                    duration: 100,
-                    url: 'abc',
-                    rating: 5,
-                },
-            }),
-        ).resolves.toMatchObject({
-            id: expect.any(Number),
-            duration: 100,
-            url: 'abc',
-            rating: 5,
-            assetType: 'Video',
-            videoType: 'RatedVideo',
+        afterEach(async () => {
+            await client.$disconnect();
         });
 
-        // create entity with relation
-        await expect(
-            client.ratedVideo.create({
-                data: {
-                    duration: 50,
-                    url: 'bcd',
-                    rating: 5,
-                    user: { create: { email: 'u1@example.com' } },
-                },
-                include: { user: true },
-            }),
-        ).resolves.toMatchObject({
-            userId: expect.any(Number),
-            user: {
-                email: 'u1@example.com',
-            },
-        });
-
-        // create entity with one level of delegation
-        await expect(
-            client.image.create({
-                data: {
-                    format: 'png',
-                    gallery: {
-                        create: {},
+        it('works with create', async () => {
+            // delegate model cannot be created directly
+            await expect(
+                client.video.create({
+                    data: {
+                        duration: 100,
+                        url: 'abc',
+                        videoType: 'MyVideo',
                     },
-                },
-            }),
-        ).resolves.toMatchObject({
-            id: expect.any(Number),
-            format: 'png',
-            galleryId: expect.any(Number),
-            assetType: 'Image',
-        });
-    });
+                }),
+            ).rejects.toThrow('is a delegate');
 
-    it('works with find', async () => {
-        const client = await createTestClient(POLYMORPHIC_SCHEMA, {
-            usePrismaPush: true,
-            log: ['query'],
-        });
-
-        const u = await client.user.create({
-            data: {
-                email: 'u1@example.com',
-            },
-        });
-        const v = await client.ratedVideo.create({
-            data: {
+            // create entity with two levels of delegation
+            await expect(
+                client.ratedVideo.create({
+                    data: {
+                        duration: 100,
+                        url: 'abc',
+                        rating: 5,
+                    },
+                }),
+            ).resolves.toMatchObject({
+                id: expect.any(Number),
                 duration: 100,
                 url: 'abc',
                 rating: 5,
-                user: { connect: { id: u.id } },
-            },
-            include: { user: true },
+                assetType: 'Video',
+                videoType: 'RatedVideo',
+            });
+
+            // create entity with relation
+            await expect(
+                client.ratedVideo.create({
+                    data: {
+                        duration: 50,
+                        url: 'bcd',
+                        rating: 5,
+                        user: { create: { email: 'u1@example.com' } },
+                    },
+                    include: { user: true },
+                }),
+            ).resolves.toMatchObject({
+                userId: expect.any(Number),
+                user: {
+                    email: 'u1@example.com',
+                },
+            });
+
+            // create entity with one level of delegation
+            await expect(
+                client.image.create({
+                    data: {
+                        format: 'png',
+                        gallery: {
+                            create: {},
+                        },
+                    },
+                }),
+            ).resolves.toMatchObject({
+                id: expect.any(Number),
+                format: 'png',
+                galleryId: expect.any(Number),
+                assetType: 'Image',
+            });
         });
 
-        const ratedVideoContent = {
-            id: v.id,
-            createdAt: expect.any(Date),
-            duration: 100,
-            rating: 5,
-            assetType: 'Video',
-            videoType: 'RatedVideo',
-        };
+        it('works with find', async () => {
+            const u = await client.user.create({
+                data: {
+                    email: 'u1@example.com',
+                },
+            });
+            const v = await client.ratedVideo.create({
+                data: {
+                    duration: 100,
+                    url: 'abc',
+                    rating: 5,
+                    owner: { connect: { id: u.id } },
+                    user: { connect: { id: u.id } },
+                },
+            });
 
-        // include all base fields
-        await expect(
-            client.ratedVideo.findUnique({
-                where: { id: v.id },
-                include: { user: true },
-            }),
-        ).resolves.toMatchObject({ ...ratedVideoContent, user: expect.any(Object) });
+            const ratedVideoContent = {
+                id: v.id,
+                createdAt: expect.any(Date),
+                duration: 100,
+                rating: 5,
+                assetType: 'Video',
+                videoType: 'RatedVideo',
+            };
 
-        // select fields
-        await expect(
-            client.ratedVideo.findUnique({
+            // include all base fields
+            await expect(
+                client.ratedVideo.findUnique({
+                    where: { id: v.id },
+                    include: { user: true, owner: true },
+                }),
+            ).resolves.toMatchObject({ ...ratedVideoContent, user: expect.any(Object), owner: expect.any(Object) });
+
+            // select fields
+            await expect(
+                client.ratedVideo.findUnique({
+                    where: { id: v.id },
+                    select: {
+                        id: true,
+                        viewCount: true,
+                        url: true,
+                        rating: true,
+                    },
+                }),
+            ).resolves.toEqual({
+                id: v.id,
+                viewCount: 0,
+                url: 'abc',
+                rating: 5,
+            });
+
+            // omit fields
+            const r = await client.ratedVideo.findUnique({
                 where: { id: v.id },
-                select: {
-                    id: true,
+                omit: {
                     viewCount: true,
                     url: true,
                     rating: true,
                 },
-            }),
-        ).resolves.toEqual({
-            id: v.id,
-            viewCount: 0,
-            url: 'abc',
-            rating: 5,
+            });
+            expect(r.viewCount).toBeUndefined();
+            expect(r.url).toBeUndefined();
+            expect(r.rating).toBeUndefined();
+            expect(r.duration).toEqual(expect.any(Number));
+
+            // include all sub fields
+            await expect(
+                client.video.findUnique({
+                    where: { id: v.id },
+                }),
+            ).resolves.toMatchObject(ratedVideoContent);
+
+            // include all sub fields
+            await expect(
+                client.asset.findUnique({
+                    where: { id: v.id },
+                }),
+            ).resolves.toMatchObject(ratedVideoContent);
+
+            // find as a relation
+            await expect(
+                client.user.findUnique({
+                    where: { id: u.id },
+                    include: { assets: true, ratedVideos: true },
+                }),
+            ).resolves.toMatchObject({
+                assets: [ratedVideoContent],
+                ratedVideos: [ratedVideoContent],
+            });
+
+            // find as a relation with selection
+            await expect(
+                client.user.findUnique({
+                    where: { id: u.id },
+                    include: {
+                        assets: {
+                            select: { id: true, assetType: true },
+                        },
+                        ratedVideos: {
+                            url: true,
+                            rating: true,
+                        },
+                    },
+                }),
+            ).resolves.toMatchObject({
+                assets: [{ id: v.id, assetType: 'Video' }],
+                ratedVideos: [{ url: 'abc', rating: 5 }],
+            });
         });
-
-        // omit fields
-        const r = await client.ratedVideo.findUnique({
-            where: { id: v.id },
-            omit: {
-                viewCount: true,
-                url: true,
-                rating: true,
-            },
-        });
-        expect(r.viewCount).toBeUndefined();
-        expect(r.url).toBeUndefined();
-        expect(r.rating).toBeUndefined();
-        expect(r.duration).toEqual(expect.any(Number));
-
-        // include all sub fields
-        await expect(
-            client.video.findUnique({
-                where: { id: v.id },
-            }),
-        ).resolves.toMatchObject(ratedVideoContent);
-
-        // include all sub fields
-        await expect(
-            client.asset.findUnique({
-                where: { id: v.id },
-            }),
-        ).resolves.toMatchObject(ratedVideoContent);
-    });
-});
+    },
+);

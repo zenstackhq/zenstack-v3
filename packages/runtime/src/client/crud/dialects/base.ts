@@ -168,7 +168,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         if (payload === null) {
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(this.schema, model, field);
 
-            if (ownedByModel) {
+            if (ownedByModel && !fieldDef.originModel) {
                 // can be short-circuited to FK null check
                 return this.and(eb, ...keyPairs.map(({ fk }) => eb(sql.ref(`${modelAlias}.${fk}`), 'is', null)));
             } else {

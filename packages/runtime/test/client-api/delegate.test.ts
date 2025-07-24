@@ -441,6 +441,14 @@ model Gallery {
                 await expect(
                     client.video.findFirst({
                         where: {
+                            owner: null,
+                        },
+                    }),
+                ).toResolveFalsy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
                             owner: { is: null },
                         },
                     }),

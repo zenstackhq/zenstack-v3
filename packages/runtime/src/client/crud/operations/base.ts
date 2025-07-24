@@ -143,7 +143,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         args: FindArgs<Schema, GetModels<Schema>, true> | undefined,
     ): Promise<any[]> {
         // table
-        let query = kysely.selectFrom(model);
+        let query = this.dialect.buildSelectModel(expressionBuilder(), model);
 
         // where
         if (args?.where) {
@@ -182,22 +182,19 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
 
-        // for deduplicating base joins
-        const joinedBases: string[] = [];
-
         // select
         if (args && 'select' in args && args.select) {
             // select is mutually exclusive with omit
-            query = this.buildFieldSelection(model, query, args.select, model, joinedBases);
+            query = this.buildFieldSelection(model, query, args.select, model);
         } else {
             // include all scalar fields except those in omit
-            query = this.dialect.buildSelectAllFields(model, query, (args as any)?.omit, joinedBases);
+            query = this.dialect.buildSelectAllFields(model, query, (args as any)?.omit);
         }
 
         // include
         if (args && 'include' in args && args.include) {
             // note that 'omit' is handled above already
-            query = this.buildFieldSelection(model, query, args.include, model, joinedBases);
+            query = this.buildFieldSelection(model, query, args.include, model);
         }
 
         if (args?.cursor) {
@@ -207,13 +204,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'read' }));
 
         let result: any[] = [];
+        const queryId = { queryId: `zenstack-${createId()}` };
+        const compiled = kysely.getExecutor().compileQuery(query.toOperationNode(), queryId);
         try {
-            result = await query.execute();
+            const r = await kysely.getExecutor().executeQuery(compiled, queryId);
+            result = r.rows;
         } catch (err) {
-            const { sql, parameters } = query.compile();
-            let message = `Failed to execute query: ${err}, sql: ${sql}`;
+            let message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
             if (this.options.debug) {
-                message += `, parameters: \n${parameters.map((p) => inspect(p)).join('\n')}`;
+                message += `, parameters: \n${compiled.parameters.map((p) => inspect(p)).join('\n')}`;
             }
             throw new QueryError(message, err);
         }
@@ -248,7 +247,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         query: SelectQueryBuilder<any, any, any>,
         selectOrInclude: Record<string, any>,
         parentAlias: string,
-        joinedBases: string[],
     ) {
         let result = query;
 
@@ -265,17 +263,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const fieldDef = this.requireField(model, field);
             if (!fieldDef.relation) {
                 // scalar field
-                result = this.dialect.buildSelectField(result, model, parentAlias, field, joinedBases);
+                result = this.dialect.buildSelectField(result, model, parentAlias, field);
             } else {
                 if (!fieldDef.array && !fieldDef.optional && payload.where) {
                     throw new QueryError(`Field "${field}" doesn't support filtering`);
                 }
                 if (fieldDef.originModel) {
-                    // relation is inherited from a delegate base model, need to build a join
-                    if (!joinedBases.includes(fieldDef.originModel)) {
-                        joinedBases.push(fieldDef.originModel);
-                        result = this.dialect.buildDelegateJoin(parentAlias, fieldDef.originModel, result);
-                    }
                     result = this.dialect.buildRelationSelection(
                         result,
                         fieldDef.originModel,
@@ -399,8 +392,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         model: GetModels<Schema>,
         data: any,
         fromRelation?: FromRelationContext<Schema>,
+        creatingForDelegate = false,
     ): Promise<unknown> {
         const modelDef = this.requireModel(model);
+
+        // additional validations
+        if (modelDef.isDelegate && !creatingForDelegate) {
+            throw new QueryError(`Model "${this.model}" is a delegate and cannot be created directly.`);
+        }
+
         let createFields: any = {};
         let parentUpdateTask: ((entity: any) => Promise<unknown>) | undefined = undefined;
 
@@ -573,7 +573,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         thisCreateFields[discriminatorField] = forModel;
 
         // create base model entity
-        const createResult = await this.create(kysely, model as GetModels<Schema>, thisCreateFields);
+        const createResult = await this.create(kysely, model as GetModels<Schema>, thisCreateFields, undefined, true);
 
         // copy over id fields from base model
         const idValues = extractIdFields(createResult, this.schema, model);

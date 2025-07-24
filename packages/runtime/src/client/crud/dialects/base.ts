@@ -22,7 +22,6 @@ import {
     buildJoinPairs,
     flattenCompoundUniqueFilters,
     getDelegateDescendantModels,
-    getField,
     getIdFields,
     getManyToManyRelation,
     getRelationForeignKeyFieldPairs,
@@ -45,6 +44,18 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     // #region common query builders
+
+    buildSelectModel(eb: ExpressionBuilder<any, any>, model: string) {
+        const modelDef = requireModel(this.schema, model);
+        let result = eb.selectFrom(model);
+        // join all delegate bases
+        let joinBase = modelDef.baseModel;
+        while (joinBase) {
+            result = this.buildDelegateJoin(model, joinBase, result);
+            joinBase = requireModel(this.schema, joinBase).baseModel;
+        }
+        return result;
+    }
 
     buildFilter(
         eb: ExpressionBuilder<any, any>,
@@ -78,12 +89,24 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             }
 
             const fieldDef = requireField(this.schema, model, key);
+
             if (fieldDef.relation) {
                 result = this.and(eb, result, this.buildRelationFilter(eb, model, modelAlias, key, fieldDef, payload));
-            } else if (fieldDef.array) {
-                result = this.and(eb, result, this.buildArrayFilter(eb, model, modelAlias, key, fieldDef, payload));
             } else {
-                result = this.and(eb, result, this.buildPrimitiveFilter(eb, model, modelAlias, key, fieldDef, payload));
+                // if the field is from a base model, build a reference from that model
+                const fieldRef = buildFieldRef(
+                    this.schema,
+                    fieldDef.originModel ?? model,
+                    key,
+                    this.options,
+                    eb,
+                    fieldDef.originModel ?? modelAlias,
+                );
+                if (fieldDef.array) {
+                    result = this.and(eb, result, this.buildArrayFilter(eb, fieldRef, fieldDef, payload));
+                } else {
+                    result = this.and(eb, result, this.buildPrimitiveFilter(eb, fieldRef, fieldDef, payload));
+                }
             }
         }
 
@@ -137,7 +160,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildToOneRelationFilter(
         eb: ExpressionBuilder<any, any>,
         model: string,
-        table: string,
+        modelAlias: string,
         field: string,
         fieldDef: FieldDef,
         payload: any,
@@ -147,15 +170,22 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
             if (ownedByModel) {
                 // can be short-circuited to FK null check
-                return this.and(eb, ...keyPairs.map(({ fk }) => eb(sql.ref(`${table}.${fk}`), 'is', null)));
+                return this.and(eb, ...keyPairs.map(({ fk }) => eb(sql.ref(`${modelAlias}.${fk}`), 'is', null)));
             } else {
                 // translate it to `{ is: null }` filter
-                return this.buildToOneRelationFilter(eb, model, table, field, fieldDef, { is: null });
+                return this.buildToOneRelationFilter(eb, model, modelAlias, field, fieldDef, { is: null });
             }
         }
 
-        const joinAlias = `${table}$${field}`;
-        const joinPairs = buildJoinPairs(this.schema, model, table, field, joinAlias);
+        const joinAlias = `${modelAlias}$${field}`;
+        const joinPairs = buildJoinPairs(
+            this.schema,
+            model,
+            // if field is from a base, use the base model to join
+            fieldDef.originModel ?? modelAlias,
+            field,
+            joinAlias,
+        );
         const filterResultField = `${field}$filter`;
 
         const joinSelect = eb
@@ -284,9 +314,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         eb,
                         result,
                         eb(
-                            eb
-                                .selectFrom(relationModel)
-                                .select((eb1) => eb1.fn.count(eb1.lit(1)).as('count'))
+                            this.buildSelectModel(eb, relationModel)
+                                .select((eb1) => eb1.fn.count(eb1.lit(1)).as('$count'))
                                 .where(buildPkFkWhereRefs(eb))
                                 .where((eb1) => this.buildFilter(eb1, relationModel, relationModel, subPayload)),
                             '>',
@@ -301,9 +330,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         eb,
                         result,
                         eb(
-                            eb
-                                .selectFrom(relationModel)
-                                .select((eb1) => eb1.fn.count(eb1.lit(1)).as('count'))
+                            this.buildSelectModel(eb, relationModel)
+                                .select((eb1) => eb1.fn.count(eb1.lit(1)).as('$count'))
                                 .where(buildPkFkWhereRefs(eb))
                                 .where((eb1) =>
                                     eb1.not(this.buildFilter(eb1, relationModel, relationModel, subPayload)),
@@ -320,9 +348,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         eb,
                         result,
                         eb(
-                            eb
-                                .selectFrom(relationModel)
-                                .select((eb1) => eb1.fn.count(eb1.lit(1)).as('count'))
+                            this.buildSelectModel(eb, relationModel)
+                                .select((eb1) => eb1.fn.count(eb1.lit(1)).as('$count'))
                                 .where(buildPkFkWhereRefs(eb))
                                 .where((eb1) => this.buildFilter(eb1, relationModel, relationModel, subPayload)),
                             '=',
@@ -339,15 +366,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     private buildArrayFilter(
         eb: ExpressionBuilder<any, any>,
-        model: string,
-        modelAlias: string,
-        field: string,
+        fieldRef: Expression<any>,
         fieldDef: FieldDef,
         payload: any,
     ) {
         const clauses: Expression<SqlBool>[] = [];
         const fieldType = fieldDef.type as BuiltinType;
-        const fieldRef = buildFieldRef(this.schema, model, field, this.options, eb, modelAlias);
 
         for (const [key, _value] of Object.entries(payload)) {
             if (_value === undefined) {
@@ -391,31 +415,24 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return this.and(eb, ...clauses);
     }
 
-    buildPrimitiveFilter(
-        eb: ExpressionBuilder<any, any>,
-        model: string,
-        modelAlias: string,
-        field: string,
-        fieldDef: FieldDef,
-        payload: any,
-    ) {
+    buildPrimitiveFilter(eb: ExpressionBuilder<any, any>, fieldRef: Expression<any>, fieldDef: FieldDef, payload: any) {
         if (payload === null) {
-            return eb(sql.ref(`${modelAlias}.${field}`), 'is', null);
+            return eb(fieldRef, 'is', null);
         }
 
         if (isEnum(this.schema, fieldDef.type)) {
-            return this.buildEnumFilter(eb, modelAlias, field, fieldDef, payload);
+            return this.buildEnumFilter(eb, fieldRef, fieldDef, payload);
         }
 
         return (
             match(fieldDef.type as BuiltinType)
-                .with('String', () => this.buildStringFilter(eb, modelAlias, field, payload))
+                .with('String', () => this.buildStringFilter(eb, fieldRef, payload))
                 .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                    this.buildNumberFilter(eb, model, modelAlias, field, type, payload),
+                    this.buildNumberFilter(eb, fieldRef, type, payload),
                 )
-                .with('Boolean', () => this.buildBooleanFilter(eb, modelAlias, field, payload))
-                .with('DateTime', () => this.buildDateTimeFilter(eb, modelAlias, field, payload))
-                .with('Bytes', () => this.buildBytesFilter(eb, modelAlias, field, payload))
+                .with('Boolean', () => this.buildBooleanFilter(eb, fieldRef, payload))
+                .with('DateTime', () => this.buildDateTimeFilter(eb, fieldRef, payload))
+                .with('Bytes', () => this.buildBytesFilter(eb, fieldRef, payload))
                 // TODO: JSON filters
                 .with('Json', () => {
                     throw new InternalError('JSON filters are not supported yet');
@@ -496,15 +513,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return { conditions, consumedKeys };
     }
 
-    private buildStringFilter(
-        eb: ExpressionBuilder<any, any>,
-        table: string,
-        field: string,
-        payload: StringFilter<true>,
-    ) {
-        const fieldDef = getField(this.schema, table, field);
-        let fieldRef: Expression<any> = fieldDef?.computed ? sql.ref(field) : sql.ref(`${table}.${field}`);
-
+    private buildStringFilter(eb: ExpressionBuilder<any, any>, fieldRef: Expression<any>, payload: StringFilter<true>) {
         let insensitive = false;
         if (payload && typeof payload === 'object' && 'mode' in payload && payload.mode === 'insensitive') {
             insensitive = true;
@@ -517,7 +526,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             payload,
             fieldRef,
             (value) => this.prepStringCasing(eb, value, insensitive),
-            (value) => this.buildStringFilter(eb, table, field, value as StringFilter<true>),
+            (value) => this.buildStringFilter(eb, fieldRef, value as StringFilter<true>),
         );
 
         if (payload && typeof payload === 'object') {
@@ -568,9 +577,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     private buildNumberFilter(
         eb: ExpressionBuilder<any, any>,
-        model: string,
-        modelAlias: string,
-        field: string,
+        fieldRef: Expression<any>,
         type: BuiltinType,
         payload: any,
     ) {
@@ -578,26 +585,25 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             eb,
             type,
             payload,
-            buildFieldRef(this.schema, model, field, this.options, eb, modelAlias),
+            fieldRef,
             (value) => this.transformPrimitive(value, type, false),
-            (value) => this.buildNumberFilter(eb, model, modelAlias, field, type, value),
+            (value) => this.buildNumberFilter(eb, fieldRef, type, value),
         );
         return this.and(eb, ...conditions);
     }
 
     private buildBooleanFilter(
         eb: ExpressionBuilder<any, any>,
-        table: string,
-        field: string,
+        fieldRef: Expression<any>,
         payload: BooleanFilter<true>,
     ) {
         const { conditions } = this.buildStandardFilter(
             eb,
             'Boolean',
             payload,
-            sql.ref(`${table}.${field}`),
+            fieldRef,
             (value) => this.transformPrimitive(value, 'Boolean', false),
-            (value) => this.buildBooleanFilter(eb, table, field, value as BooleanFilter<true>),
+            (value) => this.buildBooleanFilter(eb, fieldRef, value as BooleanFilter<true>),
             true,
             ['equals', 'not'],
         );
@@ -606,35 +612,29 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     private buildDateTimeFilter(
         eb: ExpressionBuilder<any, any>,
-        table: string,
-        field: string,
+        fieldRef: Expression<any>,
         payload: DateTimeFilter<true>,
     ) {
         const { conditions } = this.buildStandardFilter(
             eb,
             'DateTime',
             payload,
-            sql.ref(`${table}.${field}`),
+            fieldRef,
             (value) => this.transformPrimitive(value, 'DateTime', false),
-            (value) => this.buildDateTimeFilter(eb, table, field, value as DateTimeFilter<true>),
+            (value) => this.buildDateTimeFilter(eb, fieldRef, value as DateTimeFilter<true>),
             true,
         );
         return this.and(eb, ...conditions);
     }
 
-    private buildBytesFilter(
-        eb: ExpressionBuilder<any, any>,
-        table: string,
-        field: string,
-        payload: BytesFilter<true>,
-    ) {
+    private buildBytesFilter(eb: ExpressionBuilder<any, any>, fieldRef: Expression<any>, payload: BytesFilter<true>) {
         const conditions = this.buildStandardFilter(
             eb,
             'Bytes',
             payload,
-            sql.ref(`${table}.${field}`),
+            fieldRef,
             (value) => this.transformPrimitive(value, 'Bytes', false),
-            (value) => this.buildBytesFilter(eb, table, field, value as BytesFilter<true>),
+            (value) => this.buildBytesFilter(eb, fieldRef, value as BytesFilter<true>),
             true,
             ['equals', 'in', 'notIn', 'not'],
         );
@@ -643,8 +643,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     private buildEnumFilter(
         eb: ExpressionBuilder<any, any>,
-        table: string,
-        field: string,
+        fieldRef: Expression<any>,
         fieldDef: FieldDef,
         payload: any,
     ) {
@@ -652,9 +651,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             eb,
             'String',
             payload,
-            sql.ref(`${table}.${field}`),
+            fieldRef,
             (value) => value,
-            (value) => this.buildEnumFilter(eb, table, field, fieldDef, value),
+            (value) => this.buildEnumFilter(eb, fieldRef, fieldDef, value),
             true,
             ['equals', 'in', 'notIn', 'not'],
         );
@@ -747,7 +746,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                             );
                             const sort = this.negateSort(value._count, negated);
                             result = result.orderBy((eb) => {
-                                let subQuery = eb.selectFrom(relationModel);
+                                let subQuery = this.buildSelectModel(eb, relationModel);
                                 const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, relationModel);
                                 subQuery = subQuery.where(() =>
                                     this.and(
@@ -783,7 +782,6 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         model: string,
         query: SelectQueryBuilder<any, any, any>,
         omit?: Record<string, boolean | undefined>,
-        joinedBases: string[] = [],
     ) {
         const modelDef = requireModel(this.schema, model);
         let result = query;
@@ -795,16 +793,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             if (omit?.[field] === true) {
                 continue;
             }
-            result = this.buildSelectField(result, model, model, field, joinedBases);
+            result = this.buildSelectField(result, model, model, field);
         }
 
         // select all fields from delegate descendants and pack into a JSON field `$delegate$Model`
         const descendants = getDelegateDescendantModels(this.schema, model);
         for (const subModel of descendants) {
-            if (!joinedBases.includes(subModel.name)) {
-                joinedBases.push(subModel.name);
-                result = this.buildDelegateJoin(model, subModel.name, result);
-            }
+            result = this.buildDelegateJoin(model, subModel.name, result);
             result = result.select((eb) => {
                 const jsonObject: Record<string, Expression<any>> = {};
                 for (const field of Object.keys(subModel.fields)) {
@@ -823,13 +818,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
-    buildSelectField(
-        query: SelectQueryBuilder<any, any, any>,
-        model: string,
-        modelAlias: string,
-        field: string,
-        joinedBases: string[],
-    ) {
+    buildSelectField(query: SelectQueryBuilder<any, any, any>, model: string, modelAlias: string, field: string) {
         const fieldDef = requireField(this.schema, model, field);
 
         if (fieldDef.computed) {
@@ -841,11 +830,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         } else {
             // field from delegate base, build a join
             let result = query;
-            if (!joinedBases.includes(fieldDef.originModel)) {
-                joinedBases.push(fieldDef.originModel);
-                result = this.buildDelegateJoin(model, fieldDef.originModel, result);
-            }
-            result = this.buildSelectField(result, fieldDef.originModel, fieldDef.originModel, field, joinedBases);
+            result = this.buildSelectField(result, fieldDef.originModel, fieldDef.originModel, field);
             return result;
         }
     }

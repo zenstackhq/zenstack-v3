@@ -81,17 +81,14 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 // simple select by default
                 let result = eb.selectFrom(`${relationModel} as ${joinTableName}`);
 
-                const joinBases: string[] = [];
-
                 // however if there're filter/orderBy/take/skip,
                 // we need to build a subquery to handle them before aggregation
                 result = eb.selectFrom(() => {
-                    let subQuery = eb.selectFrom(relationModel);
+                    let subQuery = this.buildSelectModel(eb, relationModel);
                     subQuery = this.buildSelectAllFields(
                         relationModel,
                         subQuery,
                         typeof payload === 'object' ? payload?.omit : undefined,
-                        joinBases,
                     );
 
                     if (payload && typeof payload === 'object') {

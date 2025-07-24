@@ -29,7 +29,6 @@ model User {
                 usePrismaPush: true,
                 provider,
                 dbName: provider === 'postgresql' ? PG_DB_NAME : undefined,
-                log: ['query'],
             });
         });
 

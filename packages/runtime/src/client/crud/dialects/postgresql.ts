@@ -87,7 +87,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 // we need to build a subquery to handle them before aggregation
                 result = eb.selectFrom(() => {
                     let subQuery = eb.selectFrom(relationModel);
-                    subQuery = this.handler.buildSelectAllFields(
+                    subQuery = this.buildSelectAllFields(
                         relationModel,
                         subQuery,
                         typeof payload === 'object' ? payload?.omit : undefined,

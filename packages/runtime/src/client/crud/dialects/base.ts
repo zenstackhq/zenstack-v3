@@ -5,6 +5,7 @@ import { match, P } from 'ts-pattern';
 import type { BuiltinType, DataSourceProviderType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { enumerate } from '../../../utils/enumerate';
 import type { OrArray } from '../../../utils/type-utils';
+import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type {
     BooleanFilter,
     BytesFilter,
@@ -20,42 +21,30 @@ import {
     buildFieldRef,
     buildJoinPairs,
     flattenCompoundUniqueFilters,
+    getDelegateDescendantModels,
     getField,
     getIdFields,
     getManyToManyRelation,
     getRelationForeignKeyFieldPairs,
     isEnum,
+    isInheritedField,
+    isRelationField,
     makeDefaultOrderBy,
     requireField,
+    requireModel,
 } from '../../query-utils';
-import type { BaseOperationHandler } from '../operations/base';
 
 export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     constructor(
         protected readonly schema: Schema,
         protected readonly options: ClientOptions<Schema>,
-        protected readonly handler: BaseOperationHandler<Schema>,
     ) {}
-
-    abstract get provider(): DataSourceProviderType;
 
     transformPrimitive(value: unknown, _type: BuiltinType, _forArrayField: boolean) {
         return value;
     }
 
-    abstract buildRelationSelection(
-        query: SelectQueryBuilder<any, any, any>,
-        model: string,
-        relationField: string,
-        parentAlias: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-    ): SelectQueryBuilder<any, any, any>;
-
-    abstract buildSkipTake(
-        query: SelectQueryBuilder<any, any, any>,
-        skip: number | undefined,
-        take: number | undefined,
-    ): SelectQueryBuilder<any, any, any>;
+    // #region common query builders
 
     buildFilter(
         eb: ExpressionBuilder<any, any>,
@@ -790,6 +779,92 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
+    buildSelectAllFields(
+        model: string,
+        query: SelectQueryBuilder<any, any, any>,
+        omit?: Record<string, boolean | undefined>,
+        joinedBases: string[] = [],
+    ) {
+        const modelDef = requireModel(this.schema, model);
+        let result = query;
+
+        for (const field of Object.keys(modelDef.fields)) {
+            if (isRelationField(this.schema, model, field)) {
+                continue;
+            }
+            if (omit?.[field] === true) {
+                continue;
+            }
+            result = this.buildSelectField(result, model, model, field, joinedBases);
+        }
+
+        // select all fields from delegate descendants and pack into a JSON field `$delegate$Model`
+        const descendants = getDelegateDescendantModels(this.schema, model);
+        for (const subModel of descendants) {
+            if (!joinedBases.includes(subModel.name)) {
+                joinedBases.push(subModel.name);
+                result = this.buildDelegateJoin(model, subModel.name, result);
+            }
+            result = result.select((eb) => {
+                const jsonObject: Record<string, Expression<any>> = {};
+                for (const field of Object.keys(subModel.fields)) {
+                    if (
+                        isRelationField(this.schema, subModel.name, field) ||
+                        isInheritedField(this.schema, subModel.name, field)
+                    ) {
+                        continue;
+                    }
+                    jsonObject[field] = eb.ref(`${subModel.name}.${field}`);
+                }
+                return this.buildJsonObject(eb, jsonObject).as(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`);
+            });
+        }
+
+        return result;
+    }
+
+    buildSelectField(
+        query: SelectQueryBuilder<any, any, any>,
+        model: string,
+        modelAlias: string,
+        field: string,
+        joinedBases: string[],
+    ) {
+        const fieldDef = requireField(this.schema, model, field);
+
+        if (fieldDef.computed) {
+            // TODO: computed field from delegate base?
+            return query.select((eb) => buildFieldRef(this.schema, model, field, this.options, eb).as(field));
+        } else if (!fieldDef.originModel) {
+            // regular field
+            return query.select(sql.ref(`${modelAlias}.${field}`).as(field));
+        } else {
+            // field from delegate base, build a join
+            let result = query;
+            if (!joinedBases.includes(fieldDef.originModel)) {
+                joinedBases.push(fieldDef.originModel);
+                result = this.buildDelegateJoin(model, fieldDef.originModel, result);
+            }
+            result = this.buildSelectField(result, fieldDef.originModel, fieldDef.originModel, field, joinedBases);
+            return result;
+        }
+    }
+
+    buildDelegateJoin(thisModel: string, otherModel: string, query: SelectQueryBuilder<any, any, any>) {
+        const idFields = getIdFields(this.schema, thisModel);
+        query = query.leftJoin(otherModel, (qb) => {
+            for (const idField of idFields) {
+                qb = qb.onRef(`${thisModel}.${idField}`, '=', `${otherModel}.${idField}`);
+            }
+            return qb;
+        });
+        return query;
+    }
+
+    // #endregion
+
+    // #region utils
+
     private negateSort(sort: SortOrder, negated: boolean) {
         return negated ? (sort === 'asc' ? 'desc' : 'asc') : sort;
     }
@@ -844,6 +919,32 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return eb.not(this.and(eb, ...args));
     }
 
+    // #endregion
+
+    // #region abstract methods
+
+    abstract get provider(): DataSourceProviderType;
+
+    /**
+     * Builds selection for a relation field.
+     */
+    abstract buildRelationSelection(
+        query: SelectQueryBuilder<any, any, any>,
+        model: string,
+        relationField: string,
+        parentAlias: string,
+        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
+    ): SelectQueryBuilder<any, any, any>;
+
+    /**
+     * Builds skip and take clauses.
+     */
+    abstract buildSkipTake(
+        query: SelectQueryBuilder<any, any, any>,
+        skip: number | undefined,
+        take: number | undefined,
+    ): SelectQueryBuilder<any, any, any>;
+
     /**
      * Builds an Kysely expression that returns a JSON object for the given key-value pairs.
      */
@@ -879,4 +980,6 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Whether the dialect supports DISTINCT ON.
      */
     abstract get supportsDistinctOn(): boolean;
+
+    // #endregion
 }

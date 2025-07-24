@@ -80,7 +80,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             let subQuery = eb.selectFrom(relationModel);
 
             const joinBases: string[] = [];
-            subQuery = this.handler.buildSelectAllFields(
+            subQuery = this.buildSelectAllFields(
                 relationModel,
                 subQuery,
                 typeof payload === 'object' ? payload?.omit : undefined,

@@ -22,7 +22,7 @@ import { ExpressionUtils, type GetModels, type ModelDef, type SchemaDef } from '
 import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
 import { extractFields, fieldsToSelectObject } from '../../../utils/object-utils';
-import { CONTEXT_COMMENT_PREFIX, DELEGATE_JOINED_FIELD_PREFIX, NUMERIC_FIELD_TYPES } from '../../constants';
+import { CONTEXT_COMMENT_PREFIX, NUMERIC_FIELD_TYPES } from '../../constants';
 import type { CRUD } from '../../contract';
 import type { FindArgs, SelectIncludeOmit, SortOrder, WhereInput } from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
@@ -33,7 +33,6 @@ import {
     ensureArray,
     extractIdFields,
     flattenCompoundUniqueFilters,
-    getDelegateDescendantModels,
     getDiscriminatorField,
     getField,
     getIdFields,
@@ -42,7 +41,6 @@ import {
     getModel,
     getRelationForeignKeyFieldPairs,
     isForeignKeyField,
-    isInheritedField,
     isRelationField,
     isScalarField,
     makeDefaultOrderBy,
@@ -193,7 +191,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             query = this.buildFieldSelection(model, query, args.select, model, joinedBases);
         } else {
             // include all scalar fields except those in omit
-            query = this.buildSelectAllFields(model, query, (args as any)?.omit, joinedBases);
+            query = this.dialect.buildSelectAllFields(model, query, (args as any)?.omit, joinedBases);
         }
 
         // include
@@ -267,7 +265,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const fieldDef = this.requireField(model, field);
             if (!fieldDef.relation) {
                 // scalar field
-                result = this.selectField(result, model, parentAlias, field, joinedBases);
+                result = this.dialect.buildSelectField(result, model, parentAlias, field, joinedBases);
             } else {
                 if (!fieldDef.array && !fieldDef.optional && payload.where) {
                     throw new QueryError(`Field "${field}" doesn't support filtering`);
@@ -276,7 +274,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     // relation is inherited from a delegate base model, need to build a join
                     if (!joinedBases.includes(fieldDef.originModel)) {
                         joinedBases.push(fieldDef.originModel);
-                        result = this.buildDelegateJoin(parentAlias, fieldDef.originModel, result);
+                        result = this.dialect.buildDelegateJoin(parentAlias, fieldDef.originModel, result);
                     }
                     result = this.dialect.buildRelationSelection(
                         result,
@@ -350,90 +348,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         query = query.select((eb) => this.dialect.buildJsonObject(eb, jsonObject).as('_count'));
 
-        return query;
-    }
-
-    buildSelectAllFields(
-        model: string,
-        query: SelectQueryBuilder<any, any, any>,
-        omit?: Record<string, boolean | undefined>,
-        joinedBases: string[] = [],
-    ) {
-        const modelDef = this.requireModel(model);
-        let result = query;
-
-        for (const field of Object.keys(modelDef.fields)) {
-            if (isRelationField(this.schema, model, field)) {
-                continue;
-            }
-            if (omit?.[field] === true) {
-                continue;
-            }
-            result = this.selectField(result, model, model, field, joinedBases);
-        }
-
-        // select all fields from delegate descendants and pack into a JSON field `$delegate$Model`
-        const descendants = getDelegateDescendantModels(this.schema, model);
-        for (const subModel of descendants) {
-            if (!joinedBases.includes(subModel.name)) {
-                joinedBases.push(subModel.name);
-                result = this.buildDelegateJoin(model, subModel.name, result);
-            }
-            result = result.select((eb) => {
-                const jsonObject: Record<string, KyselyExpression<any>> = {};
-                for (const field of Object.keys(subModel.fields)) {
-                    if (
-                        isRelationField(this.schema, subModel.name, field) ||
-                        isInheritedField(this.schema, subModel.name, field)
-                    ) {
-                        continue;
-                    }
-                    jsonObject[field] = eb.ref(`${subModel.name}.${field}`);
-                }
-                return this.dialect
-                    .buildJsonObject(eb, jsonObject)
-                    .as(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`);
-            });
-        }
-
-        return result;
-    }
-
-    private selectField(
-        query: SelectQueryBuilder<any, any, any>,
-        model: string,
-        modelAlias: string,
-        field: string,
-        joinedBases: string[],
-    ) {
-        const fieldDef = this.requireField(model, field);
-
-        if (fieldDef.computed) {
-            // TODO: computed field from delegate base?
-            return query.select((eb) => buildFieldRef(this.schema, model, field, this.options, eb).as(field));
-        } else if (!fieldDef.originModel) {
-            // regular field
-            return query.select(sql.ref(`${modelAlias}.${field}`).as(field));
-        } else {
-            // field from delegate base, build a join
-            let result = query;
-            if (!joinedBases.includes(fieldDef.originModel)) {
-                joinedBases.push(fieldDef.originModel);
-                result = this.buildDelegateJoin(model, fieldDef.originModel, result);
-            }
-            result = this.selectField(result, fieldDef.originModel, fieldDef.originModel, field, joinedBases);
-            return result;
-        }
-    }
-
-    private buildDelegateJoin(thisModel: string, otherModel: string, query: SelectQueryBuilder<any, any, any>) {
-        const idFields = getIdFields(this.schema, thisModel);
-        query = query.leftJoin(otherModel, (qb) => {
-            for (const idField of idFields) {
-                qb = qb.onRef(`${thisModel}.${idField}`, '=', `${otherModel}.${idField}`);
-            }
-            return qb;
-        });
         return query;
     }
 

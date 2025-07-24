@@ -15,6 +15,13 @@ model User {
     ratedVideos RatedVideo[] @relation('direct')
 }
 
+model Comment {
+    id Int @id @default(autoincrement())
+    content String
+    asset Asset? @relation(fields: [assetId], references: [id])
+    assetId Int?
+}
+
 model Asset {
     id Int @id @default(autoincrement())
     createdAt DateTime @default(now())
@@ -22,6 +29,7 @@ model Asset {
     viewCount Int @default(0)
     owner User? @relation(fields: [ownerId], references: [id])
     ownerId Int?
+    comments Comment[]
     assetType String
     
     @@delegate(assetType)
@@ -75,6 +83,15 @@ model Gallery {
                         duration: 100,
                         url: 'abc',
                         videoType: 'MyVideo',
+                    },
+                }),
+            ).rejects.toThrow('is a delegate');
+            await expect(
+                client.user.create({
+                    data: {
+                        assets: {
+                            create: { assetType: 'Video' },
+                        },
                     },
                 }),
             ).rejects.toThrow('is a delegate');
@@ -240,6 +257,250 @@ model Gallery {
             ).resolves.toMatchObject({
                 assets: [{ id: v.id, assetType: 'Video' }],
                 ratedVideos: [{ url: 'abc', rating: 5 }],
+            });
+        });
+
+        describe('Delegate filter tests', async () => {
+            beforeEach(async () => {
+                const u = await client.user.create({
+                    data: {
+                        email: 'u1@example.com',
+                    },
+                });
+                await client.ratedVideo.create({
+                    data: {
+                        viewCount: 0,
+                        duration: 100,
+                        url: 'v1',
+                        rating: 5,
+                        owner: { connect: { id: u.id } },
+                        user: { connect: { id: u.id } },
+                        comments: { create: { content: 'c1' } },
+                    },
+                });
+                await client.ratedVideo.create({
+                    data: {
+                        viewCount: 1,
+                        duration: 200,
+                        url: 'v2',
+                        rating: 4,
+                        owner: { connect: { id: u.id } },
+                        user: { connect: { id: u.id } },
+                        comments: { create: { content: 'c2' } },
+                    },
+                });
+            });
+
+            it('works with toplevel filters', async () => {
+                await expect(
+                    client.asset.findMany({
+                        where: { viewCount: { gt: 0 } },
+                    }),
+                ).toResolveWithLength(1);
+
+                await expect(
+                    client.video.findMany({
+                        where: { viewCount: { gt: 0 }, url: 'v1' },
+                    }),
+                ).toResolveWithLength(0);
+
+                await expect(
+                    client.video.findMany({
+                        where: { viewCount: { gt: 0 }, url: 'v2' },
+                    }),
+                ).toResolveWithLength(1);
+
+                await expect(
+                    client.ratedVideo.findMany({
+                        where: { viewCount: { gt: 0 }, rating: 5 },
+                    }),
+                ).toResolveWithLength(0);
+
+                await expect(
+                    client.ratedVideo.findMany({
+                        where: { viewCount: { gt: 0 }, rating: 4 },
+                    }),
+                ).toResolveWithLength(1);
+            });
+
+            it('works with filtering relations', async () => {
+                await expect(
+                    client.user.findFirst({
+                        include: {
+                            assets: {
+                                where: { viewCount: { gt: 0 } },
+                            },
+                        },
+                    }),
+                ).resolves.toSatisfy((user) => user.assets.length === 1);
+
+                await expect(
+                    client.user.findFirst({
+                        include: {
+                            ratedVideos: {
+                                where: { viewCount: { gt: 0 }, url: 'v1' },
+                            },
+                        },
+                    }),
+                ).resolves.toSatisfy((user) => user.ratedVideos.length === 0);
+
+                await expect(
+                    client.user.findFirst({
+                        include: {
+                            ratedVideos: {
+                                where: { viewCount: { gt: 0 }, url: 'v2' },
+                            },
+                        },
+                    }),
+                ).resolves.toSatisfy((user) => user.ratedVideos.length === 1);
+
+                await expect(
+                    client.user.findFirst({
+                        include: {
+                            ratedVideos: {
+                                where: { viewCount: { gt: 0 }, rating: 5 },
+                            },
+                        },
+                    }),
+                ).resolves.toSatisfy((user) => user.ratedVideos.length === 0);
+
+                await expect(
+                    client.user.findFirst({
+                        include: {
+                            ratedVideos: {
+                                where: { viewCount: { gt: 0 }, rating: 4 },
+                            },
+                        },
+                    }),
+                ).resolves.toSatisfy((user) => user.ratedVideos.length === 1);
+            });
+
+            it('works with filtering parents', async () => {
+                await expect(
+                    client.user.findFirst({
+                        where: {
+                            assets: {
+                                some: { viewCount: { gt: 0 } },
+                            },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.user.findFirst({
+                        where: {
+                            assets: {
+                                some: { viewCount: { gt: 1 } },
+                            },
+                        },
+                    }),
+                ).toResolveFalsy();
+
+                await expect(
+                    client.user.findFirst({
+                        where: {
+                            ratedVideos: {
+                                some: { viewCount: { gt: 0 }, url: 'v1' },
+                            },
+                        },
+                    }),
+                ).toResolveFalsy();
+
+                await expect(
+                    client.user.findFirst({
+                        where: {
+                            ratedVideos: {
+                                some: { viewCount: { gt: 0 }, url: 'v2' },
+                            },
+                        },
+                    }),
+                ).toResolveTruthy();
+            });
+
+            it('works with filtering with relations from base', async () => {
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            owner: {
+                                email: 'u1@example.com',
+                            },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            owner: {
+                                email: 'u2@example.com',
+                            },
+                        },
+                    }),
+                ).toResolveFalsy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            owner: null,
+                        },
+                    }),
+                ).toResolveFalsy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            owner: { is: null },
+                        },
+                    }),
+                ).toResolveFalsy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            owner: { isNot: null },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            comments: {
+                                some: { content: 'c1' },
+                            },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            comments: {
+                                all: { content: 'c2' },
+                            },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            comments: {
+                                none: { content: 'c1' },
+                            },
+                        },
+                    }),
+                ).toResolveTruthy();
+
+                await expect(
+                    client.video.findFirst({
+                        where: {
+                            comments: {
+                                none: { content: { startsWith: 'c' } },
+                            },
+                        },
+                    }),
+                ).toResolveFalsy();
             });
         });
     },

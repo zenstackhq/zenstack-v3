@@ -1325,6 +1325,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return (returnData ? [] : { count: 0 }) as Result;
         }
 
+        const modelDef = this.requireModel(model);
+        if (modelDef.baseModel && limit !== undefined) {
+            throw new QueryError('Updating with a limit is not supported for polymorphic models');
+        }
+
         filterModel ??= model;
         let updateFields: any = {};
 
@@ -1335,7 +1340,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             updateFields[field] = this.processScalarFieldUpdateData(model, field, data);
         }
 
-        const modelDef = this.requireModel(model);
         let shouldFallbackToIdFilter = false;
 
         if (limit !== undefined && !this.dialect.supportsUpdateWithLimit) {
@@ -1358,7 +1362,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 modelDef.baseModel,
                 where,
                 updateFields,
-                limit,
                 filterModel,
             );
             updateFields = baseResult.remainingFields;
@@ -1412,7 +1415,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         model: string,
         where: any,
         updateFields: any,
-        limit: number | undefined,
         filterModel: GetModels<Schema>,
     ) {
         const thisUpdateFields: any = {};
@@ -1433,7 +1435,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             model as GetModels<Schema>,
             where,
             thisUpdateFields,
-            limit,
+            undefined,
             false,
             filterModel,
         );
@@ -1983,24 +1985,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const fieldDef = this.requireField(fromRelation.model, fromRelation.field);
             invariant(fieldDef.relation?.opposite);
 
-            deleteResult = await this.delete(
-                kysely,
-                model,
-                {
-                    AND: [
-                        {
-                            [fieldDef.relation.opposite]: {
-                                some: fromRelation.ids,
-                            },
+            deleteResult = await this.delete(kysely, model, {
+                AND: [
+                    {
+                        [fieldDef.relation.opposite]: {
+                            some: fromRelation.ids,
                         },
-                        {
-                            OR: deleteConditions,
-                        },
-                    ],
-                },
-                undefined,
-                false,
-            );
+                    },
+                    {
+                        OR: deleteConditions,
+                    },
+                ],
+            });
         } else {
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
                 this.schema,
@@ -2018,36 +2014,24 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
                 const fieldDef = this.requireField(fromRelation.model, fromRelation.field);
                 invariant(fieldDef.relation?.opposite);
-                deleteResult = await this.delete(
-                    kysely,
-                    model,
-                    {
-                        AND: [
-                            // filter for parent
-                            Object.fromEntries(keyPairs.map(({ fk, pk }) => [pk, fromEntity[fk]])),
-                            {
-                                OR: deleteConditions,
-                            },
-                        ],
-                    },
-                    undefined,
-                    false,
-                );
+                deleteResult = await this.delete(kysely, model, {
+                    AND: [
+                        // filter for parent
+                        Object.fromEntries(keyPairs.map(({ fk, pk }) => [pk, fromEntity[fk]])),
+                        {
+                            OR: deleteConditions,
+                        },
+                    ],
+                });
             } else {
-                deleteResult = await this.delete(
-                    kysely,
-                    model,
-                    {
-                        AND: [
-                            Object.fromEntries(keyPairs.map(({ fk, pk }) => [fk, fromRelation.ids[pk]])),
-                            {
-                                OR: deleteConditions,
-                            },
-                        ],
-                    },
-                    undefined,
-                    false,
-                );
+                deleteResult = await this.delete(kysely, model, {
+                    AND: [
+                        Object.fromEntries(keyPairs.map(({ fk, pk }) => [fk, fromRelation.ids[pk]])),
+                        {
+                            OR: deleteConditions,
+                        },
+                    ],
+                });
             }
         }
 
@@ -2064,52 +2048,107 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     // #endregion
 
-    protected async delete<
-        ReturnData extends boolean,
-        Result = ReturnData extends true ? unknown[] : { count: number },
-    >(
+    protected async delete(
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         where: any,
-        limit: number | undefined,
-        returnData: ReturnData,
-    ): Promise<Result> {
-        let query = kysely.deleteFrom(model);
+        limit?: number,
+        filterModel?: GetModels<Schema>,
+    ): Promise<{ count: number }> {
+        filterModel ??= model;
 
-        if (limit === undefined) {
+        const modelDef = this.requireModel(model);
+
+        if (modelDef.baseModel) {
+            if (limit !== undefined) {
+                throw new QueryError('Deleting with a limit is not supported for polymorphic models');
+            }
+            // just delete base and it'll cascade back to this model
+            return this.processBaseModelDelete(kysely, modelDef.baseModel, where, limit, filterModel);
+        }
+
+        let query = kysely.deleteFrom(model);
+        let needIdFilter = false;
+
+        if (limit !== undefined && !this.dialect.supportsDeleteWithLimit) {
+            // if the dialect doesn't support delete with limit natively, we'll
+            // simulate it by filtering by id with a limit
+            needIdFilter = true;
+        }
+
+        if (modelDef.isDelegate || modelDef.baseModel) {
+            // if the model is in a delegate hierarchy, we'll need to filter by
+            // id because the filter may involve fields in different models in
+            // the hierarchy
+            needIdFilter = true;
+        }
+
+        if (!needIdFilter) {
             query = query.where((eb) => this.dialect.buildFilter(eb, model, model, where));
         } else {
-            if (this.dialect.supportsDeleteWithLimit) {
-                query = query.where((eb) => this.dialect.buildFilter(eb, model, model, where)).limit(limit!);
-            } else {
-                query = query.where((eb) =>
-                    eb(
-                        eb.refTuple(
-                            // @ts-expect-error
-                            ...this.buildIdFieldRefs(kysely, model),
-                        ),
-                        'in',
-                        kysely
-                            .selectFrom(model)
-                            .where((eb) => this.dialect.buildFilter(eb, model, model, where))
-                            .select(this.buildIdFieldRefs(kysely, model))
-                            .limit(limit!),
+            query = query.where((eb) =>
+                eb(
+                    eb.refTuple(
+                        // @ts-expect-error
+                        ...this.buildIdFieldRefs(kysely, model),
                     ),
-                );
-            }
+                    'in',
+                    this.dialect
+                        .buildSelectModel(eb, filterModel)
+                        .where((eb) => this.dialect.buildFilter(eb, filterModel, filterModel, where))
+                        .select(this.buildIdFieldRefs(kysely, filterModel))
+                        .$if(limit !== undefined, (qb) => qb.limit(limit!)),
+                ),
+            );
         }
+
+        // if the model being deleted has a relation to a model that extends a delegate model, and if that
+        // relation is set to trigger a cascade delete from this model, the deletion will not automatically
+        // clean up the base hierarchy of the relation side (because polymorphic model's cascade deletion
+        // works downward not upward). We need to take care of the base deletions manually here.
+        await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
 
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
+        const result = await query.executeTakeFirstOrThrow();
+        return { count: Number(result.numDeletedRows) };
+    }
 
-        if (returnData) {
-            const result = await query.execute();
-            return result as Result;
-        } else {
-            const result = (await query.executeTakeFirstOrThrow()) as DeleteResult;
-            return {
-                count: Number(result.numDeletedRows),
-            } as Result;
+    private async processDelegateRelationDelete(
+        kysely: ToKysely<Schema>,
+        modelDef: ModelDef,
+        where: any,
+        limit: number | undefined,
+    ) {
+        for (const fieldDef of Object.values(modelDef.fields)) {
+            if (fieldDef.relation && fieldDef.relation.opposite) {
+                const oppositeModelDef = this.requireModel(fieldDef.type);
+                const oppositeRelation = this.requireField(fieldDef.type, fieldDef.relation.opposite);
+                if (oppositeModelDef.baseModel && oppositeRelation.relation?.onDelete === 'Cascade') {
+                    if (limit !== undefined) {
+                        throw new QueryError('Deleting with a limit is not supported for polymorphic models');
+                    }
+                    // the deletion will propagate upward to the base model chain
+                    await this.delete(
+                        kysely,
+                        fieldDef.type as GetModels<Schema>,
+                        {
+                            [fieldDef.relation.opposite]: where,
+                        },
+                        undefined,
+                    );
+                }
+            }
         }
+    }
+
+    private async processBaseModelDelete(
+        kysely: ToKysely<Schema>,
+        model: string,
+        where: any,
+        limit: number | undefined,
+        filterModel: GetModels<Schema>,
+    ) {
+        return this.delete(kysely, model as GetModels<Schema>, where, limit, filterModel);
     }
 
     protected makeIdSelect(model: string) {

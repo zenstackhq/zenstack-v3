@@ -27,15 +27,22 @@ export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperat
         if (!existing) {
             throw new NotFoundError(this.model);
         }
-        const result = await this.delete(this.kysely, this.model, args.where, undefined, false);
-        if (result.count === 0) {
-            throw new NotFoundError(this.model);
-        }
+
+        // TODO: avoid using transaction for simple delete
+        await this.safeTransaction(async (tx) => {
+            const result = await this.delete(tx, this.model, args.where, undefined);
+            if (result.count === 0) {
+                throw new NotFoundError(this.model);
+            }
+        });
+
         return existing;
     }
 
     async runDeleteMany(args: DeleteManyArgs<Schema, Extract<keyof Schema['models'], string>> | undefined) {
-        const result = await this.delete(this.kysely, this.model, args?.where, args?.limit, false);
-        return result;
+        return await this.safeTransaction(async (tx) => {
+            const result = await this.delete(tx, this.model, args?.where, args?.limit);
+            return result;
+        });
     }
 }

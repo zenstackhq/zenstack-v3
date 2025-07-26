@@ -18,7 +18,7 @@ model User {
 model Comment {
     id Int @id @default(autoincrement())
     content String
-    asset Asset? @relation(fields: [assetId], references: [id])
+    asset Asset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
     assetId Int?
 }
 
@@ -27,7 +27,7 @@ model Asset {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
     viewCount Int @default(0)
-    owner User? @relation(fields: [ownerId], references: [id])
+    owner User? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     ownerId Int?
     comments Comment[]
     assetType String
@@ -45,13 +45,13 @@ model Video extends Asset {
 
 model RatedVideo extends Video {
     rating Int
-    user User? @relation(name: 'direct', fields: [userId], references: [id])
+    user User? @relation(name: 'direct', fields: [userId], references: [id], onDelete: Cascade)
     userId Int?
 }
 
 model Image extends Asset {
     format String
-    gallery Gallery? @relation(fields: [galleryId], references: [id])
+    gallery Gallery? @relation(fields: [galleryId], references: [id], onDelete: Cascade)
     galleryId Int?
 }
 
@@ -213,6 +213,32 @@ model Gallery {
                         }),
                     ]),
                 );
+            });
+
+            it('ensures create is atomic', async () => {
+                // create with a relation that fails
+                await expect(
+                    client.ratedVideo.create({
+                        data: {
+                            duration: 100,
+                            url: 'abc',
+                            rating: 5,
+                        },
+                    }),
+                ).toResolveTruthy();
+                await expect(
+                    client.ratedVideo.create({
+                        data: {
+                            duration: 200,
+                            url: 'abc',
+                            rating: 3,
+                        },
+                    }),
+                ).rejects.toThrow('constraint');
+
+                await expect(client.ratedVideo.findMany()).toResolveWithLength(1);
+                await expect(client.video.findMany()).toResolveWithLength(1);
+                await expect(client.asset.findMany()).toResolveWithLength(1);
             });
         });
 
@@ -805,6 +831,15 @@ model Gallery {
                         }),
                     ]),
                 );
+
+                // updateMany with limit unsupported
+                await expect(
+                    client.ratedVideo.updateMany({
+                        where: { duration: { gt: 200 } },
+                        data: { viewCount: 200, duration: 300 },
+                        limit: 1,
+                    }),
+                ).rejects.toThrow('Updating with a limit is not supported for polymorphic models');
             });
 
             it('works with updateManyAndReturn', async () => {
@@ -898,6 +933,141 @@ model Gallery {
                     duration: 300,
                     rating: 2,
                 });
+            });
+        });
+
+        describe('Delegate delete tests', () => {
+            it('works with delete', async () => {
+                // delete from sub model
+                await client.ratedVideo.create({
+                    data: {
+                        id: 1,
+                        duration: 100,
+                        url: 'abc',
+                        rating: 5,
+                    },
+                });
+                await expect(
+                    client.ratedVideo.delete({
+                        where: { url: 'abc' },
+                    }),
+                ).resolves.toMatchObject({
+                    id: 1,
+                    duration: 100,
+                    url: 'abc',
+                    rating: 5,
+                });
+                await expect(client.ratedVideo.findMany()).toResolveWithLength(0);
+                await expect(client.video.findMany()).toResolveWithLength(0);
+                await expect(client.asset.findMany()).toResolveWithLength(0);
+
+                // delete from base model
+                await client.ratedVideo.create({
+                    data: {
+                        id: 1,
+                        duration: 100,
+                        url: 'abc',
+                        rating: 5,
+                    },
+                });
+                await expect(
+                    client.asset.delete({
+                        where: { id: 1 },
+                    }),
+                ).resolves.toMatchObject({
+                    id: 1,
+                    duration: 100,
+                    url: 'abc',
+                    rating: 5,
+                });
+                await expect(client.ratedVideo.findMany()).toResolveWithLength(0);
+                await expect(client.video.findMany()).toResolveWithLength(0);
+                await expect(client.asset.findMany()).toResolveWithLength(0);
+
+                // nested delete
+                await client.user.create({
+                    data: {
+                        id: 1,
+                        email: 'abc',
+                    },
+                });
+                await client.ratedVideo.create({
+                    data: {
+                        id: 1,
+                        duration: 100,
+                        url: 'abc',
+                        rating: 5,
+                        owner: { connect: { id: 1 } },
+                    },
+                });
+                await expect(
+                    client.user.update({
+                        where: { id: 1 },
+                        data: {
+                            assets: {
+                                delete: { id: 1 },
+                            },
+                        },
+                        include: { assets: true },
+                    }),
+                ).resolves.toMatchObject({ assets: [] });
+                await expect(client.ratedVideo.findMany()).toResolveWithLength(0);
+                await expect(client.video.findMany()).toResolveWithLength(0);
+                await expect(client.asset.findMany()).toResolveWithLength(0);
+
+                // delete user should cascade to ratedVideo and in turn delete its bases
+                await client.ratedVideo.create({
+                    data: {
+                        id: 1,
+                        duration: 100,
+                        url: 'abc',
+                        rating: 5,
+                        user: { connect: { id: 1 } },
+                    },
+                });
+                await expect(
+                    client.user.delete({
+                        where: { id: 1 },
+                    }),
+                ).toResolveTruthy();
+                await expect(client.ratedVideo.findMany()).toResolveWithLength(0);
+                await expect(client.video.findMany()).toResolveWithLength(0);
+                await expect(client.asset.findMany()).toResolveWithLength(0);
+            });
+
+            it('works with deleteMany', async () => {
+                await client.ratedVideo.createMany({
+                    data: [
+                        {
+                            id: 1,
+                            viewCount: 1,
+                            duration: 100,
+                            url: 'abc',
+                            rating: 5,
+                        },
+                        {
+                            id: 2,
+                            viewCount: 2,
+                            duration: 200,
+                            url: 'def',
+                            rating: 4,
+                        },
+                    ],
+                });
+
+                await expect(
+                    client.video.deleteMany({
+                        where: { duration: { gt: 150 }, viewCount: 1 },
+                    }),
+                ).resolves.toMatchObject({ count: 0 });
+                await expect(
+                    client.video.deleteMany({
+                        where: { duration: { gt: 150 }, viewCount: 2 },
+                    }),
+                ).resolves.toMatchObject({ count: 1 });
+                await expect(client.ratedVideo.findMany()).toResolveWithLength(1);
+                await expect(client.video.findMany()).toResolveWithLength(1);
+                await expect(client.asset.findMany()).toResolveWithLength(1);
             });
         });
     },

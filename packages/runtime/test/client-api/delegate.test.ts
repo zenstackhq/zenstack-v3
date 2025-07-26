@@ -1030,7 +1030,6 @@ model Gallery {
                         where: { id: 1 },
                     }),
                 ).toResolveTruthy();
-                console.log(await client.ratedVideo.findMany());
                 await expect(client.ratedVideo.findMany()).toResolveWithLength(0);
                 await expect(client.video.findMany()).toResolveWithLength(0);
                 await expect(client.asset.findMany()).toResolveWithLength(0);

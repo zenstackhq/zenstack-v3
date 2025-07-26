@@ -2193,9 +2193,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         } else {
             // otherwise, create a new transaction and execute the callback
             let txBuilder = this.kysely.transaction();
-            if (isolationLevel) {
-                txBuilder = txBuilder.setIsolationLevel(isolationLevel);
-            }
+            txBuilder = txBuilder.setIsolationLevel(isolationLevel ?? 'repeatable read');
             return txBuilder.execute(callback);
         }
     }

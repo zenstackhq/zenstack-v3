@@ -573,13 +573,19 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         thisCreateFields[discriminatorField] = forModel;
 
         // create base model entity
-        const createResult = await this.create(kysely, model as GetModels<Schema>, thisCreateFields, undefined, true);
+        const baseEntity: any = await this.create(
+            kysely,
+            model as GetModels<Schema>,
+            thisCreateFields,
+            undefined,
+            true,
+        );
 
         // copy over id fields from base model
-        const idValues = extractIdFields(createResult, this.schema, model);
+        const idValues = extractIdFields(baseEntity, this.schema, model);
         Object.assign(remainingFields, idValues);
 
-        return { baseEntity: createResult, remainingFields };
+        return { baseEntity, remainingFields };
     }
 
     private buildFkAssignments(model: string, relationField: string, entity: any) {
@@ -844,7 +850,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             relationKeyPairs = keyPairs;
         }
 
-        const createData = enumerate(input.data).map((item) => {
+        let createData = enumerate(input.data).map((item) => {
             const newItem: any = {};
             for (const [name, value] of Object.entries(item)) {
                 const fieldDef = this.requireField(model, name);
@@ -858,6 +864,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
             return this.fillGeneratedValues(modelDef, newItem);
         });
+
+        if (modelDef.baseModel) {
+            if (input.skipDuplicates) {
+                // TODO: simulate createMany with create in this case
+                throw new QueryError('"skipDuplicates" options is not supported for polymorphic models');
+            }
+            // create base hierarchy
+            const baseCreateResult = await this.processBaseModelCreateMany(
+                kysely,
+                modelDef.baseModel,
+                createData,
+                !!input.skipDuplicates,
+                model,
+            );
+            createData = baseCreateResult.remainingFieldRows;
+        }
 
         const query = kysely
             .insertInto(model)
@@ -878,6 +900,50 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const result = await query.returning(idFields as any).execute();
             return result as Result;
         }
+    }
+
+    private async processBaseModelCreateMany(
+        kysely: ToKysely<Schema>,
+        model: string,
+        createRows: any[],
+        skipDuplicates: boolean,
+        forModel: GetModels<Schema>,
+    ) {
+        const thisCreateRows: any[] = [];
+        const remainingFieldRows: any[] = [];
+        const discriminatorField = getDiscriminatorField(this.schema, model);
+        invariant(discriminatorField, `Base model "${model}" must have a discriminator field`);
+
+        for (const createFields of createRows) {
+            const thisCreateFields: any = {};
+            const remainingFields: any = {};
+            Object.entries(createFields).forEach(([field, value]) => {
+                const fieldDef = this.getField(model, field);
+                if (fieldDef) {
+                    thisCreateFields[field] = value;
+                } else {
+                    remainingFields[field] = value;
+                }
+            });
+            thisCreateFields[discriminatorField] = forModel;
+            thisCreateRows.push(thisCreateFields);
+            remainingFieldRows.push(remainingFields);
+        }
+
+        // create base model entity
+        const baseEntities = await this.createMany(
+            kysely,
+            model as GetModels<Schema>,
+            { data: thisCreateRows, skipDuplicates },
+            true,
+        );
+
+        // copy over id fields from base model
+        for (let i = 0; i < baseEntities.length; i++) {
+            const idValues = extractIdFields(baseEntities[i], this.schema, model);
+            Object.assign(remainingFieldRows[i], idValues);
+        }
+        return { baseEntities, remainingFieldRows };
     }
 
     private fillGeneratedValues(modelDef: ModelDef, data: object) {
@@ -947,7 +1013,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fromRelation?: FromRelationContext<Schema>,
         allowRelationUpdate = true,
         throwIfNotFound = true,
-    ) {
+    ): Promise<unknown> {
         if (!data || typeof data !== 'object') {
             throw new InternalError('data must be an object');
         }
@@ -1004,14 +1070,41 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         if (Object.keys(finalData).length === 0) {
-            // update without data, simply return
-            const r = await this.readUnique(kysely, model, {
+            // nothing to update, return the original filter so that caller can identify the entity
+            return combinedWhere;
+        }
+
+        let needIdRead = false;
+        if (modelDef.baseModel && !this.isIdFilter(model, combinedWhere)) {
+            // when updating a model with delegate base, base fields may be referenced in the filter,
+            // so we read the id out if the filter is not ready an id filter, and and use it as the
+            // update filter instead
+            needIdRead = true;
+        }
+
+        if (needIdRead) {
+            const readResult = await this.readUnique(kysely, model, {
                 where: combinedWhere,
-            } as FindArgs<Schema, GetModels<Schema>, true>);
-            if (!r && throwIfNotFound) {
+                select: this.makeIdSelect(model),
+            });
+            if (!readResult && throwIfNotFound) {
                 throw new NotFoundError(model);
             }
-            return r;
+            combinedWhere = readResult;
+        }
+
+        if (modelDef.baseModel) {
+            const baseUpdateResult = await this.processBaseModelUpdate(
+                kysely,
+                modelDef.baseModel,
+                combinedWhere,
+                finalData,
+                throwIfNotFound,
+            );
+            // only fields not consumed by base update will be used for this model
+            finalData = baseUpdateResult.remainingFields;
+            // base update may change entity ids, update the filter
+            combinedWhere = baseUpdateResult.baseEntity;
         }
 
         const updateFields: any = {};
@@ -1020,28 +1113,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         for (const field in finalData) {
             const fieldDef = this.requireField(model, field);
             if (isScalarField(this.schema, model, field) || isForeignKeyField(this.schema, model, field)) {
-                if (this.isNumericField(fieldDef) && typeof finalData[field] === 'object' && finalData[field]) {
-                    // numeric fields incremental updates
-                    updateFields[field] = this.transformIncrementalUpdate(model, field, fieldDef, finalData[field]);
-                    continue;
-                }
-
-                if (
-                    fieldDef.array &&
-                    typeof finalData[field] === 'object' &&
-                    !Array.isArray(finalData[field]) &&
-                    finalData[field]
-                ) {
-                    // scalar list updates
-                    updateFields[field] = this.transformScalarListUpdate(model, field, fieldDef, finalData[field]);
-                    continue;
-                }
-
-                updateFields[field] = this.dialect.transformPrimitive(
-                    finalData[field],
-                    fieldDef.type as BuiltinType,
-                    !!fieldDef.array,
-                );
+                updateFields[field] = this.processScalarFieldUpdateData(model, field, finalData);
             } else {
                 if (!allowRelationUpdate) {
                     throw new QueryError(`Relation update not allowed for field "${field}"`);
@@ -1072,8 +1144,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         if (Object.keys(updateFields).length === 0) {
-            // nothing to update, simply read back
-            return thisEntity ?? (await this.readUnique(kysely, model, { where: combinedWhere }));
+            // nothing to update, return the filter so that the caller can identify the entity
+            return combinedWhere;
         } else {
             const idFields = getIdFields(this.schema, model);
             const query = kysely
@@ -1109,6 +1181,71 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             return updatedEntity;
         }
+    }
+
+    private processScalarFieldUpdateData(model: GetModels<Schema>, field: string, data: any): any {
+        const fieldDef = this.requireField(model, field);
+        if (this.isNumericIncrementalUpdate(fieldDef, data[field])) {
+            // numeric fields incremental updates
+            return this.transformIncrementalUpdate(model, field, fieldDef, data[field]);
+        }
+
+        if (fieldDef.array && typeof data[field] === 'object' && !Array.isArray(data[field]) && data[field]) {
+            // scalar list updates
+            return this.transformScalarListUpdate(model, field, fieldDef, data[field]);
+        }
+
+        return this.dialect.transformPrimitive(data[field], fieldDef.type as BuiltinType, !!fieldDef.array);
+    }
+
+    private isNumericIncrementalUpdate(fieldDef: FieldDef, value: any) {
+        if (!this.isNumericField(fieldDef)) {
+            return false;
+        }
+        if (typeof value !== 'object' || !value) {
+            return false;
+        }
+        return ['increment', 'decrement', 'multiply', 'divide', 'set'].some((key) => key in value);
+    }
+
+    private isIdFilter(model: GetModels<Schema>, filter: any) {
+        if (!filter || typeof filter !== 'object') {
+            return false;
+        }
+        const idFields = getIdFields(this.schema, model);
+        return idFields.length === Object.keys(filter).length && idFields.every((field) => field in filter);
+    }
+
+    private async processBaseModelUpdate(
+        kysely: ToKysely<Schema>,
+        model: string,
+        where: any,
+        updateFields: any,
+        throwIfNotFound: boolean,
+    ) {
+        const thisUpdateFields: any = {};
+        const remainingFields: any = {};
+
+        Object.entries(updateFields).forEach(([field, value]) => {
+            const fieldDef = this.getField(model, field);
+            if (fieldDef) {
+                thisUpdateFields[field] = value;
+            } else {
+                remainingFields[field] = value;
+            }
+        });
+
+        // update base model entity
+        const baseEntity: any = await this.update(
+            kysely,
+            model as GetModels<Schema>,
+            where,
+            thisUpdateFields,
+            undefined,
+            undefined,
+            throwIfNotFound,
+        );
+        return { baseEntity, remainingFields };
     }
 
     private transformIncrementalUpdate(
@@ -1178,6 +1315,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         data: any,
         limit: number | undefined,
         returnData: ReturnData,
+        filterModel?: GetModels<Schema>,
     ): Promise<Result> {
         if (typeof data !== 'object') {
             throw new InternalError('data must be an object');
@@ -1187,43 +1325,74 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return (returnData ? [] : { count: 0 }) as Result;
         }
 
-        const updateFields: any = {};
+        filterModel ??= model;
+        let updateFields: any = {};
 
         for (const field in data) {
-            const fieldDef = this.requireField(model, field);
             if (isRelationField(this.schema, model, field)) {
                 continue;
             }
-            updateFields[field] = this.dialect.transformPrimitive(
-                data[field],
-                fieldDef.type as BuiltinType,
-                !!fieldDef.array,
+            updateFields[field] = this.processScalarFieldUpdateData(model, field, data);
+        }
+
+        const modelDef = this.requireModel(model);
+        let shouldFallbackToIdFilter = false;
+
+        if (limit !== undefined && !this.dialect.supportsUpdateWithLimit) {
+            // if the dialect doesn't support update with limit natively, we'll
+            // simulate it by filtering by id with a limit
+            shouldFallbackToIdFilter = true;
+        }
+
+        if (modelDef.isDelegate || modelDef.baseModel) {
+            // if the model is in a delegate hierarchy, we'll need to filter by
+            // id because the filter may involve fields in different models in
+            // the hierarchy
+            shouldFallbackToIdFilter = true;
+        }
+
+        let resultFromBaseModel: any = undefined;
+        if (modelDef.baseModel) {
+            const baseResult = await this.processBaseModelUpdateMany(
+                kysely,
+                modelDef.baseModel,
+                where,
+                updateFields,
+                limit,
+                filterModel,
             );
+            updateFields = baseResult.remainingFields;
+            resultFromBaseModel = baseResult.baseResult;
+        }
+
+        // check again if we don't have anything to update for this model
+        if (Object.keys(updateFields).length === 0) {
+            // return result from base model if it exists, otherwise return empty result
+            return resultFromBaseModel ?? ((returnData ? [] : { count: 0 }) as Result);
         }
 
         let query = kysely.updateTable(model).set(updateFields);
 
-        if (limit === undefined) {
-            query = query.where((eb) => this.dialect.buildFilter(eb, model, model, where));
+        if (!shouldFallbackToIdFilter) {
+            // simple filter
+            query = query
+                .where((eb) => this.dialect.buildFilter(eb, model, model, where))
+                .$if(limit !== undefined, (qb) => qb.limit(limit!));
         } else {
-            if (this.dialect.supportsUpdateWithLimit) {
-                query = query.where((eb) => this.dialect.buildFilter(eb, model, model, where)).limit(limit!);
-            } else {
-                query = query.where((eb) =>
-                    eb(
-                        eb.refTuple(
-                            // @ts-expect-error
-                            ...this.buildIdFieldRefs(kysely, model),
-                        ),
-                        'in',
-                        kysely
-                            .selectFrom(model)
-                            .where((eb) => this.dialect.buildFilter(eb, model, model, where))
-                            .select(this.buildIdFieldRefs(kysely, model))
-                            .limit(limit!),
+            query = query.where((eb) =>
+                eb(
+                    eb.refTuple(
+                        // @ts-expect-error
+                        ...this.buildIdFieldRefs(kysely, model),
                     ),
-                );
-            }
+                    'in',
+                    this.dialect
+                        .buildSelectModel(eb, filterModel)
+                        .where(this.dialect.buildFilter(eb, filterModel, filterModel, where))
+                        .select(this.buildIdFieldRefs(kysely, filterModel))
+                        .$if(limit !== undefined, (qb) => qb.limit(limit!)),
+                ),
+            );
         }
 
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'update' }));
@@ -1238,9 +1407,42 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
+    private async processBaseModelUpdateMany(
+        kysely: ToKysely<Schema>,
+        model: string,
+        where: any,
+        updateFields: any,
+        limit: number | undefined,
+        filterModel: GetModels<Schema>,
+    ) {
+        const thisUpdateFields: any = {};
+        const remainingFields: any = {};
+
+        Object.entries(updateFields).forEach(([field, value]) => {
+            const fieldDef = this.getField(model, field);
+            if (fieldDef) {
+                thisUpdateFields[field] = value;
+            } else {
+                remainingFields[field] = value;
+            }
+        });
+
+        // update base model entity
+        const baseResult: any = await this.updateMany(
+            kysely,
+            model as GetModels<Schema>,
+            where,
+            thisUpdateFields,
+            limit,
+            false,
+            filterModel,
+        );
+        return { baseResult, remainingFields };
+    }
+
     private buildIdFieldRefs(kysely: ToKysely<Schema>, model: GetModels<Schema>) {
         const idFields = getIdFields(this.schema, model);
-        return idFields.map((f) => kysely.dynamic.ref(f));
+        return idFields.map((f) => kysely.dynamic.ref(`${model}.${f}`));
     }
 
     private async processRelationUpdates(

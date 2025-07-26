@@ -25,28 +25,45 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
     }
 
     private async runUpdate(args: UpdateArgs<Schema, GetModels<Schema>>) {
-        const result = await this.safeTransaction(async (tx) => {
-            const updated = await this.update(tx, this.model, args.where, args.data);
-            return this.readUnique(tx, this.model, {
-                select: args.select,
-                include: args.include,
-                omit: args.omit,
-                where: getIdValues(this.schema, this.model, updated) as WhereInput<Schema, GetModels<Schema>, false>,
-            });
+        const readBackResult = await this.safeTransaction(async (tx) => {
+            const updateResult = await this.update(tx, this.model, args.where, args.data);
+            // updated can be undefined if there's nothing to update, in that case we'll use the original
+            // filter to read back the entity
+            const readFilter = updateResult ?? args.where;
+            let readBackResult: any = undefined;
+            try {
+                readBackResult = await this.readUnique(tx, this.model, {
+                    select: args.select,
+                    include: args.include,
+                    omit: args.omit,
+                    where: readFilter as WhereInput<Schema, GetModels<Schema>, false>,
+                });
+            } catch {
+                // commit the update even if read-back failed
+            }
+            return readBackResult;
         });
 
-        if (!result && this.hasPolicyEnabled) {
-            throw new RejectedByPolicyError(this.model, 'result is not allowed to be read back');
+        if (!readBackResult) {
+            // update succeeded but result cannot be read back
+            if (this.hasPolicyEnabled) {
+                // if access policy is enabled, we assume it's due to read violation (not guaranteed though)
+                throw new RejectedByPolicyError(this.model, 'result is not allowed to be read back');
+            } else {
+                // this can happen if the entity is cascade deleted during the update, return null to
+                // be consistent with Prisma even though it doesn't comply with the method signature
+                return null;
+            }
+        } else {
+            return readBackResult;
         }
-
-        // NOTE: update can actually return null if the entity being updated is deleted
-        // due to cascade when a relation is deleted during update. This doesn't comply
-        // with `update`'s method signature, but we'll allow it to be consistent with Prisma.
-        return result;
     }
 
     private async runUpdateMany(args: UpdateManyArgs<Schema, GetModels<Schema>>) {
-        return this.updateMany(this.kysely, this.model, args.where, args.data, args.limit, false);
+        // TODO: avoid using transaction for simple update
+        return this.safeTransaction(async (tx) => {
+            return this.updateMany(tx, this.model, args.where, args.data, args.limit, false);
+        });
     }
 
     private async runUpdateManyAndReturn(args: UpdateManyAndReturnArgs<Schema, GetModels<Schema>> | undefined) {
@@ -68,7 +85,15 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
 
     private async runUpsert(args: UpsertArgs<Schema, GetModels<Schema>>) {
         const result = await this.safeTransaction(async (tx) => {
-            let mutationResult = await this.update(tx, this.model, args.where, args.update, undefined, true, false);
+            let mutationResult: unknown = await this.update(
+                tx,
+                this.model,
+                args.where,
+                args.update,
+                undefined,
+                true,
+                false,
+            );
 
             if (!mutationResult) {
                 // non-existing, create

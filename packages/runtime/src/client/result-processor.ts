@@ -53,7 +53,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                         delete data[key];
                         continue;
                     }
-                    const processedSubRow = this.processRow(subRow, subRow);
+                    const processedSubRow = this.processRow(subRow, subModel);
 
                     // merge the sub-row into the main row
                     Object.assign(data, processedSubRow);

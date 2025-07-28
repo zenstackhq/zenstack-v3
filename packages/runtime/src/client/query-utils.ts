@@ -293,12 +293,7 @@ export function extractFields(object: any, fields: string[]) {
 
 export function extractIdFields(entity: any, schema: SchemaDef, model: string) {
     const idFields = getIdFields(schema, model);
-    return idFields.reduce((acc: any, field) => {
-        if (field in entity) {
-            acc[field] = entity[field];
-        }
-        return acc;
-    }, {});
+    return extractFields(entity, idFields);
 }
 
 export function getDiscriminatorField(schema: SchemaDef, model: string) {

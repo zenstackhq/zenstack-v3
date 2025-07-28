@@ -27,6 +27,7 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
                 if (key.startsWith('_') && value && typeof value === 'object') {
                     // select fields
                     Object.entries(value)
+                        .filter(([field]) => field !== '_all')
                         .filter(([, val]) => val === true)
                         .forEach(([field]) => {
                             if (!selectedFields.includes(field)) selectedFields.push(field);

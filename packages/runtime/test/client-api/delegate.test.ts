@@ -1115,7 +1115,7 @@ model Gallery {
                 ).resolves.toEqual(1);
                 await expect(
                     client.ratedVideo.count({
-                        where: { viewCount: 1 },
+                        where: { viewCount: 2 },
                     }),
                 ).resolves.toEqual(1);
 

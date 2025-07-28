@@ -6,6 +6,11 @@
             "inputs": ["src/**", "zenstack/*.zmodel"],
             "outputs": ["dist/**"]
         },
+        "watch": {
+            "dependsOn": ["^build"],
+            "inputs": ["src/**", "zenstack/*.zmodel"],
+            "outputs": []
+        },
         "lint": {
             "dependsOn": ["^lint"]
         },

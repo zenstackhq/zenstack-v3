@@ -3,6 +3,7 @@ import type { Generated, Kysely } from 'kysely';
 import type {
     FieldHasDefault,
     ForeignKeyFields,
+    GetModelField,
     GetModelFields,
     GetModelFieldType,
     GetModels,
@@ -18,11 +19,14 @@ export type ToKyselySchema<Schema extends SchemaDef> = {
 export type ToKysely<Schema extends SchemaDef> = Kysely<ToKyselySchema<Schema>>;
 
 type ToKyselyTable<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Field in ScalarFields<Schema, Model, false> | ForeignKeyFields<Schema, Model>]: toKyselyFieldType<
+    [Field in ScalarFields<Schema, Model, false> | ForeignKeyFields<Schema, Model> as GetModelField<
         Schema,
         Model,
         Field
-    >;
+    >['originModel'] extends string
+        ? // query builder should not see fields inherited from delegate base model
+          never
+        : Field]: toKyselyFieldType<Schema, Model, Field>;
 };
 
 export type MapBaseType<T> = T extends 'String'

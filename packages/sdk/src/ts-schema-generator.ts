@@ -36,7 +36,7 @@ import {
     UnaryExpr,
     type Model,
 } from '@zenstackhq/language/ast';
-import { getAllAttributes, getAllFields } from '@zenstackhq/language/utils';
+import { getAllAttributes, getAllFields, isDataFieldReference } from '@zenstackhq/language/utils';
 import fs from 'node:fs';
 import path from 'node:path';
 import { match } from 'ts-pattern';
@@ -228,6 +228,7 @@ export class TsSchemaGenerator {
             }
             return true;
         });
+        const subModels = this.getSubModels(dm);
 
         const fields: ts.PropertyAssignment[] = [
             // name
@@ -282,6 +283,18 @@ export class TsSchemaGenerator {
             ...(isDelegateModel(dm)
                 ? [ts.factory.createPropertyAssignment('isDelegate', ts.factory.createTrue())]
                 : []),
+
+            // subModels
+            ...(subModels.length > 0
+                ? [
+                      ts.factory.createPropertyAssignment(
+                          'subModels',
+                          ts.factory.createArrayLiteralExpression(
+                              subModels.map((subModel) => ts.factory.createStringLiteral(subModel)),
+                          ),
+                      ),
+                  ]
+                : []),
         ];
 
         const computedFields = dm.fields.filter((f) => hasAttribute(f, '@computed'));
@@ -293,6 +306,13 @@ export class TsSchemaGenerator {
         }
 
         return ts.factory.createObjectLiteralExpression(fields, true);
+    }
+
+    private getSubModels(dm: DataModel) {
+        return dm.$container.declarations
+            .filter(isDataModel)
+            .filter((d) => d.baseModel?.ref === dm)
+            .map((d) => d.name);
     }
 
     private createTypeDefObject(td: TypeDef): ts.Expression {
@@ -386,22 +406,6 @@ export class TsSchemaGenerator {
             ts.factory.createPropertyAssignment('type', this.generateFieldTypeLiteral(field)),
         ];
 
-        if (
-            contextModel &&
-            // id fields are duplicated in inherited models
-            !isIdField(field, contextModel) &&
-            field.$container !== contextModel &&
-            isDelegateModel(field.$container)
-        ) {
-            // field is inherited from delegate
-            objectFields.push(
-                ts.factory.createPropertyAssignment(
-                    'originModel',
-                    ts.factory.createStringLiteral(field.$container.name),
-                ),
-            );
-        }
-
         if (contextModel && ModelUtils.isIdField(field, contextModel)) {
             objectFields.push(ts.factory.createPropertyAssignment('id', ts.factory.createTrue()));
         }
@@ -420,6 +424,28 @@ export class TsSchemaGenerator {
 
         if (hasAttribute(field, '@updatedAt')) {
             objectFields.push(ts.factory.createPropertyAssignment('updatedAt', ts.factory.createTrue()));
+        }
+
+        // originModel
+        if (
+            contextModel &&
+            // id fields are duplicated in inherited models
+            !isIdField(field, contextModel) &&
+            field.$container !== contextModel &&
+            isDelegateModel(field.$container)
+        ) {
+            // field is inherited from delegate
+            objectFields.push(
+                ts.factory.createPropertyAssignment(
+                    'originModel',
+                    ts.factory.createStringLiteral(field.$container.name),
+                ),
+            );
+        }
+
+        // discriminator
+        if (this.isDiscriminatorField(field)) {
+            objectFields.push(ts.factory.createPropertyAssignment('isDiscriminator', ts.factory.createTrue()));
         }
 
         // attributes
@@ -521,6 +547,16 @@ export class TsSchemaGenerator {
         }
 
         return ts.factory.createObjectLiteralExpression(objectFields, true);
+    }
+
+    private isDiscriminatorField(field: DataField) {
+        const origin = field.$container;
+        return getAttribute(origin, '@@delegate')?.args.some(
+            (arg) =>
+                arg.$resolvedParam.name === 'discriminator' &&
+                isDataFieldReference(arg.value) &&
+                arg.value.target.ref === field,
+        );
     }
 
     private getDataSourceProvider(

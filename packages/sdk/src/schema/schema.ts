@@ -32,6 +32,7 @@ export type ModelDef = {
     idFields: string[];
     computedFields?: Record<string, Function>;
     isDelegate?: boolean;
+    subModels?: string[];
 };
 
 export type AttributeApplication = {
@@ -69,6 +70,7 @@ export type FieldDef = {
     foreignKeyFor?: string[];
     computed?: boolean;
     originModel?: string;
+    isDiscriminator?: boolean;
 };
 
 export type ProcedureParam = { name: string; type: string; optional?: boolean };
@@ -105,6 +107,17 @@ export type TypeDefDef = {
 
 export type GetModels<Schema extends SchemaDef> = Extract<keyof Schema['models'], string>;
 
+export type GetDelegateModels<Schema extends SchemaDef> = keyof {
+    [Key in GetModels<Schema> as Schema['models'][Key]['isDelegate'] extends true ? Key : never]: true;
+};
+
+export type GetSubModels<Schema extends SchemaDef, Model extends GetModels<Schema>> = GetModel<
+    Schema,
+    Model
+>['subModels'] extends string[]
+    ? Extract<GetModel<Schema, Model>['subModels'][number], GetModels<Schema>>
+    : never;
+
 export type GetModel<Schema extends SchemaDef, Model extends GetModels<Schema>> = Schema['models'][Model];
 
 export type GetEnums<Schema extends SchemaDef> = keyof Schema['enums'];
@@ -126,6 +139,14 @@ export type GetModelField<
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,
 > = GetModel<Schema, Model>['fields'][Field];
+
+export type GetModelDiscriminator<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
+    [Key in GetModelFields<Schema, Model> as FieldIsDelegateDiscriminator<Schema, Model, Key> extends true
+        ? GetModelField<Schema, Model, Key>['originModel'] extends string
+            ? never
+            : Key
+        : never]: true;
+};
 
 export type GetModelFieldType<
     Schema extends SchemaDef,
@@ -238,5 +259,25 @@ export type FieldIsRelationArray<
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,
 > = FieldIsRelation<Schema, Model, Field> extends true ? FieldIsArray<Schema, Model, Field> : false;
+
+export type IsDelegateModel<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+> = Schema['models'][Model]['isDelegate'] extends true ? true : false;
+
+export type FieldIsDelegateRelation<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends RelationFields<Schema, Model>,
+> =
+    GetModelFieldType<Schema, Model, Field> extends GetModels<Schema>
+        ? IsDelegateModel<Schema, GetModelFieldType<Schema, Model, Field>>
+        : false;
+
+export type FieldIsDelegateDiscriminator<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends GetModelFields<Schema, Model>,
+> = GetModelField<Schema, Model, Field>['isDiscriminator'] extends true ? true : false;
 
 //#endregion

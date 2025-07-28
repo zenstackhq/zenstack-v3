@@ -195,7 +195,7 @@ export type TypeDefResult<Schema extends SchemaDef, TypeDef extends GetTypeDefs<
     keyof {
         [Key in GetTypeDefFields<Schema, TypeDef> as TypeDefFieldIsOptional<Schema, TypeDef, Key> extends true
             ? Key
-            : never]: Key;
+            : never]: true;
     }
 >;
 

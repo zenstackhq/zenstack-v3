@@ -1,3 +1,4 @@
+import type { ExpressionBuilder } from 'kysely';
 import { sql } from 'kysely';
 import type { SchemaDef } from '../../../schema';
 import { BaseOperationHandler } from './base';
@@ -9,15 +10,29 @@ export class CountOperationHandler<Schema extends SchemaDef> extends BaseOperati
 
         // parse args
         const parsedArgs = this.inputValidator.validateCountArgs(this.model, normalizedArgs);
+        const subQueryName = '$sub';
 
         let query = this.kysely.selectFrom((eb) => {
             // nested query for filtering and pagination
-            let subQuery = eb
-                .selectFrom(this.model)
-                .selectAll()
+
+            let subQuery = this.dialect
+                .buildSelectModel(eb as ExpressionBuilder<any, any>, this.model)
                 .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, parsedArgs?.where));
+
+            if (parsedArgs?.select && typeof parsedArgs.select === 'object') {
+                // select fields
+                for (const [key, value] of Object.entries(parsedArgs.select)) {
+                    if (key !== '_all' && value === true) {
+                        subQuery = this.dialect.buildSelectField(subQuery, this.model, this.model, key);
+                    }
+                }
+            } else {
+                // no field selection, just build a `select 1`
+                subQuery = subQuery.select(() => eb.lit(1).as('_all'));
+            }
+
             subQuery = this.dialect.buildSkipTake(subQuery, parsedArgs?.skip, parsedArgs?.take);
-            return subQuery.as('$sub');
+            return subQuery.as(subQueryName);
         });
 
         if (parsedArgs?.select && typeof parsedArgs.select === 'object') {
@@ -26,7 +41,7 @@ export class CountOperationHandler<Schema extends SchemaDef> extends BaseOperati
                 Object.keys(parsedArgs.select!).map((key) =>
                     key === '_all'
                         ? eb.cast(eb.fn.countAll(), 'integer').as('_all')
-                        : eb.cast(eb.fn.count(sql.ref(`$sub.${key}`)), 'integer').as(key),
+                        : eb.cast(eb.fn.count(sql.ref(`${subQueryName}.${key}`)), 'integer').as(key),
                 ),
             );
 

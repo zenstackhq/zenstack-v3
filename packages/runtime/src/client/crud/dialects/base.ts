@@ -818,9 +818,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
-    buildSelectField(query: SelectQueryBuilder<any, any, any>, model: string, modelAlias: string, field: string) {
+    buildSelectField(
+        query: SelectQueryBuilder<any, any, any>,
+        model: string,
+        modelAlias: string,
+        field: string,
+    ): SelectQueryBuilder<any, any, any> {
         const fieldDef = requireField(this.schema, model, field);
-
         if (fieldDef.computed) {
             // TODO: computed field from delegate base?
             return query.select((eb) => buildFieldRef(this.schema, model, field, this.options, eb).as(field));
@@ -828,10 +832,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             // regular field
             return query.select(sql.ref(`${modelAlias}.${field}`).as(field));
         } else {
-            // field from delegate base, build a join
-            let result = query;
-            result = this.buildSelectField(result, fieldDef.originModel, fieldDef.originModel, field);
-            return result;
+            return this.buildSelectField(query, fieldDef.originModel, fieldDef.originModel, field);
         }
     }
 

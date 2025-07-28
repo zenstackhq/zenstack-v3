@@ -1,7 +1,7 @@
 {
     "name": "@zenstackhq/language",
     "description": "ZenStack ZModel language specification",
-    "version": "3.0.0-alpha.12",
+    "version": "3.0.0-alpha.13",
     "license": "MIT",
     "author": "ZenStack Team",
     "files": [
@@ -37,6 +37,16 @@
                 "default": "./dist/ast.cjs"
             }
         },
+        "./utils": {
+            "import": {
+                "types": "./dist/utils.d.ts",
+                "default": "./dist/utils.js"
+            },
+            "require": {
+                "types": "./dist/utils.d.cts",
+                "default": "./dist/utils.cjs"
+            }
+        },
         "./package.json": {
             "import": "./package.json",
             "require": "./package.json"
@@ -51,6 +61,7 @@
         "@types/pluralize": "^0.0.33",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/common-helpers": "workspace:*",
         "langium-cli": "catalog:"
     },
     "volta": {

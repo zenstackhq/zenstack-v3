@@ -1,11 +1,13 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { AstUtils, type AstNode, type DiagnosticInfo, type ValidationAcceptor } from 'langium';
 import { IssueCodes, SCALAR_TYPES } from '../constants';
 import {
     ArrayExpr,
+    DataField,
     DataModel,
-    DataModelField,
     Model,
     ReferenceExpr,
+    TypeDef,
     isDataModel,
     isDataSource,
     isEnum,
@@ -14,9 +16,9 @@ import {
     isTypeDef,
 } from '../generated/ast';
 import {
-    findUpInheritance,
+    getAllAttributes,
+    getAllFields,
     getLiteral,
-    getModelFieldsWithBases,
     getModelIdFields,
     getModelUniqueFields,
     getUniqueFields,
@@ -31,26 +33,23 @@ import { validateDuplicatedDeclarations, type AstValidator } from './common';
  */
 export default class DataModelValidator implements AstValidator<DataModel> {
     validate(dm: DataModel, accept: ValidationAcceptor): void {
-        this.validateBaseAbstractModel(dm, accept);
-        this.validateBaseDelegateModel(dm, accept);
-        validateDuplicatedDeclarations(dm, getModelFieldsWithBases(dm), accept);
+        validateDuplicatedDeclarations(dm, getAllFields(dm), accept);
         this.validateAttributes(dm, accept);
         this.validateFields(dm, accept);
-
-        if (dm.superTypes.length > 0) {
-            this.validateInheritance(dm, accept);
+        if (dm.mixins.length > 0) {
+            this.validateMixins(dm, accept);
         }
+        this.validateInherits(dm, accept);
     }
 
     private validateFields(dm: DataModel, accept: ValidationAcceptor) {
-        const allFields = getModelFieldsWithBases(dm);
+        const allFields = getAllFields(dm);
         const idFields = allFields.filter((f) => f.attributes.find((attr) => attr.decl.ref?.name === '@id'));
         const uniqueFields = allFields.filter((f) => f.attributes.find((attr) => attr.decl.ref?.name === '@unique'));
         const modelLevelIds = getModelIdFields(dm);
         const modelUniqueFields = getModelUniqueFields(dm);
 
         if (
-            !dm.isAbstract &&
             idFields.length === 0 &&
             modelLevelIds.length === 0 &&
             uniqueFields.length === 0 &&
@@ -89,17 +88,14 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         }
 
         dm.fields.forEach((field) => this.validateField(field, accept));
-
-        if (!dm.isAbstract) {
-            allFields
-                .filter((x) => isDataModel(x.type.reference?.ref))
-                .forEach((y) => {
-                    this.validateRelationField(dm, y, accept);
-                });
-        }
+        allFields
+            .filter((x) => isDataModel(x.type.reference?.ref))
+            .forEach((y) => {
+                this.validateRelationField(dm, y, accept);
+            });
     }
 
-    private validateField(field: DataModelField, accept: ValidationAcceptor): void {
+    private validateField(field: DataField, accept: ValidationAcceptor): void {
         if (field.type.array && field.type.optional) {
             accept('error', 'Optional lists are not supported. Use either `Type[]` or `Type?`', { node: field.type });
         }
@@ -137,10 +133,10 @@ export default class DataModelValidator implements AstValidator<DataModel> {
     }
 
     private validateAttributes(dm: DataModel, accept: ValidationAcceptor) {
-        dm.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
+        getAllAttributes(dm).forEach((attr) => validateAttributeApplication(attr, accept, dm));
     }
 
-    private parseRelation(field: DataModelField, accept?: ValidationAcceptor) {
+    private parseRelation(field: DataField, accept?: ValidationAcceptor) {
         const relAttr = field.attributes.find((attr) => attr.decl.ref?.name === '@relation');
 
         let name: string | undefined;
@@ -244,26 +240,37 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         return { attr: relAttr, name, fields, references, valid };
     }
 
-    private isSelfRelation(field: DataModelField) {
+    private isSelfRelation(field: DataField) {
         return field.type.reference?.ref === field.$container;
     }
 
-    private validateRelationField(contextModel: DataModel, field: DataModelField, accept: ValidationAcceptor) {
+    private validateRelationField(contextModel: DataModel, field: DataField, accept: ValidationAcceptor) {
         const thisRelation = this.parseRelation(field, accept);
         if (!thisRelation.valid) {
             return;
         }
 
-        if (this.isFieldInheritedFromDelegateModel(field, contextModel)) {
+        if (this.isFieldInheritedFromDelegateModel(field)) {
             // relation fields inherited from delegate model don't need opposite relation
             return;
+        }
+
+        if (this.isSelfRelation(field)) {
+            if (!thisRelation.name) {
+                accept('error', 'Self-relation field must have a name in @relation attribute', {
+                    node: field,
+                });
+                return;
+            }
         }
 
         const oppositeModel = field.type.reference!.ref! as DataModel;
 
         // Use name because the current document might be updated
-        let oppositeFields = getModelFieldsWithBases(oppositeModel, false).filter(
-            (f) => f.type.reference?.ref?.name === contextModel.name,
+        let oppositeFields = getAllFields(oppositeModel, false).filter(
+            (f) =>
+                f !== field && // exclude self in case of self relation
+                f.type.reference?.ref?.name === contextModel.name,
         );
         oppositeFields = oppositeFields.filter((f) => {
             const fieldRel = this.parseRelation(f);
@@ -320,29 +327,43 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         const oppositeField = oppositeFields[0]!;
         const oppositeRelation = this.parseRelation(oppositeField);
 
-        let relationOwner: DataModelField;
+        let relationOwner: DataField;
 
-        if (thisRelation?.references?.length && thisRelation.fields?.length) {
-            if (oppositeRelation?.references || oppositeRelation?.fields) {
-                accept('error', '"fields" and "references" must be provided only on one side of relation field', {
-                    node: oppositeField,
-                });
-                return;
-            } else {
-                relationOwner = oppositeField;
-            }
-        } else if (oppositeRelation?.references?.length && oppositeRelation.fields?.length) {
-            if (thisRelation?.references || thisRelation?.fields) {
-                accept('error', '"fields" and "references" must be provided only on one side of relation field', {
-                    node: field,
-                });
-                return;
-            } else {
-                relationOwner = field;
+        if (field.type.array && oppositeField.type.array) {
+            // if both the field is array, then it's an implicit many-to-many relation,
+            // neither side should have fields/references
+            for (const r of [thisRelation, oppositeRelation]) {
+                if (r.fields?.length || r.references?.length) {
+                    accept(
+                        'error',
+                        'Implicit many-to-many relation cannot have "fields" or "references" in @relation attribute',
+                        {
+                            node: r === thisRelation ? field : oppositeField,
+                        },
+                    );
+                }
             }
         } else {
-            // if both the field is array, then it's an implicit many-to-many relation
-            if (!(field.type.array && oppositeField.type.array)) {
+            if (thisRelation?.references?.length && thisRelation.fields?.length) {
+                if (oppositeRelation?.references || oppositeRelation?.fields) {
+                    accept('error', '"fields" and "references" must be provided only on one side of relation field', {
+                        node: oppositeField,
+                    });
+                    return;
+                } else {
+                    relationOwner = oppositeField;
+                }
+            } else if (oppositeRelation?.references?.length && oppositeRelation.fields?.length) {
+                if (thisRelation?.references || thisRelation?.fields) {
+                    accept('error', '"fields" and "references" must be provided only on one side of relation field', {
+                        node: field,
+                    });
+                    return;
+                } else {
+                    relationOwner = field;
+                }
+            } else {
+                // for non-M2M relations, one side must have fields/references
                 [field, oppositeField].forEach((f) => {
                     if (!this.isSelfRelation(f)) {
                         accept(
@@ -352,113 +373,120 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                         );
                     }
                 });
-            }
-            return;
-        }
-
-        if (!relationOwner.type.array && !relationOwner.type.optional) {
-            accept('error', 'Relation field needs to be list or optional', {
-                node: relationOwner,
-            });
-            return;
-        }
-
-        if (relationOwner !== field && !relationOwner.type.array) {
-            // one-to-one relation requires defining side's reference field to be @unique
-            // e.g.:
-            //     model User {
-            //         id String @id @default(cuid())
-            //         data UserData?
-            //     }
-            //     model UserData {
-            //         id String @id @default(cuid())
-            //         user User  @relation(fields: [userId], references: [id])
-            //         userId String
-            //     }
-            //
-            // UserData.userId field needs to be @unique
-
-            const containingModel = field.$container as DataModel;
-            const uniqueFieldList = getUniqueFields(containingModel);
-
-            // field is defined in the abstract base model
-            if (containingModel !== contextModel) {
-                uniqueFieldList.push(...getUniqueFields(contextModel));
+                return;
             }
 
-            thisRelation.fields?.forEach((ref) => {
-                const refField = ref.target.ref as DataModelField;
-                if (refField) {
-                    if (refField.attributes.find((a) => a.decl.ref?.name === '@id' || a.decl.ref?.name === '@unique')) {
-                        return;
-                    }
-                    if (uniqueFieldList.some((list) => list.includes(refField))) {
-                        return;
-                    }
-                    accept(
-                        'error',
-                        `Field "${refField.name}" on model "${containingModel.name}" is part of a one-to-one relation and must be marked as @unique or be part of a model-level @@unique attribute`,
-                        { node: refField },
-                    );
+            if (!relationOwner.type.array && !relationOwner.type.optional) {
+                accept('error', 'Relation field needs to be list or optional', {
+                    node: relationOwner,
+                });
+                return;
+            }
+
+            if (relationOwner !== field && !relationOwner.type.array) {
+                // one-to-one relation requires defining side's reference field to be @unique
+                // e.g.:
+                //     model User {
+                //         id String @id @default(cuid())
+                //         data UserData?
+                //     }
+                //     model UserData {
+                //         id String @id @default(cuid())
+                //         user User  @relation(fields: [userId], references: [id])
+                //         userId String
+                //     }
+                //
+                // UserData.userId field needs to be @unique
+
+                const containingModel = field.$container as DataModel;
+                const uniqueFieldList = getUniqueFields(containingModel);
+
+                // field is defined in the abstract base model
+                if (containingModel !== contextModel) {
+                    uniqueFieldList.push(...getUniqueFields(contextModel));
                 }
-            });
+
+                thisRelation.fields?.forEach((ref) => {
+                    const refField = ref.target.ref as DataField;
+                    if (refField) {
+                        if (
+                            refField.attributes.find(
+                                (a) => a.decl.ref?.name === '@id' || a.decl.ref?.name === '@unique',
+                            )
+                        ) {
+                            return;
+                        }
+                        if (uniqueFieldList.some((list) => list.includes(refField))) {
+                            return;
+                        }
+                        accept(
+                            'error',
+                            `Field "${refField.name}" on model "${containingModel.name}" is part of a one-to-one relation and must be marked as @unique or be part of a model-level @@unique attribute`,
+                            { node: refField },
+                        );
+                    }
+                });
+            }
         }
     }
 
     // checks if the given field is inherited directly or indirectly from a delegate model
-    private isFieldInheritedFromDelegateModel(field: DataModelField, contextModel: DataModel) {
-        const basePath = findUpInheritance(contextModel, field.$container as DataModel);
-        if (basePath && basePath.some(isDelegateModel)) {
-            return true;
-        } else {
-            return false;
+    private isFieldInheritedFromDelegateModel(field: DataField) {
+        return isDelegateModel(field.$container);
+    }
+
+    private validateInherits(model: DataModel, accept: ValidationAcceptor) {
+        if (!model.baseModel) {
+            return;
         }
-    }
 
-    private validateBaseAbstractModel(model: DataModel, accept: ValidationAcceptor) {
-        model.superTypes.forEach((superType, index) => {
-            if (
-                !superType.ref?.isAbstract &&
-                !superType.ref?.attributes.some((attr) => attr.decl.ref?.name === '@@delegate')
-            )
-                accept(
-                    'error',
-                    `Model ${superType.$refText} cannot be extended because it's neither abstract nor marked as "@@delegate"`,
-                    {
-                        node: model,
-                        property: 'superTypes',
-                        index,
-                    },
-                );
-        });
-    }
+        invariant(model.baseModel.ref, 'baseModel must be resolved');
 
-    private validateBaseDelegateModel(model: DataModel, accept: ValidationAcceptor) {
-        if (model.superTypes.filter((base) => base.ref && isDelegateModel(base.ref)).length > 1) {
-            accept('error', 'Extending from multiple delegate models is not supported', {
+        // check if the base model is a delegate model
+        if (!isDelegateModel(model.baseModel.ref)) {
+            accept('error', `Model ${model.baseModel.$refText} cannot be extended because it's not a delegate model`, {
                 node: model,
-                property: 'superTypes',
+                property: 'baseModel',
             });
+            return;
         }
-    }
 
-    private validateInheritance(dm: DataModel, accept: ValidationAcceptor) {
-        const seen = [dm];
-        const todo: DataModel[] = dm.superTypes.map((superType) => superType.ref!);
+        // check for cyclic inheritance
+        const seen: DataModel[] = [];
+        const todo = [model.baseModel.ref];
         while (todo.length > 0) {
             const current = todo.shift()!;
             if (seen.includes(current)) {
                 accept(
                     'error',
-                    `Circular inheritance detected: ${seen.map((m) => m.name).join(' -> ')} -> ${current.name}`,
+                    `Cyclic inheritance detected: ${seen.map((m) => m.name).join(' -> ')} -> ${current.name}`,
                     {
-                        node: dm,
+                        node: model,
                     },
                 );
                 return;
             }
             seen.push(current);
-            todo.push(...current.superTypes.map((superType) => superType.ref!));
+            if (current.baseModel) {
+                invariant(current.baseModel.ref, 'baseModel must be resolved');
+                todo.push(current.baseModel.ref);
+            }
+        }
+    }
+
+    private validateMixins(dm: DataModel, accept: ValidationAcceptor) {
+        const seen: TypeDef[] = [];
+        const todo: TypeDef[] = dm.mixins.map((mixin) => mixin.ref!);
+        while (todo.length > 0) {
+            const current = todo.shift()!;
+            if (seen.includes(current)) {
+                accept('error', `Cyclic mixin detected: ${seen.map((m) => m.name).join(' -> ')} -> ${current.name}`, {
+                    node: dm,
+                });
+                return;
+            }
+            seen.push(current);
+            todo.push(...current.mixins.map((mixin) => mixin.ref!));
         }
     }
 }

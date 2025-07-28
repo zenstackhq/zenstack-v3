@@ -4,24 +4,33 @@ import type {
     FieldDef,
     FieldHasDefault,
     FieldIsArray,
-    FieldIsOptional,
+    FieldIsDelegateDiscriminator,
+    FieldIsDelegateRelation,
     FieldIsRelation,
     FieldIsRelationArray,
     FieldType,
     ForeignKeyFields,
     GetEnum,
     GetEnums,
-    GetField,
-    GetFields,
-    GetFieldType,
     GetModel,
+    GetModelDiscriminator,
+    GetModelField,
+    GetModelFields,
+    GetModelFieldType,
     GetModels,
+    GetSubModels,
+    GetTypeDefField,
+    GetTypeDefFields,
+    GetTypeDefs,
+    IsDelegateModel,
+    ModelFieldIsOptional,
     NonRelationFields,
     RelationFields,
     RelationFieldType,
     RelationInfo,
     ScalarFields,
     SchemaDef,
+    TypeDefFieldIsOptional,
 } from '../schema';
 import type {
     AtLeast,
@@ -46,16 +55,28 @@ type DefaultModelResult<
     Optional = false,
     Array = false,
 > = WrapType<
-    {
-        [Key in NonRelationFields<Schema, Model> as Key extends keyof Omit
-            ? Omit[Key] extends true
-                ? never
-                : Key
-            : Key]: MapFieldType<Schema, Model, Key>;
-    },
+    IsDelegateModel<Schema, Model> extends true
+        ? // delegate model's selection result is a union of all sub-models
+          DelegateUnionResult<Schema, Model, GetSubModels<Schema, Model>, Omit>
+        : {
+              [Key in NonRelationFields<Schema, Model> as Key extends keyof Omit
+                  ? Omit[Key] extends true
+                      ? never
+                      : Key
+                  : Key]: MapModelFieldType<Schema, Model, Key>;
+          },
     Optional,
     Array
 >;
+
+type DelegateUnionResult<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    SubModel extends GetModels<Schema>,
+    Omit = undefined,
+> = SubModel extends string // typescript union distribution
+    ? DefaultModelResult<Schema, SubModel, Omit> & { [K in GetModelDiscriminator<Schema, Model>]: SubModel } // fixate discriminated field
+    : never;
 
 type ModelSelectResult<Schema extends SchemaDef, Model extends GetModels<Schema>, Select, Omit> = {
     [Key in keyof Select as Select[Key] extends false | undefined
@@ -71,7 +92,7 @@ type ModelSelectResult<Schema extends SchemaDef, Model extends GetModels<Schema>
             : Key]: Key extends '_count'
         ? SelectCountResult<Schema, Model, Select[Key]>
         : Key extends NonRelationFields<Schema, Model>
-          ? MapFieldType<Schema, Model, Key>
+          ? MapModelFieldType<Schema, Model, Key>
           : Key extends RelationFields<Schema, Model>
             ? Select[Key] extends FindArgs<
                   Schema,
@@ -83,21 +104,21 @@ type ModelSelectResult<Schema extends SchemaDef, Model extends GetModels<Schema>
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
                           Pick<Select[Key], 'select'>,
-                          FieldIsOptional<Schema, Model, Key>,
+                          ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >
                     : ModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
                           Pick<Select[Key], 'include' | 'omit'>,
-                          FieldIsOptional<Schema, Model, Key>,
+                          ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >
                 : DefaultModelResult<
                       Schema,
                       RelationFieldType<Schema, Model, Key>,
                       Omit,
-                      FieldIsOptional<Schema, Model, Key>,
+                      ModelFieldIsOptional<Schema, Model, Key>,
                       FieldIsArray<Schema, Model, Key>
                   >
             : never;
@@ -140,14 +161,14 @@ export type ModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
                           I[Key],
-                          FieldIsOptional<Schema, Model, Key>,
+                          ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >
                     : DefaultModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
                           undefined,
-                          FieldIsOptional<Schema, Model, Key>,
+                          ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >;
             }
@@ -161,10 +182,22 @@ export type ModelResult<
 export type SimplifiedModelResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Args extends SelectIncludeOmit<Schema, Model, boolean>,
+    Args extends SelectIncludeOmit<Schema, Model, boolean> = {},
     Optional = false,
     Array = false,
 > = Simplify<ModelResult<Schema, Model, Args, Optional, Array>>;
+
+export type TypeDefResult<Schema extends SchemaDef, TypeDef extends GetTypeDefs<Schema>> = Optional<
+    {
+        [Key in GetTypeDefFields<Schema, TypeDef>]: MapTypeDefFieldType<Schema, TypeDef, Key>;
+    },
+    // optionality
+    keyof {
+        [Key in GetTypeDefFields<Schema, TypeDef> as TypeDefFieldIsOptional<Schema, TypeDef, Key> extends true
+            ? Key
+            : never]: true;
+    }
+>;
 
 export type BatchResult = { count: number };
 
@@ -177,7 +210,7 @@ export type WhereInput<
     Model extends GetModels<Schema>,
     ScalarOnly extends boolean = false,
 > = {
-    [Key in GetFields<Schema, Model> as ScalarOnly extends true
+    [Key in GetModelFields<Schema, Model> as ScalarOnly extends true
         ? Key extends RelationFields<Schema, Model>
             ? never
             : Key
@@ -185,12 +218,12 @@ export type WhereInput<
         ? // relation
           RelationFilter<Schema, Model, Key>
         : // enum
-          GetFieldType<Schema, Model, Key> extends GetEnums<Schema>
-          ? EnumFilter<Schema, GetFieldType<Schema, Model, Key>, FieldIsOptional<Schema, Model, Key>>
+          GetModelFieldType<Schema, Model, Key> extends GetEnums<Schema>
+          ? EnumFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>
           : FieldIsArray<Schema, Model, Key> extends true
-            ? ArrayFilter<GetFieldType<Schema, Model, Key>>
+            ? ArrayFilter<GetModelFieldType<Schema, Model, Key>>
             : // primitive
-              PrimitiveFilter<GetFieldType<Schema, Model, Key>, FieldIsOptional<Schema, Model, Key>>;
+              PrimitiveFilter<GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>;
 } & {
     $expr?: (eb: ExpressionBuilder<ToKyselySchema<Schema>, Model>) => OperandExpression<SqlBool>;
 } & {
@@ -283,7 +316,7 @@ export type OrderBy<
     WithRelation extends boolean,
     WithAggregation extends boolean,
 > = {
-    [Key in NonRelationFields<Schema, Model>]?: FieldIsOptional<Schema, Model, Key> extends true
+    [Key in NonRelationFields<Schema, Model>]?: ModelFieldIsOptional<Schema, Model, Key> extends true
         ?
               | SortOrder
               | {
@@ -384,7 +417,7 @@ export type IncludeInput<Schema extends SchemaDef, Model extends GetModels<Schem
               // where clause is allowed only if the relation is array or optional
               FieldIsArray<Schema, Model, Key> extends true
                   ? true
-                  : FieldIsOptional<Schema, Model, Key> extends true
+                  : ModelFieldIsOptional<Schema, Model, Key> extends true
                     ? true
                     : false
           >;
@@ -420,14 +453,14 @@ type ToOneRelationFilter<
     WhereInput<Schema, RelationFieldType<Schema, Model, Field>> & {
         is?: NullableIf<
             WhereInput<Schema, RelationFieldType<Schema, Model, Field>>,
-            FieldIsOptional<Schema, Model, Field>
+            ModelFieldIsOptional<Schema, Model, Field>
         >;
         isNot?: NullableIf<
             WhereInput<Schema, RelationFieldType<Schema, Model, Field>>,
-            FieldIsOptional<Schema, Model, Field>
+            ModelFieldIsOptional<Schema, Model, Field>
         >;
     },
-    FieldIsOptional<Schema, Model, Field>
+    ModelFieldIsOptional<Schema, Model, Field>
 >;
 
 type RelationFilter<
@@ -443,45 +476,55 @@ type RelationFilter<
 
 //#region Field utils
 
-type MapFieldType<
+type MapModelFieldType<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>,
-> = MapFieldDefType<Schema, GetField<Schema, Model, Field>>;
+    Field extends GetModelFields<Schema, Model>,
+> = MapFieldDefType<Schema, GetModelField<Schema, Model, Field>>;
+
+type MapTypeDefFieldType<
+    Schema extends SchemaDef,
+    TypeDef extends GetTypeDefs<Schema>,
+    Field extends GetTypeDefFields<Schema, TypeDef>,
+> = MapFieldDefType<Schema, GetTypeDefField<Schema, TypeDef, Field>>;
 
 type MapFieldDefType<Schema extends SchemaDef, T extends Pick<FieldDef, 'type' | 'optional' | 'array'>> = WrapType<
-    T['type'] extends GetEnums<Schema> ? keyof GetEnum<Schema, T['type']> : MapBaseType<T['type']>,
+    T['type'] extends GetEnums<Schema>
+        ? keyof GetEnum<Schema, T['type']>
+        : T['type'] extends GetTypeDefs<Schema>
+          ? TypeDefResult<Schema, T['type']> & Record<string, unknown>
+          : MapBaseType<T['type']>,
     T['optional'],
     T['array']
 >;
 
 type OptionalFieldsForCreate<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
-    [Key in GetFields<Schema, Model> as FieldIsOptional<Schema, Model, Key> extends true
+    [Key in GetModelFields<Schema, Model> as ModelFieldIsOptional<Schema, Model, Key> extends true
         ? Key
         : FieldHasDefault<Schema, Model, Key> extends true
           ? Key
-          : GetField<Schema, Model, Key>['updatedAt'] extends true
+          : GetModelField<Schema, Model, Key>['updatedAt'] extends true
             ? Key
             : FieldIsRelationArray<Schema, Model, Key> extends true
               ? Key
-              : never]: GetField<Schema, Model, Key>;
+              : never]: GetModelField<Schema, Model, Key>;
 };
 
 type GetRelation<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>,
-> = GetField<Schema, Model, Field>['relation'];
+    Field extends GetModelFields<Schema, Model>,
+> = GetModelField<Schema, Model, Field>['relation'];
 
 type OppositeRelation<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>,
+    Field extends GetModelFields<Schema, Model>,
     FT = FieldType<Schema, Model, Field>,
 > =
     FT extends GetModels<Schema>
         ? GetRelation<Schema, Model, Field> extends RelationInfo
-            ? GetRelation<Schema, Model, Field>['opposite'] extends GetFields<Schema, FT>
+            ? GetRelation<Schema, Model, Field>['opposite'] extends GetModelFields<Schema, FT>
                 ? Schema['models'][FT]['fields'][GetRelation<Schema, Model, Field>['opposite']]['relation']
                 : never
             : never
@@ -490,20 +533,20 @@ type OppositeRelation<
 type OppositeRelationFields<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>,
+    Field extends GetModelFields<Schema, Model>,
     Opposite = OppositeRelation<Schema, Model, Field>,
 > = Opposite extends RelationInfo ? (Opposite['fields'] extends string[] ? Opposite['fields'] : []) : [];
 
 type OppositeRelationAndFK<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends GetFields<Schema, Model>,
+    Field extends GetModelFields<Schema, Model>,
     FT = FieldType<Schema, Model, Field>,
-    Relation = GetField<Schema, Model, Field>['relation'],
+    Relation = GetModelField<Schema, Model, Field>['relation'],
     Opposite = Relation extends RelationInfo ? Relation['opposite'] : never,
 > =
     FT extends GetModels<Schema>
-        ? Opposite extends GetFields<Schema, FT>
+        ? Opposite extends GetModelFields<Schema, FT>
             ? Opposite | OppositeRelationFields<Schema, Model, Field>[number]
             : never
         : never;
@@ -570,7 +613,10 @@ type CreateScalarPayload<Schema extends SchemaDef, Model extends GetModels<Schem
     Schema,
     Model,
     {
-        [Key in ScalarFields<Schema, Model, false>]: ScalarCreatePayload<Schema, Model, Key>;
+        [Key in ScalarFields<Schema, Model, false> as FieldIsDelegateDiscriminator<Schema, Model, Key> extends true
+            ? // discriminator fields cannot be assigned
+              never
+            : Key]: ScalarCreatePayload<Schema, Model, Key>;
     }
 >;
 
@@ -579,10 +625,10 @@ type ScalarCreatePayload<
     Model extends GetModels<Schema>,
     Field extends ScalarFields<Schema, Model, false>,
 > =
-    | MapFieldType<Schema, Model, Field>
+    | MapModelFieldType<Schema, Model, Field>
     | (FieldIsArray<Schema, Model, Field> extends true
           ? {
-                set?: MapFieldType<Schema, Model, Field>[];
+                set?: MapModelFieldType<Schema, Model, Field>[];
             }
           : never);
 
@@ -590,7 +636,7 @@ type CreateFKPayload<Schema extends SchemaDef, Model extends GetModels<Schema>> 
     Schema,
     Model,
     {
-        [Key in ForeignKeyFields<Schema, Model>]: MapFieldType<Schema, Model, Key>;
+        [Key in ForeignKeyFields<Schema, Model>]: MapModelFieldType<Schema, Model, Key>;
     }
 >;
 
@@ -600,13 +646,15 @@ type CreateRelationFieldPayload<
     Field extends RelationFields<Schema, Model>,
 > = Omit<
     {
+        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
         create?: NestedCreateInput<Schema, Model, Field>;
         createMany?: NestedCreateManyInput<Schema, Model, Field>;
         connect?: ConnectInput<Schema, Model, Field>;
-        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
     },
     // no "createMany" for non-array fields
-    FieldIsArray<Schema, Model, Field> extends true ? never : 'createMany'
+    | (FieldIsArray<Schema, Model, Field> extends true ? never : 'createMany')
+    // exclude operations not applicable to delegate models
+    | (FieldIsDelegateRelation<Schema, Model, Field> extends true ? 'create' | 'createMany' | 'connectOrCreate' : never)
 >;
 
 type CreateRelationPayload<Schema extends SchemaDef, Model extends GetModels<Schema>> = OptionalWrap<
@@ -719,7 +767,10 @@ type UpdateScalarInput<
     Without extends string = never,
 > = Omit<
     {
-        [Key in NonRelationFields<Schema, Model>]?: ScalarUpdatePayload<Schema, Model, Key>;
+        [Key in NonRelationFields<Schema, Model> as FieldIsDelegateDiscriminator<Schema, Model, Key> extends true
+            ? // discriminator fields cannot be assigned
+              never
+            : Key]?: ScalarUpdatePayload<Schema, Model, Key>;
     },
     Without
 >;
@@ -729,10 +780,10 @@ type ScalarUpdatePayload<
     Model extends GetModels<Schema>,
     Field extends NonRelationFields<Schema, Model>,
 > =
-    | MapFieldType<Schema, Model, Field>
+    | MapModelFieldType<Schema, Model, Field>
     | (Field extends NumericFields<Schema, Model>
           ? {
-                set?: NullableIf<number, FieldIsOptional<Schema, Model, Field>>;
+                set?: NullableIf<number, ModelFieldIsOptional<Schema, Model, Field>>;
                 increment?: number;
                 decrement?: number;
                 multiply?: number;
@@ -741,8 +792,8 @@ type ScalarUpdatePayload<
           : never)
     | (FieldIsArray<Schema, Model, Field> extends true
           ? {
-                set?: MapFieldType<Schema, Model, Field>[];
-                push?: OrArray<MapFieldType<Schema, Model, Field>, true>;
+                set?: MapModelFieldType<Schema, Model, Field>[];
+                push?: OrArray<MapModelFieldType<Schema, Model, Field>, true>;
             }
           : never);
 
@@ -776,36 +827,45 @@ type ToManyRelationUpdateInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>,
-> = {
-    create?: NestedCreateInput<Schema, Model, Field>;
-    createMany?: NestedCreateManyInput<Schema, Model, Field>;
-    connect?: ConnectInput<Schema, Model, Field>;
-    connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
-    disconnect?: DisconnectInput<Schema, Model, Field>;
-    update?: NestedUpdateInput<Schema, Model, Field>;
-    upsert?: NestedUpsertInput<Schema, Model, Field>;
-    updateMany?: NestedUpdateManyInput<Schema, Model, Field>;
-    delete?: NestedDeleteInput<Schema, Model, Field>;
-    deleteMany?: NestedDeleteManyInput<Schema, Model, Field>;
-    set?: SetRelationInput<Schema, Model, Field>;
-};
+> = Omit<
+    {
+        create?: NestedCreateInput<Schema, Model, Field>;
+        createMany?: NestedCreateManyInput<Schema, Model, Field>;
+        connect?: ConnectInput<Schema, Model, Field>;
+        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+        disconnect?: DisconnectInput<Schema, Model, Field>;
+        update?: NestedUpdateInput<Schema, Model, Field>;
+        upsert?: NestedUpsertInput<Schema, Model, Field>;
+        updateMany?: NestedUpdateManyInput<Schema, Model, Field>;
+        delete?: NestedDeleteInput<Schema, Model, Field>;
+        deleteMany?: NestedDeleteManyInput<Schema, Model, Field>;
+        set?: SetRelationInput<Schema, Model, Field>;
+    },
+    // exclude
+    FieldIsDelegateRelation<Schema, Model, Field> extends true
+        ? 'create' | 'createMany' | 'connectOrCreate' | 'upsert'
+        : never
+>;
 
 type ToOneRelationUpdateInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>,
-> = {
-    create?: NestedCreateInput<Schema, Model, Field>;
-    connect?: ConnectInput<Schema, Model, Field>;
-    connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
-    update?: NestedUpdateInput<Schema, Model, Field>;
-    upsert?: NestedUpsertInput<Schema, Model, Field>;
-} & (FieldIsOptional<Schema, Model, Field> extends true
-    ? {
-          disconnect?: DisconnectInput<Schema, Model, Field>;
-          delete?: NestedDeleteInput<Schema, Model, Field>;
-      }
-    : {});
+> = Omit<
+    {
+        create?: NestedCreateInput<Schema, Model, Field>;
+        connect?: ConnectInput<Schema, Model, Field>;
+        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+        update?: NestedUpdateInput<Schema, Model, Field>;
+        upsert?: NestedUpsertInput<Schema, Model, Field>;
+    } & (ModelFieldIsOptional<Schema, Model, Field> extends true
+        ? {
+              disconnect?: DisconnectInput<Schema, Model, Field>;
+              delete?: NestedDeleteInput<Schema, Model, Field>;
+          }
+        : {}),
+    FieldIsDelegateRelation<Schema, Model, Field> extends true ? 'create' | 'connectOrCreate' | 'upsert' : never
+>;
 
 // #endregion
 
@@ -871,11 +931,15 @@ export type AggregateArgs<Schema extends SchemaDef, Model extends GetModels<Sche
           });
 
 type NumericFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
-    [Key in GetFields<Schema, Model> as GetFieldType<Schema, Model, Key> extends 'Int' | 'Float' | 'BigInt' | 'Decimal'
+    [Key in GetModelFields<Schema, Model> as GetModelFieldType<Schema, Model, Key> extends
+        | 'Int'
+        | 'Float'
+        | 'BigInt'
+        | 'Decimal'
         ? FieldIsArray<Schema, Model, Key> extends true
             ? never
             : Key
-        : never]: GetField<Schema, Model, Key>;
+        : never]: GetModelField<Schema, Model, Key>;
 };
 
 type SumAvgInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
@@ -883,7 +947,7 @@ type SumAvgInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
 };
 
 type MinMaxInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in GetFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true
+    [Key in GetModelFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true
         ? never
         : FieldIsRelation<Schema, Model, Key> extends true
           ? never
@@ -957,7 +1021,7 @@ export type GroupByResult<
     {
         [Key in NonRelationFields<Schema, Model> as Key extends ValueOfPotentialTuple<Args['by']>
             ? Key
-            : never]: MapFieldType<Schema, Model, Key>;
+            : never]: MapModelFieldType<Schema, Model, Key>;
     } & (Args extends { _count: infer Count }
         ? {
               _count: AggCommonOutput<Count>;
@@ -1110,9 +1174,11 @@ type NestedDeleteManyInput<
 // #region Utilities
 
 type NonOwnedRelationFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
-    [Key in RelationFields<Schema, Model> as GetField<Schema, Model, Key>['relation'] extends { references: unknown[] }
+    [Key in RelationFields<Schema, Model> as GetModelField<Schema, Model, Key>['relation'] extends {
+        references: unknown[];
+    }
         ? never
-        : Key]: Key;
+        : Key]: true;
 };
 
 // #endregion

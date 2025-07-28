@@ -1,5 +1,5 @@
 import type { ClientContract } from '../../src/client';
-import type { schema } from '../test-schema';
+import type { schema } from '../schemas/basic';
 
 type ClientType = ClientContract<typeof schema>;
 

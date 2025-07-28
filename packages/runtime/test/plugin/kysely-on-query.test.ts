@@ -2,7 +2,7 @@ import SQLite from 'better-sqlite3';
 import { InsertQueryNode, Kysely, PrimitiveValueListNode, ValuesNode, type QueryResult } from 'kysely';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ZenStackClient, type ClientContract } from '../../src/client';
-import { schema } from '../test-schema';
+import { schema } from '../schemas/basic';
 
 describe('Kysely onQuery tests', () => {
     let _client: ClientContract<typeof schema>;

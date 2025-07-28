@@ -1,0 +1,58 @@
+datasource db {
+    provider = "sqlite"
+    url      = "file:./dev.db"
+}
+
+plugin policy {
+    provider = "../../dist/plugins/policy"
+}
+
+enum Role {
+    ADMIN
+    USER
+}
+
+type CommonFields {
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model User with CommonFields {
+    email     String   @unique
+    name      String?
+    role      Role     @default(USER)
+    posts     Post[]
+    profile   Profile?
+
+    // Access policies
+    @@allow('all', auth().id == id)
+    @@allow('read', auth() != null)
+}
+
+model Post with CommonFields {
+    title     String
+    content   String?
+    published Boolean   @default(false)
+    author    User      @relation(fields: [authorId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+    authorId  String
+    comments  Comment[]
+
+    // Access policies
+    @@deny('all', auth() == null)
+    @@allow('all', auth().id == authorId)
+    @@allow('read', published)
+}
+
+model Comment with CommonFields {
+    content   String
+    post      Post?    @relation(fields: [postId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+    postId    String?
+}
+
+model Profile with CommonFields {
+    bio    String
+    age    Int?
+    user   User?   @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+    userId String? @unique
+}

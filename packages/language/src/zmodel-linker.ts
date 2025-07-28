@@ -20,9 +20,9 @@ import {
     AttributeParam,
     BinaryExpr,
     BooleanLiteral,
+    DataField,
+    DataFieldType,
     DataModel,
-    DataModelField,
-    DataModelFieldType,
     Enum,
     EnumField,
     type ExpressionType,
@@ -40,24 +40,22 @@ import {
     type ResolvedShape,
     StringLiteral,
     ThisExpr,
-    TypeDefFieldType,
     UnaryExpr,
     isArrayExpr,
     isBooleanLiteral,
+    isDataField,
+    isDataFieldType,
     isDataModel,
-    isDataModelField,
-    isDataModelFieldType,
     isEnum,
     isNumberLiteral,
     isReferenceExpr,
     isStringLiteral,
-    isTypeDefField,
 } from './ast';
 import {
+    getAllFields,
     getAllLoadedAndReachableDataModelsAndTypeDefs,
     getAuthDecl,
     getContainingDataModel,
-    getModelFieldsWithBases,
     isAuthInvocation,
     isFutureExpr,
     isMemberContainer,
@@ -188,8 +186,8 @@ export class ZModelLinker extends DefaultLinker {
                 this.resolveDataModel(node as DataModel, document, extraScopes);
                 break;
 
-            case DataModelField:
-                this.resolveDataModelField(node as DataModelField, document, extraScopes);
+            case DataField:
+                this.resolveDataField(node as DataField, document, extraScopes);
                 break;
 
             default:
@@ -259,7 +257,7 @@ export class ZModelLinker extends DefaultLinker {
             if (node.target.ref.$type === EnumField) {
                 this.resolveToBuiltinTypeOrDecl(node, node.target.ref.$container);
             } else {
-                this.resolveToDeclaredType(node, (node.target.ref as DataModelField | FunctionParam).type);
+                this.resolveToDeclaredType(node, (node.target.ref as DataField | FunctionParam).type);
             }
         }
     }
@@ -379,7 +377,7 @@ export class ZModelLinker extends DefaultLinker {
         const attrParam = this.findAttrParamForArg(node);
         const attrAppliedOn = node.$container.$container;
 
-        if (attrParam?.type.type === 'TransitiveFieldReference' && isDataModelField(attrAppliedOn)) {
+        if (attrParam?.type.type === 'TransitiveFieldReference' && isDataField(attrAppliedOn)) {
             // "TransitiveFieldReference" is resolved in the context of the containing model of the field
             // where the attribute is applied
             //
@@ -399,14 +397,13 @@ export class ZModelLinker extends DefaultLinker {
             const transitiveDataModel = attrAppliedOn.type.reference?.ref as DataModel;
             if (transitiveDataModel) {
                 // resolve references in the context of the transitive data model
-                const scopeProvider = (name: string) =>
-                    getModelFieldsWithBases(transitiveDataModel).find((f) => f.name === name);
+                const scopeProvider = (name: string) => getAllFields(transitiveDataModel).find((f) => f.name === name);
                 if (isArrayExpr(node.value)) {
                     node.value.items.forEach((item) => {
                         if (isReferenceExpr(item)) {
                             const resolved = this.resolveFromScopeProviders(item, 'target', document, [scopeProvider]);
                             if (resolved) {
-                                this.resolveToDeclaredType(item, (resolved as DataModelField).type);
+                                this.resolveToDeclaredType(item, (resolved as DataField).type);
                             } else {
                                 // mark unresolvable
                                 this.unresolvableRefExpr(item);
@@ -419,7 +416,7 @@ export class ZModelLinker extends DefaultLinker {
                 } else if (isReferenceExpr(node.value)) {
                     const resolved = this.resolveFromScopeProviders(node.value, 'target', document, [scopeProvider]);
                     if (resolved) {
-                        this.resolveToDeclaredType(node.value, (resolved as DataModelField).type);
+                        this.resolveToDeclaredType(node.value, (resolved as DataField).type);
                     } else {
                         // mark unresolvable
                         this.unresolvableRefExpr(node.value);
@@ -458,11 +455,7 @@ export class ZModelLinker extends DefaultLinker {
         return this.resolveDefault(node, document, extraScopes);
     }
 
-    private resolveDataModelField(
-        node: DataModelField,
-        document: LangiumDocument<AstNode>,
-        extraScopes: ScopeProvider[],
-    ) {
+    private resolveDataField(node: DataField, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         // Field declaration may contain enum references, and enum fields are pushed to the global
         // scope, so if there're enums with fields with the same name, an arbitrary one will be
         // used as resolution target. The correct behavior is to resolve to the enum that's used
@@ -518,9 +511,9 @@ export class ZModelLinker extends DefaultLinker {
 
     //#region Utils
 
-    private resolveToDeclaredType(node: AstNode, type: FunctionParamType | DataModelFieldType | TypeDefFieldType) {
+    private resolveToDeclaredType(node: AstNode, type: FunctionParamType | DataFieldType) {
         let nullable = false;
-        if (isDataModelFieldType(type) || isTypeDefField(type)) {
+        if (isDataFieldType(type)) {
             nullable = type.optional;
 
             // referencing a field of 'Unsupported' type

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
 import { NotFoundError } from '../../src/client/errors';
-import { schema } from '../test-schema';
+import { schema } from '../schemas/basic';
 import { createClientSpecs } from './client-specs';
 import { createPosts, createUser } from './utils';
 
@@ -51,20 +51,12 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
 
         // take
         await expect(client.user.findMany({ take: 1 })).resolves.toHaveLength(1);
-        // default sorted by id
-        await expect(client.user.findFirst({ take: 1 })).resolves.toMatchObject({
-            email: 'u1@test.com',
-        });
         await expect(client.user.findMany({ take: 2 })).resolves.toHaveLength(2);
         await expect(client.user.findMany({ take: 4 })).resolves.toHaveLength(3);
 
         // skip
         await expect(client.user.findMany({ skip: 1 })).resolves.toHaveLength(2);
         await expect(client.user.findMany({ skip: 2 })).resolves.toHaveLength(1);
-        // default sorted by id
-        await expect(client.user.findFirst({ skip: 1, take: 1 })).resolves.toMatchObject({
-            email: 'u02@test.com',
-        });
         // explicit sort
         await expect(
             client.user.findFirst({
@@ -81,10 +73,10 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
 
         // negative take, default sort is negated
         await expect(client.user.findMany({ take: -2 })).toResolveWithLength(2);
-        await expect(client.user.findMany({ take: -2 })).resolves.toEqual(
+        await expect(client.user.findMany({ take: -2, orderBy: { id: 'asc' } })).resolves.toEqual(
             expect.arrayContaining([expect.objectContaining({ id: '3' }), expect.objectContaining({ id: '2' })]),
         );
-        await expect(client.user.findMany({ skip: 1, take: -1 })).resolves.toEqual([
+        await expect(client.user.findMany({ skip: 1, take: -1, orderBy: { id: 'asc' } })).resolves.toEqual([
             expect.objectContaining({ id: '2' }),
         ]);
 

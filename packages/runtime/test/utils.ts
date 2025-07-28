@@ -7,7 +7,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client as PGClient, Pool } from 'pg';
-import type { ClientOptions } from '../src/client';
+import type { ClientContract, ClientOptions } from '../src/client';
 import { ZenStackClient } from '../src/client';
 import type { SchemaDef } from '../src/schema';
 
@@ -67,7 +67,7 @@ export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptio
 export async function createTestClient<Schema extends SchemaDef>(
     schema: Schema,
     options?: CreateTestClientOptions<Schema>,
-): Promise<any>;
+): Promise<ClientContract<Schema>>;
 export async function createTestClient<Schema extends SchemaDef>(
     schema: string,
     options?: CreateTestClientOptions<Schema>,
@@ -79,8 +79,14 @@ export async function createTestClient<Schema extends SchemaDef>(
     let workDir: string | undefined;
     let _schema: Schema;
 
+    let dbName = options?.dbName;
+    const provider = options?.provider ?? 'sqlite';
+    if (provider === 'sqlite' && options?.usePrismaPush && !dbName) {
+        dbName = 'file:./test.db';
+    }
+
     if (typeof schema === 'string') {
-        const generated = await generateTsSchema(schema, options?.provider, options?.dbName, options?.extraSourceFiles);
+        const generated = await generateTsSchema(schema, provider, dbName, options?.extraSourceFiles);
         workDir = generated.workDir;
         _schema = generated.schema as Schema;
     } else {
@@ -110,21 +116,21 @@ export async function createTestClient<Schema extends SchemaDef>(
             stdio: 'inherit',
         });
     } else {
-        if (options?.provider === 'postgresql') {
-            invariant(options?.dbName, 'dbName is required');
+        if (provider === 'postgresql') {
+            invariant(dbName, 'dbName is required');
             const pgClient = new PGClient(TEST_PG_CONFIG);
             await pgClient.connect();
-            await pgClient.query(`DROP DATABASE IF EXISTS "${options!.dbName}"`);
-            await pgClient.query(`CREATE DATABASE "${options!.dbName}"`);
+            await pgClient.query(`DROP DATABASE IF EXISTS "${dbName}"`);
+            await pgClient.query(`CREATE DATABASE "${dbName}"`);
             await pgClient.end();
         }
     }
 
-    if (options?.provider === 'postgresql') {
+    if (provider === 'postgresql') {
         _options.dialectConfig = {
             pool: new Pool({
                 ...TEST_PG_CONFIG,
-                database: options!.dbName,
+                database: dbName,
             }),
         } as unknown as ClientOptions<Schema>['dialectConfig'];
     } else {

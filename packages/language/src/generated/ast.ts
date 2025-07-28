@@ -77,6 +77,7 @@ export type ZModelKeywordNames =
     | "true"
     | "type"
     | "view"
+    | "with"
     | "{"
     | "||"
     | "}";
@@ -133,7 +134,7 @@ export function isLiteralExpr(item: unknown): item is LiteralExpr {
     return reflection.isInstance(item, LiteralExpr);
 }
 
-export type MemberAccessTarget = DataModelField | TypeDefField;
+export type MemberAccessTarget = DataField;
 
 export const MemberAccessTarget = 'MemberAccessTarget';
 
@@ -141,7 +142,7 @@ export function isMemberAccessTarget(item: unknown): item is MemberAccessTarget 
     return reflection.isInstance(item, MemberAccessTarget);
 }
 
-export type ReferenceTarget = DataModelField | EnumField | FunctionParam | TypeDefField;
+export type ReferenceTarget = DataField | EnumField | FunctionParam;
 
 export const ReferenceTarget = 'ReferenceTarget';
 
@@ -167,14 +168,6 @@ export const TypeDeclaration = 'TypeDeclaration';
 
 export function isTypeDeclaration(item: unknown): item is TypeDeclaration {
     return reflection.isInstance(item, TypeDeclaration);
-}
-
-export type TypeDefFieldTypes = Enum | TypeDef;
-
-export const TypeDefFieldTypes = 'TypeDefFieldTypes';
-
-export function isTypeDefFieldTypes(item: unknown): item is TypeDefFieldTypes {
-    return reflection.isInstance(item, TypeDefFieldTypes);
 }
 
 export interface Argument extends langium.AstNode {
@@ -217,7 +210,7 @@ export function isAttribute(item: unknown): item is Attribute {
 }
 
 export interface AttributeArg extends langium.AstNode {
-    readonly $container: DataModelAttribute | DataModelFieldAttribute | InternalAttribute;
+    readonly $container: DataFieldAttribute | DataModelAttribute | InternalAttribute;
     readonly $type: 'AttributeArg';
     name?: RegularID;
     value: Expression;
@@ -337,16 +330,60 @@ export function isConfigInvocationExpr(item: unknown): item is ConfigInvocationE
     return reflection.isInstance(item, ConfigInvocationExpr);
 }
 
+export interface DataField extends langium.AstNode {
+    readonly $container: DataModel | TypeDef;
+    readonly $type: 'DataField';
+    attributes: Array<DataFieldAttribute>;
+    comments: Array<string>;
+    name: RegularIDWithTypeNames;
+    type: DataFieldType;
+}
+
+export const DataField = 'DataField';
+
+export function isDataField(item: unknown): item is DataField {
+    return reflection.isInstance(item, DataField);
+}
+
+export interface DataFieldAttribute extends langium.AstNode {
+    readonly $container: DataField | EnumField;
+    readonly $type: 'DataFieldAttribute';
+    args: Array<AttributeArg>;
+    decl: langium.Reference<Attribute>;
+}
+
+export const DataFieldAttribute = 'DataFieldAttribute';
+
+export function isDataFieldAttribute(item: unknown): item is DataFieldAttribute {
+    return reflection.isInstance(item, DataFieldAttribute);
+}
+
+export interface DataFieldType extends langium.AstNode {
+    readonly $container: DataField;
+    readonly $type: 'DataFieldType';
+    array: boolean;
+    optional: boolean;
+    reference?: langium.Reference<TypeDeclaration>;
+    type?: BuiltinType;
+    unsupported?: UnsupportedFieldType;
+}
+
+export const DataFieldType = 'DataFieldType';
+
+export function isDataFieldType(item: unknown): item is DataFieldType {
+    return reflection.isInstance(item, DataFieldType);
+}
+
 export interface DataModel extends langium.AstNode {
     readonly $container: Model;
     readonly $type: 'DataModel';
     attributes: Array<DataModelAttribute>;
+    baseModel?: langium.Reference<DataModel>;
     comments: Array<string>;
-    fields: Array<DataModelField>;
-    isAbstract: boolean;
+    fields: Array<DataField>;
     isView: boolean;
+    mixins: Array<langium.Reference<TypeDef>>;
     name: RegularID;
-    superTypes: Array<langium.Reference<DataModel>>;
 }
 
 export const DataModel = 'DataModel';
@@ -366,50 +403,6 @@ export const DataModelAttribute = 'DataModelAttribute';
 
 export function isDataModelAttribute(item: unknown): item is DataModelAttribute {
     return reflection.isInstance(item, DataModelAttribute);
-}
-
-export interface DataModelField extends langium.AstNode {
-    readonly $container: DataModel;
-    readonly $type: 'DataModelField';
-    attributes: Array<DataModelFieldAttribute>;
-    comments: Array<string>;
-    name: RegularIDWithTypeNames;
-    type: DataModelFieldType;
-}
-
-export const DataModelField = 'DataModelField';
-
-export function isDataModelField(item: unknown): item is DataModelField {
-    return reflection.isInstance(item, DataModelField);
-}
-
-export interface DataModelFieldAttribute extends langium.AstNode {
-    readonly $container: DataModelField | EnumField | TypeDefField;
-    readonly $type: 'DataModelFieldAttribute';
-    args: Array<AttributeArg>;
-    decl: langium.Reference<Attribute>;
-}
-
-export const DataModelFieldAttribute = 'DataModelFieldAttribute';
-
-export function isDataModelFieldAttribute(item: unknown): item is DataModelFieldAttribute {
-    return reflection.isInstance(item, DataModelFieldAttribute);
-}
-
-export interface DataModelFieldType extends langium.AstNode {
-    readonly $container: DataModelField;
-    readonly $type: 'DataModelFieldType';
-    array: boolean;
-    optional: boolean;
-    reference?: langium.Reference<TypeDeclaration>;
-    type?: BuiltinType;
-    unsupported?: UnsupportedFieldType;
-}
-
-export const DataModelFieldType = 'DataModelFieldType';
-
-export function isDataModelFieldType(item: unknown): item is DataModelFieldType {
-    return reflection.isInstance(item, DataModelFieldType);
 }
 
 export interface DataSource extends langium.AstNode {
@@ -443,7 +436,7 @@ export function isEnum(item: unknown): item is Enum {
 export interface EnumField extends langium.AstNode {
     readonly $container: Enum;
     readonly $type: 'EnumField';
-    attributes: Array<DataModelFieldAttribute>;
+    attributes: Array<DataFieldAttribute>;
     comments: Array<string>;
     name: RegularIDWithTypeNames;
 }
@@ -734,7 +727,8 @@ export interface TypeDef extends langium.AstNode {
     readonly $type: 'TypeDef';
     attributes: Array<DataModelAttribute>;
     comments: Array<string>;
-    fields: Array<TypeDefField>;
+    fields: Array<DataField>;
+    mixins: Array<langium.Reference<TypeDef>>;
     name: RegularID;
 }
 
@@ -742,36 +736,6 @@ export const TypeDef = 'TypeDef';
 
 export function isTypeDef(item: unknown): item is TypeDef {
     return reflection.isInstance(item, TypeDef);
-}
-
-export interface TypeDefField extends langium.AstNode {
-    readonly $container: TypeDef;
-    readonly $type: 'TypeDefField';
-    attributes: Array<DataModelFieldAttribute>;
-    comments: Array<string>;
-    name: RegularIDWithTypeNames;
-    type: TypeDefFieldType;
-}
-
-export const TypeDefField = 'TypeDefField';
-
-export function isTypeDefField(item: unknown): item is TypeDefField {
-    return reflection.isInstance(item, TypeDefField);
-}
-
-export interface TypeDefFieldType extends langium.AstNode {
-    readonly $container: TypeDefField;
-    readonly $type: 'TypeDefFieldType';
-    array: boolean;
-    optional: boolean;
-    reference?: langium.Reference<TypeDefFieldTypes>;
-    type?: BuiltinType;
-}
-
-export const TypeDefFieldType = 'TypeDefFieldType';
-
-export function isTypeDefFieldType(item: unknown): item is TypeDefFieldType {
-    return reflection.isInstance(item, TypeDefFieldType);
 }
 
 export interface UnaryExpr extends langium.AstNode {
@@ -788,7 +752,7 @@ export function isUnaryExpr(item: unknown): item is UnaryExpr {
 }
 
 export interface UnsupportedFieldType extends langium.AstNode {
-    readonly $container: DataModelFieldType;
+    readonly $container: DataFieldType;
     readonly $type: 'UnsupportedFieldType';
     value: LiteralExpr;
 }
@@ -814,11 +778,11 @@ export type ZModelAstType = {
     ConfigField: ConfigField
     ConfigInvocationArg: ConfigInvocationArg
     ConfigInvocationExpr: ConfigInvocationExpr
+    DataField: DataField
+    DataFieldAttribute: DataFieldAttribute
+    DataFieldType: DataFieldType
     DataModel: DataModel
     DataModelAttribute: DataModelAttribute
-    DataModelField: DataModelField
-    DataModelFieldAttribute: DataModelFieldAttribute
-    DataModelFieldType: DataModelFieldType
     DataSource: DataSource
     Enum: Enum
     EnumField: EnumField
@@ -849,9 +813,6 @@ export type ZModelAstType = {
     ThisExpr: ThisExpr
     TypeDeclaration: TypeDeclaration
     TypeDef: TypeDef
-    TypeDefField: TypeDefField
-    TypeDefFieldType: TypeDefFieldType
-    TypeDefFieldTypes: TypeDefFieldTypes
     UnaryExpr: UnaryExpr
     UnsupportedFieldType: UnsupportedFieldType
 }
@@ -859,7 +820,7 @@ export type ZModelAstType = {
 export class ZModelAstReflection extends langium.AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return [AbstractDeclaration, Argument, ArrayExpr, Attribute, AttributeArg, AttributeParam, AttributeParamType, BinaryExpr, BooleanLiteral, ConfigArrayExpr, ConfigExpr, ConfigField, ConfigInvocationArg, ConfigInvocationExpr, DataModel, DataModelAttribute, DataModelField, DataModelFieldAttribute, DataModelFieldType, DataSource, Enum, EnumField, Expression, FieldInitializer, FunctionDecl, FunctionParam, FunctionParamType, GeneratorDecl, InternalAttribute, InvocationExpr, LiteralExpr, MemberAccessExpr, MemberAccessTarget, Model, ModelImport, NullExpr, NumberLiteral, ObjectExpr, Plugin, PluginField, Procedure, ProcedureParam, ReferenceArg, ReferenceExpr, ReferenceTarget, StringLiteral, ThisExpr, TypeDeclaration, TypeDef, TypeDefField, TypeDefFieldType, TypeDefFieldTypes, UnaryExpr, UnsupportedFieldType];
+        return [AbstractDeclaration, Argument, ArrayExpr, Attribute, AttributeArg, AttributeParam, AttributeParamType, BinaryExpr, BooleanLiteral, ConfigArrayExpr, ConfigExpr, ConfigField, ConfigInvocationArg, ConfigInvocationExpr, DataField, DataFieldAttribute, DataFieldType, DataModel, DataModelAttribute, DataSource, Enum, EnumField, Expression, FieldInitializer, FunctionDecl, FunctionParam, FunctionParamType, GeneratorDecl, InternalAttribute, InvocationExpr, LiteralExpr, MemberAccessExpr, MemberAccessTarget, Model, ModelImport, NullExpr, NumberLiteral, ObjectExpr, Plugin, PluginField, Procedure, ProcedureParam, ReferenceArg, ReferenceExpr, ReferenceTarget, StringLiteral, ThisExpr, TypeDeclaration, TypeDef, UnaryExpr, UnsupportedFieldType];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -890,16 +851,13 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
             case ConfigArrayExpr: {
                 return this.isSubtype(ConfigExpr, supertype);
             }
-            case DataModel: {
-                return this.isSubtype(AbstractDeclaration, supertype) || this.isSubtype(TypeDeclaration, supertype);
-            }
-            case DataModelField:
-            case TypeDefField: {
+            case DataField: {
                 return this.isSubtype(MemberAccessTarget, supertype) || this.isSubtype(ReferenceTarget, supertype);
             }
+            case DataModel:
             case Enum:
             case TypeDef: {
-                return this.isSubtype(AbstractDeclaration, supertype) || this.isSubtype(TypeDeclaration, supertype) || this.isSubtype(TypeDefFieldTypes, supertype);
+                return this.isSubtype(AbstractDeclaration, supertype) || this.isSubtype(TypeDeclaration, supertype);
             }
             case EnumField:
             case FunctionParam: {
@@ -919,17 +877,21 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
         const referenceId = `${refInfo.container.$type}:${refInfo.property}`;
         switch (referenceId) {
             case 'AttributeParamType:reference':
-            case 'DataModelFieldType:reference':
+            case 'DataFieldType:reference':
             case 'FunctionParamType:reference': {
                 return TypeDeclaration;
             }
-            case 'DataModel:superTypes': {
-                return DataModel;
-            }
+            case 'DataFieldAttribute:decl':
             case 'DataModelAttribute:decl':
-            case 'DataModelFieldAttribute:decl':
             case 'InternalAttribute:decl': {
                 return Attribute;
+            }
+            case 'DataModel:baseModel': {
+                return DataModel;
+            }
+            case 'DataModel:mixins':
+            case 'TypeDef:mixins': {
+                return TypeDef;
             }
             case 'InvocationExpr:function': {
                 return FunctionDecl;
@@ -939,9 +901,6 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
             }
             case 'ReferenceExpr:target': {
                 return ReferenceTarget;
-            }
-            case 'TypeDefFieldType:reference': {
-                return TypeDefFieldTypes;
             }
             default: {
                 throw new Error(`${referenceId} is not a valid reference id.`);
@@ -1063,17 +1022,49 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
                     ]
                 };
             }
+            case DataField: {
+                return {
+                    name: DataField,
+                    properties: [
+                        { name: 'attributes', defaultValue: [] },
+                        { name: 'comments', defaultValue: [] },
+                        { name: 'name' },
+                        { name: 'type' }
+                    ]
+                };
+            }
+            case DataFieldAttribute: {
+                return {
+                    name: DataFieldAttribute,
+                    properties: [
+                        { name: 'args', defaultValue: [] },
+                        { name: 'decl' }
+                    ]
+                };
+            }
+            case DataFieldType: {
+                return {
+                    name: DataFieldType,
+                    properties: [
+                        { name: 'array', defaultValue: false },
+                        { name: 'optional', defaultValue: false },
+                        { name: 'reference' },
+                        { name: 'type' },
+                        { name: 'unsupported' }
+                    ]
+                };
+            }
             case DataModel: {
                 return {
                     name: DataModel,
                     properties: [
                         { name: 'attributes', defaultValue: [] },
+                        { name: 'baseModel' },
                         { name: 'comments', defaultValue: [] },
                         { name: 'fields', defaultValue: [] },
-                        { name: 'isAbstract', defaultValue: false },
                         { name: 'isView', defaultValue: false },
-                        { name: 'name' },
-                        { name: 'superTypes', defaultValue: [] }
+                        { name: 'mixins', defaultValue: [] },
+                        { name: 'name' }
                     ]
                 };
             }
@@ -1083,38 +1074,6 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
                     properties: [
                         { name: 'args', defaultValue: [] },
                         { name: 'decl' }
-                    ]
-                };
-            }
-            case DataModelField: {
-                return {
-                    name: DataModelField,
-                    properties: [
-                        { name: 'attributes', defaultValue: [] },
-                        { name: 'comments', defaultValue: [] },
-                        { name: 'name' },
-                        { name: 'type' }
-                    ]
-                };
-            }
-            case DataModelFieldAttribute: {
-                return {
-                    name: DataModelFieldAttribute,
-                    properties: [
-                        { name: 'args', defaultValue: [] },
-                        { name: 'decl' }
-                    ]
-                };
-            }
-            case DataModelFieldType: {
-                return {
-                    name: DataModelFieldType,
-                    properties: [
-                        { name: 'array', defaultValue: false },
-                        { name: 'optional', defaultValue: false },
-                        { name: 'reference' },
-                        { name: 'type' },
-                        { name: 'unsupported' }
                     ]
                 };
             }
@@ -1347,29 +1306,8 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
                         { name: 'attributes', defaultValue: [] },
                         { name: 'comments', defaultValue: [] },
                         { name: 'fields', defaultValue: [] },
+                        { name: 'mixins', defaultValue: [] },
                         { name: 'name' }
-                    ]
-                };
-            }
-            case TypeDefField: {
-                return {
-                    name: TypeDefField,
-                    properties: [
-                        { name: 'attributes', defaultValue: [] },
-                        { name: 'comments', defaultValue: [] },
-                        { name: 'name' },
-                        { name: 'type' }
-                    ]
-                };
-            }
-            case TypeDefFieldType: {
-                return {
-                    name: TypeDefFieldType,
-                    properties: [
-                        { name: 'array', defaultValue: false },
-                        { name: 'optional', defaultValue: false },
-                        { name: 'reference' },
-                        { name: 'type' }
                     ]
                 };
             }

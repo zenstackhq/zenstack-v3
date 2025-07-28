@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type ClientContract } from '../../src/client';
 import { PolicyPlugin } from '../../src/plugins/policy/plugin';
 import { createClientSpecs } from '../client-api/client-specs';
-import { schema } from '../test-schema';
+import { schema } from '../schemas/basic';
 
 const PG_DB_NAME = 'policy-read-tests';
 

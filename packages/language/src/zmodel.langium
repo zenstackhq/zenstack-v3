@@ -66,7 +66,8 @@ ConfigArrayExpr:
 ConfigExpr:
     LiteralExpr | InvocationExpr | ConfigArrayExpr;
 
-type ReferenceTarget = FunctionParam | DataModelField | TypeDefField | EnumField;
+type ReferenceTarget = FunctionParam | DataField | EnumField;
+
 ThisExpr:
     value='this';
 
@@ -94,7 +95,7 @@ FieldInitializer:
 InvocationExpr:
     function=[FunctionDecl] '(' ArgumentList? ')';
 
-type MemberAccessTarget = DataModelField | TypeDefField;
+type MemberAccessTarget = DataField;
 
 MemberAccessExpr infers Expression:
     PrimaryExpr (
@@ -164,40 +165,36 @@ Argument:
 DataModel:
     (comments+=TRIPLE_SLASH_COMMENT)*
     (
-        ((isAbstract?='abstract')? 'model' name=RegularID
-            ('extends' superTypes+=[DataModel] (',' superTypes+=[DataModel])*)?) |
+        ('model' name=RegularID (WithClause | ExtendsClause | (ExtendsClause WithClause) | (WithClause ExtendsClause))?) |
         ((isView?='view') name=RegularID)
     )
     '{' (
-        fields+=DataModelField
+        fields+=DataField
             | attributes+=DataModelAttribute
         )*
     '}';
 
-DataModelField:
-    (comments+=TRIPLE_SLASH_COMMENT)*
-    name=RegularIDWithTypeNames type=DataModelFieldType (attributes+=DataModelFieldAttribute)*;
+fragment WithClause:
+    'with' mixins+=[TypeDef] (','? mixins+=[TypeDef])*;
 
-DataModelFieldType:
+fragment ExtendsClause:
+    'extends' baseModel=[DataModel];
+
+DataField:
+    (comments+=TRIPLE_SLASH_COMMENT)*
+    name=RegularIDWithTypeNames type=DataFieldType (attributes+=DataFieldAttribute)*;
+
+DataFieldType:
     (type=BuiltinType | unsupported=UnsupportedFieldType | reference=[TypeDeclaration:RegularID]) (array?='[' ']')? (optional?='?')?;
 
-// TODO: unify TypeDef and abstract DataModel
 TypeDef:
     (comments+=TRIPLE_SLASH_COMMENT)*
-    'type' name=RegularID '{' (
-           fields+=TypeDefField |
+    'type' name=RegularID WithClause?
+    '{' (
+           fields+=DataField |
            attributes+=DataModelAttribute
         )*
     '}';
-
-type TypeDefFieldTypes = TypeDef | Enum;
-
-TypeDefField:
-    (comments+=TRIPLE_SLASH_COMMENT)*
-    name=RegularIDWithTypeNames type=TypeDefFieldType (attributes+=DataModelFieldAttribute)*;
-
-TypeDefFieldType:
-    (type=BuiltinType | reference=[TypeDefFieldTypes:RegularID]) (array?='[' ']')? (optional?='?')?;
 
 UnsupportedFieldType:
     'Unsupported' '(' (value=LiteralExpr) ')';
@@ -213,7 +210,7 @@ Enum:
 
 EnumField:
     (comments+=TRIPLE_SLASH_COMMENT)*
-    name=RegularIDWithTypeNames (attributes+=DataModelFieldAttribute)*;
+    name=RegularIDWithTypeNames (attributes+=DataFieldAttribute)*;
 
 // function
 FunctionDecl:
@@ -252,7 +249,7 @@ AttributeParamType:
     (type=(ExpressionType | 'FieldReference' | 'TransitiveFieldReference' | 'ContextType') | reference=[TypeDeclaration:RegularID]) (array?='[' ']')? (optional?='?')?;
 
 type TypeDeclaration = DataModel | TypeDef | Enum;
-DataModelFieldAttribute:
+DataFieldAttribute:
     decl=[Attribute:FIELD_ATTRIBUTE_NAME] ('(' AttributeArgList? ')')?;
 
 // TODO: need rename since it's for both DataModel and TypeDef

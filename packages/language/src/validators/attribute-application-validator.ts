@@ -6,23 +6,23 @@ import {
     AttributeArg,
     AttributeParam,
     DataModelAttribute,
-    DataModelField,
-    DataModelFieldAttribute,
+    DataField,
+    DataFieldAttribute,
     InternalAttribute,
     ReferenceExpr,
     isArrayExpr,
     isAttribute,
     isDataModel,
-    isDataModelField,
+    isDataField,
     isEnum,
     isReferenceExpr,
     isTypeDef,
-    isTypeDefField,
 } from '../generated/ast';
 import {
+    getAllAttributes,
     getStringLiteral,
     hasAttribute,
-    isDataModelFieldReference,
+    isDataFieldReference,
     isDelegateModel,
     isFutureExpr,
     isRelationshipField,
@@ -31,6 +31,7 @@ import {
     typeAssignable,
 } from '../utils';
 import type { AstValidator } from './common';
+import type { DataModel } from '../ast';
 
 // a registry of function handlers marked with @check
 const attributeCheckers = new Map<string, PropertyDescriptor>();
@@ -45,13 +46,13 @@ function check(name: string) {
     };
 }
 
-type AttributeApplication = DataModelAttribute | DataModelFieldAttribute | InternalAttribute;
+type AttributeApplication = DataModelAttribute | DataFieldAttribute | InternalAttribute;
 
 /**
  * Validates function declarations.
  */
 export default class AttributeApplicationValidator implements AstValidator<AttributeApplication> {
-    validate(attr: AttributeApplication, accept: ValidationAcceptor) {
+    validate(attr: AttributeApplication, accept: ValidationAcceptor, contextDataModel?: DataModel) {
         const decl = attr.decl.ref;
         if (!decl) {
             return;
@@ -63,17 +64,12 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
             return;
         }
 
-        if (isDataModelField(targetDecl) && !isValidAttributeTarget(decl, targetDecl)) {
+        if (isDataField(targetDecl) && !isValidAttributeTarget(decl, targetDecl)) {
             accept('error', `attribute "${decl.name}" cannot be used on this type of field`, { node: attr });
         }
 
-        if (isTypeDefField(targetDecl) && !hasAttribute(decl, '@@@supportTypeDef')) {
-            accept('error', `attribute "${decl.name}" cannot be used on type declaration fields`, { node: attr });
-        }
-
-        if (isTypeDef(targetDecl) && !hasAttribute(decl, '@@@supportTypeDef')) {
-            accept('error', `attribute "${decl.name}" cannot be used on type declarations`, { node: attr });
-        }
+        this.checkDeprecation(attr, accept);
+        this.checkDuplicatedAttributes(attr, accept, contextDataModel);
 
         const filledParams = new Set<AttributeParam>();
 
@@ -131,6 +127,32 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         }
     }
 
+    private checkDeprecation(attr: AttributeApplication, accept: ValidationAcceptor) {
+        const deprecateAttr = attr.decl.ref?.attributes.find((a) => a.decl.ref?.name === '@@@deprecated');
+        if (deprecateAttr) {
+            const message =
+                getStringLiteral(deprecateAttr.args[0]?.value) ?? `Attribute "${attr.decl.ref?.name}" is deprecated`;
+            accept('warning', message, { node: attr });
+        }
+    }
+
+    private checkDuplicatedAttributes(
+        attr: AttributeApplication,
+        accept: ValidationAcceptor,
+        contextDataModel?: DataModel,
+    ) {
+        const attrDecl = attr.decl.ref;
+        if (!attrDecl?.attributes.some((a) => a.decl.ref?.name === '@@@once')) {
+            return;
+        }
+
+        const allAttributes = contextDataModel ? getAllAttributes(contextDataModel) : attr.$container.attributes;
+        const duplicates = allAttributes.filter((a) => a.decl.ref === attrDecl && a !== attr);
+        if (duplicates.length > 0) {
+            accept('error', `Attribute "${attrDecl.name}" can only be applied once`, { node: attr });
+        }
+    }
+
     @check('@@allow')
     @check('@@deny')
     // @ts-expect-error
@@ -168,7 +190,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
 
         // 'update' rules are not allowed for relation fields
         if (kindItems.includes('update') || kindItems.includes('all')) {
-            const field = attr.$container as DataModelField;
+            const field = attr.$container as DataField;
             if (isRelationshipField(field)) {
                 accept(
                     'error',
@@ -189,7 +211,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         if (
             condition &&
             AstUtils.streamAst(condition).some(
-                (node) => isDataModelFieldReference(node) && isDataModel(node.$resolvedType?.decl),
+                (node) => isDataFieldReference(node) && isDataModel(node.$resolvedType?.decl),
             )
         ) {
             accept('error', `\`@@validate\` condition cannot use relation fields`, { node: condition });
@@ -197,13 +219,21 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     }
 
     @check('@@unique')
+    @check('@@id')
     // @ts-expect-error
     private _checkUnique(attr: AttributeApplication, accept: ValidationAcceptor) {
         const fields = attr.args[0]?.value;
         if (!fields) {
+            accept('error', `expects an array of field references`, {
+                node: attr.args[0]!,
+            });
             return;
         }
         if (isArrayExpr(fields)) {
+            if (fields.items.length === 0) {
+                accept('error', `\`@@unique\` expects at least one field reference`, { node: fields });
+                return;
+            }
             fields.items.forEach((item) => {
                 if (!isReferenceExpr(item)) {
                     accept('error', `Expecting a field reference`, {
@@ -211,7 +241,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
                     });
                     return;
                 }
-                if (!isDataModelField(item.target.ref)) {
+                if (!isDataField(item.target.ref)) {
                     accept('error', `Expecting a field reference`, {
                         node: item,
                     });
@@ -233,7 +263,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
 
     private rejectEncryptedFields(attr: AttributeApplication, accept: ValidationAcceptor) {
         AstUtils.streamAllContents(attr).forEach((node) => {
-            if (isDataModelFieldReference(node) && hasAttribute(node.target.ref as DataModelField, '@encrypted')) {
+            if (isDataFieldReference(node) && hasAttribute(node.target.ref as DataField, '@encrypted')) {
                 accept('error', `Encrypted fields cannot be used in policy rules`, { node });
             }
         });
@@ -270,7 +300,7 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
 
     if (dstType === 'ContextType') {
         // ContextType is inferred from the attribute's container's type
-        if (isDataModelField(attr.$container)) {
+        if (isDataField(attr.$container)) {
             dstIsArray = attr.$container.type.array;
         }
     }
@@ -298,10 +328,10 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
         if (dstIsArray) {
             return (
                 isArrayExpr(arg.value) &&
-                !arg.value.items.find((item) => !isReferenceExpr(item) || !isDataModelField(item.target.ref))
+                !arg.value.items.find((item) => !isReferenceExpr(item) || !isDataField(item.target.ref))
             );
         } else {
-            return isReferenceExpr(arg.value) && isDataModelField(arg.value.target.ref);
+            return isReferenceExpr(arg.value) && isDataField(arg.value.target.ref);
         }
     }
 
@@ -309,7 +339,7 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
         // enum type
 
         let attrArgDeclType = dstRef?.ref;
-        if (dstType === 'ContextType' && isDataModelField(attr.$container) && attr.$container?.type?.reference) {
+        if (dstType === 'ContextType' && isDataField(attr.$container) && attr.$container?.type?.reference) {
             // attribute parameter type is ContextType, need to infer type from
             // the attribute's container
             attrArgDeclType = resolved(attr.$container.type.reference);
@@ -327,7 +357,7 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
         if (dstType === 'ContextType') {
             // attribute parameter type is ContextType, need to infer type from
             // the attribute's container
-            if (isDataModelField(attr.$container)) {
+            if (isDataField(attr.$container)) {
                 if (!attr.$container?.type?.type) {
                     return false;
                 }
@@ -345,7 +375,7 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
     }
 }
 
-function isValidAttributeTarget(attrDecl: Attribute, targetDecl: DataModelField) {
+function isValidAttributeTarget(attrDecl: Attribute, targetDecl: DataField) {
     const targetField = attrDecl.attributes.find((attr) => attr.decl.ref?.name === '@@@targetField');
     if (!targetField?.args[0]) {
         // no field type constraint
@@ -403,6 +433,10 @@ function isValidAttributeTarget(attrDecl: Attribute, targetDecl: DataModelField)
     return allowed;
 }
 
-export function validateAttributeApplication(attr: AttributeApplication, accept: ValidationAcceptor) {
-    new AttributeApplicationValidator().validate(attr, accept);
+export function validateAttributeApplication(
+    attr: AttributeApplication,
+    accept: ValidationAcceptor,
+    contextDataModel?: DataModel,
+) {
+    new AttributeApplicationValidator().validate(attr, accept, contextDataModel);
 }

@@ -2,7 +2,8 @@ import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../schema';
-import { ensureArray, getField } from './query-utils';
+import { DELEGATE_JOINED_FIELD_PREFIX } from './constants';
+import { ensureArray, getField, getIdValues } from './query-utils';
 
 export class ResultProcessor<Schema extends SchemaDef> {
     constructor(private readonly schema: Schema) {}
@@ -35,6 +36,29 @@ export class ResultProcessor<Schema extends SchemaDef> {
             if (key === '_count') {
                 // underlying database provider may return string for count
                 data[key] = typeof value === 'string' ? JSON.parse(value) : value;
+                continue;
+            }
+
+            if (key.startsWith(DELEGATE_JOINED_FIELD_PREFIX)) {
+                // merge delegate descendant fields
+                if (value) {
+                    // descendant fields are packed as JSON
+                    const subRow = this.transformJson(value);
+
+                    // process the sub-row
+                    const subModel = key.slice(DELEGATE_JOINED_FIELD_PREFIX.length) as GetModels<Schema>;
+                    const idValues = getIdValues(this.schema, subModel, subRow);
+                    if (Object.values(idValues).some((v) => v === null || v === undefined)) {
+                        // if the row doesn't have a valid id, the joined row doesn't exist
+                        delete data[key];
+                        continue;
+                    }
+                    const processedSubRow = this.processRow(subRow, subModel);
+
+                    // merge the sub-row into the main row
+                    Object.assign(data, processedSubRow);
+                }
+                delete data[key];
                 continue;
             }
 
@@ -84,14 +108,19 @@ export class ResultProcessor<Schema extends SchemaDef> {
     }
 
     private transformScalar(value: unknown, type: BuiltinType) {
-        return match(type)
-            .with('Boolean', () => this.transformBoolean(value))
-            .with('DateTime', () => this.transformDate(value))
-            .with('Bytes', () => this.transformBytes(value))
-            .with('Decimal', () => this.transformDecimal(value))
-            .with('BigInt', () => this.transformBigInt(value))
-            .with('Json', () => this.transformJson(value))
-            .otherwise(() => value);
+        if (this.schema.typeDefs && type in this.schema.typeDefs) {
+            // typed JSON field
+            return this.transformJson(value);
+        } else {
+            return match(type)
+                .with('Boolean', () => this.transformBoolean(value))
+                .with('DateTime', () => this.transformDate(value))
+                .with('Bytes', () => this.transformBytes(value))
+                .with('Decimal', () => this.transformDecimal(value))
+                .with('BigInt', () => this.transformBigInt(value))
+                .with('Json', () => this.transformJson(value))
+                .otherwise(() => value);
+        }
     }
 
     private transformDecimal(value: unknown) {

@@ -181,4 +181,148 @@ model Post {
             },
         });
     });
+
+    it('merges fields and attributes from mixins', async () => {
+        const { schema } = await generateTsSchema(`
+type Timestamped {
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+type Named {
+    name String
+    @@unique([name])
+}
+    
+model User with Timestamped Named {
+    id String @id @default(uuid())
+    email String @unique
+}
+        `);
+        expect(schema).toMatchObject({
+            models: {
+                User: {
+                    fields: {
+                        id: { type: 'String' },
+                        email: { type: 'String' },
+                        createdAt: {
+                            type: 'DateTime',
+                            default: expect.objectContaining({ function: 'now', kind: 'call' }),
+                        },
+                        updatedAt: { type: 'DateTime', updatedAt: true },
+                        name: { type: 'String' },
+                    },
+                    uniqueFields: expect.objectContaining({
+                        name: { type: 'String' },
+                    }),
+                },
+            },
+        });
+    });
+
+    it('generates type definitions', async () => {
+        const { schema } = await generateTsSchema(`
+type Base {
+    name String
+    @@meta('foo', 'bar')
+}
+
+type Address with Base {
+    street String
+    city String
+}
+    `);
+        expect(schema).toMatchObject({
+            typeDefs: {
+                Base: {
+                    fields: {
+                        name: { type: 'String' },
+                    },
+                    attributes: [
+                        {
+                            name: '@@meta',
+                            args: [
+                                { name: 'name', value: { kind: 'literal', value: 'foo' } },
+                                { name: 'value', value: { kind: 'literal', value: 'bar' } },
+                            ],
+                        },
+                    ],
+                },
+                Address: {
+                    fields: {
+                        street: { type: 'String' },
+                        city: { type: 'String' },
+                    },
+                    attributes: [
+                        {
+                            name: '@@meta',
+                            args: [
+                                { name: 'name', value: { kind: 'literal', value: 'foo' } },
+                                { name: 'value', value: { kind: 'literal', value: 'bar' } },
+                            ],
+                        },
+                    ],
+                },
+            },
+        });
+    });
+
+    it('merges fields and attributes from base models', async () => {
+        const { schema } = await generateTsSchema(`
+model Base {
+    id String @id @default(uuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    type String
+    @@delegate(type)
+}
+
+model User extends Base {
+    email String @unique
+}
+        `);
+        expect(schema).toMatchObject({
+            models: {
+                Base: {
+                    fields: {
+                        id: {
+                            type: 'String',
+                            id: true,
+                            default: expect.objectContaining({ function: 'uuid', kind: 'call' }),
+                        },
+                        createdAt: {
+                            type: 'DateTime',
+                            default: expect.objectContaining({ function: 'now', kind: 'call' }),
+                        },
+                        updatedAt: { type: 'DateTime', updatedAt: true },
+                        type: { type: 'String' },
+                    },
+                    attributes: [
+                        {
+                            name: '@@delegate',
+                            args: [{ name: 'discriminator', value: { kind: 'field', field: 'type' } }],
+                        },
+                    ],
+                    isDelegate: true,
+                },
+                User: {
+                    baseModel: 'Base',
+                    fields: {
+                        id: { type: 'String' },
+                        createdAt: {
+                            type: 'DateTime',
+                            default: expect.objectContaining({ function: 'now', kind: 'call' }),
+                            originModel: 'Base',
+                        },
+                        updatedAt: { type: 'DateTime', updatedAt: true, originModel: 'Base' },
+                        type: { type: 'String', originModel: 'Base' },
+                        email: { type: 'String' },
+                    },
+                    uniqueFields: expect.objectContaining({
+                        email: { type: 'String' },
+                    }),
+                },
+            },
+        });
+    });
 });

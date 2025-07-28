@@ -1,5 +1,5 @@
 import type { AstNode } from 'langium';
-import { AbstractDeclaration, BinaryExpr, DataModel, type ExpressionType } from './generated/ast';
+import { AbstractDeclaration, BinaryExpr, DataField, DataModel, type ExpressionType } from './generated/ast';
 
 export type { AstNode, Reference } from 'langium';
 export * from './generated/ast';
@@ -46,24 +46,11 @@ declare module './ast' {
         $resolvedParam?: AttributeParam;
     }
 
-    interface DataModelField {
-        $inheritedFrom?: DataModel;
-    }
-
-    interface DataModelAttribute {
-        $inheritedFrom?: DataModel;
-    }
-
     export interface DataModel {
-        /**
-         * Indicates whether the model is already merged with the base types
-         */
-        $baseMerged?: boolean;
-
         /**
          * All fields including those marked with `@ignore`
          */
-        $allFields?: DataModelField[];
+        $allFields?: DataField[];
     }
 }
 

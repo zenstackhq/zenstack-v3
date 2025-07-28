@@ -1,6 +1,6 @@
 import SQLite from 'better-sqlite3';
-import { ZenStackClient } from '../../dist';
-import { Role } from './models';
+import { ZenStackClient } from '../../../dist';
+import { Role, type Identity, type IdentityProvider } from './models';
 import { schema } from './schema';
 
 const client = new ZenStackClient(schema, {
@@ -28,6 +28,7 @@ async function main() {
     await groupBy();
     await queryBuilder();
     enums();
+    typeDefs();
 }
 
 async function find() {
@@ -39,6 +40,7 @@ async function find() {
     });
     console.log(user1?.name);
     console.log(user1?.postCount);
+    console.log(user1?.identity?.providers[0]?.name);
 
     const users = await client.user.findMany({
         include: { posts: true },
@@ -204,6 +206,24 @@ async function create() {
                     // @ts-expect-error userId is not allowed
                     userId: 1,
                 },
+            },
+            identity: {
+                providers: [
+                    {
+                        id: '123',
+                        name: 'GitHub',
+                        // undeclared fields are allowed
+                        otherField: 123,
+                    },
+                    {
+                        id: '234',
+                        // name is optional
+                    },
+                    // @ts-expect-error id is required
+                    {
+                        name: 'Google',
+                    },
+                ],
             },
         },
     });
@@ -610,6 +630,20 @@ function enums() {
     let b = Role.ADMIN;
     b = a;
     console.log(b);
+}
+
+function typeDefs() {
+    const identityProvider: IdentityProvider = {
+        id: '123',
+        name: 'GitHub',
+    };
+    console.log(identityProvider.id);
+    console.log(identityProvider.name);
+
+    const identity: Identity = {
+        providers: [identityProvider],
+    };
+    console.log(identity.providers[0]?.name);
 }
 
 main();

@@ -7,6 +7,11 @@
     - [x] migrate
     - [x] info
     - [x] init
+    - [x] validate
+    - [ ] format
+    - [ ] db seed
+- [ ] ZModel
+    - [ ] View support
 - [ ] ORM
     - [x] Create
         - [x] Input validation
@@ -44,7 +49,7 @@
         - [x] Nested to-one
         - [x] Incremental update for numeric fields
         - [x] Array update
-        - [ ] Strict typing for checked/unchecked input
+        - [x] Strict typing for checked/unchecked input
     - [x] Upsert
         - [ ] Implement with "on conflict"
     - [x] Delete
@@ -53,13 +58,14 @@
         - [x] Aggregate
         - [x] Group by
     - [x] Raw queries
-    - [ ] Transactions
+    - [x] Transactions
         - [x] Interactive transaction
         - [x] Sequential transaction
     - [ ] Extensions
         - [x] Query builder API
         - [x] Computed fields
         - [x] Prisma client extension
+        - [ ] Custom procedures
     - [ ] Misc
         - [x] JSDoc for CRUD methods
         - [x] Cache validation schemas
@@ -67,8 +73,8 @@
         - [ ] Cross field comparison
         - [x] Many-to-many relation
         - [ ] Empty AND/OR/NOT behavior
-        - [?] Logging
-        - [ ] Error system
+        - [x] Logging
+        - [x] Error system
         - [x] Custom table name
         - [x] Custom field name
         - [ ] Strict undefined checks
@@ -76,7 +82,12 @@
     - [ ] Benchmark
 - [ ] Plugin
     - [ ] Post-mutation hooks should be called after transaction is committed
-- [ ] Polymorphism
+- [x] TypeDef and mixin
+- [ ] Strongly typed JSON
+- [x] Polymorphism
+    - [x] ZModel
+    - [x] Runtime
+    - [x] Typing
 - [ ] Validation
 - [ ] Access Policy
     - [ ] Short-circuit pre-create check for scalar-field only policies

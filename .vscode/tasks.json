@@ -18,7 +18,7 @@
         },
         {
             "label": "Build all - watch",
-            "command": "turbo watch build",
+            "command": "pnpm watch",
             "type": "shell",
             "group": {
                 "kind": "build"
@@ -50,6 +50,16 @@
                 "color": "terminal.ansiMagenta",
                 "id": "server-process"
             }
+        },
+        {
+            "label": "Submit PR",
+            "command": "pnpm pr",
+            "type": "shell",
+            "icon": {
+                "color": "terminal.ansiWhite",
+                "id": "server-process"
+            },
+            "problemMatcher": []
         }
     ]
 }

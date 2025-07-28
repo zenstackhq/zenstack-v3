@@ -397,7 +397,13 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                                         if (typeof opHooks === 'function') {
                                             const _proceed = proceed;
                                             proceed = () =>
-                                                opHooks({ client, model, operation, args, query: _proceed });
+                                                opHooks({
+                                                    client,
+                                                    model,
+                                                    operation,
+                                                    args,
+                                                    query: _proceed,
+                                                }) as Promise<unknown>;
                                         }
                                     }
                                 }

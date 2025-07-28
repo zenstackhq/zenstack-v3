@@ -19,8 +19,8 @@ import { match } from 'ts-pattern';
 import {
     BinaryExpr,
     MemberAccessExpr,
+    isDataField,
     isDataModel,
-    isDataModelField,
     isEnumField,
     isInvocationExpr,
     isMemberAccessExpr,
@@ -28,13 +28,13 @@ import {
     isReferenceExpr,
     isThisExpr,
     isTypeDef,
-    isTypeDefField,
 } from './ast';
 import { PLUGIN_MODULE_NAME, STD_LIB_MODULE_NAME } from './constants';
 import {
+    getAllFields,
     getAllLoadedAndReachableDataModelsAndTypeDefs,
     getAuthDecl,
-    getModelFieldsWithBases,
+    getRecursiveBases,
     isAuthInvocation,
     isCollectionPredicate,
     isFutureInvocation,
@@ -75,22 +75,15 @@ export class ZModelScopeComputation extends DefaultScopeComputation {
 
     override processNode(node: AstNode, document: LangiumDocument<AstNode>, scopes: PrecomputedScopes) {
         super.processNode(node, document, scopes);
-        // TODO: merge base
-        // if (isDataModel(node) && !node.$baseMerged) {
-        //     // add base fields to the scope recursively
-        //     const bases = getRecursiveBases(node);
-        //     for (const base of bases) {
-        //         for (const field of base.fields) {
-        //             scopes.add(
-        //                 node,
-        //                 this.descriptions.createDescription(
-        //                     field,
-        //                     this.nameProvider.getName(field)
-        //                 )
-        //             );
-        //         }
-        //     }
-        // }
+        if (isDataModel(node)) {
+            // add base fields to the scope recursively
+            const bases = getRecursiveBases(node);
+            for (const base of bases) {
+                for (const field of base.fields) {
+                    scopes.add(node, this.descriptions.createDescription(field, this.nameProvider.getName(field)));
+                }
+            }
+        }
     }
 }
 
@@ -152,7 +145,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             .when(isReferenceExpr, (operand) => {
                 // operand is a reference, it can only be a model/type-def field
                 const ref = operand.target.ref;
-                if (isDataModelField(ref) || isTypeDefField(ref)) {
+                if (isDataField(ref)) {
                     return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
                 return EMPTY_SCOPE;
@@ -160,10 +153,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             .when(isMemberAccessExpr, (operand) => {
                 // operand is a member access, it must be resolved to a non-array model/typedef type
                 const ref = operand.member.ref;
-                if (isDataModelField(ref) && !ref.type.array) {
-                    return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
-                }
-                if (isTypeDefField(ref) && !ref.type.array) {
+                if (isDataField(ref) && !ref.type.array) {
                     return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
                 return EMPTY_SCOPE;
@@ -203,7 +193,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             .when(isReferenceExpr, (expr) => {
                 // collection is a reference - model or typedef field
                 const ref = expr.target.ref;
-                if (isDataModelField(ref) || isTypeDefField(ref)) {
+                if (isDataField(ref)) {
                     return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
                 return EMPTY_SCOPE;
@@ -211,7 +201,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             .when(isMemberAccessExpr, (expr) => {
                 // collection is a member access, it can only be resolved to a model or typedef field
                 const ref = expr.member.ref;
-                if (isDataModelField(ref) || isTypeDefField(ref)) {
+                if (isDataField(ref)) {
                     return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
                 return EMPTY_SCOPE;
@@ -241,7 +231,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
 
     private createScopeForContainer(node: AstNode | undefined, globalScope: Scope, includeTypeDefScope = false) {
         if (isDataModel(node)) {
-            return this.createScopeForNodes(getModelFieldsWithBases(node), globalScope);
+            return this.createScopeForNodes(getAllFields(node), globalScope);
         } else if (includeTypeDefScope && isTypeDef(node)) {
             return this.createScopeForNodes(node.fields, globalScope);
         } else {

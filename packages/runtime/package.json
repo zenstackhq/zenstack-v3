@@ -1,14 +1,14 @@
 {
     "name": "@zenstackhq/runtime",
-    "version": "3.0.0-alpha.12",
+    "version": "3.0.0-alpha.13",
     "description": "ZenStack Runtime",
     "type": "module",
     "scripts": {
-        "build": "tsup-node",
+        "build": "tsup-node && pnpm test:generate",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
-        "test": "vitest run && pnpm test:generate && pnpm test:typecheck",
-        "test:generate": "tsx test/typing/generate.ts",
+        "test": "vitest run && pnpm test:typecheck",
+        "test:generate": "tsx test/scripts/generate.ts",
         "test:typecheck": "tsc --project tsconfig.test.json",
         "pack": "pnpm pack"
     },
@@ -73,12 +73,12 @@
         "nanoid": "^5.0.9",
         "ts-pattern": "catalog:",
         "ulid": "^3.0.0",
-        "uuid": "^11.0.5",
-        "zod": "catalog:"
+        "uuid": "^11.0.5"
     },
     "peerDependencies": {
         "better-sqlite3": "^11.8.1",
-        "pg": "^8.13.1"
+        "pg": "^8.13.1",
+        "zod": "catalog:"
     },
     "peerDependenciesMeta": {
         "better-sqlite3": {

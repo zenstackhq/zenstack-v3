@@ -1,11 +1,14 @@
 {
     "name": "e2e",
-    "version": "3.0.0-alpha.12",
+    "version": "3.0.0-alpha.13",
     "private": true,
     "scripts": {
         "test": "vitest run"
     },
     "dependencies": {
         "@zenstackhq/testtools": "workspace:*"
+    },
+    "devDependencies": {
+        "@zenstackhq/cli": "workspace:*"
     }
 }

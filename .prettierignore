@@ -1,2 +1,7 @@
 packages/language/src/generated/**
-**/schema.ts
+**/test/**/schema.ts
+**/test/**/models.ts
+**/test/**/input.ts
+samples/**/schema.ts
+samples/**/models.ts
+samples/**/input.ts

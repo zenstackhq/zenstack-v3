@@ -1,4 +1,6 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { AstUtils, URI, type AstNode, type LangiumDocuments, type Reference } from 'langium';
+import fs from 'node:fs';
 import path from 'path';
 import { STD_LIB_MODULE_NAME, type ExpressionContext } from './constants';
 import {
@@ -7,8 +9,8 @@ import {
     isArrayExpr,
     isBinaryExpr,
     isConfigArrayExpr,
+    isDataField,
     isDataModel,
-    isDataModelField,
     isEnumField,
     isExpression,
     isInvocationExpr,
@@ -19,32 +21,28 @@ import {
     isReferenceExpr,
     isStringLiteral,
     isTypeDef,
-    isTypeDefField,
     Model,
     ModelImport,
     ReferenceExpr,
     type Attribute,
     type AttributeParam,
     type BuiltinType,
+    type DataField,
+    type DataFieldAttribute,
     type DataModel,
     type DataModelAttribute,
-    type DataModelField,
-    type DataModelFieldAttribute,
     type Enum,
     type EnumField,
     type Expression,
     type ExpressionType,
     type FunctionDecl,
     type TypeDef,
-    type TypeDefField,
 } from './generated/ast';
-import fs from 'node:fs';
 
 export type AttributeTarget =
     | DataModel
     | TypeDef
-    | DataModelField
-    | TypeDefField
+    | DataField
     | Enum
     | EnumField
     | FunctionDecl
@@ -56,9 +54,7 @@ export function hasAttribute(decl: AttributeTarget, name: string) {
 }
 
 export function getAttribute(decl: AttributeTarget, name: string) {
-    return (decl.attributes as (DataModelAttribute | DataModelFieldAttribute)[]).find(
-        (attr) => attr.decl.$refText === name,
-    );
+    return (decl.attributes as (DataModelAttribute | DataFieldAttribute)[]).find((attr) => attr.decl.$refText === name);
 }
 
 export function isFromStdlib(node: AstNode) {
@@ -139,14 +135,14 @@ export function isEnumFieldReference(node: AstNode): node is ReferenceExpr {
     return isReferenceExpr(node) && isEnumField(node.target.ref);
 }
 
-export function isDataModelFieldReference(node: AstNode): node is ReferenceExpr {
-    return isReferenceExpr(node) && isDataModelField(node.target.ref);
+export function isDataFieldReference(node: AstNode): node is ReferenceExpr {
+    return isReferenceExpr(node) && isDataField(node.target.ref);
 }
 
 /**
  * Returns if the given field is a relation field.
  */
-export function isRelationshipField(field: DataModelField) {
+export function isRelationshipField(field: DataField) {
     return isDataModel(field.type.reference?.ref);
 }
 
@@ -165,42 +161,18 @@ export function resolved<T extends AstNode>(ref: Reference<T>): T {
     return ref.ref;
 }
 
-/**
- * Walk up the inheritance chain to find the path from the start model to the target model
- */
-export function findUpInheritance(start: DataModel, target: DataModel): DataModel[] | undefined {
-    for (const base of start.superTypes) {
-        if (base.ref === target) {
-            return [base.ref];
-        }
-        const path = findUpInheritance(base.ref as DataModel, target);
-        if (path) {
-            return [base.ref as DataModel, ...path];
-        }
-    }
-    return undefined;
-}
-
-export function getModelFieldsWithBases(model: DataModel, includeDelegate = true) {
-    if (model.$baseMerged) {
-        return model.fields;
-    } else {
-        return [...model.fields, ...getRecursiveBases(model, includeDelegate).flatMap((base) => base.fields)];
-    }
-}
-
 export function getRecursiveBases(
-    dataModel: DataModel,
+    decl: DataModel | TypeDef,
     includeDelegate = true,
-    seen = new Set<DataModel>(),
-): DataModel[] {
-    const result: DataModel[] = [];
-    if (seen.has(dataModel)) {
+    seen = new Set<DataModel | TypeDef>(),
+): (TypeDef | DataModel)[] {
+    const result: (TypeDef | DataModel)[] = [];
+    if (seen.has(decl)) {
         return result;
     }
-    seen.add(dataModel);
-    dataModel.superTypes.forEach((superType) => {
-        const baseDecl = superType.ref;
+    seen.add(decl);
+    decl.mixins.forEach((mixin) => {
+        const baseDecl = mixin.ref;
         if (baseDecl) {
             if (!includeDelegate && isDelegateModel(baseDecl)) {
                 return;
@@ -216,10 +188,11 @@ export function getRecursiveBases(
  * Gets `@@id` fields declared at the data model level (including search in base models)
  */
 export function getModelIdFields(model: DataModel) {
-    const modelsToCheck = model.$baseMerged ? [model] : [model, ...getRecursiveBases(model)];
+    const modelsToCheck = [model, ...getRecursiveBases(model)];
 
     for (const modelToCheck of modelsToCheck) {
-        const idAttr = modelToCheck.attributes.find((attr) => attr.decl.$refText === '@@id');
+        const allAttributes = getAllAttributes(modelToCheck);
+        const idAttr = allAttributes.find((attr) => attr.decl.$refText === '@@id');
         if (!idAttr) {
             continue;
         }
@@ -230,7 +203,7 @@ export function getModelIdFields(model: DataModel) {
 
         return fieldsArg.value.items
             .filter((item): item is ReferenceExpr => isReferenceExpr(item))
-            .map((item) => resolved(item.target) as DataModelField);
+            .map((item) => resolved(item.target) as DataField);
     }
 
     return [];
@@ -240,10 +213,11 @@ export function getModelIdFields(model: DataModel) {
  * Gets `@@unique` fields declared at the data model level (including search in base models)
  */
 export function getModelUniqueFields(model: DataModel) {
-    const modelsToCheck = model.$baseMerged ? [model] : [model, ...getRecursiveBases(model)];
+    const modelsToCheck = [model, ...getRecursiveBases(model)];
 
     for (const modelToCheck of modelsToCheck) {
-        const uniqueAttr = modelToCheck.attributes.find((attr) => attr.decl.$refText === '@@unique');
+        const allAttributes = getAllAttributes(modelToCheck);
+        const uniqueAttr = allAttributes.find((attr) => attr.decl.$refText === '@@unique');
         if (!uniqueAttr) {
             continue;
         }
@@ -254,7 +228,7 @@ export function getModelUniqueFields(model: DataModel) {
 
         return fieldsArg.value.items
             .filter((item): item is ReferenceExpr => isReferenceExpr(item))
-            .map((item) => resolved(item.target) as DataModelField);
+            .map((item) => resolved(item.target) as DataField);
     }
 
     return [];
@@ -277,7 +251,7 @@ export function getUniqueFields(model: DataModel) {
 
         return fieldsArg.value.items
             .filter((item): item is ReferenceExpr => isReferenceExpr(item))
-            .map((item) => resolved(item.target) as DataModelField);
+            .map((item) => resolved(item.target) as DataField);
     });
 }
 
@@ -346,7 +320,7 @@ function getArray(expr: Expression | ConfigExpr | undefined) {
 }
 
 export function getAttributeArgLiteral<T extends string | number | boolean>(
-    attr: DataModelAttribute | DataModelFieldAttribute,
+    attr: DataModelAttribute | DataFieldAttribute,
     name: string,
 ): T | undefined {
     for (const arg of attr.args) {
@@ -373,10 +347,10 @@ export function getFunctionExpressionContext(funcDecl: FunctionDecl) {
     return funcAllowedContext;
 }
 
-export function getFieldReference(expr: Expression): DataModelField | TypeDefField | undefined {
-    if (isReferenceExpr(expr) && (isDataModelField(expr.target.ref) || isTypeDefField(expr.target.ref))) {
+export function getFieldReference(expr: Expression): DataField | undefined {
+    if (isReferenceExpr(expr) && isDataField(expr.target.ref)) {
         return expr.target.ref;
-    } else if (isMemberAccessExpr(expr) && (isDataModelField(expr.member.ref) || isTypeDefField(expr.member.ref))) {
+    } else if (isMemberAccessExpr(expr) && isDataField(expr.member.ref)) {
         return expr.member.ref;
     } else {
         return undefined;
@@ -553,4 +527,53 @@ export function getContainingDataModel(node: Expression): DataModel | undefined 
 
 export function isMemberContainer(node: unknown): node is DataModel | TypeDef {
     return isDataModel(node) || isTypeDef(node);
+}
+
+export function getAllFields(
+    decl: DataModel | TypeDef,
+    includeIgnored = false,
+    seen: Set<DataModel | TypeDef> = new Set(),
+): DataField[] {
+    if (seen.has(decl)) {
+        return [];
+    }
+    seen.add(decl);
+
+    const fields: DataField[] = [];
+    for (const mixin of decl.mixins) {
+        invariant(mixin.ref, `Mixin ${mixin.$refText} is not resolved`);
+        fields.push(...getAllFields(mixin.ref, includeIgnored, seen));
+    }
+
+    if (isDataModel(decl) && decl.baseModel) {
+        invariant(decl.baseModel.ref, `Base model ${decl.baseModel.$refText} is not resolved`);
+        fields.push(...getAllFields(decl.baseModel.ref, includeIgnored, seen));
+    }
+
+    fields.push(...decl.fields.filter((f) => includeIgnored || !hasAttribute(f, '@ignore')));
+    return fields;
+}
+
+export function getAllAttributes(
+    decl: DataModel | TypeDef,
+    seen: Set<DataModel | TypeDef> = new Set(),
+): DataModelAttribute[] {
+    if (seen.has(decl)) {
+        return [];
+    }
+    seen.add(decl);
+
+    const attributes: DataModelAttribute[] = [];
+    for (const mixin of decl.mixins) {
+        invariant(mixin.ref, `Mixin ${mixin.$refText} is not resolved`);
+        attributes.push(...getAllAttributes(mixin.ref, seen));
+    }
+
+    if (isDataModel(decl) && decl.baseModel) {
+        invariant(decl.baseModel.ref, `Base model ${decl.baseModel.$refText} is not resolved`);
+        attributes.push(...getAllAttributes(decl.baseModel.ref, seen));
+    }
+
+    attributes.push(...decl.attributes);
+    return attributes;
 }

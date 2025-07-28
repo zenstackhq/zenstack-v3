@@ -1,27 +1,25 @@
 import {
-    isArrayExpr,
     isDataModel,
     isLiteralExpr,
     isModel,
-    isReferenceExpr,
     Model,
-    ReferenceExpr,
     type AstNode,
     type Attribute,
     type AttributeParam,
+    type DataField,
+    type DataFieldAttribute,
     type DataModel,
     type DataModelAttribute,
-    type DataModelField,
-    type DataModelFieldAttribute,
     type Enum,
     type EnumField,
     type FunctionDecl,
     type Reference,
     type TypeDef,
-    type TypeDefField,
 } from '@zenstackhq/language/ast';
 
-export function isIdField(field: DataModelField) {
+import { getAllFields, getModelIdFields, getModelUniqueFields, type AttributeTarget } from '@zenstackhq/language/utils';
+
+export function isIdField(field: DataField, contextModel: DataModel) {
     // field-level @id attribute
     if (hasAttribute(field, '@id')) {
         return true;
@@ -30,27 +28,26 @@ export function isIdField(field: DataModelField) {
     // NOTE: we have to use name to match fields because the fields
     // may be inherited from an abstract base and have cloned identities
 
-    const model = field.$container as DataModel;
-
     // model-level @@id attribute with a list of fields
-    const modelLevelIds = getModelIdFields(model);
+    const modelLevelIds = getModelIdFields(contextModel);
     if (modelLevelIds.map((f) => f.name).includes(field.name)) {
         return true;
     }
 
-    if (model.fields.some((f) => hasAttribute(f, '@id')) || modelLevelIds.length > 0) {
+    const allFields = getAllFields(contextModel);
+    if (allFields.some((f) => hasAttribute(f, '@id')) || modelLevelIds.length > 0) {
         // the model already has id field, don't check @unique and @@unique
         return false;
     }
 
     // then, the first field with @unique can be used as id
-    const firstUniqueField = model.fields.find((f) => hasAttribute(f, '@unique'));
+    const firstUniqueField = allFields.find((f) => hasAttribute(f, '@unique'));
     if (firstUniqueField) {
         return firstUniqueField.name === field.name;
     }
 
     // last, the first model level @@unique can be used as id
-    const modelLevelUnique = getModelUniqueFields(model);
+    const modelLevelUnique = getModelUniqueFields(contextModel);
     if (modelLevelUnique.map((f) => f.name).includes(field.name)) {
         return true;
     }
@@ -59,106 +56,21 @@ export function isIdField(field: DataModelField) {
 }
 
 export function hasAttribute(
-    decl: DataModel | TypeDef | DataModelField | Enum | EnumField | FunctionDecl | Attribute | AttributeParam,
+    decl: DataModel | TypeDef | DataField | Enum | EnumField | FunctionDecl | Attribute | AttributeParam,
     name: string,
 ) {
     return !!getAttribute(decl, name);
 }
 
-export function getAttribute(
-    decl:
-        | DataModel
-        | TypeDef
-        | DataModelField
-        | TypeDefField
-        | Enum
-        | EnumField
-        | FunctionDecl
-        | Attribute
-        | AttributeParam,
-    name: string,
-) {
-    return (decl.attributes as (DataModelAttribute | DataModelFieldAttribute)[]).find(
-        (attr) => attr.decl.$refText === name,
-    );
-}
-
-/**
- * Gets `@@id` fields declared at the data model level (including search in base models)
- */
-export function getModelIdFields(model: DataModel) {
-    const modelsToCheck = model.$baseMerged ? [model] : [model, ...getRecursiveBases(model)];
-
-    for (const modelToCheck of modelsToCheck) {
-        const idAttr = modelToCheck.attributes.find((attr) => attr.decl.$refText === '@@id');
-        if (!idAttr) {
-            continue;
-        }
-        const fieldsArg = idAttr.args.find((a) => a.$resolvedParam?.name === 'fields');
-        if (!fieldsArg || !isArrayExpr(fieldsArg.value)) {
-            continue;
-        }
-
-        return fieldsArg.value.items
-            .filter((item): item is ReferenceExpr => isReferenceExpr(item))
-            .map((item) => item.target.ref as DataModelField);
-    }
-
-    return [];
-}
-
-/**
- * Gets `@@unique` fields declared at the data model level (including search in base models)
- */
-export function getModelUniqueFields(model: DataModel) {
-    const modelsToCheck = model.$baseMerged ? [model] : [model, ...getRecursiveBases(model)];
-
-    for (const modelToCheck of modelsToCheck) {
-        const uniqueAttr = modelToCheck.attributes.find((attr) => attr.decl.$refText === '@@unique');
-        if (!uniqueAttr) {
-            continue;
-        }
-        const fieldsArg = uniqueAttr.args.find((a) => a.$resolvedParam?.name === 'fields');
-        if (!fieldsArg || !isArrayExpr(fieldsArg.value)) {
-            continue;
-        }
-
-        return fieldsArg.value.items
-            .filter((item): item is ReferenceExpr => isReferenceExpr(item))
-            .map((item) => item.target.ref as DataModelField);
-    }
-
-    return [];
-}
-
-export function getRecursiveBases(
-    dataModel: DataModel,
-    includeDelegate = true,
-    seen = new Set<DataModel>(),
-): DataModel[] {
-    const result: DataModel[] = [];
-    if (seen.has(dataModel)) {
-        return result;
-    }
-    seen.add(dataModel);
-    dataModel.superTypes.forEach((superType) => {
-        const baseDecl = superType.ref;
-        if (baseDecl) {
-            if (!includeDelegate && isDelegateModel(baseDecl)) {
-                return;
-            }
-            result.push(baseDecl);
-            result.push(...getRecursiveBases(baseDecl, includeDelegate, seen));
-        }
-    });
-    return result;
+export function getAttribute(decl: AttributeTarget, name: string) {
+    return (decl.attributes as (DataModelAttribute | DataFieldAttribute)[]).find((attr) => attr.decl.$refText === name);
 }
 
 export function isDelegateModel(node: AstNode) {
     return isDataModel(node) && hasAttribute(node, '@@delegate');
 }
 
-export function isUniqueField(field: DataModelField) {
+export function isUniqueField(field: DataField) {
     if (hasAttribute(field, '@unique')) {
         return true;
     }
@@ -197,3 +109,14 @@ export function getAuthDecl(model: Model) {
     }
     return found;
 }
+
+export function getIdFields(dm: DataModel) {
+    return getAllFields(dm)
+        .filter((f) => isIdField(f, dm))
+        .map((f) => f.name);
+}
+
+/**
+ * Prefix for auxiliary relation fields generated for delegated models
+ */
+export const DELEGATE_AUX_RELATION_PREFIX = 'delegate_aux';

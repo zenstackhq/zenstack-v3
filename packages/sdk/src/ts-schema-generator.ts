@@ -1073,7 +1073,7 @@ export class TsSchemaGenerator {
         const statements: ts.Statement[] = [];
 
         // generate: import { schema as $schema, type SchemaType as $Schema } from './schema';
-        statements.push(this.generateSchemaTypeImport(true, true));
+        statements.push(this.generateSchemaImport(model, true, true));
 
         // generate: import type { ModelResult as $ModelResult } from '@zenstackhq/runtime';
         statements.push(
@@ -1196,17 +1196,20 @@ export class TsSchemaGenerator {
         fs.writeFileSync(outputFile, result);
     }
 
-    private generateSchemaTypeImport(schemaObject: boolean, schemaType: boolean) {
+    private generateSchemaImport(model: Model, schemaObject: boolean, schemaType: boolean) {
         const importSpecifiers = [];
 
         if (schemaObject) {
-            importSpecifiers.push(
-                ts.factory.createImportSpecifier(
-                    false,
-                    ts.factory.createIdentifier('schema'),
-                    ts.factory.createIdentifier('$schema'),
-                ),
-            );
+            if (model.declarations.some(isEnum)) {
+                // enums require referencing the schema object
+                importSpecifiers.push(
+                    ts.factory.createImportSpecifier(
+                        false,
+                        ts.factory.createIdentifier('schema'),
+                        ts.factory.createIdentifier('$schema'),
+                    ),
+                );
+            }
         }
 
         if (schemaType) {
@@ -1243,7 +1246,7 @@ export class TsSchemaGenerator {
         const statements: ts.Statement[] = [];
 
         // generate: import { SchemaType as $Schema } from './schema';
-        statements.push(this.generateSchemaTypeImport(false, true));
+        statements.push(this.generateSchemaImport(model, false, true));
 
         // generate: import { CreateArgs as $CreateArgs, ... } from '@zenstackhq/runtime';
         const inputTypes = [

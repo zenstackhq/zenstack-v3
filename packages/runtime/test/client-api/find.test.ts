@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
 import { NotFoundError } from '../../src/client/errors';
-import { schema } from '../test-schema';
+import { schema } from '../schemas/basic';
 import { createClientSpecs } from './client-specs';
 import { createPosts, createUser } from './utils';
 

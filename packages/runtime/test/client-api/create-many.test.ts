@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
-import { schema } from '../test-schema';
+import { schema } from '../schemas/basic';
 import { createClientSpecs } from './client-specs';
 
 const PG_DB_NAME = 'client-api-create-many-tests';

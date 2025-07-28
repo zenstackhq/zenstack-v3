@@ -1,5 +1,5 @@
 import SQLite from 'better-sqlite3';
-import { ZenStackClient } from '../../dist';
+import { ZenStackClient } from '../../../dist';
 import { Role, type Identity, type IdentityProvider } from './models';
 import { schema } from './schema';
 

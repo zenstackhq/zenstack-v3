@@ -1,17 +1,8 @@
-import { generateTsSchemaFromFile } from '@zenstackhq/testtools';
-import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
-import type { SchemaDef } from '../../src/schema';
+import { describe, expect, it } from 'vitest';
+import { schema } from '../schemas/todo/schema';
 import { createPolicyTestClient } from './utils';
 
 describe('todo sample tests', () => {
-    let schema: SchemaDef;
-
-    beforeAll(async () => {
-        const r = await generateTsSchemaFromFile(path.join(__dirname, '../schemas/todo.zmodel'));
-        schema = r.schema;
-    });
-
     it('works with user CRUD', async () => {
         const user1 = {
             id: 'user1',
@@ -383,13 +374,13 @@ describe('todo sample tests', () => {
             where: { id: 'space1' },
             include: { lists: true },
         });
-        expect(r.lists).toHaveLength(2);
+        expect(r?.lists).toHaveLength(2);
 
         const r1 = await user2Db.space.findFirst({
             where: { id: 'space1' },
             include: { lists: true },
         });
-        expect(r1.lists).toHaveLength(1);
+        expect(r1?.lists).toHaveLength(1);
     });
 
     // TODO: `future()` support

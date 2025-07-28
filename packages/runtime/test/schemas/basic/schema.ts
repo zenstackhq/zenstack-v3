@@ -5,7 +5,7 @@
 
 /* eslint-disable */
 
-import { type SchemaDef, ExpressionUtils } from "../../dist/schema";
+import { type SchemaDef, ExpressionUtils } from "../../../dist/schema";
 export const schema = {
     provider: {
         type: "sqlite"

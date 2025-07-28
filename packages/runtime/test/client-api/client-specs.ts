@@ -1,5 +1,5 @@
 import type { LogEvent } from 'kysely';
-import { getSchema, schema } from '../test-schema';
+import { getSchema, schema } from '../schemas/basic';
 import { makePostgresClient, makeSqliteClient } from '../utils';
 import type { ClientContract } from '../../src';
 

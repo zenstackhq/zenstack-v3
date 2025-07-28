@@ -4,6 +4,8 @@ import type {
     FieldDef,
     FieldHasDefault,
     FieldIsArray,
+    FieldIsDelegateDiscriminator,
+    FieldIsDelegateRelation,
     FieldIsRelation,
     FieldIsRelationArray,
     FieldType,
@@ -11,13 +13,16 @@ import type {
     GetEnum,
     GetEnums,
     GetModel,
+    GetModelDiscriminator,
     GetModelField,
     GetModelFields,
     GetModelFieldType,
     GetModels,
+    GetSubModels,
     GetTypeDefField,
     GetTypeDefFields,
     GetTypeDefs,
+    IsDelegateModel,
     ModelFieldIsOptional,
     NonRelationFields,
     RelationFields,
@@ -50,16 +55,28 @@ type DefaultModelResult<
     Optional = false,
     Array = false,
 > = WrapType<
-    {
-        [Key in NonRelationFields<Schema, Model> as Key extends keyof Omit
-            ? Omit[Key] extends true
-                ? never
-                : Key
-            : Key]: MapModelFieldType<Schema, Model, Key>;
-    },
+    IsDelegateModel<Schema, Model> extends true
+        ? // delegate model's selection result is a union of all sub-models
+          DelegateUnionResult<Schema, Model, GetSubModels<Schema, Model>, Omit>
+        : {
+              [Key in NonRelationFields<Schema, Model> as Key extends keyof Omit
+                  ? Omit[Key] extends true
+                      ? never
+                      : Key
+                  : Key]: MapModelFieldType<Schema, Model, Key>;
+          },
     Optional,
     Array
 >;
+
+type DelegateUnionResult<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    SubModel extends GetModels<Schema>,
+    Omit = undefined,
+> = SubModel extends string // typescript union distribution
+    ? DefaultModelResult<Schema, SubModel, Omit> & { [K in GetModelDiscriminator<Schema, Model>]: SubModel } // fixate discriminated field
+    : never;
 
 type ModelSelectResult<Schema extends SchemaDef, Model extends GetModels<Schema>, Select, Omit> = {
     [Key in keyof Select as Select[Key] extends false | undefined
@@ -596,7 +613,10 @@ type CreateScalarPayload<Schema extends SchemaDef, Model extends GetModels<Schem
     Schema,
     Model,
     {
-        [Key in ScalarFields<Schema, Model, false>]: ScalarCreatePayload<Schema, Model, Key>;
+        [Key in ScalarFields<Schema, Model, false> as FieldIsDelegateDiscriminator<Schema, Model, Key> extends true
+            ? // discriminator fields cannot be assigned
+              never
+            : Key]: ScalarCreatePayload<Schema, Model, Key>;
     }
 >;
 
@@ -626,13 +646,15 @@ type CreateRelationFieldPayload<
     Field extends RelationFields<Schema, Model>,
 > = Omit<
     {
+        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
         create?: NestedCreateInput<Schema, Model, Field>;
         createMany?: NestedCreateManyInput<Schema, Model, Field>;
         connect?: ConnectInput<Schema, Model, Field>;
-        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
     },
     // no "createMany" for non-array fields
-    FieldIsArray<Schema, Model, Field> extends true ? never : 'createMany'
+    | (FieldIsArray<Schema, Model, Field> extends true ? never : 'createMany')
+    // exclude operations not applicable to delegate models
+    | (FieldIsDelegateRelation<Schema, Model, Field> extends true ? 'create' | 'createMany' | 'connectOrCreate' : never)
 >;
 
 type CreateRelationPayload<Schema extends SchemaDef, Model extends GetModels<Schema>> = OptionalWrap<
@@ -745,7 +767,10 @@ type UpdateScalarInput<
     Without extends string = never,
 > = Omit<
     {
-        [Key in NonRelationFields<Schema, Model>]?: ScalarUpdatePayload<Schema, Model, Key>;
+        [Key in NonRelationFields<Schema, Model> as FieldIsDelegateDiscriminator<Schema, Model, Key> extends true
+            ? // discriminator fields cannot be assigned
+              never
+            : Key]?: ScalarUpdatePayload<Schema, Model, Key>;
     },
     Without
 >;
@@ -802,36 +827,45 @@ type ToManyRelationUpdateInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>,
-> = {
-    create?: NestedCreateInput<Schema, Model, Field>;
-    createMany?: NestedCreateManyInput<Schema, Model, Field>;
-    connect?: ConnectInput<Schema, Model, Field>;
-    connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
-    disconnect?: DisconnectInput<Schema, Model, Field>;
-    update?: NestedUpdateInput<Schema, Model, Field>;
-    upsert?: NestedUpsertInput<Schema, Model, Field>;
-    updateMany?: NestedUpdateManyInput<Schema, Model, Field>;
-    delete?: NestedDeleteInput<Schema, Model, Field>;
-    deleteMany?: NestedDeleteManyInput<Schema, Model, Field>;
-    set?: SetRelationInput<Schema, Model, Field>;
-};
+> = Omit<
+    {
+        create?: NestedCreateInput<Schema, Model, Field>;
+        createMany?: NestedCreateManyInput<Schema, Model, Field>;
+        connect?: ConnectInput<Schema, Model, Field>;
+        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+        disconnect?: DisconnectInput<Schema, Model, Field>;
+        update?: NestedUpdateInput<Schema, Model, Field>;
+        upsert?: NestedUpsertInput<Schema, Model, Field>;
+        updateMany?: NestedUpdateManyInput<Schema, Model, Field>;
+        delete?: NestedDeleteInput<Schema, Model, Field>;
+        deleteMany?: NestedDeleteManyInput<Schema, Model, Field>;
+        set?: SetRelationInput<Schema, Model, Field>;
+    },
+    // exclude
+    FieldIsDelegateRelation<Schema, Model, Field> extends true
+        ? 'create' | 'createMany' | 'connectOrCreate' | 'upsert'
+        : never
+>;
 
 type ToOneRelationUpdateInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends RelationFields<Schema, Model>,
-> = {
-    create?: NestedCreateInput<Schema, Model, Field>;
-    connect?: ConnectInput<Schema, Model, Field>;
-    connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
-    update?: NestedUpdateInput<Schema, Model, Field>;
-    upsert?: NestedUpsertInput<Schema, Model, Field>;
-} & (ModelFieldIsOptional<Schema, Model, Field> extends true
-    ? {
-          disconnect?: DisconnectInput<Schema, Model, Field>;
-          delete?: NestedDeleteInput<Schema, Model, Field>;
-      }
-    : {});
+> = Omit<
+    {
+        create?: NestedCreateInput<Schema, Model, Field>;
+        connect?: ConnectInput<Schema, Model, Field>;
+        connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+        update?: NestedUpdateInput<Schema, Model, Field>;
+        upsert?: NestedUpsertInput<Schema, Model, Field>;
+    } & (ModelFieldIsOptional<Schema, Model, Field> extends true
+        ? {
+              disconnect?: DisconnectInput<Schema, Model, Field>;
+              delete?: NestedDeleteInput<Schema, Model, Field>;
+          }
+        : {}),
+    FieldIsDelegateRelation<Schema, Model, Field> extends true ? 'create' | 'connectOrCreate' | 'upsert' : never
+>;
 
 // #endregion
 
@@ -1144,7 +1178,7 @@ type NonOwnedRelationFields<Schema extends SchemaDef, Model extends GetModels<Sc
         references: unknown[];
     }
         ? never
-        : Key]: Key;
+        : Key]: true;
 };
 
 // #endregion

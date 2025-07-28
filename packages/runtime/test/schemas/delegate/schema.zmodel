@@ -1,0 +1,57 @@
+datasource db {
+    provider = "sqlite"
+    url      = "file:./dev.db"
+}
+
+model User {
+    id          Int          @id @default(autoincrement())
+    email       String?      @unique
+    level       Int          @default(0)
+    assets      Asset[]
+    ratedVideos RatedVideo[] @relation('direct')
+}
+
+model Comment {
+    id      Int    @id @default(autoincrement())
+    content String
+    asset   Asset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
+    assetId Int?
+}
+
+model Asset {
+    id        Int       @id @default(autoincrement())
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    viewCount Int       @default(0)
+    owner     User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    ownerId   Int?
+    comments  Comment[]
+    assetType String
+
+    @@delegate(assetType)
+}
+
+model Video extends Asset {
+    duration  Int
+    url       String @unique
+    videoType String
+
+    @@delegate(videoType)
+}
+
+model RatedVideo extends Video {
+    rating Int
+    user   User? @relation(name: 'direct', fields: [userId], references: [id], onDelete: Cascade)
+    userId Int?
+}
+
+model Image extends Asset {
+    format    String
+    gallery   Gallery? @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+    galleryId Int?
+}
+
+model Gallery {
+    id     Int     @id @default(autoincrement())
+    images Image[]
+}

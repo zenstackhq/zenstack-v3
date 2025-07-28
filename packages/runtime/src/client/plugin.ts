@@ -164,6 +164,7 @@ type OnQueryOperationHooks<Schema extends SchemaDef, Model extends GetModels<Sch
         operation: CrudOperation;
         args: unknown;
         query: (args: unknown) => Promise<unknown>;
+        client: ClientContract<Schema>;
     }) => MaybePromise<unknown>;
 };
 
@@ -195,7 +196,6 @@ type OnQueryHookContext<
      */
     query: (
         args: Parameters<ModelOperations<Schema, Model>[Operation]>[0],
-        // tx?: ClientContract<Schema>,
     ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
 
     /**

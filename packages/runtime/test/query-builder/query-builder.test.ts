@@ -2,7 +2,7 @@ import { createId } from '@paralleldrive/cuid2';
 import SQLite from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { ZenStackClient } from '../../src';
-import { getSchema } from '../test-schema';
+import { getSchema } from '../schemas/basic';
 
 describe('Client API tests', () => {
     const schema = getSchema('sqlite');

@@ -2,7 +2,7 @@ import SQLite from 'better-sqlite3';
 import { DeleteQueryNode, InsertQueryNode, UpdateQueryNode } from 'kysely';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ZenStackClient, type ClientContract } from '../../src';
-import { schema } from '../test-schema';
+import { schema } from '../schemas/basic';
 
 describe('Entity  lifecycle tests', () => {
     let _client: ClientContract<typeof schema>;

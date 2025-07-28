@@ -1070,5 +1070,146 @@ model Gallery {
                 await expect(client.asset.findMany()).toResolveWithLength(1);
             });
         });
+
+        describe('Delegate aggregation tests', () => {
+            beforeEach(async () => {
+                const u = await client.user.create({
+                    data: {
+                        id: 1,
+                        email: 'u1@example.com',
+                    },
+                });
+                await client.ratedVideo.create({
+                    data: {
+                        id: 1,
+                        viewCount: 0,
+                        duration: 100,
+                        url: 'v1',
+                        rating: 5,
+                        owner: { connect: { id: u.id } },
+                        user: { connect: { id: u.id } },
+                        comments: { create: [{ content: 'c1' }, { content: 'c2' }] },
+                    },
+                });
+                await client.ratedVideo.create({
+                    data: {
+                        id: 2,
+                        viewCount: 2,
+                        duration: 200,
+                        url: 'v2',
+                        rating: 3,
+                    },
+                });
+            });
+
+            it('works with count', async () => {
+                await expect(
+                    client.ratedVideo.count({
+                        where: { rating: 5 },
+                    }),
+                ).resolves.toEqual(1);
+                await expect(
+                    client.ratedVideo.count({
+                        where: { duration: 100 },
+                    }),
+                ).resolves.toEqual(1);
+                await expect(
+                    client.ratedVideo.count({
+                        where: { viewCount: 1 },
+                    }),
+                ).resolves.toEqual(1);
+
+                await expect(
+                    client.video.count({
+                        where: { duration: 100 },
+                    }),
+                ).resolves.toEqual(1);
+                await expect(
+                    client.asset.count({
+                        where: { viewCount: { gt: 0 } },
+                    }),
+                ).resolves.toEqual(1);
+
+                // field selection
+                await expect(
+                    client.ratedVideo.count({
+                        select: { _all: true, viewCount: true, url: true, rating: true },
+                    }),
+                ).resolves.toMatchObject({
+                    _all: 2,
+                    viewCount: 2,
+                    url: 2,
+                    rating: 2,
+                });
+                await expect(
+                    client.video.count({
+                        select: { _all: true, viewCount: true, url: true },
+                    }),
+                ).resolves.toMatchObject({
+                    _all: 2,
+                    viewCount: 2,
+                    url: 2,
+                });
+                await expect(
+                    client.asset.count({
+                        select: { _all: true, viewCount: true },
+                    }),
+                ).resolves.toMatchObject({
+                    _all: 2,
+                    viewCount: 2,
+                });
+            });
+
+            it('works with aggregate', async () => {
+                await expect(
+                    client.ratedVideo.aggregate({
+                        where: { viewCount: { gte: 0 }, duration: { gt: 0 }, rating: { gt: 0 } },
+                        _avg: { viewCount: true, duration: true, rating: true },
+                        _count: true,
+                    }),
+                ).resolves.toMatchObject({
+                    _avg: {
+                        viewCount: 1,
+                        duration: 150,
+                        rating: 4,
+                    },
+                    _count: 2,
+                });
+                await expect(
+                    client.video.aggregate({
+                        where: { viewCount: { gte: 0 }, duration: { gt: 0 } },
+                        _avg: { viewCount: true, duration: true },
+                        _count: true,
+                    }),
+                ).resolves.toMatchObject({
+                    _avg: {
+                        viewCount: 1,
+                        duration: 150,
+                    },
+                    _count: 2,
+                });
+                await expect(
+                    client.asset.aggregate({
+                        where: { viewCount: { gte: 0 } },
+                        _avg: { viewCount: true },
+                        _count: true,
+                    }),
+                ).resolves.toMatchObject({
+                    _avg: {
+                        viewCount: 1,
+                    },
+                    _count: 2,
+                });
+
+                // just count
+                await expect(
+                    client.ratedVideo.aggregate({
+                        _count: true,
+                    }),
+                ).resolves.toMatchObject({
+                    _count: 2,
+                });
+            });
+        });
     },
 );

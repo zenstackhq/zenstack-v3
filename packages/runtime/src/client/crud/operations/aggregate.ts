@@ -1,3 +1,4 @@
+import type { ExpressionBuilder } from 'kysely';
 import { sql } from 'kysely';
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
@@ -15,11 +16,31 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
         let query = this.kysely.selectFrom((eb) => {
             // nested query for filtering and pagination
 
-            // where
-            let subQuery = eb
-                .selectFrom(this.model)
-                .selectAll(this.model as any) // TODO: check typing
+            // table and where
+            let subQuery = this.dialect
+                .buildSelectModel(eb as ExpressionBuilder<any, any>, this.model)
                 .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, parsedArgs?.where));
+
+            // select fields: collect fields from aggregation body
+            const selectedFields: string[] = [];
+            for (const [key, value] of Object.entries(parsedArgs)) {
+                if (key.startsWith('_') && value && typeof value === 'object') {
+                    // select fields
+                    Object.entries(value)
+                        .filter(([, val]) => val === true)
+                        .forEach(([field]) => {
+                            if (!selectedFields.includes(field)) selectedFields.push(field);
+                        });
+                }
+            }
+            if (selectedFields.length > 0) {
+                for (const field of selectedFields) {
+                    subQuery = this.dialect.buildSelectField(subQuery, this.model, this.model, field);
+                }
+            } else {
+                // if no field is explicitly selected, just do a `select 1` so `_count` works
+                subQuery = subQuery.select(() => eb.lit(1).as('_all'));
+            }
 
             // skip & take
             const skip = parsedArgs?.skip;

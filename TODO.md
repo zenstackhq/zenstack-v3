@@ -49,7 +49,7 @@
         - [x] Nested to-one
         - [x] Incremental update for numeric fields
         - [x] Array update
-        - [ ] Strict typing for checked/unchecked input
+        - [x] Strict typing for checked/unchecked input
     - [x] Upsert
         - [ ] Implement with "on conflict"
     - [x] Delete
@@ -73,7 +73,7 @@
         - [ ] Cross field comparison
         - [x] Many-to-many relation
         - [ ] Empty AND/OR/NOT behavior
-        - [?] Logging
+        - [x] Logging
         - [x] Error system
         - [x] Custom table name
         - [x] Custom field name
@@ -84,7 +84,10 @@
     - [ ] Post-mutation hooks should be called after transaction is committed
 - [x] TypeDef and mixin
 - [ ] Strongly typed JSON
-- [ ] Polymorphism
+- [x] Polymorphism
+    - [x] ZModel
+    - [x] Runtime
+    - [x] Typing
 - [ ] Validation
 - [ ] Access Policy
     - [ ] Short-circuit pre-create check for scalar-field only policies

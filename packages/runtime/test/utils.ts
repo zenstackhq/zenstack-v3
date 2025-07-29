@@ -17,7 +17,7 @@ type PostgresSchema = SchemaDef & { provider: { type: 'postgresql' } };
 export async function makeSqliteClient<Schema extends SqliteSchema>(
     schema: Schema,
     extraOptions?: Partial<ClientOptions<Schema>>,
-) {
+): Promise<ClientContract<Schema>> {
     const client = new ZenStackClient(schema, {
         ...extraOptions,
         dialectConfig: { database: new SQLite(':memory:') },
@@ -37,7 +37,7 @@ export async function makePostgresClient<Schema extends PostgresSchema>(
     schema: Schema,
     dbName: string,
     extraOptions?: Partial<ClientOptions<Schema>>,
-) {
+): Promise<ClientContract<Schema>> {
     invariant(dbName, 'dbName is required');
     const pgClient = new PGClient(TEST_PG_CONFIG);
     await pgClient.connect();

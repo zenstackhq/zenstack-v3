@@ -20,6 +20,6 @@ export async function createPolicyTestClient<Schema extends SchemaDef>(
         {
             ...options,
             plugins: [new PolicyPlugin()],
-        } as CreateTestClientOptions<SchemaDef>,
+        } as any,
     );
 }

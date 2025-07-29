@@ -242,7 +242,7 @@ describe.each([
     });
 
     describe.each([{ relationName: undefined }, { relationName: 'myM2M' }])(
-        'Implicit many-to-many relation ($relationName)',
+        'Implicit many-to-many relation (relation: $relationName)',
         ({ relationName }) => {
             beforeEach(async () => {
                 client = await createTestClient(
@@ -269,7 +269,7 @@ describe.each([
                 `,
                     {
                         provider,
-                        dbName: provider === 'sqlite' ? 'file:./dev.db' : TEST_DB,
+                        dbName: provider === 'postgresql' ? TEST_DB : undefined,
                         usePrismaPush: true,
                     },
                 );

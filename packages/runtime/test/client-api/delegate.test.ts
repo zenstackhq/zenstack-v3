@@ -1,4 +1,7 @@
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { ClientContract } from '../../src';
+import { schema, type SchemaType } from '../schemas/delegate/schema';
 import { createTestClient } from '../utils';
 
 const DB_NAME = `client-api-delegate-tests`;
@@ -6,69 +9,18 @@ const DB_NAME = `client-api-delegate-tests`;
 describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as const }])(
     'Delegate model tests for $provider',
     ({ provider }) => {
-        const POLYMORPHIC_SCHEMA = `
-model User {
-    id Int @id @default(autoincrement())
-    email String? @unique
-    level Int @default(0)
-    assets Asset[]
-    ratedVideos RatedVideo[] @relation('direct')
-}
-
-model Comment {
-    id Int @id @default(autoincrement())
-    content String
-    asset Asset? @relation(fields: [assetId], references: [id], onDelete: Cascade)
-    assetId Int?
-}
-
-model Asset {
-    id Int @id @default(autoincrement())
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-    viewCount Int @default(0)
-    owner User? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-    ownerId Int?
-    comments Comment[]
-    assetType String
-    
-    @@delegate(assetType)
-}
-
-model Video extends Asset {
-    duration Int
-    url String @unique
-    videoType String
-
-    @@delegate(videoType)
-}
-
-model RatedVideo extends Video {
-    rating Int
-    user User? @relation(name: 'direct', fields: [userId], references: [id], onDelete: Cascade)
-    userId Int?
-}
-
-model Image extends Asset {
-    format String
-    gallery Gallery? @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-    galleryId Int?
-}
-
-model Gallery {
-    id Int @id @default(autoincrement())
-    images Image[]
-}
-`;
-
-        let client: any;
+        let client: ClientContract<SchemaType>;
 
         beforeEach(async () => {
-            client = await createTestClient(POLYMORPHIC_SCHEMA, {
-                usePrismaPush: true,
-                provider,
-                dbName: provider === 'postgresql' ? DB_NAME : undefined,
-            });
+            client = await createTestClient(
+                schema,
+                {
+                    usePrismaPush: true,
+                    provider,
+                    dbName: provider === 'postgresql' ? DB_NAME : undefined,
+                },
+                path.join(__dirname, '../schemas/delegate/schema.zmodel'),
+            );
         });
 
         afterEach(async () => {
@@ -76,9 +28,10 @@ model Gallery {
         });
 
         describe('Delegate create tests', () => {
-            it('works with create', async () => {
+            it('works with create11111', async () => {
                 // delegate model cannot be created directly
                 await expect(
+                    // @ts-expect-error
                     client.video.create({
                         data: {
                             duration: 100,
@@ -91,6 +44,7 @@ model Gallery {
                     client.user.create({
                         data: {
                             assets: {
+                                // @ts-expect-error
                                 create: { assetType: 'Video' },
                             },
                         },
@@ -294,7 +248,7 @@ model Gallery {
             });
 
             // omit fields
-            const r = await client.ratedVideo.findUnique({
+            const r: any = await client.ratedVideo.findUnique({
                 where: { id: v.id },
                 omit: {
                     viewCount: true,
@@ -341,8 +295,10 @@ model Gallery {
                             select: { id: true, assetType: true },
                         },
                         ratedVideos: {
-                            url: true,
-                            rating: true,
+                            select: {
+                                url: true,
+                                rating: true,
+                            },
                         },
                     },
                 }),
@@ -568,7 +524,7 @@ model Gallery {
                     client.video.findFirst({
                         where: {
                             comments: {
-                                all: { content: 'c2' },
+                                every: { content: 'c2' },
                             },
                         },
                     }),
@@ -878,6 +834,7 @@ model Gallery {
 
             it('works with upsert', async () => {
                 await expect(
+                    // @ts-expect-error
                     client.asset.upsert({
                         where: { id: 2 },
                         create: {

@@ -44,13 +44,13 @@ export class CountOperationHandler<Schema extends SchemaDef> extends BaseOperati
                         : eb.cast(eb.fn.count(sql.ref(`${subQueryName}.${key}`)), 'integer').as(key),
                 ),
             );
-
-            return query.executeTakeFirstOrThrow();
+            const result = await this.executeQuery(this.kysely, query, 'count');
+            return result.rows[0];
         } else {
             // simple count all
             query = query.select((eb) => eb.cast(eb.fn.countAll(), 'integer').as('count'));
-            const result = await query.executeTakeFirstOrThrow();
-            return (result as any).count as number;
+            const result = await this.executeQuery(this.kysely, query, 'count');
+            return (result.rows[0] as any).count as number;
         }
     }
 }

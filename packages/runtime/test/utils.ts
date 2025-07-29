@@ -147,14 +147,10 @@ export async function createTestClient<Schema extends SchemaDef>(
         const prismaSchema = new PrismaSchemaGenerator(r.model);
         const prismaSchemaText = await prismaSchema.generate();
         fs.writeFileSync(path.resolve(workDir, 'schema.prisma'), prismaSchemaText);
-        try {
-            execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {
-                cwd: workDir!,
-                stdio: 'inherit',
-            });
-        } catch (e) {
-            console.log(e);
-        }
+        execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {
+            cwd: workDir!,
+            stdio: 'inherit',
+        });
     } else {
         if (provider === 'postgresql') {
             invariant(dbName, 'dbName is required');

@@ -112,11 +112,11 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
             }
         }
 
-        const result = await query.executeTakeFirstOrThrow();
+        const result = await this.executeQuery(this.kysely, query, 'aggregate');
         const ret: any = {};
 
         // postprocess result to convert flat fields into nested objects
-        for (const [key, value] of Object.entries(result as object)) {
+        for (const [key, value] of Object.entries(result.rows[0] as object)) {
             if (key === '_count') {
                 ret[key] = value;
                 continue;

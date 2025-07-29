@@ -255,23 +255,33 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 
     $use(plugin: RuntimePlugin<Schema>) {
-        const newOptions = {
+        // tsc perf
+        const newPlugins: RuntimePlugin<Schema>[] = [...(this.$options.plugins ?? []), plugin];
+        const newOptions: ClientOptions<Schema> = {
             ...this.options,
-            plugins: [...(this.options.plugins ?? []), plugin],
+            plugins: newPlugins,
         };
         return new ClientImpl<Schema>(this.schema, newOptions, this);
     }
 
     $unuse(pluginId: string) {
-        const newOptions = {
+        // tsc perf
+        const newPlugins: RuntimePlugin<Schema>[] = [];
+        for (const plugin of this.options.plugins ?? []) {
+            if (plugin.id !== pluginId) {
+                newPlugins.push(plugin);
+            }
+        }
+        const newOptions: ClientOptions<Schema> = {
             ...this.options,
-            plugins: this.options.plugins?.filter((p) => p.id !== pluginId),
+            plugins: newPlugins,
         };
         return new ClientImpl<Schema>(this.schema, newOptions, this);
     }
 
     $unuseAll() {
-        const newOptions = {
+        // tsc perf
+        const newOptions: ClientOptions<Schema> = {
             ...this.options,
             plugins: [] as RuntimePlugin<Schema>[],
         };
@@ -388,7 +398,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
             for (const plugin of plugins) {
                 if (plugin.onQuery && typeof plugin.onQuery === 'object') {
                     // for each model key or "$allModels"
-                    for (const [_model, modelHooks] of Object.entries(plugin.onQuery)) {
+                    for (const [_model, modelHooks] of Object.entries<any>(plugin.onQuery)) {
                         if (_model === lowerCaseFirst(model) || _model === '$allModels') {
                             if (modelHooks && typeof modelHooks === 'object') {
                                 // for each operation key or "$allOperations"

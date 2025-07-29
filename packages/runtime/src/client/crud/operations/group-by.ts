@@ -108,8 +108,8 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
             }
         }
 
-        const result = await query.execute();
-        return result.map((row) => this.postProcessRow(row));
+        const result = await this.executeQuery(this.kysely, query, 'groupBy');
+        return result.rows.map((row) => this.postProcessRow(row));
     }
 
     private postProcessRow(row: any) {

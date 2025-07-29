@@ -7,13 +7,13 @@ import path from 'node:path';
 import { match } from 'ts-pattern';
 import { createTestProject } from './project';
 
-function makePrelude(provider: 'sqlite' | 'postgresql', dbName?: string) {
+function makePrelude(provider: 'sqlite' | 'postgresql', dbUrl?: string) {
     return match(provider)
         .with('sqlite', () => {
             return `
 datasource db {
     provider = 'sqlite'
-    url = '${dbName ?? ':memory:'}'
+    url = '${dbUrl ?? 'file:./test.db'}'
 }
 `;
         })
@@ -21,7 +21,7 @@ datasource db {
             return `
 datasource db {
     provider = 'postgresql'
-    url = 'postgres://postgres:postgres@localhost:5432/${dbName}'
+    url = '${dbUrl ?? 'postgres://postgres:postgres@localhost:5432/db'}'
 }
 `;
         })
@@ -31,15 +31,14 @@ datasource db {
 export async function generateTsSchema(
     schemaText: string,
     provider: 'sqlite' | 'postgresql' = 'sqlite',
-    dbName?: string,
+    dbUrl?: string,
     extraSourceFiles?: Record<string, string>,
 ) {
     const workDir = createTestProject();
-    console.log(`Work directory: ${workDir}`);
 
     const zmodelPath = path.join(workDir, 'schema.zmodel');
     const noPrelude = schemaText.includes('datasource ');
-    fs.writeFileSync(zmodelPath, `${noPrelude ? '' : makePrelude(provider, dbName)}\n\n${schemaText}`);
+    fs.writeFileSync(zmodelPath, `${noPrelude ? '' : makePrelude(provider, dbUrl)}\n\n${schemaText}`);
 
     const pluginModelFiles = glob.sync(path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel'));
 

@@ -28,7 +28,7 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
         });
 
         describe('Delegate create tests', () => {
-            it('works with create11111', async () => {
+            it('works with create', async () => {
                 // delegate model cannot be created directly
                 await expect(
                     // @ts-expect-error

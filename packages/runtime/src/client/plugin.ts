@@ -100,6 +100,18 @@ export type OnKyselyQueryCallback<Schema extends SchemaDef> = (
     args: OnKyselyQueryArgs<Schema>,
 ) => Promise<QueryResult<UnknownRow>>;
 
+export type MutationInterceptionFilter<Schema extends SchemaDef> = (
+    args: MutationHooksArgs<Schema>,
+) => MaybePromise<MutationInterceptionFilterResult>;
+
+export type BeforeEntityMutationCallback<Schema extends SchemaDef> = (
+    args: PluginBeforeEntityMutationArgs<Schema>,
+) => MaybePromise<void>;
+
+export type AfterEntityMutationCallback<Schema extends SchemaDef> = (
+    args: PluginAfterEntityMutationArgs<Schema>,
+) => MaybePromise<void>;
+
 /**
  * ZenStack runtime plugin.
  */
@@ -133,14 +145,14 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
      * This callback determines whether a mutation should be intercepted, and if so,
      * what data should be loaded before and after the mutation.
      */
-    mutationInterceptionFilter?: (args: MutationHooksArgs<Schema>) => MaybePromise<MutationInterceptionFilterResult>;
+    mutationInterceptionFilter?: MutationInterceptionFilter<Schema>;
 
     /**
      * Called before an entity is mutated.
      * @param args.entity Only available if `loadBeforeMutationEntity` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
-    beforeEntityMutation?: (args: PluginBeforeEntityMutationArgs<Schema>) => MaybePromise<void>;
+    beforeEntityMutation?: BeforeEntityMutationCallback<Schema>;
 
     /**
      * Called after an entity is mutated.
@@ -149,7 +161,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
      * @param args.afterMutationEntity Only available if `loadAfterMutationEntity` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
-    afterEntityMutation?: (args: PluginAfterEntityMutationArgs<Schema>) => MaybePromise<void>;
+    afterEntityMutation?: AfterEntityMutationCallback<Schema>;
 }
 
 type OnQueryHooks<Schema extends SchemaDef = SchemaDef> = {

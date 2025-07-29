@@ -6,12 +6,12 @@ import type { CompiledQuery, DatabaseConnection, Driver, Log, QueryResult, Trans
 export class ZenStackDriver implements Driver {
     readonly #driver: Driver;
     readonly #log: Log;
-    txConnection: DatabaseConnection | undefined;
 
     #initPromise?: Promise<void>;
     #initDone: boolean;
     #destroyPromise?: Promise<void>;
     #connections = new WeakSet<DatabaseConnection>();
+    #txConnections = new WeakMap<DatabaseConnection, Array<() => Promise<unknown>>>();
 
     constructor(driver: Driver, log: Log) {
         this.#initDone = false;
@@ -67,23 +67,32 @@ export class ZenStackDriver implements Driver {
 
     async beginTransaction(connection: DatabaseConnection, settings: TransactionSettings): Promise<void> {
         const result = await this.#driver.beginTransaction(connection, settings);
-        this.txConnection = connection;
+        this.#txConnections.set(connection, []);
         return result;
     }
 
-    commitTransaction(connection: DatabaseConnection): Promise<void> {
+    async commitTransaction(connection: DatabaseConnection): Promise<void> {
         try {
-            return this.#driver.commitTransaction(connection);
-        } finally {
-            this.txConnection = undefined;
+            const result = await this.#driver.commitTransaction(connection);
+            const callbacks = this.#txConnections.get(connection);
+            // delete from the map immediately to avoid accidental re-triggering
+            this.#txConnections.delete(connection);
+            if (callbacks) {
+                for (const callback of callbacks) {
+                    await callback();
+                }
+            }
+            return result;
+        } catch {
+            this.#txConnections.delete(connection);
         }
     }
 
-    rollbackTransaction(connection: DatabaseConnection): Promise<void> {
+    async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
         try {
-            return this.#driver.rollbackTransaction(connection);
+            return await this.#driver.rollbackTransaction(connection);
         } finally {
-            this.txConnection = undefined;
+            this.#txConnections.delete(connection);
         }
     }
 
@@ -174,6 +183,22 @@ export class ZenStackDriver implements Driver {
 
     #calculateDurationMillis(startTime: number): number {
         return performanceNow() - startTime;
+    }
+
+    isTransactionConnection(connection: DatabaseConnection): boolean {
+        return this.#txConnections.has(connection);
+    }
+
+    registerTransactionCommitCallback(connection: DatabaseConnection, callback: () => Promise<unknown>): void {
+        if (!this.#txConnections.has(connection)) {
+            return;
+        }
+        const callbacks = this.#txConnections.get(connection);
+        if (callbacks) {
+            callbacks.push(callback);
+        } else {
+            this.#txConnections.set(connection, [callback]);
+        }
     }
 }
 

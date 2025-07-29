@@ -30,7 +30,7 @@ export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperat
 
         // TODO: avoid using transaction for simple delete
         await this.safeTransaction(async (tx) => {
-            const result = await this.delete(tx, this.model, args.where, undefined);
+            const result = await this.delete(tx, this.model, args.where);
             if (result.count === 0) {
                 throw new NotFoundError(this.model);
             }

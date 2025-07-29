@@ -300,57 +300,100 @@ describe('Entity  lifecycle tests', () => {
         expect(post2Intercepted).toBe(true);
     });
 
-    // // TODO: revisit mutation hooks and transactions
-    // it.skip('proceeds with mutation even when hooks throw', async () => {
-    //     let userIntercepted = false;
-
-    //     const client = _client.$use({
-    //         id: 'test',
-    //         afterEntityMutation() {
-    //             userIntercepted = true;
-    //             throw new Error('trigger error');
-    //         },
-    //     });
-
-    //     let gotError = false;
-    //     try {
-    //         await client.user.create({
-    //             data: { email: 'u1@test.com' },
-    //         });
-    //     } catch (err) {
-    //         gotError = true;
-    //         expect((err as Error).message).toContain('trigger error');
-    //     }
-
-    //     expect(userIntercepted).toBe(true);
-    //     expect(gotError).toBe(true);
-    //     console.log(await client.user.findMany());
-    //     await expect(client.user.findMany()).toResolveWithLength(1);
-    // });
-
-    it('rolls back when hooks throw if transaction is used', async () => {
-        let userIntercepted = false;
+    it('does not affect the database operation if an afterEntityMutation hook throws', async () => {
+        let intercepted = false;
 
         const client = _client.$use({
             id: 'test',
             afterEntityMutation() {
-                userIntercepted = true;
+                intercepted = true;
                 throw new Error('trigger rollback');
             },
         });
 
-        let gotError = false;
+        await client.user.create({
+            data: { email: 'u1@test.com' },
+        });
+
+        expect(intercepted).toBe(true);
+        await expect(client.user.findMany()).toResolveWithLength(1);
+    });
+
+    it('does not trigger afterEntityMutation hook if a transaction is rolled back', async () => {
+        let intercepted = false;
+
+        const client = _client.$use({
+            id: 'test',
+            afterEntityMutation() {
+                intercepted = true;
+            },
+        });
+
         try {
-            await client.user.create({
-                data: { email: 'u1@test.com' },
+            await client.$transaction(async (tx) => {
+                await tx.user.create({
+                    data: { email: 'u1@test.com' },
+                });
+                throw new Error('trigger rollback');
             });
-        } catch (err) {
-            gotError = true;
-            expect((err as Error).message).toContain('trigger rollback');
+        } catch {
+            // noop
         }
 
-        expect(userIntercepted).toBe(true);
-        expect(gotError).toBe(true);
         await expect(client.user.findMany()).toResolveWithLength(0);
+        expect(intercepted).toBe(false);
+    });
+
+    it('triggers multiple afterEntityMutation hooks for multiple mutations', async () => {
+        const triggered: any[] = [];
+
+        const client = _client.$use({
+            id: 'test',
+            mutationInterceptionFilter: () => {
+                return {
+                    intercept: true,
+                    loadBeforeMutationEntity: true,
+                    loadAfterMutationEntity: true,
+                };
+            },
+            afterEntityMutation(args) {
+                triggered.push(args);
+            },
+        });
+
+        await client.$transaction(async (tx) => {
+            const user1 = await tx.user.create({
+                data: { email: 'u1@test.com' },
+            });
+            console.log('Created:', user1);
+            const user2 = await tx.user.update({
+                where: { email: 'u1@test.com' },
+                data: { email: 'u2@test.com' },
+            });
+            console.log('Updated:', user2);
+            const user3 = await tx.user.delete({ where: { email: 'u2@test.com' } });
+            console.log('Deleted:', user3);
+        });
+
+        expect(triggered).toEqual([
+            expect.objectContaining({
+                action: 'create',
+                model: 'User',
+                beforeMutationEntities: undefined,
+                afterMutationEntities: [expect.objectContaining({ email: 'u1@test.com' })],
+            }),
+            expect.objectContaining({
+                action: 'update',
+                model: 'User',
+                beforeMutationEntities: [expect.objectContaining({ email: 'u1@test.com' })],
+                afterMutationEntities: [expect.objectContaining({ email: 'u2@test.com' })],
+            }),
+            expect.objectContaining({
+                action: 'delete',
+                model: 'User',
+                beforeMutationEntities: [expect.objectContaining({ email: 'u2@test.com' })],
+                afterMutationEntities: undefined,
+            }),
+        ]);
     });
 });

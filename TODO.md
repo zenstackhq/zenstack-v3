@@ -11,6 +11,7 @@
     - [ ] format
     - [ ] db seed
 - [ ] ZModel
+    - [ ] Import
     - [ ] View support
 - [ ] ORM
     - [x] Create
@@ -80,8 +81,8 @@
         - [ ] Strict undefined checks
         - [ ] DbNull vs JsonNull
     - [ ] Benchmark
-- [ ] Plugin
-    - [ ] Post-mutation hooks should be called after transaction is committed
+- [x] Plugin
+    - [x] Post-mutation hooks should be called after transaction is committed
 - [x] TypeDef and mixin
 - [ ] Strongly typed JSON
 - [x] Polymorphism

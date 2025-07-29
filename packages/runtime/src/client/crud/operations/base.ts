@@ -6,8 +6,10 @@ import {
     ExpressionWrapper,
     sql,
     UpdateResult,
+    type Compilable,
     type IsolationLevel,
     type Expression as KyselyExpression,
+    type QueryResult,
     type SelectQueryBuilder,
 } from 'kysely';
 import { nanoid } from 'nanoid';
@@ -125,7 +127,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return getField(this.schema, model, field);
     }
 
-    protected exists(kysely: ToKysely<Schema>, model: GetModels<Schema>, filter: any): Promise<unknown | undefined> {
+    protected async exists(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        filter: any,
+    ): Promise<unknown | undefined> {
         const idFields = getIdFields(this.schema, model);
         const _filter = flattenCompoundUniqueFilters(this.schema, model, filter);
         const query = kysely
@@ -134,7 +140,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             .select(idFields.map((f) => kysely.dynamic.ref(f)))
             .limit(1)
             .modifyEnd(this.makeContextComment({ model, operation: 'read' }));
-        return query.executeTakeFirst();
+        return this.executeQueryTakeFirst(kysely, query, 'exists');
     }
 
     protected async read(
@@ -444,7 +450,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                                     operation: 'update',
                                 }),
                             );
-                        return query.execute();
+                        return this.executeQuery(kysely, query, 'update');
                     };
                 }
             }
@@ -511,10 +517,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }),
             );
 
-        const createdEntity = await query.executeTakeFirst();
+        const createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
 
         // try {
-        //     createdEntity = await query.executeTakeFirst();
+        //     createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
         // } catch (err) {
         //     const { sql, parameters } = query.compile();
         //     throw new QueryError(
@@ -893,8 +899,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
 
         if (!returnData) {
-            const result = await query.executeTakeFirstOrThrow();
-            return { count: Number(result.numInsertedOrUpdatedRows) } as Result;
+            const result = await this.executeQuery(kysely, query, 'createMany');
+            return { count: Number(result.numAffectedRows) } as Result;
         } else {
             const idFields = getIdFields(this.schema, model);
             const result = await query.returning(idFields as any).execute();
@@ -1160,10 +1166,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     }),
                 );
 
-            const updatedEntity = await query.executeTakeFirst();
+            const updatedEntity = await this.executeQueryTakeFirst(kysely, query, 'update');
 
             // try {
-            //     updatedEntity = await query.executeTakeFirst();
+            //     updatedEntity = await this.executeQueryTakeFirst(kysely, query, 'update');
             // } catch (err) {
             //     const { sql, parameters } = query.compile();
             //     throw new QueryError(
@@ -1401,8 +1407,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'update' }));
 
         if (!returnData) {
-            const result = await query.executeTakeFirstOrThrow();
-            return { count: Number(result.numUpdatedRows) } as Result;
+            const result = await this.executeQuery(kysely, query, 'update');
+            return { count: Number(result.numAffectedRows) } as Result;
         } else {
             const idFields = getIdFields(this.schema, model);
             const result = await query.returning(idFields as any).execute();
@@ -1636,7 +1642,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 fromRelation.model,
                 fromRelation.field,
             );
-            let updateResult: UpdateResult;
+            let updateResult: QueryResult<unknown>;
 
             if (ownedByModel) {
                 // set parent fk directly
@@ -1665,7 +1671,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         }),
                     );
-                updateResult = await query.executeTakeFirstOrThrow();
+                updateResult = await this.executeQuery(kysely, query, 'connect');
             } else {
                 // disconnect current if it's a one-one relation
                 const relationFieldDef = this.requireField(fromRelation.model, fromRelation.field);
@@ -1681,7 +1687,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                                 operation: 'update',
                             }),
                         );
-                    await query.execute();
+                    await this.executeQuery(kysely, query, 'disconnect');
                 }
 
                 // connect
@@ -1703,11 +1709,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         }),
                     );
-                updateResult = await query.executeTakeFirstOrThrow();
+                updateResult = await this.executeQuery(kysely, query, 'connect');
             }
 
             // validate connect result
-            if (_data.length > updateResult.numUpdatedRows) {
+            if (_data.length > updateResult.numAffectedRows!) {
                 // some entities were not connected
                 throw new NotFoundError(model);
             }
@@ -1821,7 +1827,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         }),
                     );
-                await query.executeTakeFirstOrThrow();
+                await this.executeQuery(kysely, query, 'disconnect');
             } else {
                 // disconnect
                 const query = kysely
@@ -1841,7 +1847,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         }),
                     );
-                await query.executeTakeFirstOrThrow();
+                await this.executeQuery(kysely, query, 'disconnect');
             }
         }
     }
@@ -1920,7 +1926,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         operation: 'update',
                     }),
                 );
-            await query.execute();
+            await this.executeQuery(kysely, query, 'disconnect');
 
             // connect
             if (_data.length > 0) {
@@ -1942,10 +1948,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         }),
                     );
-                const r = await query.executeTakeFirstOrThrow();
+                const r = await this.executeQuery(kysely, query, 'connect');
 
                 // validate result
-                if (_data.length > r.numUpdatedRows!) {
+                if (_data.length > r.numAffectedRows!) {
                     // some entities were not connected
                     throw new NotFoundError(model);
                 }
@@ -2109,8 +2115,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
 
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
-        const result = await query.executeTakeFirstOrThrow();
-        return { count: Number(result.numDeletedRows) };
+        const result = await this.executeQuery(kysely, query, 'delete');
+        return { count: Number(result.numAffectedRows) };
     }
 
     private async processDelegateRelationDelete(
@@ -2239,5 +2245,26 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
             }
         }
+    }
+
+    protected makeQueryId(operation: string) {
+        return { queryId: `${operation}-${createId()}` };
+    }
+
+    protected executeQuery(kysely: ToKysely<Schema>, query: Compilable, operation: string) {
+        return kysely.executeQuery(query.compile(), this.makeQueryId(operation));
+    }
+
+    protected async executeQueryTakeFirst(kysely: ToKysely<Schema>, query: Compilable, operation: string) {
+        const result = await kysely.executeQuery(query.compile(), this.makeQueryId(operation));
+        return result.rows[0];
+    }
+
+    protected async executeQueryTakeFirstOrThrow(kysely: ToKysely<Schema>, query: Compilable, operation: string) {
+        const result = await kysely.executeQuery(query.compile(), this.makeQueryId(operation));
+        if (result.rows.length === 0) {
+            throw new QueryError('No rows found');
+        }
+        return result.rows[0];
     }
 }

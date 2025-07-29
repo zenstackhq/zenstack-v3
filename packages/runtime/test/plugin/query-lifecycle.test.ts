@@ -254,40 +254,6 @@ describe('Query interception tests', () => {
         ).toResolveTruthy();
     });
 
-    // TODO: revisit transactional hooks
-    it.skip('rolls back the effect with transaction', async () => {
-        let hooksCalled = false;
-        const client = _client.$use({
-            id: 'test-plugin',
-            onQuery: {
-                user: {
-                    create: async (ctx) => {
-                        hooksCalled = true;
-                        return ctx.client.$transaction(async (_tx) => {
-                            await ctx.query(ctx.args /*, tx*/);
-                            throw new Error('trigger error');
-                        });
-                    },
-                },
-            },
-        });
-
-        try {
-            await client.user.create({
-                data: { id: '1', email: 'u1@test.com' },
-            });
-        } catch {
-            // no-op
-        }
-
-        expect(hooksCalled).toBe(true);
-        await expect(
-            _client.user.findFirst({
-                where: { id: '1' },
-            }),
-        ).toResolveNull();
-    });
-
     it('supports plugin encapsulation', async () => {
         const user = await _client.user.create({
             data: { email: 'u1@test.com' },

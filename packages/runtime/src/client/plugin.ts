@@ -96,6 +96,10 @@ export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
 
 export type ProceedKyselyQueryFunction = (query: RootOperationNode) => Promise<QueryResult<any>>;
 
+export type OnKyselyQueryCallback<Schema extends SchemaDef> = (
+    args: OnKyselyQueryArgs<Schema>,
+) => Promise<QueryResult<UnknownRow>>;
+
 /**
  * ZenStack runtime plugin.
  */
@@ -123,7 +127,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     /**
      * Intercepts a Kysely query.
      */
-    onKyselyQuery?: (args: OnKyselyQueryArgs<Schema>) => Promise<QueryResult<UnknownRow>>;
+    onKyselyQuery?: OnKyselyQueryCallback<Schema>;
 
     /**
      * This callback determines whether a mutation should be intercepted, and if so,

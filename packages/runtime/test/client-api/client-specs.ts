@@ -15,11 +15,11 @@ export function createClientSpecs(dbName: string, logQueries = false, providers:
                   {
                       provider: 'sqlite' as const,
                       schema: getSchema('sqlite'),
-                      createClient: async () => {
-                          const client = await makeSqliteClient(getSchema('sqlite'), {
+                      createClient: async (): Promise<ClientContract<typeof schema>> => {
+                          // tsc perf
+                          return makeSqliteClient<any>(getSchema('sqlite'), {
                               log: logQueries ? logger('sqlite') : undefined,
-                          });
-                          return client as ClientContract<typeof schema>;
+                          }) as unknown as ClientContract<typeof schema>;
                       },
                   },
               ]
@@ -29,11 +29,11 @@ export function createClientSpecs(dbName: string, logQueries = false, providers:
                   {
                       provider: 'postgresql' as const,
                       schema: getSchema('postgresql'),
-                      createClient: async () => {
-                          const client = await makePostgresClient(getSchema('postgresql'), dbName, {
+                      createClient: async (): Promise<ClientContract<typeof schema>> => {
+                          // tsc perf
+                          return makePostgresClient<any>(getSchema('postgresql'), dbName, {
                               log: logQueries ? logger('postgresql') : undefined,
-                          });
-                          return client as unknown as ClientContract<typeof schema>;
+                          }) as unknown as ClientContract<typeof schema>;
                       },
                   },
               ]

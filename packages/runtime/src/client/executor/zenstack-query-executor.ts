@@ -25,7 +25,7 @@ import type { GetModels, SchemaDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
 import type { ClientContract } from '../contract';
 import { InternalError, QueryError } from '../errors';
-import type { MutationInterceptionFilterResult } from '../plugin';
+import type { MutationInterceptionFilterResult, OnKyselyQueryCallback } from '../plugin';
 import { QueryNameMapper } from './name-mapper';
 import type { ZenStackDriver } from './zenstack-driver';
 
@@ -113,10 +113,13 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         //     return this.executeWithTransaction(() => callback(p));
         // };
 
-        const hooks =
-            this.options.plugins
-                ?.filter((plugin) => typeof plugin.onKyselyQuery === 'function')
-                .map((plugin) => plugin.onKyselyQuery!.bind(plugin)) ?? [];
+        const hooks: OnKyselyQueryCallback<Schema>[] = [];
+        // tsc perf
+        for (const plugin of this.client.$options.plugins ?? []) {
+            if (plugin.onKyselyQuery) {
+                hooks.push(plugin.onKyselyQuery.bind(plugin));
+            }
+        }
 
         for (const hook of hooks) {
             const _proceed = proceed;

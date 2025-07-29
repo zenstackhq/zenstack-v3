@@ -362,17 +362,14 @@ describe('Entity  lifecycle tests', () => {
         });
 
         await client.$transaction(async (tx) => {
-            const user1 = await tx.user.create({
+            await tx.user.create({
                 data: { email: 'u1@test.com' },
             });
-            console.log('Created:', user1);
-            const user2 = await tx.user.update({
+            await tx.user.update({
                 where: { email: 'u1@test.com' },
                 data: { email: 'u2@test.com' },
             });
-            console.log('Updated:', user2);
-            const user3 = await tx.user.delete({ where: { email: 'u2@test.com' } });
-            console.log('Deleted:', user3);
+            await tx.user.delete({ where: { email: 'u2@test.com' } });
         });
 
         expect(triggered).toEqual([

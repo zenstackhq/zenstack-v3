@@ -68,7 +68,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 await this.callBeforeMutationHooks(queryNode, mutationInterceptionInfo);
             }
 
-            // TODO: make sure insert and delete return rows
+            // TODO: make sure insert and update return rows
             const oldQueryNode = queryNode;
             if (
                 (InsertQueryNode.is(queryNode) || UpdateQueryNode.is(queryNode)) &&

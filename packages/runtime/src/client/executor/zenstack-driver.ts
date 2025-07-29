@@ -83,8 +83,9 @@ export class ZenStackDriver implements Driver {
                 }
             }
             return result;
-        } catch {
+        } catch (err) {
             this.#txConnections.delete(connection);
+            throw err;
         }
     }
 

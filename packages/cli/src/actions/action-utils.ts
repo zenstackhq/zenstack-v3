@@ -1,4 +1,5 @@
 import { loadDocument } from '@zenstackhq/language';
+import { isDataSource } from '@zenstackhq/language/ast';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
 import fs from 'node:fs';
@@ -41,6 +42,9 @@ export async function loadSchemaDocument(schemaFile: string) {
         });
         throw new CliError('Failed to load schema');
     }
+    loadResult.warnings.forEach((warn) => {
+        console.warn(colors.yellow(warn));
+    });
     return loadResult.model;
 }
 
@@ -54,6 +58,9 @@ export function handleSubProcessError(err: unknown) {
 
 export async function generateTempPrismaSchema(zmodelPath: string, folder?: string) {
     const model = await loadSchemaDocument(zmodelPath);
+    if (!model.declarations.some(isDataSource)) {
+        throw new CliError('Schema must define a datasource');
+    }
     const prismaSchema = await new PrismaSchemaGenerator(model).generate();
     if (!folder) {
         folder = path.dirname(zmodelPath);

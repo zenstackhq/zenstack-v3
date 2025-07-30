@@ -1,5 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { AstUtils, URI, type AstNode, type LangiumDocuments, type Reference } from 'langium';
+import { AstUtils, URI, type AstNode, type LangiumDocument, type LangiumDocuments, type Reference } from 'langium';
 import fs from 'node:fs';
 import path from 'path';
 import { STD_LIB_MODULE_NAME, type ExpressionContext } from './constants';
@@ -576,4 +576,29 @@ export function getAllAttributes(
 
     attributes.push(...decl.attributes);
     return attributes;
+}
+
+/**
+ * Retrieve the document in which the given AST node is contained. A reference to the document is
+ * usually held by the root node of the AST.
+ *
+ * @throws an error if the node is not contained in a document.
+ */
+export function getDocument<T extends AstNode = AstNode>(node: AstNode): LangiumDocument<T> {
+    const rootNode = findRootNode(node);
+    const result = rootNode.$document;
+    if (!result) {
+        throw new Error('AST node has no document.');
+    }
+    return result as LangiumDocument<T>;
+}
+
+/**
+ * Returns the root node of the given AST node by following the `$container` references.
+ */
+export function findRootNode(node: AstNode): AstNode {
+    while (node.$container) {
+        node = node.$container;
+    }
+    return node;
 }

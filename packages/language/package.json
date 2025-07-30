@@ -62,7 +62,9 @@
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/common-helpers": "workspace:*",
-        "langium-cli": "catalog:"
+        "langium-cli": "catalog:",
+        "tmp": "catalog:",
+        "@types/tmp": "catalog:"
     },
     "volta": {
         "node": "18.19.1",

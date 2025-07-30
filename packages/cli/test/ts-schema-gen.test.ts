@@ -1,5 +1,7 @@
 import { ExpressionUtils } from '@zenstackhq/runtime/schema';
-import { generateTsSchema } from '@zenstackhq/testtools';
+import { createTestProject, generateTsSchema, generateTsSchemaInPlace } from '@zenstackhq/testtools';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('TypeScript schema generation tests', () => {
@@ -324,5 +326,38 @@ model User extends Base {
                 },
             },
         });
+    });
+
+    it('merges all declarations from imported modules', async () => {
+        const workDir = createTestProject();
+        fs.writeFileSync(
+            path.join(workDir, 'a.zmodel'),
+            `
+        enum Role {
+          Admin
+          User
+        }
+          `,
+        );
+        fs.writeFileSync(
+            path.join(workDir, 'b.zmodel'),
+            `
+        import './a'
+
+        datasource db {
+            provider = 'sqlite'
+            url = 'file:./test.db'
+        }
+
+        model User {
+          id Int @id
+          role Role
+        }
+        `,
+        );
+
+        const { schema } = await generateTsSchemaInPlace(path.join(workDir, 'b.zmodel'));
+        expect(schema.enums).toMatchObject({ Role: expect.any(Object) });
+        expect(schema.models).toMatchObject({ User: expect.any(Object) });
     });
 });

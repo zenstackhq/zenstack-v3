@@ -74,12 +74,6 @@ model A {
         fs.writeFileSync(
             path.join(name, 'b.zmodel'),
             `
-}
-  `,
-        );
-        fs.writeFileSync(
-            path.join(name, 'b.zmodel'),
-            `
 import './a'
 model B {
   id Int @id

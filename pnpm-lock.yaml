@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@types/tmp':
+      specifier: ^0.2.6
+      version: 0.2.6
     kysely:
       specifier: ^0.27.6
       version: 0.27.6
@@ -18,6 +21,9 @@ catalogs:
     prisma:
       specifier: ^6.0.0
       version: 6.9.0
+    tmp:
+      specifier: ^0.2.3
+      version: 0.2.3
     ts-pattern:
       specifier: ^5.7.1
       version: 5.7.1
@@ -106,7 +112,7 @@ importers:
         specifier: ^7.6.13
         version: 7.6.13
       '@types/tmp':
-        specifier: ^0.2.6
+        specifier: 'catalog:'
         version: 0.2.6
       '@zenstackhq/eslint-config':
         specifier: workspace:*
@@ -124,7 +130,7 @@ importers:
         specifier: ^11.8.1
         version: 11.8.1
       tmp:
-        specifier: ^0.2.3
+        specifier: 'catalog:'
         version: 0.2.3
 
   packages/common-helpers:
@@ -197,6 +203,9 @@ importers:
       '@types/pluralize':
         specifier: ^0.0.33
         version: 0.0.33
+      '@types/tmp':
+        specifier: 'catalog:'
+        version: 0.2.6
       '@zenstackhq/common-helpers':
         specifier: workspace:*
         version: link:../common-helpers
@@ -209,6 +218,9 @@ importers:
       langium-cli:
         specifier: 'catalog:'
         version: 3.5.0
+      tmp:
+        specifier: 'catalog:'
+        version: 0.2.3
 
   packages/runtime:
     dependencies:
@@ -342,7 +354,7 @@ importers:
         specifier: 'catalog:'
         version: 6.9.0(typescript@5.8.3)
       tmp:
-        specifier: ^0.2.3
+        specifier: 'catalog:'
         version: 0.2.3
       ts-pattern:
         specifier: 'catalog:'
@@ -352,7 +364,7 @@ importers:
         version: 5.8.3
     devDependencies:
       '@types/tmp':
-        specifier: ^0.2.6
+        specifier: 'catalog:'
         version: 0.2.6
       '@zenstackhq/eslint-config':
         specifier: workspace:*

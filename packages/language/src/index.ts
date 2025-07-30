@@ -63,7 +63,10 @@ export async function loadDocument(
 
     // load imports
     const importedURIs = await loadImports(document, langiumDocuments);
-    const importedDocuments = await Promise.all(importedURIs.map((uri) => langiumDocuments.getOrCreateDocument(uri)));
+    const importedDocuments: LangiumDocument[] = [];
+    for (const uri of importedURIs) {
+        importedDocuments.push(await langiumDocuments.getOrCreateDocument(uri));
+    }
 
     // build the document together with standard library, plugin modules, and imported documents
     await services.shared.workspace.DocumentBuilder.build([stdLib, ...pluginDocs, document, ...importedDocuments], {
@@ -128,11 +131,7 @@ export async function loadDocument(
     };
 }
 
-async function loadImports(
-    document: LangiumDocument<AstNode>,
-    documents: LangiumDocuments,
-    uris: Set<string> = new Set(),
-) {
+async function loadImports(document: LangiumDocument, documents: LangiumDocuments, uris: Set<string> = new Set()) {
     const uriString = document.uri.toString();
     if (!uris.has(uriString)) {
         uris.add(uriString);
@@ -159,7 +158,7 @@ function mergeImportsDeclarations(documents: LangiumDocuments, model: Model) {
     // remove import directives
     model.imports = [];
 
-    // fix $containerIndex
+    // fix $container, $containerIndex, and $containerProperty
     linkContentToContainer(model);
 
     return importedModels;

@@ -413,38 +413,13 @@ export function resolveImport(documents: LangiumDocuments, imp: ModelImport) {
 }
 
 export function resolveImportUri(imp: ModelImport) {
-    if (!imp.path) return undefined; // This will return true if imp.path is undefined, null, or an empty string ("").
-
-    if (!imp.path.endsWith('.zmodel')) {
-        imp.path += '.zmodel';
-    }
-
-    if (
-        !imp.path.startsWith('.') && // Respect relative paths
-        !path.isAbsolute(imp.path) // Respect Absolute paths
-    ) {
-        // use the current model's path as the search context
-        const contextPath = imp.$container.$document
-            ? path.dirname(imp.$container.$document.uri.fsPath)
-            : process.cwd();
-        imp.path = findNodeModulesFile(imp.path, contextPath) ?? imp.path;
-    }
-
-    const doc = AstUtils.getDocument(imp);
-    const dir = path.dirname(doc.uri.fsPath);
-    return URI.file(path.resolve(dir, imp.path));
-}
-
-export function findNodeModulesFile(name: string, cwd: string = process.cwd()) {
-    if (!name) return undefined;
-    try {
-        // Use require.resolve to find the module/file. The paths option allows specifying the directory to start from.
-        const resolvedPath = require.resolve(name, { paths: [cwd] });
-        return resolvedPath;
-    } catch {
-        // If require.resolve fails to find the module/file, it will throw an error.
+    if (!imp.path) {
         return undefined;
     }
+    const doc = AstUtils.getDocument(imp);
+    const dir = path.dirname(doc.uri.fsPath);
+    const importPath = imp.path.endsWith('.zmodel') ? imp.path : `${imp.path}.zmodel`;
+    return URI.file(path.resolve(dir, importPath));
 }
 
 /**

@@ -62,6 +62,7 @@ export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptio
     dbName?: string;
     usePrismaPush?: boolean;
     extraSourceFiles?: Record<string, string>;
+    workDir?: string;
 };
 
 export async function createTestClient<Schema extends SchemaDef>(
@@ -78,7 +79,7 @@ export async function createTestClient<Schema extends SchemaDef>(
     options?: CreateTestClientOptions<Schema>,
     schemaFile?: string,
 ): Promise<any> {
-    let workDir: string | undefined;
+    let workDir = options?.workDir;
     let _schema: Schema;
     const provider = options?.provider ?? 'sqlite';
 
@@ -114,7 +115,7 @@ export async function createTestClient<Schema extends SchemaDef>(
                 type: provider,
             },
         };
-        workDir = await createTestProject();
+        workDir ??= createTestProject();
         if (schemaFile) {
             let schemaContent = fs.readFileSync(schemaFile, 'utf-8');
             if (dbUrl) {
@@ -131,7 +132,9 @@ export async function createTestClient<Schema extends SchemaDef>(
         }
     }
 
-    console.log(`Work directory: ${workDir}`);
+    if (workDir) {
+        console.log(`Work directory: ${workDir}`);
+    }
 
     const { plugins, ...rest } = options ?? {};
     const _options: ClientOptions<Schema> = {
@@ -148,7 +151,7 @@ export async function createTestClient<Schema extends SchemaDef>(
         const prismaSchemaText = await prismaSchema.generate();
         fs.writeFileSync(path.resolve(workDir, 'schema.prisma'), prismaSchemaText);
         execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {
-            cwd: workDir!,
+            cwd: workDir,
             stdio: 'inherit',
         });
     } else {

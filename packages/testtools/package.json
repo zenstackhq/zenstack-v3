@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/testtools",
-    "version": "3.0.0-alpha.14",
+    "version": "3.0.0-alpha.15",
     "description": "ZenStack Test Tools",
     "type": "module",
     "scripts": {
@@ -31,7 +31,7 @@
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "glob": "^11.0.2",
-        "tmp": "^0.2.3",
+        "tmp": "catalog:",
         "ts-pattern": "catalog:",
         "prisma": "catalog:",
         "typescript": "catalog:"
@@ -41,7 +41,7 @@
         "pg": "^8.13.1"
     },
     "devDependencies": {
-        "@types/tmp": "^0.2.6",
+        "@types/tmp": "catalog:",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*"
     }

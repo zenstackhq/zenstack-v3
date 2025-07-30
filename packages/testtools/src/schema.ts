@@ -54,6 +54,10 @@ export async function generateTsSchema(
     }
 
     // compile the generated TS schema
+    return compileAndLoad(workDir);
+}
+
+async function compileAndLoad(workDir: string) {
     execSync('npx tsc', {
         cwd: workDir,
         stdio: 'inherit',
@@ -67,4 +71,13 @@ export async function generateTsSchema(
 export function generateTsSchemaFromFile(filePath: string) {
     const schemaText = fs.readFileSync(filePath, 'utf8');
     return generateTsSchema(schemaText);
+}
+
+export async function generateTsSchemaInPlace(schemaPath: string) {
+    const workDir = path.dirname(schemaPath);
+    const pluginModelFiles = glob.sync(path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel'));
+
+    const generator = new TsSchemaGenerator();
+    await generator.generate(schemaPath, pluginModelFiles, workDir);
+    return compileAndLoad(workDir);
 }

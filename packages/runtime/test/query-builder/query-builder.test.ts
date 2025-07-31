@@ -1,5 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import SQLite from 'better-sqlite3';
+import { SqliteDialect } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import { ZenStackClient } from '../../src';
 import { getSchema } from '../schemas/basic';
@@ -9,9 +10,7 @@ describe('Client API tests', () => {
 
     it('works with queries', async () => {
         const client = new ZenStackClient(schema, {
-            dialectConfig: {
-                database: new SQLite(':memory:'),
-            },
+            dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
         });
         await client.$pushSchema();
 

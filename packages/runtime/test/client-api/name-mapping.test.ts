@@ -1,4 +1,5 @@
 import SQLite from 'better-sqlite3';
+import { SqliteDialect } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import { ZenStackClient } from '../../src';
 import { type SchemaDef, ExpressionUtils } from '../../src/schema';
@@ -59,7 +60,7 @@ describe('Name mapping tests', () => {
 
     it('works with model and implicit field mapping', async () => {
         const client = new ZenStackClient(schema, {
-            dialectConfig: { database: new SQLite(':memory:') },
+            dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
         });
         await client.$pushSchema();
         const r1 = await client.foo.create({
@@ -91,7 +92,7 @@ describe('Name mapping tests', () => {
 
     it('works with explicit field mapping', async () => {
         const client = new ZenStackClient(schema, {
-            dialectConfig: { database: new SQLite(':memory:') },
+            dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
         });
         await client.$pushSchema();
         const r1 = await client.foo.create({

@@ -1,18 +1,14 @@
 import { invariant, lowerCaseFirst } from '@zenstackhq/common-helpers';
-import type { QueryExecutor, SqliteDialectConfig } from 'kysely';
+import type { QueryExecutor } from 'kysely';
 import {
     CompiledQuery,
     DefaultConnectionProvider,
     DefaultQueryExecutor,
     Kysely,
     Log,
-    PostgresDialect,
     sql,
-    SqliteDialect,
     type KyselyProps,
-    type PostgresDialectConfig,
 } from 'kysely';
-import { match } from 'ts-pattern';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
 import type { AuthType } from '../schema/auth';
 import type { UnwrapTuplePromises } from '../utils/type-utils';
@@ -88,18 +84,17 @@ export class ClientImpl<Schema extends SchemaDef> {
             this.kyselyRaw = baseClient.kyselyRaw;
             this.auth = baseClient.auth;
         } else {
-            const dialect = this.getKyselyDialect();
-            const driver = new ZenStackDriver(dialect.createDriver(), new Log(this.$options.log ?? []));
-            const compiler = dialect.createQueryCompiler();
-            const adapter = dialect.createAdapter();
+            const driver = new ZenStackDriver(options.dialect.createDriver(), new Log(this.$options.log ?? []));
+            const compiler = options.dialect.createQueryCompiler();
+            const adapter = options.dialect.createAdapter();
             const connectionProvider = new DefaultConnectionProvider(driver);
 
             this.kyselyProps = {
                 config: {
-                    dialect,
+                    dialect: options.dialect,
                     log: this.$options.log,
                 },
-                dialect,
+                dialect: options.dialect,
                 driver,
                 executor: executor ?? new ZenStackQueryExecutor(this, driver, compiler, adapter, connectionProvider),
             };
@@ -133,21 +128,6 @@ export class ClientImpl<Schema extends SchemaDef> {
      */
     withExecutor(executor: QueryExecutor) {
         return new ClientImpl(this.schema, this.$options, this, executor);
-    }
-
-    private getKyselyDialect() {
-        return match(this.schema.provider.type)
-            .with('sqlite', () => this.makeSqliteKyselyDialect())
-            .with('postgresql', () => this.makePostgresKyselyDialect())
-            .exhaustive();
-    }
-
-    private makePostgresKyselyDialect(): PostgresDialect {
-        return new PostgresDialect(this.options.dialectConfig as PostgresDialectConfig);
-    }
-
-    private makeSqliteKyselyDialect(): SqliteDialect {
-        return new SqliteDialect(this.options.dialectConfig as SqliteDialectConfig);
     }
 
     // overload for interactive transaction

@@ -55,7 +55,7 @@ import { schema } from './schema';
 
 async function main() {
     const client = new ZenStackClient(schema, {
-        dialectConfig: {} as any,
+        dialect: {} as any,
         computedFields: {
             User: {
                 upperName: (eb) => eb.fn('upper', ['name']),
@@ -122,7 +122,7 @@ import { schema } from './schema';
 
 async function main() {
     const client = new ZenStackClient(schema, {
-        dialectConfig: {} as any,
+        dialect: {} as any,
         computedFields: {
             User: {
                 upperName: (eb) => eb.lit(null),

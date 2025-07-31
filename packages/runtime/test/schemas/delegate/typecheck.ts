@@ -1,11 +1,10 @@
 import SQLite from 'better-sqlite3';
+import { SqliteDialect } from 'kysely';
 import { ZenStackClient } from '../../../dist';
 import { schema } from './schema';
 
 const client = new ZenStackClient(schema, {
-    dialectConfig: {
-        database: new SQLite('./zenstack/test.db'),
-    },
+    dialect: new SqliteDialect({ database: new SQLite('./zenstack/test.db') }),
 });
 
 async function find() {

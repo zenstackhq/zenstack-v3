@@ -402,6 +402,9 @@ importers:
       better-sqlite3:
         specifier: ^11.8.1
         version: 11.8.1
+      kysely:
+        specifier: 'catalog:'
+        version: 0.27.6
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.12

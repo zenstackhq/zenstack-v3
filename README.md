@@ -145,9 +145,10 @@ Now you can use the compiled TypeScript schema to instantiate a database client.
 import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from './zenstack/schema';
 import SQLite from 'better-sqlite3';
+import { SqliteDialect } from 'kysely';
 
 const client = new ZenStackClient(schema, {
-    dialectConfig: { database: new SQLite('./dev.db') },
+    dialect: new SqliteDialect({ database: new SQLite('./dev.db') }),
 });
 ```
 
@@ -156,13 +157,14 @@ const client = new ZenStackClient(schema, {
 ```ts
 import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from './zenstack/schema';
+import { PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
 import { parseIntoClientConfig } from 'pg-connection-string';
 
 const client = new ZenStackClient(schema, {
-    dialectConfig: {
+    dialect: new PostgresDialect({
         pool: new Pool(parseIntoClientConfig(process.env.DATABASE_URL)),
-    },
+    }),
 });
 ```
 

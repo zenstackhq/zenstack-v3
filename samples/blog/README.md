@@ -19,14 +19,18 @@
 - When you run `zenstack generate`, a TypeScript version of the schema is generated to [zenstack/schema.ts](./zenstack/schema.ts).
 - A Prisma schema [zenstack/schema.prisma](./zenstack/schema.prisma) is also generated. It's used for generating and running database migrations, and you can also use it for other purposes as needed.
 - You can create a database client with the TypeScript schema like:
+
     ```ts
     import { ZenStackClient } from '@zenstackhq/runtime';
     import { schema } from './zenstack/schema';
     import SQLite from 'better-sqlite3';
+    import { SqliteDialect } from 'kysely';
+
     const db = ZenStackClient(schema, {
-        dialectConfig: { database: new SQLite('./zenstack/dev.db') },
+        dialect: new SqliteDialect({ database: new SQLite('./zenstack/dev.db') }),
     });
     ```
+
 - Run `zenstack migrate dev` to generate and apply database migrations. It internally calls `prisma migrate dev`. Same for `zenstack migrate deploy`.
 - ZenStack v3 doesn't generate into "node_modules" anymore. The generated TypeScript schema file can be checked in to source control, and you decide how to build or bundle it with your application.
 - The TS schema will also serve as the foundation of inferring types of other artifacts, e.g., zod schemas, frontend hooks, etc.

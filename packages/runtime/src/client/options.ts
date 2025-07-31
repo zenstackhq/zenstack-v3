@@ -1,16 +1,10 @@
-import type { Expression, ExpressionBuilder, KyselyConfig, PostgresDialectConfig, SqliteDialectConfig } from 'kysely';
-import type { DataSourceProvider, GetModel, GetModels, ProcedureDef, SchemaDef } from '../schema';
-import type { Optional, PrependParameter } from '../utils/type-utils';
+import type { Dialect, Expression, ExpressionBuilder, KyselyConfig } from 'kysely';
+import type { GetModel, GetModels, ProcedureDef, SchemaDef } from '../schema';
+import type { PrependParameter } from '../utils/type-utils';
 import type { ClientContract, CRUD, ProcedureFunc } from './contract';
 import type { BaseCrudDialect } from './crud/dialects/base';
 import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
-
-type DialectConfig<Provider extends DataSourceProvider> = Provider['type'] extends 'sqlite'
-    ? Optional<SqliteDialectConfig, 'database'>
-    : Provider['type'] extends 'postgresql'
-      ? Optional<PostgresDialectConfig, 'pool'>
-      : never;
 
 export type ZModelFunctionContext<Schema extends SchemaDef> = {
     dialect: BaseCrudDialect<Schema>;
@@ -29,9 +23,9 @@ export type ZModelFunction<Schema extends SchemaDef> = (
  */
 export type ClientOptions<Schema extends SchemaDef> = {
     /**
-     * Database dialect configuration.
+     * Kysely dialect.
      */
-    dialectConfig: DialectConfig<Schema['provider']>;
+    dialect: Dialect;
 
     /**
      * Custom function definitions.

@@ -1,4 +1,5 @@
 import SQLite from 'better-sqlite3';
+import { SqliteDialect } from 'kysely';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { definePlugin, ZenStackClient, type ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
@@ -8,9 +9,7 @@ describe('Query interception tests', () => {
 
     beforeEach(async () => {
         _client = new ZenStackClient(schema, {
-            dialectConfig: {
-                database: new SQLite(':memory:'),
-            },
+            dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
         });
         await _client.$pushSchema();
     });

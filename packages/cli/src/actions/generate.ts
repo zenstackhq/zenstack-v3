@@ -50,7 +50,7 @@ import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from '${outputPath}/schema';
 
 const client = new ZenStackClient(schema, {
-    dialectConfig: { ... }
+    dialect: { ... }
 });
 \`\`\`
 `);

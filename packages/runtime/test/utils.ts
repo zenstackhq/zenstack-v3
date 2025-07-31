@@ -3,6 +3,7 @@ import { loadDocument } from '@zenstackhq/language';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import { createTestProject, generateTsSchema } from '@zenstackhq/testtools';
 import SQLite from 'better-sqlite3';
+import { PostgresDialect, SqliteDialect } from 'kysely';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,7 +21,7 @@ export async function makeSqliteClient<Schema extends SqliteSchema>(
 ): Promise<ClientContract<Schema>> {
     const client = new ZenStackClient(schema, {
         ...extraOptions,
-        dialectConfig: { database: new SQLite(':memory:') },
+        dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
     } as unknown as ClientOptions<Schema>);
     await client.$pushSchema();
     return client;
@@ -46,18 +47,18 @@ export async function makePostgresClient<Schema extends PostgresSchema>(
 
     const client = new ZenStackClient(schema, {
         ...extraOptions,
-        dialectConfig: {
+        dialect: new PostgresDialect({
             pool: new Pool({
                 ...TEST_PG_CONFIG,
                 database: dbName,
             }),
-        },
+        }),
     } as unknown as ClientOptions<Schema>);
     await client.$pushSchema();
     return client;
 }
 
-export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptions<Schema>, 'dialectConfig'> & {
+export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptions<Schema>, 'dialect'> & {
     provider?: 'sqlite' | 'postgresql';
     dbName?: string;
     usePrismaPush?: boolean;
@@ -166,16 +167,16 @@ export async function createTestClient<Schema extends SchemaDef>(
     }
 
     if (provider === 'postgresql') {
-        _options.dialectConfig = {
+        _options.dialect = new PostgresDialect({
             pool: new Pool({
                 ...TEST_PG_CONFIG,
                 database: dbName,
             }),
-        } as unknown as ClientOptions<Schema>['dialectConfig'];
+        });
     } else {
-        _options.dialectConfig = {
+        _options.dialect = new SqliteDialect({
             database: new SQLite(path.join(workDir!, dbName)),
-        } as unknown as ClientOptions<Schema>['dialectConfig'];
+        });
     }
 
     let client = new ZenStackClient(_schema, _options);

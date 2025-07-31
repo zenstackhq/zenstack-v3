@@ -1,6 +1,6 @@
 {
     "name": "sample-blog",
-    "version": "3.0.0-alpha.15",
+    "version": "3.0.0-alpha.16",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -14,7 +14,8 @@
     "license": "MIT",
     "dependencies": {
         "@zenstackhq/runtime": "workspace:*",
-        "better-sqlite3": "^11.8.1"
+        "better-sqlite3": "^11.8.1",
+        "kysely": "catalog:"
     },
     "devDependencies": {
         "@types/better-sqlite3": "^7.6.12",

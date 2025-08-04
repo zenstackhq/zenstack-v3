@@ -967,5 +967,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      */
     abstract get supportsDistinctOn(): boolean;
 
+    /**
+     * Whether the dialect support inserting with `DEFAULT` as field value.
+     */
+    abstract get supportInsertWithDefault(): boolean;
+
     // #endregion
 }

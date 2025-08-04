@@ -15,10 +15,14 @@ const schema = {
         Model: {
             name: 'Model',
             fields: {
+                id: {
+                    name: 'id',
+                    type: 'Int',
+                    id: true,
+                },
                 uuid: {
                     name: 'uuid',
                     type: 'String',
-                    id: true,
                     default: ExpressionUtils.call('uuid'),
                 },
                 uuid7: {
@@ -56,10 +60,15 @@ const schema = {
                     type: 'DateTime',
                     default: ExpressionUtils.call('now'),
                 },
+                bool: {
+                    name: 'bool',
+                    type: 'Boolean',
+                    default: false,
+                },
             },
-            idFields: ['uuid'],
+            idFields: ['id'],
             uniqueFields: {
-                uuid: { type: 'String' },
+                id: { type: 'Int' },
             },
         },
     },
@@ -67,13 +76,13 @@ const schema = {
 } as const satisfies SchemaDef;
 
 describe('default values tests', () => {
-    it('supports generators', async () => {
+    it('supports defaults', async () => {
         const client = new ZenStackClient(schema, {
             dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
         });
         await client.$pushSchema();
 
-        const entity = await client.model.create({ data: {} });
+        const entity = await client.model.create({ data: { id: 1 } });
         expect(entity.uuid).toSatisfy(isValidUuid);
         expect(entity.uuid7).toSatisfy(isValidUuid);
         expect(entity.cuid).toSatisfy(isCuid);
@@ -82,5 +91,18 @@ describe('default values tests', () => {
         expect(entity.nanoid8).toSatisfy((id) => id.length === 8);
         expect(entity.ulid).toSatisfy(isValidUlid);
         expect(entity.dt).toBeInstanceOf(Date);
+
+        // some fields are set but some use default
+        await expect(
+            client.model.createMany({
+                data: [{ id: 2 }, { id: 3, bool: true }],
+            }),
+        ).toResolveTruthy();
+        await expect(client.model.findUnique({ where: { id: 2 } })).resolves.toMatchObject({
+            bool: false,
+        });
+        await expect(client.model.findUnique({ where: { id: 3 } })).resolves.toMatchObject({
+            bool: true,
+        });
     });
 });

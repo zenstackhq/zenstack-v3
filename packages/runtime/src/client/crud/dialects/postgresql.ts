@@ -342,4 +342,8 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             return `ARRAY[${values.map((v) => (typeof v === 'string' ? `'${v}'` : v))}]`;
         }
     }
+
+    override get supportInsertWithDefault() {
+        return true;
+    }
 }

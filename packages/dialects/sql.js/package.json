@@ -1,0 +1,42 @@
+{
+    "name": "@zenstackhq/kysely-sql-js",
+    "version": "3.0.0-alpha.16",
+    "description": "Kysely dialect for sql.js",
+    "type": "module",
+    "scripts": {
+        "build": "tsup-node",
+        "watch": "tsup-node --watch",
+        "lint": "eslint src --ext ts",
+        "pack": "pnpm pack"
+    },
+    "keywords": [],
+    "author": "ZenStack Team",
+    "license": "MIT",
+    "files": [
+        "dist"
+    ],
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        }
+    },
+    "devDependencies": {
+        "@types/sql.js": "^1.4.9",
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*",
+        "sql.js": "^1.13.0",
+        "kysely": "catalog:"
+    },
+    "peerDependencies": {
+        "sql.js": "^1.13.0",
+        "kysely": "catalog:"
+    }
+}

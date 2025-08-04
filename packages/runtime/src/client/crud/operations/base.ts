@@ -519,13 +519,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         const createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
 
+        // let createdEntity: any;
         // try {
         //     createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
         // } catch (err) {
         //     const { sql, parameters } = query.compile();
-        //     throw new QueryError(
-        //         `Error during create: ${err}, sql: ${sql}, parameters: ${parameters}`
-        //     );
+        //     throw new QueryError(`Error during create: ${err}, sql: ${sql}, parameters: ${parameters}`);
         // }
 
         if (Object.keys(postCreateRelations).length > 0) {
@@ -870,6 +869,41 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
             return this.fillGeneratedValues(modelDef, newItem);
         });
+
+        if (!this.dialect.supportInsertWithDefault) {
+            // if the dialect doesn't support `DEFAULT` as insert field values,
+            // we need to double check if data rows have mismatching fields, and
+            // if so, make sure all fields have default value filled if not provided
+            const allPassedFields = createData.reduce((acc, item) => {
+                Object.keys(item).forEach((field) => {
+                    if (!acc.includes(field)) {
+                        acc.push(field);
+                    }
+                });
+                return acc;
+            }, [] as string[]);
+            for (const item of createData) {
+                if (Object.keys(item).length === allPassedFields.length) {
+                    continue;
+                }
+                for (const field of allPassedFields) {
+                    if (!(field in item)) {
+                        const fieldDef = this.requireField(model, field);
+                        if (
+                            fieldDef.default !== undefined &&
+                            fieldDef.default !== null &&
+                            typeof fieldDef.default !== 'object'
+                        ) {
+                            item[field] = this.dialect.transformPrimitive(
+                                fieldDef.default,
+                                fieldDef.type as BuiltinType,
+                                !!fieldDef.array,
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         if (modelDef.baseModel) {
             if (input.skipDuplicates) {

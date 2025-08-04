@@ -883,10 +883,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 return acc;
             }, [] as string[]);
             for (const item of createData) {
+                if (Object.keys(item).length === allPassedFields.length) {
+                    continue;
+                }
                 for (const field of allPassedFields) {
                     if (!(field in item)) {
                         const fieldDef = this.requireField(model, field);
-                        if (fieldDef.default !== undefined && typeof fieldDef.default !== 'object') {
+                        if (
+                            fieldDef.default !== undefined &&
+                            fieldDef.default !== null &&
+                            typeof fieldDef.default !== 'object'
+                        ) {
                             item[field] = this.dialect.transformPrimitive(
                                 fieldDef.default,
                                 fieldDef.type as BuiltinType,

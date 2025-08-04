@@ -1,11 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-    ZenStackValidationTester,
-    createTestDir,
-    expectValidationSuccess,
-    expectValidationFailure,
-    baseSchema,
-} from './test-utils';
+import { afterEach, beforeEach, describe, it } from 'vitest';
+import { ZenStackValidationTester, createTestDir, expectValidationFailure } from './test-utils';
 
 describe('Datasource Validation', () => {
     let tester: ZenStackValidationTester;

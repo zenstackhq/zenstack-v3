@@ -75,7 +75,7 @@ export class ZenStackValidationTester {
         const errors: string[] = [];
 
         for (const line of lines) {
-            if (line.includes('Error:') || line.includes('error:') || line.includes('✖')) {
+            if (line.includes('.zmodel')) {
                 errors.push(line.trim());
             }
         }

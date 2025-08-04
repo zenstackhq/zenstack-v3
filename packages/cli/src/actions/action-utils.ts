@@ -36,11 +36,10 @@ export function getSchemaFile(file?: string) {
 export async function loadSchemaDocument(schemaFile: string) {
     const loadResult = await loadDocument(schemaFile);
     if (!loadResult.success) {
-        console.error(colors.red('Error loading schema:'));
         loadResult.errors.forEach((err) => {
             console.error(colors.red(err));
         });
-        throw new CliError('Failed to load schema');
+        throw new CliError('Schema contains errors. See above for details.');
     }
     loadResult.warnings.forEach((warn) => {
         console.warn(colors.yellow(warn));

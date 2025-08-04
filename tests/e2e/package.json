@@ -9,6 +9,7 @@
         "@zenstackhq/testtools": "workspace:*"
     },
     "devDependencies": {
-        "@zenstackhq/cli": "workspace:*"
+        "@zenstackhq/cli": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*"
     }
 }

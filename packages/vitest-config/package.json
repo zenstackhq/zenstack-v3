@@ -1,0 +1,10 @@
+{
+    "name": "@zenstackhq/vitest-config",
+    "type": "module",
+    "version": "3.0.0-alpha.16",
+    "private": true,
+    "license": "MIT",
+    "exports": {
+        "./base": "./base.config.js"
+    }
+}

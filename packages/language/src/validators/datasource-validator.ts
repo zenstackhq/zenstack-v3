@@ -41,24 +41,16 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
     }
 
     private validateUrl(ds: DataSource, accept: ValidationAcceptor) {
-        const url = ds.fields.find((f) => f.name === 'url');
-        if (!url) {
-            accept('error', 'datasource must include a "url" field', {
-                node: ds,
-            });
+        const urlField = ds.fields.find((f) => f.name === 'url');
+        if (!urlField) {
+            return;
         }
 
-        for (const fieldName of ['url', 'shadowDatabaseUrl']) {
-            const field = ds.fields.find((f) => f.name === fieldName);
-            if (!field) {
-                continue;
-            }
-            const value = getStringLiteral(field.value);
-            if (!value && !(isInvocationExpr(field.value) && field.value.function.ref?.name === 'env')) {
-                accept('error', `"${fieldName}" must be set to a string literal or an invocation of "env" function`, {
-                    node: field.value,
-                });
-            }
+        const value = getStringLiteral(urlField.value);
+        if (!value && !(isInvocationExpr(urlField.value) && urlField.value.function.ref?.name === 'env')) {
+            accept('error', `"${urlField.name}" must be set to a string literal or an invocation of "env" function`, {
+                node: urlField.value,
+            });
         }
     }
 

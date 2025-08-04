@@ -282,4 +282,8 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
     override buildArrayLiteralSQL(_values: unknown[]): string {
         throw new Error('SQLite does not support array literals');
     }
+
+    override get supportInsertWithDefault() {
+        return false;
+    }
 }

@@ -126,6 +126,9 @@ importers:
       '@zenstackhq/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@zenstackhq/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       better-sqlite3:
         specifier: ^11.8.1
         version: 11.8.1
@@ -160,6 +163,27 @@ importers:
       '@zenstackhq/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+
+  packages/dialects/sql.js:
+    devDependencies:
+      '@types/sql.js':
+        specifier: ^1.4.9
+        version: 1.4.9
+      '@zenstackhq/eslint-config':
+        specifier: workspace:*
+        version: link:../../eslint-config
+      '@zenstackhq/typescript-config':
+        specifier: workspace:*
+        version: link:../../typescript-config
+      '@zenstackhq/vitest-config':
+        specifier: workspace:*
+        version: link:../../vitest-config
+      kysely:
+        specifier: 'catalog:'
+        version: 0.27.6
+      sql.js:
+        specifier: ^1.13.0
+        version: 1.13.0
 
   packages/eslint-config: {}
 
@@ -215,6 +239,9 @@ importers:
       '@zenstackhq/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@zenstackhq/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       langium-cli:
         specifier: 'catalog:'
         version: 3.5.0
@@ -282,6 +309,9 @@ importers:
       '@zenstackhq/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@zenstackhq/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       tsx:
         specifier: ^4.19.2
         version: 4.19.2
@@ -375,6 +405,8 @@ importers:
 
   packages/typescript-config: {}
 
+  packages/vitest-config: {}
+
   packages/zod:
     dependencies:
       '@zenstackhq/runtime':
@@ -428,6 +460,9 @@ importers:
       '@zenstackhq/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@zenstackhq/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
 
 packages:
 
@@ -1060,6 +1095,9 @@ packages:
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
+  '@types/emscripten@1.40.1':
+    resolution: {integrity: sha512-sr53lnYkQNhjHNN0oJDdUm5564biioI5DuOpycufDVK7D3y+GR3oUswe2rlwY1nPNyusHbrJ9WoTyIHl4/Bpwg==}
+
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
@@ -1074,6 +1112,9 @@ packages:
 
   '@types/pluralize@0.0.33':
     resolution: {integrity: sha512-JOqsl+ZoCpP4e8TDke9W79FDcSgPAR0l6pixx2JHkhnRjvShyYiAYw2LVsnA7K08Y6DeOnaU6ujmENO4os/cYg==}
+
+  '@types/sql.js@1.4.9':
+    resolution: {integrity: sha512-ep8b36RKHlgWPqjNG9ToUrPiwkhwh0AEzy883mO5Xnd+cL6VBH1EvSjBAAuxLUFF2Vn/moE3Me6v9E1Lo+48GQ==}
 
   '@types/tmp@0.2.6':
     resolution: {integrity: sha512-chhaNf2oKHlRkDGt+tiKE2Z5aJ6qalm7Z9rlLdBwmOiAAf09YQvvoLXjWK4HWPF1xU/fqvMgfNfpVoBscA/tKA==}
@@ -2173,6 +2214,9 @@ packages:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
 
+  sql.js@1.13.0:
+    resolution: {integrity: sha512-RJbVP1HRDlUUXahJ7VMTcu9Rm1Nzw+EBpoPr94vnbD4LwR715F3CcxE2G2k45PewcaZ57pjetYa+LoSJLAASgA==}
+
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
 
@@ -2969,6 +3013,8 @@ snapshots:
 
   '@types/deep-eql@4.0.2': {}
 
+  '@types/emscripten@1.40.1': {}
+
   '@types/estree@1.0.8': {}
 
   '@types/json-schema@7.0.15': {}
@@ -2984,6 +3030,11 @@ snapshots:
       pg-types: 4.0.2
 
   '@types/pluralize@0.0.33': {}
+
+  '@types/sql.js@1.4.9':
+    dependencies:
+      '@types/emscripten': 1.40.1
+      '@types/node': 20.17.24
 
   '@types/tmp@0.2.6': {}
 
@@ -4136,6 +4187,8 @@ snapshots:
       whatwg-url: 7.1.0
 
   split2@4.2.0: {}
+
+  sql.js@1.13.0: {}
 
   stackback@0.0.2: {}
 

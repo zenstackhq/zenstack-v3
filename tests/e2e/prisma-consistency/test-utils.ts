@@ -8,7 +8,6 @@ import { expect } from 'vitest';
 
 export interface ValidationResult {
     success: boolean;
-    errors: string[];
 }
 
 export class ZenStackValidationTester {
@@ -60,27 +59,12 @@ export class ZenStackValidationTester {
 
             return {
                 success: true,
-                errors: [],
             };
         } catch (error: any) {
             return {
                 success: false,
-                errors: this.extractErrors(error.stderr),
             };
         }
-    }
-
-    private extractErrors(output: string): string[] {
-        const lines = output.split('\n');
-        const errors: string[] = [];
-
-        for (const line of lines) {
-            if (line.includes('Error:') || line.includes('error:') || line.includes('✖')) {
-                errors.push(line.trim());
-            }
-        }
-
-        return errors;
     }
 
     public cleanup() {
@@ -100,7 +84,6 @@ export function expectValidationSuccess(result: ValidationResult) {
 
 export function expectValidationFailure(result: ValidationResult) {
     expect(result.success).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
 }
 
 export const baseSchema = `

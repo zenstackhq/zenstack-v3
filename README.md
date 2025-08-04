@@ -118,7 +118,7 @@ npm install -D @types/pg
 Run the following command to sync schema to the database for local development:
 
 ```bash
-npx zenstack db push
+npx zen db push
 ```
 
 > Under the hood, the command uses `prisma db push` to do the job.
@@ -127,17 +127,17 @@ See [database migration](#database-migration) for how to use migration to manage
 
 ## Compiling ZModel schema
 
-ZModel needs to be compiled to TypeScript before being used to create a database client. Simply run the following command:
+ZModel needs to be compiled to TypeScript before being used to create a database db. Simply run the following command:
 
 ```bash
-npx zenstack generate
+npx zen generate
 ```
 
 A `schema.ts` file will be created inside the `zenstack` folder. The file should be included as part of your source tree for compilation/bundling. You may choose to include or ignore it in source control (and generate on the fly during build). Just remember to rerun the "generate" command whenever you make changes to the ZModel schema.
 
 ## Creating ZenStack client
 
-Now you can use the compiled TypeScript schema to instantiate a database client.
+Now you can use the compiled TypeScript schema to instantiate a database db.
 
 ### SQLite
 
@@ -147,7 +147,7 @@ import { schema } from './zenstack/schema';
 import SQLite from 'better-sqlite3';
 import { SqliteDialect } from 'kysely';
 
-const client = new ZenStackClient(schema, {
+const db = new ZenStackClient(schema, {
     dialect: new SqliteDialect({ database: new SQLite('./dev.db') }),
 });
 ```
@@ -159,11 +159,10 @@ import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from './zenstack/schema';
 import { PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
-import { parseIntoClientConfig } from 'pg-connection-string';
 
-const client = new ZenStackClient(schema, {
+const db = new ZenStackClient(schema, {
     dialect: new PostgresDialect({
-        pool: new Pool(parseIntoClientConfig(process.env.DATABASE_URL)),
+        pool: new Pool({ connectionString: process.env.DATABASE_URL }),
     }),
 });
 ```
@@ -177,7 +176,7 @@ const client = new ZenStackClient(schema, {
 A few quick examples:
 
 ```ts
-const user = await client.user.create({
+const user = await db.user.create({
     data: {
         name: 'Alex',
         email: 'alex@zenstack.dev',
@@ -185,12 +184,12 @@ const user = await client.user.create({
     },
 });
 
-const userWithPosts = await client.user.findUnique({
+const userWithPosts = await db.user.findUnique({
     where: { id: user.id },
     include: { posts: true },
 });
 
-const groupedPosts = await client.post.groupBy({
+const groupedPosts = await db.post.groupBy({
     by: 'published',
     _count: true,
 });
@@ -205,7 +204,7 @@ ZenStack uses Kysely to handle database operations, and it also directly exposes
 Please check [Kysely documentation](https://kysely.dev/docs/intro) for more details. Here're a few quick examples:
 
 ```ts
-await client.$qb
+await db.$qb
     .selectFrom('User')
     .leftJoin('Post', 'Post.authorId', 'User.id')
     .select(['User.id', 'User.email', 'Post.title'])
@@ -215,7 +214,7 @@ await client.$qb
 Query builder can also be "blended" into ORM API calls as a local escape hatch for building complex filter conditions. It allows for greater flexibility without forcing you to entirely resort to the query builder API.
 
 ```ts
-await client.user.findMany({
+await db.user.findMany({
     where: {
         age: { gt: 18 },
         // "eb" is a Kysely expression builder
@@ -243,7 +242,7 @@ ZenStack v3 allows you to define database-evaluated computed fields with the fol
 2. Provide its implementation using query builder when constructing `ZenStackClient`
 
     ```ts
-    const client = new ZenStackClient(schema, {
+    const db = new ZenStackClient(schema, {
         ...
         computedFields: {
             User: {
@@ -279,7 +278,7 @@ _Coming soon..._
 
 ### Runtime plugins
 
-V3 introduces a new runtime plugin mechanism that allows you to tap into the ORM's query execution in various ways. A plugin implements the [RuntimePlugin](./packages/runtime/src/client/plugin.ts#L121) interface, and can be installed with the `ZenStackClient.$use` API.
+V3 introduces a new runtime plugin mechanism that allows you to tap into the ORM's query execution in various ways. A plugin implements the [RuntimePlugin](./packages/runtime/src/client/plugin.ts#L121) interface, and can be installed with the `ZenStackdb.$use` API.
 
 You can use a plugin to achieve the following goals:
 
@@ -288,7 +287,7 @@ You can use a plugin to achieve the following goals:
 ORM query interception allows you to intercept the high-level ORM API calls. The interceptor's configuration is compatible with Prisma's [query client extension](https://www.prisma.io/docs/orm/prisma-client/client-extensions/query).
 
 ```ts
-client.$use({
+db.$use({
     id: 'cost-logger',
     onQuery: {
         $allModels: {
@@ -312,7 +311,7 @@ Kysely query interception allows you to intercept the low-level query builder AP
 Kysely query interception works against the low-level Kysely `OperationNode` structures. It's harder to implement but can guarantee intercepting all CRUD operations.
 
 ```ts
-client.$use({
+db.$use({
     id: 'insert-interception-plugin',
     onKyselyQuery({query, proceed}) {
         if (query.kind === 'InsertQueryNode') {
@@ -332,7 +331,7 @@ function sanitizeInsertData(query: InsertQueryNode) {
 Another popular interception use case is, instead of intercepting calls, "listening on" entity changes.
 
 ```ts
-client.$use({
+db.$use({
     id: 'mutation-hook-plugin',
     beforeEntityMutation({ model, action }) {
         console.log(`Before ${model} ${action}`);
@@ -346,7 +345,7 @@ client.$use({
 You can provide an extra `mutationInterceptionFilter` to control what to intercept, and opt in for loading the affected entities before and/or after the mutation.
 
 ```ts
-client.$use({
+db.$use({
     id: 'mutation-hook-plugin',
     mutationInterceptionFilter: ({ model }) => {
         return {
@@ -375,19 +374,19 @@ ZenStack v3 delegates database schema migration to Prisma. The CLI provides Pris
 - Sync schema to dev database and create a migration record:
 
     ```bash
-    npx zenstack migrate dev
+    npx zen migrate dev
     ```
 
 - Deploy new migrations:
 
     ```bash
-    npx zenstack migrate deploy
+    npx zen migrate deploy
     ```
 
 - Reset dev database
 
     ```bash
-    npx zenstack migrate reset
+    npx zen migrate reset
     ```
 
 See [Prisma Migrate](https://www.prisma.io/docs/orm/prisma-migrate) documentation for more details.
@@ -398,7 +397,7 @@ See [Prisma Migrate](https://www.prisma.io/docs/orm/prisma-migrate) documentatio
 1. Remove "@prisma/client" dependency
 1. Install "better-sqlite3" or "pg" based on database type
 1. Move "schema.prisma" to "zenstack" folder and rename it to "schema.zmodel"
-1. Run `npx zenstack generate`
+1. Run `npx zen generate`
 1. Replace `new PrismaClient()` with `new ZenStackClient(schema, { ... })`
 
 # Limitations

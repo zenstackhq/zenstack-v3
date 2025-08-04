@@ -186,8 +186,12 @@ function linkContentToContainer(node: AstNode): void {
 function validationAfterImportMerge(model: Model) {
     const errors: string[] = [];
     const dataSources = model.declarations.filter((d) => isDataSource(d));
-    if (dataSources.length > 1) {
-        errors.push('Validation error: Multiple datasource declarations are not allowed');
+    if (dataSources.length === 0) {
+        errors.push('Validation error: schema must have a datasource declaration');
+    } else {
+        if (dataSources.length > 1) {
+            errors.push('Validation error: multiple datasource declarations are not allowed');
+        }
     }
 
     // at most one `@@auth` model

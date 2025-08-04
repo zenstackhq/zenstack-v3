@@ -82,8 +82,6 @@ describe('person-repository', () => {
             { first_name: 'Brad', last_name: 'Pitt', gender: 'man' },
             { first_name: 'Angelina', last_name: 'Jolie', gender: 'woman' },
         ]);
-        console.log(created);
-
         await expect(PersonRepository.findPeople({ first_name: 'Brad' })).resolves.toBeTruthy();
         await expect(PersonRepository.findPeople({ first_name: 'Angelina' })).resolves.toBeTruthy();
     });

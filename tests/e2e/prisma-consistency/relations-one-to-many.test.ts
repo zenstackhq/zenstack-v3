@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 import {
     ZenStackValidationTester,
-    createTestDir,
-    expectValidationSuccess,
-    expectValidationFailure,
     baseSchema,
+    createTestDir,
+    expectValidationFailure,
+    expectValidationSuccess,
 } from './test-utils';
 
 describe('One-to-Many Relations Validation', () => {

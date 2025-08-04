@@ -1,7 +1,7 @@
 {
-    "name": "@zenstackhq/common-helpers",
+    "name": "@zenstackhq/kysely-sql-js",
     "version": "3.0.0-alpha.17",
-    "description": "ZenStack Common Helpers",
+    "description": "Kysely dialect for sql.js",
     "type": "module",
     "scripts": {
         "build": "tsup-node",
@@ -28,7 +28,15 @@
         }
     },
     "devDependencies": {
+        "@types/sql.js": "^1.4.9",
+        "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/eslint-config": "workspace:*"
+        "@zenstackhq/vitest-config": "workspace:*",
+        "sql.js": "^1.13.0",
+        "kysely": "catalog:"
+    },
+    "peerDependencies": {
+        "sql.js": "^1.13.0",
+        "kysely": "catalog:"
     }
 }

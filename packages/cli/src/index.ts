@@ -1,7 +1,8 @@
 import { ZModelLanguageMetaData } from '@zenstackhq/language';
 import colors from 'colors';
-import { Command, Option } from 'commander';
+import { Command, CommanderError, Option } from 'commander';
 import * as actions from './actions';
+import { CliError } from './cli-error';
 import { getVersion } from './utils/version-utils';
 
 const generateAction = async (options: Parameters<typeof actions.generate>[0]): Promise<void> => {
@@ -125,4 +126,17 @@ export function createProgram() {
 }
 
 const program = createProgram();
-program.parse(process.argv);
+
+program.parseAsync().catch((err) => {
+    if (err instanceof CliError) {
+        console.error(colors.red(err.message));
+        process.exit(1);
+    } else if (err instanceof CommanderError) {
+        // errors are already reported, just exit
+        process.exit(err.exitCode);
+    } else {
+        console.error(colors.red('An unexpected error occurred:'));
+        console.error(err);
+        process.exit(1);
+    }
+});

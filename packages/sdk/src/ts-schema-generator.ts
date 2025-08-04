@@ -559,32 +559,14 @@ export class TsSchemaGenerator {
         );
     }
 
-    private getDataSourceProvider(
-        model: Model,
-    ): { type: string; env: undefined; url: string } | { type: string; env: string; url: undefined } {
+    private getDataSourceProvider(model: Model) {
         const dataSource = model.declarations.find(isDataSource);
         invariant(dataSource, 'No data source found in the model');
 
         const providerExpr = dataSource.fields.find((f) => f.name === 'provider')?.value;
         invariant(isLiteralExpr(providerExpr), 'Provider must be a literal');
         const type = providerExpr.value as string;
-
-        const urlExpr = dataSource.fields.find((f) => f.name === 'url')?.value;
-        invariant(isLiteralExpr(urlExpr) || isInvocationExpr(urlExpr), 'URL must be a literal or env function');
-
-        if (isLiteralExpr(urlExpr)) {
-            return { type, url: urlExpr.value as string, env: undefined };
-        } else if (isInvocationExpr(urlExpr)) {
-            invariant(urlExpr.function.$refText === 'env', 'only "env" function is supported');
-            invariant(urlExpr.args.length === 1, 'env function must have one argument');
-            return {
-                type,
-                env: (urlExpr.args[0]!.value as LiteralExpr).value as string,
-                url: undefined,
-            };
-        } else {
-            throw new Error('Unsupported URL type');
-        }
+        return { type };
     }
 
     private getFieldMappedDefault(

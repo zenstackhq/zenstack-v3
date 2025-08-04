@@ -1,7 +1,7 @@
 {
     "name": "@zenstackhq/language",
     "description": "ZenStack ZModel language specification",
-    "version": "3.0.0-alpha.16",
+    "version": "3.0.0-alpha.17",
     "license": "MIT",
     "author": "ZenStack Team",
     "files": [
@@ -62,6 +62,7 @@
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/common-helpers": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*",
         "langium-cli": "catalog:",
         "tmp": "catalog:",
         "@types/tmp": "catalog:"

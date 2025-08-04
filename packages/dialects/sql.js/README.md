@@ -6,7 +6,7 @@ Forked from https://github.com/betarixm/kysely-sql-js
 import { type GeneratedAlways, Kysely } from 'kysely';
 import initSqlJs from 'sql.js';
 
-import { SqlJsDialect } from 'kysely-sql-js';
+import { SqlJsDialect } from '@zenstackhq/kysely-sql-js';
 
 interface Database {
     person: {

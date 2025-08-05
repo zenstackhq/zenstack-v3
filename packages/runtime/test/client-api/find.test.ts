@@ -835,6 +835,31 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
         await expect(
             client.user.findUnique({
                 where: { id: user1.id },
+                select: {
+                    id: true,
+                    posts: {
+                        select: { _count: true },
+                    },
+                },
+            }),
+        ).resolves.toMatchObject({
+            id: user1.id,
+            posts: [{ _count: { comments: 0 } }, { _count: { comments: 0 } }],
+        });
+
+        client.comment.findFirst({
+            // @ts-expect-error Comment has no to-many relations to count
+            select: { _count: true },
+        });
+
+        client.post.findFirst({
+            // @ts-expect-error Comment has no to-many relations to count
+            select: { comments: { _count: true } },
+        });
+
+        await expect(
+            client.user.findUnique({
+                where: { id: user1.id },
                 select: { id: true, _count: { select: { posts: { where: { published: true } } } } },
             }),
         ).resolves.toMatchObject({

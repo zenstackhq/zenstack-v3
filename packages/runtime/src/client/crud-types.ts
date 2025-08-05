@@ -393,7 +393,12 @@ export type SelectInput<
     [Key in NonRelationFields<Schema, Model>]?: true;
 } & (AllowRelation extends true ? IncludeInput<Schema, Model> : {}) & // relation fields
     // relation count
-    (AllowCount extends true ? { _count?: SelectCount<Schema, Model> } : {});
+    (AllowCount extends true
+        ? // _count is only allowed if the model has to-many relations
+          HasToManyRelations<Schema, Model> extends true
+            ? { _count?: SelectCount<Schema, Model> }
+            : {}
+        : {});
 
 type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
     | true
@@ -1180,5 +1185,11 @@ type NonOwnedRelationFields<Schema extends SchemaDef, Model extends GetModels<Sc
         ? never
         : Key]: true;
 };
+
+type HasToManyRelations<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
+    [Key in RelationFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true ? Key : never]: true;
+} extends never
+    ? false
+    : true;
 
 // #endregion

@@ -8,7 +8,6 @@ import {
     UpdateResult,
     type Compilable,
     type IsolationLevel,
-    type Expression as KyselyExpression,
     type QueryResult,
     type SelectQueryBuilder,
 } from 'kysely';
@@ -31,7 +30,6 @@ import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
 import {
     buildFieldRef,
-    buildJoinPairs,
     ensureArray,
     extractIdFields,
     flattenCompoundUniqueFilters,
@@ -298,56 +296,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         parentAlias: string,
         payload: any,
     ) {
-        const modelDef = requireModel(this.schema, model);
-        const toManyRelations = Object.entries(modelDef.fields).filter(([, field]) => field.relation && field.array);
-
-        const selections =
-            payload === true
-                ? {
-                      select: toManyRelations.reduce(
-                          (acc, [field]) => {
-                              acc[field] = true;
-                              return acc;
-                          },
-                          {} as Record<string, boolean>,
-                      ),
-                  }
-                : payload;
-
-        const eb = expressionBuilder<any, any>();
-        const jsonObject: Record<string, KyselyExpression<any>> = {};
-
-        for (const [field, value] of Object.entries(selections.select)) {
-            const fieldDef = requireField(this.schema, model, field);
-            const fieldModel = fieldDef.type;
-            const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field, fieldModel);
-
-            // build a nested query to count the number of records in the relation
-            let fieldCountQuery = eb.selectFrom(fieldModel).select(eb.fn.countAll().as(`_count$${field}`));
-
-            // join conditions
-            for (const [left, right] of joinPairs) {
-                fieldCountQuery = fieldCountQuery.whereRef(left, '=', right);
-            }
-
-            // merge _count filter
-            if (
-                value &&
-                typeof value === 'object' &&
-                'where' in value &&
-                value.where &&
-                typeof value.where === 'object'
-            ) {
-                const filter = this.dialect.buildFilter(eb, fieldModel, fieldModel, value.where);
-                fieldCountQuery = fieldCountQuery.where(filter);
-            }
-
-            jsonObject[field] = fieldCountQuery;
-        }
-
-        query = query.select((eb) => this.dialect.buildJsonObject(eb, jsonObject).as('_count'));
-
-        return query;
+        return query.select((eb) => this.dialect.buildCountJson(model, eb, parentAlias, payload).as('_count'));
     }
 
     private buildCursorFilter(

@@ -847,6 +847,56 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return query;
     }
 
+    buildCountJson(model: string, eb: ExpressionBuilder<any, any>, parentAlias: string, payload: any) {
+        const modelDef = requireModel(this.schema, model);
+        const toManyRelations = Object.entries(modelDef.fields).filter(([, field]) => field.relation && field.array);
+
+        const selections =
+            payload === true
+                ? {
+                      select: toManyRelations.reduce(
+                          (acc, [field]) => {
+                              acc[field] = true;
+                              return acc;
+                          },
+                          {} as Record<string, boolean>,
+                      ),
+                  }
+                : payload;
+
+        const jsonObject: Record<string, Expression<any>> = {};
+
+        for (const [field, value] of Object.entries(selections.select)) {
+            const fieldDef = requireField(this.schema, model, field);
+            const fieldModel = fieldDef.type;
+            const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field, fieldModel);
+
+            // build a nested query to count the number of records in the relation
+            let fieldCountQuery = eb.selectFrom(fieldModel).select(eb.fn.countAll().as(`_count$${field}`));
+
+            // join conditions
+            for (const [left, right] of joinPairs) {
+                fieldCountQuery = fieldCountQuery.whereRef(left, '=', right);
+            }
+
+            // merge _count filter
+            if (
+                value &&
+                typeof value === 'object' &&
+                'where' in value &&
+                value.where &&
+                typeof value.where === 'object'
+            ) {
+                const filter = this.buildFilter(eb, fieldModel, fieldModel, value.where);
+                fieldCountQuery = fieldCountQuery.where(filter);
+            }
+
+            jsonObject[field] = fieldCountQuery;
+        }
+
+        return this.buildJsonObject(eb, jsonObject);
+    }
+
     // #endregion
 
     // #region utils

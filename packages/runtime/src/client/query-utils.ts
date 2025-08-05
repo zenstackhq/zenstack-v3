@@ -97,23 +97,23 @@ export function getRelationForeignKeyFieldPairs(schema: SchemaDef, model: string
 }
 
 export function isScalarField(schema: SchemaDef, model: string, field: string): boolean {
-    const fieldDef = requireField(schema, model, field);
-    return !fieldDef.relation && !fieldDef.foreignKeyFor;
+    const fieldDef = getField(schema, model, field);
+    return !fieldDef?.relation && !fieldDef?.foreignKeyFor;
 }
 
 export function isForeignKeyField(schema: SchemaDef, model: string, field: string): boolean {
-    const fieldDef = requireField(schema, model, field);
-    return !!fieldDef.foreignKeyFor;
+    const fieldDef = getField(schema, model, field);
+    return !!fieldDef?.foreignKeyFor;
 }
 
 export function isRelationField(schema: SchemaDef, model: string, field: string): boolean {
-    const fieldDef = requireField(schema, model, field);
-    return !!fieldDef.relation;
+    const fieldDef = getField(schema, model, field);
+    return !!fieldDef?.relation;
 }
 
 export function isInheritedField(schema: SchemaDef, model: string, field: string): boolean {
-    const fieldDef = requireField(schema, model, field);
-    return !!fieldDef.originModel;
+    const fieldDef = getField(schema, model, field);
+    return !!fieldDef?.originModel;
 }
 
 export function getUniqueFields(schema: SchemaDef, model: string) {

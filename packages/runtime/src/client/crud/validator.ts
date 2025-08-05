@@ -544,7 +544,7 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         }
 
-        const toManyRelations = Object.entries(modelDef.fields).filter(([, value]) => value.relation && value.array);
+        const toManyRelations = Object.values(modelDef.fields).filter((def) => def.relation && def.array);
 
         if (toManyRelations.length > 0) {
             fields['_count'] = z
@@ -552,9 +552,9 @@ export class InputValidator<Schema extends SchemaDef> {
                     z.literal(true),
                     z.object(
                         toManyRelations.reduce(
-                            (acc, [name, fieldDef]) => ({
+                            (acc, fieldDef) => ({
                                 ...acc,
-                                [name]: z
+                                [fieldDef.name]: z
                                     .union([
                                         z.boolean(),
                                         z.object({

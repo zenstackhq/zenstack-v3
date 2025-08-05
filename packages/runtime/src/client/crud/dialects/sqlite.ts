@@ -67,14 +67,14 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         model: string,
         eb: ExpressionBuilder<any, any>,
         relationField: string,
-        parentName: string,
+        parentAlias: string,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>,
     ) {
         const relationFieldDef = requireField(this.schema, model, relationField);
         const relationModel = relationFieldDef.type as GetModels<Schema>;
         const relationModelDef = requireModel(this.schema, relationModel);
 
-        const subQueryName = `${parentName}$${relationField}`;
+        const subQueryName = `${parentAlias}$${relationField}`;
 
         let tbl = eb.selectFrom(() => {
             let subQuery = this.buildSelectModel(eb, relationModel);
@@ -129,7 +129,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                         eb
                             .selectFrom(m2m.joinTable)
                             .select(`${m2m.joinTable}.${m2m.otherFkName}`)
-                            .whereRef(`${parentName}.${parentIds[0]}`, '=', `${m2m.joinTable}.${m2m.parentFkName}`),
+                            .whereRef(`${parentAlias}.${parentIds[0]}`, '=', `${m2m.joinTable}.${m2m.parentFkName}`),
                     ),
                 );
             } else {
@@ -137,10 +137,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 keyPairs.forEach(({ fk, pk }) => {
                     if (ownedByModel) {
                         // the parent model owns the fk
-                        subQuery = subQuery.whereRef(`${relationModel}.${pk}`, '=', `${parentName}.${fk}`);
+                        subQuery = subQuery.whereRef(`${relationModel}.${pk}`, '=', `${parentAlias}.${fk}`);
                     } else {
                         // the relation side owns the fk
-                        subQuery = subQuery.whereRef(`${relationModel}.${fk}`, '=', `${parentName}.${pk}`);
+                        subQuery = subQuery.whereRef(`${relationModel}.${fk}`, '=', `${parentAlias}.${pk}`);
                     }
                 });
             }
@@ -183,21 +183,31 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                     ...Object.entries<any>(payload.select)
                         .filter(([, value]) => value)
                         .map(([field, value]) => {
-                            const fieldDef = requireField(this.schema, relationModel, field);
-                            if (fieldDef.relation) {
-                                const subJson = this.buildRelationJSON(
+                            if (field === '_count') {
+                                const subJson = this.buildCountJson(
                                     relationModel as GetModels<Schema>,
                                     eb,
-                                    field,
-                                    `${parentName}$${relationField}`,
+                                    `${parentAlias}$${relationField}`,
                                     value,
                                 );
-                                return [sql.lit(field), subJson as ArgsType];
+                                return [sql.lit(field), subJson];
                             } else {
-                                return [
-                                    sql.lit(field),
-                                    buildFieldRef(this.schema, relationModel, field, this.options, eb) as ArgsType,
-                                ];
+                                const fieldDef = requireField(this.schema, relationModel, field);
+                                if (fieldDef.relation) {
+                                    const subJson = this.buildRelationJSON(
+                                        relationModel as GetModels<Schema>,
+                                        eb,
+                                        field,
+                                        `${parentAlias}$${relationField}`,
+                                        value,
+                                    );
+                                    return [sql.lit(field), subJson];
+                                } else {
+                                    return [
+                                        sql.lit(field),
+                                        buildFieldRef(this.schema, relationModel, field, this.options, eb) as ArgsType,
+                                    ];
+                                }
                             }
                         })
                         .flatMap((v) => v),
@@ -214,7 +224,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                                 relationModel as GetModels<Schema>,
                                 eb,
                                 field,
-                                `${parentName}$${relationField}`,
+                                `${parentAlias}$${relationField}`,
                                 value,
                             );
                             return [sql.lit(field), subJson];

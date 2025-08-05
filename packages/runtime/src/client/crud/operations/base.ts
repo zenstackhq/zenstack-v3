@@ -244,9 +244,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             // clean up distinct utility fields
             for (const r of result) {
-                for (const f of inMemoryDistinct) {
-                    delete r[`$distinct$${f}`];
-                }
+                Object.keys(r)
+                    .filter((k) => k.startsWith('$distinct$'))
+                    .forEach((k) => delete r[k]);
             }
         }
 

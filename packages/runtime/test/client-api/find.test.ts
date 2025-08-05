@@ -282,7 +282,6 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
 
         // distinct with select
         r = await client.user.findMany({ distinct: ['role'], select: { email: true } });
-        console.log(r);
         expect(r).toHaveLength(2);
         expect(r).toEqual(expect.arrayContaining([{ email: expect.any(String) }, { email: expect.any(String) }]));
 

@@ -177,12 +177,21 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // distinct
         let inMemoryDistinct: string[] | undefined = undefined;
         if (args?.distinct) {
-            const distinct = ensureArray(args.distinct);
+            const distinct = ensureArray(args.distinct) as string[];
             if (this.dialect.supportsDistinctOn) {
-                query = query.distinctOn(distinct.map((f: any) => sql.ref(`${model}.${f}`)));
+                query = query.distinctOn(distinct.map((f) => sql.ref(`${model}.${f}`)));
             } else {
                 // in-memory distinct after fetching all results
                 inMemoryDistinct = distinct;
+
+                // make sure distinct fields are selected
+                query = distinct.reduce(
+                    (acc, field) =>
+                        acc.select((eb) =>
+                            buildFieldRef(this.schema, model, field, this.options, eb).as(`$distinct$${field}`),
+                        ),
+                    query,
+                );
             }
         }
 
@@ -225,13 +234,20 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const distinctResult: Record<string, unknown>[] = [];
             const seen = new Set<string>();
             for (const r of result as any[]) {
-                const key = safeJSONStringify(inMemoryDistinct.map((f) => r[f]))!;
+                const key = safeJSONStringify(inMemoryDistinct.map((f) => r[`$distinct$${f}`]))!;
                 if (!seen.has(key)) {
                     distinctResult.push(r);
                     seen.add(key);
                 }
             }
             result = distinctResult;
+
+            // clean up distinct utility fields
+            for (const r of result) {
+                Object.keys(r)
+                    .filter((k) => k.startsWith('$distinct$'))
+                    .forEach((k) => delete r[k]);
+            }
         }
 
         return result;

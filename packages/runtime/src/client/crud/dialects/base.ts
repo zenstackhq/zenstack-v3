@@ -560,7 +560,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                             : eb(fieldRef, 'like', sql.val(`%${value}`)),
                     )
                     .otherwise(() => {
-                        throw new Error(`Invalid string filter key: ${key}`);
+                        throw new QueryError(`Invalid string filter key: ${key}`);
                     });
 
                 if (condition) {

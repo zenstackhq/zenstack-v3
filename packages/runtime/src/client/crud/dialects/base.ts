@@ -457,6 +457,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         recurse: (value: unknown) => Expression<SqlBool>,
         throwIfInvalid = false,
         onlyForKeys: string[] | undefined = undefined,
+        excludeKeys: string[] = [],
     ) {
         if (payload === null || !isPlainObject(payload)) {
             return {
@@ -470,6 +471,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
         for (const [op, value] of Object.entries(payload)) {
             if (onlyForKeys && !onlyForKeys.includes(op)) {
+                continue;
+            }
+            if (excludeKeys.includes(op)) {
                 continue;
             }
             const rhs = Array.isArray(value) ? value.map(getRhs) : getRhs(value);
@@ -513,20 +517,23 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return { conditions, consumedKeys };
     }
 
-    private buildStringFilter(eb: ExpressionBuilder<any, any>, fieldRef: Expression<any>, payload: StringFilter<true>) {
-        let insensitive = false;
-        if (payload && typeof payload === 'object' && 'mode' in payload && payload.mode === 'insensitive') {
-            insensitive = true;
-            fieldRef = eb.fn('lower', [fieldRef]);
+    private buildStringFilter(
+        eb: ExpressionBuilder<any, any>,
+        fieldRef: Expression<any>,
+        payload: StringFilter<Schema, true>,
+    ) {
+        let mode: 'default' | 'insensitive' | undefined;
+        if (payload && typeof payload === 'object' && 'mode' in payload) {
+            mode = payload.mode;
         }
 
         const { conditions, consumedKeys } = this.buildStandardFilter(
             eb,
             'String',
             payload,
-            fieldRef,
-            (value) => this.prepStringCasing(eb, value, insensitive),
-            (value) => this.buildStringFilter(eb, fieldRef, value as StringFilter<true>),
+            mode === 'insensitive' ? eb.fn('lower', [fieldRef]) : fieldRef,
+            (value) => this.prepStringCasing(eb, value, mode),
+            (value) => this.buildStringFilter(eb, fieldRef, value as StringFilter<Schema, true>),
         );
 
         if (payload && typeof payload === 'object') {
@@ -538,22 +545,22 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
                 const condition = match(key)
                     .with('contains', () =>
-                        insensitive
-                            ? eb(fieldRef, 'ilike', sql.lit(`%${value}%`))
-                            : eb(fieldRef, 'like', sql.lit(`%${value}%`)),
+                        mode === 'insensitive'
+                            ? eb(fieldRef, 'ilike', sql.val(`%${value}%`))
+                            : eb(fieldRef, 'like', sql.val(`%${value}%`)),
                     )
                     .with('startsWith', () =>
-                        insensitive
-                            ? eb(fieldRef, 'ilike', sql.lit(`${value}%`))
-                            : eb(fieldRef, 'like', sql.lit(`${value}%`)),
+                        mode === 'insensitive'
+                            ? eb(fieldRef, 'ilike', sql.val(`${value}%`))
+                            : eb(fieldRef, 'like', sql.val(`${value}%`)),
                     )
                     .with('endsWith', () =>
-                        insensitive
-                            ? eb(fieldRef, 'ilike', sql.lit(`%${value}`))
-                            : eb(fieldRef, 'like', sql.lit(`%${value}`)),
+                        mode === 'insensitive'
+                            ? eb(fieldRef, 'ilike', sql.val(`%${value}`))
+                            : eb(fieldRef, 'like', sql.val(`%${value}`)),
                     )
                     .otherwise(() => {
-                        throw new Error(`Invalid string filter key: ${key}`);
+                        throw new QueryError(`Invalid string filter key: ${key}`);
                     });
 
                 if (condition) {
@@ -565,13 +572,21 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return this.and(eb, ...conditions);
     }
 
-    private prepStringCasing(eb: ExpressionBuilder<any, any>, value: unknown, toLower: boolean = true): any {
+    private prepStringCasing(
+        eb: ExpressionBuilder<any, any>,
+        value: unknown,
+        mode: 'default' | 'insensitive' | undefined,
+    ): any {
+        if (!mode || mode === 'default') {
+            return value === null ? value : sql.val(value);
+        }
+
         if (typeof value === 'string') {
-            return toLower ? eb.fn('lower', [sql.lit(value)]) : sql.lit(value);
+            return eb.fn('lower', [sql.val(value)]);
         } else if (Array.isArray(value)) {
-            return value.map((v) => this.prepStringCasing(eb, v, toLower));
+            return value.map((v) => this.prepStringCasing(eb, v, mode));
         } else {
-            return value === null ? null : sql.lit(value);
+            return value === null ? null : sql.val(value);
         }
     }
 
@@ -613,7 +628,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildDateTimeFilter(
         eb: ExpressionBuilder<any, any>,
         fieldRef: Expression<any>,
-        payload: DateTimeFilter<true>,
+        payload: DateTimeFilter<Schema, true>,
     ) {
         const { conditions } = this.buildStandardFilter(
             eb,
@@ -621,7 +636,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             payload,
             fieldRef,
             (value) => this.transformPrimitive(value, 'DateTime', false),
-            (value) => this.buildDateTimeFilter(eb, fieldRef, value as DateTimeFilter<true>),
+            (value) => this.buildDateTimeFilter(eb, fieldRef, value as DateTimeFilter<Schema, true>),
             true,
         );
         return this.and(eb, ...conditions);
@@ -845,6 +860,56 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             return qb;
         });
         return query;
+    }
+
+    buildCountJson(model: string, eb: ExpressionBuilder<any, any>, parentAlias: string, payload: any) {
+        const modelDef = requireModel(this.schema, model);
+        const toManyRelations = Object.entries(modelDef.fields).filter(([, field]) => field.relation && field.array);
+
+        const selections =
+            payload === true
+                ? {
+                      select: toManyRelations.reduce(
+                          (acc, [field]) => {
+                              acc[field] = true;
+                              return acc;
+                          },
+                          {} as Record<string, boolean>,
+                      ),
+                  }
+                : payload;
+
+        const jsonObject: Record<string, Expression<any>> = {};
+
+        for (const [field, value] of Object.entries(selections.select)) {
+            const fieldDef = requireField(this.schema, model, field);
+            const fieldModel = fieldDef.type;
+            const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field, fieldModel);
+
+            // build a nested query to count the number of records in the relation
+            let fieldCountQuery = eb.selectFrom(fieldModel).select(eb.fn.countAll().as(`_count$${field}`));
+
+            // join conditions
+            for (const [left, right] of joinPairs) {
+                fieldCountQuery = fieldCountQuery.whereRef(left, '=', right);
+            }
+
+            // merge _count filter
+            if (
+                value &&
+                typeof value === 'object' &&
+                'where' in value &&
+                value.where &&
+                typeof value.where === 'object'
+            ) {
+                const filter = this.buildFilter(eb, fieldModel, fieldModel, value.where);
+                fieldCountQuery = fieldCountQuery.where(filter);
+            }
+
+            jsonObject[field] = fieldCountQuery;
+        }
+
+        return this.buildJsonObject(eb, jsonObject);
     }
 
     // #endregion

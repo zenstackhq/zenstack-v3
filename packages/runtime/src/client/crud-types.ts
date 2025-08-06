@@ -223,7 +223,7 @@ export type WhereInput<
           : FieldIsArray<Schema, Model, Key> extends true
             ? ArrayFilter<GetModelFieldType<Schema, Model, Key>>
             : // primitive
-              PrimitiveFilter<GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>;
+              PrimitiveFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>;
 } & {
     $expr?: (eb: ExpressionBuilder<ToKyselySchema<Schema>, Model>) => OperandExpression<SqlBool>;
 } & {
@@ -249,21 +249,21 @@ type ArrayFilter<T extends string> = {
     isEmpty?: boolean;
 };
 
-type PrimitiveFilter<T extends string, Nullable extends boolean> = T extends 'String'
-    ? StringFilter<Nullable>
+type PrimitiveFilter<Schema extends SchemaDef, T extends string, Nullable extends boolean> = T extends 'String'
+    ? StringFilter<Schema, Nullable>
     : T extends 'Int' | 'Float' | 'Decimal' | 'BigInt'
-      ? NumberFilter<T, Nullable>
+      ? NumberFilter<Schema, T, Nullable>
       : T extends 'Boolean'
         ? BooleanFilter<Nullable>
         : T extends 'DateTime'
-          ? DateTimeFilter<Nullable>
+          ? DateTimeFilter<Schema, Nullable>
           : T extends 'Bytes'
             ? BytesFilter<Nullable>
             : T extends 'Json'
               ? 'Not implemented yet' // TODO: Json filter
               : never;
 
-type CommonPrimitiveFilter<DataType, T extends BuiltinType, Nullable extends boolean> = {
+type CommonPrimitiveFilter<Schema extends SchemaDef, DataType, T extends BuiltinType, Nullable extends boolean> = {
     equals?: NullableIf<DataType, Nullable>;
     in?: DataType[];
     notIn?: DataType[];
@@ -271,25 +271,30 @@ type CommonPrimitiveFilter<DataType, T extends BuiltinType, Nullable extends boo
     lte?: DataType;
     gt?: DataType;
     gte?: DataType;
-    not?: PrimitiveFilter<T, Nullable>;
+    not?: PrimitiveFilter<Schema, T, Nullable>;
 };
 
-export type StringFilter<Nullable extends boolean> =
+export type StringFilter<Schema extends SchemaDef, Nullable extends boolean> =
     | NullableIf<string, Nullable>
-    | (CommonPrimitiveFilter<string, 'String', Nullable> & {
+    | (CommonPrimitiveFilter<Schema, string, 'String', Nullable> & {
           contains?: string;
           startsWith?: string;
           endsWith?: string;
-          mode?: 'default' | 'insensitive';
-      });
+      } & (ProviderSupportsCaseSensitivity<Schema> extends true
+              ? {
+                    mode?: 'default' | 'insensitive';
+                }
+              : {}));
 
-export type NumberFilter<T extends 'Int' | 'Float' | 'Decimal' | 'BigInt', Nullable extends boolean> =
-    | NullableIf<number | bigint, Nullable>
-    | CommonPrimitiveFilter<number, T, Nullable>;
+export type NumberFilter<
+    Schema extends SchemaDef,
+    T extends 'Int' | 'Float' | 'Decimal' | 'BigInt',
+    Nullable extends boolean,
+> = NullableIf<number | bigint, Nullable> | CommonPrimitiveFilter<Schema, number, T, Nullable>;
 
-export type DateTimeFilter<Nullable extends boolean> =
+export type DateTimeFilter<Schema extends SchemaDef, Nullable extends boolean> =
     | NullableIf<Date | string, Nullable>
-    | CommonPrimitiveFilter<Date | string, 'DateTime', Nullable>;
+    | CommonPrimitiveFilter<Schema, Date | string, 'DateTime', Nullable>;
 
 export type BytesFilter<Nullable extends boolean> =
     | NullableIf<Uint8Array | Buffer, Nullable>
@@ -393,7 +398,12 @@ export type SelectInput<
     [Key in NonRelationFields<Schema, Model>]?: true;
 } & (AllowRelation extends true ? IncludeInput<Schema, Model> : {}) & // relation fields
     // relation count
-    (AllowCount extends true ? { _count?: SelectCount<Schema, Model> } : {});
+    (AllowCount extends true
+        ? // _count is only allowed if the model has to-many relations
+          HasToManyRelations<Schema, Model> extends true
+            ? { _count?: SelectCount<Schema, Model> }
+            : {}
+        : {});
 
 type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
     | true
@@ -1180,5 +1190,13 @@ type NonOwnedRelationFields<Schema extends SchemaDef, Model extends GetModels<Sc
         ? never
         : Key]: true;
 };
+
+type HasToManyRelations<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
+    [Key in RelationFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true ? Key : never]: true;
+} extends never
+    ? false
+    : true;
+
+type ProviderSupportsCaseSensitivity<Schema extends SchemaDef> = Schema['provider'] extends 'postgresql' ? true : false;
 
 // #endregion

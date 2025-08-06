@@ -200,7 +200,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         relationField: string,
         eb: ExpressionBuilder<any, any>,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-        parentName: string,
+        parentAlias: string,
     ) {
         const relationModelDef = requireModel(this.schema, relationModel);
         const objArgs: Array<
@@ -238,14 +238,24 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             objArgs.push(
                 ...Object.entries(payload.select)
                     .filter(([, value]) => value)
-                    .map(([field]) => {
-                        const fieldDef = requireField(this.schema, relationModel, field);
-                        const fieldValue = fieldDef.relation
-                            ? // reference the synthesized JSON field
-                              eb.ref(`${parentName}$${relationField}$${field}.$j`)
-                            : // reference a plain field
-                              buildFieldRef(this.schema, relationModel, field, this.options, eb);
-                        return [sql.lit(field), fieldValue];
+                    .map(([field, value]) => {
+                        if (field === '_count') {
+                            const subJson = this.buildCountJson(
+                                relationModel as GetModels<Schema>,
+                                eb,
+                                `${parentAlias}$${relationField}`,
+                                value,
+                            );
+                            return [sql.lit(field), subJson];
+                        } else {
+                            const fieldDef = requireField(this.schema, relationModel, field);
+                            const fieldValue = fieldDef.relation
+                                ? // reference the synthesized JSON field
+                                  eb.ref(`${parentAlias}$${relationField}$${field}.$j`)
+                                : // reference a plain field
+                                  buildFieldRef(this.schema, relationModel, field, this.options, eb);
+                            return [sql.lit(field), fieldValue];
+                        }
                     })
                     .flatMap((v) => v),
             );
@@ -259,7 +269,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                     .map(([field]) => [
                         sql.lit(field),
                         // reference the synthesized JSON field
-                        eb.ref(`${parentName}$${relationField}$${field}.$j`),
+                        eb.ref(`${parentAlias}$${relationField}$${field}.$j`),
                     ])
                     .flatMap((v) => v),
             );

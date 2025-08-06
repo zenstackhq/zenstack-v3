@@ -5,7 +5,7 @@ import { createClientSpecs } from './client-specs';
 
 const PG_DB_NAME = 'client-api-filter-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME))('Client filter tests for $provider', ({ createClient }) => {
+describe.each(createClientSpecs(PG_DB_NAME))('Client filter tests for $provider', ({ createClient, provider }) => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
@@ -76,19 +76,117 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client filter tests for $provider'
             }),
         ).toResolveTruthy();
 
-        // case-insensitive
-        await expect(
-            client.user.findFirst({
-                where: { email: { equals: 'u1@Test.com' } },
-            }),
-        ).toResolveFalsy();
-        await expect(
-            client.user.findFirst({
-                where: {
-                    email: { equals: 'u1@Test.com', mode: 'insensitive' },
-                },
-            }),
-        ).toResolveTruthy();
+        if (provider === 'sqlite') {
+            // sqlite: equalities are case-sensitive, match is case-insensitive
+            await expect(
+                client.user.findFirst({
+                    where: { email: { equals: 'u1@Test.com' } },
+                }),
+            ).toResolveFalsy();
+
+            await expect(
+                client.user.findFirst({
+                    where: { email: { equals: 'u1@test.com' } },
+                }),
+            ).toResolveTruthy();
+
+            await expect(
+                client.user.findFirst({
+                    where: { email: { contains: 'test' } },
+                }),
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({
+                    where: { email: { contains: 'Test' } },
+                }),
+            ).toResolveTruthy();
+
+            await expect(
+                client.user.findFirst({
+                    where: { email: { startsWith: 'u1' } },
+                }),
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({
+                    where: { email: { startsWith: 'U1' } },
+                }),
+            ).toResolveTruthy();
+
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { in: ['u1@Test.com'] },
+                    },
+                }),
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { in: ['u1@test.com'] },
+                    },
+                }),
+            ).toResolveTruthy();
+        } else if (provider === 'postgresql') {
+            // postgresql: default is case-sensitive, but can be toggled with "mode"
+
+            await expect(
+                client.user.findFirst({
+                    where: { email: { equals: 'u1@Test.com' } },
+                }),
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { equals: 'u1@Test.com', mode: 'insensitive' } as any,
+                    },
+                }),
+            ).toResolveTruthy();
+
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { contains: 'u1@Test.com' },
+                    },
+                }),
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { contains: 'u1@Test.com', mode: 'insensitive' } as any,
+                    },
+                }),
+            ).toResolveTruthy();
+
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { endsWith: 'Test.com' },
+                    },
+                }),
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { endsWith: 'Test.com', mode: 'insensitive' } as any,
+                    },
+                }),
+            ).toResolveTruthy();
+
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { in: ['u1@Test.com'] },
+                    },
+                }),
+            ).toResolveFalsy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { in: ['u1@Test.com'], mode: 'insensitive' } as any,
+                    },
+                }),
+            ).toResolveTruthy();
+        }
 
         // in
         await expect(
@@ -225,7 +323,9 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client filter tests for $provider'
 
         // equals
         await expect(client.profile.findFirst({ where: { age: 20 } })).resolves.toMatchObject({ id: '1' });
-        await expect(client.profile.findFirst({ where: { age: { equals: 20 } } })).resolves.toMatchObject({ id: '1' });
+        await expect(client.profile.findFirst({ where: { age: { equals: 20 } } })).resolves.toMatchObject({
+            id: '1',
+        });
         await expect(client.profile.findFirst({ where: { age: { equals: 10 } } })).toResolveFalsy();
         await expect(client.profile.findFirst({ where: { age: null } })).resolves.toMatchObject({ id: '2' });
         await expect(client.profile.findFirst({ where: { age: { equals: null } } })).resolves.toMatchObject({

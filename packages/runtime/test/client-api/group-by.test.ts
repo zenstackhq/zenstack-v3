@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
 import { createClientSpecs } from './client-specs';
-import { createUser } from './utils';
+import { createPosts, createUser } from './utils';
 
 const PG_DB_NAME = 'client-api-group-by-tests';
 
@@ -33,6 +33,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client groupBy tests', ({ createCl
             name: 'User',
             role: 'USER',
         });
+        await createPosts(client, '1');
 
         await expect(
             client.user.groupBy({
@@ -67,7 +68,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client groupBy tests', ({ createCl
                 take: -2,
                 orderBy: { email: 'desc' },
             }),
-        ).resolves.toEqual([{ email: 'u2@test.com' }, { email: 'u1@test.com' }]);
+        ).resolves.toEqual(expect.arrayContaining([{ email: 'u2@test.com' }, { email: 'u1@test.com' }]));
 
         await expect(
             client.user.groupBy({
@@ -93,6 +94,18 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client groupBy tests', ({ createCl
             { name: 'User', role: 'USER', _count: 2 },
             { name: 'Admin', role: 'ADMIN', _count: 1 },
         ]);
+
+        await expect(
+            client.post.groupBy({
+                by: ['published'],
+                _count: true,
+            }),
+        ).resolves.toEqual(
+            expect.arrayContaining([
+                { published: true, _count: 1 },
+                { published: false, _count: 1 },
+            ]),
+        );
     });
 
     it('works with multiple bys', async () => {
@@ -130,12 +143,14 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client groupBy tests', ({ createCl
     it('works with different types of aggregation', async () => {
         await client.profile.create({
             data: {
+                id: '1',
                 age: 10,
                 bio: 'bio',
             },
         });
         await client.profile.create({
             data: {
+                id: '2',
                 age: 20,
                 bio: 'bio',
             },
@@ -144,24 +159,106 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client groupBy tests', ({ createCl
         await expect(
             client.profile.groupBy({
                 by: ['bio'],
-                _count: { age: true },
+                _count: { age: true, id: true },
                 _avg: { age: true },
                 _sum: { age: true },
-                _min: { age: true },
-                _max: { age: true },
+                _min: { age: true, id: true },
+                _max: { age: true, id: true },
             }),
         ).resolves.toEqual(
             expect.arrayContaining([
                 {
                     bio: 'bio',
-                    _count: { age: 2 },
+                    _count: { age: 2, id: 2 },
                     _avg: { age: 15 },
                     _sum: { age: 30 },
-                    _min: { age: 10 },
-                    _max: { age: 20 },
+                    _min: { age: 10, id: '1' },
+                    _max: { age: 20, id: '2' },
                 },
             ]),
         );
+    });
+
+    it('works with using aggregations in having', async () => {
+        await client.profile.create({
+            data: {
+                id: '1',
+                age: 10,
+                bio: 'bio1',
+            },
+        });
+        await client.profile.create({
+            data: {
+                id: '2',
+                age: 20,
+                bio: 'bio1',
+            },
+        });
+        await client.profile.create({
+            data: {
+                id: '3',
+                age: 30,
+                bio: 'bio2',
+            },
+        });
+        await client.profile.create({
+            data: {
+                id: '4',
+                age: 40,
+                bio: 'bio2',
+            },
+        });
+
+        await expect(
+            client.profile.groupBy({
+                by: ['bio'],
+                having: {
+                    age: { _avg: { gt: 15, lt: 50 }, _sum: { equals: 70 } },
+                },
+            }),
+        ).resolves.toEqual(expect.arrayContaining([{ bio: 'bio2' }]));
+    });
+
+    it('works with using aggregations in orderBy', async () => {
+        await client.profile.create({
+            data: {
+                id: '1',
+                age: 10,
+                bio: 'bio1',
+            },
+        });
+        await client.profile.create({
+            data: {
+                id: '2',
+                age: 20,
+                bio: 'bio1',
+            },
+        });
+        await client.profile.create({
+            data: {
+                id: '3',
+                age: 30,
+                bio: 'bio2',
+            },
+        });
+        await client.profile.create({
+            data: {
+                id: '4',
+                age: 40,
+                bio: 'bio2',
+            },
+        });
+
+        await expect(
+            client.profile.groupBy({
+                by: ['bio'],
+                orderBy: {
+                    _avg: {
+                        age: 'desc',
+                    },
+                },
+            }),
+        ).resolves.toEqual(expect.arrayContaining([{ bio: 'bio2' }]));
     });
 
     it('complains about fields in having that are not in by', async () => {

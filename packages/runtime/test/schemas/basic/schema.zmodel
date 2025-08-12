@@ -24,6 +24,7 @@ model User with CommonFields {
     role      Role     @default(USER)
     posts     Post[]
     profile   Profile?
+    meta      Json?
 
     // Access policies
     @@allow('all', auth().id == id)

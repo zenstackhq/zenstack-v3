@@ -5,7 +5,7 @@ import { match, P } from 'ts-pattern';
 import type { BuiltinType, DataSourceProviderType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { enumerate } from '../../../utils/enumerate';
 import type { OrArray } from '../../../utils/type-utils';
-import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
+import { AGGREGATE_OPERATORS, DELEGATE_JOINED_FIELD_PREFIX, LOGICAL_COMBINATORS } from '../../constants';
 import type {
     BooleanFilter,
     BytesFilter,
@@ -18,6 +18,7 @@ import type {
 import { InternalError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
+    aggregate,
     buildFieldRef,
     buildJoinPairs,
     flattenCompoundUniqueFilters,
@@ -83,7 +84,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 continue;
             }
 
-            if (key === 'AND' || key === 'OR' || key === 'NOT') {
+            if (this.isLogicalCombinator(key)) {
                 result = this.and(eb, result, this.buildCompositeFilter(eb, model, modelAlias, key, payload));
                 continue;
             }
@@ -118,11 +119,15 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
+    private isLogicalCombinator(key: string): key is (typeof LOGICAL_COMBINATORS)[number] {
+        return LOGICAL_COMBINATORS.includes(key as any);
+    }
+
     protected buildCompositeFilter(
         eb: ExpressionBuilder<any, any>,
         model: string,
         modelAlias: string,
-        key: 'AND' | 'OR' | 'NOT',
+        key: (typeof LOGICAL_COMBINATORS)[number],
         payload: any,
     ): Expression<SqlBool> {
         return match(key)
@@ -500,6 +505,20 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 .with('gt', () => eb(lhs, '>', rhs))
                 .with('gte', () => eb(lhs, '>=', rhs))
                 .with('not', () => eb.not(recurse(value)))
+                // aggregations
+                .with(P.union(...AGGREGATE_OPERATORS), (op) => {
+                    const innerResult = this.buildStandardFilter(
+                        eb,
+                        type,
+                        value,
+                        aggregate(eb, lhs, op),
+                        getRhs,
+                        recurse,
+                        throwIfInvalid,
+                    );
+                    consumedKeys.push(...innerResult.consumedKeys);
+                    return this.and(eb, ...innerResult.conditions);
+                })
                 .otherwise(() => {
                     if (throwIfInvalid) {
                         throw new QueryError(`Invalid filter key: ${op}`);
@@ -520,7 +539,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildStringFilter(
         eb: ExpressionBuilder<any, any>,
         fieldRef: Expression<any>,
-        payload: StringFilter<Schema, true>,
+        payload: StringFilter<Schema, true, boolean>,
     ) {
         let mode: 'default' | 'insensitive' | undefined;
         if (payload && typeof payload === 'object' && 'mode' in payload) {
@@ -533,7 +552,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             payload,
             mode === 'insensitive' ? eb.fn('lower', [fieldRef]) : fieldRef,
             (value) => this.prepStringCasing(eb, value, mode),
-            (value) => this.buildStringFilter(eb, fieldRef, value as StringFilter<Schema, true>),
+            (value) => this.buildStringFilter(eb, fieldRef, value as StringFilter<Schema, true, boolean>),
         );
 
         if (payload && typeof payload === 'object') {
@@ -610,7 +629,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildBooleanFilter(
         eb: ExpressionBuilder<any, any>,
         fieldRef: Expression<any>,
-        payload: BooleanFilter<true>,
+        payload: BooleanFilter<Schema, boolean, boolean>,
     ) {
         const { conditions } = this.buildStandardFilter(
             eb,
@@ -618,7 +637,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             payload,
             fieldRef,
             (value) => this.transformPrimitive(value, 'Boolean', false),
-            (value) => this.buildBooleanFilter(eb, fieldRef, value as BooleanFilter<true>),
+            (value) => this.buildBooleanFilter(eb, fieldRef, value as BooleanFilter<Schema, boolean, boolean>),
             true,
             ['equals', 'not'],
         );
@@ -628,7 +647,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildDateTimeFilter(
         eb: ExpressionBuilder<any, any>,
         fieldRef: Expression<any>,
-        payload: DateTimeFilter<Schema, true>,
+        payload: DateTimeFilter<Schema, boolean, boolean>,
     ) {
         const { conditions } = this.buildStandardFilter(
             eb,
@@ -636,20 +655,24 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             payload,
             fieldRef,
             (value) => this.transformPrimitive(value, 'DateTime', false),
-            (value) => this.buildDateTimeFilter(eb, fieldRef, value as DateTimeFilter<Schema, true>),
+            (value) => this.buildDateTimeFilter(eb, fieldRef, value as DateTimeFilter<Schema, boolean, boolean>),
             true,
         );
         return this.and(eb, ...conditions);
     }
 
-    private buildBytesFilter(eb: ExpressionBuilder<any, any>, fieldRef: Expression<any>, payload: BytesFilter<true>) {
+    private buildBytesFilter(
+        eb: ExpressionBuilder<any, any>,
+        fieldRef: Expression<any>,
+        payload: BytesFilter<Schema, boolean, boolean>,
+    ) {
         const conditions = this.buildStandardFilter(
             eb,
             'Bytes',
             payload,
             fieldRef,
             (value) => this.transformPrimitive(value, 'Bytes', false),
-            (value) => this.buildBytesFilter(eb, fieldRef, value as BytesFilter<true>),
+            (value) => this.buildBytesFilter(eb, fieldRef, value as BytesFilter<Schema, boolean, boolean>),
             true,
             ['equals', 'in', 'notIn', 'not'],
         );
@@ -704,7 +727,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     for (const [k, v] of Object.entries<string>(value)) {
                         invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                         result = result.orderBy(
-                            (eb) => eb.fn(field.slice(1), [sql.ref(k)]),
+                            (eb) => aggregate(eb, sql.ref(`${modelAlias}.${k}`), field as AGGREGATE_OPERATORS),
                             sql.raw(this.negateSort(v, negated)),
                         );
                     }

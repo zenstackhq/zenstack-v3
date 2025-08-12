@@ -1,5 +1,8 @@
-import type { ExpressionBuilder, ExpressionWrapper } from 'kysely';
+import type { Expression, ExpressionBuilder, ExpressionWrapper } from 'kysely';
+import { match } from 'ts-pattern';
 import { ExpressionUtils, type FieldDef, type GetModels, type ModelDef, type SchemaDef } from '../schema';
+import { extractFields } from '../utils/object-utils';
+import type { AGGREGATE_OPERATORS } from './constants';
 import type { OrderBy } from './crud-types';
 import { InternalError, QueryError } from './errors';
 import type { ClientOptions } from './options';
@@ -282,15 +285,6 @@ export function safeJSONStringify(value: unknown) {
     });
 }
 
-export function extractFields(object: any, fields: string[]) {
-    return fields.reduce((acc: any, field) => {
-        if (field in object) {
-            acc[field] = object[field];
-        }
-        return acc;
-    }, {});
-}
-
 export function extractIdFields(entity: any, schema: SchemaDef, model: string) {
     const idFields = getIdFields(schema, model);
     return extractFields(entity, idFields);
@@ -322,4 +316,18 @@ export function getDelegateDescendantModels(
         }
     });
     return [...collected];
+}
+
+export function aggregate(
+    eb: ExpressionBuilder<any, any>,
+    expr: Expression<any>,
+    op: AGGREGATE_OPERATORS,
+): Expression<any> {
+    return match(op)
+        .with('_count', () => eb.fn.count(expr))
+        .with('_sum', () => eb.fn.sum(expr))
+        .with('_avg', () => eb.fn.avg(expr))
+        .with('_min', () => eb.fn.min(expr))
+        .with('_max', () => eb.fn.max(expr))
+        .exhaustive();
 }

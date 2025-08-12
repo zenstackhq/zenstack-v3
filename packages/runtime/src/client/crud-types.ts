@@ -209,6 +209,7 @@ export type WhereInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     ScalarOnly extends boolean = false,
+    WithAggregations extends boolean = false,
 > = {
     [Key in GetModelFields<Schema, Model> as ScalarOnly extends true
         ? Key extends RelationFields<Schema, Model>
@@ -223,7 +224,12 @@ export type WhereInput<
           : FieldIsArray<Schema, Model, Key> extends true
             ? ArrayFilter<GetModelFieldType<Schema, Model, Key>>
             : // primitive
-              PrimitiveFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>;
+              PrimitiveFilter<
+                  Schema,
+                  GetModelFieldType<Schema, Model, Key>,
+                  ModelFieldIsOptional<Schema, Model, Key>,
+                  WithAggregations
+              >;
 } & {
     $expr?: (eb: ExpressionBuilder<ToKyselySchema<Schema>, Model>) => OperandExpression<SqlBool>;
 } & {
@@ -249,21 +255,32 @@ type ArrayFilter<T extends string> = {
     isEmpty?: boolean;
 };
 
-type PrimitiveFilter<Schema extends SchemaDef, T extends string, Nullable extends boolean> = T extends 'String'
-    ? StringFilter<Schema, Nullable>
+type PrimitiveFilter<
+    Schema extends SchemaDef,
+    T extends string,
+    Nullable extends boolean,
+    WithAggregations extends boolean,
+> = T extends 'String'
+    ? StringFilter<Schema, Nullable, WithAggregations>
     : T extends 'Int' | 'Float' | 'Decimal' | 'BigInt'
-      ? NumberFilter<Schema, T, Nullable>
+      ? NumberFilter<Schema, T, Nullable, WithAggregations>
       : T extends 'Boolean'
-        ? BooleanFilter<Nullable>
+        ? BooleanFilter<Schema, Nullable, WithAggregations>
         : T extends 'DateTime'
-          ? DateTimeFilter<Schema, Nullable>
+          ? DateTimeFilter<Schema, Nullable, WithAggregations>
           : T extends 'Bytes'
-            ? BytesFilter<Nullable>
+            ? BytesFilter<Schema, Nullable, WithAggregations>
             : T extends 'Json'
               ? 'Not implemented yet' // TODO: Json filter
               : never;
 
-type CommonPrimitiveFilter<Schema extends SchemaDef, DataType, T extends BuiltinType, Nullable extends boolean> = {
+type CommonPrimitiveFilter<
+    Schema extends SchemaDef,
+    DataType,
+    T extends BuiltinType,
+    Nullable extends boolean,
+    WithAggregations extends boolean,
+> = {
     equals?: NullableIf<DataType, Nullable>;
     in?: DataType[];
     notIn?: DataType[];
@@ -271,16 +288,23 @@ type CommonPrimitiveFilter<Schema extends SchemaDef, DataType, T extends Builtin
     lte?: DataType;
     gt?: DataType;
     gte?: DataType;
-    not?: PrimitiveFilter<Schema, T, Nullable>;
+    not?: PrimitiveFilter<Schema, T, Nullable, WithAggregations>;
 };
 
-export type StringFilter<Schema extends SchemaDef, Nullable extends boolean> =
+export type StringFilter<Schema extends SchemaDef, Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<string, Nullable>
-    | (CommonPrimitiveFilter<Schema, string, 'String', Nullable> & {
+    | (CommonPrimitiveFilter<Schema, string, 'String', Nullable, WithAggregations> & {
           contains?: string;
           startsWith?: string;
           endsWith?: string;
-      } & (ProviderSupportsCaseSensitivity<Schema> extends true
+      } & (WithAggregations extends true
+              ? {
+                    _count?: NumberFilter<Schema, 'Int', false, false>;
+                    _min?: StringFilter<Schema, false, false>;
+                    _max?: StringFilter<Schema, false, false>;
+                }
+              : {}) &
+          (ProviderSupportsCaseSensitivity<Schema> extends true
               ? {
                     mode?: 'default' | 'insensitive';
                 }
@@ -290,27 +314,58 @@ export type NumberFilter<
     Schema extends SchemaDef,
     T extends 'Int' | 'Float' | 'Decimal' | 'BigInt',
     Nullable extends boolean,
-> = NullableIf<number | bigint, Nullable> | CommonPrimitiveFilter<Schema, number, T, Nullable>;
+    WithAggregations extends boolean,
+> =
+    | NullableIf<number | bigint, Nullable>
+    | (CommonPrimitiveFilter<Schema, number, T, Nullable, WithAggregations> &
+          (WithAggregations extends true
+              ? {
+                    _count?: NumberFilter<Schema, 'Int', false, false>;
+                    _avg?: NumberFilter<Schema, T, false, false>;
+                    _sum?: NumberFilter<Schema, T, false, false>;
+                    _min?: NumberFilter<Schema, T, false, false>;
+                    _max?: NumberFilter<Schema, T, false, false>;
+                }
+              : {}));
 
-export type DateTimeFilter<Schema extends SchemaDef, Nullable extends boolean> =
+export type DateTimeFilter<Schema extends SchemaDef, Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<Date | string, Nullable>
-    | CommonPrimitiveFilter<Schema, Date | string, 'DateTime', Nullable>;
+    | (CommonPrimitiveFilter<Schema, Date | string, 'DateTime', Nullable, WithAggregations> &
+          (WithAggregations extends true
+              ? {
+                    _count?: NumberFilter<Schema, 'Int', false, false>;
+                    _min?: DateTimeFilter<Schema, false, false>;
+                    _max?: DateTimeFilter<Schema, false, false>;
+                }
+              : {}));
 
-export type BytesFilter<Nullable extends boolean> =
+export type BytesFilter<Schema extends SchemaDef, Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<Uint8Array | Buffer, Nullable>
-    | {
+    | ({
           equals?: NullableIf<Uint8Array, Nullable>;
           in?: Uint8Array[];
           notIn?: Uint8Array[];
-          not?: BytesFilter<Nullable>;
-      };
+          not?: BytesFilter<Schema, Nullable, WithAggregations>;
+      } & (WithAggregations extends true
+          ? {
+                _count?: NumberFilter<Schema, 'Int', false, false>;
+                _min?: BytesFilter<Schema, false, false>;
+                _max?: BytesFilter<Schema, false, false>;
+            }
+          : {}));
 
-export type BooleanFilter<Nullable extends boolean> =
+export type BooleanFilter<Schema extends SchemaDef, Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<boolean, Nullable>
-    | {
+    | ({
           equals?: NullableIf<boolean, Nullable>;
-          not?: BooleanFilter<Nullable>;
-      };
+          not?: BooleanFilter<Schema, Nullable, WithAggregations>;
+      } & (WithAggregations extends true
+          ? {
+                _count?: NumberFilter<Schema, 'Int', false, false>;
+                _min?: BooleanFilter<Schema, false, false>;
+                _max?: BooleanFilter<Schema, false, false>;
+            }
+          : {}));
 
 export type SortOrder = 'asc' | 'desc';
 export type NullsOrder = 'first' | 'last';
@@ -340,14 +395,15 @@ export type OrderBy<
     : {}) &
     (WithAggregation extends true
         ? {
-              _count?: OrderBy<Schema, Model, WithRelation, false>;
+              _count?: OrderBy<Schema, Model, false, false>;
+              _min?: MinMaxInput<Schema, Model, SortOrder>;
+              _max?: MinMaxInput<Schema, Model, SortOrder>;
           } & (NumericFields<Schema, Model> extends never
               ? {}
               : {
-                    _avg?: SumAvgInput<Schema, Model>;
-                    _sum?: SumAvgInput<Schema, Model>;
-                    _min?: MinMaxInput<Schema, Model>;
-                    _max?: MinMaxInput<Schema, Model>;
+                    // aggregations specific to numeric fields
+                    _avg?: SumAvgInput<Schema, Model, SortOrder>;
+                    _sum?: SumAvgInput<Schema, Model, SortOrder>;
                 })
         : {});
 
@@ -931,13 +987,13 @@ export type AggregateArgs<Schema extends SchemaDef, Model extends GetModels<Sche
     orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
 } & {
     _count?: true | CountAggregateInput<Schema, Model>;
+    _min?: MinMaxInput<Schema, Model, true>;
+    _max?: MinMaxInput<Schema, Model, true>;
 } & (NumericFields<Schema, Model> extends never
         ? {}
         : {
-              _avg?: SumAvgInput<Schema, Model>;
-              _sum?: SumAvgInput<Schema, Model>;
-              _min?: MinMaxInput<Schema, Model>;
-              _max?: MinMaxInput<Schema, Model>;
+              _avg?: SumAvgInput<Schema, Model, true>;
+              _sum?: SumAvgInput<Schema, Model, true>;
           });
 
 type NumericFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
@@ -952,16 +1008,16 @@ type NumericFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = 
         : never]: GetModelField<Schema, Model, Key>;
 };
 
-type SumAvgInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in NumericFields<Schema, Model>]?: true;
+type SumAvgInput<Schema extends SchemaDef, Model extends GetModels<Schema>, ValueType> = {
+    [Key in NumericFields<Schema, Model>]?: ValueType;
 };
 
-type MinMaxInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+type MinMaxInput<Schema extends SchemaDef, Model extends GetModels<Schema>, ValueType> = {
     [Key in GetModelFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true
         ? never
         : FieldIsRelation<Schema, Model, Key> extends true
           ? never
-          : Key]?: true;
+          : Key]?: ValueType;
 };
 
 export type AggregateResult<
@@ -1006,21 +1062,28 @@ type AggCommonOutput<Input> = Input extends true
 
 // #region GroupBy
 
+type GroupByHaving<Schema extends SchemaDef, Model extends GetModels<Schema>> = Omit<
+    WhereInput<Schema, Model, true, true>,
+    '$expr'
+>;
+
 export type GroupByArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     where?: WhereInput<Schema, Model>;
     orderBy?: OrArray<OrderBy<Schema, Model, false, true>>;
     by: NonRelationFields<Schema, Model> | NonEmptyArray<NonRelationFields<Schema, Model>>;
-    having?: WhereInput<Schema, Model, true>;
+    having?: GroupByHaving<Schema, Model>;
     take?: number;
     skip?: number;
+    // aggregations
     _count?: true | CountAggregateInput<Schema, Model>;
+    _min?: MinMaxInput<Schema, Model, true>;
+    _max?: MinMaxInput<Schema, Model, true>;
 } & (NumericFields<Schema, Model> extends never
     ? {}
     : {
-          _avg?: SumAvgInput<Schema, Model>;
-          _sum?: SumAvgInput<Schema, Model>;
-          _min?: MinMaxInput<Schema, Model>;
-          _max?: MinMaxInput<Schema, Model>;
+          // aggregations specific to numeric fields
+          _avg?: SumAvgInput<Schema, Model, true>;
+          _sum?: SumAvgInput<Schema, Model, true>;
       });
 
 export type GroupByResult<

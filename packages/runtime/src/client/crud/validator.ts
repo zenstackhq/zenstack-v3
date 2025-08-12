@@ -4,7 +4,9 @@ import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
 import { z, ZodType } from 'zod';
 import { type BuiltinType, type EnumDef, type FieldDef, type GetModels, type SchemaDef } from '../../schema';
-import { NUMERIC_FIELD_TYPES } from '../constants';
+import { enumerate } from '../../utils/enumerate';
+import { extractFields } from '../../utils/object-utils';
+import { AGGREGATE_OPERATORS, LOGICAL_COMBINATORS, NUMERIC_FIELD_TYPES } from '../constants';
 import {
     type AggregateArgs,
     type CountArgs,
@@ -231,10 +233,10 @@ export class InputValidator<Schema extends SchemaDef> {
         } else {
             return match(type)
                 .with('String', () => z.string())
-                .with('Int', () => z.number())
+                .with('Int', () => z.int())
                 .with('Float', () => z.number())
                 .with('Boolean', () => z.boolean())
-                .with('BigInt', () => z.union([z.number(), z.bigint()]))
+                .with('BigInt', () => z.union([z.int(), z.bigint()]))
                 .with('Decimal', () => z.union([z.number(), z.instanceof(Decimal), z.string()]))
                 .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
                 .with('Bytes', () => z.instanceof(Uint8Array))
@@ -268,7 +270,12 @@ export class InputValidator<Schema extends SchemaDef> {
         return schema;
     }
 
-    private makeWhereSchema(model: string, unique: boolean, withoutRelationFields = false): ZodType {
+    private makeWhereSchema(
+        model: string,
+        unique: boolean,
+        withoutRelationFields = false,
+        withAggregations = false,
+    ): ZodType {
         const modelDef = getModel(this.schema, model);
         if (!modelDef) {
             throw new QueryError(`Model "${model}" not found in schema`);
@@ -313,14 +320,18 @@ export class InputValidator<Schema extends SchemaDef> {
                 if (enumDef) {
                     // enum
                     if (Object.keys(enumDef).length > 0) {
-                        fieldSchema = this.makeEnumFilterSchema(enumDef, !!fieldDef.optional);
+                        fieldSchema = this.makeEnumFilterSchema(enumDef, !!fieldDef.optional, withAggregations);
                     }
                 } else if (fieldDef.array) {
                     // array field
                     fieldSchema = this.makeArrayFilterSchema(fieldDef.type as BuiltinType);
                 } else {
                     // primitive field
-                    fieldSchema = this.makePrimitiveFilterSchema(fieldDef.type as BuiltinType, !!fieldDef.optional);
+                    fieldSchema = this.makePrimitiveFilterSchema(
+                        fieldDef.type as BuiltinType,
+                        !!fieldDef.optional,
+                        withAggregations,
+                    );
                 }
             }
 
@@ -344,7 +355,7 @@ export class InputValidator<Schema extends SchemaDef> {
                                     if (enumDef) {
                                         // enum
                                         if (Object.keys(enumDef).length > 0) {
-                                            fieldSchema = this.makeEnumFilterSchema(enumDef, !!def.optional);
+                                            fieldSchema = this.makeEnumFilterSchema(enumDef, !!def.optional, false);
                                         } else {
                                             fieldSchema = z.never();
                                         }
@@ -353,6 +364,7 @@ export class InputValidator<Schema extends SchemaDef> {
                                         fieldSchema = this.makePrimitiveFilterSchema(
                                             def.type as BuiltinType,
                                             !!def.optional,
+                                            false,
                                         );
                                     }
                                     return [key, fieldSchema];
@@ -407,20 +419,16 @@ export class InputValidator<Schema extends SchemaDef> {
         return result;
     }
 
-    private makeEnumFilterSchema(enumDef: EnumDef, optional: boolean) {
+    private makeEnumFilterSchema(enumDef: EnumDef, optional: boolean, withAggregations: boolean) {
         const baseSchema = z.enum(Object.keys(enumDef) as [string, ...string[]]);
-        const components = this.makeCommonPrimitiveFilterComponents(baseSchema, optional, () =>
-            z.lazy(() => this.makeEnumFilterSchema(enumDef, optional)),
+        const components = this.makeCommonPrimitiveFilterComponents(
+            baseSchema,
+            optional,
+            () => z.lazy(() => this.makeEnumFilterSchema(enumDef, optional, withAggregations)),
+            ['equals', 'in', 'notIn', 'not'],
+            withAggregations ? ['_count', '_min', '_max'] : undefined,
         );
-        return z.union([
-            this.nullableIf(baseSchema, optional),
-            z.strictObject({
-                equals: components.equals,
-                in: components.in,
-                notIn: components.notIn,
-                not: components.not,
-            }),
-        ]);
+        return z.union([this.nullableIf(baseSchema, optional), z.strictObject(components)]);
     }
 
     private makeArrayFilterSchema(type: BuiltinType) {
@@ -433,20 +441,20 @@ export class InputValidator<Schema extends SchemaDef> {
         });
     }
 
-    private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean) {
+    private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean, withAggregations: boolean) {
         if (this.schema.typeDefs && type in this.schema.typeDefs) {
             // typed JSON field
             return this.makeTypeDefFilterSchema(type, optional);
         }
         return (
             match(type)
-                .with('String', () => this.makeStringFilterSchema(optional))
+                .with('String', () => this.makeStringFilterSchema(optional, withAggregations))
                 .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                    this.makeNumberFilterSchema(this.makePrimitiveSchema(type), optional),
+                    this.makeNumberFilterSchema(this.makePrimitiveSchema(type), optional, withAggregations),
                 )
-                .with('Boolean', () => this.makeBooleanFilterSchema(optional))
-                .with('DateTime', () => this.makeDateTimeFilterSchema(optional))
-                .with('Bytes', () => this.makeBytesFilterSchema(optional))
+                .with('Boolean', () => this.makeBooleanFilterSchema(optional, withAggregations))
+                .with('DateTime', () => this.makeDateTimeFilterSchema(optional, withAggregations))
+                .with('Bytes', () => this.makeBytesFilterSchema(optional, withAggregations))
                 // TODO: JSON filters
                 .with('Json', () => z.any())
                 .with('Unsupported', () => z.never())
@@ -459,40 +467,48 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.never();
     }
 
-    private makeDateTimeFilterSchema(optional: boolean): ZodType {
-        return this.makeCommonPrimitiveFilterSchema(z.union([z.string().datetime(), z.date()]), optional, () =>
-            z.lazy(() => this.makeDateTimeFilterSchema(optional)),
+    private makeDateTimeFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
+        return this.makeCommonPrimitiveFilterSchema(
+            z.union([z.iso.datetime(), z.date()]),
+            optional,
+            () => z.lazy(() => this.makeDateTimeFilterSchema(optional, withAggregations)),
+            withAggregations ? ['_count', '_min', '_max'] : undefined,
         );
     }
 
-    private makeBooleanFilterSchema(optional: boolean): ZodType {
-        return z.union([
-            this.nullableIf(z.boolean(), optional),
-            z.strictObject({
-                equals: this.nullableIf(z.boolean(), optional).optional(),
-                not: z.lazy(() => this.makeBooleanFilterSchema(optional)).optional(),
-            }),
-        ]);
+    private makeBooleanFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
+        const components = this.makeCommonPrimitiveFilterComponents(
+            z.boolean(),
+            optional,
+            () => z.lazy(() => this.makeBooleanFilterSchema(optional, withAggregations)),
+            ['equals', 'not'],
+            withAggregations ? ['_count', '_min', '_max'] : undefined,
+        );
+        return z.union([this.nullableIf(z.boolean(), optional), z.strictObject(components)]);
     }
 
-    private makeBytesFilterSchema(optional: boolean): ZodType {
+    private makeBytesFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
         const baseSchema = z.instanceof(Uint8Array);
-        const components = this.makeCommonPrimitiveFilterComponents(baseSchema, optional, () =>
-            z.instanceof(Uint8Array),
+        const components = this.makeCommonPrimitiveFilterComponents(
+            baseSchema,
+            optional,
+            () => z.instanceof(Uint8Array),
+            ['equals', 'in', 'notIn', 'not'],
+            withAggregations ? ['_count', '_min', '_max'] : undefined,
         );
-        return z.union([
-            this.nullableIf(baseSchema, optional),
-            z.strictObject({
-                equals: components.equals,
-                in: components.in,
-                notIn: components.notIn,
-                not: components.not,
-            }),
-        ]);
+        return z.union([this.nullableIf(baseSchema, optional), z.strictObject(components)]);
     }
 
-    private makeCommonPrimitiveFilterComponents(baseSchema: ZodType, optional: boolean, makeThis: () => ZodType) {
-        return {
+    private makeCommonPrimitiveFilterComponents(
+        baseSchema: ZodType,
+        optional: boolean,
+        makeThis: () => ZodType,
+        supportedOperators: string[] | undefined = undefined,
+        withAggregations: Array<'_count' | '_avg' | '_sum' | '_min' | '_max'> | undefined = undefined,
+    ) {
+        const commonAggSchema = () =>
+            this.makeCommonPrimitiveFilterSchema(baseSchema, false, makeThis, undefined).optional();
+        let result = {
             equals: this.nullableIf(baseSchema.optional(), optional),
             notEquals: this.nullableIf(baseSchema.optional(), optional),
             in: baseSchema.array().optional(),
@@ -502,28 +518,54 @@ export class InputValidator<Schema extends SchemaDef> {
             gt: baseSchema.optional(),
             gte: baseSchema.optional(),
             not: makeThis().optional(),
+            ...(withAggregations?.includes('_count')
+                ? { _count: this.makeNumberFilterSchema(z.int(), false, false).optional() }
+                : {}),
+            ...(withAggregations?.includes('_avg') ? { _avg: commonAggSchema() } : {}),
+            ...(withAggregations?.includes('_sum') ? { _sum: commonAggSchema() } : {}),
+            ...(withAggregations?.includes('_min') ? { _min: commonAggSchema() } : {}),
+            ...(withAggregations?.includes('_max') ? { _max: commonAggSchema() } : {}),
         };
+        if (supportedOperators) {
+            const keys = [...supportedOperators, ...(withAggregations ?? [])];
+            result = extractFields(result, keys) as typeof result;
+        }
+        return result;
     }
 
-    private makeCommonPrimitiveFilterSchema(baseSchema: ZodType, optional: boolean, makeThis: () => ZodType) {
+    private makeCommonPrimitiveFilterSchema(
+        baseSchema: ZodType,
+        optional: boolean,
+        makeThis: () => ZodType,
+        withAggregations: Array<AGGREGATE_OPERATORS> | undefined = undefined,
+    ): z.ZodType {
         return z.union([
             this.nullableIf(baseSchema, optional),
-            z.strictObject(this.makeCommonPrimitiveFilterComponents(baseSchema, optional, makeThis)),
+            z.strictObject(
+                this.makeCommonPrimitiveFilterComponents(baseSchema, optional, makeThis, undefined, withAggregations),
+            ),
         ]);
     }
 
-    private makeNumberFilterSchema(baseSchema: ZodType, optional: boolean): ZodType {
-        return this.makeCommonPrimitiveFilterSchema(baseSchema, optional, () =>
-            z.lazy(() => this.makeNumberFilterSchema(baseSchema, optional)),
+    private makeNumberFilterSchema(baseSchema: ZodType, optional: boolean, withAggregations: boolean): ZodType {
+        return this.makeCommonPrimitiveFilterSchema(
+            baseSchema,
+            optional,
+            () => z.lazy(() => this.makeNumberFilterSchema(baseSchema, optional, withAggregations)),
+            withAggregations ? ['_count', '_avg', '_sum', '_min', '_max'] : undefined,
         );
     }
 
-    private makeStringFilterSchema(optional: boolean): ZodType {
+    private makeStringFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
         return z.union([
             this.nullableIf(z.string(), optional),
             z.strictObject({
-                ...this.makeCommonPrimitiveFilterComponents(z.string(), optional, () =>
-                    z.lazy(() => this.makeStringFilterSchema(optional)),
+                ...this.makeCommonPrimitiveFilterComponents(
+                    z.string(),
+                    optional,
+                    () => z.lazy(() => this.makeStringFilterSchema(optional, withAggregations)),
+                    undefined,
+                    withAggregations ? ['_count', '_min', '_max'] : undefined,
                 ),
                 startsWith: z.string().optional(),
                 endsWith: z.string().optional(),
@@ -973,7 +1015,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.object({
             where: this.makeWhereSchema(model, false).optional(),
             data: this.makeUpdateDataSchema(model, [], true),
-            limit: z.number().int().nonnegative().optional(),
+            limit: z.int().nonnegative().optional(),
         });
     }
 
@@ -1113,7 +1155,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z
             .object({
                 where: this.makeWhereSchema(model, false).optional(),
-                limit: z.number().int().nonnegative().optional(),
+                limit: z.int().nonnegative().optional(),
             })
 
             .optional();
@@ -1214,7 +1256,7 @@ export class InputValidator<Schema extends SchemaDef> {
             where: this.makeWhereSchema(model, false).optional(),
             orderBy: this.orArray(this.makeOrderBySchema(model, false, true), true).optional(),
             by: this.orArray(z.enum(nonRelationFields), true),
-            having: this.makeWhereSchema(model, false, true).optional(),
+            having: this.makeHavingSchema(model).optional(),
             skip: this.makeSkipSchema().optional(),
             take: this.makeTakeSchema().optional(),
             _count: this.makeCountAggregateInputSchema(model).optional(),
@@ -1223,26 +1265,41 @@ export class InputValidator<Schema extends SchemaDef> {
             _min: this.makeMinMaxInputSchema(model).optional(),
             _max: this.makeMinMaxInputSchema(model).optional(),
         });
+
+        // fields used in `having` must be either in the `by` list, or aggregations
         schema = schema.refine((value) => {
             const bys = typeof value.by === 'string' ? [value.by] : value.by;
-            if (
-                value.having &&
-                Object.keys(value.having)
-                    .filter((f) => !f.startsWith('_'))
-                    .some((key) => !bys.includes(key))
-            ) {
-                return false;
-            } else {
-                return true;
+            if (value.having && typeof value.having === 'object') {
+                for (const [key, val] of Object.entries(value.having)) {
+                    if (AGGREGATE_OPERATORS.includes(key as any)) {
+                        continue;
+                    }
+                    if (bys.includes(key)) {
+                        continue;
+                    }
+                    // we have a key not mentioned in `by`, in this case it must only use
+                    // aggregations in the condition
+
+                    // 1. payload must be an object
+                    if (!val || typeof val !== 'object') {
+                        return false;
+                    }
+                    // 2. payload must only contain aggregations
+                    if (!this.onlyAggregationFields(val)) {
+                        return false;
+                    }
+                }
             }
+            return true;
         }, 'fields in "having" must be in "by"');
 
+        // fields used in `orderBy` must be either in the `by` list, or aggregations
         schema = schema.refine((value) => {
             const bys = typeof value.by === 'string' ? [value.by] : value.by;
             if (
                 value.orderBy &&
                 Object.keys(value.orderBy)
-                    .filter((f) => !f.startsWith('_'))
+                    .filter((f) => !AGGREGATE_OPERATORS.includes(f as AGGREGATE_OPERATORS))
                     .some((key) => !bys.includes(key))
             ) {
                 return false;
@@ -1254,16 +1311,39 @@ export class InputValidator<Schema extends SchemaDef> {
         return schema;
     }
 
+    private onlyAggregationFields(val: object) {
+        let result = true;
+        for (const [key, value] of Object.entries(val)) {
+            if (AGGREGATE_OPERATORS.includes(key as any)) {
+                continue; // aggregation field
+            }
+            if (LOGICAL_COMBINATORS.includes(key as any)) {
+                if (!enumerate(value).every((v) => this.onlyAggregationFields(v))) {
+                    // logical operators
+                    result = false;
+                    break;
+                }
+            }
+            result = false;
+            break;
+        }
+        return result;
+    }
+
+    private makeHavingSchema(model: GetModels<Schema>) {
+        return this.makeWhereSchema(model, false, true, true);
+    }
+
     // #endregion
 
     // #region Helpers
 
     private makeSkipSchema() {
-        return z.number().int().nonnegative();
+        return z.int().nonnegative();
     }
 
     private makeTakeSchema() {
-        return z.number().int();
+        return z.int();
     }
 
     private refineForSelectIncludeMutuallyExclusive(schema: ZodType) {

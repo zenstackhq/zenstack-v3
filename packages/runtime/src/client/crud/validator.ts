@@ -1312,7 +1312,6 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private onlyAggregationFields(val: object) {
-        let result = true;
         for (const [key, value] of Object.entries(val)) {
             if (AGGREGATE_OPERATORS.includes(key as any)) {
                 // aggregation field
@@ -1324,10 +1323,9 @@ export class InputValidator<Schema extends SchemaDef> {
                     continue;
                 }
             }
-            result = false;
-            break;
+            return false;
         }
-        return result;
+        return true;
     }
 
     private makeHavingSchema(model: GetModels<Schema>) {

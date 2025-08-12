@@ -1315,13 +1315,13 @@ export class InputValidator<Schema extends SchemaDef> {
         let result = true;
         for (const [key, value] of Object.entries(val)) {
             if (AGGREGATE_OPERATORS.includes(key as any)) {
-                continue; // aggregation field
+                // aggregation field
+                continue;
             }
             if (LOGICAL_COMBINATORS.includes(key as any)) {
-                if (!enumerate(value).every((v) => this.onlyAggregationFields(v))) {
-                    // logical operators
-                    result = false;
-                    break;
+                // logical operators
+                if (enumerate(value).every((v) => this.onlyAggregationFields(v))) {
+                    continue;
                 }
             }
             result = false;

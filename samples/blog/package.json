@@ -1,6 +1,6 @@
 {
     "name": "sample-blog",
-    "version": "3.0.0-alpha.19",
+    "version": "3.0.0-alpha.20",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -14,11 +14,11 @@
     "license": "MIT",
     "dependencies": {
         "@zenstackhq/runtime": "workspace:*",
-        "better-sqlite3": "^11.8.1",
+        "better-sqlite3": "^12.2.0",
         "kysely": "catalog:"
     },
     "devDependencies": {
-        "@types/better-sqlite3": "^7.6.12",
+        "@types/better-sqlite3": "^7.6.13",
         "prisma": "catalog:",
         "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*"

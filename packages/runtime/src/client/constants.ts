@@ -17,3 +17,14 @@ export const TRANSACTION_UNSUPPORTED_METHODS = ['$transaction', '$disconnect', '
  * Prefix for JSON field used to store joined delegate rows.
  */
 export const DELEGATE_JOINED_FIELD_PREFIX = '$delegate$';
+
+/**
+ * Logical combinators used in filters.
+ */
+export const LOGICAL_COMBINATORS = ['AND', 'OR', 'NOT'] as const;
+
+/**
+ * Aggregation operators.
+ */
+export const AGGREGATE_OPERATORS = ['_count', '_sum', '_avg', '_min', '_max'] as const;
+export type AGGREGATE_OPERATORS = (typeof AGGREGATE_OPERATORS)[number];

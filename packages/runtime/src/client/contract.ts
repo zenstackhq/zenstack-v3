@@ -752,17 +752,18 @@ export type ModelOperations<Schema extends SchemaDef, Model extends GetModels<Sc
          *     _count: true
          * }); // result: `Array<{ country: string, city: string, _count: number }>`
          *
-         * // group by with sorting, the `orderBy` fields must be in the `by` list
+         * // group by with sorting, the `orderBy` fields must be either an aggregation
+         * // or a field used in the `by` list
          * await db.profile.groupBy({
          *     by: 'country',
          *     orderBy: { country: 'desc' }
          * });
          *
-         * // group by with having (post-aggregation filter), the `having` fields must
-         * // be in the `by` list
+         * // group by with having (post-aggregation filter), the fields used in `having` must
+         * // be either an aggregation, or a field used in the `by` list
          * await db.profile.groupBy({
          *     by: 'country',
-         *     having: { country: 'US' }
+         *     having: { country: 'US', age: { _avg: { gte: 18 } } }
          * });
          */
         groupBy<T extends GroupByArgs<Schema, Model>>(

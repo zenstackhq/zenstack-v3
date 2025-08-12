@@ -556,7 +556,12 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         },
 
         groupBy: (args: unknown) => {
-            return createPromise('groupBy', args, new GroupByOperationHandler<Schema>(client, model, inputValidator));
+            return createPromise(
+                'groupBy',
+                args,
+                new GroupByOperationHandler<Schema>(client, model, inputValidator),
+                true,
+            );
         },
     } as ModelOperations<Schema, Model>;
 }

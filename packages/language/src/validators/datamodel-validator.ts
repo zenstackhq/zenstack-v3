@@ -107,7 +107,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         if (field.type.array && !isDataModel(field.type.reference?.ref)) {
             const provider = this.getDataSourceProvider(AstUtils.getContainerOfType(field, isModel)!);
             if (provider === 'sqlite') {
-                accept('error', `Array type is not supported for "${provider}" provider.`, { node: field.type });
+                accept('error', `List type is not supported for "${provider}" provider.`, { node: field.type });
             }
         }
 

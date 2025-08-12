@@ -44,9 +44,9 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
             return subQuery.as('$sub');
         });
 
+        // groupBy
         const bys = typeof parsedArgs.by === 'string' ? [parsedArgs.by] : (parsedArgs.by as string[]);
-
-        query = query.groupBy(bys as any);
+        query = query.groupBy(bys.map((by) => sql.ref(`$sub.${by}`)));
 
         // orderBy
         if (parsedArgs.orderBy) {
@@ -54,7 +54,7 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
         }
 
         if (parsedArgs.having) {
-            query = query.having((eb1) => this.dialect.buildFilter(eb1, this.model, '$sub', parsedArgs.having));
+            query = query.having((eb) => this.dialect.buildFilter(eb, this.model, '$sub', parsedArgs.having));
         }
 
         // select all by fields

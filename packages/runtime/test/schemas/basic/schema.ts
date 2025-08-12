@@ -61,6 +61,11 @@ export const schema = {
                     type: "Profile",
                     optional: true,
                     relation: { opposite: "user" }
+                },
+                meta: {
+                    name: "meta",
+                    type: "Json",
+                    optional: true
                 }
             },
             attributes: [

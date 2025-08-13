@@ -1,6 +1,6 @@
 import { invariant, isPlainObject } from '@zenstackhq/common-helpers';
 import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
-import { sql, type SelectQueryBuilder } from 'kysely';
+import { expressionBuilder, sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';
 import type { BuiltinType, DataSourceProviderType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { enumerate } from '../../../utils/enumerate';
@@ -95,11 +95,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 result = this.and(eb, result, this.buildRelationFilter(eb, model, modelAlias, key, fieldDef, payload));
             } else {
                 // if the field is from a base model, build a reference from that model
-                const fieldRef = buildFieldRef(
-                    this.schema,
+                const fieldRef = this.fieldRef(
                     fieldDef.originModel ?? model,
                     key,
-                    this.options,
                     eb,
                     fieldDef.originModel ?? modelAlias,
                 );
@@ -727,7 +725,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     for (const [k, v] of Object.entries<string>(value)) {
                         invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                         result = result.orderBy(
-                            (eb) => aggregate(eb, sql.ref(`${modelAlias}.${k}`), field as AGGREGATE_OPERATORS),
+                            (eb) =>
+                                aggregate(eb, this.fieldRef(model, k, eb, modelAlias), field as AGGREGATE_OPERATORS),
                             sql.raw(this.negateSort(v, negated)),
                         );
                     }
@@ -740,7 +739,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         for (const [k, v] of Object.entries<string>(value)) {
                             invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                             result = result.orderBy(
-                                (eb) => eb.fn.count(sql.ref(k)),
+                                (eb) => eb.fn.count(this.fieldRef(model, k, eb, modelAlias)),
                                 sql.raw(this.negateSort(v, negated)),
                             );
                         }
@@ -753,8 +752,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 const fieldDef = requireField(this.schema, model, field);
 
                 if (!fieldDef.relation) {
+                    const fieldRef = this.fieldRef(model, field, expressionBuilder(), modelAlias);
                     if (value === 'asc' || value === 'desc') {
-                        result = result.orderBy(sql.ref(`${modelAlias}.${field}`), this.negateSort(value, negated));
+                        result = result.orderBy(fieldRef, this.negateSort(value, negated));
                     } else if (
                         value &&
                         typeof value === 'object' &&
@@ -764,7 +764,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         (value.nulls === 'first' || value.nulls === 'last')
                     ) {
                         result = result.orderBy(
-                            sql.ref(`${modelAlias}.${field}`),
+                            fieldRef,
                             sql.raw(`${this.negateSort(value.sort, negated)} nulls ${value.nulls}`),
                         );
                     }
@@ -865,7 +865,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         const fieldDef = requireField(this.schema, model, field);
         if (fieldDef.computed) {
             // TODO: computed field from delegate base?
-            return query.select((eb) => buildFieldRef(this.schema, model, field, this.options, eb).as(field));
+            return query.select((eb) => this.fieldRef(model, field, eb, modelAlias).as(field));
         } else if (!fieldDef.originModel) {
             // regular field
             return query.select(sql.ref(`${modelAlias}.${field}`).as(field));
@@ -991,6 +991,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     protected not(eb: ExpressionBuilder<any, any>, ...args: Expression<SqlBool>[]) {
         return eb.not(this.and(eb, ...args));
+    }
+
+    fieldRef(model: string, field: string, eb: ExpressionBuilder<any, any>, modelAlias?: string) {
+        return buildFieldRef(this.schema, model, field, this.options, eb, modelAlias);
     }
 
     // #endregion

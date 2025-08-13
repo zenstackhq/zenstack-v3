@@ -29,7 +29,6 @@ import type { FindArgs, SelectIncludeOmit, SortOrder, WhereInput } from '../../c
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
 import {
-    buildFieldRef,
     ensureArray,
     extractIdFields,
     flattenCompoundUniqueFilters,
@@ -187,9 +186,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 // make sure distinct fields are selected
                 query = distinct.reduce(
                     (acc, field) =>
-                        acc.select((eb) =>
-                            buildFieldRef(this.schema, model, field, this.options, eb).as(`$distinct$${field}`),
-                        ),
+                        acc.select((eb) => this.dialect.fieldRef(model, field, eb).as(`$distinct$${field}`)),
                     query,
                 );
             }
@@ -1267,7 +1264,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const key = Object.keys(payload)[0];
         const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, false);
         const eb = expressionBuilder<any, any>();
-        const fieldRef = buildFieldRef(this.schema, model, field, this.options, eb);
+        const fieldRef = this.dialect.fieldRef(model, field, eb);
 
         return match(key)
             .with('set', () => value)
@@ -1290,7 +1287,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const key = Object.keys(payload)[0];
         const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, true);
         const eb = expressionBuilder<any, any>();
-        const fieldRef = buildFieldRef(this.schema, model, field, this.options, eb);
+        const fieldRef = this.dialect.fieldRef(model, field, eb);
 
         return match(key)
             .with('set', () => value)

@@ -318,11 +318,7 @@ export function getDelegateDescendantModels(
     return [...collected];
 }
 
-export function aggregate(
-    eb: ExpressionBuilder<any, any>,
-    expr: Expression<any>,
-    op: AGGREGATE_OPERATORS,
-): Expression<any> {
+export function aggregate(eb: ExpressionBuilder<any, any>, expr: Expression<any>, op: AGGREGATE_OPERATORS) {
     return match(op)
         .with('_count', () => eb.fn.count(expr))
         .with('_sum', () => eb.fn.sum(expr))

@@ -36,6 +36,58 @@ model User {
         ).resolves.toMatchObject({
             upperName: 'ALEX',
         });
+
+        await expect(
+            db.user.findFirst({
+                where: { upperName: 'ALEX' },
+            }),
+        ).resolves.toMatchObject({
+            upperName: 'ALEX',
+        });
+
+        await expect(
+            db.user.findFirst({
+                where: { upperName: 'Alex' },
+            }),
+        ).toResolveNull();
+
+        await expect(
+            db.user.findFirst({
+                orderBy: { upperName: 'desc' },
+            }),
+        ).resolves.toMatchObject({
+            upperName: 'ALEX',
+        });
+
+        await expect(
+            db.user.findFirst({
+                orderBy: { upperName: 'desc' },
+                take: -1,
+            }),
+        ).resolves.toMatchObject({
+            upperName: 'ALEX',
+        });
+
+        await expect(
+            db.user.aggregate({
+                _count: { upperName: true },
+            }),
+        ).resolves.toMatchObject({
+            _count: { upperName: 1 },
+        });
+
+        await expect(
+            db.user.groupBy({
+                by: ['upperName'],
+                _count: { upperName: true },
+                _max: { upperName: true },
+            }),
+        ).resolves.toEqual([
+            expect.objectContaining({
+                _count: { upperName: 1 },
+                _max: { upperName: 'ALEX' },
+            }),
+        ]);
     });
 
     it('is typed correctly for non-optional fields', async () => {

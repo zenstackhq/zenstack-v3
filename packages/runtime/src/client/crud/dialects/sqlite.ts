@@ -13,7 +13,6 @@ import type { BuiltinType, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
 import {
-    buildFieldRef,
     getDelegateDescendantModels,
     getIdFields,
     getManyToManyRelation,
@@ -171,10 +170,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                     ...Object.entries(relationModelDef.fields)
                         .filter(([, value]) => !value.relation)
                         .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
-                        .map(([field]) => [
-                            sql.lit(field),
-                            buildFieldRef(this.schema, relationModel, field, this.options, eb),
-                        ])
+                        .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, eb)])
                         .flatMap((v) => v),
                 );
             } else if (payload.select) {
@@ -203,10 +199,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                                     );
                                     return [sql.lit(field), subJson];
                                 } else {
-                                    return [
-                                        sql.lit(field),
-                                        buildFieldRef(this.schema, relationModel, field, this.options, eb) as ArgsType,
-                                    ];
+                                    return [sql.lit(field), this.fieldRef(relationModel, field, eb) as ArgsType];
                                 }
                             }
                         })

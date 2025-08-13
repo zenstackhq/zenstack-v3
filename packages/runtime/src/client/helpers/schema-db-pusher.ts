@@ -1,12 +1,12 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import { CreateTableBuilder, sql, type ColumnDataType, type OnModifyForeignAction } from 'kysely';
+import toposort from 'toposort';
 import { match } from 'ts-pattern';
 import {
     ExpressionUtils,
     type BuiltinType,
     type CascadeAction,
     type FieldDef,
-    type GetModels,
     type ModelDef,
     type SchemaDef,
 } from '../../schema';
@@ -24,32 +24,82 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             if (this.schema.enums && this.schema.provider.type === 'postgresql') {
                 for (const [name, enumDef] of Object.entries(this.schema.enums)) {
                     const createEnum = tx.schema.createType(name).asEnum(Object.values(enumDef));
-                    // console.log('Creating enum:', createEnum.compile().sql);
                     await createEnum.execute();
                 }
             }
 
-            for (const model of Object.keys(this.schema.models)) {
-                const createTable = this.createModelTable(tx, model as GetModels<Schema>);
-                // console.log('Creating table:', createTable.compile().sql);
+            // sort models so that target of fk constraints are created first
+            const sortedModels = this.sortModels(this.schema.models);
+            for (const modelDef of sortedModels) {
+                const createTable = this.createModelTable(tx, modelDef);
                 await createTable.execute();
             }
         });
     }
 
-    private createModelTable(kysely: ToKysely<Schema>, model: GetModels<Schema>) {
-        let table = kysely.schema.createTable(model).ifNotExists();
-        const modelDef = requireModel(this.schema, model);
-        for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
-            if (fieldDef.relation) {
-                table = this.addForeignKeyConstraint(table, model, fieldName, fieldDef);
-            } else if (!this.isComputedField(fieldDef)) {
-                table = this.createModelField(table, fieldName, fieldDef, modelDef);
+    private sortModels(models: Record<string, ModelDef>): ModelDef[] {
+        const graph: [ModelDef, ModelDef | undefined][] = [];
+
+        for (const model of Object.values(models)) {
+            let added = false;
+
+            if (model.baseModel) {
+                // base model should be created before concrete model
+                const baseDef = requireModel(this.schema, model.baseModel);
+                // edge: base model -> concrete model
+                graph.push([baseDef, model]);
+                added = true;
+            }
+
+            for (const field of Object.values(model.fields)) {
+                // relation order
+                if (field.relation && field.relation.fields && field.relation.references) {
+                    const targetModel = requireModel(this.schema, field.type);
+                    // edge: relation target model -> fk model
+                    graph.push([targetModel, model]);
+                    added = true;
+                }
+            }
+
+            if (!added) {
+                // no relations, add self to graph to ensure it is included in the result
+                graph.push([model, undefined]);
             }
         }
 
-        table = this.addPrimaryKeyConstraint(table, model, modelDef);
-        table = this.addUniqueConstraint(table, model, modelDef);
+        return toposort(graph).filter((m) => !!m);
+    }
+
+    private createModelTable(kysely: ToKysely<Schema>, modelDef: ModelDef) {
+        let table: CreateTableBuilder<string, any> = kysely.schema.createTable(modelDef.name).ifNotExists();
+
+        for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
+            if (fieldDef.originModel && !fieldDef.id) {
+                // skip non-id fields inherited from base model
+                continue;
+            }
+
+            if (fieldDef.relation) {
+                table = this.addForeignKeyConstraint(table, modelDef.name, fieldName, fieldDef);
+            } else if (!this.isComputedField(fieldDef)) {
+                table = this.createModelField(table, fieldDef, modelDef);
+            }
+        }
+
+        if (modelDef.baseModel) {
+            // create fk constraint
+            const baseModelDef = requireModel(this.schema, modelDef.baseModel);
+            table = table.addForeignKeyConstraint(
+                `fk_${modelDef.baseModel}_delegate`,
+                baseModelDef.idFields,
+                modelDef.baseModel,
+                baseModelDef.idFields,
+                (cb) => cb.onDelete('cascade').onUpdate('cascade'),
+            );
+        }
+
+        table = this.addPrimaryKeyConstraint(table, modelDef);
+        table = this.addUniqueConstraint(table, modelDef);
 
         return table;
     }
@@ -58,11 +108,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         return fieldDef.attributes?.some((a) => a.name === '@computed');
     }
 
-    private addPrimaryKeyConstraint(
-        table: CreateTableBuilder<string, any>,
-        model: GetModels<Schema>,
-        modelDef: ModelDef,
-    ) {
+    private addPrimaryKeyConstraint(table: CreateTableBuilder<string, any>, modelDef: ModelDef) {
         if (modelDef.idFields.length === 1) {
             if (Object.values(modelDef.fields).some((f) => f.id)) {
                 // @id defined at field level
@@ -71,13 +117,13 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         }
 
         if (modelDef.idFields.length > 0) {
-            table = table.addPrimaryKeyConstraint(`pk_${model}`, modelDef.idFields);
+            table = table.addPrimaryKeyConstraint(`pk_${modelDef.name}`, modelDef.idFields);
         }
 
         return table;
     }
 
-    private addUniqueConstraint(table: CreateTableBuilder<string, any>, model: string, modelDef: ModelDef) {
+    private addUniqueConstraint(table: CreateTableBuilder<string, any>, modelDef: ModelDef) {
         for (const [key, value] of Object.entries(modelDef.uniqueFields)) {
             invariant(typeof value === 'object', 'expecting an object');
             if ('type' in value) {
@@ -86,22 +132,17 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 if (fieldDef.unique) {
                     continue;
                 }
-                table = table.addUniqueConstraint(`unique_${model}_${key}`, [key]);
+                table = table.addUniqueConstraint(`unique_${modelDef.name}_${key}`, [key]);
             } else {
                 // multi-field constraint
-                table = table.addUniqueConstraint(`unique_${model}_${key}`, Object.keys(value));
+                table = table.addUniqueConstraint(`unique_${modelDef.name}_${key}`, Object.keys(value));
             }
         }
         return table;
     }
 
-    private createModelField(
-        table: CreateTableBuilder<any>,
-        fieldName: string,
-        fieldDef: FieldDef,
-        modelDef: ModelDef,
-    ) {
-        return table.addColumn(fieldName, this.mapFieldType(fieldDef), (col) => {
+    private createModelField(table: CreateTableBuilder<any>, fieldDef: FieldDef, modelDef: ModelDef) {
+        return table.addColumn(fieldDef.name, this.mapFieldType(fieldDef), (col) => {
             // @id
             if (fieldDef.id && modelDef.idFields.length === 1) {
                 col = col.primaryKey();
@@ -178,7 +219,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
     private addForeignKeyConstraint(
         table: CreateTableBuilder<string, any>,
-        model: GetModels<Schema>,
+        model: string,
         fieldName: string,
         fieldDef: FieldDef,
     ) {

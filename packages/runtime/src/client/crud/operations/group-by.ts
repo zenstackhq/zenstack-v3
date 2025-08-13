@@ -1,7 +1,7 @@
-import { sql } from 'kysely';
+import { expressionBuilder } from 'kysely';
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
-import { getField } from '../../query-utils';
+import { aggregate, getField } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 
 export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
@@ -44,9 +44,11 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
             return subQuery.as('$sub');
         });
 
+        const fieldRef = (field: string) => this.dialect.fieldRef(this.model, field, expressionBuilder(), '$sub');
+
         // groupBy
         const bys = typeof parsedArgs.by === 'string' ? [parsedArgs.by] : (parsedArgs.by as string[]);
-        query = query.groupBy(bys.map((by) => sql.ref(`$sub.${by}`)));
+        query = query.groupBy(bys.map((by) => fieldRef(by)));
 
         // orderBy
         if (parsedArgs.orderBy) {
@@ -59,7 +61,7 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
 
         // select all by fields
         for (const by of bys) {
-            query = query.select(() => sql.ref(`$sub.${by}`).as(by));
+            query = query.select(() => fieldRef(by).as(by));
         }
 
         // aggregations
@@ -77,7 +79,7 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
                                     );
                                 } else {
                                     query = query.select((eb) =>
-                                        eb.cast(eb.fn.count(sql.ref(`$sub.${field}`)), 'integer').as(`${key}.${field}`),
+                                        eb.cast(eb.fn.count(fieldRef(field)), 'integer').as(`${key}.${field}`),
                                     );
                                 }
                             }
@@ -92,15 +94,7 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
                 case '_min': {
                     Object.entries(value).forEach(([field, val]) => {
                         if (val === true) {
-                            query = query.select((eb) => {
-                                const fn = match(key)
-                                    .with('_sum', () => eb.fn.sum)
-                                    .with('_avg', () => eb.fn.avg)
-                                    .with('_max', () => eb.fn.max)
-                                    .with('_min', () => eb.fn.min)
-                                    .exhaustive();
-                                return fn(sql.ref(`$sub.${field}`)).as(`${key}.${field}`);
-                            });
+                            query = query.select((eb) => aggregate(eb, fieldRef(field), key).as(`${key}.${field}`));
                         }
                     });
                     break;

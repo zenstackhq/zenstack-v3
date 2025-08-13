@@ -46,8 +46,8 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             if (model.baseModel) {
                 // base model should be created before concrete model
                 const baseDef = requireModel(this.schema, model.baseModel);
-                // edge: base model -> concrete model
-                graph.push([baseDef, model]);
+                // edge: concrete model -> base model
+                graph.push([model, baseDef]);
                 added = true;
             }
 
@@ -55,8 +55,8 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 // relation order
                 if (field.relation && field.relation.fields && field.relation.references) {
                     const targetModel = requireModel(this.schema, field.type);
-                    // edge: relation target model -> fk model
-                    graph.push([targetModel, model]);
+                    // edge: fk side -> target model
+                    graph.push([model, targetModel]);
                     added = true;
                 }
             }
@@ -67,7 +67,9 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             }
         }
 
-        return toposort(graph).filter((m) => !!m);
+        return toposort(graph)
+            .reverse()
+            .filter((m) => !!m);
     }
 
     private createModelTable(kysely: ToKysely<Schema>, modelDef: ModelDef) {

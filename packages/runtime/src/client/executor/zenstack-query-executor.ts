@@ -72,7 +72,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
             const oldQueryNode = queryNode;
             if (
                 (InsertQueryNode.is(queryNode) || UpdateQueryNode.is(queryNode)) &&
-                mutationInterceptionInfo?.loadAfterMutationEntity
+                mutationInterceptionInfo?.loadAfterMutationEntities
             ) {
                 // need to make sure the query node has "returnAll"
                 // for insert and update queries
@@ -283,13 +283,13 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                         queryNode,
                     });
                     result.intercept ||= filterResult.intercept;
-                    result.loadBeforeMutationEntity ||= filterResult.loadBeforeMutationEntity;
-                    result.loadAfterMutationEntity ||= filterResult.loadAfterMutationEntity;
+                    result.loadBeforeMutationEntities ||= filterResult.loadBeforeMutationEntities;
+                    result.loadAfterMutationEntities ||= filterResult.loadAfterMutationEntities;
                 }
             }
 
             let beforeMutationEntities: Record<string, unknown>[] | undefined;
-            if (result.loadBeforeMutationEntity && (UpdateQueryNode.is(queryNode) || DeleteQueryNode.is(queryNode))) {
+            if (result.loadBeforeMutationEntities && (UpdateQueryNode.is(queryNode) || DeleteQueryNode.is(queryNode))) {
                 beforeMutationEntities = await this.loadEntities(mutationModel, where);
             }
 
@@ -354,7 +354,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
 
         for (const hook of hooks) {
             let afterMutationEntities: Record<string, unknown>[] | undefined = undefined;
-            if (mutationInterceptionInfo.loadAfterMutationEntity) {
+            if (mutationInterceptionInfo.loadAfterMutationEntities) {
                 if (InsertQueryNode.is(queryNode) || UpdateQueryNode.is(queryNode)) {
                     afterMutationEntities = queryResult.rows as Record<string, unknown>[];
                 }

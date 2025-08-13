@@ -112,7 +112,7 @@ describe('Entity  lifecycle tests', () => {
             mutationInterceptionFilter: () => {
                 return {
                     intercept: true,
-                    loadBeforeMutationEntity: true,
+                    loadBeforeMutationEntities: true,
                 };
             },
             beforeEntityMutation(args) {
@@ -350,7 +350,7 @@ describe('Entity  lifecycle tests', () => {
             mutationInterceptionFilter: () => {
                 return {
                     intercept: true,
-                    loadBeforeMutationEntity: true,
+                    loadBeforeMutationEntities: true,
                     loadAfterMutationEntity: true,
                 };
             },

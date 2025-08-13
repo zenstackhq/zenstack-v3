@@ -39,12 +39,12 @@ export type MutationInterceptionFilterResult = {
     /**
      * Whether entities should be loaded before the mutation.
      */
-    loadBeforeMutationEntity?: boolean;
+    loadBeforeMutationEntities?: boolean;
 
     /**
      * Whether entities should be loaded after the mutation.
      */
-    loadAfterMutationEntity?: boolean;
+    loadAfterMutationEntities?: boolean;
 };
 
 type MutationHooksArgs<Schema extends SchemaDef> = {
@@ -149,16 +149,16 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
 
     /**
      * Called before an entity is mutated.
-     * @param args.entity Only available if `loadBeforeMutationEntity` is set to true in the
+     * @param args.entity Only available if `loadBeforeMutationEntities` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
     beforeEntityMutation?: BeforeEntityMutationCallback<Schema>;
 
     /**
      * Called after an entity is mutated.
-     * @param args.beforeMutationEntity Only available if `loadBeforeMutationEntity` is set to true in the
+     * @param args.beforeMutationEntity Only available if `loadBeforeMutationEntities` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
-     * @param args.afterMutationEntity Only available if `loadAfterMutationEntity` is set to true in the
+     * @param args.afterMutationEntity Only available if `loadAfterMutationEntities` is set to true in the
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
     afterEntityMutation?: AfterEntityMutationCallback<Schema>;

@@ -351,9 +351,9 @@ db.$use({
         return {
             intercept: model === 'User',
             // load entities affected before the mutation (defaults to false)
-            loadBeforeMutationEntity: true,
+            loadBeforeMutationEntities: true,
             // load entities affected after the mutation (defaults to false)
-            loadAfterMutationEntity: true,
+            loadAfterMutationEntities: true,
         };
     },
     beforeEntityMutation({ model, action, entities }) {

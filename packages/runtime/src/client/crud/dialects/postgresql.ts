@@ -12,7 +12,6 @@ import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schem
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
 import {
-    buildFieldRef,
     buildJoinPairs,
     getDelegateDescendantModels,
     getIdFields,
@@ -227,10 +226,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 ...Object.entries(relationModelDef.fields)
                     .filter(([, value]) => !value.relation)
                     .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
-                    .map(([field]) => [
-                        sql.lit(field),
-                        buildFieldRef(this.schema, relationModel, field, this.options, eb),
-                    ])
+                    .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, eb)])
                     .flatMap((v) => v),
             );
         } else if (payload.select) {
@@ -253,7 +249,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                                 ? // reference the synthesized JSON field
                                   eb.ref(`${parentAlias}$${relationField}$${field}.$j`)
                                 : // reference a plain field
-                                  buildFieldRef(this.schema, relationModel, field, this.options, eb);
+                                  this.fieldRef(relationModel, field, eb);
                             return [sql.lit(field), fieldValue];
                         }
                     })

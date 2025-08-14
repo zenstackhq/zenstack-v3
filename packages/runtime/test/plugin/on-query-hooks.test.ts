@@ -1,6 +1,6 @@
 import SQLite from 'better-sqlite3';
 import { SqliteDialect } from 'kysely';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { definePlugin, ZenStackClient, type ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
 
@@ -12,6 +12,10 @@ describe('On query hooks tests', () => {
             dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
         });
         await _client.$pushSchema();
+    });
+
+    afterEach(async () => {
+        await _client?.$disconnect();
     });
 
     it('supports simple interception', async () => {

@@ -664,7 +664,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      */
     delete<T extends DeleteArgs<Schema, Model>>(
         args: SelectSubset<T, DeleteArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model>>>;
+    ): ZenStackPromise<Schema, Simplify<ModelResult<Schema, Model, T>>>;
 
     /**
      * Deletes multiple entities.

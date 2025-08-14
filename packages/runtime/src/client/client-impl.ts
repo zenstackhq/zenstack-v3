@@ -1,4 +1,4 @@
-import { invariant, lowerCaseFirst } from '@zenstackhq/common-helpers';
+import { invariant } from '@zenstackhq/common-helpers';
 import type { QueryExecutor } from 'kysely';
 import {
     CompiledQuery,
@@ -376,30 +376,10 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
             // apply plugins
             const plugins = [...(client.$options.plugins ?? [])];
             for (const plugin of plugins) {
-                if (plugin.onQuery && typeof plugin.onQuery === 'object') {
-                    // for each model key or "$allModels"
-                    for (const [_model, modelHooks] of Object.entries<any>(plugin.onQuery)) {
-                        if (_model === lowerCaseFirst(model) || _model === '$allModels') {
-                            if (modelHooks && typeof modelHooks === 'object') {
-                                // for each operation key or "$allOperations"
-                                for (const [op, opHooks] of Object.entries(modelHooks)) {
-                                    if (op === operation || op === '$allOperations') {
-                                        if (typeof opHooks === 'function') {
-                                            const _proceed = proceed;
-                                            proceed = () =>
-                                                opHooks({
-                                                    client,
-                                                    model,
-                                                    operation,
-                                                    args,
-                                                    query: _proceed,
-                                                }) as Promise<unknown>;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                const onQuery = plugin.onQuery;
+                if (onQuery) {
+                    const _proceed = proceed;
+                    proceed = () => onQuery({ client, model, operation, args, query: _proceed }) as Promise<unknown>;
                 }
             }
 

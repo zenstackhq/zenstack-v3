@@ -23,7 +23,7 @@ import { ExpressionUtils, type GetModels, type ModelDef, type SchemaDef } from '
 import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
 import { extractFields, fieldsToSelectObject } from '../../../utils/object-utils';
-import { CONTEXT_COMMENT_PREFIX, NUMERIC_FIELD_TYPES } from '../../constants';
+import { NUMERIC_FIELD_TYPES } from '../../constants';
 import type { CRUD } from '../../contract';
 import type { FindArgs, SelectIncludeOmit, SortOrder, WhereInput } from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
@@ -1303,8 +1303,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return NUMERIC_FIELD_TYPES.includes(fieldDef.type) && !fieldDef.array;
     }
 
-    private makeContextComment(context: { model: GetModels<Schema>; operation: CRUD }) {
-        return sql.raw(`${CONTEXT_COMMENT_PREFIX}${JSON.stringify(context)}`);
+    private makeContextComment(_context: { model: GetModels<Schema>; operation: CRUD }) {
+        return sql``;
+        // return sql.raw(`${CONTEXT_COMMENT_PREFIX}${JSON.stringify(context)}`);
     }
 
     protected async updateMany<

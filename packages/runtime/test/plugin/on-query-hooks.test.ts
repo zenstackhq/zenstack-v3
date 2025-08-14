@@ -35,7 +35,7 @@ describe('On query hooks tests', () => {
                 } else if (ctx.operation === 'update') {
                     updateHookCalled = true;
                 }
-                return ctx.query(ctx.args);
+                return ctx.proceed(ctx.args);
             },
         });
 
@@ -61,7 +61,7 @@ describe('On query hooks tests', () => {
                     hooksCalled = true;
                     expect(ctx.model).toBe('User');
                 }
-                return ctx.query(ctx.args);
+                return ctx.proceed(ctx.args);
             },
         });
         await expect(
@@ -84,7 +84,7 @@ describe('On query hooks tests', () => {
                 hooksCalled = true;
                 expect(ctx.model).toBe('User');
                 expect(ctx.operation).toBe('findFirst');
-                return ctx.query(ctx.args);
+                return ctx.proceed(ctx.args);
             },
         });
         await expect(
@@ -106,9 +106,9 @@ describe('On query hooks tests', () => {
             onQuery: async (ctx) => {
                 if (ctx.model === 'User' && ctx.operation === 'findFirst') {
                     hooksCalled = true;
-                    return ctx.query({ where: { id: 'non-exist' } });
+                    return ctx.proceed({ where: { id: 'non-exist' } });
                 } else {
-                    return ctx.query(ctx.args);
+                    return ctx.proceed(ctx.args);
                 }
             },
         });
@@ -132,11 +132,11 @@ describe('On query hooks tests', () => {
             onQuery: async (ctx) => {
                 if (ctx.model === 'User' && ctx.operation === 'findFirst') {
                     hooksCalled = true;
-                    const result = await ctx.query(ctx.args);
+                    const result = await ctx.proceed(ctx.args);
                     (result as any).happy = true;
                     return result;
                 } else {
-                    return ctx.query(ctx.args);
+                    return ctx.proceed(ctx.args);
                 }
             },
         });
@@ -159,10 +159,10 @@ describe('On query hooks tests', () => {
             onQuery: async (ctx) => {
                 if (ctx.model === 'User' && ctx.operation === 'create') {
                     hooksCalled = true;
-                    await ctx.query(ctx.args);
+                    await ctx.proceed(ctx.args);
                     throw new Error('trigger error');
                 } else {
-                    return ctx.query(ctx.args);
+                    return ctx.proceed(ctx.args);
                 }
             },
         });
@@ -194,7 +194,7 @@ describe('On query hooks tests', () => {
             id: 'test-plugin',
             onQuery: (ctx) => {
                 findHookCalled = true;
-                return ctx.query(ctx.args);
+                return ctx.proceed(ctx.args);
             },
         });
 

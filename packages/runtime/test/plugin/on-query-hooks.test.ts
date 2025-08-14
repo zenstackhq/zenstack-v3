@@ -211,4 +211,42 @@ describe('On query hooks tests', () => {
         ).resolves.toMatchObject(user);
         expect(findHookCalled).toBe(true);
     });
+
+    it('propagates overridden args across multiple onQuery plugins', async () => {
+        const user = await _client.user.create({ data: { email: 'u1@test.com' } });
+
+        let earlierSawOverridden = false;
+
+        // Plugin A (registered first) should see the overridden args from Plugin B
+        const clientA = _client.$use({
+            id: 'plugin-a',
+            onQuery: (ctx) => {
+                if (ctx.model === 'User' && ctx.operation === 'findFirst') {
+                    // expect overridden where clause from Plugin B
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    earlierSawOverridden = (ctx.args as any)?.where?.id === 'non-exist';
+                }
+                return ctx.proceed(ctx.args);
+            },
+        });
+
+        // Plugin B (registered second) overrides args
+        const client = clientA.$use({
+            id: 'plugin-b',
+            onQuery: (ctx) => {
+                if (ctx.model === 'User' && ctx.operation === 'findFirst') {
+                    return ctx.proceed({ where: { id: 'non-exist' } });
+                }
+                return ctx.proceed(ctx.args);
+            },
+        });
+
+        await expect(
+            client.user.findFirst({
+                where: { id: user.id },
+            }),
+        ).toResolveNull();
+
+        expect(earlierSawOverridden).toBe(true);
+    });
 });

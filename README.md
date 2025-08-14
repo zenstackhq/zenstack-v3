@@ -289,15 +289,11 @@ ORM query interception allows you to intercept the high-level ORM API calls. The
 ```ts
 db.$use({
     id: 'cost-logger',
-    onQuery: {
-        $allModels: {
-            $allOperations: async ({ model, operation, args, query }) => {
-                const start = Date.now();
-                const result = await query(args);
-                console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
-                return result;
-            },
-        },
+    onQuery: async ({ model, operation, args, query }) => {
+        const start = Date.now();
+        const result = await query(args);
+        console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
+        return result;
     },
 });
 ```
@@ -333,11 +329,14 @@ Another popular interception use case is, instead of intercepting calls, "listen
 ```ts
 db.$use({
     id: 'mutation-hook-plugin',
-    beforeEntityMutation({ model, action }) {
-        console.log(`Before ${model} ${action}`);
-    },
-    afterEntityMutation({ model, action }) {
-        console.log(`After ${model} ${action}`);
+    onEntityMutation: {
+        beforeEntityMutation({ model, action }) {
+            console.log(`Before ${model} ${action}`);
+        },
+
+        afterEntityMutation({ model, action }) {
+            console.log(`After ${model} ${action}`);
+        },
     },
 });
 ```
@@ -347,20 +346,24 @@ You can provide an extra `mutationInterceptionFilter` to control what to interce
 ```ts
 db.$use({
     id: 'mutation-hook-plugin',
-    mutationInterceptionFilter: ({ model }) => {
-        return {
-            intercept: model === 'User',
-            // load entities affected before the mutation (defaults to false)
-            loadBeforeMutationEntities: true,
-            // load entities affected after the mutation (defaults to false)
-            loadAfterMutationEntities: true,
-        };
-    },
-    beforeEntityMutation({ model, action, entities }) {
-        console.log(`Before ${model} ${action}: ${entities}`);
-    },
-    afterEntityMutation({ model, action, afterMutationEntities }) {
-        console.log(`After ${model} ${action}: ${afterMutationEntities}`);
+    onEntityMutation: {
+        mutationInterceptionFilter: ({ model }) => {
+            return {
+                intercept: model === 'User',
+                // load entities affected before the mutation (defaults to false)
+                loadBeforeMutationEntities: true,
+                // load entities affected after the mutation (defaults to false)
+                loadAfterMutationEntities: true,
+            };
+        },
+
+        beforeEntityMutation({ model, action, entities }) {
+            console.log(`Before ${model} ${action}: ${entities}`);
+        },
+
+        afterEntityMutation({ model, action, afterMutationEntities }) {
+            console.log(`After ${model} ${action}: ${afterMutationEntities}`);
+        },
     },
 });
 ```

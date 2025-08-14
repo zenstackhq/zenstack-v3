@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ZenStackClient, type ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
 
-describe('Kysely onQuery tests', () => {
+describe('On kysely query tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {

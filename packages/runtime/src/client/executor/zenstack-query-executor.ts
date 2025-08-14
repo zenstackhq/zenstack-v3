@@ -230,9 +230,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     }
 
     private get hasMutationHooks() {
-        return this.client.$options.plugins?.some(
-            (plugin) => plugin.beforeEntityMutation || plugin.afterEntityMutation,
-        );
+        return this.client.$options.plugins?.some((plugin) => !!plugin.onEntityMutation);
     }
 
     private getMutationModel(queryNode: OperationNode): GetModels<Schema> {
@@ -274,10 +272,16 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 .exhaustive();
 
             for (const plugin of plugins) {
-                if (!plugin.mutationInterceptionFilter) {
+                const onEntityMutation = plugin.onEntityMutation;
+                if (!onEntityMutation) {
+                    continue;
+                }
+
+                if (!onEntityMutation.mutationInterceptionFilter) {
+                    // by default intercept without loading entities
                     result.intercept = true;
                 } else {
-                    const filterResult = await plugin.mutationInterceptionFilter({
+                    const filterResult = await onEntityMutation.mutationInterceptionFilter({
                         model: mutationModel,
                         action,
                         queryNode,
@@ -316,8 +320,9 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         if (this.options.plugins) {
             const mutationModel = this.getMutationModel(queryNode);
             for (const plugin of this.options.plugins) {
-                if (plugin.beforeEntityMutation) {
-                    await plugin.beforeEntityMutation({
+                const onEntityMutation = plugin.onEntityMutation;
+                if (onEntityMutation?.beforeEntityMutation) {
+                    await onEntityMutation.beforeEntityMutation({
                         model: mutationModel,
                         action: mutationInterceptionInfo.action,
                         queryNode,
@@ -341,8 +346,9 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         const hooks: AfterEntityMutationCallback<Schema>[] = [];
         // tsc perf
         for (const plugin of this.options.plugins ?? []) {
-            if (plugin.afterEntityMutation) {
-                hooks.push(plugin.afterEntityMutation.bind(plugin));
+            const onEntityMutation = plugin.onEntityMutation;
+            if (onEntityMutation?.afterEntityMutation) {
+                hooks.push(onEntityMutation.afterEntityMutation.bind(plugin));
             }
         }
         if (hooks.length === 0) {

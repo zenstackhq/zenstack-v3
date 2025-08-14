@@ -17,15 +17,11 @@ async function main() {
         },
     }).$use({
         id: 'cost-logger',
-        onQuery: {
-            $allModels: {
-                $allOperations: async ({ model, operation, args, query }) => {
-                    const start = Date.now();
-                    const result = await query(args);
-                    console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
-                    return result;
-                },
-            },
+        onQuery: async ({ model, operation, args, query }) => {
+            const start = Date.now();
+            const result = await query(args);
+            console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
+            return result;
         },
     });
 

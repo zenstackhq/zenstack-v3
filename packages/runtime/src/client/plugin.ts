@@ -69,12 +69,12 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
     args: unknown;
 
     /**
-     * The query function to proceed with the original query.
+     * The function to proceed with the original query.
      * It takes the same arguments as the operation method.
      *
      * @param args The query arguments.
      */
-    query: (args: unknown) => Promise<unknown>;
+    proceed: (args: unknown) => Promise<unknown>;
 
     /**
      * The ZenStack client that is performing the operation.

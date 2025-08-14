@@ -289,9 +289,9 @@ ORM query interception allows you to intercept the high-level ORM API calls. The
 ```ts
 db.$use({
     id: 'cost-logger',
-    onQuery: async ({ model, operation, args, query }) => {
+    onQuery: async ({ model, operation, args, proceed }) => {
         const start = Date.now();
-        const result = await query(args);
+        const result = await proceed(args);
         console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
         return result;
     },

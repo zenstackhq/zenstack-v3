@@ -379,7 +379,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 const onQuery = plugin.onQuery;
                 if (onQuery) {
                     const _proceed = proceed;
-                    proceed = () => onQuery({ client, model, operation, args, query: _proceed }) as Promise<unknown>;
+                    proceed = () => onQuery({ client, model, operation, args, proceed: _proceed }) as Promise<unknown>;
                 }
             }
 

@@ -2,115 +2,7 @@ import type { OperationNode, QueryResult, RootOperationNode, UnknownRow } from '
 import type { ClientContract, ToKysely } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
-import type { ModelOperations } from './contract';
 import type { CrudOperation } from './crud/operations/base';
-
-export type QueryContext<Schema extends SchemaDef> = {
-    /**
-     * The ZenStack client that's invoking the plugin.
-     */
-    client: ClientContract<Schema>;
-
-    /**
-     * The model that is being queried.
-     */
-    model: GetModels<Schema>;
-
-    /**
-     * The query operation that is being performed.
-     */
-    operation: CrudOperation;
-
-    /**
-     * The query arguments.
-     */
-    queryArgs: unknown;
-};
-
-/**
- * The result of the hooks interception filter.
- */
-export type MutationInterceptionFilterResult = {
-    /**
-     * Whether to intercept the mutation or not.
-     */
-    intercept: boolean;
-
-    /**
-     * Whether entities should be loaded before the mutation.
-     */
-    loadBeforeMutationEntities?: boolean;
-
-    /**
-     * Whether entities should be loaded after the mutation.
-     */
-    loadAfterMutationEntities?: boolean;
-};
-
-type MutationHooksArgs<Schema extends SchemaDef> = {
-    /**
-     * The model that is being mutated.
-     */
-    model: GetModels<Schema>;
-
-    /**
-     * The mutation action that is being performed.
-     */
-    action: 'create' | 'update' | 'delete';
-
-    /**
-     * The mutation data. Only available for create and update actions.
-     */
-    queryNode: OperationNode;
-};
-
-export type OnQueryArgs<Schema extends SchemaDef> = QueryContext<Schema> & {
-    proceed: ProceedQueryFunction<Schema>;
-};
-
-export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
-    entities?: Record<string, unknown>[];
-};
-
-export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
-    beforeMutationEntities?: Record<string, unknown>[];
-    afterMutationEntities?: Record<string, unknown>[];
-};
-
-export type ProceedQueryFunction<Schema extends SchemaDef> = (
-    queryArgs: unknown,
-    tx?: ClientContract<Schema>,
-) => Promise<unknown>;
-
-export type OnKyselyQueryTransactionCallback = (proceed: ProceedKyselyQueryFunction) => Promise<QueryResult<any>>;
-
-export type OnKyselyQueryTransaction = (callback: OnKyselyQueryTransactionCallback) => Promise<QueryResult<any>>;
-
-export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
-    kysely: ToKysely<Schema>;
-    schema: SchemaDef;
-    client: ClientContract<Schema>;
-    query: RootOperationNode;
-    proceed: ProceedKyselyQueryFunction;
-};
-
-export type ProceedKyselyQueryFunction = (query: RootOperationNode) => Promise<QueryResult<any>>;
-
-export type OnKyselyQueryCallback<Schema extends SchemaDef> = (
-    args: OnKyselyQueryArgs<Schema>,
-) => Promise<QueryResult<UnknownRow>>;
-
-export type MutationInterceptionFilter<Schema extends SchemaDef> = (
-    args: MutationHooksArgs<Schema>,
-) => MaybePromise<MutationInterceptionFilterResult>;
-
-export type BeforeEntityMutationCallback<Schema extends SchemaDef> = (
-    args: PluginBeforeEntityMutationArgs<Schema>,
-) => MaybePromise<void>;
-
-export type AfterEntityMutationCallback<Schema extends SchemaDef> = (
-    args: PluginAfterEntityMutationArgs<Schema>,
-) => MaybePromise<void>;
 
 /**
  * ZenStack runtime plugin.
@@ -134,13 +26,67 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     /**
      * Intercepts an ORM query.
      */
-    onQuery?: OnQueryHooks<Schema>;
+    onQuery?: OnQueryCallback<Schema>;
+
+    /**
+     * Intercepts an entity mutation.
+     */
+    onEntityMutation?: EntityMutationHooksDef<Schema>;
 
     /**
      * Intercepts a Kysely query.
      */
     onKyselyQuery?: OnKyselyQueryCallback<Schema>;
+}
 
+/**
+ * Defines a ZenStack runtime plugin.
+ */
+export function definePlugin<Schema extends SchemaDef>(plugin: RuntimePlugin<Schema>) {
+    return plugin;
+}
+
+export { type CrudOperation } from './crud/operations/base';
+
+// #region OnQuery hooks
+
+type OnQueryCallback<Schema extends SchemaDef> = (ctx: OnQueryHookContext<Schema>) => Promise<unknown>;
+
+type OnQueryHookContext<Schema extends SchemaDef> = {
+    /**
+     * The model that is being queried.
+     */
+    model: GetModels<Schema>;
+
+    /**
+     * The operation that is being performed.
+     */
+    operation: CrudOperation;
+
+    /**
+     * The query arguments.
+     */
+    args: unknown;
+
+    /**
+     * The function to proceed with the original query.
+     * It takes the same arguments as the operation method.
+     *
+     * @param args The query arguments.
+     */
+    proceed: (args: unknown) => Promise<unknown>;
+
+    /**
+     * The ZenStack client that is performing the operation.
+     */
+    client: ClientContract<Schema>;
+};
+
+// #endregion
+
+// #region OnEntityMutation hooks
+
+export type EntityMutationHooksDef<Schema extends SchemaDef> = {
     /**
      * This callback determines whether a mutation should be intercepted, and if so,
      * what data should be loaded before and after the mutation.
@@ -162,69 +108,95 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
      * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
     afterEntityMutation?: AfterEntityMutationCallback<Schema>;
-}
-
-type OnQueryHooks<Schema extends SchemaDef = SchemaDef> = {
-    [Model in GetModels<Schema> as Uncapitalize<Model>]?: OnQueryOperationHooks<Schema, Model>;
-} & {
-    $allModels?: OnQueryOperationHooks<Schema, GetModels<Schema>>;
 };
 
-type OnQueryOperationHooks<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Operation in keyof ModelOperations<Schema, Model>]?: (
-        ctx: OnQueryHookContext<Schema, Model, Operation>,
-    ) => Promise<Awaited<ReturnType<ModelOperations<Schema, Model>[Operation]>>>;
-} & {
-    $allOperations?: (ctx: {
-        model: Model;
-        operation: CrudOperation;
-        args: unknown;
-        query: (args: unknown) => Promise<unknown>;
-        client: ClientContract<Schema>;
-    }) => MaybePromise<unknown>;
+type MutationHooksArgs<Schema extends SchemaDef> = {
+    /**
+     * The model that is being mutated.
+     */
+    model: GetModels<Schema>;
+
+    /**
+     * The mutation action that is being performed.
+     */
+    action: 'create' | 'update' | 'delete';
+
+    /**
+     * The mutation data. Only available for create and update actions.
+     */
+    queryNode: OperationNode;
 };
 
-type OnQueryHookContext<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Operation extends keyof ModelOperations<Schema, Model>,
-> = {
-    /**
-     * The model that is being queried.
-     */
-    model: Model;
-
-    /**
-     * The operation that is being performed.
-     */
-    operation: Operation;
-
-    /**
-     * The query arguments.
-     */
-    args: Parameters<ModelOperations<Schema, Model>[Operation]>[0];
-
-    /**
-     * The query function to proceed with the original query.
-     * It takes the same arguments as the operation method.
-     *
-     * @param args The query arguments.
-     */
-    query: (
-        args: Parameters<ModelOperations<Schema, Model>[Operation]>[0],
-    ) => ReturnType<ModelOperations<Schema, Model>[Operation]>;
-
-    /**
-     * The ZenStack client that is performing the operation.
-     */
-    client: ClientContract<Schema>;
-};
+export type MutationInterceptionFilter<Schema extends SchemaDef> = (
+    args: MutationHooksArgs<Schema>,
+) => MaybePromise<MutationInterceptionFilterResult>;
 
 /**
- * Defines a ZenStack runtime plugin.
+ * The result of the hooks interception filter.
  */
-export function definePlugin<Schema extends SchemaDef>(plugin: RuntimePlugin<Schema>) {
-    return plugin;
-}
+export type MutationInterceptionFilterResult = {
+    /**
+     * Whether to intercept the mutation or not.
+     */
+    intercept: boolean;
 
-export { type CrudOperation } from './crud/operations/base';
+    /**
+     * Whether entities should be loaded before the mutation.
+     */
+    loadBeforeMutationEntities?: boolean;
+
+    /**
+     * Whether entities should be loaded after the mutation.
+     */
+    loadAfterMutationEntities?: boolean;
+};
+
+export type BeforeEntityMutationCallback<Schema extends SchemaDef> = (
+    args: PluginBeforeEntityMutationArgs<Schema>,
+) => MaybePromise<void>;
+
+export type AfterEntityMutationCallback<Schema extends SchemaDef> = (
+    args: PluginAfterEntityMutationArgs<Schema>,
+) => MaybePromise<void>;
+
+export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
+    /**
+     * Entities that are about to be mutated. Only available if `loadBeforeMutationEntities` is set to
+     * true in the return value of {@link RuntimePlugin.mutationInterceptionFilter}.
+     */
+    entities?: unknown[];
+};
+
+export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
+    /**
+     * Entities that are about to be mutated. Only available if `loadBeforeMutationEntities` is set to
+     * true in the return value of {@link RuntimePlugin.mutationInterceptionFilter}.
+     */
+    beforeMutationEntities?: unknown[];
+
+    /**
+     * Entities mutated. Only available if `loadAfterMutationEntities` is set to true in the return
+     * value of {@link RuntimePlugin.mutationInterceptionFilter}.
+     */
+    afterMutationEntities?: unknown[];
+};
+
+// #endregion
+
+// #region OnKyselyQuery hooks
+
+export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
+    kysely: ToKysely<Schema>;
+    schema: SchemaDef;
+    client: ClientContract<Schema>;
+    query: RootOperationNode;
+    proceed: ProceedKyselyQueryFunction;
+};
+
+export type ProceedKyselyQueryFunction = (query: RootOperationNode) => Promise<QueryResult<any>>;
+
+export type OnKyselyQueryCallback<Schema extends SchemaDef> = (
+    args: OnKyselyQueryArgs<Schema>,
+) => Promise<QueryResult<UnknownRow>>;
+
+// #endregion

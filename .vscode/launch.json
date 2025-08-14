@@ -10,11 +10,7 @@
             "request": "launch",
             "skipFiles": ["<node_internals>/**"],
             "type": "node",
-            "args": [
-                "generate",
-                "--schema",
-                "${workspaceFolder}/samples/blog/zenstack/schema.zmodel"
-            ]
+            "args": ["generate", "--schema", "${workspaceFolder}/samples/blog/zenstack/schema.zmodel"]
         },
         {
             "name": "Debug with TSX",
@@ -44,15 +40,14 @@
 
                 // Ignore all dependencies (optional)
                 "${workspaceFolder}/node_modules/**"
-            ]
+            ],
+            "cwd": "${fileDirname}"
         },
         {
             "name": "Run Extension",
             "type": "extensionHost",
             "request": "launch",
-            "args": [
-                "--extensionDevelopmentPath=${workspaceFolder}/packages/ide/vscode"
-            ],
+            "args": ["--extensionDevelopmentPath=${workspaceFolder}/packages/ide/vscode"],
             "sourceMaps": true,
             "outFiles": ["${workspaceFolder}/packages/ide/vscode/dist/**/*.js"]
         },

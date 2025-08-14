@@ -99,6 +99,7 @@
     - [ ] Short-circuit pre-create check for scalar-field only policies
     - [ ] Inject "replace into"
     - [ ] Inject "on conflict do update"
+    - [ ] Inject "insert into select from"
 - [x] Migration
 - [ ] Databases
     - [x] SQLite

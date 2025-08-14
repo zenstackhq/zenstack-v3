@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ZenStackClient, type ClientContract } from '../../src';
 import { schema } from '../schemas/basic';
 
-describe('Entity  lifecycle tests', () => {
+describe('Entity mutation hooks tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
@@ -24,23 +24,25 @@ describe('Entity  lifecycle tests', () => {
 
         const client = _client.$use({
             id: 'test',
-            beforeEntityMutation(args) {
-                beforeCalled[args.action] = true;
-                if (args.action === 'create') {
-                    expect(InsertQueryNode.is(args.queryNode)).toBe(true);
-                }
-                if (args.action === 'update') {
-                    expect(UpdateQueryNode.is(args.queryNode)).toBe(true);
-                }
-                if (args.action === 'delete') {
-                    expect(DeleteQueryNode.is(args.queryNode)).toBe(true);
-                }
-                expect(args.entities).toBeUndefined();
-            },
-            afterEntityMutation(args) {
-                afterCalled[args.action] = true;
-                expect(args.beforeMutationEntities).toBeUndefined();
-                expect(args.afterMutationEntities).toBeUndefined();
+            onEntityMutation: {
+                beforeEntityMutation(args) {
+                    beforeCalled[args.action] = true;
+                    if (args.action === 'create') {
+                        expect(InsertQueryNode.is(args.queryNode)).toBe(true);
+                    }
+                    if (args.action === 'update') {
+                        expect(UpdateQueryNode.is(args.queryNode)).toBe(true);
+                    }
+                    if (args.action === 'delete') {
+                        expect(DeleteQueryNode.is(args.queryNode)).toBe(true);
+                    }
+                    expect(args.entities).toBeUndefined();
+                },
+                afterEntityMutation(args) {
+                    afterCalled[args.action] = true;
+                    expect(args.beforeMutationEntities).toBeUndefined();
+                    expect(args.afterMutationEntities).toBeUndefined();
+                },
             },
         });
 
@@ -71,17 +73,19 @@ describe('Entity  lifecycle tests', () => {
 
         const client = _client.$use({
             id: 'test',
-            mutationInterceptionFilter: (args) => {
-                return {
-                    intercept: args.action !== 'delete',
-                };
-            },
-            beforeEntityMutation(args) {
-                beforeCalled[args.action] = true;
-                expect(args.entities).toBeUndefined();
-            },
-            afterEntityMutation(args) {
-                afterCalled[args.action] = true;
+            onEntityMutation: {
+                mutationInterceptionFilter: (args) => {
+                    return {
+                        intercept: args.action !== 'delete',
+                    };
+                },
+                beforeEntityMutation(args) {
+                    beforeCalled[args.action] = true;
+                    expect(args.entities).toBeUndefined();
+                },
+                afterEntityMutation(args) {
+                    afterCalled[args.action] = true;
+                },
             },
         });
 
@@ -109,32 +113,34 @@ describe('Entity  lifecycle tests', () => {
     it('can intercept with loading before mutation entities', async () => {
         const client = _client.$use({
             id: 'test',
-            mutationInterceptionFilter: () => {
-                return {
-                    intercept: true,
-                    loadBeforeMutationEntities: true,
-                };
-            },
-            beforeEntityMutation(args) {
-                if (args.action === 'update' || args.action === 'delete') {
-                    expect(args.entities).toEqual([
-                        expect.objectContaining({
-                            email: args.action === 'update' ? 'u1@test.com' : 'u3@test.com',
-                        }),
-                    ]);
-                } else {
-                    expect(args.entities).toBeUndefined();
-                }
-            },
-            afterEntityMutation(args) {
-                if (args.action === 'update' || args.action === 'delete') {
-                    expect(args.beforeMutationEntities).toEqual([
-                        expect.objectContaining({
-                            email: args.action === 'update' ? 'u1@test.com' : 'u3@test.com',
-                        }),
-                    ]);
-                }
-                expect(args.afterMutationEntities).toBeUndefined();
+            onEntityMutation: {
+                mutationInterceptionFilter: () => {
+                    return {
+                        intercept: true,
+                        loadBeforeMutationEntities: true,
+                    };
+                },
+                beforeEntityMutation(args) {
+                    if (args.action === 'update' || args.action === 'delete') {
+                        expect(args.entities).toEqual([
+                            expect.objectContaining({
+                                email: args.action === 'update' ? 'u1@test.com' : 'u3@test.com',
+                            }),
+                        ]);
+                    } else {
+                        expect(args.entities).toBeUndefined();
+                    }
+                },
+                afterEntityMutation(args) {
+                    if (args.action === 'update' || args.action === 'delete') {
+                        expect(args.beforeMutationEntities).toEqual([
+                            expect.objectContaining({
+                                email: args.action === 'update' ? 'u1@test.com' : 'u3@test.com',
+                            }),
+                        ]);
+                    }
+                    expect(args.afterMutationEntities).toBeUndefined();
+                },
             },
         });
 
@@ -156,30 +162,32 @@ describe('Entity  lifecycle tests', () => {
         let userUpdateIntercepted = false;
         const client = _client.$use({
             id: 'test',
-            mutationInterceptionFilter: () => {
-                return {
-                    intercept: true,
-                    loadAfterMutationEntities: true,
-                };
-            },
-            afterEntityMutation(args) {
-                if (args.action === 'create' || args.action === 'update') {
-                    if (args.action === 'create') {
-                        userCreateIntercepted = true;
+            onEntityMutation: {
+                mutationInterceptionFilter: () => {
+                    return {
+                        intercept: true,
+                        loadAfterMutationEntities: true,
+                    };
+                },
+                afterEntityMutation(args) {
+                    if (args.action === 'create' || args.action === 'update') {
+                        if (args.action === 'create') {
+                            userCreateIntercepted = true;
+                        }
+                        if (args.action === 'update') {
+                            userUpdateIntercepted = true;
+                        }
+                        expect(args.afterMutationEntities).toEqual(
+                            expect.arrayContaining([
+                                expect.objectContaining({
+                                    email: args.action === 'create' ? 'u1@test.com' : 'u2@test.com',
+                                }),
+                            ]),
+                        );
+                    } else {
+                        expect(args.afterMutationEntities).toBeUndefined();
                     }
-                    if (args.action === 'update') {
-                        userUpdateIntercepted = true;
-                    }
-                    expect(args.afterMutationEntities).toEqual(
-                        expect.arrayContaining([
-                            expect.objectContaining({
-                                email: args.action === 'create' ? 'u1@test.com' : 'u2@test.com',
-                            }),
-                        ]),
-                    );
-                } else {
-                    expect(args.afterMutationEntities).toBeUndefined();
-                }
+                },
             },
         });
 
@@ -202,44 +210,46 @@ describe('Entity  lifecycle tests', () => {
 
         const client = _client.$use({
             id: 'test',
-            mutationInterceptionFilter: () => {
-                return {
-                    intercept: true,
-                    loadAfterMutationEntities: true,
-                };
-            },
-            afterEntityMutation(args) {
-                if (args.action === 'create') {
-                    userCreateIntercepted = true;
-                    expect(args.afterMutationEntities).toEqual(
-                        expect.arrayContaining([
-                            expect.objectContaining({ email: 'u1@test.com' }),
-                            expect.objectContaining({ email: 'u2@test.com' }),
-                        ]),
-                    );
-                } else if (args.action === 'update') {
-                    userUpdateIntercepted = true;
-                    expect(args.afterMutationEntities).toEqual(
-                        expect.arrayContaining([
-                            expect.objectContaining({
-                                email: 'u1@test.com',
-                                name: 'A user',
-                            }),
-                            expect.objectContaining({
-                                email: 'u1@test.com',
-                                name: 'A user',
-                            }),
-                        ]),
-                    );
-                } else if (args.action === 'delete') {
-                    userDeleteIntercepted = true;
-                    expect(args.afterMutationEntities).toEqual(
-                        expect.arrayContaining([
-                            expect.objectContaining({ email: 'u1@test.com' }),
-                            expect.objectContaining({ email: 'u2@test.com' }),
-                        ]),
-                    );
-                }
+            onEntityMutation: {
+                mutationInterceptionFilter: () => {
+                    return {
+                        intercept: true,
+                        loadAfterMutationEntities: true,
+                    };
+                },
+                afterEntityMutation(args) {
+                    if (args.action === 'create') {
+                        userCreateIntercepted = true;
+                        expect(args.afterMutationEntities).toEqual(
+                            expect.arrayContaining([
+                                expect.objectContaining({ email: 'u1@test.com' }),
+                                expect.objectContaining({ email: 'u2@test.com' }),
+                            ]),
+                        );
+                    } else if (args.action === 'update') {
+                        userUpdateIntercepted = true;
+                        expect(args.afterMutationEntities).toEqual(
+                            expect.arrayContaining([
+                                expect.objectContaining({
+                                    email: 'u1@test.com',
+                                    name: 'A user',
+                                }),
+                                expect.objectContaining({
+                                    email: 'u2@test.com',
+                                    name: 'A user',
+                                }),
+                            ]),
+                        );
+                    } else if (args.action === 'delete') {
+                        userDeleteIntercepted = true;
+                        expect(args.afterMutationEntities).toEqual(
+                            expect.arrayContaining([
+                                expect.objectContaining({ email: 'u1@test.com' }),
+                                expect.objectContaining({ email: 'u2@test.com' }),
+                            ]),
+                        );
+                    }
+                },
             },
         });
 
@@ -260,23 +270,25 @@ describe('Entity  lifecycle tests', () => {
         let post2Intercepted = false;
         const client = _client.$use({
             id: 'test',
-            mutationInterceptionFilter: (args) => {
-                return {
-                    intercept: args.action === 'create' || args.action === 'update',
-                    loadAfterMutationEntities: true,
-                };
-            },
-            afterEntityMutation(args) {
-                if (args.action === 'create') {
-                    if (args.model === 'Post') {
-                        if ((args.afterMutationEntities![0] as any).title === 'Post1') {
-                            post1Intercepted = true;
-                        }
-                        if ((args.afterMutationEntities![0] as any).title === 'Post2') {
-                            post2Intercepted = true;
+            onEntityMutation: {
+                mutationInterceptionFilter: (args) => {
+                    return {
+                        intercept: args.action === 'create' || args.action === 'update',
+                        loadAfterMutationEntities: true,
+                    };
+                },
+                afterEntityMutation(args) {
+                    if (args.action === 'create') {
+                        if (args.model === 'Post') {
+                            if ((args.afterMutationEntities![0] as any).title === 'Post1') {
+                                post1Intercepted = true;
+                            }
+                            if ((args.afterMutationEntities![0] as any).title === 'Post2') {
+                                post2Intercepted = true;
+                            }
                         }
                     }
-                }
+                },
             },
         });
 
@@ -303,9 +315,11 @@ describe('Entity  lifecycle tests', () => {
 
         const client = _client.$use({
             id: 'test',
-            afterEntityMutation() {
-                intercepted = true;
-                throw new Error('trigger rollback');
+            onEntityMutation: {
+                afterEntityMutation() {
+                    intercepted = true;
+                    throw new Error('trigger rollback');
+                },
             },
         });
 
@@ -322,8 +336,10 @@ describe('Entity  lifecycle tests', () => {
 
         const client = _client.$use({
             id: 'test',
-            afterEntityMutation() {
-                intercepted = true;
+            onEntityMutation: {
+                afterEntityMutation() {
+                    intercepted = true;
+                },
             },
         });
 
@@ -347,15 +363,17 @@ describe('Entity  lifecycle tests', () => {
 
         const client = _client.$use({
             id: 'test',
-            mutationInterceptionFilter: () => {
-                return {
-                    intercept: true,
-                    loadBeforeMutationEntities: true,
-                    loadAfterMutationEntities: true,
-                };
-            },
-            afterEntityMutation(args) {
-                triggered.push(args);
+            onEntityMutation: {
+                mutationInterceptionFilter: () => {
+                    return {
+                        intercept: true,
+                        loadBeforeMutationEntities: true,
+                        loadAfterMutationEntities: true,
+                    };
+                },
+                afterEntityMutation(args) {
+                    triggered.push(args);
+                },
             },
         });
 

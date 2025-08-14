@@ -23,14 +23,10 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-queryOverride',
-            onQuery: {
-                model: {
-                    findMany({ args, query }: any) {
-                        args = args ?? {};
-                        args.where = { ...args.where, y: { lt: 300 } };
-                        return query(args);
-                    },
-                },
+            onQuery: async ({ args, proceed }: any) => {
+                args = args ?? {};
+                args.where = { ...args.where, y: { lt: 300 } };
+                return proceed(args);
             },
         });
 
@@ -58,14 +54,10 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-queryOverride',
-            onQuery: {
-                $allModels: {
-                    async findMany({ args, query }: any) {
-                        args = args ?? {};
-                        args.where = { ...args.where, y: { lt: 300 } };
-                        return query(args);
-                    },
-                },
+            onQuery: async ({ args, proceed }: any) => {
+                args = args ?? {};
+                args.where = { ...args.where, y: { lt: 300 } };
+                return proceed(args);
             },
         });
 
@@ -93,14 +85,10 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-queryOverride',
-            onQuery: {
-                model: {
-                    async $allOperations({ args, query }: any) {
-                        args = args ?? {};
-                        args.where = { ...args.where, y: { lt: 300 } };
-                        return query(args);
-                    },
-                },
+            onQuery: async ({ args, proceed }: any) => {
+                args = args ?? {};
+                args.where = { ...args.where, y: { lt: 300 } };
+                return proceed(args);
             },
         });
 
@@ -128,14 +116,10 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-queryOverride',
-            onQuery: {
-                $allModels: {
-                    $allOperations({ args, query }: any) {
-                        args = args ?? {};
-                        args.where = { ...args.where, y: { lt: 300 } };
-                        return query(args);
-                    },
-                },
+            onQuery: async ({ args, proceed }: any) => {
+                args = args ?? {};
+                args.where = { ...args.where, y: { lt: 300 } };
+                return proceed(args);
             },
         });
 
@@ -161,16 +145,12 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-resultMutation',
-            onQuery: {
-                model: {
-                    async findMany({ args, query }: any) {
-                        const r: any = await query(args);
-                        for (let i = 0; i < r.length; i++) {
-                            r[i].value = r[i].value + 1;
-                        }
-                        return r;
-                    },
-                },
+            onQuery: async ({ args, proceed }: any) => {
+                const r: any = await proceed(args);
+                for (let i = 0; i < r.length; i++) {
+                    r[i].value = r[i].value + 1;
+                }
+                return r;
             },
         });
 

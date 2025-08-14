@@ -358,9 +358,9 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         throwIfNoResult = false,
     ) => {
         return createZenStackPromise(async (txClient?: ClientContract<Schema>) => {
-            let proceed = async (_args?: unknown) => {
+            let proceed = async (_args: unknown) => {
                 const _handler = txClient ? handler.withClient(txClient) : handler;
-                const r = await _handler.handle(operation, _args ?? args);
+                const r = await _handler.handle(operation, _args);
                 if (!r && throwIfNoResult) {
                     throw new NotFoundError(model);
                 }
@@ -379,7 +379,16 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 const onQuery = plugin.onQuery;
                 if (onQuery) {
                     const _proceed = proceed;
-                    proceed = () => onQuery({ client, model, operation, args, proceed: _proceed }) as Promise<unknown>;
+                    proceed = (_args: unknown) =>
+                        onQuery({
+                            client,
+                            model,
+                            operation,
+                            // reflect the latest override if provided
+                            args: _args,
+                            // ensure inner overrides are propagated to the previous proceed
+                            proceed: (nextArgs: unknown) => _proceed(nextArgs),
+                        }) as Promise<unknown>;
                 }
             }
 

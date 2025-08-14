@@ -23,10 +23,10 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-queryOverride',
-            onQuery: async ({ args, query }: any) => {
+            onQuery: async ({ args, proceed }: any) => {
                 args = args ?? {};
                 args.where = { ...args.where, y: { lt: 300 } };
-                return query(args);
+                return proceed(args);
             },
         });
 
@@ -54,10 +54,10 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-queryOverride',
-            onQuery: async ({ args, query }: any) => {
+            onQuery: async ({ args, proceed }: any) => {
                 args = args ?? {};
                 args.where = { ...args.where, y: { lt: 300 } };
-                return query(args);
+                return proceed(args);
             },
         });
 
@@ -85,10 +85,10 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-queryOverride',
-            onQuery: async ({ args, query }: any) => {
+            onQuery: async ({ args, proceed }: any) => {
                 args = args ?? {};
                 args.where = { ...args.where, y: { lt: 300 } };
-                return query(args);
+                return proceed(args);
             },
         });
 
@@ -116,10 +116,10 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-queryOverride',
-            onQuery: async ({ args, query }: any) => {
+            onQuery: async ({ args, proceed }: any) => {
                 args = args ?? {};
                 args.where = { ...args.where, y: { lt: 300 } };
-                return query(args);
+                return proceed(args);
             },
         });
 
@@ -145,8 +145,8 @@ describe('client extensions tests for policies', () => {
 
         const ext = definePlugin({
             id: 'prisma-extension-resultMutation',
-            onQuery: async ({ args, query }: any) => {
-                const r: any = await query(args);
+            onQuery: async ({ args, proceed }: any) => {
+                const r: any = await proceed(args);
                 for (let i = 0; i < r.length; i++) {
                     r[i].value = r[i].value + 1;
                 }

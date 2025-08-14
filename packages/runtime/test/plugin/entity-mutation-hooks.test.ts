@@ -235,7 +235,7 @@ describe('Entity mutation hooks tests', () => {
                                     name: 'A user',
                                 }),
                                 expect.objectContaining({
-                                    email: 'u1@test.com',
+                                    email: 'u2@test.com',
                                     name: 'A user',
                                 }),
                             ]),

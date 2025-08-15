@@ -7,7 +7,7 @@ export function makeSelectSchema<Schema extends SchemaDef, Model extends GetMode
     schema: Schema,
     model: Model,
 ) {
-    return z.object(mapFields(schema, model)) as SelectSchema<Schema, typeof model>;
+    return z.strictObject(mapFields(schema, model)) as SelectSchema<Schema, typeof model>;
 }
 
 function mapFields<Schema extends SchemaDef>(schema: Schema, model: GetModels<Schema>): any {

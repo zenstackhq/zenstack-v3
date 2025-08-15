@@ -46,7 +46,17 @@ describe('CLI migrate commands test', () => {
         // find the migration record "timestamp_init"
         const migrationRecords = fs.readdirSync(path.join(workDir, 'zenstack/migrations'));
         const migration = migrationRecords.find((f) => f.endsWith('_init'));
-        expect(migration).toBeDefined();
+
+        // force a migration failure
+        fs.writeFileSync(path.join(workDir, 'zenstack/migrations', migration!, 'migration.sql'), 'invalid content');
+
+        // redeploy the migration, which will fail
+        fs.rmSync(path.join(workDir, 'zenstack/dev.db'), { force: true });
+        try {
+            runCli('migrate deploy', workDir);
+        } catch {
+            // noop
+        }
 
         // --rolled-back
         runCli(`migrate resolve --rolled-back ${migration}`, workDir);

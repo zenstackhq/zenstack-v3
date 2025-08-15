@@ -105,7 +105,7 @@ export function createProgram() {
         .addOption(new Option('--applied <migration>', 'record a specific migration as applied'))
         .addOption(new Option('--rolled-back <migration>', 'record a specific migration as rolled back'))
         .description('Resolve issues with database migrations in deployment databases')
-        .action((options) => migrateAction('status', options));
+        .action((options) => migrateAction('resolve', options));
 
     const dbCommand = program.command('db').description('Manage your database schema during development.');
 

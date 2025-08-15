@@ -993,8 +993,14 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return eb.not(this.and(eb, ...args));
     }
 
-    fieldRef(model: string, field: string, eb: ExpressionBuilder<any, any>, modelAlias?: string) {
-        return buildFieldRef(this.schema, model, field, this.options, eb, modelAlias);
+    fieldRef(
+        model: string,
+        field: string,
+        eb: ExpressionBuilder<any, any>,
+        modelAlias?: string,
+        inlineComputedField = true,
+    ) {
+        return buildFieldRef(this.schema, model, field, this.options, eb, modelAlias, inlineComputedField);
     }
 
     // #endregion

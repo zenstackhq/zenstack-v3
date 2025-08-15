@@ -44,7 +44,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<FindArgs<Schema, GetModels<Schema>, true>, Parameters<typeof this.makeFindSchema>[1]>(
             model,
             'find',
-            { unique, collection: true },
+            { unique },
             (model, options) => this.makeFindSchema(model, options),
             args,
         );
@@ -196,7 +196,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Find
 
-    private makeFindSchema(model: string, options: { unique: boolean; collection: boolean }) {
+    private makeFindSchema(model: string, options: { unique: boolean }) {
         const fields: Record<string, z.ZodSchema> = {};
         const where = this.makeWhereSchema(model, options.unique);
         if (options.unique) {
@@ -208,13 +208,13 @@ export class InputValidator<Schema extends SchemaDef> {
         fields['select'] = this.makeSelectSchema(model).optional();
         fields['include'] = this.makeIncludeSchema(model).optional();
         fields['omit'] = this.makeOmitSchema(model).optional();
-        fields['distinct'] = this.makeDistinctSchema(model).optional();
-        fields['cursor'] = this.makeCursorSchema(model).optional();
 
-        if (options.collection) {
+        if (!options.unique) {
             fields['skip'] = this.makeSkipSchema().optional();
             fields['take'] = this.makeTakeSchema().optional();
             fields['orderBy'] = this.orArray(this.makeOrderBySchema(model, true, false), true).optional();
+            fields['cursor'] = this.makeCursorSchema(model).optional();
+            fields['distinct'] = this.makeDistinctSchema(model).optional();
         }
 
         let result: ZodType = z.strictObject(fields);
@@ -589,15 +589,7 @@ export class InputValidator<Schema extends SchemaDef> {
         for (const field of Object.keys(modelDef.fields)) {
             const fieldDef = requireField(this.schema, model, field);
             if (fieldDef.relation) {
-                fields[field] = z
-                    .union([
-                        z.literal(true),
-                        z.strictObject({
-                            select: z.lazy(() => this.makeSelectSchema(fieldDef.type)).optional(),
-                            include: z.lazy(() => this.makeIncludeSchema(fieldDef.type)).optional(),
-                        }),
-                    ])
-                    .optional();
+                fields[field] = this.makeRelationSelectIncludeSchema(fieldDef).optional();
             } else {
                 fields[field] = z.boolean().optional();
             }
@@ -634,6 +626,33 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.strictObject(fields);
     }
 
+    private makeRelationSelectIncludeSchema(fieldDef: FieldDef) {
+        return z.union([
+            z.boolean(),
+            z.strictObject({
+                ...(fieldDef.array || fieldDef.optional
+                    ? {
+                          // to-many relations and optional to-one relations are filterable
+                          where: z.lazy(() => this.makeWhereSchema(fieldDef.type, false)).optional(),
+                      }
+                    : {}),
+                select: z.lazy(() => this.makeSelectSchema(fieldDef.type)).optional(),
+                include: z.lazy(() => this.makeIncludeSchema(fieldDef.type)).optional(),
+                omit: z.lazy(() => this.makeOmitSchema(fieldDef.type)).optional(),
+                ...(fieldDef.array
+                    ? {
+                          // to-many relations can be ordered, skipped, taken, and cursor-located
+                          orderBy: z.lazy(() => this.makeOrderBySchema(fieldDef.type, true, false)).optional(),
+                          skip: this.makeSkipSchema().optional(),
+                          take: this.makeTakeSchema().optional(),
+                          cursor: this.makeCursorSchema(fieldDef.type).optional(),
+                          distinct: this.makeDistinctSchema(fieldDef.type).optional(),
+                      }
+                    : {}),
+            }),
+        ]);
+    }
+
     private makeOmitSchema(model: string) {
         const modelDef = requireModel(this.schema, model);
         const fields: Record<string, ZodType> = {};
@@ -652,21 +671,7 @@ export class InputValidator<Schema extends SchemaDef> {
         for (const field of Object.keys(modelDef.fields)) {
             const fieldDef = requireField(this.schema, model, field);
             if (fieldDef.relation) {
-                fields[field] = z
-                    .union([
-                        z.literal(true),
-                        z.strictObject({
-                            select: z.lazy(() => this.makeSelectSchema(fieldDef.type)).optional(),
-                            include: z.lazy(() => this.makeIncludeSchema(fieldDef.type)).optional(),
-                            omit: z.lazy(() => this.makeOmitSchema(fieldDef.type)).optional(),
-                            where: z.lazy(() => this.makeWhereSchema(fieldDef.type, false)).optional(),
-                            orderBy: z.lazy(() => this.makeOrderBySchema(fieldDef.type, true, false)).optional(),
-                            skip: this.makeSkipSchema().optional(),
-                            take: this.makeTakeSchema().optional(),
-                            distinct: this.makeDistinctSchema(fieldDef.type).optional(),
-                        }),
-                    ])
-                    .optional();
+                fields[field] = this.makeRelationSelectIncludeSchema(fieldDef).optional();
             }
         }
 

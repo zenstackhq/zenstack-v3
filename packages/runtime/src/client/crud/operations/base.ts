@@ -68,6 +68,8 @@ export type CrudOperation =
     | 'aggregate'
     | 'groupBy';
 
+export type AllCrudOperation = CrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
+
 export type FromRelationContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
     field: string;

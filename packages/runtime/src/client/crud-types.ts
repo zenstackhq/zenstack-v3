@@ -631,16 +631,15 @@ export type FindArgs<
           skip?: number;
           take?: number;
           orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
-      }
+      } & Distinct<Schema, Model> &
+          Cursor<Schema, Model>
     : {}) &
     (AllowFilter extends true
         ? {
               where?: WhereInput<Schema, Model>;
           }
         : {}) &
-    SelectIncludeOmit<Schema, Model, Collection> &
-    Distinct<Schema, Model> &
-    Cursor<Schema, Model>;
+    SelectIncludeOmit<Schema, Model, Collection>;
 
 export type FindManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, true>;
 export type FindFirstArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, false>;

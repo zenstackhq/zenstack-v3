@@ -6,7 +6,7 @@
     "main": "index.js",
     "private": true,
     "scripts": {
-        "build": "tsup-node",
+        "build": "tsc --noEmit && tsup-node",
         "lint": "eslint src --ext ts"
     },
     "keywords": [],

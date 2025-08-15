@@ -10,7 +10,7 @@
     ],
     "type": "module",
     "scripts": {
-        "build": "pnpm langium:generate && tsup-node",
+        "build": "pnpm langium:generate && tsc --noEmit && tsup-node",
         "lint": "eslint src --ext ts",
         "langium:generate": "langium generate",
         "langium:generate:production": "langium generate --mode=production",

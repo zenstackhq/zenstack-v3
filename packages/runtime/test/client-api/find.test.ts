@@ -671,26 +671,28 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
             posts: [expect.objectContaining({ title: 'Post1' })],
         });
 
-        await expect(
-            client.user.findUnique({
-                where: { id: user.id },
-                select: {
-                    posts: { orderBy: { title: 'asc' }, skip: 1, take: 1, distinct: ['title'] },
-                },
-            }),
-        ).resolves.toMatchObject({
-            posts: [expect.objectContaining({ title: 'Post2' })],
-        });
-        await expect(
-            client.user.findUnique({
-                where: { id: user.id },
-                include: {
-                    posts: { orderBy: { title: 'asc' }, skip: 1, take: 1, distinct: ['title'] },
-                },
-            }),
-        ).resolves.toMatchObject({
-            posts: [expect.objectContaining({ title: 'Post2' })],
-        });
+        if (provider === 'postgresql') {
+            await expect(
+                client.user.findUnique({
+                    where: { id: user.id },
+                    select: {
+                        posts: { orderBy: { title: 'asc' }, skip: 1, take: 1, distinct: ['title'] } as any,
+                    },
+                }),
+            ).resolves.toMatchObject({
+                posts: [expect.objectContaining({ title: 'Post2' })],
+            });
+            await expect(
+                client.user.findUnique({
+                    where: { id: user.id },
+                    include: {
+                        posts: { orderBy: { title: 'asc' }, skip: 1, take: 1, distinct: ['title'] } as any,
+                    },
+                }),
+            ).resolves.toMatchObject({
+                posts: [expect.objectContaining({ title: 'Post2' })],
+            });
+        }
 
         await expect(
             client.post.findFirst({

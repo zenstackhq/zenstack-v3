@@ -7,7 +7,7 @@ import { createPosts, createUser } from './utils';
 
 const PG_DB_NAME = 'client-api-find-tests';
 
-describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', ({ createClient }) => {
+describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', ({ createClient, provider }) => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
@@ -241,10 +241,11 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
     });
 
     it('works with distinct', async () => {
-        await createUser(client, 'u1@test.com', {
+        const user1 = await createUser(client, 'u1@test.com', {
             name: 'Admin1',
             role: 'ADMIN',
             profile: { create: { bio: 'Bio1' } },
+            posts: { create: [{ title: 'Post1' }, { title: 'Post1' }, { title: 'Post2' }] },
         });
         await createUser(client, 'u3@test.com', {
             name: 'User',
@@ -260,8 +261,13 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
             role: 'USER',
         });
 
+        if (provider === 'sqlite') {
+            await expect(client.user.findMany({ distinct: ['role'] } as any)).rejects.toThrow('not supported');
+            return;
+        }
+
         // single field distinct
-        let r: any = await client.user.findMany({ distinct: ['role'] });
+        let r: any = await client.user.findMany({ distinct: ['role'] } as any);
         expect(r).toHaveLength(2);
         expect(r).toEqual(
             expect.arrayContaining([
@@ -270,8 +276,15 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
             ]),
         );
 
+        // distinct in relation
+        r = await client.user.findUnique({
+            where: { id: user1.id },
+            include: { posts: { distinct: ['title'] } as any },
+        });
+        expect(r.posts).toHaveLength(2);
+
         // distinct with include
-        r = await client.user.findMany({ distinct: ['role'], include: { profile: true } });
+        r = await client.user.findMany({ distinct: ['role'], include: { profile: true } } as any);
         expect(r).toHaveLength(2);
         expect(r).toEqual(
             expect.arrayContaining([
@@ -281,14 +294,14 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
         );
 
         // distinct with select
-        r = await client.user.findMany({ distinct: ['role'], select: { email: true } });
+        r = await client.user.findMany({ distinct: ['role'], select: { email: true } } as any);
         expect(r).toHaveLength(2);
         expect(r).toEqual(expect.arrayContaining([{ email: expect.any(String) }, { email: expect.any(String) }]));
 
         // multiple fields distinct
         r = await client.user.findMany({
             distinct: ['role', 'name'],
-        });
+        } as any);
         expect(r).toHaveLength(3);
         expect(r).toEqual(
             expect.arrayContaining([
@@ -894,6 +907,19 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
             },
         });
         expect(u.posts[0]).toMatchObject(post1);
+
+        // cursor
+        u = await client.user.findUniqueOrThrow({
+            where: { id: user.id },
+            include: {
+                posts: {
+                    orderBy: { title: 'asc' },
+                    cursor: { id: post2.id },
+                },
+            },
+        });
+        expect(u.posts).toHaveLength(1);
+        expect(u.posts?.[0]?.id).toBe(post2.id);
 
         // skip and take
         u = await client.user.findUniqueOrThrow({

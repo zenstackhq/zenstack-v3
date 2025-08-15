@@ -437,14 +437,6 @@ export type SelectIncludeOmit<Schema extends SchemaDef, Model extends GetModels<
     omit?: OmitInput<Schema, Model>;
 };
 
-type Distinct<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    distinct?: OrArray<NonRelationFields<Schema, Model>>;
-};
-
-type Cursor<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    cursor?: WhereUniqueInput<Schema, Model>;
-};
-
 export type SelectInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
@@ -621,25 +613,34 @@ type OppositeRelationAndFK<
 
 //#region Find args
 
+type FilterArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    where?: WhereInput<Schema, Model>;
+};
+
+type SortAndTakeArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    skip?: number;
+    take?: number;
+    orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
+    cursor?: WhereUniqueInput<Schema, Model>;
+};
+
 export type FindArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Collection extends boolean,
     AllowFilter extends boolean = true,
-> = (Collection extends true
-    ? {
-          skip?: number;
-          take?: number;
-          orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
-      } & Distinct<Schema, Model> &
-          Cursor<Schema, Model>
-    : {}) &
-    (AllowFilter extends true
-        ? {
-              where?: WhereInput<Schema, Model>;
-          }
-        : {}) &
-    SelectIncludeOmit<Schema, Model, Collection>;
+> =
+    ProviderSupportsDistinct<Schema> extends true
+        ? (Collection extends true
+              ? SortAndTakeArgs<Schema, Model> & {
+                    distinct?: OrArray<NonRelationFields<Schema, Model>>;
+                }
+              : {}) &
+              (AllowFilter extends true ? FilterArgs<Schema, Model> : {}) &
+              SelectIncludeOmit<Schema, Model, Collection>
+        : (Collection extends true ? SortAndTakeArgs<Schema, Model> : {}) &
+              (AllowFilter extends true ? FilterArgs<Schema, Model> : {}) &
+              SelectIncludeOmit<Schema, Model, Collection>;
 
 export type FindManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, true>;
 export type FindFirstArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, false>;
@@ -1259,6 +1260,12 @@ type HasToManyRelations<Schema extends SchemaDef, Model extends GetModels<Schema
     ? false
     : true;
 
-type ProviderSupportsCaseSensitivity<Schema extends SchemaDef> = Schema['provider'] extends 'postgresql' ? true : false;
+type ProviderSupportsCaseSensitivity<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
+    ? true
+    : false;
+
+type ProviderSupportsDistinct<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
+    ? true
+    : false;
 
 // #endregion

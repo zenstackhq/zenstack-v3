@@ -14,7 +14,7 @@ import type { AuthType } from '../schema/auth';
 import type { UnwrapTuplePromises } from '../utils/type-utils';
 import type { ClientConstructor, ClientContract, ModelOperations, TransactionIsolationLevel } from './contract';
 import { AggregateOperationHandler } from './crud/operations/aggregate';
-import type { CrudOperation } from './crud/operations/base';
+import type { AllCrudOperation, CoreCrudOperation } from './crud/operations/base';
 import { BaseOperationHandler } from './crud/operations/base';
 import { CountOperationHandler } from './crud/operations/count';
 import { CreateOperationHandler } from './crud/operations/create';
@@ -351,7 +351,8 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
     resultProcessor: ResultProcessor<Schema>,
 ): ModelOperations<Schema, Model> {
     const createPromise = (
-        operation: CrudOperation,
+        operation: CoreCrudOperation,
+        nominalOperation: AllCrudOperation,
         args: unknown,
         handler: BaseOperationHandler<Schema>,
         postProcess = false,
@@ -383,7 +384,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                         onQuery({
                             client,
                             model,
-                            operation,
+                            operation: nominalOperation,
                             // reflect the latest override if provided
                             args: _args,
                             // ensure inner overrides are propagated to the previous proceed
@@ -401,6 +402,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         findUnique: (args: unknown) => {
             return createPromise(
                 'findUnique',
+                'findUnique',
                 args,
                 new FindOperationHandler<Schema>(client, model, inputValidator),
                 true,
@@ -410,6 +412,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         findUniqueOrThrow: (args: unknown) => {
             return createPromise(
                 'findUnique',
+                'findUniqueOrThrow',
                 args,
                 new FindOperationHandler<Schema>(client, model, inputValidator),
                 true,
@@ -420,6 +423,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         findFirst: (args: unknown) => {
             return createPromise(
                 'findFirst',
+                'findFirst',
                 args,
                 new FindOperationHandler<Schema>(client, model, inputValidator),
                 true,
@@ -429,6 +433,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         findFirstOrThrow: (args: unknown) => {
             return createPromise(
                 'findFirst',
+                'findFirstOrThrow',
                 args,
                 new FindOperationHandler<Schema>(client, model, inputValidator),
                 true,
@@ -439,6 +444,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         findMany: (args: unknown) => {
             return createPromise(
                 'findMany',
+                'findMany',
                 args,
                 new FindOperationHandler<Schema>(client, model, inputValidator),
                 true,
@@ -447,6 +453,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
 
         create: (args: unknown) => {
             return createPromise(
+                'create',
                 'create',
                 args,
                 new CreateOperationHandler<Schema>(client, model, inputValidator),
@@ -457,6 +464,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         createMany: (args: unknown) => {
             return createPromise(
                 'createMany',
+                'createMany',
                 args,
                 new CreateOperationHandler<Schema>(client, model, inputValidator),
                 false,
@@ -465,6 +473,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
 
         createManyAndReturn: (args: unknown) => {
             return createPromise(
+                'createManyAndReturn',
                 'createManyAndReturn',
                 args,
                 new CreateOperationHandler<Schema>(client, model, inputValidator),
@@ -475,6 +484,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         update: (args: unknown) => {
             return createPromise(
                 'update',
+                'update',
                 args,
                 new UpdateOperationHandler<Schema>(client, model, inputValidator),
                 true,
@@ -483,6 +493,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
 
         updateMany: (args: unknown) => {
             return createPromise(
+                'updateMany',
                 'updateMany',
                 args,
                 new UpdateOperationHandler<Schema>(client, model, inputValidator),
@@ -493,6 +504,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         updateManyAndReturn: (args: unknown) => {
             return createPromise(
                 'updateManyAndReturn',
+                'updateManyAndReturn',
                 args,
                 new UpdateOperationHandler<Schema>(client, model, inputValidator),
                 true,
@@ -501,6 +513,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
 
         upsert: (args: unknown) => {
             return createPromise(
+                'upsert',
                 'upsert',
                 args,
                 new UpdateOperationHandler<Schema>(client, model, inputValidator),
@@ -511,6 +524,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         delete: (args: unknown) => {
             return createPromise(
                 'delete',
+                'delete',
                 args,
                 new DeleteOperationHandler<Schema>(client, model, inputValidator),
                 true,
@@ -519,6 +533,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
 
         deleteMany: (args: unknown) => {
             return createPromise(
+                'deleteMany',
                 'deleteMany',
                 args,
                 new DeleteOperationHandler<Schema>(client, model, inputValidator),
@@ -529,6 +544,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         count: (args: unknown) => {
             return createPromise(
                 'count',
+                'count',
                 args,
                 new CountOperationHandler<Schema>(client, model, inputValidator),
                 false,
@@ -538,6 +554,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
         aggregate: (args: unknown) => {
             return createPromise(
                 'aggregate',
+                'aggregate',
                 args,
                 new AggregateOperationHandler<Schema>(client, model, inputValidator),
                 false,
@@ -546,6 +563,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
 
         groupBy: (args: unknown) => {
             return createPromise(
+                'groupBy',
                 'groupBy',
                 args,
                 new GroupByOperationHandler<Schema>(client, model, inputValidator),

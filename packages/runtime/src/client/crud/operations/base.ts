@@ -51,7 +51,7 @@ import { getCrudDialect } from '../dialects';
 import type { BaseCrudDialect } from '../dialects/base';
 import { InputValidator } from '../validator';
 
-export type CrudOperation =
+export type CoreCrudOperation =
     | 'findMany'
     | 'findUnique'
     | 'findFirst'
@@ -68,7 +68,7 @@ export type CrudOperation =
     | 'aggregate'
     | 'groupBy';
 
-export type AllCrudOperation = CrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
+export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
 
 export type FromRelationContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
@@ -99,7 +99,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return this.client.$qb;
     }
 
-    abstract handle(operation: CrudOperation, args: any): Promise<unknown>;
+    abstract handle(operation: CoreCrudOperation, args: any): Promise<unknown>;
 
     withClient(client: ClientContract<Schema>) {
         return new (this.constructor as new (...args: any[]) => this)(client, this.model, this.inputValidator);

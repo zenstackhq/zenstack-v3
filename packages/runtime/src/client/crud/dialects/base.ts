@@ -21,6 +21,7 @@ import {
     aggregate,
     buildFieldRef,
     buildJoinPairs,
+    ensureArray,
     flattenCompoundUniqueFilters,
     getDelegateDescendantModels,
     getIdFields,
@@ -54,6 +55,54 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         while (joinBase) {
             result = this.buildDelegateJoin(model, joinBase, result);
             joinBase = requireModel(this.schema, joinBase).baseModel;
+        }
+        return result;
+    }
+
+    buildFilterSortTake(
+        model: GetModels<Schema>,
+        args: FindArgs<Schema, GetModels<Schema>, true>,
+        query: SelectQueryBuilder<any, any, {}>,
+    ) {
+        let result = query;
+
+        // where
+        if (args.where) {
+            result = result.where((eb) => this.buildFilter(eb, model, model, args?.where));
+        }
+
+        // skip && take
+        let negateOrderBy = false;
+        const skip = args.skip;
+        let take = args.take;
+        if (take !== undefined && take < 0) {
+            negateOrderBy = true;
+            take = -take;
+        }
+        result = this.buildSkipTake(result, skip, take);
+
+        // orderBy
+        result = this.buildOrderBy(
+            result,
+            model,
+            model,
+            args.orderBy,
+            skip !== undefined || take !== undefined,
+            negateOrderBy,
+        );
+
+        // distinct
+        if ('distinct' in args && (args as any).distinct) {
+            const distinct = ensureArray((args as any).distinct) as string[];
+            if (this.supportsDistinctOn) {
+                result = result.distinctOn(distinct.map((f) => sql.ref(`${model}.${f}`)));
+            } else {
+                throw new QueryError(`"distinct" is not supported by "${this.schema.provider.type}" provider`);
+            }
+        }
+
+        if (args.cursor) {
+            result = this.buildCursorFilter(model, result, args.cursor, args.orderBy, negateOrderBy);
         }
         return result;
     }
@@ -113,6 +162,47 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         if ('$expr' in _where && typeof _where['$expr'] === 'function') {
             result = this.and(eb, result, _where['$expr'](eb));
         }
+
+        return result;
+    }
+
+    private buildCursorFilter(
+        model: string,
+        query: SelectQueryBuilder<any, any, any>,
+        cursor: FindArgs<Schema, GetModels<Schema>, true>['cursor'],
+        orderBy: FindArgs<Schema, GetModels<Schema>, true>['orderBy'],
+        negateOrderBy: boolean,
+    ) {
+        const _orderBy = orderBy ?? makeDefaultOrderBy(this.schema, model);
+
+        const orderByItems = ensureArray(_orderBy).flatMap((obj) => Object.entries<SortOrder>(obj));
+
+        const eb = expressionBuilder<any, any>();
+        const cursorFilter = this.buildFilter(eb, model, model, cursor);
+
+        let result = query;
+        const filters: ExpressionWrapper<any, any, any>[] = [];
+
+        for (let i = orderByItems.length - 1; i >= 0; i--) {
+            const andFilters: ExpressionWrapper<any, any, any>[] = [];
+
+            for (let j = 0; j <= i; j++) {
+                const [field, order] = orderByItems[j]!;
+                const _order = negateOrderBy ? (order === 'asc' ? 'desc' : 'asc') : order;
+                const op = j === i ? (_order === 'asc' ? '>=' : '<=') : '=';
+                andFilters.push(
+                    eb(
+                        eb.ref(`${model}.${field}`),
+                        op,
+                        eb.selectFrom(model).select(`${model}.${field}`).where(cursorFilter),
+                    ),
+                );
+            }
+
+            filters.push(eb.and(andFilters));
+        }
+
+        result = result.where((eb) => eb.or(filters));
 
         return result;
     }
@@ -722,7 +812,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 // aggregations
                 if (['_count', '_avg', '_sum', '_min', '_max'].includes(field)) {
                     invariant(value && typeof value === 'object', `invalid orderBy value for field "${field}"`);
-                    for (const [k, v] of Object.entries<string>(value)) {
+                    for (const [k, v] of Object.entries<SortOrder>(value)) {
                         invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                         result = result.orderBy(
                             (eb) =>

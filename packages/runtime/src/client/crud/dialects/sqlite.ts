@@ -85,31 +85,8 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             );
 
             if (payload && typeof payload === 'object') {
-                if (payload.where) {
-                    subQuery = subQuery.where((eb) =>
-                        this.buildFilter(eb, relationModel, relationModel, payload.where),
-                    );
-                }
-
-                // skip & take
-                const skip = payload.skip;
-                let take = payload.take;
-                let negateOrderBy = false;
-                if (take !== undefined && take < 0) {
-                    negateOrderBy = true;
-                    take = -take;
-                }
-                subQuery = this.buildSkipTake(subQuery, skip, take);
-
-                // orderBy
-                subQuery = this.buildOrderBy(
-                    subQuery,
-                    relationModel,
-                    relationModel,
-                    payload.orderBy,
-                    skip !== undefined || take !== undefined,
-                    negateOrderBy,
-                );
+                // take care of where, orderBy, skip, take, cursor, and distinct
+                subQuery = this.buildFilterSortTake(relationModel, payload, subQuery);
             }
 
             // join conditions

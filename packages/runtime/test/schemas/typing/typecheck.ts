@@ -84,7 +84,6 @@ async function find() {
             email: 'asc',
             name: 'desc',
         },
-        distinct: ['name'],
         cursor: { id: 1 },
     });
 

@@ -869,7 +869,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
                 // @ts-expect-error
                 include: { author: { where: { email: user.email } } },
             }),
-        ).rejects.toThrow(`Field "author" doesn't support filtering`);
+        ).rejects.toThrow(`Invalid find args`);
 
         // sorting
         let u = await client.user.findUniqueOrThrow({

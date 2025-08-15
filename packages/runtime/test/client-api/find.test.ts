@@ -647,11 +647,31 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
         ).resolves.toMatchObject({
             posts: [expect.objectContaining({ title: 'Post1' })],
         });
+        await expect(
+            client.user.findUnique({
+                where: { id: user.id },
+                include: {
+                    posts: { where: { published: true }, select: { title: true }, orderBy: { createdAt: 'desc' } },
+                },
+            }),
+        ).resolves.toMatchObject({
+            posts: [expect.objectContaining({ title: 'Post1' })],
+        });
 
         await expect(
             client.user.findUnique({
                 where: { id: user.id },
                 select: {
+                    posts: { orderBy: { title: 'asc' }, skip: 1, take: 1, distinct: ['title'] },
+                },
+            }),
+        ).resolves.toMatchObject({
+            posts: [expect.objectContaining({ title: 'Post2' })],
+        });
+        await expect(
+            client.user.findUnique({
+                where: { id: user.id },
+                include: {
                     posts: { orderBy: { title: 'asc' }, skip: 1, take: 1, distinct: ['title'] },
                 },
             }),
@@ -666,7 +686,22 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
         ).resolves.toMatchObject({
             author: { email: expect.any(String) },
         });
+        await expect(
+            client.post.findFirst({
+                include: { author: { select: { email: true } } },
+            }),
+        ).resolves.toMatchObject({
+            author: { email: expect.any(String) },
+        });
 
+        await expect(
+            client.user.findUnique({
+                where: { id: user.id },
+                select: {
+                    profile: { where: { bio: 'My bio' } },
+                },
+            }),
+        ).resolves.toMatchObject({ profile: expect.any(Object) });
         await expect(
             client.user.findUnique({
                 where: { id: user.id },
@@ -676,6 +711,14 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
             }),
         ).resolves.toMatchObject({ profile: expect.any(Object) });
 
+        await expect(
+            client.user.findUnique({
+                where: { id: user.id },
+                select: {
+                    profile: { where: { bio: 'Other bio' } },
+                },
+            }),
+        ).resolves.toMatchObject({ profile: null });
         await expect(
             client.user.findUnique({
                 where: { id: user.id },

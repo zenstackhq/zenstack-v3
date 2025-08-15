@@ -593,8 +593,27 @@ export class InputValidator<Schema extends SchemaDef> {
                     .union([
                         z.literal(true),
                         z.strictObject({
+                            ...(fieldDef.array || fieldDef.optional
+                                ? {
+                                      // to-many relations and optional to-one relations are filterable
+                                      where: z.lazy(() => this.makeWhereSchema(fieldDef.type, false)).optional(),
+                                  }
+                                : {}),
                             select: z.lazy(() => this.makeSelectSchema(fieldDef.type)).optional(),
                             include: z.lazy(() => this.makeIncludeSchema(fieldDef.type)).optional(),
+                            omit: z.lazy(() => this.makeOmitSchema(fieldDef.type)).optional(),
+                            ...(fieldDef.array
+                                ? {
+                                      // to-many relations can be ordered, skipped, taken, and cursor-located
+                                      orderBy: z
+                                          .lazy(() => this.makeOrderBySchema(fieldDef.type, true, false))
+                                          .optional(),
+                                      skip: this.makeSkipSchema().optional(),
+                                      take: this.makeTakeSchema().optional(),
+                                      cursor: this.makeCursorSchema(fieldDef.type).optional(),
+                                      distinct: this.makeDistinctSchema(fieldDef.type).optional(),
+                                  }
+                                : {}),
                         }),
                     ])
                     .optional();

@@ -38,4 +38,35 @@ describe('CLI migrate commands test', () => {
         runCli('migrate dev --name init', workDir);
         runCli('migrate status', workDir);
     });
+
+    it('supports migrate resolve', () => {
+        const workDir = createProject(model);
+        runCli('migrate dev --name init', workDir);
+
+        // find the migration record "timestamp_init"
+        const migrationRecords = fs.readdirSync(path.join(workDir, 'zenstack/migrations'));
+        const migration = migrationRecords.find((f) => f.endsWith('_init'));
+
+        // force a migration failure
+        fs.writeFileSync(path.join(workDir, 'zenstack/migrations', migration!, 'migration.sql'), 'invalid content');
+
+        // redeploy the migration, which will fail
+        fs.rmSync(path.join(workDir, 'zenstack/dev.db'), { force: true });
+        try {
+            runCli('migrate deploy', workDir);
+        } catch {
+            // noop
+        }
+
+        // --rolled-back
+        runCli(`migrate resolve --rolled-back ${migration}`, workDir);
+
+        // --applied
+        runCli(`migrate resolve --applied ${migration}`, workDir);
+    });
+
+    it('should throw error when neither applied nor rolled-back is provided', () => {
+        const workDir = createProject(model);
+        expect(() => runCli('migrate resolve', workDir)).toThrow();
+    });
 });

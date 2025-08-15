@@ -3,7 +3,7 @@
     "publisher": "zenstack",
     "displayName": "ZenStack CLI",
     "description": "FullStack database toolkit with built-in access control and automatic API generation.",
-    "version": "3.0.0-alpha.24",
+    "version": "3.0.0-alpha.25",
     "type": "module",
     "author": {
         "name": "ZenStack Team"
@@ -22,7 +22,7 @@
         "zenstack": "bin/cli"
     },
     "scripts": {
-        "build": "tsup-node",
+        "build": "tsc --noEmit && tsup-node",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "test": "vitest run",

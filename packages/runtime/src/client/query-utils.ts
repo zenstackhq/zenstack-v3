@@ -161,11 +161,15 @@ export function buildFieldRef<Schema extends SchemaDef>(
     options: ClientOptions<Schema>,
     eb: ExpressionBuilder<any, any>,
     modelAlias?: string,
+    inlineComputedField = true,
 ): ExpressionWrapper<any, any, unknown> {
     const fieldDef = requireField(schema, model, field);
     if (!fieldDef.computed) {
         return eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
     } else {
+        if (!inlineComputedField) {
+            return eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
+        }
         let computer: Function | undefined;
         if ('computedFields' in options) {
             const computedFields = options.computedFields as Record<string, any>;

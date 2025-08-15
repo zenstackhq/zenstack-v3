@@ -226,13 +226,13 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 ...Object.entries(relationModelDef.fields)
                     .filter(([, value]) => !value.relation)
                     .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
-                    .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, eb)])
+                    .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, eb, undefined, false)])
                     .flatMap((v) => v),
             );
         } else if (payload.select) {
             // select specific fields
             objArgs.push(
-                ...Object.entries(payload.select)
+                ...Object.entries<any>(payload.select)
                     .filter(([, value]) => value)
                     .map(([field, value]) => {
                         if (field === '_count') {
@@ -249,7 +249,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                                 ? // reference the synthesized JSON field
                                   eb.ref(`${parentAlias}$${relationField}$${field}.$j`)
                                 : // reference a plain field
-                                  this.fieldRef(relationModel, field, eb);
+                                  this.fieldRef(relationModel, field, eb, undefined, false);
                             return [sql.lit(field), fieldValue];
                         }
                     })

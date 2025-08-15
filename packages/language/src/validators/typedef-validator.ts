@@ -1,5 +1,5 @@
 import type { ValidationAcceptor } from 'langium';
-import type { TypeDef, TypeDefField } from '../generated/ast';
+import type { DataField, TypeDef } from '../generated/ast';
 import { validateAttributeApplication } from './attribute-application-validator';
 import { validateDuplicatedDeclarations, type AstValidator } from './common';
 
@@ -21,7 +21,7 @@ export default class TypeDefValidator implements AstValidator<TypeDef> {
         typeDef.fields.forEach((field) => this.validateField(field, accept));
     }
 
-    private validateField(field: TypeDefField, accept: ValidationAcceptor): void {
+    private validateField(field: DataField, accept: ValidationAcceptor): void {
         field.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
     }
 }

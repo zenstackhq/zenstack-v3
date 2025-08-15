@@ -109,7 +109,7 @@ npm install -D @types/better-sqlite3
 For Postgres:
 
 ```bash
-npm install pg pg-connection-string
+npm install pg
 npm install -D @types/pg
 ```
 

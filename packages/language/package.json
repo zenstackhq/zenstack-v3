@@ -1,7 +1,7 @@
 {
     "name": "@zenstackhq/language",
     "description": "ZenStack ZModel language specification",
-    "version": "3.0.0-alpha.24",
+    "version": "3.0.0-alpha.25",
     "license": "MIT",
     "author": "ZenStack Team",
     "files": [
@@ -10,7 +10,7 @@
     ],
     "type": "module",
     "scripts": {
-        "build": "pnpm langium:generate && tsup-node",
+        "build": "pnpm langium:generate && tsc --noEmit && tsup-node",
         "lint": "eslint src --ext ts",
         "langium:generate": "langium generate",
         "langium:generate:production": "langium generate --mode=production",

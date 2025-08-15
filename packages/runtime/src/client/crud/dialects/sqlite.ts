@@ -170,7 +170,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                     ...Object.entries(relationModelDef.fields)
                         .filter(([, value]) => !value.relation)
                         .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
-                        .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, eb)])
+                        .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, eb, undefined, false)])
                         .flatMap((v) => v),
                 );
             } else if (payload.select) {
@@ -199,7 +199,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                                     );
                                     return [sql.lit(field), subJson];
                                 } else {
-                                    return [sql.lit(field), this.fieldRef(relationModel, field, eb) as ArgsType];
+                                    return [
+                                        sql.lit(field),
+                                        this.fieldRef(relationModel, field, eb, undefined, false) as ArgsType,
+                                    ];
                                 }
                             }
                         })

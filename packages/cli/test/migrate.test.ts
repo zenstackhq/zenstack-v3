@@ -38,4 +38,20 @@ describe('CLI migrate commands test', () => {
         runCli('migrate dev --name init', workDir);
         runCli('migrate status', workDir);
     });
+
+    it('supports migrate resolve', () => {
+        const workDir = createProject(model);
+        runCli('migrate dev --name init', workDir);
+
+        // find the migration record "timestamp_init"
+        const migrationRecords = fs.readdirSync(path.join(workDir, 'zenstack/migrations'));
+        const migration = migrationRecords.find((f) => f.endsWith('_init'));
+        expect(migration).toBeDefined();
+
+        // --rolled-back
+        runCli(`migrate resolve --rolled-back ${migration}`, workDir);
+
+        // --applied
+        runCli(`migrate resolve --applied ${migration}`, workDir);
+    });
 });

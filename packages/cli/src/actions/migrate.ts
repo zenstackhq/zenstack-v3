@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { CliError } from '../cli-error';
 import { execPackage } from '../utils/exec-utils';
 import { generateTempPrismaSchema, getSchemaFile } from './action-utils';
 
@@ -20,6 +21,11 @@ type ResetOptions = CommonOptions & {
 type DeployOptions = CommonOptions;
 
 type StatusOptions = CommonOptions;
+
+type ResolveOptions = CommonOptions & {
+    applied?: string;
+    rolledBack?: string;
+};
 
 /**
  * CLI action for migration-related commands
@@ -45,6 +51,10 @@ export async function run(command: string, options: CommonOptions) {
 
             case 'status':
                 await runStatus(prismaSchemaFile, options as StatusOptions);
+                break;
+
+            case 'resolve':
+                await runResolve(prismaSchemaFile, options as ResolveOptions);
                 break;
         }
     } finally {
@@ -95,6 +105,25 @@ async function runDeploy(prismaSchemaFile: string, _options: DeployOptions) {
 async function runStatus(prismaSchemaFile: string, _options: StatusOptions) {
     try {
         await execPackage(`prisma migrate status --schema "${prismaSchemaFile}"`);
+    } catch (err) {
+        handleSubProcessError(err);
+    }
+}
+
+async function runResolve(prismaSchemaFile: string, options: ResolveOptions) {
+    if (!options.applied && !options.rolledBack) {
+        throw new CliError('Either --applied or --rolled-back option must be provided');
+    }
+
+    try {
+        const cmd = [
+            'prisma migrate resolve',
+            ` --schema "${prismaSchemaFile}"`,
+            options.applied ? ` --applied ${options.applied}` : '',
+            options.rolledBack ? ` --rolled-back ${options.rolledBack}` : '',
+        ].join('');
+
+        await execPackage(cmd);
     } catch (err) {
         handleSubProcessError(err);
     }

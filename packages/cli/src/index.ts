@@ -95,7 +95,16 @@ export function createProgram() {
         .command('status')
         .addOption(schemaOption)
         .addOption(migrationsOption)
-        .description('check the status of your database migrations.')
+        .description('Check the status of your database migrations.')
+        .action((options) => migrateAction('status', options));
+
+    migrateCommand
+        .command('resolve')
+        .addOption(schemaOption)
+        .addOption(migrationsOption)
+        .addOption(new Option('--applied <migration>', 'record a specific migration as applied'))
+        .addOption(new Option('--rolled-back <migration>', 'record a specific migration as rolled back'))
+        .description('Resolve issues with database migrations in deployment databases')
         .action((options) => migrateAction('status', options));
 
     const dbCommand = program.command('db').description('Manage your database schema during development.');

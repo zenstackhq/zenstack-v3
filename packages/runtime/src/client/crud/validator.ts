@@ -44,7 +44,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<FindArgs<Schema, GetModels<Schema>, true>, Parameters<typeof this.makeFindSchema>[1]>(
             model,
             'find',
-            { unique, collection: true },
+            { unique },
             (model, options) => this.makeFindSchema(model, options),
             args,
         );
@@ -196,7 +196,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Find
 
-    private makeFindSchema(model: string, options: { unique: boolean; collection: boolean }) {
+    private makeFindSchema(model: string, options: { unique: boolean }) {
         const fields: Record<string, z.ZodSchema> = {};
         const where = this.makeWhereSchema(model, options.unique);
         if (options.unique) {
@@ -208,13 +208,13 @@ export class InputValidator<Schema extends SchemaDef> {
         fields['select'] = this.makeSelectSchema(model).optional();
         fields['include'] = this.makeIncludeSchema(model).optional();
         fields['omit'] = this.makeOmitSchema(model).optional();
-        fields['distinct'] = this.makeDistinctSchema(model).optional();
-        fields['cursor'] = this.makeCursorSchema(model).optional();
 
-        if (options.collection) {
+        if (!options.unique) {
             fields['skip'] = this.makeSkipSchema().optional();
             fields['take'] = this.makeTakeSchema().optional();
             fields['orderBy'] = this.orArray(this.makeOrderBySchema(model, true, false), true).optional();
+            fields['cursor'] = this.makeCursorSchema(model).optional();
+            fields['distinct'] = this.makeDistinctSchema(model).optional();
         }
 
         let result: ZodType = z.strictObject(fields);

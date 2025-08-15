@@ -2,7 +2,7 @@ import type { OperationNode, QueryResult, RootOperationNode, UnknownRow } from '
 import type { ClientContract, ToKysely } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
-import type { CrudOperation } from './crud/operations/base';
+import type { AllCrudOperation } from './crud/operations/base';
 
 /**
  * ZenStack runtime plugin.
@@ -61,7 +61,7 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
     /**
      * The operation that is being performed.
      */
-    operation: CrudOperation;
+    operation: AllCrudOperation;
 
     /**
      * The query arguments.

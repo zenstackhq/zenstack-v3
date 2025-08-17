@@ -10,7 +10,8 @@
             "request": "launch",
             "skipFiles": ["<node_internals>/**"],
             "type": "node",
-            "args": ["generate", "--schema", "${workspaceFolder}/samples/blog/zenstack/schema.zmodel"]
+            "args": ["generate"],
+            "cwd": "${workspaceFolder}/samples/blog/zenstack"
         },
         {
             "name": "Debug with TSX",

@@ -1,16 +1,18 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { isPlugin, LiteralExpr, type Model } from '@zenstackhq/language/ast';
-import { PrismaSchemaGenerator, TsSchemaGenerator, type CliGenerator } from '@zenstackhq/sdk';
+import { isPlugin, LiteralExpr, Plugin, type Model } from '@zenstackhq/language/ast';
+import { getLiteral, getLiteralArray } from '@zenstackhq/language/utils';
+import { type CliPlugin } from '@zenstackhq/sdk';
 import colors from 'colors';
-import fs from 'node:fs';
 import path from 'node:path';
+import ora from 'ora';
+import { CliError } from '../cli-error';
+import * as corePlugins from '../plugins';
 import { getPkgJsonConfig, getSchemaFile, loadSchemaDocument } from './action-utils';
 
 type Options = {
     schema?: string;
     output?: string;
     silent?: boolean;
-    savePrismaSchema?: string | boolean;
 };
 
 /**
@@ -24,25 +26,10 @@ export async function run(options: Options) {
     const model = await loadSchemaDocument(schemaFile);
     const outputPath = getOutputPath(options, schemaFile);
 
-    // generate TS schema
-    const tsSchemaFile = path.join(outputPath, 'schema.ts');
-    await new TsSchemaGenerator().generate(schemaFile, [], outputPath);
-
-    await runPlugins(model, outputPath, tsSchemaFile);
-
-    // generate Prisma schema
-    if (options.savePrismaSchema) {
-        const prismaSchema = await new PrismaSchemaGenerator(model).generate();
-        let prismaSchemaFile = path.join(outputPath, 'schema.prisma');
-        if (typeof options.savePrismaSchema === 'string') {
-            prismaSchemaFile = path.resolve(outputPath, options.savePrismaSchema);
-            fs.mkdirSync(path.dirname(prismaSchemaFile), { recursive: true });
-        }
-        fs.writeFileSync(prismaSchemaFile, prismaSchema);
-    }
+    await runPlugins(schemaFile, model, outputPath);
 
     if (!options.silent) {
-        console.log(colors.green(`Generation completed successfully in ${Date.now() - start}ms.`));
+        console.log(colors.green(`Generation completed successfully in ${Date.now() - start}ms.\n`));
         console.log(`You can now create a ZenStack client with it.
 
 \`\`\`ts
@@ -68,18 +55,79 @@ function getOutputPath(options: Options, schemaFile: string) {
     }
 }
 
-async function runPlugins(model: Model, outputPath: string, tsSchemaFile: string) {
+async function runPlugins(schemaFile: string, model: Model, outputPath: string) {
     const plugins = model.declarations.filter(isPlugin);
+    const processedPlugins: { cliPlugin: CliPlugin; pluginOptions: Record<string, unknown> }[] = [];
+
     for (const plugin of plugins) {
-        const providerField = plugin.fields.find((f) => f.name === 'provider');
-        invariant(providerField, `Plugin ${plugin.name} does not have a provider field`);
-        const provider = (providerField.value as LiteralExpr).value as string;
-        let useProvider = provider;
-        if (useProvider.startsWith('@core/')) {
-            useProvider = `@zenstackhq/runtime/plugins/${useProvider.slice(6)}`;
+        const provider = getPluginProvider(plugin);
+
+        let cliPlugin: CliPlugin;
+        if (provider.startsWith('@core/')) {
+            cliPlugin = (corePlugins as any)[provider.slice('@core/'.length)];
+            if (!cliPlugin) {
+                throw new CliError(`Unknown core plugin: ${provider}`);
+            }
+        } else {
+            try {
+                cliPlugin = (await import(provider)).default as CliPlugin;
+            } catch (error) {
+                throw new CliError(`Failed to load plugin ${provider}: ${error}`);
+            }
         }
-        const generator = (await import(useProvider)).default as CliGenerator;
-        console.log('Running generator:', provider);
-        await generator({ model, outputPath, tsSchemaFile });
+
+        processedPlugins.push({ cliPlugin, pluginOptions: getPluginOptions(plugin) });
     }
+
+    const defaultPlugins = [corePlugins['typescript']].reverse();
+    defaultPlugins.forEach((d) => {
+        if (!processedPlugins.some((p) => p.cliPlugin === d)) {
+            processedPlugins.push({ cliPlugin: d, pluginOptions: {} });
+        }
+    });
+
+    for (const { cliPlugin, pluginOptions } of processedPlugins) {
+        invariant(
+            typeof cliPlugin.generate === 'function',
+            `Plugin ${cliPlugin.name} does not have a generate function`,
+        );
+
+        // run plugin generator
+        const spinner = ora(cliPlugin.statusText ?? `Running plugin ${cliPlugin.name}`).start();
+        try {
+            await cliPlugin.generate({
+                schemaFile,
+                model,
+                defaultOutputPath: outputPath,
+                pluginOptions,
+            });
+            spinner.succeed();
+        } catch (err) {
+            spinner.fail();
+            console.error(err);
+        }
+    }
+}
+
+function getPluginProvider(plugin: Plugin) {
+    const providerField = plugin.fields.find((f) => f.name === 'provider');
+    invariant(providerField, `Plugin ${plugin.name} does not have a provider field`);
+    const provider = (providerField.value as LiteralExpr).value as string;
+    return provider;
+}
+
+function getPluginOptions(plugin: Plugin): Record<string, unknown> {
+    const result: any = {};
+    for (const field of plugin.fields) {
+        if (field.name === 'provider') {
+            continue; // skip provider
+        }
+        const value = getLiteral(field.value) ?? getLiteralArray(field.value);
+        if (value === undefined) {
+            console.warn(`Plugin "${plugin.name}" option "${field.name}" has unsupported value, skipping`);
+            continue;
+        }
+        result[field.name] = value;
+    }
+    return result;
 }

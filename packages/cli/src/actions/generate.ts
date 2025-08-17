@@ -117,7 +117,7 @@ function getPluginProvider(plugin: Plugin) {
 }
 
 function getPluginOptions(plugin: Plugin): Record<string, unknown> {
-    const result: any = {};
+    const result: Record<string, unknown> = {};
     for (const field of plugin.fields) {
         if (field.name === 'provider') {
             continue; // skip provider

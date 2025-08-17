@@ -69,8 +69,13 @@ async function runPlugins(schemaFile: string, model: Model, outputPath: string) 
                 throw new CliError(`Unknown core plugin: ${provider}`);
             }
         } else {
+            let moduleSpec = provider;
+            if (moduleSpec.startsWith('.')) {
+                // relative to schema's path
+                moduleSpec = path.resolve(path.dirname(schemaFile), moduleSpec);
+            }
             try {
-                cliPlugin = (await import(provider)).default as CliPlugin;
+                cliPlugin = (await import(moduleSpec)).default as CliPlugin;
             } catch (error) {
                 throw new CliError(`Failed to load plugin ${provider}: ${error}`);
             }

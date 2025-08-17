@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@types/node':
+      specifier: ^20.17.24
+      version: 20.17.24
     '@types/tmp':
       specifier: ^0.2.6
       version: 0.2.6
@@ -42,7 +45,7 @@ importers:
         specifier: ^9.29.0
         version: 9.29.0
       '@types/node':
-        specifier: ^20.17.24
+        specifier: 'catalog:'
         version: 20.17.24
       eslint:
         specifier: ~9.29.0
@@ -399,6 +402,9 @@ importers:
         specifier: 'catalog:'
         version: 5.8.3
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 20.17.24
       '@types/tmp':
         specifier: 'catalog:'
         version: 0.2.6

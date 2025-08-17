@@ -1,3 +1,4 @@
+import { loadDocument } from '@zenstackhq/language';
 import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import type { SchemaDef } from '@zenstackhq/sdk/schema';
 import { glob } from 'glob';
@@ -41,9 +42,13 @@ export async function generateTsSchema(
     fs.writeFileSync(zmodelPath, `${noPrelude ? '' : makePrelude(provider, dbUrl)}\n\n${schemaText}`);
 
     const pluginModelFiles = glob.sync(path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel'));
+    const result = await loadDocument(zmodelPath, pluginModelFiles);
+    if (!result.success) {
+        throw new Error(`Failed to load schema from ${zmodelPath}: ${result.errors}`);
+    }
 
     const generator = new TsSchemaGenerator();
-    await generator.generate(zmodelPath, pluginModelFiles, workDir);
+    await generator.generate(result.model, workDir);
 
     if (extraSourceFiles) {
         for (const [fileName, content] of Object.entries(extraSourceFiles)) {
@@ -76,8 +81,11 @@ export function generateTsSchemaFromFile(filePath: string) {
 export async function generateTsSchemaInPlace(schemaPath: string) {
     const workDir = path.dirname(schemaPath);
     const pluginModelFiles = glob.sync(path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel'));
-
+    const result = await loadDocument(schemaPath, pluginModelFiles);
+    if (!result.success) {
+        throw new Error(`Failed to load schema from ${schemaPath}: ${result.errors}`);
+    }
     const generator = new TsSchemaGenerator();
-    await generator.generate(schemaPath, pluginModelFiles, workDir);
+    await generator.generate(result.model, workDir);
     return compileAndLoad(workDir);
 }

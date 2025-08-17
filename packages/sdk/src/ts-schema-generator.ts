@@ -1,5 +1,4 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { loadDocument } from '@zenstackhq/language';
 import {
     ArrayExpr,
     AttributeArg,
@@ -53,14 +52,7 @@ import {
 } from './model-utils';
 
 export class TsSchemaGenerator {
-    public async generate(schemaFile: string, pluginModelFiles: string[], outputDir: string) {
-        const loaded = await loadDocument(schemaFile, pluginModelFiles);
-        if (!loaded.success) {
-            throw new Error(`Error loading schema:${loaded.errors.join('\n')}`);
-        }
-
-        const { model } = loaded;
-
+    async generate(model: Model, outputDir: string) {
         fs.mkdirSync(outputDir, { recursive: true });
 
         // the schema itself

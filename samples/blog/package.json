@@ -4,8 +4,9 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "generate": "zenstack generate",
-        "db:migrate": "zenstack migrate dev",
+        "generate": "zen generate",
+        "db:push": "zen db push",
+        "db:migrate": "zen migrate dev",
         "build": "pnpm generate && tsc --noEmit",
         "dev": "tsx main.ts"
     },

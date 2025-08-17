@@ -1,3 +1,4 @@
+import { loadDocument } from '@zenstackhq/language';
 import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import { glob } from 'glob';
 import fs from 'node:fs';
@@ -20,7 +21,11 @@ async function generate(schemaPath: string) {
     const outputDir = path.dirname(schemaPath);
     const tsPath = path.join(outputDir, 'schema.ts');
     const pluginModelFiles = glob.sync(path.resolve(dir, '../../dist/**/plugin.zmodel'));
-    await generator.generate(schemaPath, pluginModelFiles, outputDir);
+    const result = await loadDocument(schemaPath, pluginModelFiles);
+    if (!result.success) {
+        throw new Error(`Failed to load schema from ${schemaPath}: ${result.errors}`);
+    }
+    await generator.generate(result.model, outputDir);
     const content = fs.readFileSync(tsPath, 'utf-8');
     fs.writeFileSync(tsPath, content.replace(/@zenstackhq\/runtime/g, '../../../dist'));
     console.log('TS schema generated at:', outputDir);

@@ -188,6 +188,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             return 'serial';
         }
 
+        if (this.isCustomType(fieldDef.type)) {
+            return 'jsonb';
+        }
+
         const type = fieldDef.type as BuiltinType;
         const result = match<BuiltinType, ColumnDataType>(type)
             .with('String', () => 'text')
@@ -209,6 +213,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         } else {
             return result as ColumnDataType;
         }
+    }
+
+    private isCustomType(type: string) {
+        return this.schema.typeDefs && Object.values(this.schema.typeDefs).some((def) => def.name === type);
     }
 
     private isAutoIncrement(fieldDef: FieldDef) {

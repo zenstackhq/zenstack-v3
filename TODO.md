@@ -16,6 +16,7 @@
 - [ ] ZModel
     - [x] Import
     - [ ] View support
+    - [ ] Datasource provider-scoped attributes
 - [ ] ORM
     - [x] Create
         - [x] Input validation

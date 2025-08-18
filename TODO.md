@@ -9,14 +9,14 @@
     - [x] init
     - [x] validate
     - [ ] format
-    - [ ] db seed
-    - [ ] plugin mechanism
-    - [ ] built-in plugins
-        - [ ] ts
-        - [ ] prisma
+    - [x] plugin mechanism
+    - [x] built-in plugins
+        - [x] ts
+        - [x] prisma
 - [ ] ZModel
-    - [ ] Import
+    - [x] Import
     - [ ] View support
+    - [ ] Datasource provider-scoped attributes
 - [ ] ORM
     - [x] Create
         - [x] Input validation
@@ -85,11 +85,12 @@
         - [x] Custom field name
         - [ ] Strict undefined checks
         - [ ] DbNull vs JsonNull
+        - [ ] Migrate to tsdown
     - [ ] Benchmark
 - [x] Plugin
     - [x] Post-mutation hooks should be called after transaction is committed
 - [x] TypeDef and mixin
-- [ ] Strongly typed JSON
+- [x] Strongly typed JSON
 - [x] Polymorphism
     - [x] ZModel
     - [x] Runtime
@@ -105,3 +106,4 @@
     - [x] SQLite
     - [x] PostgreSQL
         - [ ] Multi-schema
+    - [ ] MySQL

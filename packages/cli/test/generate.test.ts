@@ -30,18 +30,6 @@ describe('CLI generate command test', () => {
         expect(fs.existsSync(path.join(workDir, 'zenstack/schema.ts'))).toBe(true);
     });
 
-    it('should respect save prisma schema option', () => {
-        const workDir = createProject(model);
-        runCli('generate --save-prisma-schema', workDir);
-        expect(fs.existsSync(path.join(workDir, 'zenstack/schema.prisma'))).toBe(true);
-    });
-
-    it('should respect save prisma schema custom path option', () => {
-        const workDir = createProject(model);
-        runCli('generate --save-prisma-schema "../prisma/schema.prisma"', workDir);
-        expect(fs.existsSync(path.join(workDir, 'prisma/schema.prisma'))).toBe(true);
-    });
-
     it('should respect package.json config', () => {
         const workDir = createProject(model);
         fs.mkdirSync(path.join(workDir, 'foo'));

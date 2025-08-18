@@ -1,7 +1,6 @@
 {
     "extends": "@zenstackhq/typescript-config/base.json",
     "compilerOptions": {
-        "baseUrl": ".",
         "noUnusedLocals": false
     },
     "include": ["src/**/*.ts"]

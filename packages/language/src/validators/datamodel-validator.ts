@@ -443,7 +443,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         invariant(model.baseModel.ref, 'baseModel must be resolved');
 
         // check if the base model is a delegate model
-        if (!isDelegateModel(model.baseModel.ref)) {
+        if (!isDelegateModel(model.baseModel.ref!)) {
             accept('error', `Model ${model.baseModel.$refText} cannot be extended because it's not a delegate model`, {
                 node: model,
                 property: 'baseModel',

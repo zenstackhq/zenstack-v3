@@ -1,6 +1,6 @@
 {
     "name": "zenstack-v3",
-    "version": "3.0.0-alpha.26",
+    "version": "3.0.0-alpha.27",
     "description": "ZenStack",
     "packageManager": "pnpm@10.12.1",
     "scripts": {
@@ -21,7 +21,7 @@
     "license": "MIT",
     "devDependencies": {
         "@eslint/js": "^9.29.0",
-        "@types/node": "^20.17.24",
+        "@types/node": "catalog:",
         "eslint": "~9.29.0",
         "glob": "^11.0.2",
         "prettier": "^3.5.3",

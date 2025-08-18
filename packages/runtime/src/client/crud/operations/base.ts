@@ -3,7 +3,6 @@ import { invariant, isPlainObject } from '@zenstackhq/common-helpers';
 import {
     DeleteResult,
     expressionBuilder,
-    ExpressionWrapper,
     sql,
     UpdateResult,
     type Compilable,
@@ -25,7 +24,7 @@ import { enumerate } from '../../../utils/enumerate';
 import { extractFields, fieldsToSelectObject } from '../../../utils/object-utils';
 import { NUMERIC_FIELD_TYPES } from '../../constants';
 import type { CRUD } from '../../contract';
-import type { FindArgs, SelectIncludeOmit, SortOrder, WhereInput } from '../../crud-types';
+import type { FindArgs, SelectIncludeOmit, WhereInput } from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
 import {
@@ -42,16 +41,14 @@ import {
     isForeignKeyField,
     isRelationField,
     isScalarField,
-    makeDefaultOrderBy,
     requireField,
     requireModel,
-    safeJSONStringify,
 } from '../../query-utils';
 import { getCrudDialect } from '../dialects';
 import type { BaseCrudDialect } from '../dialects/base';
 import { InputValidator } from '../validator';
 
-export type CrudOperation =
+export type CoreCrudOperation =
     | 'findMany'
     | 'findUnique'
     | 'findFirst'
@@ -68,7 +65,7 @@ export type CrudOperation =
     | 'aggregate'
     | 'groupBy';
 
-export type AllCrudOperation = CrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
+export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
 
 export type FromRelationContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
@@ -99,7 +96,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return this.client.$qb;
     }
 
-    abstract handle(operation: CrudOperation, args: any): Promise<unknown>;
+    abstract handle(operation: CoreCrudOperation, args: any): Promise<unknown>;
 
     withClient(client: ClientContract<Schema>) {
         return new (this.constructor as new (...args: any[]) => this)(client, this.model, this.inputValidator);
@@ -150,48 +147,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // table
         let query = this.dialect.buildSelectModel(expressionBuilder(), model);
 
-        // where
-        if (args?.where) {
-            query = query.where((eb) => this.dialect.buildFilter(eb, model, model, args?.where));
-        }
-
-        // skip && take
-        let negateOrderBy = false;
-        const skip = args?.skip;
-        let take = args?.take;
-        if (take !== undefined && take < 0) {
-            negateOrderBy = true;
-            take = -take;
-        }
-        query = this.dialect.buildSkipTake(query, skip, take);
-
-        // orderBy
-        query = this.dialect.buildOrderBy(
-            query,
-            model,
-            model,
-            args?.orderBy,
-            skip !== undefined || take !== undefined,
-            negateOrderBy,
-        );
-
-        // distinct
-        let inMemoryDistinct: string[] | undefined = undefined;
-        if (args?.distinct) {
-            const distinct = ensureArray(args.distinct) as string[];
-            if (this.dialect.supportsDistinctOn) {
-                query = query.distinctOn(distinct.map((f) => sql.ref(`${model}.${f}`)));
-            } else {
-                // in-memory distinct after fetching all results
-                inMemoryDistinct = distinct;
-
-                // make sure distinct fields are selected
-                query = distinct.reduce(
-                    (acc, field) =>
-                        acc.select((eb) => this.dialect.fieldRef(model, field, eb).as(`$distinct$${field}`)),
-                    query,
-                );
-            }
+        if (args) {
+            query = this.dialect.buildFilterSortTake(model, args, query);
         }
 
         // select
@@ -209,10 +166,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             query = this.buildFieldSelection(model, query, args.include, model);
         }
 
-        if (args?.cursor) {
-            query = this.buildCursorFilter(model, query, args.cursor, args.orderBy, negateOrderBy);
-        }
-
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'read' }));
 
         let result: any[] = [];
@@ -227,26 +180,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 message += `, parameters: \n${compiled.parameters.map((p) => inspect(p)).join('\n')}`;
             }
             throw new QueryError(message, err);
-        }
-
-        if (inMemoryDistinct) {
-            const distinctResult: Record<string, unknown>[] = [];
-            const seen = new Set<string>();
-            for (const r of result as any[]) {
-                const key = safeJSONStringify(inMemoryDistinct.map((f) => r[`$distinct$${f}`]))!;
-                if (!seen.has(key)) {
-                    distinctResult.push(r);
-                    seen.add(key);
-                }
-            }
-            result = distinctResult;
-
-            // clean up distinct utility fields
-            for (const r of result) {
-                Object.keys(r)
-                    .filter((k) => k.startsWith('$distinct$'))
-                    .forEach((k) => delete r[k]);
-            }
         }
 
         return result;
@@ -312,49 +245,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         payload: any,
     ) {
         return query.select((eb) => this.dialect.buildCountJson(model, eb, parentAlias, payload).as('_count'));
-    }
-
-    private buildCursorFilter(
-        model: string,
-        query: SelectQueryBuilder<any, any, any>,
-        cursor: FindArgs<Schema, GetModels<Schema>, true>['cursor'],
-        orderBy: FindArgs<Schema, GetModels<Schema>, true>['orderBy'],
-        negateOrderBy: boolean,
-    ) {
-        if (!orderBy) {
-            orderBy = makeDefaultOrderBy(this.schema, model);
-        }
-
-        const orderByItems = ensureArray(orderBy).flatMap((obj) => Object.entries<SortOrder>(obj));
-
-        const eb = expressionBuilder<any, any>();
-        const cursorFilter = this.dialect.buildFilter(eb, model, model, cursor);
-
-        let result = query;
-        const filters: ExpressionWrapper<any, any, any>[] = [];
-
-        for (let i = orderByItems.length - 1; i >= 0; i--) {
-            const andFilters: ExpressionWrapper<any, any, any>[] = [];
-
-            for (let j = 0; j <= i; j++) {
-                const [field, order] = orderByItems[j]!;
-                const _order = negateOrderBy ? (order === 'asc' ? 'desc' : 'asc') : order;
-                const op = j === i ? (_order === 'asc' ? '>=' : '<=') : '=';
-                andFilters.push(
-                    eb(
-                        eb.ref(`${model}.${field}`),
-                        op,
-                        eb.selectFrom(model).select(`${model}.${field}`).where(cursorFilter),
-                    ),
-                );
-            }
-
-            filters.push(eb.and(andFilters));
-        }
-
-        result = result.where((eb) => eb.or(filters));
-
-        return result;
     }
 
     protected async create(

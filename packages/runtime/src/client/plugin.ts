@@ -46,7 +46,7 @@ export function definePlugin<Schema extends SchemaDef>(plugin: RuntimePlugin<Sch
     return plugin;
 }
 
-export { type CrudOperation } from './crud/operations/base';
+export { type CoreCrudOperation as CrudOperation } from './crud/operations/base';
 
 // #region OnQuery hooks
 

@@ -91,31 +91,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                     );
 
                     if (payload && typeof payload === 'object') {
-                        if (payload.where) {
-                            subQuery = subQuery.where((eb) =>
-                                this.buildFilter(eb, relationModel, relationModel, payload.where),
-                            );
-                        }
-
-                        // skip & take
-                        const skip = payload.skip;
-                        let take = payload.take;
-                        let negateOrderBy = false;
-                        if (take !== undefined && take < 0) {
-                            negateOrderBy = true;
-                            take = -take;
-                        }
-                        subQuery = this.buildSkipTake(subQuery, skip, take);
-
-                        // orderBy
-                        subQuery = this.buildOrderBy(
-                            subQuery,
-                            relationModel,
-                            relationModel,
-                            payload.orderBy,
-                            skip !== undefined || take !== undefined,
-                            negateOrderBy,
-                        );
+                        subQuery = this.buildFilterSortTake(relationModel, payload, subQuery);
                     }
 
                     // add join conditions

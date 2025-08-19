@@ -70,7 +70,7 @@ model User {
     createdAt     DateTime    @default(now())
     updatedAt     DateTime    @updatedAt
     email         String      @unique @email
-    password      String?     @password @omit
+    password      String?
     emailVerified DateTime?
     name          String?
     bio           String?     @ignore

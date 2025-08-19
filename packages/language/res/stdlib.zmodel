@@ -424,25 +424,12 @@ attribute @@fulltext(_ fields: FieldReference[], map: String?) @@@prisma
 
 // String type modifiers
 
-enum MSSQLServerTypes {
-    Max
-}
-
-attribute @db.String(_ x: Int?) @@@targetField([StringField]) @@@prisma
 attribute @db.Text() @@@targetField([StringField]) @@@prisma
-attribute @db.NText() @@@targetField([StringField]) @@@prisma
 attribute @db.Char(_ x: Int?) @@@targetField([StringField]) @@@prisma
-attribute @db.NChar(_ x: Int?) @@@targetField([StringField]) @@@prisma
 attribute @db.VarChar(_ x: Any?) @@@targetField([StringField]) @@@prisma
-attribute @db.NVarChar(_ x: Any?) @@@targetField([StringField]) @@@prisma
-attribute @db.CatalogSingleChar() @@@targetField([StringField]) @@@prisma
-attribute @db.TinyText() @@@targetField([StringField]) @@@prisma
-attribute @db.MediumText() @@@targetField([StringField]) @@@prisma
-attribute @db.LongText() @@@targetField([StringField]) @@@prisma
 attribute @db.Bit(_ x: Int?) @@@targetField([StringField, BooleanField, BytesField]) @@@prisma
 attribute @db.VarBit(_ x: Int?) @@@targetField([StringField]) @@@prisma
 attribute @db.Uuid() @@@targetField([StringField]) @@@prisma
-attribute @db.UniqueIdentifier() @@@targetField([StringField]) @@@prisma
 attribute @db.Xml() @@@targetField([StringField]) @@@prisma
 attribute @db.Inet() @@@targetField([StringField]) @@@prisma
 attribute @db.Citext() @@@targetField([StringField]) @@@prisma
@@ -450,8 +437,6 @@ attribute @db.Citext() @@@targetField([StringField]) @@@prisma
 // Boolean type modifiers
 
 attribute @db.Boolean() @@@targetField([BooleanField]) @@@prisma
-attribute @db.TinyInt(_ x: Int?) @@@targetField([BooleanField, IntField]) @@@prisma
-attribute @db.Bool() @@@targetField([BooleanField]) @@@prisma
 
 // Int type modifiers
 
@@ -459,38 +444,19 @@ attribute @db.Int() @@@targetField([IntField]) @@@prisma
 attribute @db.Integer() @@@targetField([IntField]) @@@prisma
 attribute @db.SmallInt() @@@targetField([IntField]) @@@prisma
 attribute @db.Oid() @@@targetField([IntField]) @@@prisma
-attribute @db.UnsignedInt() @@@targetField([IntField]) @@@prisma
-attribute @db.UnsignedSmallInt() @@@targetField([IntField]) @@@prisma
-attribute @db.MediumInt() @@@targetField([IntField]) @@@prisma
-attribute @db.UnsignedMediumInt() @@@targetField([IntField]) @@@prisma
-attribute @db.UnsignedTinyInt() @@@targetField([IntField]) @@@prisma
-attribute @db.Year() @@@targetField([IntField]) @@@prisma
-attribute @db.Int4() @@@targetField([IntField]) @@@prisma
-attribute @db.Int2() @@@targetField([IntField]) @@@prisma
 
 // BigInt type modifiers
 
 attribute @db.BigInt() @@@targetField([BigIntField]) @@@prisma
-attribute @db.UnsignedBigInt() @@@targetField([BigIntField]) @@@prisma
-attribute @db.Int8() @@@targetField([BigIntField]) @@@prisma
 
 // Float/Decimal type modifiers
 attribute @db.DoublePrecision() @@@targetField([FloatField, DecimalField]) @@@prisma
 attribute @db.Real() @@@targetField([FloatField, DecimalField]) @@@prisma
-attribute @db.Float() @@@targetField([FloatField, DecimalField]) @@@prisma
 attribute @db.Decimal(_ p: Int?, _ s: Int?) @@@targetField([FloatField, DecimalField]) @@@prisma
-attribute @db.Double() @@@targetField([FloatField, DecimalField]) @@@prisma
 attribute @db.Money() @@@targetField([FloatField, DecimalField]) @@@prisma
-attribute @db.SmallMoney() @@@targetField([FloatField, DecimalField]) @@@prisma
-attribute @db.Float8() @@@targetField([FloatField, DecimalField]) @@@prisma
-attribute @db.Float4() @@@targetField([FloatField, DecimalField]) @@@prisma
 
 // DateTime type modifiers
 
-attribute @db.DateTime(_ x: Int?) @@@targetField([DateTimeField]) @@@prisma
-attribute @db.DateTime2() @@@targetField([DateTimeField]) @@@prisma
-attribute @db.SmallDateTime() @@@targetField([DateTimeField]) @@@prisma
-attribute @db.DateTimeOffset() @@@targetField([DateTimeField]) @@@prisma
 attribute @db.Timestamp(_ x: Int?) @@@targetField([DateTimeField]) @@@prisma
 attribute @db.Timestamptz(_ x: Int?) @@@targetField([DateTimeField]) @@@prisma
 attribute @db.Date() @@@targetField([DateTimeField]) @@@prisma
@@ -504,49 +470,14 @@ attribute @db.JsonB() @@@targetField([JsonField]) @@@prisma
 
 // Bytes type modifiers
 
-attribute @db.Bytes() @@@targetField([BytesField]) @@@prisma
 attribute @db.ByteA() @@@targetField([BytesField]) @@@prisma
-attribute @db.LongBlob() @@@targetField([BytesField]) @@@prisma
-attribute @db.Binary() @@@targetField([BytesField]) @@@prisma
-attribute @db.VarBinary(_ x: Int?) @@@targetField([BytesField]) @@@prisma
-attribute @db.TinyBlob() @@@targetField([BytesField]) @@@prisma
-attribute @db.Blob() @@@targetField([BytesField]) @@@prisma
-attribute @db.MediumBlob() @@@targetField([BytesField]) @@@prisma
-attribute @db.Image() @@@targetField([BytesField]) @@@prisma
 
-/**
- * Specifies the schema to use in a multi-schema database. https://www.prisma.io/docs/guides/database/multi-schema.
- *
- * @param: The name of the database schema.
- */
-attribute @@schema(_ name: String) @@@prisma
-
-/**
- * Indicates that the field is a password field and needs to be hashed before persistence.
- *
- * ZenStack uses `bcryptjs` library to hash password. You can use the `saltLength` parameter
- * to configure the cost of hashing, or use `salt` parameter to provide an explicit salt.
- * By default, salt length of 12 is used.
- *
- * @see https://www.npmjs.com/package/bcryptjs for details
- *
- * @param saltLength: length of salt to use (cost factor for the hash function)
- * @param salt: salt to use (a pregenerated valid salt)
- */
-attribute @password(saltLength: Int?, salt: String?) @@@targetField([StringField])
-
-
-/**
- * Indicates that the field is encrypted when storing in the DB and should be decrypted when read
- *
- * ZenStack uses the Web Crypto API to encrypt and decrypt the field.
- */
-attribute @encrypted() @@@targetField([StringField])
-
-/**
- * Indicates that the field should be omitted when read from the generated services.
- */
-attribute @omit()
+// /**
+//  * Specifies the schema to use in a multi-schema database. https://www.prisma.io/docs/guides/database/multi-schema.
+//  *
+//  * @param: The name of the database schema.
+//  */
+// attribute @@schema(_ name: String) @@@prisma
 
 //////////////////////////////////////////////
 // Begin validation attributes and functions

@@ -6,7 +6,7 @@ type Options = {
 };
 
 /**
- * CLI action for checks a schema's validity.
+ * CLI action for checking a schema's validity.
  */
 export async function run(options: Options) {
     const schemaFile = getSchemaFile(options.schema);

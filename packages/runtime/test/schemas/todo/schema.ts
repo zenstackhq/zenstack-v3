@@ -180,8 +180,7 @@ export const schema = {
                 password: {
                     name: "password",
                     type: "String",
-                    optional: true,
-                    attributes: [{ name: "@password" }, { name: "@omit" }]
+                    optional: true
                 },
                 emailVerified: {
                     name: "emailVerified",

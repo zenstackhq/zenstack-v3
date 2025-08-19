@@ -35,7 +35,7 @@ import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
 
 /**
- * ZenStack client.
+ * ZenStack ORM client.
  */
 export const ZenStackClient = function <Schema extends SchemaDef>(
     this: any,

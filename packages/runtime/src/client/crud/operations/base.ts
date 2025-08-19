@@ -11,7 +11,6 @@ import {
     type SelectQueryBuilder,
 } from 'kysely';
 import { nanoid } from 'nanoid';
-import { inspect } from 'node:util';
 import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
@@ -175,10 +174,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const r = await kysely.getExecutor().executeQuery(compiled, queryId);
             result = r.rows;
         } catch (err) {
-            let message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
-            if (this.options.debug) {
-                message += `, parameters: \n${compiled.parameters.map((p) => inspect(p)).join('\n')}`;
-            }
+            const message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
             throw new QueryError(message, err);
         }
 

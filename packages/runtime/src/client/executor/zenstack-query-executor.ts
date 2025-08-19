@@ -159,7 +159,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 return { result, connection };
             });
         } catch (err) {
-            let message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
+            const message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
             throw new QueryError(message, err);
         }
     }

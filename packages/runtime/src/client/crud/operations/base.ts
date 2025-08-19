@@ -174,7 +174,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const r = await kysely.getExecutor().executeQuery(compiled, queryId);
             result = r.rows;
         } catch (err) {
-            let message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
+            const message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
             throw new QueryError(message, err);
         }
 

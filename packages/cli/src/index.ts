@@ -25,8 +25,8 @@ const initAction = async (projectPath: string): Promise<void> => {
     await actions.init(projectPath);
 };
 
-const validateAction = async (options: Parameters<typeof actions.validate>[0]): Promise<void> => {
-    await actions.validate(options);
+const checkAction = async (options: Parameters<typeof actions.check>[0]): Promise<void> => {
+    await actions.check(options);
 };
 
 export function createProgram() {
@@ -40,26 +40,25 @@ export function createProgram() {
         .description(
             `${colors.bold.blue(
                 'ζ',
-            )} ZenStack is a database access toolkit for TypeScript apps.\n\nDocumentation: https://zenstack.dev.`,
+            )} ZenStack is the data layer for modern TypeScript apps.\n\nDocumentation: https://zenstack.dev.`,
         )
         .showHelpAfterError()
         .showSuggestionAfterError();
 
     const schemaOption = new Option(
         '--schema <file>',
-        `schema file (with extension ${schemaExtensions}). Defaults to "schema.zmodel" unless specified in package.json.`,
+        `schema file (with extension ${schemaExtensions}). Defaults to "zenstack/schema.zmodel" unless specified in package.json.`,
     );
 
     program
         .command('generate')
-        .description('Run code generation.')
+        .description('Run code generation plugins.')
         .addOption(schemaOption)
-        .addOption(new Option('--silent', 'do not print any output'))
-        .addOption(new Option('-o, --output <path>', 'default output directory for core plugins'))
+        .addOption(new Option('-o, --output <path>', 'default output directory for code generation'))
         .action(generateAction);
 
-    const migrateCommand = program.command('migrate').description('Update the database schema with migrations.');
-    const migrationsOption = new Option('--migrations <path>', 'path for migrations');
+    const migrateCommand = program.command('migrate').description('Run database schema migration related tasks.');
+    const migrationsOption = new Option('--migrations <path>', 'path that contains the "migrations" directory');
 
     migrateCommand
         .command('dev')
@@ -98,14 +97,14 @@ export function createProgram() {
         .addOption(migrationsOption)
         .addOption(new Option('--applied <migration>', 'record a specific migration as applied'))
         .addOption(new Option('--rolled-back <migration>', 'record a specific migration as rolled back'))
-        .description('Resolve issues with database migrations in deployment databases')
+        .description('Resolve issues with database migrations in deployment databases.')
         .action((options) => migrateAction('resolve', options));
 
     const dbCommand = program.command('db').description('Manage your database schema during development.');
 
     dbCommand
         .command('push')
-        .description('Push the state from your schema to your database')
+        .description('Push the state from your schema to your database.')
         .addOption(schemaOption)
         .addOption(new Option('--accept-data-loss', 'ignore data loss warnings'))
         .addOption(new Option('--force-reset', 'force a reset of the database before push'))
@@ -113,7 +112,7 @@ export function createProgram() {
 
     program
         .command('info')
-        .description('Get information of installed ZenStack and related packages.')
+        .description('Get information of installed ZenStack packages.')
         .argument('[path]', 'project path', '.')
         .action(infoAction);
 
@@ -123,7 +122,11 @@ export function createProgram() {
         .argument('[path]', 'project path', '.')
         .action(initAction);
 
-    program.command('validate').description('Validate a ZModel schema.').addOption(schemaOption).action(validateAction);
+    program
+        .command('check')
+        .description('Check a ZModel schema for syntax or semantic errors.')
+        .addOption(schemaOption)
+        .action(checkAction);
 
     return program;
 }

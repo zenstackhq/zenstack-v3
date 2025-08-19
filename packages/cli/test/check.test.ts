@@ -40,14 +40,14 @@ describe('CLI validate command test', () => {
         const workDir = createProject(validModel);
 
         // Should not throw an error
-        expect(() => runCli('validate', workDir)).not.toThrow();
+        expect(() => runCli('check', workDir)).not.toThrow();
     });
 
     it('should fail validation for invalid schema', () => {
         const workDir = createProject(invalidModel);
 
         // Should throw an error due to validation failure
-        expect(() => runCli('validate', workDir)).toThrow();
+        expect(() => runCli('check', workDir)).toThrow();
     });
 
     it('should respect custom schema location', () => {
@@ -55,14 +55,14 @@ describe('CLI validate command test', () => {
         fs.renameSync(path.join(workDir, 'zenstack/schema.zmodel'), path.join(workDir, 'zenstack/custom.zmodel'));
 
         // Should not throw an error when using custom schema path
-        expect(() => runCli('validate --schema ./zenstack/custom.zmodel', workDir)).not.toThrow();
+        expect(() => runCli('check --schema ./zenstack/custom.zmodel', workDir)).not.toThrow();
     });
 
     it('should fail when schema file does not exist', () => {
         const workDir = createProject(validModel);
 
         // Should throw an error when schema file doesn't exist
-        expect(() => runCli('validate --schema ./nonexistent.zmodel', workDir)).toThrow();
+        expect(() => runCli('check --schema ./nonexistent.zmodel', workDir)).toThrow();
     });
 
     it('should respect package.json config', () => {
@@ -78,7 +78,7 @@ describe('CLI validate command test', () => {
         fs.writeFileSync(path.join(workDir, 'package.json'), JSON.stringify(pkgJson, null, 2));
 
         // Should not throw an error when using package.json config
-        expect(() => runCli('validate', workDir)).not.toThrow();
+        expect(() => runCli('check', workDir)).not.toThrow();
     });
 
     it('should validate schema with syntax errors', () => {
@@ -96,6 +96,6 @@ model User {
         const workDir = createProject(modelWithSyntaxError, false);
 
         // Should throw an error due to syntax error
-        expect(() => runCli('validate', workDir)).toThrow();
+        expect(() => runCli('check', workDir)).toThrow();
     });
 });

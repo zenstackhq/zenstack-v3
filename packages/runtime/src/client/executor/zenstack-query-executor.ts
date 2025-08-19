@@ -20,7 +20,6 @@ import {
     type TableNode,
 } from 'kysely';
 import { nanoid } from 'nanoid';
-import { inspect } from 'node:util';
 import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
@@ -160,10 +159,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 return { result, connection };
             });
         } catch (err) {
-            let message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
-            if (this.options.debug) {
-                message += `, parameters: \n${compiled.parameters.map((p) => inspect(p)).join('\n')}`;
-            }
+            const message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
             throw new QueryError(message, err);
         }
     }

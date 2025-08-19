@@ -12,7 +12,6 @@ import { getPkgJsonConfig, getSchemaFile, loadSchemaDocument } from './action-ut
 type Options = {
     schema?: string;
     output?: string;
-    silent?: boolean;
 };
 
 /**
@@ -28,9 +27,8 @@ export async function run(options: Options) {
 
     await runPlugins(schemaFile, model, outputPath);
 
-    if (!options.silent) {
-        console.log(colors.green(`Generation completed successfully in ${Date.now() - start}ms.\n`));
-        console.log(`You can now create a ZenStack client with it.
+    console.log(colors.green(`Generation completed successfully in ${Date.now() - start}ms.\n`));
+    console.log(`You can now create a ZenStack client with it.
 
 \`\`\`ts
 import { ZenStackClient } from '@zenstackhq/runtime';
@@ -40,7 +38,6 @@ const client = new ZenStackClient(schema, {
     dialect: { ... }
 });
 \`\`\``);
-    }
 }
 
 function getOutputPath(options: Options, schemaFile: string) {

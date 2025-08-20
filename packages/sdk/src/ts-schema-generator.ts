@@ -352,7 +352,24 @@ export class TsSchemaGenerator {
                     field.name,
                     undefined,
                     undefined,
-                    [],
+                    [
+                        // parameter: `context: { currentModel: string }`
+                        ts.factory.createParameterDeclaration(
+                            undefined,
+                            undefined,
+                            '_context',
+                            undefined,
+                            ts.factory.createTypeLiteralNode([
+                                ts.factory.createPropertySignature(
+                                    undefined,
+                                    'currentModel',
+                                    undefined,
+                                    ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                ),
+                            ]),
+                            undefined,
+                        ),
+                    ],
                     ts.factory.createTypeReferenceNode('OperandExpression', [
                         ts.factory.createTypeReferenceNode(this.mapFieldTypeToTSType(field.type)),
                     ]),

@@ -16,7 +16,7 @@ export class CountOperationHandler<Schema extends SchemaDef> extends BaseOperati
             // nested query for filtering and pagination
 
             let subQuery = this.dialect
-                .buildSelectModel(eb as ExpressionBuilder<any, any>, this.model)
+                .buildSelectModel(eb as ExpressionBuilder<any, any>, this.model, this.model)
                 .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, parsedArgs?.where));
 
             if (parsedArgs?.select && typeof parsedArgs.select === 'object') {

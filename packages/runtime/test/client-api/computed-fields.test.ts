@@ -1,3 +1,4 @@
+import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createTestClient } from '../utils';
 
@@ -236,10 +237,10 @@ model Post {
                     dbName: TEST_DB,
                     computedFields: {
                         User: {
-                            postCount: (eb: any) =>
+                            postCount: (eb: any, context: { currentModel: string }) =>
                                 eb
                                     .selectFrom('Post')
-                                    .whereRef('Post.authorId', '=', 'User.id')
+                                    .whereRef('Post.authorId', '=', sql.ref(`${context.currentModel}.id`))
                                     .select(() => eb.fn.countAll().as('count')),
                         },
                     },

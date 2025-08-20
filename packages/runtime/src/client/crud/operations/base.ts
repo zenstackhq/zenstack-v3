@@ -144,10 +144,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         args: FindArgs<Schema, GetModels<Schema>, true> | undefined,
     ): Promise<any[]> {
         // table
-        let query = this.dialect.buildSelectModel(expressionBuilder(), model);
+        let query = this.dialect.buildSelectModel(expressionBuilder(), model, model);
 
         if (args) {
-            query = this.dialect.buildFilterSortTake(model, args, query);
+            query = this.dialect.buildFilterSortTake(model, args, query, model);
         }
 
         // select
@@ -156,7 +156,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             query = this.buildFieldSelection(model, query, args.select, model);
         } else {
             // include all scalar fields except those in omit
-            query = this.dialect.buildSelectAllFields(model, query, (args as any)?.omit);
+            query = this.dialect.buildSelectAllFields(model, query, (args as any)?.omit, model);
         }
 
         // include
@@ -484,7 +484,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 field: rightField,
                 entity: rightEntity,
             },
-        ].sort((a, b) => a.model.localeCompare(b.model));
+        ].sort((a, b) =>
+            // the implement m2m join table's "A", "B" fk fields' order is determined
+            // by model name's sort order, and when identical (for self-relations),
+            // field name's sort order
+            a.model !== b.model ? a.model.localeCompare(b.model) : a.field.localeCompare(b.field),
+        );
 
         const firstIds = getIdFields(this.schema, sortedRecords[0]!.model);
         const secondIds = getIdFields(this.schema, sortedRecords[1]!.model);
@@ -1281,7 +1286,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ),
                     'in',
                     this.dialect
-                        .buildSelectModel(eb, filterModel)
+                        .buildSelectModel(eb, filterModel, filterModel)
                         .where(this.dialect.buildFilter(eb, filterModel, filterModel, where))
                         .select(this.buildIdFieldRefs(kysely, filterModel))
                         .$if(limit !== undefined, (qb) => qb.limit(limit!)),
@@ -1985,7 +1990,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ),
                     'in',
                     this.dialect
-                        .buildSelectModel(eb, filterModel)
+                        .buildSelectModel(eb, filterModel, filterModel)
                         .where((eb) => this.dialect.buildFilter(eb, filterModel, filterModel, where))
                         .select(this.buildIdFieldRefs(kysely, filterModel))
                         .$if(limit !== undefined, (qb) => qb.limit(limit!)),

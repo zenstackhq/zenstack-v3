@@ -82,16 +82,22 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
                 // however if there're filter/orderBy/take/skip,
                 // we need to build a subquery to handle them before aggregation
+
+                // give sub query an alias to avoid conflict with parent scope
+                // (e.g., for cases like self-relation)
+                const subQueryAlias = `${relationModel}$${relationField}$sub`;
+
                 result = eb.selectFrom(() => {
-                    let subQuery = this.buildSelectModel(eb, relationModel);
+                    let subQuery = this.buildSelectModel(eb, relationModel, subQueryAlias);
                     subQuery = this.buildSelectAllFields(
                         relationModel,
                         subQuery,
                         typeof payload === 'object' ? payload?.omit : undefined,
+                        subQueryAlias,
                     );
 
                     if (payload && typeof payload === 'object') {
-                        subQuery = this.buildFilterSortTake(relationModel, payload, subQuery);
+                        subQuery = this.buildFilterSortTake(relationModel, payload, subQuery, subQueryAlias);
                     }
 
                     // add join conditions
@@ -106,7 +112,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                         invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
                         subQuery = subQuery.where(
                             eb(
-                                eb.ref(`${relationModel}.${relationIds[0]}`),
+                                eb.ref(`${subQueryAlias}.${relationIds[0]}`),
                                 'in',
                                 eb
                                     .selectFrom(m2m.joinTable)
@@ -119,7 +125,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                             ),
                         );
                     } else {
-                        const joinPairs = buildJoinPairs(this.schema, model, parentName, relationField, relationModel);
+                        const joinPairs = buildJoinPairs(this.schema, model, parentName, relationField, subQueryAlias);
                         subQuery = subQuery.where((eb) =>
                             this.and(eb, ...joinPairs.map(([left, right]) => eb(sql.ref(left), '=', sql.ref(right)))),
                         );
@@ -130,6 +136,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
                 result = this.buildRelationObjectSelect(
                     relationModel,
+                    joinTableName,
                     relationField,
                     relationFieldDef,
                     result,
@@ -149,6 +156,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
     private buildRelationObjectSelect(
         relationModel: string,
+        relationModelAlias: string,
         relationField: string,
         relationFieldDef: FieldDef,
         qb: SelectQueryBuilder<any, any, any>,
@@ -156,7 +164,14 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         parentName: string,
     ) {
         qb = qb.select((eb) => {
-            const objArgs = this.buildRelationObjectArgs(relationModel, relationField, eb, payload, parentName);
+            const objArgs = this.buildRelationObjectArgs(
+                relationModel,
+                relationModelAlias,
+                relationField,
+                eb,
+                payload,
+                parentName,
+            );
 
             if (relationFieldDef.array) {
                 return eb.fn
@@ -172,6 +187,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
     private buildRelationObjectArgs(
         relationModel: string,
+        relationModelAlias: string,
         relationField: string,
         eb: ExpressionBuilder<any, any>,
         payload: true | FindArgs<Schema, GetModels<Schema>, true>,
@@ -202,7 +218,10 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 ...Object.entries(relationModelDef.fields)
                     .filter(([, value]) => !value.relation)
                     .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
-                    .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, eb, undefined, false)])
+                    .map(([field]) => [
+                        sql.lit(field),
+                        this.fieldRef(relationModel, field, eb, relationModelAlias, false),
+                    ])
                     .flatMap((v) => v),
             );
         } else if (payload.select) {

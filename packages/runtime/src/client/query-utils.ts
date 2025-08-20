@@ -178,7 +178,7 @@ export function buildFieldRef<Schema extends SchemaDef>(
         if (!computer) {
             throw new QueryError(`Computed field "${field}" implementation not provided for model "${model}"`);
         }
-        return computer(eb);
+        return computer(eb, { currentModel: modelAlias });
     }
 }
 
@@ -231,11 +231,23 @@ export function getManyToManyRelation(schema: SchemaDef, model: string, field: s
         // - join table is named _<model1>To<model2>, unless an explicit name is provided by `@relation`
         // - foreign keys are named A and B (based on the order of the model)
         const sortedModelNames = [model, fieldDef.type].sort();
+
+        let orderedFK: [string, string];
+        if (model !== fieldDef.type) {
+            // not a self-relation, model name's sort order determines fk order
+            orderedFK = sortedModelNames[0] === model ? ['A', 'B'] : ['B', 'A'];
+        } else {
+            // for self-relations, since model names are identical, relation field name's
+            // sort order determines fk order
+            const sortedFieldNames = [field, oppositeFieldDef.name].sort();
+            orderedFK = sortedFieldNames[0] === field ? ['A', 'B'] : ['B', 'A'];
+        }
+
         return {
-            parentFkName: sortedModelNames[0] === model ? 'A' : 'B',
+            parentFkName: orderedFK[0],
             otherModel: fieldDef.type,
             otherField: fieldDef.relation.opposite,
-            otherFkName: sortedModelNames[0] === fieldDef.type ? 'A' : 'B',
+            otherFkName: orderedFK[1],
             joinTable: fieldDef.relation.name
                 ? `_${fieldDef.relation.name}`
                 : `_${sortedModelNames[0]}To${sortedModelNames[1]}`,

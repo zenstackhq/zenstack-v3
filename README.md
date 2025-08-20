@@ -249,7 +249,7 @@ ZenStack v3 allows you to define database-evaluated computed fields with the fol
                 postCount: (eb) =>
                     eb
                         .selectFrom('Post')
-                        .whereRef('Post.authorId', '=', 'User.id')
+                        .whereRef('Post.authorId', '=', 'id')
                         .select(({ fn }) =>
                             fn.countAll<number>().as('postCount')
                         ),

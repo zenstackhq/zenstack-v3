@@ -76,17 +76,21 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         const subQueryName = `${parentAlias}$${relationField}`;
 
         let tbl = eb.selectFrom(() => {
-            let subQuery = this.buildSelectModel(eb, relationModel);
+            // give sub query an alias to avoid conflict with parent scope
+            // (e.g., for cases like self-relation)
+            const subQueryAlias = `${parentAlias}$${relationField}$sub`;
+            let subQuery = this.buildSelectModel(eb, relationModel, subQueryAlias);
 
             subQuery = this.buildSelectAllFields(
                 relationModel,
                 subQuery,
                 typeof payload === 'object' ? payload?.omit : undefined,
+                subQueryAlias,
             );
 
             if (payload && typeof payload === 'object') {
                 // take care of where, orderBy, skip, take, cursor, and distinct
-                subQuery = this.buildFilterSortTake(relationModel, payload, subQuery);
+                subQuery = this.buildFilterSortTake(relationModel, payload, subQuery, subQueryAlias);
             }
 
             // join conditions
@@ -100,7 +104,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
                 subQuery = subQuery.where(
                     eb(
-                        eb.ref(`${relationModel}.${relationIds[0]}`),
+                        eb.ref(`${subQueryAlias}.${relationIds[0]}`),
                         'in',
                         eb
                             .selectFrom(m2m.joinTable)
@@ -113,10 +117,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 keyPairs.forEach(({ fk, pk }) => {
                     if (ownedByModel) {
                         // the parent model owns the fk
-                        subQuery = subQuery.whereRef(`${relationModel}.${pk}`, '=', `${parentAlias}.${fk}`);
+                        subQuery = subQuery.whereRef(`${subQueryAlias}.${pk}`, '=', `${parentAlias}.${fk}`);
                     } else {
                         // the relation side owns the fk
-                        subQuery = subQuery.whereRef(`${relationModel}.${fk}`, '=', `${parentAlias}.${pk}`);
+                        subQuery = subQuery.whereRef(`${subQueryAlias}.${fk}`, '=', `${parentAlias}.${pk}`);
                     }
                 });
             }
@@ -158,7 +162,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                         .map(([field, value]) => {
                             if (field === '_count') {
                                 const subJson = this.buildCountJson(
-                                    relationModel as GetModels<Schema>,
+                                    relationModel,
                                     eb,
                                     `${parentAlias}$${relationField}`,
                                     value,
@@ -168,7 +172,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                                 const fieldDef = requireField(this.schema, relationModel, field);
                                 if (fieldDef.relation) {
                                     const subJson = this.buildRelationJSON(
-                                        relationModel as GetModels<Schema>,
+                                        relationModel,
                                         eb,
                                         field,
                                         `${parentAlias}$${relationField}`,
@@ -194,7 +198,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                         .filter(([, value]) => value)
                         .map(([field, value]) => {
                             const subJson = this.buildRelationJSON(
-                                relationModel as GetModels<Schema>,
+                                relationModel,
                                 eb,
                                 field,
                                 `${parentAlias}$${relationField}`,

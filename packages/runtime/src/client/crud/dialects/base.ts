@@ -47,13 +47,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     // #region common query builders
 
-    buildSelectModel(eb: ExpressionBuilder<any, any>, model: string) {
+    buildSelectModel(eb: ExpressionBuilder<any, any>, model: string, modelAlias: string) {
         const modelDef = requireModel(this.schema, model);
-        let result = eb.selectFrom(model);
+        let result = eb.selectFrom(model === modelAlias ? model : `${model} as ${modelAlias}`);
         // join all delegate bases
         let joinBase = modelDef.baseModel;
         while (joinBase) {
-            result = this.buildDelegateJoin(model, joinBase, result);
+            result = this.buildDelegateJoin(model, modelAlias, joinBase, result);
             joinBase = requireModel(this.schema, joinBase).baseModel;
         }
         return result;
@@ -63,12 +63,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         model: GetModels<Schema>,
         args: FindArgs<Schema, GetModels<Schema>, true>,
         query: SelectQueryBuilder<any, any, {}>,
+        modelAlias: string,
     ) {
         let result = query;
 
         // where
         if (args.where) {
-            result = result.where((eb) => this.buildFilter(eb, model, model, args?.where));
+            result = result.where((eb) => this.buildFilter(eb, model, modelAlias, args?.where));
         }
 
         // skip && take
@@ -85,7 +86,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         result = this.buildOrderBy(
             result,
             model,
-            model,
+            modelAlias,
             args.orderBy,
             skip !== undefined || take !== undefined,
             negateOrderBy,
@@ -95,14 +96,14 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         if ('distinct' in args && (args as any).distinct) {
             const distinct = ensureArray((args as any).distinct) as string[];
             if (this.supportsDistinctOn) {
-                result = result.distinctOn(distinct.map((f) => sql.ref(`${model}.${f}`)));
+                result = result.distinctOn(distinct.map((f) => sql.ref(`${modelAlias}.${f}`)));
             } else {
                 throw new QueryError(`"distinct" is not supported by "${this.schema.provider.type}" provider`);
             }
         }
 
         if (args.cursor) {
-            result = this.buildCursorFilter(model, result, args.cursor, args.orderBy, negateOrderBy);
+            result = this.buildCursorFilter(model, result, args.cursor, args.orderBy, negateOrderBy, modelAlias);
         }
         return result;
     }
@@ -172,13 +173,15 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         cursor: FindArgs<Schema, GetModels<Schema>, true>['cursor'],
         orderBy: FindArgs<Schema, GetModels<Schema>, true>['orderBy'],
         negateOrderBy: boolean,
+        modelAlias: string,
     ) {
         const _orderBy = orderBy ?? makeDefaultOrderBy(this.schema, model);
 
         const orderByItems = ensureArray(_orderBy).flatMap((obj) => Object.entries<SortOrder>(obj));
 
         const eb = expressionBuilder<any, any>();
-        const cursorFilter = this.buildFilter(eb, model, model, cursor);
+        const subQueryAlias = `${model}$cursor$sub`;
+        const cursorFilter = this.buildFilter(eb, model, subQueryAlias, cursor);
 
         let result = query;
         const filters: ExpressionWrapper<any, any, any>[] = [];
@@ -192,9 +195,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 const op = j === i ? (_order === 'asc' ? '>=' : '<=') : '=';
                 andFilters.push(
                     eb(
-                        eb.ref(`${model}.${field}`),
+                        eb.ref(`${modelAlias}.${field}`),
                         op,
-                        eb.selectFrom(model).select(`${model}.${field}`).where(cursorFilter),
+                        this.buildSelectModel(eb, model, subQueryAlias)
+                            .select(`${subQueryAlias}.${field}`)
+                            .where(cursorFilter),
                     ),
                 );
             }
@@ -341,17 +346,21 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildToManyRelationFilter(
         eb: ExpressionBuilder<any, any>,
         model: string,
-        table: string,
+        modelAlias: string,
         field: string,
         fieldDef: FieldDef,
         payload: any,
     ) {
         // null check needs to be converted to fk "is null" checks
         if (payload === null) {
-            return eb(sql.ref(`${table}.${field}`), 'is', null);
+            return eb(sql.ref(`${modelAlias}.${field}`), 'is', null);
         }
 
         const relationModel = fieldDef.type;
+
+        // evaluating the filter involves creating an inner select,
+        // give it an alias to avoid conflict
+        const relationFilterSelectAlias = `${modelAlias}$${field}$filter`;
 
         const buildPkFkWhereRefs = (eb: ExpressionBuilder<any, any>) => {
             const m2m = getManyToManyRelation(this.schema, model, field);
@@ -360,7 +369,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 const modelIdField = getIdFields(this.schema, model)[0]!;
                 const relationIdField = getIdFields(this.schema, relationModel)[0]!;
                 return eb(
-                    sql.ref(`${relationModel}.${relationIdField}`),
+                    sql.ref(`${relationFilterSelectAlias}.${relationIdField}`),
                     'in',
                     eb
                         .selectFrom(m2m.joinTable)
@@ -368,7 +377,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         .whereRef(
                             sql.ref(`${m2m.joinTable}.${m2m.parentFkName}`),
                             '=',
-                            sql.ref(`${table}.${modelIdField}`),
+                            sql.ref(`${modelAlias}.${modelIdField}`),
                         ),
                 );
             } else {
@@ -380,13 +389,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         result = this.and(
                             eb,
                             result,
-                            eb(sql.ref(`${table}.${fk}`), '=', sql.ref(`${relationModel}.${pk}`)),
+                            eb(sql.ref(`${modelAlias}.${fk}`), '=', sql.ref(`${relationFilterSelectAlias}.${pk}`)),
                         );
                     } else {
                         result = this.and(
                             eb,
                             result,
-                            eb(sql.ref(`${table}.${pk}`), '=', sql.ref(`${relationModel}.${fk}`)),
+                            eb(sql.ref(`${modelAlias}.${pk}`), '=', sql.ref(`${relationFilterSelectAlias}.${fk}`)),
                         );
                     }
                 }
@@ -407,10 +416,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         eb,
                         result,
                         eb(
-                            this.buildSelectModel(eb, relationModel)
+                            this.buildSelectModel(eb, relationModel, relationFilterSelectAlias)
                                 .select((eb1) => eb1.fn.count(eb1.lit(1)).as('$count'))
                                 .where(buildPkFkWhereRefs(eb))
-                                .where((eb1) => this.buildFilter(eb1, relationModel, relationModel, subPayload)),
+                                .where((eb1) =>
+                                    this.buildFilter(eb1, relationModel, relationFilterSelectAlias, subPayload),
+                                ),
                             '>',
                             0,
                         ),
@@ -423,11 +434,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         eb,
                         result,
                         eb(
-                            this.buildSelectModel(eb, relationModel)
+                            this.buildSelectModel(eb, relationModel, relationFilterSelectAlias)
                                 .select((eb1) => eb1.fn.count(eb1.lit(1)).as('$count'))
                                 .where(buildPkFkWhereRefs(eb))
                                 .where((eb1) =>
-                                    eb1.not(this.buildFilter(eb1, relationModel, relationModel, subPayload)),
+                                    eb1.not(
+                                        this.buildFilter(eb1, relationModel, relationFilterSelectAlias, subPayload),
+                                    ),
                                 ),
                             '=',
                             0,
@@ -441,10 +454,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         eb,
                         result,
                         eb(
-                            this.buildSelectModel(eb, relationModel)
+                            this.buildSelectModel(eb, relationModel, relationFilterSelectAlias)
                                 .select((eb1) => eb1.fn.count(eb1.lit(1)).as('$count'))
                                 .where(buildPkFkWhereRefs(eb))
-                                .where((eb1) => this.buildFilter(eb1, relationModel, relationModel, subPayload)),
+                                .where((eb1) =>
+                                    this.buildFilter(eb1, relationModel, relationFilterSelectAlias, subPayload),
+                                ),
                             '=',
                             0,
                         ),
@@ -874,8 +889,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                             );
                             const sort = this.negateSort(value._count, negated);
                             result = result.orderBy((eb) => {
-                                let subQuery = this.buildSelectModel(eb, relationModel);
-                                const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, relationModel);
+                                const subQueryAlias = `${modelAlias}$orderBy$${field}$count`;
+                                let subQuery = this.buildSelectModel(eb, relationModel, subQueryAlias);
+                                const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, subQueryAlias);
                                 subQuery = subQuery.where(() =>
                                     this.and(
                                         eb,
@@ -909,7 +925,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     buildSelectAllFields(
         model: string,
         query: SelectQueryBuilder<any, any, any>,
-        omit?: Record<string, boolean | undefined>,
+        omit: Record<string, boolean | undefined> | undefined,
+        modelAlias: string,
     ) {
         const modelDef = requireModel(this.schema, model);
         let result = query;
@@ -921,13 +938,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             if (omit?.[field] === true) {
                 continue;
             }
-            result = this.buildSelectField(result, model, model, field);
+            result = this.buildSelectField(result, model, modelAlias, field);
         }
 
         // select all fields from delegate descendants and pack into a JSON field `$delegate$Model`
         const descendants = getDelegateDescendantModels(this.schema, model);
         for (const subModel of descendants) {
-            result = this.buildDelegateJoin(model, subModel.name, result);
+            result = this.buildDelegateJoin(model, modelAlias, subModel.name, result);
             result = result.select((eb) => {
                 const jsonObject: Record<string, Expression<any>> = {};
                 for (const field of Object.keys(subModel.fields)) {
@@ -964,11 +981,16 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
     }
 
-    buildDelegateJoin(thisModel: string, otherModel: string, query: SelectQueryBuilder<any, any, any>) {
+    buildDelegateJoin(
+        thisModel: string,
+        thisModelAlias: string,
+        otherModelAlias: string,
+        query: SelectQueryBuilder<any, any, any>,
+    ) {
         const idFields = getIdFields(this.schema, thisModel);
-        query = query.leftJoin(otherModel, (qb) => {
+        query = query.leftJoin(otherModelAlias, (qb) => {
             for (const idField of idFields) {
-                qb = qb.onRef(`${thisModel}.${idField}`, '=', `${otherModel}.${idField}`);
+                qb = qb.onRef(`${thisModelAlias}.${idField}`, '=', `${otherModelAlias}.${idField}`);
             }
             return qb;
         });

@@ -1,17 +1,18 @@
 import { ZenStackClient } from '@zenstackhq/runtime';
 import SQLite from 'better-sqlite3';
-import { SqliteDialect } from 'kysely';
+import { sql, SqliteDialect } from 'kysely';
 import { schema } from './zenstack/schema';
 
 async function main() {
     const db = new ZenStackClient(schema, {
         dialect: new SqliteDialect({ database: new SQLite('./zenstack/dev.db') }),
+        log: ['query'],
         computedFields: {
             User: {
-                postCount: (eb) =>
+                postCount: (eb, { currentModel }) =>
                     eb
                         .selectFrom('Post')
-                        .whereRef('Post.authorId', '=', 'User.id')
+                        .whereRef('Post.authorId', '=', sql.ref(`${currentModel}.id`))
                         .select(({ fn }) => fn.countAll<number>().as('postCount')),
             },
         },

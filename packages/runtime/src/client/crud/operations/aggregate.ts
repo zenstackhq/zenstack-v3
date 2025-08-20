@@ -18,7 +18,7 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
 
             // table and where
             let subQuery = this.dialect
-                .buildSelectModel(eb as ExpressionBuilder<any, any>, this.model)
+                .buildSelectModel(eb as ExpressionBuilder<any, any>, this.model, this.model)
                 .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, parsedArgs?.where));
 
             // select fields: collect fields from aggregation body

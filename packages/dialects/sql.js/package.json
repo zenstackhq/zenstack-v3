@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/kysely-sql-js",
-    "version": "3.0.0-alpha.28",
+    "version": "3.0.0-alpha.29",
     "description": "Kysely dialect for sql.js",
     "type": "module",
     "scripts": {

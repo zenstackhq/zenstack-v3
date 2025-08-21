@@ -11,7 +11,7 @@ const client = new ZenStackClient(schema, {
             postCount: (eb) =>
                 eb
                     .selectFrom('Post')
-                    .whereRef('Post.authorId', '=', 'User.id')
+                    .whereRef('Post.authorId', '=', 'id')
                     .select(({ fn }) => fn.countAll<number>().as('postCount')),
         },
     },

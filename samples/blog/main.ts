@@ -6,7 +6,6 @@ import { schema } from './zenstack/schema';
 async function main() {
     const db = new ZenStackClient(schema, {
         dialect: new SqliteDialect({ database: new SQLite('./zenstack/dev.db') }),
-        log: ['query'],
         computedFields: {
             User: {
                 postCount: (eb, { currentModel }) =>

@@ -77,7 +77,7 @@
         - [x] Compound ID
         - [ ] Cross field comparison
         - [x] Many-to-many relation
-        - [ ] Self relation
+        - [x] Self relation
         - [ ] Empty AND/OR/NOT behavior
         - [x] Logging
         - [x] Error system

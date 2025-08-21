@@ -427,7 +427,7 @@ export type WhereUniqueInput<Schema extends SchemaDef, Model extends GetModels<S
 >;
 
 export type OmitInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in NonRelationFields<Schema, Model>]?: true;
+    [Key in NonRelationFields<Schema, Model>]?: boolean;
 };
 
 export type SelectIncludeOmit<Schema extends SchemaDef, Model extends GetModels<Schema>, AllowCount extends boolean> = {
@@ -442,7 +442,7 @@ export type SelectInput<
     AllowCount extends boolean = true,
     AllowRelation extends boolean = true,
 > = {
-    [Key in NonRelationFields<Schema, Model>]?: true;
+    [Key in NonRelationFields<Schema, Model>]?: boolean;
 } & (AllowRelation extends true ? IncludeInput<Schema, Model> : {}) & // relation fields
     // relation count
     (AllowCount extends true
@@ -453,11 +453,11 @@ export type SelectInput<
         : {});
 
 type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
-    | true
+    | boolean
     | {
           select: {
               [Key in RelationFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true ? Key : never]:
-                  | true
+                  | boolean
                   | {
                         where: WhereInput<Schema, RelationFieldType<Schema, Model, Key>, false>;
                     };

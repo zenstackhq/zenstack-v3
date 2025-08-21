@@ -456,7 +456,7 @@ type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
     | boolean
     | {
           select: {
-              [Key in RelationFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true ? Key : never]:
+              [Key in RelationFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true ? Key : never]?:
                   | boolean
                   | {
                         where: WhereInput<Schema, RelationFieldType<Schema, Model, Key>, false>;

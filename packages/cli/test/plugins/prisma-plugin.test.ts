@@ -47,7 +47,7 @@ model User {
         const workDir = createProject(`
 plugin prisma {
     provider = '@core/prisma'
-    output = './prisma'
+    output = '../prisma/schema.prisma'
 }
 
 model User {
@@ -55,6 +55,6 @@ model User {
 }
 `);
         runCli('generate', workDir);
-        expect(fs.existsSync(path.join(workDir, 'zenstack/prisma/schema.prisma'))).toBe(true);
+        expect(fs.existsSync(path.join(workDir, 'prisma/schema.prisma'))).toBe(true);
     });
 });

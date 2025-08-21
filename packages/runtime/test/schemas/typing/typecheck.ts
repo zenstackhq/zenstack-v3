@@ -1,7 +1,7 @@
 import SQLite from 'better-sqlite3';
 import { SqliteDialect } from 'kysely';
 import { ZenStackClient } from '../../../dist';
-import { Role, type Identity, type IdentityProvider } from './models';
+import { Role, Status, type Identity, type IdentityProvider } from './models';
 import { schema } from './schema';
 
 const client = new ZenStackClient(schema, {
@@ -35,6 +35,9 @@ async function find() {
         where: {
             name: 'Alex',
             role: Role.USER,
+            status: {
+                has: Status.ACTIVE,
+            },
         },
     });
     console.log(user1?.name);

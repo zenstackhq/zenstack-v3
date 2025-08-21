@@ -693,7 +693,7 @@ type ScalarCreatePayload<
     | MapModelFieldType<Schema, Model, Field>
     | (FieldIsArray<Schema, Model, Field> extends true
           ? {
-                set?: MapModelFieldType<Schema, Model, Field>[];
+                set?: MapModelFieldType<Schema, Model, Field>;
             }
           : never);
 
@@ -1203,7 +1203,7 @@ type NestedUpsertInput<
     Field extends RelationFields<Schema, Model>,
 > = OrArray<
     {
-        where: WhereUniqueInput<Schema, Model>;
+        where: WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>;
         create: CreateInput<
             Schema,
             RelationFieldType<Schema, Model, Field>,

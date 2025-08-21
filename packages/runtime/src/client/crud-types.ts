@@ -7,7 +7,6 @@ import type {
     FieldIsDelegateDiscriminator,
     FieldIsDelegateRelation,
     FieldIsRelation,
-    FieldIsRelationArray,
     FieldType,
     ForeignKeyFields,
     GetEnum,
@@ -218,11 +217,11 @@ export type WhereInput<
         : Key]?: Key extends RelationFields<Schema, Model>
         ? // relation
           RelationFilter<Schema, Model, Key>
-        : // enum
-          GetModelFieldType<Schema, Model, Key> extends GetEnums<Schema>
-          ? EnumFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>
-          : FieldIsArray<Schema, Model, Key> extends true
-            ? ArrayFilter<GetModelFieldType<Schema, Model, Key>>
+        : FieldIsArray<Schema, Model, Key> extends true
+          ? ArrayFilter<GetModelFieldType<Schema, Model, Key>>
+          : // enum
+            GetModelFieldType<Schema, Model, Key> extends GetEnums<Schema>
+            ? EnumFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>
             : // primitive
               PrimitiveFilter<
                   Schema,
@@ -561,9 +560,9 @@ type OptionalFieldsForCreate<Schema extends SchemaDef, Model extends GetModels<S
         ? Key
         : FieldHasDefault<Schema, Model, Key> extends true
           ? Key
-          : GetModelField<Schema, Model, Key>['updatedAt'] extends true
+          : FieldIsArray<Schema, Model, Key> extends true
             ? Key
-            : FieldIsRelationArray<Schema, Model, Key> extends true
+            : GetModelField<Schema, Model, Key>['updatedAt'] extends true
               ? Key
               : never]: GetModelField<Schema, Model, Key>;
 };

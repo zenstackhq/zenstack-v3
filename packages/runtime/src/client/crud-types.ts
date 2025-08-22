@@ -246,7 +246,7 @@ type EnumFilter<
     Schema extends SchemaDef,
     T extends GetEnums<Schema>,
     Nullable extends boolean,
-    WithAggregations extends Boolean,
+    WithAggregations extends boolean,
 > =
     | NullableIf<keyof GetEnum<Schema, T>, Nullable>
     | ({

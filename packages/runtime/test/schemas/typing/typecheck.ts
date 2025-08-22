@@ -80,6 +80,17 @@ async function find() {
         where: { name: 'Alex' },
     });
 
+    // enum array
+    await client.user.findFirst({
+        where: { status: { equals: [Status.ACTIVE] } },
+    });
+    await client.user.findFirst({
+        where: { status: { has: Status.ACTIVE } },
+    });
+    await client.user.findFirst({
+        where: { status: { hasEvery: [Status.ACTIVE] } },
+    });
+
     await client.user.findMany({
         skip: 1,
         take: 1,

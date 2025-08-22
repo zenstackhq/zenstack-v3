@@ -218,7 +218,7 @@ export type WhereInput<
         ? // relation
           RelationFilter<Schema, Model, Key>
         : FieldIsArray<Schema, Model, Key> extends true
-          ? ArrayFilter<GetModelFieldType<Schema, Model, Key>>
+          ? ArrayFilter<Schema, GetModelFieldType<Schema, Model, Key>>
           : // enum
             GetModelFieldType<Schema, Model, Key> extends GetEnums<Schema>
             ? EnumFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>
@@ -246,13 +246,17 @@ type EnumFilter<Schema extends SchemaDef, T extends GetEnums<Schema>, Nullable e
           not?: EnumFilter<Schema, T, Nullable>;
       };
 
-type ArrayFilter<T extends string> = {
-    equals?: MapBaseType<T>[];
-    has?: MapBaseType<T>;
-    hasEvery?: MapBaseType<T>[];
-    hasSome?: MapBaseType<T>[];
+type ArrayFilter<Schema extends SchemaDef, T extends string> = {
+    equals?: MapScalarType<Schema, T>[];
+    has?: MapScalarType<Schema, T>;
+    hasEvery?: MapScalarType<Schema, T>[];
+    hasSome?: MapScalarType<Schema, T>[];
     isEmpty?: boolean;
 };
+
+// map a scalar type (primitive and enum) to TS type
+type MapScalarType<Schema extends SchemaDef, T extends string> =
+    T extends GetEnums<Schema> ? keyof GetEnum<Schema, T> : MapBaseType<T>;
 
 type PrimitiveFilter<
     Schema extends SchemaDef,

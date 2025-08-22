@@ -1256,11 +1256,15 @@ export class InputValidator<Schema extends SchemaDef> {
     private makeGroupBySchema(model: GetModels<Schema>) {
         const modelDef = requireModel(this.schema, model);
         const nonRelationFields = Object.keys(modelDef.fields).filter((field) => !modelDef.fields[field]?.relation);
+        const bySchema =
+            nonRelationFields.length > 0
+                ? this.orArray(z.enum(nonRelationFields as [string, ...string[]]), true)
+                : z.never();
 
         let schema: z.ZodSchema = z.strictObject({
             where: this.makeWhereSchema(model, false).optional(),
             orderBy: this.orArray(this.makeOrderBySchema(model, false, true), true).optional(),
-            by: this.orArray(z.enum(nonRelationFields as [string, ...string[]]), true),
+            by: bySchema,
             having: this.makeHavingSchema(model).optional(),
             skip: this.makeSkipSchema().optional(),
             take: this.makeTakeSchema().optional(),

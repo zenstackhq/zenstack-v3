@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/zod",
-    "version": "3.0.0-alpha.29",
+    "version": "3.0.0-alpha.30",
     "description": "",
     "type": "module",
     "main": "index.js",
@@ -30,7 +30,8 @@
     },
     "devDependencies": {
         "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*"
+        "@zenstackhq/typescript-config": "workspace:*",
+        "zod": "~3.25.0"
     },
     "peerDependencies": {
         "zod": "catalog:"

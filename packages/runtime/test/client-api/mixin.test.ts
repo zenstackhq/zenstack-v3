@@ -51,7 +51,7 @@ model Bar with CommonFields {
                     description: 'Bar',
                 },
             }),
-        ).rejects.toThrow('Invalid input');
+        ).rejects.toThrow(/invalid/i);
 
         await expect(
             client.bar.create({

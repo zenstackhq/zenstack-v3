@@ -1,7 +1,7 @@
 import SQLite from 'better-sqlite3';
 import { SqliteDialect } from 'kysely';
 import { ZenStackClient } from '../../../dist';
-import { Role, type Identity, type IdentityProvider } from './models';
+import { Role, Status, type Identity, type IdentityProvider } from './models';
 import { schema } from './schema';
 
 const client = new ZenStackClient(schema, {
@@ -35,6 +35,9 @@ async function find() {
         where: {
             name: 'Alex',
             role: Role.USER,
+            status: {
+                has: Status.ACTIVE,
+            },
         },
     });
     console.log(user1?.name);
@@ -75,6 +78,17 @@ async function find() {
     await client.user.findUnique({
         // @ts-expect-error expect unique filter
         where: { name: 'Alex' },
+    });
+
+    // enum array
+    await client.user.findFirst({
+        where: { status: { equals: [Status.ACTIVE] } },
+    });
+    await client.user.findFirst({
+        where: { status: { has: Status.ACTIVE } },
+    });
+    await client.user.findFirst({
+        where: { status: { hasEvery: [Status.ACTIVE] } },
     });
 
     await client.user.findMany({

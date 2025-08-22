@@ -8,7 +8,7 @@
 import { type SchemaDef, type OperandExpression, ExpressionUtils } from "../../../dist/schema";
 export const schema = {
     provider: {
-        type: "sqlite"
+        type: "postgresql"
     },
     models: {
         User: {
@@ -48,6 +48,11 @@ export const schema = {
                     type: "Role",
                     attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("USER") }] }],
                     default: "USER"
+                },
+                status: {
+                    name: "status",
+                    type: "Status",
+                    array: true
                 },
                 posts: {
                     name: "posts",
@@ -325,6 +330,11 @@ export const schema = {
         Role: {
             ADMIN: "ADMIN",
             USER: "USER"
+        },
+        Status: {
+            ACTIVE: "ACTIVE",
+            INACTIVE: "INACTIVE",
+            BANNED: "BANNED"
         }
     },
     authType: "User",

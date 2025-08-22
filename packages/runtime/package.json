@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/runtime",
-    "version": "3.0.0-alpha.29",
+    "version": "3.0.0-alpha.30",
     "description": "ZenStack Runtime",
     "type": "module",
     "scripts": {
@@ -99,6 +99,7 @@
         "@zenstackhq/testtools": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
-        "tsx": "^4.19.2"
+        "tsx": "^4.19.2",
+        "zod": "~3.25.0"
     }
 }

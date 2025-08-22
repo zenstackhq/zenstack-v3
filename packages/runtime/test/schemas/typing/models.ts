@@ -17,3 +17,5 @@ export type Identity = $TypeDefResult<$Schema, "Identity">;
 export type IdentityProvider = $TypeDefResult<$Schema, "IdentityProvider">;
 export const Role = $schema.enums.Role;
 export type Role = (typeof Role)[keyof typeof Role];
+export const Status = $schema.enums.Status;
+export type Status = (typeof Status)[keyof typeof Status];

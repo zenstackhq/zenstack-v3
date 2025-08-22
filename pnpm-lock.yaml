@@ -22,7 +22,7 @@ catalogs:
       specifier: 3.5.0
       version: 3.5.0
     prisma:
-      specifier: ^6.14.0
+      specifier: ^6.10.0
       version: 6.14.0
     tmp:
       specifier: ^0.2.3
@@ -31,11 +31,8 @@ catalogs:
       specifier: ^5.7.1
       version: 5.7.1
     typescript:
-      specifier: ^5.0.0
+      specifier: ^5.8.0
       version: 5.8.3
-    zod:
-      specifier: ^4.0.0
-      version: 4.0.5
 
 importers:
 
@@ -290,9 +287,6 @@ importers:
       uuid:
         specifier: ^11.0.5
         version: 11.0.5
-      zod:
-        specifier: 'catalog:'
-        version: 4.0.5
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -324,6 +318,9 @@ importers:
       tsx:
         specifier: ^4.19.2
         version: 4.19.2
+      zod:
+        specifier: ~3.25.0
+        version: 3.25.76
 
   packages/sdk:
     dependencies:
@@ -427,9 +424,6 @@ importers:
       ts-pattern:
         specifier: 'catalog:'
         version: 5.7.1
-      zod:
-        specifier: 'catalog:'
-        version: 4.0.5
     devDependencies:
       '@zenstackhq/eslint-config':
         specifier: workspace:*
@@ -437,6 +431,9 @@ importers:
       '@zenstackhq/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      zod:
+        specifier: ~3.25.0
+        version: 3.25.76
 
   samples/blog:
     dependencies:
@@ -2666,8 +2663,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@4.0.5:
-    resolution: {integrity: sha512-/5UuuRPStvHXu7RS+gmvRf4NXrNxpSllGwDnCBcJZtQsKrviYXm54yDGV2KYNLT5kq0lHGcl7lqWJLgSaG+tgA==}
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
 
@@ -4727,4 +4724,4 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod@4.0.5: {}
+  zod@3.25.76: {}

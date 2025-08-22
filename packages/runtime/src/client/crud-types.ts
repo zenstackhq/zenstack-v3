@@ -7,7 +7,6 @@ import type {
     FieldIsDelegateDiscriminator,
     FieldIsDelegateRelation,
     FieldIsRelation,
-    FieldIsRelationArray,
     FieldType,
     ForeignKeyFields,
     GetEnum,
@@ -218,11 +217,11 @@ export type WhereInput<
         : Key]?: Key extends RelationFields<Schema, Model>
         ? // relation
           RelationFilter<Schema, Model, Key>
-        : // enum
-          GetModelFieldType<Schema, Model, Key> extends GetEnums<Schema>
-          ? EnumFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>
-          : FieldIsArray<Schema, Model, Key> extends true
-            ? ArrayFilter<GetModelFieldType<Schema, Model, Key>>
+        : FieldIsArray<Schema, Model, Key> extends true
+          ? ArrayFilter<Schema, GetModelFieldType<Schema, Model, Key>>
+          : // enum
+            GetModelFieldType<Schema, Model, Key> extends GetEnums<Schema>
+            ? EnumFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>
             : // primitive
               PrimitiveFilter<
                   Schema,
@@ -247,13 +246,17 @@ type EnumFilter<Schema extends SchemaDef, T extends GetEnums<Schema>, Nullable e
           not?: EnumFilter<Schema, T, Nullable>;
       };
 
-type ArrayFilter<T extends string> = {
-    equals?: MapBaseType<T>[];
-    has?: MapBaseType<T>;
-    hasEvery?: MapBaseType<T>[];
-    hasSome?: MapBaseType<T>[];
+type ArrayFilter<Schema extends SchemaDef, T extends string> = {
+    equals?: MapScalarType<Schema, T>[] | null;
+    has?: MapScalarType<Schema, T> | null;
+    hasEvery?: MapScalarType<Schema, T>[];
+    hasSome?: MapScalarType<Schema, T>[];
     isEmpty?: boolean;
 };
+
+// map a scalar type (primitive and enum) to TS type
+type MapScalarType<Schema extends SchemaDef, T extends string> =
+    T extends GetEnums<Schema> ? keyof GetEnum<Schema, T> : MapBaseType<T>;
 
 type PrimitiveFilter<
     Schema extends SchemaDef,
@@ -428,7 +431,7 @@ export type WhereUniqueInput<Schema extends SchemaDef, Model extends GetModels<S
 >;
 
 export type OmitInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in NonRelationFields<Schema, Model>]?: true;
+    [Key in NonRelationFields<Schema, Model>]?: boolean;
 };
 
 export type SelectIncludeOmit<Schema extends SchemaDef, Model extends GetModels<Schema>, AllowCount extends boolean> = {
@@ -443,7 +446,7 @@ export type SelectInput<
     AllowCount extends boolean = true,
     AllowRelation extends boolean = true,
 > = {
-    [Key in NonRelationFields<Schema, Model>]?: true;
+    [Key in NonRelationFields<Schema, Model>]?: boolean;
 } & (AllowRelation extends true ? IncludeInput<Schema, Model> : {}) & // relation fields
     // relation count
     (AllowCount extends true
@@ -454,11 +457,11 @@ export type SelectInput<
         : {});
 
 type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
-    | true
+    | boolean
     | {
           select: {
-              [Key in RelationFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true ? Key : never]:
-                  | true
+              [Key in RelationFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true ? Key : never]?:
+                  | boolean
                   | {
                         where: WhereInput<Schema, RelationFieldType<Schema, Model, Key>, false>;
                     };
@@ -561,9 +564,9 @@ type OptionalFieldsForCreate<Schema extends SchemaDef, Model extends GetModels<S
         ? Key
         : FieldHasDefault<Schema, Model, Key> extends true
           ? Key
-          : GetModelField<Schema, Model, Key>['updatedAt'] extends true
+          : FieldIsArray<Schema, Model, Key> extends true
             ? Key
-            : FieldIsRelationArray<Schema, Model, Key> extends true
+            : GetModelField<Schema, Model, Key>['updatedAt'] extends true
               ? Key
               : never]: GetModelField<Schema, Model, Key>;
 };
@@ -694,7 +697,7 @@ type ScalarCreatePayload<
     | MapModelFieldType<Schema, Model, Field>
     | (FieldIsArray<Schema, Model, Field> extends true
           ? {
-                set?: MapModelFieldType<Schema, Model, Field>[];
+                set?: MapModelFieldType<Schema, Model, Field>;
             }
           : never);
 
@@ -1204,7 +1207,7 @@ type NestedUpsertInput<
     Field extends RelationFields<Schema, Model>,
 > = OrArray<
     {
-        where: WhereUniqueInput<Schema, Model>;
+        where: WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>;
         create: CreateInput<
             Schema,
             RelationFieldType<Schema, Model, Field>,

@@ -1,11 +1,17 @@
 datasource db {
-    provider = "sqlite"
-    url = "file:./test.db"
+    provider = 'postgresql'
+    url = env('DATABASE_URL')
 }
 
 enum Role {
     ADMIN
     USER
+}
+
+enum Status {
+    ACTIVE
+    INACTIVE
+    BANNED
 }
 
 type Identity {
@@ -24,6 +30,7 @@ model User {
     name      String
     email     String    @unique
     role      Role      @default(USER)
+    status    Status[]
     posts     Post[]
     profile   Profile?
     postCount Int       @computed

@@ -127,7 +127,7 @@ model User {
                         },
                     },
                 }),
-            ).rejects.toThrow('Invalid input');
+            ).rejects.toThrow(/invalid/i);
         });
 
         it('works with find', async () => {
@@ -215,7 +215,7 @@ model User {
                         },
                     },
                 }),
-            ).rejects.toThrow('Invalid input');
+            ).rejects.toThrow(/invalid/i);
         });
     },
 );

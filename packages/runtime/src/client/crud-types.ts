@@ -247,8 +247,8 @@ type EnumFilter<Schema extends SchemaDef, T extends GetEnums<Schema>, Nullable e
       };
 
 type ArrayFilter<Schema extends SchemaDef, T extends string> = {
-    equals?: MapScalarType<Schema, T>[];
-    has?: MapScalarType<Schema, T>;
+    equals?: MapScalarType<Schema, T>[] | null;
+    has?: MapScalarType<Schema, T> | null;
     hasEvery?: MapScalarType<Schema, T>[];
     hasSome?: MapScalarType<Schema, T>[];
     isEmpty?: boolean;

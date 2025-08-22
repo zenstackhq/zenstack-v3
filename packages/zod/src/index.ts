@@ -28,6 +28,6 @@ function makeScalarSchema(fieldDef: FieldDef): ZodType {
         .with('String', () => z.string())
         .with(P.union('Int', 'BigInt', 'Float', 'Decimal'), () => z.number())
         .with('Boolean', () => z.boolean())
-        .with('DateTime', () => z.iso.datetime())
+        .with('DateTime', () => z.string().datetime())
         .otherwise(() => z.unknown());
 }

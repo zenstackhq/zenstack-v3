@@ -233,10 +233,10 @@ export class InputValidator<Schema extends SchemaDef> {
         } else {
             return match(type)
                 .with('String', () => z.string())
-                .with('Int', () => z.int())
+                .with('Int', () => z.number().int())
                 .with('Float', () => z.number())
                 .with('Boolean', () => z.boolean())
-                .with('BigInt', () => z.union([z.int(), z.bigint()]))
+                .with('BigInt', () => z.union([z.number().int(), z.bigint()]))
                 .with('Decimal', () => z.union([z.number(), z.instanceof(Decimal), z.string()]))
                 .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
                 .with('Bytes', () => z.instanceof(Uint8Array))
@@ -252,20 +252,22 @@ export class InputValidator<Schema extends SchemaDef> {
         }
         const typeDef = this.schema.typeDefs?.[type];
         invariant(typeDef, `Type definition "${type}" not found in schema`);
-        schema = z.looseObject(
-            Object.fromEntries(
-                Object.entries(typeDef.fields).map(([field, def]) => {
-                    let fieldSchema = this.makePrimitiveSchema(def.type);
-                    if (def.array) {
-                        fieldSchema = fieldSchema.array();
-                    }
-                    if (def.optional) {
-                        fieldSchema = fieldSchema.optional();
-                    }
-                    return [field, fieldSchema];
-                }),
-            ),
-        );
+        schema = z
+            .object(
+                Object.fromEntries(
+                    Object.entries(typeDef.fields).map(([field, def]) => {
+                        let fieldSchema = this.makePrimitiveSchema(def.type);
+                        if (def.array) {
+                            fieldSchema = fieldSchema.array();
+                        }
+                        if (def.optional) {
+                            fieldSchema = fieldSchema.optional();
+                        }
+                        return [field, fieldSchema];
+                    }),
+                ),
+            )
+            .passthrough();
         this.schemaCache.set(key, schema);
         return schema;
     }
@@ -469,7 +471,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeDateTimeFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
         return this.makeCommonPrimitiveFilterSchema(
-            z.union([z.iso.datetime(), z.date()]),
+            z.union([z.string().datetime(), z.date()]),
             optional,
             () => z.lazy(() => this.makeDateTimeFilterSchema(optional, withAggregations)),
             withAggregations ? ['_count', '_min', '_max'] : undefined,
@@ -519,7 +521,7 @@ export class InputValidator<Schema extends SchemaDef> {
             gte: baseSchema.optional(),
             not: makeThis().optional(),
             ...(withAggregations?.includes('_count')
-                ? { _count: this.makeNumberFilterSchema(z.int(), false, false).optional() }
+                ? { _count: this.makeNumberFilterSchema(z.number().int(), false, false).optional() }
                 : {}),
             ...(withAggregations?.includes('_avg') ? { _avg: commonAggSchema() } : {}),
             ...(withAggregations?.includes('_sum') ? { _sum: commonAggSchema() } : {}),
@@ -1020,7 +1022,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.strictObject({
             where: this.makeWhereSchema(model, false).optional(),
             data: this.makeUpdateDataSchema(model, [], true),
-            limit: z.int().nonnegative().optional(),
+            limit: z.number().int().nonnegative().optional(),
         });
     }
 
@@ -1158,7 +1160,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z
             .object({
                 where: this.makeWhereSchema(model, false).optional(),
-                limit: z.int().nonnegative().optional(),
+                limit: z.number().int().nonnegative().optional(),
             })
 
             .optional();
@@ -1255,10 +1257,10 @@ export class InputValidator<Schema extends SchemaDef> {
         const modelDef = requireModel(this.schema, model);
         const nonRelationFields = Object.keys(modelDef.fields).filter((field) => !modelDef.fields[field]?.relation);
 
-        let schema = z.strictObject({
+        let schema: z.ZodSchema = z.strictObject({
             where: this.makeWhereSchema(model, false).optional(),
             orderBy: this.orArray(this.makeOrderBySchema(model, false, true), true).optional(),
-            by: this.orArray(z.enum(nonRelationFields), true),
+            by: this.orArray(z.enum(nonRelationFields as [string, ...string[]]), true),
             having: this.makeHavingSchema(model).optional(),
             skip: this.makeSkipSchema().optional(),
             take: this.makeTakeSchema().optional(),
@@ -1340,11 +1342,11 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Helpers
 
     private makeSkipSchema() {
-        return z.int().nonnegative();
+        return z.number().int().nonnegative();
     }
 
     private makeTakeSchema() {
-        return z.int();
+        return z.number().int();
     }
 
     private refineForSelectIncludeMutuallyExclusive(schema: ZodType) {

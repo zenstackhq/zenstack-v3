@@ -133,9 +133,8 @@ export async function createTestClient<Schema extends SchemaDef>(
         }
     }
 
-    if (workDir) {
-        console.log(`Work directory: ${workDir}`);
-    }
+    invariant(workDir);
+    console.log(`Work directory: ${workDir}`);
 
     const { plugins, ...rest } = options ?? {};
     const _options: ClientOptions<Schema> = {
@@ -144,13 +143,13 @@ export async function createTestClient<Schema extends SchemaDef>(
 
     if (options?.usePrismaPush) {
         invariant(typeof schema === 'string' || schemaFile, 'a schema file must be provided when using prisma db push');
-        const r = await loadDocument(path.resolve(workDir, 'schema.zmodel'));
+        const r = await loadDocument(path.resolve(workDir!, 'schema.zmodel'));
         if (!r.success) {
             throw new Error(r.errors.join('\n'));
         }
         const prismaSchema = new PrismaSchemaGenerator(r.model);
         const prismaSchemaText = await prismaSchema.generate();
-        fs.writeFileSync(path.resolve(workDir, 'schema.prisma'), prismaSchemaText);
+        fs.writeFileSync(path.resolve(workDir!, 'schema.prisma'), prismaSchemaText);
         execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {
             cwd: workDir,
             stdio: 'inherit',

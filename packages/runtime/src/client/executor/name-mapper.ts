@@ -1,10 +1,12 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import {
     AliasNode,
     ColumnNode,
-    CreateTableNode,
     DeleteQueryNode,
+    FromNode,
     IdentifierNode,
     InsertQueryNode,
+    JoinNode,
     OperationNodeTransformer,
     ReferenceNode,
     ReturningNode,
@@ -16,13 +18,18 @@ import {
     type OperationNode,
 } from 'kysely';
 import type { FieldDef, ModelDef, SchemaDef } from '../../schema';
-import { InternalError } from '../errors';
-import { requireModel } from '../query-utils';
+import { getModel, requireModel } from '../query-utils';
+
+type Scope = {
+    model: string;
+    alias?: string;
+    namesMapped?: boolean;
+};
 
 export class QueryNameMapper extends OperationNodeTransformer {
     private readonly modelToTableMap = new Map<string, string>();
     private readonly fieldToColumnMap = new Map<string, string>();
-    private readonly modelStack: string[] = [];
+    private readonly modelScopes: Scope[] = [];
 
     constructor(private readonly schema: SchemaDef) {
         super();
@@ -41,192 +48,216 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    private get currentModel() {
-        return this.modelStack[this.modelStack.length - 1];
-    }
-
-    protected override transformCreateTable(node: CreateTableNode) {
-        try {
-            this.modelStack.push(node.table.table.identifier.name);
-            return super.transformCreateTable(node);
-        } finally {
-            this.modelStack.pop();
-        }
-    }
-
-    protected override transformInsertQuery(node: InsertQueryNode) {
-        try {
-            if (node.into?.table.identifier.name) {
-                this.modelStack.push(node.into.table.identifier.name);
-            }
-            return super.transformInsertQuery(node);
-        } finally {
-            if (node.into?.table.identifier.name) {
-                this.modelStack.pop();
-            }
-        }
-    }
-
-    protected override transformReturning(node: ReturningNode) {
-        return ReturningNode.create(this.transformSelections(node.selections, node));
-    }
-
-    protected override transformUpdateQuery(node: UpdateQueryNode) {
-        let pushed = false;
-        if (node.table && TableNode.is(node.table)) {
-            this.modelStack.push(node.table.table.identifier.name);
-            pushed = true;
-        }
-        try {
-            return super.transformUpdateQuery(node);
-        } finally {
-            if (pushed) {
-                this.modelStack.pop();
-            }
-        }
-    }
-
-    protected override transformDeleteQuery(node: DeleteQueryNode): DeleteQueryNode {
-        let pushed = false;
-        if (node.from?.froms && node.from.froms.length === 1 && node.from.froms[0]) {
-            const from = node.from.froms[0];
-            if (TableNode.is(from)) {
-                this.modelStack.push(from.table.identifier.name);
-                pushed = true;
-            } else if (AliasNode.is(from) && TableNode.is(from.node)) {
-                this.modelStack.push(from.node.table.identifier.name);
-                pushed = true;
-            }
-        }
-        try {
-            return super.transformDeleteQuery(node);
-        } finally {
-            if (pushed) {
-                this.modelStack.pop();
-            }
-        }
-    }
+    // #region overrides
 
     protected override transformSelectQuery(node: SelectQueryNode) {
-        if (!node.from?.froms || node.from.froms.length === 0) {
+        if (!node.from?.froms) {
             return super.transformSelectQuery(node);
         }
 
-        if (node.from.froms.length > 1) {
-            throw new InternalError(`SelectQueryNode must have a single table in from clause`);
-        }
-
-        let pushed = false;
-        const from = node.from.froms[0]!;
-        if (TableNode.is(from)) {
-            this.modelStack.push(from.table.identifier.name);
-            pushed = true;
-        } else if (AliasNode.is(from) && TableNode.is(from.node)) {
-            this.modelStack.push(from.node.table.identifier.name);
-            pushed = true;
-        }
-
-        const selections = node.selections ? this.transformSelections(node.selections, node) : node.selections;
-
-        try {
+        // all table names in "from" are pushed as scopes, each "from" is expanded
+        // as nested query to apply column name mapping, so the scopes are marked
+        // "namesMapped" so no additional name mapping is applied when resolving
+        // columns
+        const scopes = this.createScopesFromFroms(node.from, true);
+        return this.withScopes(scopes, () => {
             return {
                 ...super.transformSelectQuery(node),
-                selections,
+                // convert "from" to nested query as needed
+                from: this.processFrom(node.from!),
             };
-        } finally {
-            if (pushed) {
-                this.modelStack.pop();
-            }
-        }
+        });
     }
 
-    private transformSelections(selections: readonly SelectionNode[], contextNode: OperationNode) {
-        const result: SelectionNode[] = [];
+    protected override transformInsertQuery(node: InsertQueryNode) {
+        if (!node.into) {
+            return super.transformInsertQuery(node);
+        }
 
-        for (const selection of selections) {
-            let selectAllFromModel: string | undefined = undefined;
-            let isSelectAll = false;
+        return this.withScope(
+            { model: node.into.table.identifier.name },
+            () =>
+                ({
+                    ...super.transformInsertQuery(node),
+                    // map table name
+                    into: this.processTableRef(node.into!),
+                }) satisfies InsertQueryNode,
+        );
+    }
 
-            if (SelectAllNode.is(selection.selection)) {
-                selectAllFromModel = this.currentModel;
-                isSelectAll = true;
-            } else if (ReferenceNode.is(selection.selection) && SelectAllNode.is(selection.selection.column)) {
-                selectAllFromModel = selection.selection.table?.table.identifier.name ?? this.currentModel;
-                isSelectAll = true;
+    protected override transformReturning(node: ReturningNode) {
+        return {
+            kind: node.kind,
+            // map column names in returning selections (include returningAll)
+            selections: this.processSelections(node.selections),
+        };
+    }
+
+    protected override transformJoin(node: JoinNode) {
+        const { alias, node: innerNode } = this.stripAlias(node.table);
+        if (TableNode.is(innerNode!)) {
+            const modelName = innerNode.table.identifier.name;
+            if (this.hasMappedColumns(modelName)) {
+                // create a nested query with all fields selected and names mapped
+                const select = this.createSelectAll(modelName);
+                return { ...super.transformJoin(node), table: this.wrapAlias(select, alias ?? modelName) };
             }
+        }
+        return super.transformJoin(node);
+    }
 
-            if (isSelectAll) {
-                if (!selectAllFromModel) {
-                    continue;
-                } else {
-                    const scalarFields = this.getModelScalarFields(contextNode, selectAllFromModel);
-                    const fromModelDef = requireModel(this.schema, selectAllFromModel);
-                    const mappedTableName = this.getMappedName(fromModelDef) ?? selectAllFromModel;
-                    result.push(
-                        ...scalarFields.map((fieldName) => {
-                            const fieldRef = ReferenceNode.create(
-                                ColumnNode.create(this.mapFieldName(fieldName)),
-                                TableNode.create(mappedTableName),
-                            );
-                            return SelectionNode.create(
-                                this.fieldHasMappedName(fieldName)
-                                    ? AliasNode.create(fieldRef, IdentifierNode.create(fieldName))
-                                    : fieldRef,
-                            );
-                        }),
-                    );
+    protected override transformReference(node: ReferenceNode) {
+        if (!ColumnNode.is(node.column)) {
+            return super.transformReference(node);
+        }
+
+        // resolve the reference to a field from outer scopes
+        const { fieldDef, modelDef, scope } = this.resolveFieldFromScopes(
+            node.column.column.name,
+            node.table?.table.identifier.name,
+        );
+        if (fieldDef && !scope.namesMapped) {
+            // map column name and table name as needed
+            const mappedFieldName = this.mapFieldName(modelDef.name, fieldDef.name);
+
+            // map table name depending on how it is resolved
+            let mappedTableName = node.table?.table.identifier.name;
+            if (mappedTableName) {
+                if (scope.alias === mappedTableName) {
+                    // table name is resolved to an alias, no mapping needed
+                } else if (scope.model === mappedTableName) {
+                    // table name is resolved to a model, map the name as needed
+                    mappedTableName = this.mapTableName(scope.model);
                 }
-            } else {
-                result.push(this.transformSelectionWithAlias(selection));
             }
-        }
 
-        return result;
-    }
-
-    private transformSelectionWithAlias(node: SelectionNode) {
-        if (ColumnNode.is(node.selection) && this.fieldHasMappedName(node.selection.column.name)) {
-            return SelectionNode.create(
-                AliasNode.create(
-                    this.transformColumn(node.selection),
-                    IdentifierNode.create(node.selection.column.name),
-                ),
-            );
-        } else if (
-            ReferenceNode.is(node.selection) &&
-            this.fieldHasMappedName((node.selection.column as ColumnNode).column.name)
-        ) {
-            return SelectionNode.create(
-                AliasNode.create(
-                    this.transformReference(node.selection),
-                    IdentifierNode.create((node.selection.column as ColumnNode).column.name),
-                ),
+            return ReferenceNode.create(
+                ColumnNode.create(mappedFieldName),
+                mappedTableName ? TableNode.create(mappedTableName) : undefined,
             );
         } else {
-            return this.transformSelection(node);
-        }
-    }
-
-    private fieldHasMappedName(name: string) {
-        if (!this.currentModel) {
-            return false;
-        }
-        return this.fieldToColumnMap.has(`${this.currentModel}.${name}`);
-    }
-
-    protected override transformTable(node: TableNode) {
-        const tableName = node.table.identifier.name;
-        const mappedName = this.modelToTableMap.get(tableName);
-        if (mappedName) {
-            // TODO: db schema?
-            return TableNode.create(mappedName);
-        } else {
-            return node;
+            return super.transformReference(node);
         }
     }
 
     protected override transformColumn(node: ColumnNode) {
-        return ColumnNode.create(this.mapFieldName(node.column.name));
+        const { modelDef, fieldDef, scope } = this.resolveFieldFromScopes(node.column.name);
+        if (!fieldDef || scope.namesMapped) {
+            return super.transformColumn(node);
+        }
+        const mappedName = this.mapFieldName(modelDef.name, fieldDef.name);
+        return ColumnNode.create(mappedName);
+    }
+
+    protected override transformUpdateQuery(node: UpdateQueryNode) {
+        const { alias, node: innerTable } = this.stripAlias(node.table);
+        if (!innerTable || !TableNode.is(innerTable)) {
+            return super.transformUpdateQuery(node);
+        }
+
+        return this.withScope({ model: innerTable.table.identifier.name, alias }, () => {
+            return {
+                ...super.transformUpdateQuery(node),
+                // map table name
+                table: this.wrapAlias(this.processTableRef(innerTable), alias),
+            };
+        });
+    }
+
+    protected override transformDeleteQuery(node: DeleteQueryNode) {
+        // all "from" nodes are pushed as scopes
+        const scopes = this.createScopesFromFroms(node.from, false);
+
+        // process name mapping in each "from"
+        const froms = node.from.froms.map((from) => {
+            const { alias, node: innerNode } = this.stripAlias(from);
+            if (TableNode.is(innerNode!)) {
+                // map table name
+                return this.wrapAlias(this.processTableRef(innerNode), alias);
+            } else {
+                return super.transformNode(from);
+            }
+        });
+
+        return this.withScopes(scopes, () => {
+            return {
+                ...super.transformDeleteQuery(node),
+                from: FromNode.create(froms),
+            };
+        });
+    }
+
+    // #endregion
+
+    // #region utils
+
+    private resolveFieldFromScopes(name: string, qualifier?: string) {
+        for (const scope of this.modelScopes.toReversed()) {
+            if (qualifier) {
+                if (scope.alias) {
+                    if (qualifier !== scope.alias) {
+                        continue;
+                    }
+                } else {
+                    if (qualifier !== scope.model) {
+                        continue;
+                    }
+                }
+            }
+            const modelDef = getModel(this.schema, scope.model);
+            if (!modelDef) {
+                continue;
+            }
+            if (modelDef.fields[name]) {
+                return { modelDef, fieldDef: modelDef.fields[name], scope };
+            }
+        }
+        return { modelDef: undefined, fieldDef: undefined, scope: undefined };
+    }
+
+    private pushScope(scope: Scope) {
+        this.modelScopes.push(scope);
+    }
+
+    private withScope<T>(scope: Scope, fn: (...args: unknown[]) => T): T {
+        this.pushScope(scope);
+        try {
+            return fn();
+        } finally {
+            this.modelScopes.pop();
+        }
+    }
+
+    private withScopes<T>(scopes: Scope[], fn: (...args: unknown[]) => T): T {
+        scopes.forEach((s) => this.pushScope(s));
+        try {
+            return fn();
+        } finally {
+            scopes.forEach(() => this.modelScopes.pop());
+        }
+    }
+
+    private wrapAlias<T extends OperationNode>(node: T, alias: string | undefined) {
+        return alias ? AliasNode.create(node, IdentifierNode.create(alias)) : node;
+    }
+
+    private ensureAlias(node: OperationNode, alias: string | undefined, fallbackName: string) {
+        if (!node) {
+            return node;
+        }
+        return alias
+            ? AliasNode.create(node, IdentifierNode.create(alias))
+            : AliasNode.create(node, IdentifierNode.create(fallbackName));
+    }
+
+    private processTableRef(node: TableNode) {
+        if (!node) {
+            return node;
+        }
+        if (!TableNode.is(node)) {
+            return super.transformNode(node);
+        }
+        return TableNode.create(this.mapTableName(node.table.identifier.name));
     }
 
     private getMappedName(def: ModelDef | FieldDef) {
@@ -240,31 +271,159 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return undefined;
     }
 
-    private mapFieldName(fieldName: string): string {
-        if (!this.currentModel) {
-            return fieldName;
-        }
-        const mappedName = this.fieldToColumnMap.get(`${this.currentModel}.${fieldName}`);
+    private mapFieldName(model: string, field: string): string {
+        const mappedName = this.fieldToColumnMap.get(`${model}.${field}`);
         if (mappedName) {
             return mappedName;
         } else {
-            return fieldName;
+            return field;
         }
     }
 
-    private requireCurrentModel(node: OperationNode) {
-        if (!this.currentModel) {
-            throw new InternalError(`Missing model context for "${node}"`);
+    private mapTableName(tableName: string): string {
+        const mappedName = this.modelToTableMap.get(tableName);
+        if (mappedName) {
+            return mappedName;
+        } else {
+            return tableName;
         }
     }
 
-    private getModelScalarFields(contextNode: OperationNode, model: string | undefined) {
-        this.requireCurrentModel(contextNode);
-        model = model ?? this.currentModel;
-        const modelDef = requireModel(this.schema, model!);
-        const scalarFields = Object.entries(modelDef.fields)
-            .filter(([, fieldDef]) => !fieldDef.relation && !fieldDef.computed && !fieldDef.originModel)
-            .map(([fieldName]) => fieldName);
-        return scalarFields;
+    private stripAlias(node: OperationNode | undefined) {
+        if (!node) {
+            return { alias: undefined, node };
+        }
+        if (AliasNode.is(node)) {
+            invariant(IdentifierNode.is(node.alias), 'Expected identifier as alias');
+            return { alias: node.alias.name, node: node.node };
+        }
+        return { alias: undefined, node };
     }
+
+    private hasMappedColumns(modelName: string) {
+        return [...this.fieldToColumnMap.keys()].some((key) => key.startsWith(modelName + '.'));
+    }
+
+    private createScopesFromFroms(node: FromNode | undefined, namesMapped: boolean) {
+        if (!node) {
+            return [];
+        }
+        return node.froms
+            .map((from) => {
+                const { alias, node: innerNode } = this.stripAlias(from);
+                if (innerNode && TableNode.is(innerNode)) {
+                    return { model: innerNode.table.identifier.name, alias, namesMapped };
+                } else {
+                    return undefined;
+                }
+            })
+            .filter((s) => !!s);
+    }
+
+    // convert a "from" node to a nested query if there are columns with name mapping
+    private processFrom(node: FromNode): FromNode {
+        return {
+            ...super.transformFrom(node),
+            froms: node.froms.map((from) => {
+                const { alias, node: innerNode } = this.stripAlias(from);
+                if (!innerNode) {
+                    return super.transformNode(from);
+                }
+                if (TableNode.is(innerNode)) {
+                    if (this.hasMappedColumns(innerNode.table.identifier.name)) {
+                        // create a nested query with all fields selected and names mapped
+                        const selectAll = this.createSelectAll(innerNode.table.identifier.name);
+
+                        // use the original alias or table name as the alias for the nested query
+                        // so its transparent to the outer scope
+                        return this.ensureAlias(selectAll, alias, innerNode.table.identifier.name);
+                    }
+                }
+                return this.transformNode(from);
+            }),
+        };
+    }
+
+    // create a `SelectQueryNode` for the given model with all columns mapped
+    private createSelectAll(model: string): SelectQueryNode {
+        const modelDef = requireModel(this.schema, model);
+        const tableName = this.mapTableName(model);
+        return {
+            kind: 'SelectQueryNode',
+            from: FromNode.create([TableNode.create(tableName)]),
+            selections: this.getModelFields(modelDef).map((fieldDef) => {
+                const columnName = this.mapFieldName(model, fieldDef.name);
+                const columnRef = ReferenceNode.create(ColumnNode.create(columnName), TableNode.create(tableName));
+                if (columnName !== fieldDef.name) {
+                    const aliased = AliasNode.create(columnRef, IdentifierNode.create(fieldDef.name));
+                    return SelectionNode.create(aliased);
+                } else {
+                    return SelectionNode.create(columnRef);
+                }
+            }),
+        };
+    }
+
+    private getModelFields(modelDef: ModelDef) {
+        return Object.values(modelDef.fields).filter((f) => !f.relation && !f.computed && !f.originModel);
+    }
+
+    private processSelections(selections: readonly SelectionNode[]) {
+        const result: SelectionNode[] = [];
+        selections.forEach((selection) => {
+            if (SelectAllNode.is(selection.selection)) {
+                // expand "select *" to a list of selections if name mapping is needed
+                const processed = this.processSelectAll(selection.selection);
+                if (Array.isArray(processed)) {
+                    // expanded and names mapped
+                    result.push(...processed.map((s) => SelectionNode.create(s)));
+                } else {
+                    // not expanded
+                    result.push(SelectionNode.create(processed));
+                }
+            } else {
+                result.push(SelectionNode.create(this.processSelection(selection.selection)));
+            }
+        });
+        return result;
+    }
+
+    private processSelection(node: AliasNode | ColumnNode | ReferenceNode) {
+        let alias: string | undefined;
+        if (!AliasNode.is(node)) {
+            alias = this.extractFieldName(node);
+        }
+        const result = super.transformNode(node);
+        return this.wrapAlias(result, alias);
+    }
+
+    private processSelectAll(node: SelectAllNode) {
+        const scope = this.modelScopes[this.modelScopes.length - 1];
+        invariant(scope);
+
+        if (!this.hasMappedColumns(scope.model)) {
+            // no name mapping needed, preserve the select all
+            return super.transformSelectAll(node);
+        }
+
+        // expand select all to a list of selections with name mapping
+        const modelDef = requireModel(this.schema, scope.model);
+        return this.getModelFields(modelDef).map((fieldDef) => {
+            const columnName = this.mapFieldName(scope.model, fieldDef.name);
+            const columnRef = ReferenceNode.create(ColumnNode.create(columnName));
+            return columnName !== fieldDef.name ? this.wrapAlias(columnRef, fieldDef.name) : columnRef;
+        });
+    }
+
+    private extractFieldName(node: ReferenceNode | ColumnNode) {
+        if (ReferenceNode.is(node) && ColumnNode.is(node.column)) {
+            return node.column.column.name;
+        } else if (ColumnNode.is(node)) {
+            return node.column.name;
+        } else {
+            return undefined;
+        }
+    }
+
+    // #endregion
 }

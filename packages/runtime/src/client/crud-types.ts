@@ -221,7 +221,12 @@ export type WhereInput<
           ? ArrayFilter<Schema, GetModelFieldType<Schema, Model, Key>>
           : // enum
             GetModelFieldType<Schema, Model, Key> extends GetEnums<Schema>
-            ? EnumFilter<Schema, GetModelFieldType<Schema, Model, Key>, ModelFieldIsOptional<Schema, Model, Key>>
+            ? EnumFilter<
+                  Schema,
+                  GetModelFieldType<Schema, Model, Key>,
+                  ModelFieldIsOptional<Schema, Model, Key>,
+                  WithAggregations
+              >
             : // primitive
               PrimitiveFilter<
                   Schema,
@@ -237,14 +242,25 @@ export type WhereInput<
     NOT?: OrArray<WhereInput<Schema, Model, ScalarOnly>>;
 };
 
-type EnumFilter<Schema extends SchemaDef, T extends GetEnums<Schema>, Nullable extends boolean> =
+type EnumFilter<
+    Schema extends SchemaDef,
+    T extends GetEnums<Schema>,
+    Nullable extends boolean,
+    WithAggregations extends boolean,
+> =
     | NullableIf<keyof GetEnum<Schema, T>, Nullable>
-    | {
+    | ({
           equals?: NullableIf<keyof GetEnum<Schema, T>, Nullable>;
           in?: (keyof GetEnum<Schema, T>)[];
           notIn?: (keyof GetEnum<Schema, T>)[];
-          not?: EnumFilter<Schema, T, Nullable>;
-      };
+          not?: EnumFilter<Schema, T, Nullable, WithAggregations>;
+      } & (WithAggregations extends true
+          ? {
+                _count?: NumberFilter<Schema, 'Int', false, false>;
+                _min?: EnumFilter<Schema, T, false, false>;
+                _max?: EnumFilter<Schema, T, false, false>;
+            }
+          : {}));
 
 type ArrayFilter<Schema extends SchemaDef, T extends string> = {
     equals?: MapScalarType<Schema, T>[] | null;

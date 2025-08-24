@@ -194,11 +194,14 @@ export class QueryNameMapper extends OperationNodeTransformer {
     private resolveFieldFromScopes(name: string, qualifier?: string) {
         for (const scope of this.modelScopes.toReversed()) {
             if (qualifier) {
-                if (scope.alias && qualifier !== scope.alias) {
-                    continue;
-                }
-                if (qualifier !== scope.model) {
-                    continue;
+                if (scope.alias) {
+                    if (qualifier !== scope.alias) {
+                        continue;
+                    }
+                } else {
+                    if (qualifier !== scope.model) {
+                        continue;
+                    }
                 }
             }
             const modelDef = getModel(this.schema, scope.model);

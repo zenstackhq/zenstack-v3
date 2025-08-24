@@ -54,10 +54,16 @@ export class QueryNameMapper extends OperationNodeTransformer {
         if (!node.from?.froms) {
             return super.transformSelectQuery(node);
         }
+
+        // all table names in "from" are pushed as scopes, each "from" is expanded
+        // as nested query to apply column name mapping, so the scopes are marked
+        // "namesMapped" so no additional name mapping is applied when resolving
+        // columns
         const scopes = this.createScopesFromFroms(node.from, true);
         return this.withScopes(scopes, () => {
             return {
                 ...super.transformSelectQuery(node),
+                // convert "from" to nested query as needed
                 from: this.processFrom(node.from!),
             };
         });
@@ -69,10 +75,11 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
 
         return this.withScope(
-            { model: node.into.table.identifier.name, alias: undefined },
+            { model: node.into.table.identifier.name },
             () =>
                 ({
                     ...super.transformInsertQuery(node),
+                    // map table name
                     into: this.processTableRef(node.into!),
                 }) satisfies InsertQueryNode,
         );
@@ -81,6 +88,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
     protected override transformReturning(node: ReturningNode) {
         return {
             kind: node.kind,
+            // map column names in returning selections (include returningAll)
             selections: this.processSelections(node.selections),
         };
     }
@@ -89,8 +97,11 @@ export class QueryNameMapper extends OperationNodeTransformer {
         const { alias, node: innerNode } = this.stripAlias(node.table);
         if (TableNode.is(innerNode!)) {
             const modelName = innerNode.table.identifier.name;
-            const select = this.createSelectAll(modelName);
-            return { ...super.transformJoin(node), table: this.wrapAlias(select, alias ?? modelName) };
+            if (this.hasMappedColumns(modelName)) {
+                // create a nested query with all fields selected and names mapped
+                const select = this.createSelectAll(modelName);
+                return { ...super.transformJoin(node), table: this.wrapAlias(select, alias ?? modelName) };
+            }
         }
         return super.transformJoin(node);
     }
@@ -99,15 +110,30 @@ export class QueryNameMapper extends OperationNodeTransformer {
         if (!ColumnNode.is(node.column)) {
             return super.transformReference(node);
         }
+
+        // resolve the reference to a field from outer scopes
         const { fieldDef, modelDef, scope } = this.resolveFieldFromScopes(
             node.column.column.name,
             node.table?.table.identifier.name,
         );
         if (fieldDef && !scope.namesMapped) {
-            const mappedName = this.mapFieldName(modelDef.name, fieldDef.name);
+            // map column name and table name as needed
+            const mappedFieldName = this.mapFieldName(modelDef.name, fieldDef.name);
+
+            // map table name depending on how it is resolved
+            let mappedTableName = node.table?.table.identifier.name;
+            if (mappedTableName) {
+                if (scope.alias === mappedTableName) {
+                    // table name is resolved to an alias, no mapping needed
+                } else if (scope.model === mappedTableName) {
+                    // table name is resolved to a model, map the name as needed
+                    mappedTableName = this.mapTableName(scope.model);
+                }
+            }
+
             return ReferenceNode.create(
-                ColumnNode.create(mappedName),
-                node.table ? this.processTableRef(node.table) : undefined,
+                ColumnNode.create(mappedFieldName),
+                mappedTableName ? TableNode.create(mappedTableName) : undefined,
             );
         } else {
             return super.transformReference(node);
@@ -132,21 +158,27 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return this.withScope({ model: innerTable.table.identifier.name, alias }, () => {
             return {
                 ...super.transformUpdateQuery(node),
+                // map table name
                 table: this.wrapAlias(this.processTableRef(innerTable), alias),
             };
         });
     }
 
     protected override transformDeleteQuery(node: DeleteQueryNode) {
+        // all "from" nodes are pushed as scopes
         const scopes = this.createScopesFromFroms(node.from, false);
+
+        // process name mapping in each "from"
         const froms = node.from.froms.map((from) => {
             const { alias, node: innerNode } = this.stripAlias(from);
             if (TableNode.is(innerNode!)) {
+                // map table name
                 return this.wrapAlias(this.processTableRef(innerNode), alias);
             } else {
                 return super.transformNode(from);
             }
         });
+
         return this.withScopes(scopes, () => {
             return {
                 ...super.transformDeleteQuery(node),
@@ -285,7 +317,8 @@ export class QueryNameMapper extends OperationNodeTransformer {
             .filter((s) => !!s);
     }
 
-    private processFrom(node: FromNode) {
+    // convert a "from" node to a nested query if there are columns with name mapping
+    private processFrom(node: FromNode): FromNode {
         return {
             ...super.transformFrom(node),
             froms: node.froms.map((from) => {
@@ -295,15 +328,20 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 }
                 if (TableNode.is(innerNode)) {
                     if (this.hasMappedColumns(innerNode.table.identifier.name)) {
+                        // create a nested query with all fields selected and names mapped
                         const selectAll = this.createSelectAll(innerNode.table.identifier.name);
+
+                        // use the original alias or table name as the alias for the nested query
+                        // so its transparent to the outer scope
                         return this.ensureAlias(selectAll, alias, innerNode.table.identifier.name);
                     }
                 }
                 return this.transformNode(from);
             }),
-        } satisfies FromNode;
+        };
     }
 
+    // create a `SelectQueryNode` for the given model with all columns mapped
     private createSelectAll(model: string): SelectQueryNode {
         const modelDef = requireModel(this.schema, model);
         const tableName = this.mapTableName(model);
@@ -331,10 +369,13 @@ export class QueryNameMapper extends OperationNodeTransformer {
         const result: SelectionNode[] = [];
         selections.forEach((selection) => {
             if (SelectAllNode.is(selection.selection)) {
+                // expand "select *" to a list of selections if name mapping is needed
                 const processed = this.processSelectAll(selection.selection);
                 if (Array.isArray(processed)) {
+                    // expanded and names mapped
                     result.push(...processed.map((s) => SelectionNode.create(s)));
                 } else {
+                    // not expanded
                     result.push(SelectionNode.create(processed));
                 }
             } else {
@@ -356,10 +397,13 @@ export class QueryNameMapper extends OperationNodeTransformer {
     private processSelectAll(node: SelectAllNode) {
         const scope = this.modelScopes[this.modelScopes.length - 1];
         invariant(scope);
+
         if (!this.hasMappedColumns(scope.model)) {
+            // no name mapping needed, preserve the select all
             return super.transformSelectAll(node);
         }
 
+        // expand select all to a list of selections with name mapping
         const modelDef = requireModel(this.schema, scope.model);
         return this.getModelFields(modelDef).map((fieldDef) => {
             const columnName = this.mapFieldName(scope.model, fieldDef.name);

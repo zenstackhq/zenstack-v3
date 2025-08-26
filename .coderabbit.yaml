@@ -4,6 +4,7 @@ early_access: false
 reviews:
     auto_review:
         enabled: true
+    base_branches: ['dev', 'main']
     sequence_diagrams: false
 chat:
     auto_reply: true

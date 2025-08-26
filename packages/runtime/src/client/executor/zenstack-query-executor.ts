@@ -139,7 +139,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         try {
             return await this.provideConnection(async (connection) => {
                 if (this.suppressMutationHooks || !this.isMutationNode(query) || !this.hasEntityMutationPlugins) {
-                    // non-mutation query or hooks suppressed, just proceed
+                    // no need to handle mutation hooks, just proceed
                     const finalQuery = this.nameMapper.transformNode(query);
                     compiled = this.compileQuery(finalQuery);
                     if (parameters) {
@@ -174,8 +174,8 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
 
                 const mutationInfo = this.getMutationInfo(finalQuery);
 
-                let beforeMutationEntities: Record<string, unknown>[] | undefined = undefined;
-
+                // cache already loaded before-mutation entities
+                let beforeMutationEntities: Record<string, unknown>[] | undefined;
                 const loadBeforeMutationEntities = async () => {
                     if (
                         beforeMutationEntities === undefined &&

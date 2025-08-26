@@ -88,26 +88,28 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
 
 export type EntityMutationHooksDef<Schema extends SchemaDef> = {
     /**
-     * This callback determines whether a mutation should be intercepted, and if so,
-     * what data should be loaded before and after the mutation.
-     */
-    mutationInterceptionFilter?: MutationInterceptionFilter<Schema>;
-
-    /**
-     * Called before an entity is mutated.
-     * @param args.entity Only available if `loadBeforeMutationEntities` is set to true in the
-     * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
+     * Called before entities are mutated.
      */
     beforeEntityMutation?: BeforeEntityMutationCallback<Schema>;
 
     /**
-     * Called after an entity is mutated.
-     * @param args.beforeMutationEntity Only available if `loadBeforeMutationEntities` is set to true in the
-     * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
-     * @param args.afterMutationEntity Only available if `loadAfterMutationEntities` is set to true in the
-     * return value of {@link RuntimePlugin.mutationInterceptionFilter}.
+     * Called after entities are mutated.
      */
     afterEntityMutation?: AfterEntityMutationCallback<Schema>;
+
+    /**
+     * Whether to run after-mutation hooks within the transaction that performs the mutation.
+     *
+     * If set to `true`, if the mutation already runs inside a transaction, the callbacks are
+     * executed immediately after the mutation within the transaction boundary. If the mutation
+     * is not running inside a transaction, a new transaction is created to run both the mutation
+     * and the callbacks.
+     *
+     * If set to `false`, the callbacks are executed after the mutation transaction is committed.
+     *
+     * Defaults to `false`.
+     */
+    runAfterMutationWithinTransaction?: boolean;
 };
 
 type MutationHooksArgs<Schema extends SchemaDef> = {
@@ -125,44 +127,12 @@ type MutationHooksArgs<Schema extends SchemaDef> = {
      * The mutation data. Only available for create and update actions.
      */
     queryNode: OperationNode;
-};
-
-export type MutationInterceptionFilter<Schema extends SchemaDef> = (
-    args: MutationHooksArgs<Schema>,
-) => MaybePromise<MutationInterceptionFilterResult>;
-
-/**
- * The result of the hooks interception filter.
- */
-export type MutationInterceptionFilterResult = {
-    /**
-     * Whether to intercept the mutation or not.
-     */
-    intercept: boolean;
 
     /**
-     * Whether entities should be loaded before the mutation.
+     * A query ID that uniquely identifies the mutation operation. You can use it to correlate
+     * data between the before and after mutation hooks.
      */
-    loadBeforeMutationEntities?: boolean;
-
-    /**
-     * Whether entities should be loaded after the mutation.
-     */
-    loadAfterMutationEntities?: boolean;
-
-    /**
-     * Whether to run after-mutation hooks within the transaction that performs the mutation.
-     *
-     * If set to `true`, if the mutation already runs inside a transaction, the callbacks are
-     * executed immediately after the mutation within the transaction boundary. If the mutation
-     * is not running inside a transaction, a new transaction is created to run both the mutation
-     * and the callbacks.
-     *
-     * If set to `false`, the callbacks are executed after the mutation transaction is committed.
-     *
-     * Defaults to `false`.
-     */
-    runAfterMutationWithinTransaction?: boolean;
+    queryId: string;
 };
 
 export type BeforeEntityMutationCallback<Schema extends SchemaDef> = (
@@ -175,10 +145,10 @@ export type AfterEntityMutationCallback<Schema extends SchemaDef> = (
 
 export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
     /**
-     * Entities that are about to be mutated. Only available if `loadBeforeMutationEntities` is set to
-     * true in the return value of {@link RuntimePlugin.mutationInterceptionFilter}.
+     * Loads the entities that are about to be mutated. The db operation that loads the entities is executed
+     * within the same transaction context as the mutation.
      */
-    entities?: unknown[];
+    loadBeforeMutationEntities(): Promise<Record<string, unknown>[] | undefined>;
 
     /**
      * The ZenStack client you can use to perform additional operations. The database operations initiated
@@ -192,20 +162,13 @@ export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> = MutationH
 
 export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
     /**
-     * Entities that are about to be mutated. Only available if `loadBeforeMutationEntities` is set to
-     * true in the return value of {@link RuntimePlugin.mutationInterceptionFilter}.
+     * Loads the entities that have been mutated.
      */
-    beforeMutationEntities?: unknown[];
-
-    /**
-     * Entities mutated. Only available if `loadAfterMutationEntities` is set to true in the return
-     * value of {@link RuntimePlugin.mutationInterceptionFilter}.
-     */
-    afterMutationEntities?: unknown[];
+    loadAfterMutationEntities(): Promise<Record<string, unknown>[] | undefined>;
 
     /**
      * The ZenStack client you can use to perform additional operations.
-     * See {@link MutationInterceptionFilterResult.runAfterMutationWithinTransaction} for detailed transaction behavior.
+     * See {@link EntityMutationHooksDef.runAfterMutationWithinTransaction} for detailed transaction behavior.
      *
      * Mutations initiated from this client will NOT trigger entity mutation hooks to avoid infinite loops.
      */

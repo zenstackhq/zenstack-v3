@@ -40,12 +40,9 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                         if (args.action === 'delete') {
                             expect(DeleteQueryNode.is(args.queryNode)).toBe(true);
                         }
-                        expect(args.entities).toBeUndefined();
                     },
                     afterEntityMutation(args) {
                         afterCalled[args.action] = true;
-                        expect(args.beforeMutationEntities).toBeUndefined();
-                        expect(args.afterMutationEntities).toBeUndefined();
                     },
                 },
             });
@@ -68,82 +65,32 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 create: true,
                 update: true,
                 delete: true,
-            });
-        });
-
-        it('can intercept with filtering', async () => {
-            const beforeCalled = { create: false, update: false, delete: false };
-            const afterCalled = { create: false, update: false, delete: false };
-
-            const client = _client.$use({
-                id: 'test',
-                onEntityMutation: {
-                    mutationInterceptionFilter: (args) => {
-                        return {
-                            intercept: args.action !== 'delete',
-                        };
-                    },
-                    beforeEntityMutation(args) {
-                        beforeCalled[args.action] = true;
-                        expect(args.entities).toBeUndefined();
-                    },
-                    afterEntityMutation(args) {
-                        afterCalled[args.action] = true;
-                    },
-                },
-            });
-
-            const user = await client.user.create({
-                data: { email: 'u1@test.com' },
-            });
-            await client.user.update({
-                where: { id: user.id },
-                data: { email: 'u2@test.com' },
-            });
-            await client.user.delete({ where: { id: user.id } });
-
-            expect(beforeCalled).toEqual({
-                create: true,
-                update: true,
-                delete: false,
-            });
-            expect(afterCalled).toEqual({
-                create: true,
-                update: true,
-                delete: false,
             });
         });
 
         it('can intercept with loading before mutation entities', async () => {
+            const queryIds = {
+                update: { before: '', after: '' },
+                delete: { before: '', after: '' },
+            };
+
             const client = _client.$use({
                 id: 'test',
                 onEntityMutation: {
-                    mutationInterceptionFilter: () => {
-                        return {
-                            intercept: true,
-                            loadBeforeMutationEntities: true,
-                        };
-                    },
-                    beforeEntityMutation(args) {
+                    async beforeEntityMutation(args) {
                         if (args.action === 'update' || args.action === 'delete') {
-                            expect(args.entities).toEqual([
+                            await expect(args.loadBeforeMutationEntities()).resolves.toEqual([
                                 expect.objectContaining({
                                     email: args.action === 'update' ? 'u1@test.com' : 'u3@test.com',
                                 }),
                             ]);
-                        } else {
-                            expect(args.entities).toBeUndefined();
+                            queryIds[args.action].before = args.queryId;
                         }
                     },
-                    afterEntityMutation(args) {
+                    async afterEntityMutation(args) {
                         if (args.action === 'update' || args.action === 'delete') {
-                            expect(args.beforeMutationEntities).toEqual([
-                                expect.objectContaining({
-                                    email: args.action === 'update' ? 'u1@test.com' : 'u3@test.com',
-                                }),
-                            ]);
+                            queryIds[args.action].after = args.queryId;
                         }
-                        expect(args.afterMutationEntities).toBeUndefined();
                     },
                 },
             });
@@ -159,6 +106,11 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 data: { email: 'u3@test.com' },
             });
             await client.user.delete({ where: { id: user.id } });
+
+            expect(queryIds.update.before).toBeTruthy();
+            expect(queryIds.delete.before).toBeTruthy();
+            expect(queryIds.update.before).toBe(queryIds.update.after);
+            expect(queryIds.delete.before).toBe(queryIds.delete.after);
         });
 
         it('can intercept with loading after mutation entities', async () => {
@@ -167,13 +119,7 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
             const client = _client.$use({
                 id: 'test',
                 onEntityMutation: {
-                    mutationInterceptionFilter: () => {
-                        return {
-                            intercept: true,
-                            loadAfterMutationEntities: true,
-                        };
-                    },
-                    afterEntityMutation(args) {
+                    async afterEntityMutation(args) {
                         if (args.action === 'create' || args.action === 'update') {
                             if (args.action === 'create') {
                                 userCreateIntercepted = true;
@@ -181,15 +127,13 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                             if (args.action === 'update') {
                                 userUpdateIntercepted = true;
                             }
-                            expect(args.afterMutationEntities).toEqual(
+                            await expect(args.loadAfterMutationEntities()).resolves.toEqual(
                                 expect.arrayContaining([
                                     expect.objectContaining({
                                         email: args.action === 'create' ? 'u1@test.com' : 'u2@test.com',
                                     }),
                                 ]),
                             );
-                        } else {
-                            expect(args.afterMutationEntities).toBeUndefined();
                         }
                     },
                 },
@@ -215,16 +159,10 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
             const client = _client.$use({
                 id: 'test',
                 onEntityMutation: {
-                    mutationInterceptionFilter: () => {
-                        return {
-                            intercept: true,
-                            loadAfterMutationEntities: true,
-                        };
-                    },
-                    afterEntityMutation(args) {
+                    async afterEntityMutation(args) {
                         if (args.action === 'create') {
                             userCreateIntercepted = true;
-                            expect(args.afterMutationEntities).toEqual(
+                            await expect(args.loadAfterMutationEntities()).resolves.toEqual(
                                 expect.arrayContaining([
                                     expect.objectContaining({ email: 'u1@test.com' }),
                                     expect.objectContaining({ email: 'u2@test.com' }),
@@ -232,7 +170,7 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                             );
                         } else if (args.action === 'update') {
                             userUpdateIntercepted = true;
-                            expect(args.afterMutationEntities).toEqual(
+                            await expect(args.loadAfterMutationEntities()).resolves.toEqual(
                                 expect.arrayContaining([
                                     expect.objectContaining({
                                         email: 'u1@test.com',
@@ -246,7 +184,7 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                             );
                         } else if (args.action === 'delete') {
                             userDeleteIntercepted = true;
-                            expect(args.afterMutationEntities).toEqual(
+                            await expect(args.loadAfterMutationEntities()).resolves.toEqual(
                                 expect.arrayContaining([
                                     expect.objectContaining({ email: 'u1@test.com' }),
                                     expect.objectContaining({ email: 'u2@test.com' }),
@@ -275,19 +213,14 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
             const client = _client.$use({
                 id: 'test',
                 onEntityMutation: {
-                    mutationInterceptionFilter: (args) => {
-                        return {
-                            intercept: args.action === 'create' || args.action === 'update',
-                            loadAfterMutationEntities: true,
-                        };
-                    },
-                    afterEntityMutation(args) {
+                    async afterEntityMutation(args) {
                         if (args.action === 'create') {
                             if (args.model === 'Post') {
-                                if ((args.afterMutationEntities![0] as any).title === 'Post1') {
+                                const afterEntities = await args.loadAfterMutationEntities();
+                                if ((afterEntities![0] as any).title === 'Post1') {
                                     post1Intercepted = true;
                                 }
-                                if ((args.afterMutationEntities![0] as any).title === 'Post2') {
+                                if ((afterEntities![0] as any).title === 'Post2') {
                                     post2Intercepted = true;
                                 }
                             }
@@ -320,15 +253,12 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
             const client = _client.$use({
                 id: 'test',
                 onEntityMutation: {
-                    mutationInterceptionFilter: () => {
-                        return {
-                            intercept: true,
-                            loadBeforeMutationEntities: true,
-                            loadAfterMutationEntities: true,
-                        };
-                    },
-                    afterEntityMutation(args) {
-                        triggered.push(args);
+                    async afterEntityMutation(args) {
+                        triggered.push({
+                            action: args.action,
+                            model: args.model,
+                            afterMutationEntities: await args.loadAfterMutationEntities(),
+                        });
                     },
                 },
             });
@@ -348,19 +278,16 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 expect.objectContaining({
                     action: 'create',
                     model: 'User',
-                    beforeMutationEntities: undefined,
                     afterMutationEntities: [expect.objectContaining({ email: 'u1@test.com' })],
                 }),
                 expect.objectContaining({
                     action: 'update',
                     model: 'User',
-                    beforeMutationEntities: [expect.objectContaining({ email: 'u1@test.com' })],
                     afterMutationEntities: [expect.objectContaining({ email: 'u2@test.com' })],
                 }),
                 expect.objectContaining({
                     action: 'delete',
                     model: 'User',
-                    beforeMutationEntities: [expect.objectContaining({ email: 'u2@test.com' })],
                     afterMutationEntities: undefined,
                 }),
             ]);
@@ -403,12 +330,7 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 const client = _client.$use({
                     id: 'test',
                     onEntityMutation: {
-                        mutationInterceptionFilter: () => {
-                            return {
-                                intercept: true,
-                                runAfterMutationWithinTransaction: true,
-                            };
-                        },
+                        runAfterMutationWithinTransaction: true,
                         async beforeEntityMutation(ctx) {
                             await ctx.client.profile.create({
                                 data: { bio: 'Bio1' },
@@ -481,12 +403,7 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 const client = _client.$use({
                     id: 'test',
                     onEntityMutation: {
-                        mutationInterceptionFilter: () => {
-                            return {
-                                intercept: true,
-                                runAfterMutationWithinTransaction: true,
-                            };
-                        },
+                        runAfterMutationWithinTransaction: true,
                         async afterEntityMutation(ctx) {
                             intercepted = true;
                             await ctx.client.user.create({ data: { email: 'u2@test.com' } });
@@ -541,12 +458,7 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 const client = _client.$use({
                     id: 'test',
                     onEntityMutation: {
-                        mutationInterceptionFilter: () => {
-                            return {
-                                intercept: true,
-                                runAfterMutationWithinTransaction: true,
-                            };
-                        },
+                        runAfterMutationWithinTransaction: true,
                         async afterEntityMutation(ctx) {
                             intercepted = true;
                             await ctx.client.user.create({ data: { email: 'u2@test.com' } });
@@ -577,15 +489,13 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 const client = _client.$use({
                     id: 'test',
                     onEntityMutation: {
-                        mutationInterceptionFilter: (ctx) => {
-                            return {
-                                intercept: ctx.action === 'update',
-                                loadBeforeMutationEntities: true,
-                            };
-                        },
-                        async beforeEntityMutation(ctx) {
-                            intercepted = true;
-                            expect(ctx.entities).toEqual([expect.objectContaining({ email: 'u1@test.com' })]);
+                        async beforeEntityMutation(args) {
+                            if (args.action === 'update') {
+                                intercepted = true;
+                                await expect(args.loadBeforeMutationEntities()).resolves.toEqual([
+                                    expect.objectContaining({ email: 'u1@test.com' }),
+                                ]);
+                            }
                         },
                     },
                 });
@@ -689,12 +599,7 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 const client = _client.$use({
                     id: 'test',
                     onEntityMutation: {
-                        mutationInterceptionFilter: () => {
-                            return {
-                                intercept: true,
-                                runAfterMutationWithinTransaction: true,
-                            };
-                        },
+                        runAfterMutationWithinTransaction: true,
                         async afterEntityMutation(ctx) {
                             if (intercepted) {
                                 return;
@@ -760,12 +665,7 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 const client = _client.$use({
                     id: 'test',
                     onEntityMutation: {
-                        mutationInterceptionFilter: () => {
-                            return {
-                                intercept: true,
-                                runAfterMutationWithinTransaction: true,
-                            };
-                        },
+                        runAfterMutationWithinTransaction: true,
                         async afterEntityMutation(ctx) {
                             intercepted = true;
                             await ctx.client.user.create({ data: { email: 'u2@test.com' } });
@@ -787,58 +687,6 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 // both the mutation and hook's side effect are rolled back
                 await expect(client.user.findMany()).toResolveWithLength(0);
             });
-        });
-
-        it('triggers multiple afterEntityMutation hooks for multiple mutations', async () => {
-            const triggered: any[] = [];
-
-            const client = _client.$use({
-                id: 'test',
-                onEntityMutation: {
-                    mutationInterceptionFilter: () => {
-                        return {
-                            intercept: true,
-                            loadBeforeMutationEntities: true,
-                            loadAfterMutationEntities: true,
-                        };
-                    },
-                    afterEntityMutation(args) {
-                        triggered.push(args);
-                    },
-                },
-            });
-
-            await client.$transaction(async (tx) => {
-                await tx.user.create({
-                    data: { email: 'u1@test.com' },
-                });
-                await tx.user.update({
-                    where: { email: 'u1@test.com' },
-                    data: { email: 'u2@test.com' },
-                });
-                await tx.user.delete({ where: { email: 'u2@test.com' } });
-            });
-
-            expect(triggered).toEqual([
-                expect.objectContaining({
-                    action: 'create',
-                    model: 'User',
-                    beforeMutationEntities: undefined,
-                    afterMutationEntities: [expect.objectContaining({ email: 'u1@test.com' })],
-                }),
-                expect.objectContaining({
-                    action: 'update',
-                    model: 'User',
-                    beforeMutationEntities: [expect.objectContaining({ email: 'u1@test.com' })],
-                    afterMutationEntities: [expect.objectContaining({ email: 'u2@test.com' })],
-                }),
-                expect.objectContaining({
-                    action: 'delete',
-                    model: 'User',
-                    beforeMutationEntities: [expect.objectContaining({ email: 'u2@test.com' })],
-                    afterMutationEntities: undefined,
-                }),
-            ]);
         });
     },
 );

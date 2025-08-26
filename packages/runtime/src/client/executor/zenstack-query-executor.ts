@@ -24,7 +24,7 @@ import {
 import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
-import type { ClientContract } from '../contract';
+import { TransactionIsolationLevel, type ClientContract } from '../contract';
 import { InternalError, QueryError } from '../errors';
 import type {
     AfterEntityMutationCallback,
@@ -213,7 +213,9 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                     return { result };
                 } else {
                     // if an on-the-fly tx is created, create one and wrap the query execution inside
-                    await this.driver.beginTransaction(connection, { isolationLevel: 'repeatable read' });
+                    await this.driver.beginTransaction(connection, {
+                        isolationLevel: TransactionIsolationLevel.ReadCommitted,
+                    });
                     try {
                         // execute the query inside the on-the-fly transaction
                         const result = await connection.executeQuery<any>(compiled);
@@ -270,7 +272,9 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     private hasPluginRequestingAfterMutationWithinTransaction(
         mutationInterceptionInfo: MutationInterceptionInfo<Schema>,
     ) {
-        return [...mutationInterceptionInfo.perPlugin.values()].some((info) => info.runAfterMutationWithinTransaction);
+        return [...mutationInterceptionInfo.perPlugin.values()].some(
+            (info) => info.intercept && info.runAfterMutationWithinTransaction,
+        );
     }
 
     private isMutationNode(queryNode: RootOperationNode): queryNode is MutationQueryNode {

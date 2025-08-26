@@ -79,7 +79,12 @@ export class ZenStackDriver implements Driver {
             this.#txConnections.delete(connection);
             if (callbacks) {
                 for (const callback of callbacks) {
-                    await callback();
+                    try {
+                        await callback();
+                    } catch (err) {
+                        // errors in commit callbacks are logged but do not fail the commit
+                        console.error(`Error executing transaction commit callback: ${err}`);
+                    }
                 }
             }
             return result;

@@ -149,6 +149,20 @@ export type MutationInterceptionFilterResult = {
      * Whether entities should be loaded after the mutation.
      */
     loadAfterMutationEntities?: boolean;
+
+    /**
+     * Whether to run after-mutation hooks within the transaction that performs the mutation.
+     *
+     * If set to `true`, if the mutation already runs inside a transaction, the callbacks are
+     * executed immediately after the mutation within the transaction boundary. If the mutation
+     * is not running inside a transaction, a new transaction is created to run both the mutation
+     * and the callbacks.
+     *
+     * If set to `false`, the callbacks are executed after the mutation transaction is committed.
+     *
+     * Defaults to `false`.
+     */
+    runAfterMutationWithinTransaction?: boolean;
 };
 
 export type BeforeEntityMutationCallback<Schema extends SchemaDef> = (
@@ -165,6 +179,15 @@ export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> = MutationH
      * true in the return value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
     entities?: unknown[];
+
+    /**
+     * The ZenStack client you can use to perform additional operations. The database operations initiated
+     * from this client are executed within the same transaction as the mutation if the mutation is running
+     * inside a transaction.
+     *
+     * Mutations initiated from this client will NOT trigger entity mutation hooks to avoid infinite loops.
+     */
+    client: ClientContract<Schema>;
 };
 
 export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
@@ -179,6 +202,14 @@ export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHo
      * value of {@link RuntimePlugin.mutationInterceptionFilter}.
      */
     afterMutationEntities?: unknown[];
+
+    /**
+     * The ZenStack client you can use to perform additional operations.
+     * See {@link MutationInterceptionFilterResult.runAfterMutationWithinTransaction} for detailed transaction behavior.
+     *
+     * Mutations initiated from this client will NOT trigger entity mutation hooks to avoid infinite loops.
+     */
+    client: ClientContract<Schema>;
 };
 
 // #endregion

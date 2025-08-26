@@ -1,7 +1,5 @@
 ## V3 Alpha Todo
 
-- [ ] Infra
-    - [ ] Dependency injection
 - [ ] CLI
     - [x] generate
     - [x] migrate
@@ -11,7 +9,7 @@
     - [ ] format
     - [x] plugin mechanism
     - [x] built-in plugins
-        - [x] ts
+        - [x] typescript
         - [x] prisma
 - [ ] ZModel
     - [x] Import
@@ -34,10 +32,12 @@
         - [x] Pagination
             - [x] Skip and limit
             - [x] Cursor
-        - [x] Filtering
+        - [ ] Filtering
             - [x] Unique fields
             - [x] Scalar fields
             - [x] Relation fields
+            - [ ] JSON filtering
+            - [ ] Full-text search
         - [x] Sort
             - [x] Scalar fields
             - [x] Relation fields
@@ -46,7 +46,6 @@
             - [x] Sorting
             - [x] Pagination
         - [x] Distinct
-        - [ ] JSON filtering
     - [x] Update
         - [x] Input validation
         - [x] Top-level
@@ -66,10 +65,10 @@
     - [x] Transactions
         - [x] Interactive transaction
         - [x] Sequential transaction
-    - [ ] Extensions
+    - [ ] Extensibility
         - [x] Query builder API
         - [x] Computed fields
-        - [x] Prisma client extension
+        - [x] Plugin
         - [ ] Custom procedures
     - [ ] Misc
         - [x] JSDoc for CRUD methods

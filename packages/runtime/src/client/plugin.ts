@@ -145,7 +145,8 @@ export type AfterEntityMutationCallback<Schema extends SchemaDef> = (
 
 export type PluginBeforeEntityMutationArgs<Schema extends SchemaDef> = MutationHooksArgs<Schema> & {
     /**
-     * Loads the entities that are about to be mutated.
+     * Loads the entities that are about to be mutated. The db operation that loads the entities is executed
+     * within the same transaction context as the mutation.
      */
     loadBeforeMutationEntities(): Promise<Record<string, unknown>[] | undefined>;
 

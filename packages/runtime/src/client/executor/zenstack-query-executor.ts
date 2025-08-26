@@ -26,30 +26,20 @@ import type { GetModels, SchemaDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
 import { TransactionIsolationLevel, type ClientContract } from '../contract';
 import { InternalError, QueryError } from '../errors';
-import type {
-    AfterEntityMutationCallback,
-    MutationInterceptionFilterResult,
-    OnKyselyQueryCallback,
-    RuntimePlugin,
-} from '../plugin';
+import type { AfterEntityMutationCallback, OnKyselyQueryCallback } from '../plugin';
 import { stripAlias } from './kysely-utils';
 import { QueryNameMapper } from './name-mapper';
 import type { ZenStackDriver } from './zenstack-driver';
 
 type QueryId = { queryId: string };
 
-type MutationInterceptionInfo<Schema extends SchemaDef> = Pick<
-    MutationInterceptionFilterResult,
-    'loadBeforeMutationEntities' | 'loadAfterMutationEntities'
-> & {
+type MutationQueryNode = InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
+
+type MutationInfo<Schema extends SchemaDef> = {
+    model: GetModels<Schema>;
     action: 'create' | 'update' | 'delete';
     where: WhereNode | undefined;
-    beforeMutationEntities: Record<string, unknown>[] | undefined;
-    mutationModel: GetModels<Schema>;
-    perPlugin: Map<RuntimePlugin<Schema>, MutationInterceptionFilterResult>;
 };
-
-type MutationQueryNode = InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
 
 export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQueryExecutor {
     private readonly nameMapper: QueryNameMapper;
@@ -75,11 +65,11 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         return this.client.$options;
     }
 
-    override async executeQuery(compiledQuery: CompiledQuery, _queryId: QueryId) {
+    override async executeQuery(compiledQuery: CompiledQuery, queryId: QueryId) {
         // proceed with the query with kysely interceptors
         // if the query is a raw query, we need to carry over the parameters
         const queryParams = (compiledQuery as any).$raw ? compiledQuery.parameters : undefined;
-        const result = await this.proceedQueryWithKyselyInterceptors(compiledQuery.query, queryParams);
+        const result = await this.proceedQueryWithKyselyInterceptors(compiledQuery.query, queryParams, queryId.queryId);
 
         return result.result;
     }
@@ -87,8 +77,9 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     private async proceedQueryWithKyselyInterceptors(
         queryNode: RootOperationNode,
         parameters: readonly unknown[] | undefined,
+        queryId: string,
     ) {
-        let proceed = (q: RootOperationNode) => this.proceedQuery(q, parameters);
+        let proceed = (q: RootOperationNode) => this.proceedQuery(q, parameters, queryId);
 
         const hooks: OnKyselyQueryCallback<Schema>[] = [];
         // tsc perf
@@ -122,7 +113,27 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         return result;
     }
 
-    private async proceedQuery(query: RootOperationNode, parameters: readonly unknown[] | undefined) {
+    private getMutationInfo(queryNode: MutationQueryNode): MutationInfo<Schema> {
+        const model = this.getMutationModel(queryNode);
+        const { action, where } = match(queryNode)
+            .when(InsertQueryNode.is, () => ({
+                action: 'create' as const,
+                where: undefined,
+            }))
+            .when(UpdateQueryNode.is, (node) => ({
+                action: 'update' as const,
+                where: node.where,
+            }))
+            .when(DeleteQueryNode.is, (node) => ({
+                action: 'delete' as const,
+                where: node.where,
+            }))
+            .exhaustive();
+
+        return { model, action, where };
+    }
+
+    private async proceedQuery(query: RootOperationNode, parameters: readonly unknown[] | undefined, queryId: string) {
         let compiled: CompiledQuery | undefined;
 
         try {
@@ -138,14 +149,12 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                     return { result };
                 }
 
-                const mutationInterceptionInfo = await this.callMutationInterceptionFilters(query, connection);
-
                 if (
                     (InsertQueryNode.is(query) || UpdateQueryNode.is(query)) &&
-                    mutationInterceptionInfo.loadAfterMutationEntities
+                    this.hasEntityMutationPluginsWithAfterMutationHooks
                 ) {
-                    // need to make sure the query node has "returnAll"
-                    // for insert and update queries
+                    // need to make sure the query node has "returnAll" for insert and update queries
+                    // so that after-mutation hooks can get the mutated entities with all fields
                     query = {
                         ...query,
                         returning: ReturningNode.create([SelectionNode.createSelectAll()]),
@@ -163,39 +172,62 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
 
                 const connectionClient = this.createClientForConnection(connection, currentlyInTx);
 
+                const mutationInfo = this.getMutationInfo(finalQuery);
+
+                let beforeMutationEntities: Record<string, unknown>[] | undefined = undefined;
+
+                const loadBeforeMutationEntities = async () => {
+                    if (
+                        beforeMutationEntities === undefined &&
+                        (UpdateQueryNode.is(query) || DeleteQueryNode.is(query))
+                    ) {
+                        beforeMutationEntities = await this.loadEntities(
+                            mutationInfo.model,
+                            mutationInfo.where,
+                            connection,
+                        );
+                    }
+                    return beforeMutationEntities;
+                };
+
                 // call before mutation hooks
-                await this.callBeforeMutationHooks(finalQuery, mutationInterceptionInfo!, connectionClient);
+                await this.callBeforeMutationHooks(
+                    finalQuery,
+                    mutationInfo,
+                    loadBeforeMutationEntities,
+                    connectionClient,
+                    queryId,
+                );
 
                 // if mutation interceptor demands to run afterMutation hook in the transaction but we're not already
                 // inside one, we need to create one on the fly
                 const shouldCreateTx =
-                    mutationInterceptionInfo &&
-                    this.hasPluginRequestingAfterMutationWithinTransaction(mutationInterceptionInfo) &&
+                    this.hasPluginRequestingAfterMutationWithinTransaction &&
                     !this.driver.isTransactionConnection(connection);
 
                 if (!shouldCreateTx) {
                     // if no on-the-fly tx is needed, just proceed with the query as is
                     const result = await connection.executeQuery<any>(compiled);
 
-                    invariant(mutationInterceptionInfo);
-
                     if (!this.driver.isTransactionConnection(connection)) {
                         // not in a transaction, just call all after-mutation hooks
                         await this.callAfterMutationHooks(
                             result,
                             finalQuery,
-                            mutationInterceptionInfo,
+                            mutationInfo,
                             connectionClient,
                             'all',
+                            queryId,
                         );
                     } else {
                         // run after-mutation hooks that are requested to be run inside tx
                         await this.callAfterMutationHooks(
                             result,
                             finalQuery,
-                            mutationInterceptionInfo,
+                            mutationInfo,
                             connectionClient,
                             'inTx',
+                            queryId,
                         );
 
                         // register other after-mutation hooks to be run after the tx is committed
@@ -203,9 +235,10 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                             this.callAfterMutationHooks(
                                 result,
                                 finalQuery,
-                                mutationInterceptionInfo,
+                                mutationInfo,
                                 connectionClient,
                                 'outTx',
+                                queryId,
                             ),
                         );
                     }
@@ -224,9 +257,10 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                         await this.callAfterMutationHooks(
                             result,
                             finalQuery,
-                            mutationInterceptionInfo,
+                            mutationInfo,
                             connectionClient,
                             'inTx',
+                            queryId,
                         );
 
                         // commit the transaction
@@ -236,9 +270,10 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                         await this.callAfterMutationHooks(
                             result,
                             finalQuery,
-                            mutationInterceptionInfo,
+                            mutationInfo,
                             connectionClient,
                             'outTx',
+                            queryId,
                         );
 
                         return { result };
@@ -269,11 +304,13 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         return (this.client.$options.plugins ?? []).some((plugin) => plugin.onEntityMutation);
     }
 
-    private hasPluginRequestingAfterMutationWithinTransaction(
-        mutationInterceptionInfo: MutationInterceptionInfo<Schema>,
-    ) {
-        return [...mutationInterceptionInfo.perPlugin.values()].some(
-            (info) => info.intercept && info.runAfterMutationWithinTransaction,
+    private get hasEntityMutationPluginsWithAfterMutationHooks() {
+        return (this.client.$options.plugins ?? []).some((plugin) => plugin.onEntityMutation?.afterEntityMutation);
+    }
+
+    private get hasPluginRequestingAfterMutationWithinTransaction() {
+        return (this.client.$options.plugins ?? []).some(
+            (plugin) => plugin.onEntityMutation?.runAfterMutationWithinTransaction,
         );
     }
 
@@ -367,104 +404,28 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
             }) as GetModels<Schema>;
     }
 
-    private async callMutationInterceptionFilters(
-        queryNode: UpdateQueryNode | InsertQueryNode | DeleteQueryNode,
-        connection: DatabaseConnection,
-    ): Promise<MutationInterceptionInfo<Schema>> {
-        const mutationModel = this.getMutationModel(queryNode);
-        const { action, where } = match(queryNode)
-            .when(InsertQueryNode.is, () => ({
-                action: 'create' as const,
-                where: undefined,
-            }))
-            .when(UpdateQueryNode.is, (node) => ({
-                action: 'update' as const,
-                where: node.where,
-            }))
-            .when(DeleteQueryNode.is, (node) => ({
-                action: 'delete' as const,
-                where: node.where,
-            }))
-            .exhaustive();
-
-        const plugins = this.client.$options.plugins;
-        const perPlugin = new Map<RuntimePlugin<Schema>, MutationInterceptionFilterResult>();
-        if (plugins) {
-            const mergedResult: Pick<
-                MutationInterceptionFilterResult,
-                'loadBeforeMutationEntities' | 'loadAfterMutationEntities'
-            > = {};
-
-            for (const plugin of plugins) {
-                const onEntityMutation = plugin.onEntityMutation;
-                if (!onEntityMutation) {
-                    continue;
-                }
-
-                if (!onEntityMutation.mutationInterceptionFilter) {
-                    // by default intercept without loading entities
-                    perPlugin.set(plugin, { intercept: true });
-                } else {
-                    const filterResult = await onEntityMutation.mutationInterceptionFilter({
-                        model: mutationModel,
-                        action,
-                        queryNode,
-                    });
-                    mergedResult.loadBeforeMutationEntities ||= filterResult.loadBeforeMutationEntities;
-                    mergedResult.loadAfterMutationEntities ||= filterResult.loadAfterMutationEntities;
-                    perPlugin.set(plugin, filterResult);
-                }
-            }
-
-            let beforeMutationEntities: Record<string, unknown>[] | undefined;
-            if (
-                mergedResult.loadBeforeMutationEntities &&
-                (UpdateQueryNode.is(queryNode) || DeleteQueryNode.is(queryNode))
-            ) {
-                beforeMutationEntities = await this.loadEntities(mutationModel, where, connection);
-            }
-
-            return {
-                ...mergedResult,
-                mutationModel,
-                action,
-                where,
-                beforeMutationEntities,
-                perPlugin,
-            };
-        } else {
-            return {
-                mutationModel,
-                action,
-                where,
-                beforeMutationEntities: undefined,
-                perPlugin,
-            };
-        }
-    }
-
     private async callBeforeMutationHooks(
         queryNode: OperationNode,
-        mutationInterceptionInfo: MutationInterceptionInfo<Schema>,
+        mutationInfo: MutationInfo<Schema>,
+        loadBeforeMutationEntities: () => Promise<Record<string, unknown>[] | undefined>,
         client: ClientContract<Schema>,
+        queryId: string,
     ) {
         if (this.options.plugins) {
-            const mutationModel = this.getMutationModel(queryNode);
             for (const plugin of this.options.plugins) {
-                const info = mutationInterceptionInfo.perPlugin.get(plugin);
-                if (!info?.intercept) {
+                const onEntityMutation = plugin.onEntityMutation;
+                if (!onEntityMutation?.beforeEntityMutation) {
                     continue;
                 }
-                const onEntityMutation = plugin.onEntityMutation;
-                if (onEntityMutation?.beforeEntityMutation) {
-                    await onEntityMutation.beforeEntityMutation({
-                        model: mutationModel,
-                        action: mutationInterceptionInfo.action,
-                        queryNode,
-                        entities: mutationInterceptionInfo.beforeMutationEntities,
-                        client,
-                    });
-                }
+
+                await onEntityMutation.beforeEntityMutation({
+                    model: mutationInfo.model,
+                    action: mutationInfo.action,
+                    queryNode,
+                    loadBeforeMutationEntities,
+                    client,
+                    queryId,
+                });
             }
         }
     }
@@ -472,31 +433,29 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     private async callAfterMutationHooks(
         queryResult: QueryResult<unknown>,
         queryNode: OperationNode,
-        mutationInterceptionInfo: MutationInterceptionInfo<Schema>,
+        mutationInfo: MutationInfo<Schema>,
         client: ClientContract<Schema>,
         filterFor: 'inTx' | 'outTx' | 'all',
+        queryId: string,
     ) {
         const hooks: AfterEntityMutationCallback<Schema>[] = [];
 
         // tsc perf
         for (const plugin of this.options.plugins ?? []) {
-            const info = mutationInterceptionInfo.perPlugin.get(plugin);
-            if (!info?.intercept) {
-                continue;
-            }
-
-            if (filterFor === 'inTx' && !info.runAfterMutationWithinTransaction) {
-                continue;
-            }
-
-            if (filterFor === 'outTx' && info.runAfterMutationWithinTransaction) {
-                continue;
-            }
-
             const onEntityMutation = plugin.onEntityMutation;
-            if (onEntityMutation?.afterEntityMutation) {
-                hooks.push(onEntityMutation.afterEntityMutation.bind(plugin));
+
+            if (!onEntityMutation?.afterEntityMutation) {
+                continue;
             }
+            if (filterFor === 'inTx' && !onEntityMutation.runAfterMutationWithinTransaction) {
+                continue;
+            }
+
+            if (filterFor === 'outTx' && onEntityMutation.runAfterMutationWithinTransaction) {
+                continue;
+            }
+
+            hooks.push(onEntityMutation.afterEntityMutation.bind(plugin));
         }
 
         if (hooks.length === 0) {
@@ -505,21 +464,22 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
 
         const mutationModel = this.getMutationModel(queryNode);
 
-        for (const hook of hooks) {
-            let afterMutationEntities: Record<string, unknown>[] | undefined = undefined;
-            if (mutationInterceptionInfo.loadAfterMutationEntities) {
-                if (InsertQueryNode.is(queryNode) || UpdateQueryNode.is(queryNode)) {
-                    afterMutationEntities = queryResult.rows as Record<string, unknown>[];
-                }
+        const loadAfterMutationEntities = async () => {
+            if (mutationInfo.action === 'delete') {
+                return undefined;
+            } else {
+                return queryResult.rows as Record<string, unknown>[];
             }
+        };
 
+        for (const hook of hooks) {
             await hook({
                 model: mutationModel,
-                action: mutationInterceptionInfo.action,
+                action: mutationInfo.action,
                 queryNode,
-                beforeMutationEntities: mutationInterceptionInfo.beforeMutationEntities,
-                afterMutationEntities,
+                loadAfterMutationEntities,
                 client,
+                queryId,
             });
         }
     }

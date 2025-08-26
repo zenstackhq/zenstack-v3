@@ -7,6 +7,7 @@ import {
     Kysely,
     Log,
     sql,
+    Transaction,
     type KyselyProps,
 } from 'kysely';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
@@ -152,6 +153,12 @@ export class ClientImpl<Schema extends SchemaDef> {
             return this.interactiveTransaction(input, options);
         } else {
             return this.sequentialTransaction(input, options);
+        }
+    }
+
+    forceTransaction() {
+        if (!this.kysely.isTransaction) {
+            this.kysely = new Transaction(this.kyselyProps);
         }
     }
 

@@ -22,7 +22,7 @@ import { clone } from '../../../utils/clone';
 import { enumerate } from '../../../utils/enumerate';
 import { extractFields, fieldsToSelectObject } from '../../../utils/object-utils';
 import { NUMERIC_FIELD_TYPES } from '../../constants';
-import type { CRUD } from '../../contract';
+import { TransactionIsolationLevel, type CRUD } from '../../contract';
 import type { FindArgs, SelectIncludeOmit, WhereInput } from '../../crud-types';
 import { InternalError, NotFoundError, QueryError } from '../../errors';
 import type { ToKysely } from '../../query-builder';
@@ -2089,7 +2089,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         } else {
             // otherwise, create a new transaction and execute the callback
             let txBuilder = this.kysely.transaction();
-            txBuilder = txBuilder.setIsolationLevel(isolationLevel ?? 'repeatable read');
+            txBuilder = txBuilder.setIsolationLevel(isolationLevel ?? TransactionIsolationLevel.RepeatableRead);
             return txBuilder.execute(callback);
         }
     }

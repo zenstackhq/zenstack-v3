@@ -19,6 +19,7 @@ import {
 } from 'kysely';
 import type { FieldDef, ModelDef, SchemaDef } from '../../schema';
 import { getModel, requireModel } from '../query-utils';
+import { stripAlias } from './kysely-utils';
 
 type Scope = {
     model: string;
@@ -94,7 +95,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
     }
 
     protected override transformJoin(node: JoinNode) {
-        const { alias, node: innerNode } = this.stripAlias(node.table);
+        const { alias, node: innerNode } = stripAlias(node.table);
         if (TableNode.is(innerNode!)) {
             const modelName = innerNode.table.identifier.name;
             if (this.hasMappedColumns(modelName)) {
@@ -150,7 +151,11 @@ export class QueryNameMapper extends OperationNodeTransformer {
     }
 
     protected override transformUpdateQuery(node: UpdateQueryNode) {
-        const { alias, node: innerTable } = this.stripAlias(node.table);
+        if (!node.table) {
+            return super.transformUpdateQuery(node);
+        }
+
+        const { alias, node: innerTable } = stripAlias(node.table);
         if (!innerTable || !TableNode.is(innerTable)) {
             return super.transformUpdateQuery(node);
         }
@@ -170,7 +175,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
 
         // process name mapping in each "from"
         const froms = node.from.froms.map((from) => {
-            const { alias, node: innerNode } = this.stripAlias(from);
+            const { alias, node: innerNode } = stripAlias(from);
             if (TableNode.is(innerNode!)) {
                 // map table name
                 return this.wrapAlias(this.processTableRef(innerNode), alias);
@@ -289,17 +294,6 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    private stripAlias(node: OperationNode | undefined) {
-        if (!node) {
-            return { alias: undefined, node };
-        }
-        if (AliasNode.is(node)) {
-            invariant(IdentifierNode.is(node.alias), 'Expected identifier as alias');
-            return { alias: node.alias.name, node: node.node };
-        }
-        return { alias: undefined, node };
-    }
-
     private hasMappedColumns(modelName: string) {
         return [...this.fieldToColumnMap.keys()].some((key) => key.startsWith(modelName + '.'));
     }
@@ -310,7 +304,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
         return node.froms
             .map((from) => {
-                const { alias, node: innerNode } = this.stripAlias(from);
+                const { alias, node: innerNode } = stripAlias(from);
                 if (innerNode && TableNode.is(innerNode)) {
                     return { model: innerNode.table.identifier.name, alias, namesMapped };
                 } else {
@@ -325,7 +319,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return {
             ...super.transformFrom(node),
             froms: node.froms.map((from) => {
-                const { alias, node: innerNode } = this.stripAlias(from);
+                const { alias, node: innerNode } = stripAlias(from);
                 if (!innerNode) {
                     return super.transformNode(from);
                 }

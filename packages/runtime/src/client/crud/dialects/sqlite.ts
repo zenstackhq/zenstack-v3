@@ -107,7 +107,6 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             type ArgsType = Expression<any> | RawBuilder<any> | SelectQueryBuilder<any, any, any>;
             const objArgs: ArgsType[] = [];
 
-            // TODO: descendant JSON shouldn't be joined and selected if none of its fields are selected
             const descendantModels = getDelegateDescendantModels(this.schema, relationModel);
             if (descendantModels.length > 0) {
                 // select all JSONs built from delegate descendants

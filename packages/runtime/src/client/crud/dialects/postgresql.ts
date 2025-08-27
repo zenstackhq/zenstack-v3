@@ -221,7 +221,6 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             string | ExpressionWrapper<any, any, any> | SelectQueryBuilder<any, any, any> | RawBuilder<any>
         > = [];
 
-        // TODO: descendant JSON shouldn't be joined and selected if none of its fields are selected
         const descendantModels = getDelegateDescendantModels(this.schema, relationModel);
         if (descendantModels.length > 0) {
             // select all JSONs built from delegate descendants

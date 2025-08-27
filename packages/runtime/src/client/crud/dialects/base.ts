@@ -1150,7 +1150,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         if (modelDef.baseModel || modelDef.isDelegate) {
-            // delete models require upward/downward joins
+            // delegate models require upward/downward joins
             return false;
         }
 

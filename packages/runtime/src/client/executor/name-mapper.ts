@@ -351,8 +351,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
             // inner transformations will map column names
             const modelName = innerNode.table.identifier.name;
             const mappedName = this.mapTableName(modelName);
+            const finalAlias = alias ?? (mappedName !== modelName ? modelName : undefined);
             return {
-                node: this.wrapAlias(TableNode.create(mappedName), alias ?? modelName),
+                node: this.wrapAlias(TableNode.create(mappedName), finalAlias),
                 scope: {
                     alias: alias ?? modelName,
                     model: modelName,

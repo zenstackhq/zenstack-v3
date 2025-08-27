@@ -213,9 +213,9 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             if (relationFieldDef.array) {
                 return eb.fn
                     .coalesce(sql`json_group_array(json_object(${sql.join(objArgs)}))`, sql`json_array()`)
-                    .as('$j');
+                    .as('$t');
             } else {
-                return sql`json_object(${sql.join(objArgs)})`.as('data');
+                return sql`json_object(${sql.join(objArgs)})`.as('$t');
             }
         });
 

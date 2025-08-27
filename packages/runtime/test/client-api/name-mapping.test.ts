@@ -235,5 +235,201 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 posts: [],
             });
         });
+
+        it('works with count', async () => {
+            await db.user.create({
+                data: {
+                    email: 'u1@test.com',
+                    posts: {
+                        create: [{ title: 'Post1' }, { title: 'Post2' }],
+                    },
+                },
+            });
+
+            await db.user.create({
+                data: {
+                    email: 'u2@test.com',
+                    posts: {
+                        create: [{ title: 'Post3' }],
+                    },
+                },
+            });
+
+            // Test ORM count operations
+            await expect(db.user.count()).resolves.toBe(2);
+            await expect(db.post.count()).resolves.toBe(3);
+            await expect(db.user.count({ select: { email: true } })).resolves.toMatchObject({
+                email: 2,
+            });
+
+            await expect(db.user.count({ where: { email: 'u1@test.com' } })).resolves.toBe(1);
+            await expect(db.post.count({ where: { title: { contains: 'Post1' } } })).resolves.toBe(1);
+
+            await expect(db.post.count({ where: { author: { email: 'u1@test.com' } } })).resolves.toBe(2);
+
+            // Test Kysely count operations
+            const r = await db.$qb
+                .selectFrom('User')
+                .select((eb) => eb.fn.count('email').as('count'))
+                .executeTakeFirst();
+            await expect(Number(r?.count)).toBe(2);
+        });
+
+        it('works with aggregate', async () => {
+            await db.user.create({
+                data: {
+                    id: 1,
+                    email: 'u1@test.com',
+                    posts: {
+                        create: [
+                            { id: 1, title: 'Post1' },
+                            { id: 2, title: 'Post2' },
+                        ],
+                    },
+                },
+            });
+
+            await db.user.create({
+                data: {
+                    id: 2,
+                    email: 'u2@test.com',
+                    posts: {
+                        create: [{ id: 3, title: 'Post3' }],
+                    },
+                },
+            });
+
+            // Test ORM aggregate operations
+            await expect(db.user.aggregate({ _count: { id: true, email: true } })).resolves.toMatchObject({
+                _count: { id: 2, email: 2 },
+            });
+
+            await expect(
+                db.post.aggregate({ _count: { authorId: true }, _min: { authorId: true }, _max: { authorId: true } }),
+            ).resolves.toMatchObject({
+                _count: { authorId: 3 },
+                _min: { authorId: 1 },
+                _max: { authorId: 2 },
+            });
+
+            await expect(
+                db.post.aggregate({
+                    where: { author: { email: 'u1@test.com' } },
+                    _count: { authorId: true },
+                    _min: { authorId: true },
+                    _max: { authorId: true },
+                }),
+            ).resolves.toMatchObject({
+                _count: { authorId: 2 },
+                _min: { authorId: 1 },
+                _max: { authorId: 1 },
+            });
+
+            // Test Kysely aggregate operations
+            const countResult = await db.$qb
+                .selectFrom('User')
+                .select((eb) => eb.fn.count('email').as('emailCount'))
+                .executeTakeFirst();
+            expect(Number(countResult?.emailCount)).toBe(2);
+
+            const postAggResult = await db.$qb
+                .selectFrom('Post')
+                .select((eb) => [eb.fn.min('authorId').as('minAuthorId'), eb.fn.max('authorId').as('maxAuthorId')])
+                .executeTakeFirst();
+            expect(Number(postAggResult?.minAuthorId)).toBe(1);
+            expect(Number(postAggResult?.maxAuthorId)).toBe(2);
+        });
+
+        it('works with groupBy', async () => {
+            // Create test data with multiple posts per user
+            await db.user.create({
+                data: {
+                    id: 1,
+                    email: 'u1@test.com',
+                    posts: {
+                        create: [
+                            { id: 1, title: 'Post1' },
+                            { id: 2, title: 'Post2' },
+                            { id: 3, title: 'Post3' },
+                        ],
+                    },
+                },
+            });
+
+            await db.user.create({
+                data: {
+                    id: 2,
+                    email: 'u2@test.com',
+                    posts: {
+                        create: [
+                            { id: 4, title: 'Post4' },
+                            { id: 5, title: 'Post5' },
+                        ],
+                    },
+                },
+            });
+
+            await db.user.create({
+                data: {
+                    id: 3,
+                    email: 'u3@test.com',
+                    posts: {
+                        create: [{ id: 6, title: 'Post6' }],
+                    },
+                },
+            });
+
+            // Test ORM groupBy operations
+            const userGroupBy = await db.user.groupBy({
+                by: ['email'],
+                _count: { id: true },
+            });
+            expect(userGroupBy).toHaveLength(3);
+            expect(userGroupBy).toEqual(
+                expect.arrayContaining([
+                    { email: 'u1@test.com', _count: { id: 1 } },
+                    { email: 'u2@test.com', _count: { id: 1 } },
+                    { email: 'u3@test.com', _count: { id: 1 } },
+                ]),
+            );
+
+            const postGroupBy = await db.post.groupBy({
+                by: ['authorId'],
+                _count: { id: true },
+                _min: { id: true },
+                _max: { id: true },
+            });
+            expect(postGroupBy).toHaveLength(3);
+            expect(postGroupBy).toEqual(
+                expect.arrayContaining([
+                    { authorId: 1, _count: { id: 3 }, _min: { id: 1 }, _max: { id: 3 } },
+                    { authorId: 2, _count: { id: 2 }, _min: { id: 4 }, _max: { id: 5 } },
+                    { authorId: 3, _count: { id: 1 }, _min: { id: 6 }, _max: { id: 6 } },
+                ]),
+            );
+
+            const filteredGroupBy = await db.post.groupBy({
+                by: ['authorId'],
+                where: { title: { contains: 'Post' } },
+                _count: { title: true },
+                having: { title: { _count: { gte: 2 } } },
+            });
+            expect(filteredGroupBy).toHaveLength(2);
+            expect(filteredGroupBy).toEqual(
+                expect.arrayContaining([
+                    { authorId: 1, _count: { title: 3 } },
+                    { authorId: 2, _count: { title: 2 } },
+                ]),
+            );
+
+            // Test Kysely groupBy operations
+            const kyselyUserGroupBy = await db.$qb
+                .selectFrom('User')
+                .select(['email', (eb) => eb.fn.count('email').as('count')])
+                .groupBy('email')
+                .having((eb) => eb.fn.count('email'), '>=', 1)
+                .execute();
+            expect(kyselyUserGroupBy).toHaveLength(3);
+        });
     },
 );

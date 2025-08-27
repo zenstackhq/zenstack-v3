@@ -2,7 +2,7 @@ import { invariant, isPlainObject } from '@zenstackhq/common-helpers';
 import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { expressionBuilder, sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';
-import type { BuiltinType, DataSourceProviderType, FieldDef, GetModels, SchemaDef } from '../../../schema';
+import type { BuiltinType, DataSourceProviderType, FieldDef, GetModels, ModelDef, SchemaDef } from '../../../schema';
 import { enumerate } from '../../../utils/enumerate';
 import type { OrArray } from '../../../utils/type-utils';
 import { AGGREGATE_OPERATORS, DELEGATE_JOINED_FIELD_PREFIX, LOGICAL_COMBINATORS } from '../../constants';
@@ -963,6 +963,31 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
+    protected buildModelSelect(
+        eb: ExpressionBuilder<any, any>,
+        model: GetModels<Schema>,
+        subQueryAlias: string,
+        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
+        selectAllFields: boolean,
+    ) {
+        let subQuery = this.buildSelectModel(eb, model, subQueryAlias);
+
+        if (selectAllFields) {
+            subQuery = this.buildSelectAllFields(
+                model,
+                subQuery,
+                typeof payload === 'object' ? payload?.omit : undefined,
+                subQueryAlias,
+            );
+        }
+
+        if (payload && typeof payload === 'object') {
+            subQuery = this.buildFilterSortTake(model, payload, subQuery, subQueryAlias);
+        }
+
+        return subQuery;
+    }
+
     buildSelectField(
         query: SelectQueryBuilder<any, any, any>,
         model: string,
@@ -1113,6 +1138,35 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         inlineComputedField = true,
     ) {
         return buildFieldRef(this.schema, model, field, this.options, eb, modelAlias, inlineComputedField);
+    }
+
+    protected canJoinWithoutNestedSelect(
+        modelDef: ModelDef,
+        payload: boolean | FindArgs<Schema, GetModels<Schema>, true>,
+    ) {
+        if (modelDef.computedFields) {
+            // computed fields requires explicit select
+            return false;
+        }
+
+        if (modelDef.baseModel || modelDef.isDelegate) {
+            // delegate models require upward/downward joins
+            return false;
+        }
+
+        if (
+            typeof payload === 'object' &&
+            (payload.orderBy ||
+                payload.skip !== undefined ||
+                payload.take !== undefined ||
+                payload.cursor ||
+                (payload as any).distinct)
+        ) {
+            // ordering/pagination/distinct needs to be handled before joining
+            return false;
+        }
+
+        return true;
     }
 
     // #endregion

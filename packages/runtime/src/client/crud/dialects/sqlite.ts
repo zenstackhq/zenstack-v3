@@ -74,64 +74,39 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         const relationModelDef = requireModel(this.schema, relationModel);
 
         const subQueryName = `${parentAlias}$${relationField}`;
+        let tbl: SelectQueryBuilder<any, any, any>;
 
-        let tbl = eb.selectFrom(() => {
-            // give sub query an alias to avoid conflict with parent scope
-            // (e.g., for cases like self-relation)
-            const subQueryAlias = `${parentAlias}$${relationField}$sub`;
-            let subQuery = this.buildSelectModel(eb, relationModel, subQueryAlias);
+        if (this.canJoinWithoutNestedSelect(relationModelDef, payload)) {
+            // join without needing a nested select on relation model
+            tbl = this.buildModelSelect(eb, relationModel, subQueryName, payload, false);
 
-            subQuery = this.buildSelectAllFields(
-                relationModel,
-                subQuery,
-                typeof payload === 'object' ? payload?.omit : undefined,
-                subQueryAlias,
-            );
+            // add parent join filter
+            tbl = this.buildRelationJoinFilter(tbl, model, relationField, subQueryName, parentAlias);
+        } else {
+            // need to make a nested select on relation model
+            tbl = eb.selectFrom(() => {
+                // nested query name
+                const selectModelAlias = `${parentAlias}$${relationField}$sub`;
 
-            if (payload && typeof payload === 'object') {
-                // take care of where, orderBy, skip, take, cursor, and distinct
-                subQuery = this.buildFilterSortTake(relationModel, payload, subQuery, subQueryAlias);
-            }
+                // select all fields
+                let selectModelQuery = this.buildModelSelect(eb, relationModel, selectModelAlias, payload, true);
 
-            // join conditions
-
-            const m2m = getManyToManyRelation(this.schema, model, relationField);
-            if (m2m) {
-                // many-to-many relation
-                const parentIds = getIdFields(this.schema, model);
-                const relationIds = getIdFields(this.schema, relationModel);
-                invariant(parentIds.length === 1, 'many-to-many relation must have exactly one id field');
-                invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
-                subQuery = subQuery.where(
-                    eb(
-                        eb.ref(`${subQueryAlias}.${relationIds[0]}`),
-                        'in',
-                        eb
-                            .selectFrom(m2m.joinTable)
-                            .select(`${m2m.joinTable}.${m2m.otherFkName}`)
-                            .whereRef(`${parentAlias}.${parentIds[0]}`, '=', `${m2m.joinTable}.${m2m.parentFkName}`),
-                    ),
+                // add parent join filter
+                selectModelQuery = this.buildRelationJoinFilter(
+                    selectModelQuery,
+                    model,
+                    relationField,
+                    selectModelAlias,
+                    parentAlias,
                 );
-            } else {
-                const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(this.schema, model, relationField);
-                keyPairs.forEach(({ fk, pk }) => {
-                    if (ownedByModel) {
-                        // the parent model owns the fk
-                        subQuery = subQuery.whereRef(`${subQueryAlias}.${pk}`, '=', `${parentAlias}.${fk}`);
-                    } else {
-                        // the relation side owns the fk
-                        subQuery = subQuery.whereRef(`${subQueryAlias}.${fk}`, '=', `${parentAlias}.${pk}`);
-                    }
-                });
-            }
-            return subQuery.as(subQueryName);
-        });
+                return selectModelQuery.as(subQueryName);
+            });
+        }
 
         tbl = tbl.select(() => {
             type ArgsType = Expression<any> | RawBuilder<any> | SelectQueryBuilder<any, any, any>;
             const objArgs: ArgsType[] = [];
 
-            // TODO: descendant JSON shouldn't be joined and selected if none of its fields are selected
             const descendantModels = getDelegateDescendantModels(this.schema, relationModel);
             if (descendantModels.length > 0) {
                 // select all JSONs built from delegate descendants
@@ -151,7 +126,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                     ...Object.entries(relationModelDef.fields)
                         .filter(([, value]) => !value.relation)
                         .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
-                        .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, eb, undefined, false)])
+                        .map(([field]) => [
+                            sql.lit(field),
+                            this.fieldRef(relationModel, field, eb, subQueryName, false),
+                        ])
                         .flatMap((v) => v),
                 );
             } else if (payload.select) {
@@ -182,7 +160,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                                 } else {
                                     return [
                                         sql.lit(field),
-                                        this.fieldRef(relationModel, field, eb, undefined, false) as ArgsType,
+                                        this.fieldRef(relationModel, field, eb, subQueryName, false) as ArgsType,
                                     ];
                                 }
                             }
@@ -213,13 +191,63 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             if (relationFieldDef.array) {
                 return eb.fn
                     .coalesce(sql`json_group_array(json_object(${sql.join(objArgs)}))`, sql`json_array()`)
-                    .as('$t');
+                    .as('$data');
             } else {
-                return sql`json_object(${sql.join(objArgs)})`.as('$t');
+                return sql`json_object(${sql.join(objArgs)})`.as('$data');
             }
         });
 
         return tbl;
+    }
+
+    private buildRelationJoinFilter(
+        selectModelQuery: SelectQueryBuilder<any, any, {}>,
+        model: string,
+        relationField: string,
+        relationModelAlias: string,
+        parentAlias: string,
+    ) {
+        const fieldDef = requireField(this.schema, model, relationField);
+        const relationModel = fieldDef.type as GetModels<Schema>;
+
+        const m2m = getManyToManyRelation(this.schema, model, relationField);
+        if (m2m) {
+            // many-to-many relation
+            const parentIds = getIdFields(this.schema, model);
+            const relationIds = getIdFields(this.schema, relationModel);
+            invariant(parentIds.length === 1, 'many-to-many relation must have exactly one id field');
+            invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
+            selectModelQuery = selectModelQuery.where((eb) =>
+                eb(
+                    eb.ref(`${relationModelAlias}.${relationIds[0]}`),
+                    'in',
+                    eb
+                        .selectFrom(m2m.joinTable)
+                        .select(`${m2m.joinTable}.${m2m.otherFkName}`)
+                        .whereRef(`${parentAlias}.${parentIds[0]}`, '=', `${m2m.joinTable}.${m2m.parentFkName}`),
+                ),
+            );
+        } else {
+            const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(this.schema, model, relationField);
+            keyPairs.forEach(({ fk, pk }) => {
+                if (ownedByModel) {
+                    // the parent model owns the fk
+                    selectModelQuery = selectModelQuery.whereRef(
+                        `${relationModelAlias}.${pk}`,
+                        '=',
+                        `${parentAlias}.${fk}`,
+                    );
+                } else {
+                    // the relation side owns the fk
+                    selectModelQuery = selectModelQuery.whereRef(
+                        `${relationModelAlias}.${fk}`,
+                        '=',
+                        `${parentAlias}.${pk}`,
+                    );
+                }
+            });
+        }
+        return selectModelQuery;
     }
 
     override buildSkipTake(

@@ -266,7 +266,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                                 ? // reference the synthesized JSON field
                                   eb.ref(`${parentResultName}$${field}.$data`)
                                 : // reference a plain field
-                                  this.fieldRef(relationModel, field, eb, undefined, false);
+                                  this.fieldRef(relationModel, field, eb, relationModelAlias, false);
                             return [sql.lit(field), fieldValue];
                         }
                     })

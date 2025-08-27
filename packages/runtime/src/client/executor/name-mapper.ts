@@ -235,7 +235,8 @@ export class QueryNameMapper extends OperationNodeTransformer {
     }
 
     private resolveFieldFromScopes(name: string, qualifier?: string) {
-        for (const scope of this.scopes.toReversed()) {
+        for (let i = this.scopes.length - 1; i >= 0; i--) {
+            const scope = this.scopes[i]!;
             if (qualifier) {
                 // if the field as a qualifier, the qualifier must match the scope's
                 // alias if any, or model if no alias

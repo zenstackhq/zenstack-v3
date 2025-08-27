@@ -73,7 +73,9 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
     }
 
     private createModelTable(kysely: ToKysely<Schema>, modelDef: ModelDef) {
-        let table: CreateTableBuilder<string, any> = kysely.schema.createTable(modelDef.name).ifNotExists();
+        let table: CreateTableBuilder<string, any> = kysely.schema
+            .createTable(this.getTableName(modelDef))
+            .ifNotExists();
 
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
             if (fieldDef.originModel && !fieldDef.id) {
@@ -106,6 +108,28 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         return table;
     }
 
+    private getTableName(modelDef: ModelDef) {
+        const mapAttr = modelDef.attributes?.find((a) => a.name === '@@map');
+        if (mapAttr && mapAttr.args?.[0]) {
+            const mappedName = ExpressionUtils.getLiteralValue(mapAttr.args[0].value);
+            if (mappedName) {
+                return mappedName as string;
+            }
+        }
+        return modelDef.name;
+    }
+
+    private getColumnName(fieldDef: FieldDef) {
+        const mapAttr = fieldDef.attributes?.find((a) => a.name === '@map');
+        if (mapAttr && mapAttr.args?.[0]) {
+            const mappedName = ExpressionUtils.getLiteralValue(mapAttr.args[0].value);
+            if (mappedName) {
+                return mappedName as string;
+            }
+        }
+        return fieldDef.name;
+    }
+
     private isComputedField(fieldDef: FieldDef) {
         return fieldDef.attributes?.some((a) => a.name === '@computed');
     }
@@ -119,7 +143,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         }
 
         if (modelDef.idFields.length > 0) {
-            table = table.addPrimaryKeyConstraint(`pk_${modelDef.name}`, modelDef.idFields);
+            table = table.addPrimaryKeyConstraint(
+                `pk_${modelDef.name}`,
+                modelDef.idFields.map((f) => this.getColumnName(modelDef.fields[f]!)),
+            );
         }
 
         return table;
@@ -134,17 +161,20 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 if (fieldDef.unique) {
                     continue;
                 }
-                table = table.addUniqueConstraint(`unique_${modelDef.name}_${key}`, [key]);
+                table = table.addUniqueConstraint(`unique_${modelDef.name}_${key}`, [this.getColumnName(fieldDef)]);
             } else {
                 // multi-field constraint
-                table = table.addUniqueConstraint(`unique_${modelDef.name}_${key}`, Object.keys(value));
+                table = table.addUniqueConstraint(
+                    `unique_${modelDef.name}_${key}`,
+                    Object.keys(value).map((f) => this.getColumnName(modelDef.fields[f]!)),
+                );
             }
         }
         return table;
     }
 
     private createModelField(table: CreateTableBuilder<any>, fieldDef: FieldDef, modelDef: ModelDef) {
-        return table.addColumn(fieldDef.name, this.mapFieldType(fieldDef), (col) => {
+        return table.addColumn(this.getColumnName(fieldDef), this.mapFieldType(fieldDef), (col) => {
             // @id
             if (fieldDef.id && modelDef.idFields.length === 1) {
                 col = col.primaryKey();
@@ -240,11 +270,14 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             return table;
         }
 
+        const modelDef = requireModel(this.schema, model);
+        const relationModelDef = requireModel(this.schema, fieldDef.type);
+
         table = table.addForeignKeyConstraint(
             `fk_${model}_${fieldName}`,
-            fieldDef.relation.fields,
-            fieldDef.type,
-            fieldDef.relation.references,
+            fieldDef.relation.fields.map((f) => this.getColumnName(modelDef.fields[f]!)),
+            this.getTableName(relationModelDef),
+            fieldDef.relation.references.map((f) => this.getColumnName(relationModelDef.fields[f]!)),
             (cb) => {
                 if (fieldDef.relation?.onDelete) {
                     cb = cb.onDelete(this.mapCascadeAction(fieldDef.relation.onDelete));

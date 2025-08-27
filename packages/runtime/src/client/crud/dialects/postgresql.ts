@@ -60,7 +60,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
     ): SelectQueryBuilder<any, any, any> {
         const joinedQuery = this.buildRelationJSON(model, query, relationField, parentAlias, payload);
 
-        return joinedQuery.select(`${parentAlias}$${relationField}.$j as ${relationField}`);
+        return joinedQuery.select(`${parentAlias}$${relationField}.$t as ${relationField}`);
     }
 
     private buildRelationJSON(
@@ -176,9 +176,9 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             if (relationFieldDef.array) {
                 return eb.fn
                     .coalesce(sql`jsonb_agg(jsonb_build_object(${sql.join(objArgs)}))`, sql`'[]'::jsonb`)
-                    .as('$j');
+                    .as('$t');
             } else {
-                return sql`jsonb_build_object(${sql.join(objArgs)})`.as('$j');
+                return sql`jsonb_build_object(${sql.join(objArgs)})`.as('$t');
             }
         });
 
@@ -242,7 +242,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                             const fieldDef = requireField(this.schema, relationModel, field);
                             const fieldValue = fieldDef.relation
                                 ? // reference the synthesized JSON field
-                                  eb.ref(`${parentAlias}$${relationField}$${field}.$j`)
+                                  eb.ref(`${parentAlias}$${relationField}$${field}.$t`)
                                 : // reference a plain field
                                   this.fieldRef(relationModel, field, eb, undefined, false);
                             return [sql.lit(field), fieldValue];
@@ -260,7 +260,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                     .map(([field]) => [
                         sql.lit(field),
                         // reference the synthesized JSON field
-                        eb.ref(`${parentAlias}$${relationField}$${field}.$j`),
+                        eb.ref(`${parentAlias}$${relationField}$${field}.$t`),
                     ])
                     .flatMap((v) => v),
             );

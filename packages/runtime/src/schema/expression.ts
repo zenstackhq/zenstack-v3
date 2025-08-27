@@ -109,4 +109,8 @@ export const ExpressionUtils = {
     isField: (value: unknown): value is FieldExpression => ExpressionUtils.is(value, 'field'),
 
     isMember: (value: unknown): value is MemberExpression => ExpressionUtils.is(value, 'member'),
+
+    getLiteralValue: (expr: Expression): string | number | boolean | undefined => {
+        return ExpressionUtils.isLiteral(expr) ? expr.value : undefined;
+    },
 };

@@ -53,7 +53,7 @@ To enable formatting in combination with prettier, add the following to your `.v
 ## Links
 
 - [Home](https://zenstack.dev/v3)
-- [Documentation](https://zenstack.dev/docs/x.3)
+- [Documentation](https://zenstack.dev/docs/3.x)
 - [Community chat](https://discord.gg/Ykhr738dUe)
 - [Twitter](https://twitter.com/zenstackhq)
 - [Blog](https://zenstack.dev/blog)

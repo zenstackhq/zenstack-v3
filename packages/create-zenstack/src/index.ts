@@ -134,7 +134,7 @@ function runCommand(cmd: string, status: string, stdio: StdioOptions = 'ignore')
 }
 
 function createVsCodeConfig() {
-    fs.mkdirSync('.vscode');
+    fs.mkdirSync('.vscode', { recursive: true });
     fs.writeFileSync(
         '.vscode/settings.json',
         JSON.stringify(

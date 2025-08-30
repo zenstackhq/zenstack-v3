@@ -43,7 +43,7 @@ function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
 
     // Options to control the language client
     const clientOptions: LanguageClientOptions = {
-        documentSelector: [{ scheme: '*', language: 'zmodel-v3' }],
+        documentSelector: [{ language: 'zmodel-v3' }],
     };
 
     // Create the language client and start the client.

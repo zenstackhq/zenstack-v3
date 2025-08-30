@@ -1,6 +1,6 @@
 # ZenStack V3 VS Code Extension
 
-[ZenStack](https://zenstack.dev) is the modern data layer for TypeScript applications. It provides a data modeling language, an type-safe ORM with built-in access control, and other utilities that help you streamline full-stack development. This VS Code extension provides code editing helpers for authoring ZenStack's schema files (`.zmodel` files).
+[ZenStack](https://zenstack.dev) is the modern data layer for TypeScript applications. It provides a data modeling language, a type-safe ORM with built-in access control, and other utilities that help you streamline full-stack development. This VS Code extension provides code editing helpers for authoring ZenStack's schema files (`.zmodel` files).
 
 Use this extension if you are using ZenStack v3.x, otherwise use the [original extension](https://marketplace.visualstudio.com/items?itemName=zenstack.zenstack) that works with v2.x. See [Configuration](#configuration) for how to use both versions side by side.
 

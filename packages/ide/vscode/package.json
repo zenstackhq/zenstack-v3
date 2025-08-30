@@ -1,9 +1,9 @@
 {
-    "name": "zenstack",
+    "name": "zenstack-v3",
     "publisher": "zenstack",
-    "version": "3.0.0-alpha.33",
-    "displayName": "ZenStack Language Tools",
-    "description": "VSCode extension for ZenStack ZModel language",
+    "version": "3.0.2",
+    "displayName": "ZenStack V3 Language Tools",
+    "description": "VSCode extension for ZenStack (v3) ZModel language",
     "private": true,
     "repository": {
         "type": "git",
@@ -12,7 +12,7 @@
     "scripts": {
         "build": "tsc --noEmit && tsup",
         "lint": "eslint src --ext ts",
-        "vscode:publish": "pnpm build && vsce publish --no-dependencies --pre-release --follow-symlinks",
+        "vscode:publish": "pnpm build && vsce publish --no-dependencies --follow-symlinks",
         "vscode:package": "pnpm build && vsce package --no-dependencies"
     },
     "homepage": "https://zenstack.dev",
@@ -49,7 +49,7 @@
     ],
     "engines": {
         "vscode": "^1.63.0",
-        "node": ">=18.0.0"
+        "node": ">=20.0.0"
     },
     "categories": [
         "Programming Languages"
@@ -57,7 +57,7 @@
     "contributes": {
         "languages": [
             {
-                "id": "zmodel",
+                "id": "zmodel-v3",
                 "aliases": [
                     "ZenStack Model",
                     "zmodel"
@@ -74,14 +74,14 @@
         ],
         "grammars": [
             {
-                "language": "zmodel",
+                "language": "zmodel-v3",
                 "scopeName": "source.zmodel",
                 "path": "./syntaxes/zmodel.tmLanguage.json"
             }
         ]
     },
     "activationEvents": [
-        "onLanguage:zmodel"
+        "onLanguage:zmodel-v3"
     ],
     "main": "./dist/extension.js"
 }

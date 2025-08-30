@@ -30,7 +30,7 @@ const checkAction = async (options: Parameters<typeof actions.check>[0]): Promis
 };
 
 export function createProgram() {
-    const program = new Command('zenstack');
+    const program = new Command('zen');
 
     program.version(getVersion()!, '-v --version', 'display CLI version');
 
@@ -55,6 +55,7 @@ export function createProgram() {
         .description('Run code generation plugins.')
         .addOption(schemaOption)
         .addOption(new Option('-o, --output <path>', 'default output directory for code generation'))
+        .addOption(new Option('--silent', 'suppress all output except errors').default(false))
         .action(generateAction);
 
     const migrateCommand = program.command('migrate').description('Run database schema migration related tasks.');

@@ -13,7 +13,7 @@
         "build": "tsc --noEmit && tsup",
         "lint": "eslint src --ext ts",
         "vscode:publish": "pnpm build && vsce publish --no-dependencies --follow-symlinks",
-        "vscode:package": "pnpm build && vsce package --no-dependencies"
+        "vscode:package": "pnpm build && vsce package --no-dependencies --follow-symlinks"
     },
     "homepage": "https://zenstack.dev",
     "icon": "asset/logo-256-bg.png",

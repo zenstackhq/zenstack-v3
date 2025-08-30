@@ -8,7 +8,7 @@ import { ZModelAstReflection } from './ast.js';
 import { ZModelGrammar } from './grammar.js';
 
 export const ZModelLanguageMetaData = {
-    languageId: 'zmodel',
+    languageId: 'zmodel-v3',
     fileExtensions: ['.zmodel'],
     caseInsensitive: false,
     mode: 'development'

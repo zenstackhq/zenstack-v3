@@ -3,6 +3,8 @@ import { glob } from 'glob';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
 
+const excludes = ['packages/ide/vscode/package.json'];
+
 function getWorkspacePackageJsonFiles(workspaceFile: string): string[] {
     const workspaceYaml = fs.readFileSync(workspaceFile, 'utf8');
     const workspace = yaml.parse(workspaceYaml) as { packages?: string[] };
@@ -23,7 +25,8 @@ function getWorkspacePackageJsonFiles(workspaceFile: string): string[] {
     // include root package.json
     files.add(path.resolve(__dirname, '../package.json'));
 
-    return Array.from(files);
+    const result = Array.from(files).filter((f) => !excludes.some((e) => f.endsWith(e)));
+    return result;
 }
 
 function incrementVersion(version: string): string {

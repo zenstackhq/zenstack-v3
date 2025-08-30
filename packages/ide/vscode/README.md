@@ -45,7 +45,7 @@ To automatically format on save, add the following to your `.vscode/settings.jso
 To enable formatting in combination with prettier, add the following to your `.vscode/settings.json` file:
 
 ```json
-"[zmodel]": {
+"[zmodel-v3]": {
     "editor.defaultFormatter": "zenstack.zenstack-v3"
 },
 ```

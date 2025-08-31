@@ -4,7 +4,7 @@ import { Command, CommanderError, Option } from 'commander';
 import * as actions from './actions';
 import { CliError } from './cli-error';
 import { telemetry } from './telemetry';
-import { getVersion } from './utils/version-utils';
+import { checkNewVersion, getVersion } from './utils/version-utils';
 
 const generateAction = async (options: Parameters<typeof actions.generate>[0]): Promise<void> => {
     await telemetry.trackCommand('generate', () => actions.generate(options));
@@ -51,10 +51,13 @@ function createProgram() {
         `schema file (with extension ${schemaExtensions}). Defaults to "zenstack/schema.zmodel" unless specified in package.json.`,
     );
 
+    const noVersionCheckOption = new Option('--no-version-check', 'do not check for new version');
+
     program
         .command('generate')
         .description('Run code generation plugins.')
         .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
         .addOption(new Option('-o, --output <path>', 'default output directory for code generation'))
         .addOption(new Option('--silent', 'suppress all output except errors').default(false))
         .action(generateAction);
@@ -65,6 +68,7 @@ function createProgram() {
     migrateCommand
         .command('dev')
         .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
         .addOption(new Option('-n, --name <name>', 'migration name'))
         .addOption(new Option('--create-only', 'only create migration, do not apply'))
         .addOption(migrationsOption)
@@ -76,12 +80,14 @@ function createProgram() {
         .addOption(schemaOption)
         .addOption(new Option('--force', 'skip the confirmation prompt'))
         .addOption(migrationsOption)
+        .addOption(noVersionCheckOption)
         .description('Reset your database and apply all migrations, all data will be lost.')
         .action((options) => migrateAction('reset', options));
 
     migrateCommand
         .command('deploy')
         .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
         .addOption(migrationsOption)
         .description('Deploy your pending migrations to your production/staging database.')
         .action((options) => migrateAction('deploy', options));
@@ -89,6 +95,7 @@ function createProgram() {
     migrateCommand
         .command('status')
         .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
         .addOption(migrationsOption)
         .description('Check the status of your database migrations.')
         .action((options) => migrateAction('status', options));
@@ -96,6 +103,7 @@ function createProgram() {
     migrateCommand
         .command('resolve')
         .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
         .addOption(migrationsOption)
         .addOption(new Option('--applied <migration>', 'record a specific migration as applied'))
         .addOption(new Option('--rolled-back <migration>', 'record a specific migration as rolled back'))
@@ -108,6 +116,7 @@ function createProgram() {
         .command('push')
         .description('Push the state from your schema to your database.')
         .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
         .addOption(new Option('--accept-data-loss', 'ignore data loss warnings'))
         .addOption(new Option('--force-reset', 'force a reset of the database before push'))
         .action((options) => dbAction('push', options));
@@ -116,19 +125,28 @@ function createProgram() {
         .command('info')
         .description('Get information of installed ZenStack packages.')
         .argument('[path]', 'project path', '.')
+        .addOption(noVersionCheckOption)
         .action(infoAction);
 
     program
         .command('init')
         .description('Initialize an existing project for ZenStack.')
         .argument('[path]', 'project path', '.')
+        .addOption(noVersionCheckOption)
         .action(initAction);
 
     program
         .command('check')
         .description('Check a ZModel schema for syntax or semantic errors.')
         .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
         .action(checkAction);
+
+    program.hook('preAction', async (_thisCommand, actionCommand) => {
+        if (actionCommand.getOptionValue('versionCheck')) {
+            await checkNewVersion();
+        }
+    });
 
     return program;
 }

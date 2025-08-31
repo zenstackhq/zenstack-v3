@@ -6,6 +6,10 @@ on:
             - main
             - dev
 
+env:
+    TELEMETRY_TRACKING_TOKEN: ${{ secrets.TELEMETRY_TRACKING_TOKEN }}
+    DO_NOT_TRACK: '1'
+
 permissions:
     contents: read
 

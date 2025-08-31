@@ -1,35 +1,35 @@
 import { ZModelLanguageMetaData } from '@zenstackhq/language';
 import colors from 'colors';
-import { Command, CommanderError, Option } from 'commander';
+import { Command, Option } from 'commander';
 import * as actions from './actions';
-import { CliError } from './cli-error';
+import { telemetry } from './telemetry';
 import { getVersion } from './utils/version-utils';
 
 const generateAction = async (options: Parameters<typeof actions.generate>[0]): Promise<void> => {
-    await actions.generate(options);
+    await telemetry.trackCommand('generate', () => actions.generate(options));
 };
 
-const migrateAction = async (command: string, options: any): Promise<void> => {
-    await actions.migrate(command, options);
+const migrateAction = async (subCommand: string, options: any): Promise<void> => {
+    await telemetry.trackCommand(`migrate ${subCommand}`, () => actions.migrate(subCommand, options));
 };
 
-const dbAction = async (command: string, options: any): Promise<void> => {
-    await actions.db(command, options);
+const dbAction = async (subCommand: string, options: any): Promise<void> => {
+    await telemetry.trackCommand(`db ${subCommand}`, () => actions.db(subCommand, options));
 };
 
 const infoAction = async (projectPath: string): Promise<void> => {
-    await actions.info(projectPath);
+    await telemetry.trackCommand('info', () => actions.info(projectPath));
 };
 
 const initAction = async (projectPath: string): Promise<void> => {
-    await actions.init(projectPath);
+    await telemetry.trackCommand('init', () => actions.init(projectPath));
 };
 
 const checkAction = async (options: Parameters<typeof actions.check>[0]): Promise<void> => {
-    await actions.check(options);
+    await telemetry.trackCommand('check', () => actions.check(options));
 };
 
-export function createProgram() {
+function createProgram() {
     const program = new Command('zen');
 
     program.version(getVersion()!, '-v --version', 'display CLI version');
@@ -132,18 +132,32 @@ export function createProgram() {
     return program;
 }
 
-const program = createProgram();
+async function main() {
+    const program = createProgram();
+    await telemetry.trackCli(() => void program.parseAsync());
 
-program.parseAsync().catch((err) => {
-    if (err instanceof CliError) {
-        console.error(colors.red(err.message));
-        process.exit(1);
-    } else if (err instanceof CommanderError) {
-        // errors are already reported, just exit
-        process.exit(err.exitCode);
+    let exitCode = 0;
+
+    process.on('unhandledRejection', (reason) => {
+        if (reason instanceof Error) {
+            telemetry.trackError(reason);
+        }
+        exitCode = 1;
+    });
+
+    process.on('uncaughtException', (error) => {
+        telemetry.trackError(error);
+        exitCode = 1;
+    });
+
+    if (telemetry.isTracking) {
+        // give telemetry a chance to send events before exit
+        setTimeout(() => {
+            process.exit(exitCode);
+        }, 200);
     } else {
-        console.error(colors.red('An unexpected error occurred:'));
-        console.error(err);
-        process.exit(1);
+        process.exit(exitCode);
     }
-});
+}
+
+main();

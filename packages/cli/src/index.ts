@@ -1,7 +1,8 @@
 import { ZModelLanguageMetaData } from '@zenstackhq/language';
 import colors from 'colors';
-import { Command, Option } from 'commander';
+import { Command, CommanderError, Option } from 'commander';
 import * as actions from './actions';
+import { CliError } from './cli-error';
 import { telemetry } from './telemetry';
 import { getVersion } from './utils/version-utils';
 
@@ -133,22 +134,28 @@ function createProgram() {
 }
 
 async function main() {
-    const program = createProgram();
-    await telemetry.trackCli(() => void program.parseAsync());
-
     let exitCode = 0;
 
-    process.on('unhandledRejection', (reason) => {
-        if (reason instanceof Error) {
-            telemetry.trackError(reason);
-        }
-        exitCode = 1;
-    });
+    const program = createProgram();
+    program.exitOverride();
 
-    process.on('uncaughtException', (error) => {
-        telemetry.trackError(error);
-        exitCode = 1;
-    });
+    try {
+        await telemetry.trackCli(async () => {
+            await program.parseAsync();
+        });
+    } catch (e) {
+        if (e instanceof CommanderError) {
+            // ignore
+            exitCode = e.exitCode;
+        } else if (e instanceof CliError) {
+            // log
+            console.error(colors.red(e.message));
+            exitCode = 1;
+        } else {
+            console.error(colors.red(`Unhandled error: ${e}`));
+            exitCode = 1;
+        }
+    }
 
     if (telemetry.isTracking) {
         // give telemetry a chance to send events before exit

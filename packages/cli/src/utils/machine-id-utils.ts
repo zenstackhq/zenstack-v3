@@ -1,7 +1,7 @@
 // modified from https://github.com/automation-stack/node-machine-id
 
 import { execSync } from 'child_process';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 const { platform } = process;
 const win32RegBinPath = {

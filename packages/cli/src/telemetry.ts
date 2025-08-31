@@ -1,5 +1,5 @@
-import { createId } from '@paralleldrive/cuid2';
 import { init, type Mixpanel } from 'mixpanel';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import * as os from 'os';
 import { TELEMETRY_TRACKING_TOKEN } from './constants';
@@ -30,7 +30,7 @@ export type TelemetryEvents =
 export class Telemetry {
     private readonly mixpanel: Mixpanel | undefined;
     private readonly hostId = getMachineId();
-    private readonly sessionid = createId();
+    private readonly sessionid = randomUUID();
     private readonly _os_type = os.type();
     private readonly _os_release = os.release();
     private readonly _os_arch = os.arch();

@@ -6,33 +6,18 @@ settings:
 
 catalogs:
   default:
-    '@types/node':
-      specifier: ^20.17.24
-      version: 20.17.24
     '@types/tmp':
       specifier: ^0.2.6
       version: 0.2.6
-    kysely:
-      specifier: ^0.27.6
-      version: 0.27.6
     langium:
       specifier: 3.5.0
       version: 3.5.0
-    langium-cli:
-      specifier: 3.5.0
-      version: 3.5.0
-    prisma:
-      specifier: ^6.10.0
-      version: 6.14.0
     tmp:
       specifier: ^0.2.3
       version: 0.2.3
     ts-pattern:
       specifier: ^5.7.1
       version: 5.7.1
-    typescript:
-      specifier: ^5.8.0
-      version: 5.8.3
 
 importers:
 
@@ -77,9 +62,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@paralleldrive/cuid2':
-        specifier: ^2.2.2
-        version: 2.2.2
       '@zenstackhq/common-helpers':
         specifier: workspace:*
         version: link:../common-helpers

@@ -22,7 +22,7 @@ describe('client extensions tests for policies', () => {
         await rawDb.model.create({ data: { x: 2, y: 300 } });
 
         const ext = definePlugin({
-            id: 'prisma-extension-queryOverride',
+            id: 'queryOverride',
             onQuery: async ({ args, proceed }: any) => {
                 args = args ?? {};
                 args.where = { ...args.where, y: { lt: 300 } };
@@ -53,7 +53,7 @@ describe('client extensions tests for policies', () => {
         await rawDb.model.create({ data: { x: 2, y: 300 } });
 
         const ext = definePlugin({
-            id: 'prisma-extension-queryOverride',
+            id: 'queryOverride',
             onQuery: async ({ args, proceed }: any) => {
                 args = args ?? {};
                 args.where = { ...args.where, y: { lt: 300 } };
@@ -84,7 +84,7 @@ describe('client extensions tests for policies', () => {
         await rawDb.model.create({ data: { x: 2, y: 300 } });
 
         const ext = definePlugin({
-            id: 'prisma-extension-queryOverride',
+            id: 'queryOverride',
             onQuery: async ({ args, proceed }: any) => {
                 args = args ?? {};
                 args.where = { ...args.where, y: { lt: 300 } };
@@ -115,7 +115,7 @@ describe('client extensions tests for policies', () => {
         await rawDb.model.create({ data: { x: 2, y: 300 } });
 
         const ext = definePlugin({
-            id: 'prisma-extension-queryOverride',
+            id: 'queryOverride',
             onQuery: async ({ args, proceed }: any) => {
                 args = args ?? {};
                 args.where = { ...args.where, y: { lt: 300 } };
@@ -144,7 +144,7 @@ describe('client extensions tests for policies', () => {
         await rawDb.model.create({ data: { value: 1 } });
 
         const ext = definePlugin({
-            id: 'prisma-extension-resultMutation',
+            id: 'resultMutation',
             onQuery: async ({ args, proceed }: any) => {
                 const r: any = await proceed(args);
                 for (let i = 0; i < r.length; i++) {

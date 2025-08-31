@@ -57,6 +57,9 @@ async function getZenStackPackages(projectPath: string): Promise<Array<{ pkg: st
                         with: { type: 'json' },
                     })
                 ).default;
+                if (depPkgJson.private) {
+                    return undefined;
+                }
                 return { pkg, version: depPkgJson.version as string };
             } catch {
                 return { pkg, version: undefined };
@@ -64,5 +67,5 @@ async function getZenStackPackages(projectPath: string): Promise<Array<{ pkg: st
         }),
     );
 
-    return result;
+    return result.filter((p) => !!p);
 }

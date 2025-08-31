@@ -39,7 +39,9 @@ import { schema } from '${outputPath}/schema';
 const client = new ZenStackClient(schema, {
     dialect: { ... }
 });
-\`\`\``);
+\`\`\`
+
+Check documentation: https://zenstack.dev/docs/3.x`);
     }
 }
 

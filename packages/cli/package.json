@@ -29,6 +29,7 @@
         "pack": "pnpm pack"
     },
     "dependencies": {
+        "@paralleldrive/cuid2": "^2.2.2",
         "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",

@@ -106,4 +106,19 @@ describe('Mixin Tests', () => {
             'can only be applied once',
         );
     });
+
+    it('does not allow relation fields in type', async () => {
+        await loadSchemaWithError(
+            `
+        model User {
+            id Int @id @default(autoincrement())
+        }
+
+        type T {
+            u User
+        }
+        `,
+            'Type field cannot be a relation',
+        );
+    });
 });

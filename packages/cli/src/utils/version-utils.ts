@@ -33,14 +33,14 @@ export async function checkNewVersion() {
 }
 
 export async function getLatestVersion() {
-    const fetchResult = await fetch('https://registry.npmjs.org/@zenstackhq/cli', {
+    const fetchResult = await fetch(`https://registry.npmjs.org/@zenstackhq/cli/${VERSION_CHECK_TAG}`, {
         headers: { accept: 'application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*' },
         signal: AbortSignal.timeout(CHECK_VERSION_TIMEOUT),
     });
 
     if (fetchResult.ok) {
         const data: any = await fetchResult.json();
-        const latestVersion = data?.['dist-tags']?.[VERSION_CHECK_TAG];
+        const latestVersion = data?.version;
         if (typeof latestVersion === 'string' && semver.valid(latestVersion)) {
             return latestVersion;
         }

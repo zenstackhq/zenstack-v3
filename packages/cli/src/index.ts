@@ -143,7 +143,7 @@ function createProgram() {
         .action(checkAction);
 
     program.hook('preAction', async (_thisCommand, actionCommand) => {
-        if (actionCommand.getOptionValue('versionCheck')) {
+        if (actionCommand.getOptionValue('versionCheck') !== false) {
             await checkNewVersion();
         }
     });

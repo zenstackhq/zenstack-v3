@@ -212,7 +212,7 @@ importers:
         version: 9.0.1
     devDependencies:
       '@types/vscode':
-        specifier: ^1.63.0
+        specifier: ^1.90.0
         version: 1.101.0
       '@zenstackhq/eslint-config':
         specifier: workspace:*

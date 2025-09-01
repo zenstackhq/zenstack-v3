@@ -36,7 +36,7 @@
         "vscode-languageserver": "^9.0.1"
     },
     "devDependencies": {
-        "@types/vscode": "^1.63.0",
+        "@types/vscode": "^1.90.0",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*"
     },
@@ -48,7 +48,7 @@
         "language-configuration.json"
     ],
     "engines": {
-        "vscode": "^1.63.0",
+        "vscode": "^1.90.0",
         "node": ">=20.0.0"
     },
     "categories": [

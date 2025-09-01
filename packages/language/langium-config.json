@@ -2,7 +2,7 @@
     "projectName": "ZModel",
     "languages": [
         {
-            "id": "zmodel",
+            "id": "zmodel-v3",
             "grammar": "src/zmodel.langium",
             "fileExtensions": [".zmodel"],
             "textMate": {

@@ -4,7 +4,7 @@ import { getLiteral, getLiteralArray } from '@zenstackhq/language/utils';
 import { type CliPlugin } from '@zenstackhq/sdk';
 import colors from 'colors';
 import path from 'node:path';
-import ora from 'ora';
+import ora, { type Ora } from 'ora';
 import { CliError } from '../cli-error';
 import * as corePlugins from '../plugins';
 import { getPkgJsonConfig, getSchemaFile, loadSchemaDocument } from './action-utils';
@@ -12,6 +12,7 @@ import { getPkgJsonConfig, getSchemaFile, loadSchemaDocument } from './action-ut
 type Options = {
     schema?: string;
     output?: string;
+    silent: boolean;
 };
 
 /**
@@ -25,10 +26,11 @@ export async function run(options: Options) {
     const model = await loadSchemaDocument(schemaFile);
     const outputPath = getOutputPath(options, schemaFile);
 
-    await runPlugins(schemaFile, model, outputPath);
+    await runPlugins(schemaFile, model, outputPath, options);
 
-    console.log(colors.green(`Generation completed successfully in ${Date.now() - start}ms.\n`));
-    console.log(`You can now create a ZenStack client with it.
+    if (!options.silent) {
+        console.log(colors.green(`Generation completed successfully in ${Date.now() - start}ms.\n`));
+        console.log(`You can now create a ZenStack client with it.
 
 \`\`\`ts
 import { ZenStackClient } from '@zenstackhq/runtime';
@@ -37,7 +39,10 @@ import { schema } from '${outputPath}/schema';
 const client = new ZenStackClient(schema, {
     dialect: { ... }
 });
-\`\`\``);
+\`\`\`
+
+Check documentation: https://zenstack.dev/docs/3.x`);
+    }
 }
 
 function getOutputPath(options: Options, schemaFile: string) {
@@ -52,7 +57,7 @@ function getOutputPath(options: Options, schemaFile: string) {
     }
 }
 
-async function runPlugins(schemaFile: string, model: Model, outputPath: string) {
+async function runPlugins(schemaFile: string, model: Model, outputPath: string, options: Options) {
     const plugins = model.declarations.filter(isPlugin);
     const processedPlugins: { cliPlugin: CliPlugin; pluginOptions: Record<string, unknown> }[] = [];
 
@@ -95,7 +100,11 @@ async function runPlugins(schemaFile: string, model: Model, outputPath: string) 
         );
 
         // run plugin generator
-        const spinner = ora(cliPlugin.statusText ?? `Running plugin ${cliPlugin.name}`).start();
+        let spinner: Ora | undefined;
+
+        if (!options.silent) {
+            spinner = ora(cliPlugin.statusText ?? `Running plugin ${cliPlugin.name}`).start();
+        }
         try {
             await cliPlugin.generate({
                 schemaFile,
@@ -103,9 +112,9 @@ async function runPlugins(schemaFile: string, model: Model, outputPath: string) 
                 defaultOutputPath: outputPath,
                 pluginOptions,
             });
-            spinner.succeed();
+            spinner?.succeed();
         } catch (err) {
-            spinner.fail();
+            spinner?.fail();
             console.error(err);
         }
     }

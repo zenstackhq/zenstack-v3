@@ -795,14 +795,14 @@ export class TsSchemaGenerator {
                     );
                 } else {
                     // multi-field unique
-                    const key = fieldNames.join('_');
+                    const key = this.getCompoundUniqueKey(attr, fieldNames);
                     if (seenKeys.has(key)) {
                         continue;
                     }
                     seenKeys.add(key);
                     properties.push(
                         ts.factory.createPropertyAssignment(
-                            fieldNames.join('_'),
+                            key,
                             ts.factory.createObjectLiteralExpression(
                                 fieldNames.map((field) => {
                                     const fieldDef = allFields.find((f) => f.name === field)!;
@@ -824,6 +824,15 @@ export class TsSchemaGenerator {
         }
 
         return ts.factory.createObjectLiteralExpression(properties, true);
+    }
+
+    private getCompoundUniqueKey(attr: DataModelAttribute, fieldNames: string[]) {
+        const nameArg = attr.args.find((arg) => arg.$resolvedParam.name === 'name');
+        if (nameArg && isLiteralExpr(nameArg.value)) {
+            return nameArg.value.value as string;
+        } else {
+            return fieldNames.join('_');
+        }
     }
 
     private generateFieldTypeLiteral(field: DataField): ts.Expression {

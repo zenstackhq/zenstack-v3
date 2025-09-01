@@ -1,6 +1,6 @@
 import colors from 'colors';
 import { Command } from 'commander';
-import { execSync } from 'node:child_process';
+import { execSync, type StdioOptions } from 'node:child_process';
 import fs from 'node:fs';
 import ora from 'ora';
 import { STARTER_MAIN_TS, STARTER_ZMODEL } from './templates';
@@ -61,6 +61,9 @@ function initProject(name: string) {
         ),
     );
 
+    // create VSCode config files
+    createVsCodeConfig();
+
     // install packages
     const packages = [
         { name: '@zenstackhq/cli@next', dev: true },
@@ -103,24 +106,46 @@ function initProject(name: string) {
     // create main.ts
     fs.writeFileSync('main.ts', STARTER_MAIN_TS);
 
-    // run `zenstack generate`
-    runCommand(`${agentExec} zenstack generate`, 'Running `zenstack generate`');
+    // run `zen generate`
+    runCommand(`${agentExec} zen generate`, 'Running `zen generate`');
 
-    // run `zenstack db push`
-    runCommand(`${agentExec} zenstack db push`, 'Running `zenstack db push`');
+    // run `zen db push`
+    runCommand(`${agentExec} zen db push`, 'Running `zen db push`');
+
+    // run `$agent run dev`
+    console.log(`Running \`${agent} run dev\``);
+    execSync(`${agent} run dev`, { stdio: 'inherit' });
+    console.log(colors.green('Project setup completed!'));
 }
 
 function installPackage(pkg: { name: string; dev: boolean }) {
     runCommand(`${agent} install ${pkg.name} ${pkg.dev ? saveDev : ''}`, `Installing "${pkg.name}"`);
 }
 
-function runCommand(cmd: string, status: string) {
+function runCommand(cmd: string, status: string, stdio: StdioOptions = 'ignore') {
     const spinner = ora(status).start();
     try {
-        execSync(cmd);
+        execSync(cmd, { stdio });
         spinner.succeed();
     } catch (e) {
         spinner.fail();
         throw e;
     }
+}
+
+function createVsCodeConfig() {
+    fs.mkdirSync('.vscode', { recursive: true });
+    fs.writeFileSync(
+        '.vscode/settings.json',
+        JSON.stringify(
+            {
+                'files.associations': {
+                    '*.zmodel': 'zmodel-v3',
+                },
+            },
+            null,
+            4,
+        ),
+    );
+    fs.writeFileSync('.vscode/extensions.json', JSON.stringify({ recommendations: ['zenstack.zenstack-v3'] }, null, 4));
 }

@@ -7,6 +7,7 @@
     - [x] init
     - [x] validate
     - [ ] format
+    - [ ] repl
     - [x] plugin mechanism
     - [x] built-in plugins
         - [x] typescript
@@ -82,7 +83,6 @@
         - [x] Error system
         - [x] Custom table name
         - [x] Custom field name
-        - [ ] Strict undefined checks
         - [ ] DbNull vs JsonNull
         - [ ] Migrate to tsdown
     - [ ] Benchmark

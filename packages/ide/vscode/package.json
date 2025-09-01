@@ -48,7 +48,7 @@
         "language-configuration.json"
     ],
     "engines": {
-        "vscode": "^1.63.0",
+        "vscode": "^1.90.0",
         "node": ">=20.0.0"
     },
     "categories": [

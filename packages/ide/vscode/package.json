@@ -1,7 +1,7 @@
 {
     "name": "zenstack-v3",
     "publisher": "zenstack",
-    "version": "3.0.5",
+    "version": "3.0.6",
     "displayName": "ZenStack V3 Language Tools",
     "description": "VSCode extension for ZenStack (v3) ZModel language",
     "private": true,
@@ -75,7 +75,7 @@
         "grammars": [
             {
                 "language": "zmodel-v3",
-                "scopeName": "source.zmodel",
+                "scopeName": "source.zmodel-v3",
                 "path": "./syntaxes/zmodel.tmLanguage.json"
             }
         ]

@@ -7,23 +7,26 @@ export class FindOperationHandler<Schema extends SchemaDef> extends BaseOperatio
         // normalize args to strip `undefined` fields
         const normalizedArgs = this.normalizeArgs(args);
 
-        // parse args
-        const parsedArgs = (validateArgs
-            ? this.inputValidator.validateFindArgs(this.model, operation === 'findUnique', normalizedArgs)
-            : normalizedArgs) as FindArgs<Schema, GetModels<Schema>, true>;
+        const findOne = operation === 'findFirst' || operation === 'findUnique';
 
-        if (operation === 'findFirst') {
+        // parse args
+        let parsedArgs = validateArgs
+            ? this.inputValidator.validateFindArgs(this.model, normalizedArgs, {
+                  unique: operation === 'findUnique',
+                  findOne,
+              })
+            : (normalizedArgs as FindArgs<Schema, GetModels<Schema>, true> | undefined);
+
+        if (findOne) {
+            // ensure "limit 1"
+            parsedArgs = parsedArgs ?? {};
             parsedArgs.take = 1;
         }
 
         // run query
-        const result = await this.read(
-            this.client.$qb,
-            this.model,
-            parsedArgs,
-        );
+        const result = await this.read(this.client.$qb, this.model, parsedArgs);
 
-        const finalResult = operation === 'findMany' ? result : (result[0] ?? null);
+        const finalResult = findOne ? (result[0] ?? null) : result;
         return finalResult;
     }
 }

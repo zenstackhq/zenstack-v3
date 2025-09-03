@@ -40,14 +40,11 @@ export class InputValidator<Schema extends SchemaDef> {
 
     constructor(private readonly schema: Schema) {}
 
-    validateFindArgs(model: GetModels<Schema>, unique: boolean, args: unknown) {
-        return this.validate<FindArgs<Schema, GetModels<Schema>, true>, Parameters<typeof this.makeFindSchema>[1]>(
-            model,
-            'find',
-            { unique },
-            (model, options) => this.makeFindSchema(model, options),
-            args,
-        );
+    validateFindArgs(model: GetModels<Schema>, args: unknown, options: { unique: boolean; findOne: boolean }) {
+        return this.validate<
+            FindArgs<Schema, GetModels<Schema>, true> | undefined,
+            Parameters<typeof this.makeFindSchema>[1]
+        >(model, 'find', options, (model, options) => this.makeFindSchema(model, options), args);
     }
 
     validateCreateArgs(model: GetModels<Schema>, args: unknown) {
@@ -196,7 +193,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Find
 
-    private makeFindSchema(model: string, options: { unique: boolean }) {
+    private makeFindSchema(model: string, options: { unique: boolean; findOne: boolean }) {
         const fields: Record<string, z.ZodSchema> = {};
         const where = this.makeWhereSchema(model, options.unique);
         if (options.unique) {
@@ -211,7 +208,11 @@ export class InputValidator<Schema extends SchemaDef> {
 
         if (!options.unique) {
             fields['skip'] = this.makeSkipSchema().optional();
-            fields['take'] = this.makeTakeSchema().optional();
+            if (options.findOne) {
+                fields['take'] = z.literal(1).optional();
+            } else {
+                fields['take'] = this.makeTakeSchema().optional();
+            }
             fields['orderBy'] = this.orArray(this.makeOrderBySchema(model, true, false), true).optional();
             fields['cursor'] = this.makeCursorSchema(model).optional();
             fields['distinct'] = this.makeDistinctSchema(model).optional();

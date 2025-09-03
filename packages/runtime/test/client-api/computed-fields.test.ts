@@ -75,7 +75,7 @@ model User {
             await expect(
                 db.user.findFirst({
                     orderBy: { upperName: 'desc' },
-                    take: -1,
+                    take: 1,
                 }),
             ).resolves.toMatchObject({
                 upperName: 'ALEX',

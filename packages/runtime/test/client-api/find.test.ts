@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
-import { NotFoundError } from '../../src/client/errors';
+import { InputValidationError, NotFoundError } from '../../src/client/errors';
 import { schema } from '../schemas/basic';
 import { createClientSpecs } from './client-specs';
 import { createPosts, createUser } from './utils';
@@ -53,6 +53,10 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
         await expect(client.user.findMany({ take: 1 })).resolves.toHaveLength(1);
         await expect(client.user.findMany({ take: 2 })).resolves.toHaveLength(2);
         await expect(client.user.findMany({ take: 4 })).resolves.toHaveLength(3);
+
+        // findFirst's take must be 1
+        await expect(client.user.findFirst({ take: 2 })).rejects.toThrow(InputValidationError);
+        await expect(client.user.findFirst({ take: 1 })).toResolveTruthy();
 
         // skip
         await expect(client.user.findMany({ skip: 1 })).resolves.toHaveLength(2);

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const token = process.env['TELEMETRY_TRACKING_TOKEN'] ?? '';
 
-console.log('TELEMETRY_TRACKING_TOKEN:', token);
+console.log('TELEMETRY_TRACKING_TOKEN:', token?.[0]);
 
 const filesToProcess = ['dist/index.js', 'dist/index.cjs'];
 const _dirname = path.dirname(fileURLToPath(import.meta.url));

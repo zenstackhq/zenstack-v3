@@ -12,6 +12,9 @@ export default defineConfig({
     clean: true,
     dts: true,
     format: ['esm', 'cjs'],
+    env: {
+        TELEMETRY_TRACKING_TOKEN: process.env['TELEMETRY_TRACKING_TOKEN'] ?? '',
+    },
     onSuccess: async () => {
         console.log('TELEMETRY_TRACKING_TOKEN:', process.env['TELEMETRY_TRACKING_TOKEN']);
         if (!process.env['TELEMETRY_TRACKING_TOKEN']) {

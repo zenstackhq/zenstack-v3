@@ -6,10 +6,6 @@ on:
             - main
             - dev
 
-env:
-    TELEMETRY_TRACKING_TOKEN: ${{ secrets.TELEMETRY_TRACKING_TOKEN }}
-    DO_NOT_TRACK: '1'
-
 permissions:
     contents: read
 
@@ -68,6 +64,8 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Build
+              env:
+                  TELEMETRY_TRACKING_TOKEN: ${{ secrets.TELEMETRY_TRACKING_TOKEN }}
               run: echo TOKEN $TELEMETRY_TRACKING_TOKEN && pnpm run build
 
             - name: Lint

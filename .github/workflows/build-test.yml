@@ -69,7 +69,6 @@ jobs:
 
             - name: Build
               run: |
-                  echo TOKEN $TELEMETRY_TRACKING_TOKEN
                   pnpm run build
                   pnpm tsx packages/cli/scripts/post-build.ts
 

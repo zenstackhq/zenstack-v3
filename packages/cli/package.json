@@ -22,7 +22,7 @@
         "zenstack": "bin/cli"
     },
     "scripts": {
-        "build": "tsc --noEmit && tsup-node",
+        "build": "tsc --noEmit && tsup-node && tsx scripts/post-build.ts",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "test": "vitest run",

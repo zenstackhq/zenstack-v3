@@ -68,7 +68,9 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Build
-              run: pnpm run build
+              run: |
+                  pnpm run build
+                  pnpm tsx packages/cli/scripts/post-build.ts
 
             - name: Lint
               run: pnpm run lint

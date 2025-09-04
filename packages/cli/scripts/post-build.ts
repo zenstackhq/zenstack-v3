@@ -14,7 +14,7 @@ const _dirname = path.dirname(fileURLToPath(import.meta.url));
 for (const file of filesToProcess) {
     console.log(`Processing ${file} for telemetry token...`);
     const filePath = path.join(_dirname, '..', file);
-    const content = fs.readFileSync(path.join(_dirname, '..', filePath), 'utf-8');
+    const content = fs.readFileSync(filePath, 'utf-8');
     const updatedContent = content.replace('<TELEMETRY_TRACKING_TOKEN>', token);
     fs.writeFileSync(filePath, updatedContent, 'utf-8');
 }

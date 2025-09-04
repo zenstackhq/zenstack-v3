@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const token = process.env['TELEMETRY_TRACKING_TOKEN'] ?? '';
+const token = process.env.TELEMETRY_TRACKING_TOKEN ?? '';
 
 console.log('TELEMETRY_TRACKING_TOKEN:', token?.[0]);
 

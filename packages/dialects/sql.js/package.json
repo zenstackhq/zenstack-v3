@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/kysely-sql-js",
-    "version": "3.0.0-beta.2",
+    "version": "3.0.0-beta.3",
     "description": "Kysely dialect for sql.js",
     "type": "module",
     "scripts": {
@@ -25,6 +25,10 @@
                 "types": "./dist/index.d.cts",
                 "default": "./dist/index.cjs"
             }
+        },
+        "./package.json": {
+            "import": "./package.json",
+            "require": "./package.json"
         }
     },
     "devDependencies": {

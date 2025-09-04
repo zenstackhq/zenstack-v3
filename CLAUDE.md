@@ -82,3 +82,4 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Database migrations still use Prisma CLI under the hood
 - Plugin system allows interception at ORM, Kysely, and entity mutation levels
 - Computed fields are evaluated at database level for performance
+- The "ide/vscode" package by-design has a different version from the rest of the packages as VSCode doesn't allow pre-release versions in its marketplace.

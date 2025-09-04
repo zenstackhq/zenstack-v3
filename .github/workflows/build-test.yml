@@ -68,7 +68,10 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Build
-              run: echo TOKEN $TELEMETRY_TRACKING_TOKEN && pnpm run build
+              run: |
+                  echo TOKEN $TELEMETRY_TRACKING_TOKEN
+                  pnpm run build
+                  pnpm tsx packages/cli/scripts/post-build.ts
 
             - name: Lint
               run: pnpm run lint

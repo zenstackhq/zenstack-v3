@@ -860,9 +860,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
                 } else if (fields[field]?.default !== undefined) {
                     let value = fields[field].default;
-                    if (fieldDef.type === 'Json' && typeof value === 'string') {
+                    if (fieldDef.type === 'Json') {
                         // Schema uses JSON string for default value of Json fields
-                        value = JSON.parse(value);
+                        if (fieldDef.array && Array.isArray(value)) {
+                            value = value.map((v) => (typeof v === 'string' ? JSON.parse(v) : v));
+                        } else if (typeof value === 'string') {
+                            value = JSON.parse(value);
+                        }
                     }
                     values[field] = this.dialect.transformPrimitive(
                         value,

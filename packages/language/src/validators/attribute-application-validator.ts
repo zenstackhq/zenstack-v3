@@ -154,24 +154,6 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         }
     }
 
-    @check('@default')
-    // @ts-expect-error
-    private _checkDefault(attr: AttributeApplication, accept: ValidationAcceptor) {
-        if (attr.$container && isDataField(attr.$container) && attr.$container.type.type === 'Json') {
-            // Json field default value must be a valid JSON string
-            const value = getStringLiteral(attr.args[0]?.value);
-            if (!value) {
-                accept('error', 'value must be a valid JSON string', { node: attr });
-                return;
-            }
-            try {
-                JSON.parse(value);
-            } catch {
-                accept('error', 'value is not a valid JSON string', { node: attr });
-            }
-        }
-    }
-
     // TODO: design a way to let plugin register validation
     @check('@@allow')
     @check('@@deny')

@@ -272,7 +272,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             const authModel = getModel(this.schema, this.authType);
             if (!authModel) {
                 throw new QueryError(
-                    `Unsupported use of \`auth()\` in policy of model "${this}", comparing with \`auth()\` is only possible when auth type is a model`,
+                    `Unsupported use of \`auth()\` in policy of model "${context.model}", comparing with \`auth()\` is only possible when auth type is a model`,
                 );
             }
 

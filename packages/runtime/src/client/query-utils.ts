@@ -14,7 +14,7 @@ export function hasModel(schema: SchemaDef, model: string) {
 }
 
 export function getModel(schema: SchemaDef, model: string) {
-    return schema.models[model];
+    return Object.values(schema.models).find((m) => m.name.toLowerCase() === model.toLowerCase());
 }
 
 export function getTypeDef(schema: SchemaDef, type: string) {
@@ -22,11 +22,11 @@ export function getTypeDef(schema: SchemaDef, type: string) {
 }
 
 export function requireModel(schema: SchemaDef, model: string) {
-    const matchedName = Object.keys(schema.models).find((k) => k.toLowerCase() === model.toLowerCase());
-    if (!matchedName) {
+    const modelDef = getModel(schema, model);
+    if (!modelDef) {
         throw new QueryError(`Model "${model}" not found in schema`);
     }
-    return schema.models[matchedName]!;
+    return modelDef;
 }
 
 export function getField(schema: SchemaDef, model: string, field: string) {

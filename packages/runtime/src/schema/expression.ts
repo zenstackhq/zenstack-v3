@@ -88,6 +88,10 @@ export const ExpressionUtils = {
         return expressions.reduce((acc, exp) => ExpressionUtils.binary(acc, '||', exp), expr);
     },
 
+    not: (expr: Expression) => {
+        return ExpressionUtils.unary('!', expr);
+    },
+
     is: (value: unknown, kind: Expression['kind']): value is Expression => {
         return !!value && typeof value === 'object' && 'kind' in value && value.kind === kind;
     },

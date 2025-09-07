@@ -83,8 +83,10 @@
         - [x] Error system
         - [x] Custom table name
         - [x] Custom field name
+        - [ ] Global omit
         - [ ] DbNull vs JsonNull
         - [ ] Migrate to tsdown
+        - [ ] @default validation
     - [ ] Benchmark
 - [x] Plugin
     - [x] Post-mutation hooks should be called after transaction is committed

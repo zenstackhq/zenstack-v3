@@ -84,7 +84,7 @@ describe('On kysely query tests', () => {
     it('supports spawning multiple queries', async () => {
         const client = _client.$use({
             id: 'test-plugin',
-            async onKyselyQuery({ kysely, proceed, query }) {
+            async onKyselyQuery({ client, proceed, query }) {
                 if (query.kind !== 'InsertQueryNode') {
                     return proceed(query);
                 }
@@ -92,7 +92,7 @@ describe('On kysely query tests', () => {
                 const result = await proceed(query);
 
                 // create a post for the user
-                await proceed(createPost(kysely, result));
+                await proceed(createPost(client.$qb, result));
 
                 return result;
             },

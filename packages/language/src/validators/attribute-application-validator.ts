@@ -1,19 +1,20 @@
 import { AstUtils, type ValidationAcceptor } from 'langium';
 import pluralize from 'pluralize';
+import type { BinaryExpr, DataModel, Expression } from '../ast';
 import {
     ArrayExpr,
     Attribute,
     AttributeArg,
     AttributeParam,
-    DataModelAttribute,
     DataField,
     DataFieldAttribute,
+    DataModelAttribute,
     InternalAttribute,
     ReferenceExpr,
     isArrayExpr,
     isAttribute,
-    isDataModel,
     isDataField,
+    isDataModel,
     isEnum,
     isReferenceExpr,
     isTypeDef,
@@ -21,7 +22,8 @@ import {
 import {
     getAllAttributes,
     getStringLiteral,
-    hasAttribute,
+    isAuthOrAuthMemberAccess,
+    isCollectionPredicate,
     isDataFieldReference,
     isDelegateModel,
     isFutureExpr,
@@ -31,7 +33,6 @@ import {
     typeAssignable,
 } from '../utils';
 import type { AstValidator } from './common';
-import type { DataModel } from '../ast';
 
 // a registry of function handlers marked with @check
 const attributeCheckers = new Map<string, PropertyDescriptor>();
@@ -153,6 +154,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         }
     }
 
+    // TODO: design a way to let plugin register validation
     @check('@@allow')
     @check('@@deny')
     // @ts-expect-error
@@ -166,10 +168,75 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         }
         this.validatePolicyKinds(kind, ['create', 'read', 'update', 'delete', 'all'], attr, accept);
 
-        // @encrypted fields cannot be used in policy rules
-        this.rejectEncryptedFields(attr, accept);
+        if ((kind === 'create' || kind === 'all') && attr.args[1]?.value) {
+            // "create" rules cannot access non-owned relations because the entity does not exist yet, so
+            // there can't possibly be a fk that points to it
+            this.rejectNonOwnedRelationInExpression(attr.args[1].value, accept);
+        }
     }
 
+    private rejectNonOwnedRelationInExpression(expr: Expression, accept: ValidationAcceptor) {
+        const contextModel = AstUtils.getContainerOfType(expr, isDataModel);
+        if (!contextModel) {
+            return;
+        }
+
+        if (
+            AstUtils.streamAst(expr).some((node) => {
+                if (!isDataFieldReference(node)) {
+                    // not a field reference, skip
+                    return false;
+                }
+
+                // referenced field is not a member of the context model, skip
+                if (node.target.ref?.$container !== contextModel) {
+                    return false;
+                }
+
+                const field = node.target.ref as DataField;
+                if (!isRelationshipField(field)) {
+                    // not a relation, skip
+                    return false;
+                }
+
+                if (isAuthOrAuthMemberAccess(node)) {
+                    // field reference is from auth() or access from auth(), not a relation query
+                    return false;
+                }
+
+                // check if the the node is a reference inside a collection predicate scope by auth access,
+                // e.g., `auth().foo?[x > 0]`
+
+                // make sure to skip the current level if the node is already an LHS of a collection predicate,
+                // otherwise we're just circling back to itself when visiting the parent
+                const startNode =
+                    isCollectionPredicate(node.$container) && (node.$container as BinaryExpr).left === node
+                        ? node.$container
+                        : node;
+                const collectionPredicate = AstUtils.getContainerOfType(startNode.$container, isCollectionPredicate);
+                if (collectionPredicate && isAuthOrAuthMemberAccess(collectionPredicate.left)) {
+                    return false;
+                }
+
+                const relationAttr = field.attributes.find((attr) => attr.decl.ref?.name === '@relation');
+                if (!relationAttr) {
+                    // no "@relation", not owner side of the relation, match
+                    return true;
+                }
+
+                if (!relationAttr.args.some((arg) => arg.name === 'fields')) {
+                    // no "fields" argument, can't be owner side of the relation, match
+                    return true;
+                }
+
+                return false;
+            })
+        ) {
+            accept('error', `non-owned relation fields are not allowed in "create" rules`, { node: expr });
+        }
+    }
+
+    // TODO: design a way to let plugin register validation
     @check('@allow')
     @check('@deny')
     // @ts-expect-error
@@ -199,9 +266,6 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
                 );
             }
         }
-
-        // @encrypted fields cannot be used in policy rules
-        this.rejectEncryptedFields(attr, accept);
     }
 
     @check('@@validate')
@@ -259,14 +323,6 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
                 node: fields,
             });
         }
-    }
-
-    private rejectEncryptedFields(attr: AttributeApplication, accept: ValidationAcceptor) {
-        AstUtils.streamAllContents(attr).forEach((node) => {
-            if (isDataFieldReference(node) && hasAttribute(node.target.ref as DataField, '@encrypted')) {
-                accept('error', `Encrypted fields cannot be used in policy rules`, { node });
-            }
-        });
     }
 
     private validatePolicyKinds(

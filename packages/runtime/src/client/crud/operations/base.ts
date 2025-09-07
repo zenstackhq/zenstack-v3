@@ -353,7 +353,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             createFields = baseCreateResult.remainingFields;
         }
 
-        const updatedData = this.fillGeneratedValues(modelDef, createFields);
+        const updatedData = this.fillGeneratedAndDefaultValues(modelDef, createFields);
         const idFields = getIdFields(this.schema, model);
         const query = kysely
             .insertInto(model)
@@ -722,7 +722,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     newItem[fk] = fromRelation.ids[pk];
                 }
             }
-            return this.fillGeneratedValues(modelDef, newItem);
+            return this.fillGeneratedAndDefaultValues(modelDef, newItem);
         });
 
         if (!this.dialect.supportInsertWithDefault) {
@@ -841,7 +841,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return { baseEntities, remainingFieldRows };
     }
 
-    private fillGeneratedValues(modelDef: ModelDef, data: object) {
+    private fillGeneratedAndDefaultValues(modelDef: ModelDef, data: object) {
         const fields = modelDef.fields;
         const values: any = clone(data);
         for (const [field, fieldDef] of Object.entries(fields)) {
@@ -858,6 +858,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 } else if (fields[field]?.updatedAt) {
                     // TODO: should this work at kysely level instead?
                     values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                } else if (fields[field]?.default !== undefined) {
+                    let value = fields[field].default;
+                    if (fieldDef.type === 'Json' && typeof value === 'string') {
+                        // Schema uses JSON string for default value of Json fields
+                        value = JSON.parse(value);
+                    }
+                    values[field] = this.dialect.transformPrimitive(
+                        value,
+                        fields[field].type as BuiltinType,
+                        !!fields[field].array,
+                    );
                 }
             }
         }

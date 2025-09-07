@@ -22,7 +22,7 @@ import { stripAlias } from './kysely-utils';
 
 type Scope = {
     model?: string;
-    alias?: string;
+    alias?: OperationNode;
     namesMapped?: boolean; // true means fields referring to this scope have their names already mapped
 };
 
@@ -120,7 +120,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
             // map table name depending on how it is resolved
             let mappedTableName = node.table?.table.identifier.name;
             if (mappedTableName) {
-                if (scope.alias === mappedTableName) {
+                if (scope.alias && IdentifierNode.is(scope.alias) && scope.alias.name === mappedTableName) {
                     // table name is resolved to an alias, no mapping needed
                 } else if (scope.model === mappedTableName) {
                     // table name is resolved to a model, map the name as needed
@@ -222,7 +222,14 @@ export class QueryNameMapper extends OperationNodeTransformer {
                     const origFieldName = this.extractFieldName(selection.selection);
                     const fieldName = this.extractFieldName(transformed);
                     if (fieldName !== origFieldName) {
-                        selections.push(SelectionNode.create(this.wrapAlias(transformed, origFieldName)));
+                        selections.push(
+                            SelectionNode.create(
+                                this.wrapAlias(
+                                    transformed,
+                                    origFieldName ? IdentifierNode.create(origFieldName) : undefined,
+                                ),
+                            ),
+                        );
                     } else {
                         selections.push(SelectionNode.create(transformed));
                     }
@@ -241,7 +248,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 // if the field as a qualifier, the qualifier must match the scope's
                 // alias if any, or model if no alias
                 if (scope.alias) {
-                    if (scope.alias === qualifier) {
+                    if (scope.alias && IdentifierNode.is(scope.alias) && scope.alias.name === qualifier) {
                         // scope has an alias that matches the qualifier
                         return scope;
                     } else {
@@ -295,8 +302,8 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    private wrapAlias<T extends OperationNode>(node: T, alias: string | undefined) {
-        return alias ? AliasNode.create(node, IdentifierNode.create(alias)) : node;
+    private wrapAlias<T extends OperationNode>(node: T, alias: OperationNode | undefined) {
+        return alias ? AliasNode.create(node, alias) : node;
     }
 
     private processTableRef(node: TableNode) {
@@ -351,11 +358,11 @@ export class QueryNameMapper extends OperationNodeTransformer {
             // inner transformations will map column names
             const modelName = innerNode.table.identifier.name;
             const mappedName = this.mapTableName(modelName);
-            const finalAlias = alias ?? (mappedName !== modelName ? modelName : undefined);
+            const finalAlias = alias ?? (mappedName !== modelName ? IdentifierNode.create(modelName) : undefined);
             return {
                 node: this.wrapAlias(TableNode.create(mappedName), finalAlias),
                 scope: {
-                    alias: alias ?? modelName,
+                    alias: alias ?? IdentifierNode.create(modelName),
                     model: modelName,
                     namesMapped: !this.hasMappedColumns(modelName),
                 },
@@ -374,13 +381,13 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    private createSelectAllFields(model: string, alias: string | undefined) {
+    private createSelectAllFields(model: string, alias: OperationNode | undefined) {
         const modelDef = requireModel(this.schema, model);
         return this.getModelFields(modelDef).map((fieldDef) => {
             const columnName = this.mapFieldName(model, fieldDef.name);
             const columnRef = ReferenceNode.create(
                 ColumnNode.create(columnName),
-                alias ? TableNode.create(alias) : undefined,
+                alias && IdentifierNode.is(alias) ? TableNode.create(alias.name) : undefined,
             );
             if (columnName !== fieldDef.name) {
                 const aliased = AliasNode.create(columnRef, IdentifierNode.create(fieldDef.name));
@@ -421,7 +428,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
             alias = this.extractFieldName(node);
         }
         const result = super.transformNode(node);
-        return this.wrapAlias(result, alias);
+        return this.wrapAlias(result, alias ? IdentifierNode.create(alias) : undefined);
     }
 
     private processSelectAll(node: SelectAllNode) {
@@ -438,7 +445,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return this.getModelFields(modelDef).map((fieldDef) => {
             const columnName = this.mapFieldName(modelDef.name, fieldDef.name);
             const columnRef = ReferenceNode.create(ColumnNode.create(columnName));
-            return columnName !== fieldDef.name ? this.wrapAlias(columnRef, fieldDef.name) : columnRef;
+            return columnName !== fieldDef.name
+                ? this.wrapAlias(columnRef, IdentifierNode.create(fieldDef.name))
+                : columnRef;
         });
     }
 

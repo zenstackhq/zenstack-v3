@@ -3,7 +3,7 @@ import { loadDocument } from '@zenstackhq/language';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import { createTestProject, generateTsSchema } from '@zenstackhq/testtools';
 import SQLite from 'better-sqlite3';
-import { PostgresDialect, SqliteDialect } from 'kysely';
+import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -191,4 +191,8 @@ export async function createTestClient<Schema extends SchemaDef>(
     }
 
     return client;
+}
+
+export function testLogger(e: LogEvent) {
+    console.log(e.query.sql, e.query.parameters);
 }

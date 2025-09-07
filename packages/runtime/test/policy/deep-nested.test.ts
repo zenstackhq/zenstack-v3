@@ -7,7 +7,8 @@ describe('deep nested operations tests', () => {
     //           -* M4
     model M1 {
         myId String @id @default(cuid())
-        m2 M2?
+        m2 M2? @relation(fields: [m2Id], references: [id], onDelete: Cascade)
+        m2Id Int? @unique
         value Int @default(0)
 
         @@allow('all', true)
@@ -19,8 +20,7 @@ describe('deep nested operations tests', () => {
     model M2 {
         id Int @id @default(autoincrement())
         value Int
-        m1 M1 @relation(fields: [m1Id], references: [myId], onDelete: Cascade)
-        m1Id String @unique
+        m1 M1?
 
         m3 M3?
         m4 M4[]
@@ -616,7 +616,8 @@ describe('deep nested operations tests', () => {
                 myId: '1',
                 m2: {
                     create: {
-                        value: 1,
+                        id: 1,
+                        value: 3,
                         m4: {
                             create: [{ value: 200 }, { value: 22 }],
                         },
@@ -628,10 +629,14 @@ describe('deep nested operations tests', () => {
         // delete read-back filtered: M4 @@deny('read', value == 200)
         const r = await db.m1.delete({
             where: { myId: '1' },
-            include: { m2: { select: { m4: true } } },
+            include: { m2: { select: { id: true, m4: true } } },
         });
         expect(r.m2.m4).toHaveLength(1);
 
+        await expect(db.m2.findMany()).resolves.toHaveLength(1);
+        await expect(db.m4.findMany()).resolves.toHaveLength(1);
+
+        await db.m2.delete({ where: { id: 1 } });
         await expect(db.m4.findMany()).resolves.toHaveLength(0);
 
         await db.m1.create({

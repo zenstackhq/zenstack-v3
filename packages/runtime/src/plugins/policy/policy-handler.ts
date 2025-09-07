@@ -5,10 +5,12 @@ import {
     ColumnNode,
     DeleteQueryNode,
     FromNode,
+    FunctionNode,
     IdentifierNode,
     InsertQueryNode,
     OperationNodeTransformer,
     OperatorNode,
+    ParensNode,
     PrimitiveValueListNode,
     RawNode,
     ReturningNode,
@@ -16,6 +18,7 @@ import {
     SelectQueryNode,
     TableNode,
     UpdateQueryNode,
+    ValueListNode,
     ValueNode,
     ValuesNode,
     WhereNode,
@@ -103,7 +106,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         // TODO: run in transaction
-        //let readBackError = false;
+        // let readBackError = false;
 
         // transform and post-process in a transaction
         // const result = await transaction(async (txProceed) => {
@@ -142,19 +145,14 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     private async enforcePreCreatePolicy(node: InsertQueryNode, proceed: ProceedKyselyQueryFunction) {
-        if (!node.columns || !node.values) {
-            return;
-        }
-
         const model = this.getMutationModel(node);
-        const fields = node.columns.map((c) => c.column.name);
-        const valueRows = this.unwrapCreateValueRows(node.values, model, fields);
+        const fields = node.columns?.map((c) => c.column.name) ?? [];
+        const valueRows = node.values ? this.unwrapCreateValueRows(node.values, model, fields) : [[]];
         for (const values of valueRows) {
             await this.enforcePreCreatePolicyForOne(
                 model,
                 fields,
                 values.map((v) => v.node),
-                values.map((v) => v.raw),
                 proceed,
             );
         }
@@ -164,23 +162,54 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         model: GetModels<Schema>,
         fields: string[],
         values: OperationNode[],
-        valuesRaw: unknown[],
         proceed: ProceedKyselyQueryFunction,
     ) {
-        const thisEntity: Record<string, OperationNode> = {};
-        const thisEntityRaw: Record<string, unknown> = {};
-        for (let i = 0; i < fields.length; i++) {
-            thisEntity[fields[i]!] = values[i]!;
-            thisEntityRaw[fields[i]!] = valuesRaw[i]!;
+        const allFields = Object.keys(requireModel(this.client.$schema, model).fields);
+        const allValues: OperationNode[] = [];
+
+        for (const fieldName of allFields) {
+            const index = fields.indexOf(fieldName);
+            if (index >= 0) {
+                allValues.push(values[index]!);
+            } else {
+                // set non-provided fields to null
+                allValues.push(ValueNode.createImmediate(null));
+            }
         }
 
-        const filter = this.buildPolicyFilter(model, undefined, 'create', thisEntity, thisEntityRaw);
+        // create a `SELECT column1 as field1, column2 as field2, ... FROM (VALUES (...))` table for policy evaluation
+        const constTable: SelectQueryNode = {
+            kind: 'SelectQueryNode',
+            from: FromNode.create([ParensNode.create(ValuesNode.create([ValueListNode.create(allValues)]))]),
+            selections: allFields.map((field, index) =>
+                SelectionNode.create(
+                    AliasNode.create(ColumnNode.create(`column${index + 1}`), IdentifierNode.create(field)),
+                ),
+            ),
+        };
+
+        const filter = this.buildPolicyFilter(model, undefined, 'create');
+
         const preCreateCheck: SelectQueryNode = {
             kind: 'SelectQueryNode',
-            selections: [SelectionNode.create(AliasNode.create(filter, IdentifierNode.create('$condition')))],
+            from: FromNode.create([AliasNode.create(constTable, IdentifierNode.create(model))]),
+            selections: [
+                SelectionNode.create(
+                    AliasNode.create(
+                        BinaryOperationNode.create(
+                            FunctionNode.create('COUNT', [ValueNode.createImmediate(1)]),
+                            OperatorNode.create('>'),
+                            ValueNode.createImmediate(0),
+                        ),
+                        IdentifierNode.create('$condition'),
+                    ),
+                ),
+            ],
+            where: WhereNode.create(filter),
         };
+
         const result = await proceed(preCreateCheck);
-        if (!(result.rows[0] as any)?.$condition) {
+        if (!result.rows[0]?.$condition) {
             throw new RejectedByPolicyError(model);
         }
     }
@@ -327,13 +356,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node);
     }
 
-    private buildPolicyFilter(
-        model: GetModels<Schema>,
-        alias: string | undefined,
-        operation: CRUD,
-        thisEntity?: Record<string, OperationNode>,
-        thisEntityRaw?: Record<string, unknown>,
-    ) {
+    private buildPolicyFilter(model: GetModels<Schema>, alias: string | undefined, operation: CRUD) {
         const policies = this.getModelPolicies(model, operation);
         if (policies.length === 0) {
             return falseNode(this.dialect);
@@ -341,11 +364,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const allows = policies
             .filter((policy) => policy.kind === 'allow')
-            .map((policy) => this.transformPolicyCondition(model, alias, operation, policy, thisEntity, thisEntityRaw));
+            .map((policy) => this.transformPolicyCondition(model, alias, operation, policy));
 
         const denies = policies
             .filter((policy) => policy.kind === 'deny')
-            .map((policy) => this.transformPolicyCondition(model, alias, operation, policy, thisEntity, thisEntityRaw));
+            .map((policy) => this.transformPolicyCondition(model, alias, operation, policy));
 
         let combinedPolicy: OperationNode;
 
@@ -458,8 +481,6 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         alias: string | undefined,
         operation: CRUD,
         policy: Policy,
-        thisEntity?: Record<string, OperationNode>,
-        thisEntityRaw?: Record<string, unknown>,
     ) {
         return new ExpressionTransformer(this.client.$schema, this.client.$options, this.client.$auth).transform(
             policy.condition,
@@ -467,8 +488,6 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 model,
                 alias,
                 operation,
-                thisEntity,
-                thisEntityRaw,
                 auth: this.client.$auth,
             },
         );

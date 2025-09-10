@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createPolicyTestClient } from '../utils';
 
 describe('Update policy tests', () => {
-    describe('Scala condition tests', () => {
+    describe('Scalar condition tests', () => {
         it('works with scalar field check', async () => {
             const db = await createPolicyTestClient(
                 `

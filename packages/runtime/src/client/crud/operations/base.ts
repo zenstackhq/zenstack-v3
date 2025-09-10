@@ -1745,7 +1745,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     );
                 const result = await this.executeQuery(kysely, query, 'disconnect');
                 if (!result.numAffectedRows) {
-                    throw new NotFoundError(fromRelation.model);
+                    // determine if the parent entity doesn't exist, or the relation entity to be disconnected doesn't exist
+                    const parentExists = await this.exists(kysely, fromRelation.model, fromRelation.ids);
+                    if (!parentExists) {
+                        throw new NotFoundError(fromRelation.model);
+                    } else {
+                        // silently ignore
+                    }
                 }
             } else {
                 // disconnect

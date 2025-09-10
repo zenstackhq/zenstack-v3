@@ -231,7 +231,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         });
 
         if (expr.op === '!') {
-            predicateFilter = logicalNot(predicateFilter);
+            predicateFilter = logicalNot(this.dialect, predicateFilter);
         }
 
         const count = FunctionNode.create('count', [ValueNode.createImmediate(1)]);
@@ -305,7 +305,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     private _unary(expr: UnaryExpression, context: ExpressionTransformerContext<Schema>) {
         // only '!' operator for now
         invariant(expr.op === '!', 'only "!" operator is supported');
-        return logicalNot(this.transform(expr.operand, context));
+        return logicalNot(this.dialect, this.transform(expr.operand, context));
     }
 
     private transformOperator(op: Exclude<BinaryOperator, '?' | '!' | '^'>) {

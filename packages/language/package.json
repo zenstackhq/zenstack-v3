@@ -59,13 +59,14 @@
     },
     "devDependencies": {
         "@types/pluralize": "^0.0.33",
+        "@types/tmp": "catalog:",
+        "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
+        "glob": "^11.0.2",
         "langium-cli": "catalog:",
-        "tmp": "catalog:",
-        "@types/tmp": "catalog:"
+        "tmp": "catalog:"
     },
     "volta": {
         "node": "18.19.1",

@@ -567,7 +567,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             select: fieldsToSelectObject(referencedPkFields) as any,
                         });
                         if (!relationEntity) {
-                            throw new NotFoundError(`Could not find the entity for connect action`);
+                            throw new NotFoundError(
+                                relationModel,
+                                `Could not find the entity to connect for the relation "${relationField.name}"`,
+                            );
                         }
                         result = relationEntity;
                     }

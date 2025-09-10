@@ -305,11 +305,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     private _unary(expr: UnaryExpression, context: ExpressionTransformerContext<Schema>) {
         // only '!' operator for now
         invariant(expr.op === '!', 'only "!" operator is supported');
-        return BinaryOperationNode.create(
-            this.transform(expr.operand, context),
-            this.transformOperator('!='),
-            trueNode(this.dialect),
-        );
+        return logicalNot(this.transform(expr.operand, context));
     }
 
     private transformOperator(op: Exclude<BinaryOperator, '?' | '!' | '^'>) {

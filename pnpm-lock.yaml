@@ -251,6 +251,9 @@ importers:
       '@zenstackhq/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
+      glob:
+        specifier: ^11.0.2
+        version: 11.0.2
       langium-cli:
         specifier: 'catalog:'
         version: 3.5.0

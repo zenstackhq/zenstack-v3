@@ -25,7 +25,7 @@ export class InternalError extends Error {}
  * Error thrown when an entity is not found.
  */
 export class NotFoundError extends Error {
-    constructor(model: string) {
-        super(`Entity not found for model "${model}"`);
+    constructor(model: string, details?: string) {
+        super(`Entity not found for model "${model}"${details ? `: ${details}` : ''}`);
     }
 }

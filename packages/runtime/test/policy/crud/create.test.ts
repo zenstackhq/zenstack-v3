@@ -15,6 +15,13 @@ model Foo {
         );
         await expect(db.foo.create({ data: { x: 0 } })).toBeRejectedByPolicy();
         await expect(db.foo.create({ data: { x: 1 } })).resolves.toMatchObject({ x: 1 });
+
+        await expect(
+            db.$qb.insertInto('Foo').values({ x: 0 }).returningAll().executeTakeFirst(),
+        ).toBeRejectedByPolicy();
+        await expect(
+            db.$qb.insertInto('Foo').values({ x: 1 }).returningAll().executeTakeFirst(),
+        ).resolves.toMatchObject({ x: 1 });
     });
 
     it('works with this scalar member check', async () => {
@@ -66,7 +73,7 @@ model Foo {
     id Int @id @default(autoincrement())
     x  Int
     @@deny('create', x <= 0)
-    @@allow('create', x > 1)
+    @@allow('create', x <= 0 || x > 1)
     @@allow('read', true)
 }
 `,

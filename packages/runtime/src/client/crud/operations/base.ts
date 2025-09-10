@@ -281,7 +281,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     );
                     Object.assign(createFields, parentFkFields);
                 } else {
-                    parentUpdateTask = (entity) => {
+                    parentUpdateTask = async (entity) => {
                         const query = kysely
                             .updateTable(fromRelation.model)
                             .set(
@@ -300,7 +300,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                                     operation: 'update',
                                 }),
                             );
-                        return this.executeQuery(kysely, query, 'update');
+                        const result = await this.executeQuery(kysely, query, 'update');
+                        if (!result.numAffectedRows) {
+                            throw new NotFoundError(fromRelation.model);
+                        }
                     };
                 }
             }
@@ -1551,8 +1554,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 fromRelation.field,
             );
             let updateResult: QueryResult<unknown>;
+            let updateModel: GetModels<Schema>;
 
             if (ownedByModel) {
+                updateModel = fromRelation.model;
+
                 // set parent fk directly
                 invariant(_data.length === 1, 'only one entity can be connected');
                 const target = await this.readUnique(kysely, model, {
@@ -1581,6 +1587,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     );
                 updateResult = await this.executeQuery(kysely, query, 'connect');
             } else {
+                updateModel = model;
+
                 // disconnect current if it's a one-one relation
                 const relationFieldDef = this.requireField(fromRelation.model, fromRelation.field);
 
@@ -1621,9 +1629,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
 
             // validate connect result
-            if (_data.length > updateResult.numAffectedRows!) {
+            if (!updateResult.numAffectedRows || _data.length > updateResult.numAffectedRows) {
                 // some entities were not connected
-                throw new NotFoundError(model);
+                throw new NotFoundError(updateModel);
             }
         }
     }
@@ -1735,7 +1743,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         }),
                     );
-                await this.executeQuery(kysely, query, 'disconnect');
+                const result = await this.executeQuery(kysely, query, 'disconnect');
+                if (!result.numAffectedRows) {
+                    throw new NotFoundError(fromRelation.model);
+                }
             } else {
                 // disconnect
                 const query = kysely
@@ -1859,7 +1870,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 const r = await this.executeQuery(kysely, query, 'connect');
 
                 // validate result
-                if (_data.length > r.numAffectedRows!) {
+                if (!r.numAffectedRows || _data.length > r.numAffectedRows) {
                     // some entities were not connected
                     throw new NotFoundError(model);
                 }
@@ -1892,9 +1903,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         let deleteResult: { count: number };
+        let deleteFromModel: GetModels<Schema>;
         const m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
 
         if (m2m) {
+            deleteFromModel = model;
+
             // handle many-to-many relation
             const fieldDef = this.requireField(fromRelation.model, fromRelation.field);
             invariant(fieldDef.relation?.opposite);
@@ -1919,11 +1933,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
 
             if (ownedByModel) {
+                deleteFromModel = fromRelation.model;
+
                 const fromEntity = await this.readUnique(kysely, fromRelation.model as GetModels<Schema>, {
                     where: fromRelation.ids,
                 });
                 if (!fromEntity) {
-                    throw new NotFoundError(model);
+                    throw new NotFoundError(fromRelation.model);
                 }
 
                 const fieldDef = this.requireField(fromRelation.model, fromRelation.field);
@@ -1938,6 +1954,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ],
                 });
             } else {
+                deleteFromModel = model;
                 deleteResult = await this.delete(kysely, model, {
                     AND: [
                         Object.fromEntries(keyPairs.map(({ fk, pk }) => [fk, fromRelation.ids[pk]])),
@@ -1952,7 +1969,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // validate result
         if (throwForNotFound && expectedDeleteCount > deleteResult.count) {
             // some entities were not deleted
-            throw new NotFoundError(model);
+            throw new NotFoundError(deleteFromModel);
         }
     }
 

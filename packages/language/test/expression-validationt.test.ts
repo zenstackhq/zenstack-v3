@@ -1,0 +1,100 @@
+import { describe, it } from 'vitest';
+import { loadSchema, loadSchemaWithError } from './utils';
+
+describe('Expression Validation Tests', () => {
+    it('should reject model comparison', async () => {
+        await loadSchemaWithError(
+            `
+            model User {
+                id Int @id
+                name String
+                posts Post[]
+            }
+
+            model Post {
+                id Int @id
+                title String
+                author User @relation(fields: [authorId], references: [id])
+                @@allow('all', author == this)
+            }
+        `,
+            'comparison between models is not supported',
+        );
+    });
+
+    it('should reject model comparison', async () => {
+        await loadSchemaWithError(
+            `
+            model User {
+                id Int @id
+                name String
+                profile Profile?
+                address Address?
+                @@allow('read', profile == this)
+            }
+
+            model Profile {
+                id Int @id
+                bio String
+                user User @relation(fields: [userId], references: [id])
+                userId Int @unique
+            }
+
+            model Address {
+                id Int @id
+                street String
+                user User @relation(fields: [userId], references: [id])
+                userId Int @unique
+            }
+        `,
+            'comparison between models is not supported',
+        );
+    });
+
+    it('should allow auth comparison with auth type', async () => {
+        await loadSchema(
+            `
+            datasource db {
+                provider = 'sqlite'
+                url      = 'file:./dev.db'
+            }
+
+            model User {
+                id Int @id
+                name String
+                profile Profile?
+                @@allow('read', auth() == this)
+            }
+
+            model Profile {
+                id Int @id
+                bio String
+                user User @relation(fields: [userId], references: [id])
+                userId Int @unique
+                @@allow('read', auth() == user)
+            }
+        `,
+        );
+    });
+
+    it('should reject auth comparison with non-auth type', async () => {
+        await loadSchemaWithError(
+            `
+            model User {
+                id Int @id
+                name String
+                profile Profile?
+            }
+
+            model Profile {
+                id Int @id
+                bio String
+                user User @relation(fields: [userId], references: [id])
+                userId Int @unique
+                @@allow('read', auth() == this)
+            }
+        `,
+            'incompatible operand types',
+        );
+    });
+});

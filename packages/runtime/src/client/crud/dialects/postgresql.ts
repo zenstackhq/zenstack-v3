@@ -20,7 +20,7 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import { BaseCrudDialect } from './base';
+import { BaseCrudDialect } from './base-dialect';
 
 export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
     override get provider() {

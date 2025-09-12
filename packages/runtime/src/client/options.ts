@@ -2,7 +2,7 @@ import type { Dialect, Expression, ExpressionBuilder, KyselyConfig } from 'kysel
 import type { GetModel, GetModels, ProcedureDef, SchemaDef } from '../schema';
 import type { PrependParameter } from '../utils/type-utils';
 import type { ClientContract, CRUD, ProcedureFunc } from './contract';
-import type { BaseCrudDialect } from './crud/dialects/base';
+import type { BaseCrudDialect } from './crud/dialects/base-dialect';
 import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
 

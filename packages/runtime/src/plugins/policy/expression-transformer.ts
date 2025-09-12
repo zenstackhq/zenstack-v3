@@ -22,7 +22,7 @@ import {
 import { match } from 'ts-pattern';
 import type { CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
-import type { BaseCrudDialect } from '../../client/crud/dialects/base';
+import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
 import type { ClientOptions } from '../../client/options';
 import { getModel, getRelationForeignKeyFieldPairs, requireField } from '../../client/query-utils';

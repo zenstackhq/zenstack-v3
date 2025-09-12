@@ -485,6 +485,31 @@ importers:
         specifier: workspace:*
         version: link:../../packages/vitest-config
 
+  tests/regression:
+    dependencies:
+      '@zenstackhq/testtools':
+        specifier: workspace:*
+        version: link:../../packages/testtools
+    devDependencies:
+      '@zenstackhq/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@zenstackhq/language':
+        specifier: workspace:*
+        version: link:../../packages/language
+      '@zenstackhq/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@zenstackhq/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@zenstackhq/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@zenstackhq/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
+
 packages:
 
   '@chevrotain/cst-dts-gen@11.0.3':

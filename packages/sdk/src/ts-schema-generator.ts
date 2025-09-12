@@ -52,8 +52,13 @@ import {
 } from './model-utils';
 
 export class TsSchemaGenerator {
+    private usedExpressionUtils = false;
+
     async generate(model: Model, outputDir: string) {
         fs.mkdirSync(outputDir, { recursive: true });
+
+        // Reset the flag for each generation
+        this.usedExpressionUtils = false;
 
         // the schema itself
         this.generateSchema(model, outputDir);
@@ -82,6 +87,10 @@ export class TsSchemaGenerator {
             (d) => isDataModel(d) && d.fields.some((f) => hasAttribute(f, '@computed')),
         );
 
+        // Generate schema content first to determine if ExpressionUtils is needed
+        const schemaObject = this.createSchemaObject(model);
+
+        // Now generate the import declaration with the correct imports
         const runtimeImportDecl = ts.factory.createImportDeclaration(
             undefined,
             ts.factory.createImportClause(
@@ -98,7 +107,15 @@ export class TsSchemaGenerator {
                               ),
                           ]
                         : []),
-                    ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier('ExpressionUtils')),
+                    ...(this.usedExpressionUtils
+                        ? [
+                              ts.factory.createImportSpecifier(
+                                  false,
+                                  undefined,
+                                  ts.factory.createIdentifier('ExpressionUtils'),
+                              ),
+                          ]
+                        : []),
                 ]),
             ),
             ts.factory.createStringLiteral('@zenstackhq/runtime/schema'),
@@ -114,10 +131,7 @@ export class TsSchemaGenerator {
                         undefined,
                         undefined,
                         ts.factory.createSatisfiesExpression(
-                            ts.factory.createAsExpression(
-                                this.createSchemaObject(model),
-                                ts.factory.createTypeReferenceNode('const'),
-                            ),
+                            ts.factory.createAsExpression(schemaObject, ts.factory.createTypeReferenceNode('const')),
                             ts.factory.createTypeReferenceNode('SchemaDef'),
                         ),
                     ),
@@ -135,6 +149,15 @@ export class TsSchemaGenerator {
             ts.factory.createTypeReferenceNode('typeof schema'),
         );
         statements.push(typeDeclaration);
+    }
+
+    private createExpressionUtilsCall(method: string, args?: ts.Expression[]): ts.CallExpression {
+        this.usedExpressionUtils = true;
+        return ts.factory.createCallExpression(
+            ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('ExpressionUtils'), method),
+            undefined,
+            args || [],
+        );
     }
 
     private createSchemaObject(model: Model) {
@@ -477,40 +500,28 @@ export class TsSchemaGenerator {
                         ts.factory.createPropertyAssignment(
                             'default',
 
-                            ts.factory.createCallExpression(
-                                ts.factory.createIdentifier('ExpressionUtils.call'),
-                                undefined,
-                                [
-                                    ts.factory.createStringLiteral(defaultValue.call),
-                                    ...(defaultValue.args.length > 0
-                                        ? [
-                                              ts.factory.createArrayLiteralExpression(
-                                                  defaultValue.args.map((arg) => this.createLiteralNode(arg)),
-                                              ),
-                                          ]
-                                        : []),
-                                ],
-                            ),
+                            this.createExpressionUtilsCall('call', [
+                                ts.factory.createStringLiteral(defaultValue.call),
+                                ...(defaultValue.args.length > 0
+                                    ? [
+                                          ts.factory.createArrayLiteralExpression(
+                                              defaultValue.args.map((arg) => this.createLiteralNode(arg)),
+                                          ),
+                                      ]
+                                    : []),
+                            ]),
                         ),
                     );
                 } else if ('authMember' in defaultValue) {
                     objectFields.push(
                         ts.factory.createPropertyAssignment(
                             'default',
-                            ts.factory.createCallExpression(
-                                ts.factory.createIdentifier('ExpressionUtils.member'),
-                                undefined,
-                                [
-                                    ts.factory.createCallExpression(
-                                        ts.factory.createIdentifier('ExpressionUtils.call'),
-                                        undefined,
-                                        [ts.factory.createStringLiteral('auth')],
-                                    ),
-                                    ts.factory.createArrayLiteralExpression(
-                                        defaultValue.authMember.map((m) => ts.factory.createStringLiteral(m)),
-                                    ),
-                                ],
-                            ),
+                            this.createExpressionUtilsCall('member', [
+                                this.createExpressionUtilsCall('call', [ts.factory.createStringLiteral('auth')]),
+                                ts.factory.createArrayLiteralExpression(
+                                    defaultValue.authMember.map((m) => ts.factory.createStringLiteral(m)),
+                                ),
+                            ]),
                         ),
                     );
                 } else {
@@ -1015,7 +1026,7 @@ export class TsSchemaGenerator {
     }
 
     private createThisExpression() {
-        return ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils._this'), undefined, []);
+        return this.createExpressionUtilsCall('_this');
     }
 
     private createMemberExpression(expr: MemberAccessExpr) {
@@ -1034,15 +1045,15 @@ export class TsSchemaGenerator {
             ts.factory.createArrayLiteralExpression(members.map((m) => ts.factory.createStringLiteral(m))),
         ];
 
-        return ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.member'), undefined, args);
+        return this.createExpressionUtilsCall('member', args);
     }
 
     private createNullExpression() {
-        return ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils._null'), undefined, []);
+        return this.createExpressionUtilsCall('_null');
     }
 
     private createBinaryExpression(expr: BinaryExpr) {
-        return ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.binary'), undefined, [
+        return this.createExpressionUtilsCall('binary', [
             this.createExpression(expr.left),
             this.createLiteralNode(expr.operator),
             this.createExpression(expr.right),
@@ -1050,23 +1061,21 @@ export class TsSchemaGenerator {
     }
 
     private createUnaryExpression(expr: UnaryExpr) {
-        return ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.unary'), undefined, [
+        return this.createExpressionUtilsCall('unary', [
             this.createLiteralNode(expr.operator),
             this.createExpression(expr.operand),
         ]);
     }
 
     private createArrayExpression(expr: ArrayExpr): any {
-        return ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.array'), undefined, [
+        return this.createExpressionUtilsCall('array', [
             ts.factory.createArrayLiteralExpression(expr.items.map((item) => this.createExpression(item))),
         ]);
     }
 
     private createRefExpression(expr: ReferenceExpr): any {
         if (isDataField(expr.target.ref)) {
-            return ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.field'), undefined, [
-                this.createLiteralNode(expr.target.$refText),
-            ]);
+            return this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]);
         } else if (isEnumField(expr.target.ref)) {
             return this.createLiteralExpression('StringLiteral', expr.target.$refText);
         } else {
@@ -1075,7 +1084,7 @@ export class TsSchemaGenerator {
     }
 
     private createCallExpression(expr: InvocationExpr) {
-        return ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.call'), undefined, [
+        return this.createExpressionUtilsCall('call', [
             ts.factory.createStringLiteral(expr.function.$refText),
             ...(expr.args.length > 0
                 ? [ts.factory.createArrayLiteralExpression(expr.args.map((arg) => this.createExpression(arg.value)))]
@@ -1085,21 +1094,11 @@ export class TsSchemaGenerator {
 
     private createLiteralExpression(type: string, value: string | boolean) {
         return match(type)
-            .with('BooleanLiteral', () =>
-                ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.literal'), undefined, [
-                    this.createLiteralNode(value),
-                ]),
-            )
+            .with('BooleanLiteral', () => this.createExpressionUtilsCall('literal', [this.createLiteralNode(value)]))
             .with('NumberLiteral', () =>
-                ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.literal'), undefined, [
-                    ts.factory.createIdentifier(value as string),
-                ]),
+                this.createExpressionUtilsCall('literal', [ts.factory.createIdentifier(value as string)]),
             )
-            .with('StringLiteral', () =>
-                ts.factory.createCallExpression(ts.factory.createIdentifier('ExpressionUtils.literal'), undefined, [
-                    this.createLiteralNode(value),
-                ]),
-            )
+            .with('StringLiteral', () => this.createExpressionUtilsCall('literal', [this.createLiteralNode(value)]))
             .otherwise(() => {
                 throw new Error(`Unsupported literal type: ${type}`);
             });

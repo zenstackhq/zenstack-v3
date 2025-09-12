@@ -12,7 +12,7 @@ import {
     UnaryOperationNode,
     ValueNode,
 } from 'kysely';
-import type { BaseCrudDialect } from '../../client/crud/dialects/base';
+import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import type { SchemaDef } from '../../schema';
 
 /**

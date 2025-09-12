@@ -7,7 +7,6 @@ import {
     UpdateResult,
     type Compilable,
     type IsolationLevel,
-    type QueryResult,
     type SelectQueryBuilder,
 } from 'kysely';
 import { nanoid } from 'nanoid';
@@ -44,7 +43,7 @@ import {
     requireModel,
 } from '../../query-utils';
 import { getCrudDialect } from '../dialects';
-import type { BaseCrudDialect } from '../dialects/base';
+import type { BaseCrudDialect } from '../dialects/base-dialect';
 import { InputValidator } from '../validator';
 
 export type CoreCrudOperation =
@@ -66,10 +65,16 @@ export type CoreCrudOperation =
 
 export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
 
+// context for nested relation operations
 export type FromRelationContext<Schema extends SchemaDef> = {
+    // the model where the relation field is defined
     model: GetModels<Schema>;
+    // the relation field name
     field: string;
+    // the parent entity's id fields and values
     ids: any;
+    // for relations owned by model, record the parent updates needed after the relation is processed
+    parentUpdates: Record<string, unknown>;
 };
 
 export abstract class BaseOperationHandler<Schema extends SchemaDef> {
@@ -258,7 +263,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         let createFields: any = {};
-        let parentUpdateTask: ((entity: any) => Promise<unknown>) | undefined = undefined;
+        let updateParent: ((entity: any) => void) | undefined = undefined;
 
         let m2m: ReturnType<typeof getManyToManyRelation> = undefined;
 
@@ -281,26 +286,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     );
                     Object.assign(createFields, parentFkFields);
                 } else {
-                    parentUpdateTask = (entity) => {
-                        const query = kysely
-                            .updateTable(fromRelation.model)
-                            .set(
-                                keyPairs.reduce(
-                                    (acc, { fk, pk }) => ({
-                                        ...acc,
-                                        [fk]: entity[pk],
-                                    }),
-                                    {} as any,
-                                ),
-                            )
-                            .where((eb) => eb.and(fromRelation.ids))
-                            .modifyEnd(
-                                this.makeContextComment({
-                                    model: fromRelation.model,
-                                    operation: 'update',
-                                }),
-                            );
-                        return this.executeQuery(kysely, query, 'update');
+                    // record parent fk update after entity is created
+                    updateParent = (entity) => {
+                        for (const { fk, pk } of keyPairs) {
+                            fromRelation.parentUpdates[fk] = entity[pk];
+                        }
                     };
                 }
             }
@@ -403,8 +393,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // finally update parent if needed
-        if (parentUpdateTask) {
-            await parentUpdateTask(createdEntity);
+        if (updateParent) {
+            updateParent(createdEntity);
         }
 
         return createdEntity;
@@ -608,10 +598,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const relationFieldDef = this.requireField(contextModel, relationFieldName);
         const relationModel = relationFieldDef.type as GetModels<Schema>;
         const tasks: Promise<unknown>[] = [];
-        const fromRelationContext = {
+        const fromRelationContext: FromRelationContext<Schema> = {
             model: contextModel,
             field: relationFieldName,
             ids: parentEntity,
+            parentUpdates: {},
         };
 
         for (const [action, subPayload] of Object.entries<any>(payload)) {
@@ -644,13 +635,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
 
                 case 'connect': {
-                    tasks.push(
-                        this.connectRelation(kysely, relationModel, subPayload, {
-                            model: contextModel,
-                            field: relationFieldName,
-                            ids: parentEntity,
-                        }),
-                    );
+                    tasks.push(this.connectRelation(kysely, relationModel, subPayload, fromRelationContext));
                     break;
                 }
 
@@ -659,16 +644,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ...enumerate(subPayload).map((item) =>
                             this.exists(kysely, relationModel, item.where).then((found) =>
                                 !found
-                                    ? this.create(kysely, relationModel, item.create, {
-                                          model: contextModel,
-                                          field: relationFieldName,
-                                          ids: parentEntity,
-                                      })
-                                    : this.connectRelation(kysely, relationModel, found, {
-                                          model: contextModel,
-                                          field: relationFieldName,
-                                          ids: parentEntity,
-                                      }),
+                                    ? this.create(kysely, relationModel, item.create, fromRelationContext)
+                                    : this.connectRelation(kysely, relationModel, found, fromRelationContext),
                             ),
                         ),
                     );
@@ -1044,7 +1021,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         }
                     }
                 }
-                await this.processRelationUpdates(
+                const parentUpdates = await this.processRelationUpdates(
                     kysely,
                     model,
                     field,
@@ -1053,6 +1030,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     finalData[field],
                     throwIfNotFound,
                 );
+
+                if (Object.keys(parentUpdates).length > 0) {
+                    // merge field updates propagated from nested relation processing
+                    Object.assign(updateFields, parentUpdates);
+                }
             }
         }
 
@@ -1372,10 +1354,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     ) {
         const tasks: Promise<unknown>[] = [];
         const fieldModel = fieldDef.type as GetModels<Schema>;
-        const fromRelationContext = {
+        const fromRelationContext: FromRelationContext<Schema> = {
             model,
             field,
             ids: parentIds,
+            parentUpdates: {},
         };
 
         for (const [key, value] of Object.entries(args)) {
@@ -1506,6 +1489,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         await Promise.all(tasks);
+
+        return fromRelationContext.parentUpdates;
     }
 
     // #region relation manipulation
@@ -1550,10 +1535,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 fromRelation.model,
                 fromRelation.field,
             );
-            let updateResult: QueryResult<unknown>;
 
             if (ownedByModel) {
-                // set parent fk directly
+                // record parent fk update
                 invariant(_data.length === 1, 'only one entity can be connected');
                 const target = await this.readUnique(kysely, model, {
                     where: _data[0],
@@ -1561,25 +1545,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (!target) {
                     throw new NotFoundError(model);
                 }
-                const query = kysely
-                    .updateTable(fromRelation.model)
-                    .where((eb) => eb.and(fromRelation.ids))
-                    .set(
-                        keyPairs.reduce(
-                            (acc, { fk, pk }) => ({
-                                ...acc,
-                                [fk]: target[pk],
-                            }),
-                            {} as any,
-                        ),
-                    )
-                    .modifyEnd(
-                        this.makeContextComment({
-                            model: fromRelation.model,
-                            operation: 'update',
-                        }),
-                    );
-                updateResult = await this.executeQuery(kysely, query, 'connect');
+
+                for (const { fk, pk } of keyPairs) {
+                    fromRelation.parentUpdates[fk] = target[pk];
+                }
             } else {
                 // disconnect current if it's a one-one relation
                 const relationFieldDef = this.requireField(fromRelation.model, fromRelation.field);
@@ -1617,13 +1586,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             operation: 'update',
                         }),
                     );
-                updateResult = await this.executeQuery(kysely, query, 'connect');
-            }
+                const updateResult = await this.executeQuery(kysely, query, 'connect');
 
-            // validate connect result
-            if (_data.length > updateResult.numAffectedRows!) {
-                // some entities were not connected
-                throw new NotFoundError(model);
+                // validate connect result
+                if (!updateResult.numAffectedRows || _data.length > updateResult.numAffectedRows) {
+                    // some entities were not connected
+                    throw new NotFoundError(model);
+                }
             }
         }
     }
@@ -1707,35 +1676,44 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             const eb = expressionBuilder<any, any>();
             if (ownedByModel) {
-                // set parent fk directly
+                // record parent fk update
                 invariant(disconnectConditions.length === 1, 'only one entity can be disconnected');
                 const condition = disconnectConditions[0];
-                const query = kysely
-                    .updateTable(fromRelation.model)
-                    // id filter
-                    .where(eb.and(fromRelation.ids))
-                    // merge extra disconnect conditions
-                    .$if(condition !== true, (qb) =>
-                        qb.where(
-                            eb(
-                                // @ts-ignore
-                                eb.refTuple(...keyPairs.map(({ fk }) => fk)),
-                                'in',
-                                eb
-                                    .selectFrom(model)
-                                    .select(keyPairs.map(({ pk }) => pk))
-                                    .where(this.dialect.buildFilter(eb, model, model, condition)),
-                            ),
-                        ),
-                    )
-                    .set(keyPairs.reduce((acc, { fk }) => ({ ...acc, [fk]: null }), {} as any))
-                    .modifyEnd(
-                        this.makeContextComment({
-                            model: fromRelation.model,
-                            operation: 'update',
-                        }),
-                    );
-                await this.executeQuery(kysely, query, 'disconnect');
+
+                if (condition === true) {
+                    // just disconnect, record parent fk update
+                    for (const { fk } of keyPairs) {
+                        fromRelation.parentUpdates[fk] = null;
+                    }
+                } else {
+                    // disconnect with a filter
+
+                    // read parent's fk
+                    const fromEntity = await this.readUnique(kysely, fromRelation.model, {
+                        where: fromRelation.ids,
+                        select: fieldsToSelectObject(keyPairs.map(({ fk }) => fk)),
+                    });
+                    if (!fromEntity || keyPairs.some(({ fk }) => fromEntity[fk] == null)) {
+                        return;
+                    }
+
+                    // check if the disconnect target exists under parent fk and the filter condition
+                    const relationFilter = {
+                        AND: [condition, Object.fromEntries(keyPairs.map(({ fk, pk }) => [pk, fromEntity[fk]]))],
+                    };
+
+                    // if the target exists, record parent fk update, otherwise do nothing
+                    const targetExists = await this.read(kysely, model, {
+                        where: relationFilter,
+                        take: 1,
+                        select: this.makeIdSelect(model),
+                    } as any);
+                    if (targetExists.length > 0) {
+                        for (const { fk } of keyPairs) {
+                            fromRelation.parentUpdates[fk] = null;
+                        }
+                    }
+                }
             } else {
                 // disconnect
                 const query = kysely
@@ -1859,7 +1837,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 const r = await this.executeQuery(kysely, query, 'connect');
 
                 // validate result
-                if (_data.length > r.numAffectedRows!) {
+                if (!r.numAffectedRows || _data.length > r.numAffectedRows) {
                     // some entities were not connected
                     throw new NotFoundError(model);
                 }
@@ -1892,9 +1870,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         let deleteResult: { count: number };
+        let deleteFromModel: GetModels<Schema>;
         const m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
 
         if (m2m) {
+            deleteFromModel = model;
+
             // handle many-to-many relation
             const fieldDef = this.requireField(fromRelation.model, fromRelation.field);
             invariant(fieldDef.relation?.opposite);
@@ -1919,11 +1900,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
 
             if (ownedByModel) {
+                deleteFromModel = fromRelation.model;
+
                 const fromEntity = await this.readUnique(kysely, fromRelation.model as GetModels<Schema>, {
                     where: fromRelation.ids,
                 });
                 if (!fromEntity) {
-                    throw new NotFoundError(model);
+                    throw new NotFoundError(fromRelation.model);
                 }
 
                 const fieldDef = this.requireField(fromRelation.model, fromRelation.field);
@@ -1938,6 +1921,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ],
                 });
             } else {
+                deleteFromModel = model;
                 deleteResult = await this.delete(kysely, model, {
                     AND: [
                         Object.fromEntries(keyPairs.map(({ fk, pk }) => [fk, fromRelation.ids[pk]])),
@@ -1952,7 +1936,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // validate result
         if (throwForNotFound && expectedDeleteCount > deleteResult.count) {
             // some entities were not deleted
-            throw new NotFoundError(model);
+            throw new NotFoundError(deleteFromModel);
         }
     }
 

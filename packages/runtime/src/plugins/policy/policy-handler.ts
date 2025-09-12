@@ -30,7 +30,7 @@ import { match } from 'ts-pattern';
 import type { ClientContract } from '../../client';
 import type { CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
-import type { BaseCrudDialect } from '../../client/crud/dialects/base';
+import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError } from '../../client/errors';
 import type { ProceedKyselyQueryFunction } from '../../client/plugin';
 import { getIdFields, requireField, requireModel } from '../../client/query-utils';
@@ -180,7 +180,12 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         // create a `SELECT column1 as field1, column2 as field2, ... FROM (VALUES (...))` table for policy evaluation
         const constTable: SelectQueryNode = {
             kind: 'SelectQueryNode',
-            from: FromNode.create([ParensNode.create(ValuesNode.create([ValueListNode.create(allValues)]))]),
+            from: FromNode.create([
+                AliasNode.create(
+                    ParensNode.create(ValuesNode.create([ValueListNode.create(allValues)])),
+                    IdentifierNode.create('$t'),
+                ),
+            ]),
             selections: allFields.map((field, index) =>
                 SelectionNode.create(
                     AliasNode.create(ColumnNode.create(`column${index + 1}`), IdentifierNode.create(field)),

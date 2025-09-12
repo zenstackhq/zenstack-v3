@@ -1815,6 +1815,21 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client update tests', ({ createCli
                     user: { connect: { id: '1' } },
                 },
             });
+            // not matching filter, no-op
+            await expect(
+                client.profile.update({
+                    where: { id: profile.id },
+                    data: {
+                        user: {
+                            disconnect: { id: '2' },
+                        },
+                    },
+                    include: { user: true },
+                }),
+            ).resolves.toMatchObject({
+                user: { id: '1' },
+            });
+            // connected, disconnect
             await expect(
                 client.profile.update({
                     where: { id: profile.id },
@@ -1828,8 +1843,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client update tests', ({ createCli
             ).resolves.toMatchObject({
                 user: null,
             });
-
-            // non-existing
+            // not connected, no-op
             await expect(
                 client.profile.update({
                     where: { id: profile.id },

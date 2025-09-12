@@ -154,7 +154,7 @@ export class TsSchemaGenerator {
     private createExpressionUtilsCall(method: string, args?: ts.Expression[]): ts.CallExpression {
         this.usedExpressionUtils = true;
         return ts.factory.createCallExpression(
-            ts.factory.createIdentifier(`ExpressionUtils.${method}`),
+            ts.factory.createPropertyAccessExpression(ts.factory.createIdentifier('ExpressionUtils'), method),
             undefined,
             args || [],
         );

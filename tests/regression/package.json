@@ -1,0 +1,21 @@
+{
+    "name": "regression",
+    "version": "3.0.0-beta.3",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "generate": "tsx generate.ts",
+        "test": "pnpm generate && tsc && vitest run"
+    },
+    "dependencies": {
+        "@zenstackhq/testtools": "workspace:*"
+    },
+    "devDependencies": {
+        "@zenstackhq/cli": "workspace:*",
+        "@zenstackhq/sdk": "workspace:*",
+        "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*"
+    }
+}

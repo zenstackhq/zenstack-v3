@@ -14,15 +14,19 @@ export function hasModel(schema: SchemaDef, model: string) {
 }
 
 export function getModel(schema: SchemaDef, model: string) {
-    return schema.models[model];
+    return Object.values(schema.models).find((m) => m.name.toLowerCase() === model.toLowerCase());
+}
+
+export function getTypeDef(schema: SchemaDef, type: string) {
+    return schema.typeDefs?.[type];
 }
 
 export function requireModel(schema: SchemaDef, model: string) {
-    const matchedName = Object.keys(schema.models).find((k) => k.toLowerCase() === model.toLowerCase());
-    if (!matchedName) {
+    const modelDef = getModel(schema, model);
+    if (!modelDef) {
         throw new QueryError(`Model "${model}" not found in schema`);
     }
-    return schema.models[matchedName]!;
+    return modelDef;
 }
 
 export function getField(schema: SchemaDef, model: string, field: string) {
@@ -30,12 +34,24 @@ export function getField(schema: SchemaDef, model: string, field: string) {
     return modelDef?.fields[field];
 }
 
-export function requireField(schema: SchemaDef, model: string, field: string) {
-    const modelDef = requireModel(schema, model);
-    if (!modelDef.fields[field]) {
-        throw new QueryError(`Field "${field}" not found in model "${model}"`);
+export function requireField(schema: SchemaDef, modelOrType: string, field: string) {
+    const modelDef = getModel(schema, modelOrType);
+    if (modelDef) {
+        if (!modelDef.fields[field]) {
+            throw new QueryError(`Field "${field}" not found in model "${modelOrType}"`);
+        } else {
+            return modelDef.fields[field];
+        }
     }
-    return modelDef.fields[field];
+    const typeDef = getTypeDef(schema, modelOrType);
+    if (typeDef) {
+        if (!typeDef.fields[field]) {
+            throw new QueryError(`Field "${field}" not found in type "${modelOrType}"`);
+        } else {
+            return typeDef.fields[field];
+        }
+    }
+    throw new QueryError(`Model or type "${modelOrType}" not found in schema`);
 }
 
 export function getIdFields<Schema extends SchemaDef>(schema: SchemaDef, model: GetModels<Schema>) {

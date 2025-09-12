@@ -207,12 +207,12 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                         isDataFieldReference(expr.left) &&
                         (isThisExpr(expr.right) || isDataFieldReference(expr.right))
                     ) {
-                        accept('error', 'comparison between model-typed fields are not supported', { node: expr });
+                        accept('error', 'comparison between models is not supported', { node: expr });
                     } else if (
                         isDataFieldReference(expr.right) &&
                         (isThisExpr(expr.left) || isDataFieldReference(expr.left))
                     ) {
-                        accept('error', 'comparison between model-typed fields are not supported', { node: expr });
+                        accept('error', 'comparison between models is not supported', { node: expr });
                     }
                 } else if (
                     (isDataModel(leftType) && !isNullExpr(expr.right)) ||

@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { ClientOptions } from '../../options';
-import type { BaseCrudDialect } from './base';
+import type { BaseCrudDialect } from './base-dialect';
 import { PostgresCrudDialect } from './postgresql';
 import { SqliteCrudDialect } from './sqlite';
 

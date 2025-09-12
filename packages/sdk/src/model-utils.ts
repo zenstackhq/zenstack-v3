@@ -2,6 +2,7 @@ import {
     isDataModel,
     isLiteralExpr,
     isModel,
+    isTypeDef,
     Model,
     type AstNode,
     type Attribute,
@@ -102,7 +103,7 @@ export function resolved<T extends AstNode>(ref: Reference<T>): T {
 
 export function getAuthDecl(model: Model) {
     let found = model.declarations.find(
-        (d) => isDataModel(d) && d.attributes.some((attr) => attr.decl.$refText === '@@auth'),
+        (d) => (isDataModel(d) || isTypeDef(d)) && d.attributes.some((attr) => attr.decl.$refText === '@@auth'),
     );
     if (!found) {
         found = model.declarations.find((d) => isDataModel(d) && d.name === 'User');

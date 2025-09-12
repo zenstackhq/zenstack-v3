@@ -22,12 +22,11 @@ import {
     type UpdateManyArgs,
     type UpsertArgs,
 } from '../crud-types';
-import { InputValidationError, InternalError, QueryError } from '../errors';
+import { InputValidationError, InternalError } from '../errors';
 import {
     fieldHasDefaultValue,
     getDiscriminatorField,
     getEnum,
-    getModel,
     getUniqueFields,
     requireField,
     requireModel,
@@ -279,10 +278,7 @@ export class InputValidator<Schema extends SchemaDef> {
         withoutRelationFields = false,
         withAggregations = false,
     ): ZodType {
-        const modelDef = getModel(this.schema, model);
-        if (!modelDef) {
-            throw new QueryError(`Model "${model}" not found in schema`);
-        }
+        const modelDef = requireModel(this.schema, model);
 
         const fields: Record<string, any> = {};
         for (const field of Object.keys(modelDef.fields)) {

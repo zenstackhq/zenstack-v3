@@ -251,6 +251,9 @@ importers:
       '@zenstackhq/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
+      glob:
+        specifier: ^11.0.2
+        version: 11.0.2
       langium-cli:
         specifier: 'catalog:'
         version: 3.5.0
@@ -478,6 +481,31 @@ importers:
       '@zenstackhq/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@zenstackhq/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
+
+  tests/regression:
+    dependencies:
+      '@zenstackhq/testtools':
+        specifier: workspace:*
+        version: link:../../packages/testtools
+    devDependencies:
+      '@zenstackhq/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@zenstackhq/language':
+        specifier: workspace:*
+        version: link:../../packages/language
+      '@zenstackhq/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@zenstackhq/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@zenstackhq/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
       '@zenstackhq/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config

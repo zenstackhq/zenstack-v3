@@ -21,7 +21,7 @@
     </a>
 </div>
 
-> V3 is currently in alpha phase and not ready for production use. Feedback and bug reports are greatly appreciated. Please visit this dedicated [discord channel](https://discord.com/channels/1035538056146595961/1352359627525718056) for chat and support.
+> V3 is currently in beta phase and not ready for production use. Feedback and bug reports are greatly appreciated. Please visit this dedicated [discord channel](https://discord.com/channels/1035538056146595961/1352359627525718056) for chat and support.
 
 # What's ZenStack
 

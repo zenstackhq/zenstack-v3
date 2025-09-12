@@ -100,7 +100,6 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 const hookResult = await hook!({
                     client: this.client as ClientContract<Schema>,
                     schema: this.client.$schema,
-                    kysely: this.kysely,
                     query,
                     proceed: _p,
                 });

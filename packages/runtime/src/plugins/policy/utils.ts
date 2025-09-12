@@ -12,7 +12,7 @@ import {
     UnaryOperationNode,
     ValueNode,
 } from 'kysely';
-import type { BaseCrudDialect } from '../../client/crud/dialects/base';
+import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import type { SchemaDef } from '../../schema';
 
 /**
@@ -50,6 +50,12 @@ export function conjunction<Schema extends SchemaDef>(
     dialect: BaseCrudDialect<Schema>,
     nodes: OperationNode[],
 ): OperationNode {
+    if (nodes.length === 0) {
+        return trueNode(dialect);
+    }
+    if (nodes.length === 1) {
+        return nodes[0]!;
+    }
     if (nodes.some(isFalseNode)) {
         return falseNode(dialect);
     }
@@ -57,17 +63,19 @@ export function conjunction<Schema extends SchemaDef>(
     if (items.length === 0) {
         return trueNode(dialect);
     }
-    return items.reduce((acc, node) =>
-        OrNode.is(node)
-            ? AndNode.create(acc, ParensNode.create(node)) // wraps parentheses
-            : AndNode.create(acc, node),
-    );
+    return items.reduce((acc, node) => AndNode.create(wrapParensIf(acc, OrNode.is), wrapParensIf(node, OrNode.is)));
 }
 
 export function disjunction<Schema extends SchemaDef>(
     dialect: BaseCrudDialect<Schema>,
     nodes: OperationNode[],
 ): OperationNode {
+    if (nodes.length === 0) {
+        return falseNode(dialect);
+    }
+    if (nodes.length === 1) {
+        return nodes[0]!;
+    }
     if (nodes.some(isTrueNode)) {
         return trueNode(dialect);
     }
@@ -75,23 +83,30 @@ export function disjunction<Schema extends SchemaDef>(
     if (items.length === 0) {
         return falseNode(dialect);
     }
-    return items.reduce((acc, node) =>
-        AndNode.is(node)
-            ? OrNode.create(acc, ParensNode.create(node)) // wraps parentheses
-            : OrNode.create(acc, node),
-    );
+    return items.reduce((acc, node) => OrNode.create(wrapParensIf(acc, AndNode.is), wrapParensIf(node, AndNode.is)));
 }
 
 /**
  * Negates a logical expression.
  */
-export function logicalNot(node: OperationNode): OperationNode {
+export function logicalNot<Schema extends SchemaDef>(
+    dialect: BaseCrudDialect<Schema>,
+    node: OperationNode,
+): OperationNode {
+    if (isTrueNode(node)) {
+        return falseNode(dialect);
+    }
+    if (isFalseNode(node)) {
+        return trueNode(dialect);
+    }
     return UnaryOperationNode.create(
         OperatorNode.create('not'),
-        AndNode.is(node) || OrNode.is(node)
-            ? ParensNode.create(node) // wraps parentheses
-            : node,
+        wrapParensIf(node, (n) => AndNode.is(n) || OrNode.is(n)),
     );
+}
+
+function wrapParensIf(node: OperationNode, predicate: (node: OperationNode) => boolean): OperationNode {
+    return predicate(node) ? ParensNode.create(node) : node;
 }
 
 /**

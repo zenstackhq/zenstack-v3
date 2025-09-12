@@ -16,10 +16,12 @@ export type Simplify<T, D extends number = 6> = D extends 0
           : { [K in keyof T]: Simplify<T[K], _Depth[D]> } & {}
       : T;
 
-export type WrapType<T, Optional = false, Array = false> = Optional extends true
-    ? T | null
-    : Array extends true
-      ? T[]
+export type WrapType<T, Optional = false, Array = false> = Array extends true
+    ? Optional extends true
+        ? T[] | null
+        : T[]
+    : Optional extends true
+      ? T | null
       : T;
 
 type TypeMap = {

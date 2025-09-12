@@ -1104,7 +1104,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return (node as ValueNode).value === false || (node as ValueNode).value === 0;
     }
 
-    protected and(eb: ExpressionBuilder<any, any>, ...args: Expression<SqlBool>[]) {
+    and(eb: ExpressionBuilder<any, any>, ...args: Expression<SqlBool>[]) {
         const nonTrueArgs = args.filter((arg) => !this.isTrue(arg));
         if (nonTrueArgs.length === 0) {
             return this.true(eb);
@@ -1115,7 +1115,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
     }
 
-    protected or(eb: ExpressionBuilder<any, any>, ...args: Expression<SqlBool>[]) {
+    or(eb: ExpressionBuilder<any, any>, ...args: Expression<SqlBool>[]) {
         const nonFalseArgs = args.filter((arg) => !this.isFalse(arg));
         if (nonFalseArgs.length === 0) {
             return this.false(eb);
@@ -1126,7 +1126,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
     }
 
-    protected not(eb: ExpressionBuilder<any, any>, ...args: Expression<SqlBool>[]) {
+    not(eb: ExpressionBuilder<any, any>, ...args: Expression<SqlBool>[]) {
         return eb.not(this.and(eb, ...args));
     }
 

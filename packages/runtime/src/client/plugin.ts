@@ -1,5 +1,5 @@
 import type { OperationNode, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
-import type { ClientContract, ToKysely } from '.';
+import type { ClientContract } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
 import type { AllCrudOperation } from './crud/operations/base';
@@ -180,7 +180,6 @@ export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHo
 // #region OnKyselyQuery hooks
 
 export type OnKyselyQueryArgs<Schema extends SchemaDef> = {
-    kysely: ToKysely<Schema>;
     schema: SchemaDef;
     client: ClientContract<Schema>;
     query: RootOperationNode;

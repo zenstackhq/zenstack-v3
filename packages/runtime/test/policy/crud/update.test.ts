@@ -953,4 +953,100 @@ model Foo {
             );
         });
     });
+
+    describe('Query builder tests', () => {
+        it('works with simple update', async () => {
+            const db = await createPolicyTestClient(
+                `
+model Foo {
+    id Int @id
+    x  Int
+    @@allow('create', true)
+    @@allow('update', x > 1)
+    @@allow('read', true)
+}
+`,
+            );
+
+            await db.foo.createMany({
+                data: [
+                    { id: 1, x: 1 },
+                    { id: 2, x: 2 },
+                    { id: 3, x: 3 },
+                ],
+            });
+
+            // not updatable
+            await expect(
+                db.$qb.updateTable('Foo').set({ x: 5 }).where('id', '=', 1).executeTakeFirst(),
+            ).resolves.toMatchObject({ numUpdatedRows: 0n });
+
+            // with where
+            await expect(
+                db.$qb.updateTable('Foo').set({ x: 5 }).where('id', '=', 2).executeTakeFirst(),
+            ).resolves.toMatchObject({ numUpdatedRows: 1n });
+            await expect(db.foo.findUnique({ where: { id: 2 } })).resolves.toMatchObject({ x: 5 });
+
+            // without where
+            await expect(db.$qb.updateTable('Foo').set({ x: 6 }).executeTakeFirst()).resolves.toMatchObject({
+                numUpdatedRows: 2n,
+            });
+            await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 1 });
+        });
+
+        it('works with insert on conflict do update', async () => {
+            const db = await createPolicyTestClient(
+                `
+model Foo {
+    id Int @id
+    x  Int
+    @@allow('create', true)
+    @@allow('update', x > 1)
+    @@allow('read', true)
+}
+`,
+            );
+
+            await db.foo.createMany({
+                data: [
+                    { id: 1, x: 1 },
+                    { id: 2, x: 2 },
+                    { id: 3, x: 3 },
+                ],
+            });
+
+            // #1 not updatable
+            await expect(
+                db.$qb
+                    .insertInto('Foo')
+                    .values({ id: 1, x: 5 })
+                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 5 }))
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 0n });
+            await expect(db.foo.count()).resolves.toBe(3);
+            await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 1 });
+
+            // with where, #1 not updatable
+            await expect(
+                db.$qb
+                    .insertInto('Foo')
+                    .values({ id: 1, x: 5 })
+                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 5 }).where('id', '=', 1))
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 0n });
+            await expect(db.foo.count()).resolves.toBe(3);
+            await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 1 });
+
+            // with where, #2 updatable
+            await expect(
+                db.$qb
+                    .insertInto('Foo')
+                    .values({ id: 2, x: 5 })
+                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 6 }).where('id', '=', 2))
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 1n });
+            await expect(db.foo.count()).resolves.toBe(3);
+            await expect(db.foo.findUnique({ where: { id: 2 } })).resolves.toMatchObject({ x: 6 });
+        });
+    });
 });

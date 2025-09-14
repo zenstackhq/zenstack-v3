@@ -134,6 +134,102 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         // return result;
     }
 
+    // #region overrides
+
+    protected override transformSelectQuery(node: SelectQueryNode) {
+        let whereNode = node.where;
+
+        node.from?.froms.forEach((from) => {
+            const extractResult = this.extractTableName(from);
+            if (extractResult) {
+                const { model, alias } = extractResult;
+                const filter = this.buildPolicyFilter(model, alias, 'read');
+                whereNode = WhereNode.create(
+                    whereNode?.where ? conjunction(this.dialect, [whereNode.where, filter]) : filter,
+                );
+            }
+        });
+
+        const baseResult = super.transformSelectQuery({
+            ...node,
+            where: undefined,
+        });
+
+        return {
+            ...baseResult,
+            where: whereNode,
+        };
+    }
+
+    protected override transformInsertQuery(node: InsertQueryNode) {
+        // pre-insert check is done in `handle()`
+
+        let onConflict = node.onConflict;
+
+        if (onConflict?.updates) {
+            // for "on conflict do update", we need to apply policy filter to the "where" clause
+            const mutationModel = this.getMutationModel(node);
+            const filter = this.buildPolicyFilter(mutationModel, undefined, 'update');
+            if (onConflict.updateWhere) {
+                onConflict = {
+                    ...onConflict,
+                    updateWhere: WhereNode.create(conjunction(this.dialect, [onConflict.updateWhere.where, filter])),
+                };
+            } else {
+                onConflict = {
+                    ...onConflict,
+                    updateWhere: WhereNode.create(filter),
+                };
+            }
+        }
+
+        // merge updated onConflict
+        const processedNode = onConflict ? { ...node, onConflict } : node;
+
+        const result = super.transformInsertQuery(processedNode);
+
+        if (!node.returning) {
+            return result;
+        }
+
+        if (this.onlyReturningId(node)) {
+            return result;
+        } else {
+            // only return ID fields, that's enough for reading back the inserted row
+            const idFields = getIdFields(this.client.$schema, this.getMutationModel(node));
+            return {
+                ...result,
+                returning: ReturningNode.create(
+                    idFields.map((field) => SelectionNode.create(ColumnNode.create(field))),
+                ),
+            };
+        }
+    }
+
+    protected override transformUpdateQuery(node: UpdateQueryNode) {
+        const result = super.transformUpdateQuery(node);
+        const mutationModel = this.getMutationModel(node);
+        const filter = this.buildPolicyFilter(mutationModel, undefined, 'update');
+        return {
+            ...result,
+            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
+        };
+    }
+
+    protected override transformDeleteQuery(node: DeleteQueryNode) {
+        const result = super.transformDeleteQuery(node);
+        const mutationModel = this.getMutationModel(node);
+        const filter = this.buildPolicyFilter(mutationModel, undefined, 'delete');
+        return {
+            ...result,
+            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
+        };
+    }
+
+    // #endregion
+
+    // #region helpers
+
     private onlyReturningId(node: MutationQueryNode) {
         if (!node.returning) {
             return true;
@@ -397,70 +493,6 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return combinedPolicy;
     }
 
-    protected override transformSelectQuery(node: SelectQueryNode) {
-        let whereNode = node.where;
-
-        node.from?.froms.forEach((from) => {
-            const extractResult = this.extractTableName(from);
-            if (extractResult) {
-                const { model, alias } = extractResult;
-                const filter = this.buildPolicyFilter(model, alias, 'read');
-                whereNode = WhereNode.create(
-                    whereNode?.where ? conjunction(this.dialect, [whereNode.where, filter]) : filter,
-                );
-            }
-        });
-
-        const baseResult = super.transformSelectQuery({
-            ...node,
-            where: undefined,
-        });
-
-        return {
-            ...baseResult,
-            where: whereNode,
-        };
-    }
-
-    protected override transformInsertQuery(node: InsertQueryNode) {
-        const result = super.transformInsertQuery(node);
-        if (!node.returning) {
-            return result;
-        }
-        if (this.onlyReturningId(node)) {
-            return result;
-        } else {
-            // only return ID fields, that's enough for reading back the inserted row
-            const idFields = getIdFields(this.client.$schema, this.getMutationModel(node));
-            return {
-                ...result,
-                returning: ReturningNode.create(
-                    idFields.map((field) => SelectionNode.create(ColumnNode.create(field))),
-                ),
-            };
-        }
-    }
-
-    protected override transformUpdateQuery(node: UpdateQueryNode) {
-        const result = super.transformUpdateQuery(node);
-        const mutationModel = this.getMutationModel(node);
-        const filter = this.buildPolicyFilter(mutationModel, undefined, 'update');
-        return {
-            ...result,
-            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
-        };
-    }
-
-    protected override transformDeleteQuery(node: DeleteQueryNode) {
-        const result = super.transformDeleteQuery(node);
-        const mutationModel = this.getMutationModel(node);
-        const filter = this.buildPolicyFilter(mutationModel, undefined, 'delete');
-        return {
-            ...result,
-            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
-        };
-    }
-
     private extractTableName(from: OperationNode): { model: GetModels<Schema>; alias?: string } | undefined {
         if (TableNode.is(from)) {
             return { model: from.table.identifier.name as GetModels<Schema> };
@@ -528,4 +560,6 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
         return result;
     }
+
+    // #endregion
 }

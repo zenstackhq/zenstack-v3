@@ -13,3 +13,4 @@ catalog:
     '@types/node': ^20.17.24
     tmp: ^0.2.3
     '@types/tmp': ^0.2.6
+    'zod-validation-error': ^4.0.1

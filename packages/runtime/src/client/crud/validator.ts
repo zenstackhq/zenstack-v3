@@ -6,6 +6,7 @@ import { z, ZodType } from 'zod';
 import { type BuiltinType, type EnumDef, type FieldDef, type GetModels, type SchemaDef } from '../../schema';
 import { enumerate } from '../../utils/enumerate';
 import { extractFields } from '../../utils/object-utils';
+import { formatError } from '../../utils/zod-utils';
 import { AGGREGATE_OPERATORS, LOGICAL_COMBINATORS, NUMERIC_FIELD_TYPES } from '../constants';
 import {
     type AggregateArgs,
@@ -185,7 +186,7 @@ export class InputValidator<Schema extends SchemaDef> {
         }
         const { error } = schema.safeParse(args);
         if (error) {
-            throw new InputValidationError(`Invalid ${operation} args: ${error.message}`, error);
+            throw new InputValidationError(`Invalid ${operation} args: ${formatError(error)}`, error);
         }
         return args as T;
     }

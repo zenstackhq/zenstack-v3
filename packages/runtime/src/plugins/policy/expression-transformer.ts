@@ -281,11 +281,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 .map((f) => f.name);
             invariant(idFields.length > 0, 'auth type model must have at least one id field');
 
+            // convert `auth() == other` into `auth().id == other.id`
             const conditions = idFields.map((fieldName) =>
                 ExpressionUtils.binary(
                     ExpressionUtils.member(authExpr, [fieldName]),
                     '==',
-                    ExpressionUtils.member(other, [fieldName]),
+                    this.makeOrAppendMember(other, fieldName),
                 ),
             );
             let result = this.buildAnd(conditions);
@@ -293,6 +294,14 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 result = this.buildLogicalNot(result);
             }
             return this.transform(result, context);
+        }
+    }
+
+    private makeOrAppendMember(other: Expression, fieldName: string): Expression {
+        if (ExpressionUtils.isMember(other)) {
+            return ExpressionUtils.member(other.receiver, [...other.members, fieldName]);
+        } else {
+            return ExpressionUtils.member(other, [fieldName]);
         }
     }
 

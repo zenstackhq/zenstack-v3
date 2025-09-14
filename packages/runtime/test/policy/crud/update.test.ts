@@ -340,8 +340,138 @@ model Post {
         });
     });
 
+    describe('Nested create tests', () => {
+        it('works with nested create non-owner side', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    profile Profile?
+    @@allow('all', true)
+}
+
+model Profile {
+    id Int @id
+    user User? @relation(fields: [userId], references: [id])
+    userId Int? @unique
+    @@allow('create', user.id == auth().id)
+    @@allow('read', true)
+}
+            `,
+            );
+
+            await db.user.create({ data: { id: 1 } });
+            await expect(
+                db.user.update({ where: { id: 1 }, data: { profile: { create: { id: 1 } } } }),
+            ).toBeRejectedByPolicy();
+            await expect(
+                db.$setAuth({ id: 1 }).user.update({
+                    where: { id: 1 },
+                    data: { profile: { create: { id: 1 } } },
+                    include: { profile: true },
+                }),
+            ).resolves.toMatchObject({
+                profile: {
+                    id: 1,
+                },
+            });
+        });
+
+        it('works with nested create owner side', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    profile Profile? @relation(fields: [profileId], references: [id])
+    profileId Int? @unique
+    @@allow('create,read', true)
+    @@allow('update', auth() == this)
+}
+
+model Profile {
+    id Int @id
+    user User?
+    @@allow('all', true)
+}
+`,
+            );
+
+            await db.user.create({ data: { id: 1 } });
+            await expect(
+                db.user.update({ where: { id: 1 }, data: { profile: { create: { id: 1 } } } }),
+            ).toBeRejectedNotFound();
+            await expect(
+                db.$setAuth({ id: 1 }).user.update({
+                    where: { id: 1 },
+                    data: { profile: { create: { id: 1 } } },
+                    include: { profile: true },
+                }),
+            ).resolves.toMatchObject({
+                profile: {
+                    id: 1,
+                },
+            });
+        });
+
+        it('works with nested create many', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    posts Post[]
+    @@allow('all', true)
+}
+
+model Post {
+    id Int @id
+    title String
+    user User @relation(fields: [userId], references: [id])
+    userId Int
+    @@allow('read', true)
+    @@allow('create', auth() == this.user)
+}
+`,
+            );
+
+            await db.user.create({ data: { id: 1 } });
+            await expect(
+                db.user.update({
+                    where: { id: 1 },
+                    data: {
+                        posts: {
+                            createMany: {
+                                data: [
+                                    { id: 1, title: 'Post1' },
+                                    { id: 2, title: 'Post2' },
+                                ],
+                            },
+                        },
+                    },
+                }),
+            ).toBeRejectedByPolicy();
+            await expect(
+                db.$setAuth({ id: 1 }).user.update({
+                    where: { id: 1 },
+                    data: {
+                        posts: {
+                            createMany: {
+                                data: [
+                                    { id: 1, title: 'Post1' },
+                                    { id: 2, title: 'Post2' },
+                                ],
+                            },
+                        },
+                    },
+                    include: { posts: true },
+                }),
+            ).resolves.toMatchObject({
+                posts: [{ id: 1 }, { id: 2 }],
+            });
+        });
+    });
+
     describe('Nested update tests', () => {
-        it('works with nested update owner side', async () => {
+        it('works with nested update non-owner side', async () => {
             const db = await createPolicyTestClient(
                 `
 model User {
@@ -384,7 +514,7 @@ model Profile {
             });
         });
 
-        it('works with nested update non-owner side', async () => {
+        it('works with nested update owner side', async () => {
             const db = await createPolicyTestClient(
                 `
 model User {
@@ -425,6 +555,188 @@ model Profile {
                     bio: 'UpdatedBio2',
                 },
             });
+        });
+
+        it('works with nested update many', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    posts Post[]
+    @@allow('all', true)
+}
+
+model Post {
+    id Int @id
+    title String
+    private Boolean
+    user User @relation(fields: [userId], references: [id])
+    userId Int
+    @@allow('create,read', true)
+    @@allow('update', !private)
+}
+`,
+            );
+
+            await db.user.create({
+                data: {
+                    id: 1,
+                    posts: {
+                        create: [
+                            { id: 1, title: 'Post 1', private: true },
+                            { id: 2, title: 'Post 2', private: false },
+                        ],
+                    },
+                },
+            });
+            await expect(
+                db.user.update({
+                    where: { id: 1 },
+                    data: {
+                        posts: {
+                            updateMany: {
+                                where: { title: { contains: 'Post' } },
+                                data: { title: 'Updated Title' },
+                            },
+                        },
+                    },
+                    include: { posts: true },
+                }),
+            ).resolves.toMatchObject({
+                posts: [{ title: 'Post 1' }, { title: 'Updated Title' }],
+            });
+        });
+
+        it('works with nested upsert', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    posts Post[]
+    @@allow('all', true)
+}
+
+model Post {
+    id Int @id
+    title String
+    user User @relation(fields: [userId], references: [id])
+    userId Int
+    @@allow('read', true)
+    @@allow('create', contains(title, 'Foo'))
+    @@allow('update', contains(title, 'Bar'))
+}
+`,
+            );
+
+            await db.user.create({ data: { id: 1 } });
+            // can't create
+            await expect(
+                db.user.update({
+                    where: { id: 1 },
+                    data: {
+                        posts: {
+                            upsert: {
+                                where: { id: 1 },
+                                create: { id: 1, title: 'Post1' },
+                                update: { title: 'Post1' },
+                            },
+                        },
+                    },
+                }),
+            ).toBeRejectedByPolicy();
+            // can create
+            await expect(
+                db.user.update({
+                    where: { id: 1 },
+                    data: {
+                        posts: {
+                            upsert: {
+                                where: { id: 1 },
+                                create: { id: 1, title: 'Foo Post' },
+                                update: { title: 'Post1' },
+                            },
+                        },
+                    },
+                    include: { posts: true },
+                }),
+            ).resolves.toMatchObject({
+                posts: [{ id: 1, title: 'Foo Post' }],
+            });
+            // can't update
+            await expect(
+                db.user.update({
+                    where: { id: 1 },
+                    data: {
+                        posts: {
+                            upsert: {
+                                where: { id: 1 },
+                                create: { id: 1, title: 'Foo Post' },
+                                update: { title: 'Post1' },
+                            },
+                        },
+                    },
+                }),
+            ).rejects.toThrow('constraint');
+            await db.$unuseAll().post.update({ where: { id: 1 }, data: { title: 'Bar Post' } });
+            // can update
+            await expect(
+                db.user.update({
+                    where: { id: 1 },
+                    data: {
+                        posts: {
+                            upsert: {
+                                where: { id: 1 },
+                                create: { id: 1, title: 'Foo Post' },
+                                update: { title: 'Bar Updated' },
+                            },
+                        },
+                    },
+                    include: { posts: true },
+                }),
+            ).resolves.toMatchObject({
+                posts: [{ id: 1, title: 'Bar Updated' }],
+            });
+        });
+    });
+
+    describe('Nested delete tests', () => {
+        it('works with nested delete non-owner side', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    profile Profile?
+    @@allow('all', true)
+}
+
+model Profile {
+    id Int @id
+    private Boolean
+    user User? @relation(fields: [userId], references: [id])
+    userId Int? @unique
+    @@allow('create,read', true)
+    @@allow('delete', !private)
+}
+`,
+            );
+
+            await db.user.create({ data: { id: 1, profile: { create: { id: 1, private: true } } } });
+            await expect(
+                db.user.update({
+                    where: { id: 1 },
+                    data: { profile: { delete: true } },
+                }),
+            ).toBeRejectedNotFound();
+
+            await db.user.create({ data: { id: 2, profile: { create: { id: 2, private: false } } } });
+            await expect(
+                db.user.update({
+                    where: { id: 2 },
+                    data: { profile: { delete: true } },
+                    include: { profile: true },
+                }),
+            ).resolves.toMatchObject({ profile: null });
+            await expect(db.profile.findUnique({ where: { id: 2 } })).resolves.toBeNull();
         });
     });
 
@@ -578,7 +890,67 @@ model Profile {
         });
     });
 
-    // describe('Upsert tests', () => {});
+    describe('Upsert tests', () => {
+        it('works with upsert', async () => {
+            const db = await createPolicyTestClient(
+                `
+model Foo {
+    id Int @id
+    x  Int
+    @@allow('create', x > 0)
+    @@allow('update', x > 1)
+    @@allow('read', true)
+}
+`,
+            );
+            // can't create
+            await expect(
+                db.foo.upsert({ where: { id: 1 }, create: { id: 1, x: 0 }, update: { x: 2 } }),
+            ).toBeRejectedByPolicy();
+            await expect(
+                db.foo.upsert({ where: { id: 1 }, create: { id: 1, x: 1 }, update: { x: 2 } }),
+            ).resolves.toMatchObject({ x: 1 });
+            // can't update, but create violates unique constraint
+            await expect(
+                db.foo.upsert({ where: { id: 1 }, create: { id: 1, x: 1 }, update: { x: 1 } }),
+            ).rejects.toThrow('constraint');
+            await db.$unuseAll().foo.update({ where: { id: 1 }, data: { x: 2 } });
+            // can update now
+            await expect(
+                db.foo.upsert({ where: { id: 1 }, create: { id: 1, x: 1 }, update: { x: 3 } }),
+            ).resolves.toMatchObject({ x: 3 });
+        });
+    });
 
-    // describe('Update many tests', () => {});
+    describe('Update many tests', () => {
+        it('works with update many', async () => {
+            const db = await createPolicyTestClient(
+                `
+model Foo {
+    id Int @id
+    x  Int
+    @@allow('create', true)
+    @@allow('update', x > 1)
+    @@allow('read', true)
+}
+`,
+            );
+
+            await db.foo.createMany({
+                data: [
+                    { id: 1, x: 1 },
+                    { id: 2, x: 2 },
+                    { id: 3, x: 3 },
+                ],
+            });
+            await expect(db.foo.updateMany({ data: { x: 5 } })).resolves.toMatchObject({ count: 2 });
+            await expect(db.foo.findMany()).resolves.toEqual(
+                expect.arrayContaining([
+                    { id: 1, x: 1 },
+                    { id: 2, x: 5 },
+                    { id: 3, x: 5 },
+                ]),
+            );
+        });
+    });
 });

@@ -152,7 +152,7 @@ export async function createTestClient<Schema extends SchemaDef>(
         fs.writeFileSync(path.resolve(workDir!, 'schema.prisma'), prismaSchemaText);
         execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {
             cwd: workDir,
-            stdio: 'inherit',
+            stdio: 'ignore',
         });
     } else {
         if (provider === 'postgresql') {

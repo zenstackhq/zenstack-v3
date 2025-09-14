@@ -73,7 +73,8 @@
         "toposort": "^2.0.2",
         "ts-pattern": "catalog:",
         "ulid": "^3.0.0",
-        "uuid": "^11.0.5"
+        "uuid": "^11.0.5",
+        "zod-validation-error": "catalog:"
     },
     "peerDependencies": {
         "better-sqlite3": "^12.2.0",

@@ -33,6 +33,9 @@ catalogs:
     typescript:
       specifier: ^5.8.0
       version: 5.8.3
+    zod-validation-error:
+      specifier: ^4.0.1
+      version: 4.0.1
 
 importers:
 
@@ -299,6 +302,9 @@ importers:
       uuid:
         specifier: ^11.0.5
         version: 11.0.5
+      zod-validation-error:
+        specifier: 'catalog:'
+        version: 4.0.1(zod@3.25.76)
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -2711,6 +2717,12 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod-validation-error@4.0.1:
+    resolution: {integrity: sha512-F3rdaCOHs5ViJ5YTz5zzRtfkQdMdIeKudJAoxy7yB/2ZMEHw73lmCAcQw11r7++20MyGl4WV59EVh7A9rNAyog==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
@@ -4790,5 +4802,9 @@ snapshots:
   yaml@2.8.0: {}
 
   yocto-queue@0.1.0: {}
+
+  zod-validation-error@4.0.1(zod@3.25.76):
+    dependencies:
+      zod: 3.25.76
 
   zod@3.25.76: {}

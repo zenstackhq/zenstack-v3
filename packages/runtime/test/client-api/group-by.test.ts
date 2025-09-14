@@ -269,7 +269,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client groupBy tests', ({ createCl
                     age: 10,
                 },
             }),
-        ).rejects.toThrow(/must be in \\"by\\"/);
+        ).rejects.toThrow(/must be in "by"/);
     });
 
     it('complains about fields in orderBy that are not in by', async () => {
@@ -280,6 +280,6 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client groupBy tests', ({ createCl
                     age: 'asc',
                 },
             }),
-        ).rejects.toThrow(/must be in \\"by\\"/);
+        ).rejects.toThrow(/must be in "by"/);
     });
 });

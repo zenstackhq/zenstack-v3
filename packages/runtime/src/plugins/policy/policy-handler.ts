@@ -183,9 +183,10 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             }
         }
 
-        let result = super.transformInsertQuery(node);
         // merge updated onConflict
-        result = onConflict ? { ...result, onConflict } : result;
+        const processedNode = onConflict ? { ...node, onConflict } : node;
+
+        const result = super.transformInsertQuery(processedNode);
 
         if (!node.returning) {
             return result;

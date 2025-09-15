@@ -198,13 +198,13 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     private normalizeBinaryOperationOperands(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
         let normalizedLeft: Expression = expr.left;
         if (this.isRelationField(expr.left, context.model)) {
-            invariant(ExpressionUtils.isNull(expr.right));
+            invariant(ExpressionUtils.isNull(expr.right), 'only null comparison is supported for relation field');
             const idFields = getIdFields(this.schema, context.model);
             normalizedLeft = this.makeOrAppendMember(normalizedLeft, idFields[0]!);
         }
         let normalizedRight: Expression = expr.right;
         if (this.isRelationField(expr.right, context.model)) {
-            invariant(ExpressionUtils.isNull(expr.left));
+            invariant(ExpressionUtils.isNull(expr.left), 'only null comparison is supported for relation field');
             const idFields = getIdFields(this.schema, context.model);
             normalizedRight = this.makeOrAppendMember(normalizedRight, idFields[0]!);
         }

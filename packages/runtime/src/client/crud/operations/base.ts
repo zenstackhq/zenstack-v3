@@ -1009,10 +1009,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     throw new QueryError(`Relation update not allowed for field "${field}"`);
                 }
                 if (!thisEntity) {
-                    thisEntity = await this.readUnique(kysely, model, {
-                        where: combinedWhere,
-                        select: this.makeIdSelect(model),
-                    });
+                    thisEntity = await this.getEntityIds(kysely, model, combinedWhere);
                     if (!thisEntity) {
                         if (throwIfNotFound) {
                             throw new NotFoundError(model);

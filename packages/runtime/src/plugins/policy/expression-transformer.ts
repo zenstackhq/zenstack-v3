@@ -25,7 +25,7 @@ import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
 import type { ClientOptions } from '../../client/options';
-import { getModel, getRelationForeignKeyFieldPairs, requireField } from '../../client/query-utils';
+import { getIdFields, getModel, getRelationForeignKeyFieldPairs, requireField } from '../../client/query-utils';
 import type {
     BinaryExpression,
     BinaryOperator,
@@ -111,7 +111,6 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     @expr('field')
-    // @ts-expect-error
     private _field(expr: FieldExpression, context: ExpressionTransformerContext<Schema>) {
         const fieldDef = requireField(this.schema, context.model, expr.field);
         if (!fieldDef.relation) {
@@ -162,8 +161,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             return this.transformCollectionPredicate(expr, context);
         }
 
-        const left = this.transform(expr.left, context);
-        const right = this.transform(expr.right, context);
+        const { normalizedLeft, normalizedRight } = this.normalizeBinaryOperationOperands(expr, context);
+        const left = this.transform(normalizedLeft, context);
+        const right = this.transform(normalizedRight, context);
 
         if (op === 'in') {
             if (this.isNullNode(left)) {
@@ -195,6 +195,22 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         return BinaryOperationNode.create(left, this.transformOperator(op), right);
     }
 
+    private normalizeBinaryOperationOperands(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
+        let normalizedLeft: Expression = expr.left;
+        if (this.isRelationField(expr.left, context.model)) {
+            invariant(ExpressionUtils.isNull(expr.right));
+            const idFields = getIdFields(this.schema, context.model);
+            normalizedLeft = this.makeOrAppendMember(normalizedLeft, idFields[0]!);
+        }
+        let normalizedRight: Expression = expr.right;
+        if (this.isRelationField(expr.right, context.model)) {
+            invariant(ExpressionUtils.isNull(expr.left));
+            const idFields = getIdFields(this.schema, context.model);
+            normalizedRight = this.makeOrAppendMember(normalizedRight, idFields[0]!);
+        }
+        return { normalizedLeft, normalizedRight };
+    }
+
     private transformCollectionPredicate(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
         invariant(expr.op === '?' || expr.op === '!' || expr.op === '^', 'expected "?" or "!" or "^" operator');
 
@@ -211,11 +227,15 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         );
 
         let newContextModel: string;
-        if (ExpressionUtils.isField(expr.left)) {
-            const fieldDef = requireField(this.schema, context.model, expr.left.field);
+        const fieldDef = this.getFieldDefFromFieldRef(expr.left, context.model);
+        if (fieldDef) {
+            invariant(fieldDef.relation, `field is not a relation: ${JSON.stringify(expr.left)}`);
             newContextModel = fieldDef.type;
         } else {
-            invariant(ExpressionUtils.isField(expr.left.receiver));
+            invariant(
+                ExpressionUtils.isMember(expr.left) && ExpressionUtils.isField(expr.left.receiver),
+                'left operand must be member access with field receiver',
+            );
             const fieldDef = requireField(this.schema, context.model, expr.left.receiver.field);
             newContextModel = fieldDef.type;
             for (const member of expr.left.members) {
@@ -396,16 +416,14 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
         if (ExpressionUtils.isThis(expr.receiver)) {
             if (expr.members.length === 1) {
-                // optimize for the simple this.scalar case
-                const fieldDef = requireField(this.schema, context.model, expr.members[0]!);
-                invariant(!fieldDef.relation, 'this.relation access should have been transformed into relation access');
-                return this.createColumnRef(expr.members[0]!, restContext);
+                // `this.relation` case, equivalent to field access
+                return this._field(ExpressionUtils.field(expr.members[0]!), context);
+            } else {
+                // transform the first segment into a relation access, then continue with the rest of the members
+                const firstMemberFieldDef = requireField(this.schema, context.model, expr.members[0]!);
+                receiver = this.transformRelationAccess(expr.members[0]!, firstMemberFieldDef.type, restContext);
+                members = expr.members.slice(1);
             }
-
-            // transform the first segment into a relation access, then continue with the rest of the members
-            const firstMemberFieldDef = requireField(this.schema, context.model, expr.members[0]!);
-            receiver = this.transformRelationAccess(expr.members[0]!, firstMemberFieldDef.type, restContext);
-            members = expr.members.slice(1);
         } else {
             receiver = this.transform(expr.receiver, restContext);
         }
@@ -557,6 +575,25 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             return conditions[0]!;
         } else {
             return conditions.reduce((acc, condition) => ExpressionUtils.binary(acc, '&&', condition));
+        }
+    }
+
+    private isRelationField(expr: Expression, model: GetModels<Schema>) {
+        const fieldDef = this.getFieldDefFromFieldRef(expr, model);
+        return !!fieldDef?.relation;
+    }
+
+    private getFieldDefFromFieldRef(expr: Expression, model: GetModels<Schema>): FieldDef | undefined {
+        if (ExpressionUtils.isField(expr)) {
+            return requireField(this.schema, model, expr.field);
+        } else if (
+            ExpressionUtils.isMember(expr) &&
+            expr.members.length === 1 &&
+            ExpressionUtils.isThis(expr.receiver)
+        ) {
+            return requireField(this.schema, model, expr.members[0]!);
+        } else {
+            return undefined;
         }
     }
 }

@@ -102,6 +102,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             }
             return readBackResult;
         } else {
+            // reading id fields bypasses policy
             return result;
         }
 

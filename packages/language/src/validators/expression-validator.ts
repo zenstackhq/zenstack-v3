@@ -109,8 +109,9 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                 }
 
                 if (
-                    typeof expr.left.$resolvedType?.decl !== 'string' ||
-                    !supportedShapes.includes(expr.left.$resolvedType.decl)
+                    expr.left.$resolvedType &&
+                    (typeof expr.left.$resolvedType?.decl !== 'string' ||
+                        !supportedShapes.includes(expr.left.$resolvedType.decl))
                 ) {
                     accept('error', `invalid operand type for "${expr.operator}" operator`, {
                         node: expr.left,
@@ -118,8 +119,9 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                     return;
                 }
                 if (
-                    typeof expr.right.$resolvedType?.decl !== 'string' ||
-                    !supportedShapes.includes(expr.right.$resolvedType.decl)
+                    expr.right.$resolvedType &&
+                    (typeof expr.right.$resolvedType?.decl !== 'string' ||
+                        !supportedShapes.includes(expr.right.$resolvedType.decl))
                 ) {
                     accept('error', `invalid operand type for "${expr.operator}" operator`, {
                         node: expr.right,
@@ -128,13 +130,13 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                 }
 
                 // DateTime comparison is only allowed between two DateTime values
-                if (expr.left.$resolvedType.decl === 'DateTime' && expr.right.$resolvedType.decl !== 'DateTime') {
+                if (expr.left.$resolvedType?.decl === 'DateTime' && expr.right.$resolvedType?.decl !== 'DateTime') {
                     accept('error', 'incompatible operand types', {
                         node: expr,
                     });
                 } else if (
-                    expr.right.$resolvedType.decl === 'DateTime' &&
-                    expr.left.$resolvedType.decl !== 'DateTime'
+                    expr.right.$resolvedType?.decl === 'DateTime' &&
+                    expr.left.$resolvedType?.decl !== 'DateTime'
                 ) {
                     accept('error', 'incompatible operand types', {
                         node: expr,

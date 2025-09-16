@@ -56,7 +56,7 @@ export function requireField(schema: SchemaDef, modelOrType: string, field: stri
 
 export function getIdFields<Schema extends SchemaDef>(schema: SchemaDef, model: GetModels<Schema>) {
     const modelDef = requireModel(schema, model);
-    return modelDef?.idFields as GetModels<Schema>[];
+    return modelDef?.idFields;
 }
 
 export function requireIdFields(schema: SchemaDef, model: string) {

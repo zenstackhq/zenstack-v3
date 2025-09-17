@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from './utils';
+import { createPolicyTestClient } from '../utils';
 
 describe('createManyAndReturn tests', () => {
     it('works with model-level policies', async () => {

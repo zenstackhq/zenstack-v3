@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from './utils';
+import { createPolicyTestClient } from '../utils';
 
 describe('cross-model field comparison tests', () => {
     it('works with to-one relation', async () => {

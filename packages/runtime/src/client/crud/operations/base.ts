@@ -31,7 +31,6 @@ import {
     flattenCompoundUniqueFilters,
     getDiscriminatorField,
     getField,
-    getIdFields,
     getIdValues,
     getManyToManyRelation,
     getModel,
@@ -40,6 +39,7 @@ import {
     isRelationField,
     isScalarField,
     requireField,
+    requireIdFields,
     requireModel,
 } from '../../query-utils';
 import { getCrudDialect } from '../dialects';
@@ -132,7 +132,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         model: GetModels<Schema>,
         filter: any,
     ): Promise<unknown | undefined> {
-        const idFields = getIdFields(this.schema, model);
+        const idFields = requireIdFields(this.schema, model);
         const _filter = flattenCompoundUniqueFilters(this.schema, model, filter);
         const query = kysely
             .selectFrom(model)
@@ -344,7 +344,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         const updatedData = this.fillGeneratedAndDefaultValues(modelDef, createFields);
-        const idFields = getIdFields(this.schema, model);
+        const idFields = requireIdFields(this.schema, model);
         const query = kysely
             .insertInto(model)
             .$if(Object.keys(updatedData).length === 0, (qb) => qb.defaultValues())
@@ -481,8 +481,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             a.model !== b.model ? a.model.localeCompare(b.model) : a.field.localeCompare(b.field),
         );
 
-        const firstIds = getIdFields(this.schema, sortedRecords[0]!.model);
-        const secondIds = getIdFields(this.schema, sortedRecords[1]!.model);
+        const firstIds = requireIdFields(this.schema, sortedRecords[0]!.model);
+        const secondIds = requireIdFields(this.schema, sortedRecords[1]!.model);
         invariant(firstIds.length === 1, 'many-to-many relation must have exactly one id field');
         invariant(secondIds.length === 1, 'many-to-many relation must have exactly one id field');
 
@@ -771,7 +771,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const result = await this.executeQuery(kysely, query, 'createMany');
             return { count: Number(result.numAffectedRows) } as Result;
         } else {
-            const idFields = getIdFields(this.schema, model);
+            const idFields = requireIdFields(this.schema, model);
             const result = await query.returning(idFields as any).execute();
             return result as Result;
         }
@@ -1039,7 +1039,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             // nothing to update, return the filter so that the caller can identify the entity
             return combinedWhere;
         } else {
-            const idFields = getIdFields(this.schema, model);
+            const idFields = requireIdFields(this.schema, model);
             const query = kysely
                 .updateTable(model)
                 .where((eb) => this.dialect.buildFilter(eb, model, model, combinedWhere))
@@ -1104,7 +1104,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (!filter || typeof filter !== 'object') {
             return false;
         }
-        const idFields = getIdFields(this.schema, model);
+        const idFields = requireIdFields(this.schema, model);
         return idFields.length === Object.keys(filter).length && idFields.every((field) => field in filter);
     }
 
@@ -1297,7 +1297,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const result = await this.executeQuery(kysely, query, 'update');
             return { count: Number(result.numAffectedRows) } as Result;
         } else {
-            const idFields = getIdFields(this.schema, model);
+            const idFields = requireIdFields(this.schema, model);
             const result = await query.returning(idFields as any).execute();
             return result as Result;
         }
@@ -1336,7 +1336,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private buildIdFieldRefs(kysely: ToKysely<Schema>, model: GetModels<Schema>) {
-        const idFields = getIdFields(this.schema, model);
+        const idFields = requireIdFields(this.schema, model);
         return idFields.map((f) => kysely.dynamic.ref(`${model}.${f}`));
     }
 
@@ -2097,7 +2097,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     // reused the filter if it's a complete id filter (without extra fields)
     // otherwise, read the entity by the filter
     private getEntityIds(kysely: ToKysely<Schema>, model: GetModels<Schema>, uniqueFilter: any) {
-        const idFields: string[] = getIdFields(this.schema, model);
+        const idFields: string[] = requireIdFields(this.schema, model);
         if (
             // all id fields are provided
             idFields.every((f) => f in uniqueFilter && uniqueFilter[f] !== undefined) &&

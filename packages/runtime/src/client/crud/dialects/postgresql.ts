@@ -14,10 +14,10 @@ import type { FindArgs } from '../../crud-types';
 import {
     buildJoinPairs,
     getDelegateDescendantModels,
-    getIdFields,
     getManyToManyRelation,
     isRelationField,
     requireField,
+    requireIdFields,
     requireModel,
 } from '../../query-utils';
 import { BaseCrudDialect } from './base-dialect';
@@ -157,8 +157,8 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         const m2m = getManyToManyRelation(this.schema, model, relationField);
         if (m2m) {
             // many-to-many relation
-            const parentIds = getIdFields(this.schema, model);
-            const relationIds = getIdFields(this.schema, relationModel);
+            const parentIds = requireIdFields(this.schema, model);
+            const relationIds = requireIdFields(this.schema, relationModel);
             invariant(parentIds.length === 1, 'many-to-many relation must have exactly one id field');
             invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
             query = query.where((eb) =>

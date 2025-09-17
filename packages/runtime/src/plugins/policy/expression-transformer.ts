@@ -25,7 +25,7 @@ import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
 import type { ClientOptions } from '../../client/options';
-import { getIdFields, getModel, getRelationForeignKeyFieldPairs, requireField } from '../../client/query-utils';
+import { getModel, getRelationForeignKeyFieldPairs, requireField, requireIdFields } from '../../client/query-utils';
 import type {
     BinaryExpression,
     BinaryOperator,
@@ -196,16 +196,18 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private normalizeBinaryOperationOperands(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
+        // if relation fields are used directly in comparison, it can only be compared with null,
+        // so we normalize the args with the id field (use the first id field if multiple)
         let normalizedLeft: Expression = expr.left;
         if (this.isRelationField(expr.left, context.model)) {
             invariant(ExpressionUtils.isNull(expr.right), 'only null comparison is supported for relation field');
-            const idFields = getIdFields(this.schema, context.model);
+            const idFields = requireIdFields(this.schema, context.model);
             normalizedLeft = this.makeOrAppendMember(normalizedLeft, idFields[0]!);
         }
         let normalizedRight: Expression = expr.right;
         if (this.isRelationField(expr.right, context.model)) {
             invariant(ExpressionUtils.isNull(expr.left), 'only null comparison is supported for relation field');
-            const idFields = getIdFields(this.schema, context.model);
+            const idFields = requireIdFields(this.schema, context.model);
             normalizedRight = this.makeOrAppendMember(normalizedRight, idFields[0]!);
         }
         return { normalizedLeft, normalizedRight };

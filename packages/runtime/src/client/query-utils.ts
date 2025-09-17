@@ -55,7 +55,7 @@ export function requireField(schema: SchemaDef, modelOrType: string, field: stri
 }
 
 export function getIdFields<Schema extends SchemaDef>(schema: SchemaDef, model: GetModels<Schema>) {
-    const modelDef = requireModel(schema, model);
+    const modelDef = getModel(schema, model);
     return modelDef?.idFields;
 }
 
@@ -231,7 +231,7 @@ export function buildJoinPairs(
 }
 
 export function makeDefaultOrderBy<Schema extends SchemaDef>(schema: SchemaDef, model: string) {
-    const idFields = getIdFields(schema, model);
+    const idFields = requireIdFields(schema, model);
     return idFields.map((f) => ({ [f]: 'asc' }) as OrderBy<Schema, GetModels<Schema>, true, false>);
 }
 
@@ -318,7 +318,7 @@ export function safeJSONStringify(value: unknown) {
 }
 
 export function extractIdFields(entity: any, schema: SchemaDef, model: string) {
-    const idFields = getIdFields(schema, model);
+    const idFields = requireIdFields(schema, model);
     return extractFields(entity, idFields);
 }
 

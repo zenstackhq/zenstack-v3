@@ -24,7 +24,6 @@ import {
     ensureArray,
     flattenCompoundUniqueFilters,
     getDelegateDescendantModels,
-    getIdFields,
     getManyToManyRelation,
     getRelationForeignKeyFieldPairs,
     isEnum,
@@ -32,6 +31,7 @@ import {
     isRelationField,
     makeDefaultOrderBy,
     requireField,
+    requireIdFields,
     requireModel,
 } from '../../query-utils';
 
@@ -366,10 +366,14 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             const m2m = getManyToManyRelation(this.schema, model, field);
             if (m2m) {
                 // many-to-many relation
-                const modelIdField = getIdFields(this.schema, model)[0]!;
-                const relationIdField = getIdFields(this.schema, relationModel)[0]!;
+
+                const modelIdFields = requireIdFields(this.schema, model);
+                invariant(modelIdFields.length === 1, 'many-to-many relation must have exactly one id field');
+                const relationIdFields = requireIdFields(this.schema, relationModel);
+                invariant(relationIdFields.length === 1, 'many-to-many relation must have exactly one id field');
+
                 return eb(
-                    sql.ref(`${relationFilterSelectAlias}.${relationIdField}`),
+                    sql.ref(`${relationFilterSelectAlias}.${relationIdFields[0]}`),
                     'in',
                     eb
                         .selectFrom(m2m.joinTable)
@@ -377,7 +381,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         .whereRef(
                             sql.ref(`${m2m.joinTable}.${m2m.parentFkName}`),
                             '=',
-                            sql.ref(`${modelAlias}.${modelIdField}`),
+                            sql.ref(`${modelAlias}.${modelIdFields[0]}`),
                         ),
                 );
             } else {
@@ -1012,7 +1016,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         otherModelAlias: string,
         query: SelectQueryBuilder<any, any, any>,
     ) {
-        const idFields = getIdFields(this.schema, thisModel);
+        const idFields = requireIdFields(this.schema, thisModel);
         query = query.leftJoin(otherModelAlias, (qb) => {
             for (const idField of idFields) {
                 qb = qb.onRef(`${thisModelAlias}.${idField}`, '=', `${otherModelAlias}.${idField}`);

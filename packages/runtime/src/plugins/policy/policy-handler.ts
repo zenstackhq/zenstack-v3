@@ -34,7 +34,7 @@ import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
 import type { ProceedKyselyQueryFunction } from '../../client/plugin';
-import { getIdFields, requireField, requireModel } from '../../client/query-utils';
+import { requireField, requireIdFields, requireModel } from '../../client/query-utils';
 import { ExpressionUtils, type BuiltinType, type Expression, type GetModels, type SchemaDef } from '../../schema';
 import { ColumnCollector } from './column-collector';
 import { RejectedByPolicyError } from './errors';
@@ -217,7 +217,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         } else {
             // only return ID fields, that's enough for reading back the inserted row
             const { mutationModel } = this.getMutationModel(node);
-            const idFields = getIdFields(this.client.$schema, mutationModel);
+            const idFields = requireIdFields(this.client.$schema, mutationModel);
             return {
                 ...result,
                 returning: ReturningNode.create(
@@ -274,7 +274,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             return true;
         }
         const { mutationModel } = this.getMutationModel(node);
-        const idFields = getIdFields(this.client.$schema, mutationModel);
+        const idFields = requireIdFields(this.client.$schema, mutationModel);
         const collector = new ColumnCollector();
         const selectedColumns = collector.collect(node.returning);
         return selectedColumns.every((c) => idFields.includes(c));
@@ -448,7 +448,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     private buildIdConditions(table: string, rows: any[]): OperationNode {
-        const idFields = getIdFields(this.client.$schema, table);
+        const idFields = requireIdFields(this.client.$schema, table);
         return disjunction(
             this.dialect,
             rows.map((row) =>

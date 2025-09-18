@@ -1,10 +1,10 @@
-import { ExpressionWrapper, ValueNode, type Expression, type ExpressionBuilder } from 'kysely';
-import type { ZModelFunction, ZModelFunctionContext } from '../../client/options';
 import { invariant } from '@zenstackhq/common-helpers';
+import { ExpressionWrapper, ValueNode, type Expression, type ExpressionBuilder } from 'kysely';
+import { CRUD } from '../../client/contract';
+import { extractFieldName } from '../../client/kysely-utils';
+import type { ZModelFunction, ZModelFunctionContext } from '../../client/options';
 import { buildJoinPairs, requireField } from '../../client/query-utils';
 import { PolicyHandler } from './policy-handler';
-import type { CRUD } from '../../client/contract';
-import { extractFieldName } from '../../client/kysely-utils';
 
 /**
  * Relation checker implementation.
@@ -25,7 +25,7 @@ export const check: ZModelFunction<any> = (
             '"operation" parameter must be a string literal when provided',
         );
         invariant(
-            ['create', 'read', 'update', 'delete'].includes(arg2Node.value),
+            CRUD.includes(arg2Node.value as CRUD),
             '"operation" parameter must be one of "create", "read", "update", "delete"',
         );
     }

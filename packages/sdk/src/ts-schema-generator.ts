@@ -376,7 +376,7 @@ export class TsSchemaGenerator {
                     undefined,
                     undefined,
                     [
-                        // parameter: `context: { currentModel: string }`
+                        // parameter: `context: { modelAlias: string }`
                         ts.factory.createParameterDeclaration(
                             undefined,
                             undefined,
@@ -385,7 +385,7 @@ export class TsSchemaGenerator {
                             ts.factory.createTypeLiteralNode([
                                 ts.factory.createPropertySignature(
                                     undefined,
-                                    'currentModel',
+                                    'modelAlias',
                                     undefined,
                                     ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                                 ),

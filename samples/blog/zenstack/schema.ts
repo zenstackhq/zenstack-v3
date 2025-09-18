@@ -76,7 +76,7 @@ export const schema = {
             },
             computedFields: {
                 postCount(_context: {
-                    currentModel: string;
+                    modelAlias: string;
                 }): OperandExpression<number> {
                     throw new Error("This is a stub for computed field");
                 }

@@ -170,6 +170,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         return true;
     }
 
+    // TODO: move this to policy plugin
     @func('check')
     // @ts-expect-error
     private _checkCheck(expr: InvocationExpr, accept: ValidationAcceptor) {

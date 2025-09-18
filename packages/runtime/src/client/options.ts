@@ -7,8 +7,29 @@ import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
 
 export type ZModelFunctionContext<Schema extends SchemaDef> = {
+    /**
+     * ZenStack client instance
+     */
+    client: ClientContract<Schema>;
+
+    /**
+     * Database dialect
+     */
     dialect: BaseCrudDialect<Schema>;
+
+    /**
+     * The containing model name
+     */
     model: GetModels<Schema>;
+
+    /**
+     * The alias name that can be used to refer to the containing model
+     */
+    modelAlias: string;
+
+    /**
+     * The CRUD operation being performed
+     */
     operation: CRUD;
 };
 

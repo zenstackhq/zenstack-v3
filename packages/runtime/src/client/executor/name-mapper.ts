@@ -17,8 +17,8 @@ import {
     type OperationNode,
 } from 'kysely';
 import type { FieldDef, ModelDef, SchemaDef } from '../../schema';
+import { extractFieldName, extractModelName, stripAlias } from '../kysely-utils';
 import { getModel, requireModel } from '../query-utils';
-import { stripAlias } from './kysely-utils';
 
 type Scope = {
     model?: string;
@@ -170,7 +170,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         const scopes: Scope[] = node.from.froms.map((node) => {
             const { alias, node: innerNode } = stripAlias(node);
             return {
-                model: this.extractModelName(innerNode),
+                model: extractModelName(innerNode),
                 alias,
                 namesMapped: false,
             };
@@ -219,8 +219,8 @@ export class QueryNameMapper extends OperationNodeTransformer {
                     selections.push(SelectionNode.create(transformed));
                 } else {
                     // otherwise use an alias to preserve the original field name
-                    const origFieldName = this.extractFieldName(selection.selection);
-                    const fieldName = this.extractFieldName(transformed);
+                    const origFieldName = extractFieldName(selection.selection);
+                    const fieldName = extractFieldName(transformed);
                     if (fieldName !== origFieldName) {
                         selections.push(
                             SelectionNode.create(
@@ -425,7 +425,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
     private processSelection(node: AliasNode | ColumnNode | ReferenceNode) {
         let alias: string | undefined;
         if (!AliasNode.is(node)) {
-            alias = this.extractFieldName(node);
+            alias = extractFieldName(node);
         }
         const result = super.transformNode(node);
         return this.wrapAlias(result, alias ? IdentifierNode.create(alias) : undefined);
@@ -449,21 +449,6 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 ? this.wrapAlias(columnRef, IdentifierNode.create(fieldDef.name))
                 : columnRef;
         });
-    }
-
-    private extractModelName(node: OperationNode): string | undefined {
-        const { node: innerNode } = stripAlias(node);
-        return TableNode.is(innerNode!) ? innerNode!.table.identifier.name : undefined;
-    }
-
-    private extractFieldName(node: ReferenceNode | ColumnNode) {
-        if (ReferenceNode.is(node) && ColumnNode.is(node.column)) {
-            return node.column.column.name;
-        } else if (ColumnNode.is(node)) {
-            return node.column.name;
-        } else {
-            return undefined;
-        }
     }
 
     // #endregion

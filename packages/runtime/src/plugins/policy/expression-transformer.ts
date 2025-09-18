@@ -20,11 +20,10 @@ import {
     type OperationNode,
 } from 'kysely';
 import { match } from 'ts-pattern';
-import type { CRUD } from '../../client/contract';
+import type { ClientContract, CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
-import type { ClientOptions } from '../../client/options';
 import { getModel, getRelationForeignKeyFieldPairs, requireField, requireIdFields } from '../../client/query-utils';
 import type {
     BinaryExpression,
@@ -72,12 +71,20 @@ function expr(kind: Expression['kind']) {
 export class ExpressionTransformer<Schema extends SchemaDef> {
     private readonly dialect: BaseCrudDialect<Schema>;
 
-    constructor(
-        private readonly schema: Schema,
-        private readonly clientOptions: ClientOptions<Schema>,
-        private readonly auth: unknown | undefined,
-    ) {
+    constructor(private readonly client: ClientContract<Schema>) {
         this.dialect = getCrudDialect(this.schema, this.clientOptions);
+    }
+
+    get schema() {
+        return this.client.$schema;
+    }
+
+    get clientOptions() {
+        return this.client.$options;
+    }
+
+    get auth() {
+        return this.client.$auth;
     }
 
     get authType() {
@@ -354,7 +361,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private transformCall(expr: CallExpression, context: ExpressionTransformerContext<Schema>) {
-        const func = this.clientOptions.functions?.[expr.function];
+        const func = this.getFunctionImpl(expr.function);
         if (!func) {
             throw new QueryError(`Function not implemented: ${expr.function}`);
         }
@@ -363,11 +370,28 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             eb,
             (expr.args ?? []).map((arg) => this.transformCallArg(eb, arg, context)),
             {
+                client: this.client,
                 dialect: this.dialect,
                 model: context.model,
+                modelAlias: context.alias ?? context.model,
                 operation: context.operation,
             },
         );
+    }
+
+    private getFunctionImpl(functionName: string) {
+        // check built-in functions
+        let func = this.clientOptions.functions?.[functionName];
+        if (!func) {
+            // check plugins
+            for (const plugin of this.clientOptions.plugins ?? []) {
+                if (plugin.functions?.[functionName]) {
+                    func = plugin.functions[functionName];
+                    break;
+                }
+            }
+        }
+        return func;
     }
 
     private transformCallArg(

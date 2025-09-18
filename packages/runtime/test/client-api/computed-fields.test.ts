@@ -237,10 +237,10 @@ model Post {
                     dbName: TEST_DB,
                     computedFields: {
                         User: {
-                            postCount: (eb: any, context: { currentModel: string }) =>
+                            postCount: (eb: any, context: { modelAlias: string }) =>
                                 eb
                                     .selectFrom('Post')
-                                    .whereRef('Post.authorId', '=', sql.ref(`${context.currentModel}.id`))
+                                    .whereRef('Post.authorId', '=', sql.ref(`${context.modelAlias}.id`))
                                     .select(() => eb.fn.countAll().as('count')),
                         },
                     },

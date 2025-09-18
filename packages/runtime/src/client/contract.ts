@@ -213,6 +213,11 @@ export interface ClientConstructor {
  */
 export type CRUD = 'create' | 'read' | 'update' | 'delete';
 
+/**
+ * CRUD operations.
+ */
+export const CRUD = ['create', 'read', 'update', 'delete'] as const;
+
 //#region Model operations
 
 export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels<Schema>> = {

@@ -194,7 +194,7 @@ export function buildFieldRef<Schema extends SchemaDef>(
         if (!computer) {
             throw new QueryError(`Computed field "${field}" implementation not provided for model "${model}"`);
         }
-        return computer(eb, { currentModel: modelAlias });
+        return computer(eb, { modelAlias });
     }
 }
 

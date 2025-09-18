@@ -503,7 +503,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node);
     }
 
-    private buildPolicyFilter(model: GetModels<Schema>, alias: string | undefined, operation: CRUD) {
+    buildPolicyFilter(model: GetModels<Schema>, alias: string | undefined, operation: CRUD) {
         const policies = this.getModelPolicies(model, operation);
         if (policies.length === 0) {
             return falseNode(this.dialect);
@@ -584,15 +584,12 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         operation: CRUD,
         policy: Policy,
     ) {
-        return new ExpressionTransformer(this.client.$schema, this.client.$options, this.client.$auth).transform(
-            policy.condition,
-            {
-                model,
-                alias,
-                operation,
-                auth: this.client.$auth,
-            },
-        );
+        return new ExpressionTransformer(this.client).transform(policy.condition, {
+            model,
+            alias,
+            operation,
+            auth: this.client.$auth,
+        });
     }
 
     private getModelPolicies(modelName: string, operation: PolicyOperation) {

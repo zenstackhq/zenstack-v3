@@ -10,7 +10,7 @@ describe('Policy many-to-many relation tests', () => {
         m2 M2[]
     
         @@allow('read', !deleted)
-        @@allow('create', true)
+        @@allow('create,update', true)
     }
     
     model M2 {
@@ -20,7 +20,7 @@ describe('Policy many-to-many relation tests', () => {
         m1 M1[]
     
         @@allow('read', !deleted)
-        @@allow('create', true)
+        @@allow('create,update', true)
     }
     `;
 

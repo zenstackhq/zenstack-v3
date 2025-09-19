@@ -1,5 +1,5 @@
 /**
- * Zipped two arrays into an array of tuples.
+ * Zips two arrays into an array of tuples.
  */
 export function zip<T, U>(arr1: T[], arr2: U[]): Array<[T, U]> {
     const length = Math.min(arr1.length, arr2.length);

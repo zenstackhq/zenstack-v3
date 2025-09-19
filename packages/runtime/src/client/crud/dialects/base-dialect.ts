@@ -1055,13 +1055,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             if (m2m) {
                 // many-to-many relation, count the join table
                 fieldCountQuery = eb
-                    .selectFrom(m2m.joinTable)
-                    .select(eb.fn.countAll().as(`_count$${field}`))
-                    .whereRef(
-                        eb.ref(`${parentAlias}.${m2m.parentPKName}`),
-                        '=',
-                        eb.ref(`${m2m.joinTable}.${m2m.parentFkName}`),
-                    );
+                    .selectFrom(fieldModel)
+                    .innerJoin(m2m.joinTable, (join) =>
+                        join
+                            .onRef(`${m2m.joinTable}.${m2m.otherFkName}`, '=', `${fieldModel}.${m2m.otherPKName}`)
+                            .onRef(`${m2m.joinTable}.${m2m.parentFkName}`, '=', `${parentAlias}.${m2m.parentPKName}`),
+                    )
+                    .select(eb.fn.countAll().as(`_count$${field}`));
             } else {
                 // build a nested query to count the number of records in the relation
                 fieldCountQuery = eb.selectFrom(fieldModel).select(eb.fn.countAll().as(`_count$${field}`));

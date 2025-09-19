@@ -44,7 +44,7 @@ import {
     type SchemaDef,
 } from '../../schema';
 import { ExpressionEvaluator } from './expression-evaluator';
-import { conjunction, disjunction, logicalNot, trueNode } from './utils';
+import { conjunction, disjunction, falseNode, logicalNot, trueNode } from './utils';
 
 export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
@@ -335,7 +335,13 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private transformValue(value: unknown, type: BuiltinType) {
-        return ValueNode.create(this.dialect.transformPrimitive(value, type, false) ?? null);
+        if (value === true) {
+            return trueNode(this.dialect);
+        } else if (value === false) {
+            return falseNode(this.dialect);
+        } else {
+            return ValueNode.create(this.dialect.transformPrimitive(value, type, false) ?? null);
+        }
     }
 
     @expr('unary')

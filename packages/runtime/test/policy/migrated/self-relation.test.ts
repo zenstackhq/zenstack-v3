@@ -12,7 +12,7 @@ describe('Policy self relations tests', () => {
                 successor   User?   @relation("BlogOwnerHistory", fields: [successorId], references: [id])
                 predecessor User?   @relation("BlogOwnerHistory")
 
-                @@allow('create', value > 0)
+                @@allow('create,update', value > 0)
                 @@allow('read', true)
             }
         `,
@@ -88,7 +88,7 @@ describe('Policy self relations tests', () => {
                 teacher   User?   @relation("TeacherStudents", fields: [teacherId], references: [id])
                 students  User[]  @relation("TeacherStudents")
 
-                @@allow('create', value > 0)
+                @@allow('create,update', value > 0)
                 @@allow('read', true)
             }
         `,
@@ -153,7 +153,7 @@ describe('Policy self relations tests', () => {
                 followedBy User[]  @relation("UserFollows")
                 following  User[]  @relation("UserFollows")
 
-                @@allow('create', value > 0)
+                @@allow('create,update', value > 0)
                 @@allow('read', true)                
             }
         `,

@@ -3,7 +3,14 @@ import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
 import { z, ZodType } from 'zod';
-import { type BuiltinType, type EnumDef, type FieldDef, type GetModels, type SchemaDef } from '../../schema';
+import {
+    type BuiltinType,
+    type EnumDef,
+    type FieldDef,
+    type GetModels,
+    type ModelDef,
+    type SchemaDef,
+} from '../../schema';
 import { enumerate } from '../../utils/enumerate';
 import { extractFields } from '../../utils/object-utils';
 import { formatError } from '../../utils/zod-utils';
@@ -595,10 +602,18 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         }
 
-        const toManyRelations = Object.values(modelDef.fields).filter((def) => def.relation && def.array);
+        const _countSchema = this.makeCountSelectionSchema(modelDef);
+        if (_countSchema) {
+            fields['_count'] = _countSchema;
+        }
 
+        return z.strictObject(fields);
+    }
+
+    private makeCountSelectionSchema(modelDef: ModelDef) {
+        const toManyRelations = Object.values(modelDef.fields).filter((def) => def.relation && def.array);
         if (toManyRelations.length > 0) {
-            fields['_count'] = z
+            return z
                 .union([
                     z.literal(true),
                     z.strictObject({
@@ -621,9 +636,9 @@ export class InputValidator<Schema extends SchemaDef> {
                     }),
                 ])
                 .optional();
+        } else {
+            return undefined;
         }
-
-        return z.strictObject(fields);
     }
 
     private makeRelationSelectIncludeSchema(fieldDef: FieldDef) {
@@ -675,6 +690,11 @@ export class InputValidator<Schema extends SchemaDef> {
             if (fieldDef.relation) {
                 fields[field] = this.makeRelationSelectIncludeSchema(fieldDef).optional();
             }
+        }
+
+        const _countSchema = this.makeCountSelectionSchema(modelDef);
+        if (_countSchema) {
+            fields['_count'] = _countSchema;
         }
 
         return z.strictObject(fields);

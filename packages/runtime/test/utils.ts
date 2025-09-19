@@ -1,7 +1,8 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
+import type { Model } from '@zenstackhq/language/ast';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
-import { createTestProject, generateTsSchema } from '@zenstackhq/testtools';
+import { createTestProject, generateTsSchema, getPluginModules } from '@zenstackhq/testtools';
 import SQLite from 'better-sqlite3';
 import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
 import { execSync } from 'node:child_process';
@@ -98,9 +99,12 @@ export async function createTestClient<Schema extends SchemaDef>(
             ? `file:${dbName}`
             : `postgres://${TEST_PG_CONFIG.user}:${TEST_PG_CONFIG.password}@${TEST_PG_CONFIG.host}:${TEST_PG_CONFIG.port}/${dbName}`;
 
+    let model: Model | undefined;
+
     if (typeof schema === 'string') {
         const generated = await generateTsSchema(schema, provider, dbUrl, options?.extraSourceFiles);
         workDir = generated.workDir;
+        model = generated.model;
         // replace schema's provider
         _schema = {
             ...generated.schema,
@@ -143,11 +147,14 @@ export async function createTestClient<Schema extends SchemaDef>(
 
     if (options?.usePrismaPush) {
         invariant(typeof schema === 'string' || schemaFile, 'a schema file must be provided when using prisma db push');
-        const r = await loadDocument(path.resolve(workDir!, 'schema.zmodel'));
-        if (!r.success) {
-            throw new Error(r.errors.join('\n'));
+        if (!model) {
+            const r = await loadDocument(path.join(workDir, 'schema.zmodel'), getPluginModules());
+            if (!r.success) {
+                throw new Error(r.errors.join('\n'));
+            }
+            model = r.model;
         }
-        const prismaSchema = new PrismaSchemaGenerator(r.model);
+        const prismaSchema = new PrismaSchemaGenerator(model);
         const prismaSchemaText = await prismaSchema.generate();
         fs.writeFileSync(path.resolve(workDir!, 'schema.prisma'), prismaSchemaText);
         execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {

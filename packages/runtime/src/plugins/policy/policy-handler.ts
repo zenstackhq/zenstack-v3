@@ -1,9 +1,11 @@
-import { invariant } from '@zenstackhq/common-helpers';
+import { invariant, zip } from '@zenstackhq/common-helpers';
 import {
     AliasNode,
     BinaryOperationNode,
     ColumnNode,
     DeleteQueryNode,
+    expressionBuilder,
+    ExpressionWrapper,
     FromNode,
     FunctionNode,
     IdentifierNode,
@@ -26,6 +28,7 @@ import {
     type OperationNode,
     type QueryResult,
     type RootOperationNode,
+    type SelectQueryBuilder,
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { ClientContract } from '../../client';
@@ -34,7 +37,7 @@ import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
 import type { ProceedKyselyQueryFunction } from '../../client/plugin';
-import { requireField, requireIdFields, requireModel } from '../../client/query-utils';
+import { getManyToManyRelation, requireField, requireIdFields, requireModel } from '../../client/query-utils';
 import { ExpressionUtils, type BuiltinType, type Expression, type GetModels, type SchemaDef } from '../../schema';
 import { ColumnCollector } from './column-collector';
 import { RejectedByPolicyError } from './errors';
@@ -75,7 +78,9 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         let mutationRequiresTransaction = false;
         const { mutationModel } = this.getMutationModel(node);
 
-        if (InsertQueryNode.is(node)) {
+        const isManyToManyJoinTable = this.isManyToManyJoinTable(mutationModel);
+
+        if (InsertQueryNode.is(node) && !isManyToManyJoinTable) {
             // reject create if unconditional deny
             const constCondition = this.tryGetConstantPolicy(mutationModel, 'create');
             if (constCondition === false) {
@@ -91,7 +96,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         if (InsertQueryNode.is(node)) {
-            await this.enforcePreCreatePolicy(node, proceed);
+            await this.enforcePreCreatePolicy(node, mutationModel, isManyToManyJoinTable, proceed);
         }
         const transformedNode = this.transformNode(node);
         const result = await proceed(transformedNode);
@@ -280,10 +285,16 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return selectedColumns.every((c) => idFields.includes(c));
     }
 
-    private async enforcePreCreatePolicy(node: InsertQueryNode, proceed: ProceedKyselyQueryFunction) {
-        const { mutationModel } = this.getMutationModel(node);
+    private async enforcePreCreatePolicy(
+        node: InsertQueryNode,
+        mutationModel: GetModels<Schema>,
+        isManyToManyJoinTable: boolean,
+        proceed: ProceedKyselyQueryFunction,
+    ) {
         const fields = node.columns?.map((c) => c.column.name) ?? [];
-        const valueRows = node.values ? this.unwrapCreateValueRows(node.values, mutationModel, fields) : [[]];
+        const valueRows = node.values
+            ? this.unwrapCreateValueRows(node.values, mutationModel, fields, isManyToManyJoinTable)
+            : [[]];
         for (const values of valueRows) {
             await this.enforcePreCreatePolicyForOne(
                 mutationModel,
@@ -355,23 +366,33 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
     }
 
-    private unwrapCreateValueRows(node: OperationNode, model: GetModels<Schema>, fields: string[]) {
+    private unwrapCreateValueRows(
+        node: OperationNode,
+        model: GetModels<Schema>,
+        fields: string[],
+        isManyToManyJoinTable: boolean,
+    ) {
         if (ValuesNode.is(node)) {
-            return node.values.map((v) => this.unwrapCreateValueRow(v.values, model, fields));
+            return node.values.map((v) => this.unwrapCreateValueRow(v.values, model, fields, isManyToManyJoinTable));
         } else if (PrimitiveValueListNode.is(node)) {
-            return [this.unwrapCreateValueRow(node.values, model, fields)];
+            return [this.unwrapCreateValueRow(node.values, model, fields, isManyToManyJoinTable)];
         } else {
             throw new InternalError(`Unexpected node kind: ${node.kind} for unwrapping create values`);
         }
     }
 
-    private unwrapCreateValueRow(data: readonly unknown[], model: GetModels<Schema>, fields: string[]) {
+    private unwrapCreateValueRow(
+        data: readonly unknown[],
+        model: GetModels<Schema>,
+        fields: string[],
+        isImplicitManyToManyJoinTable: boolean,
+    ) {
         invariant(data.length === fields.length, 'data length must match fields length');
         const result: { node: OperationNode; raw: unknown }[] = [];
         for (let i = 0; i < data.length; i++) {
             const item = data[i]!;
-            const fieldDef = requireField(this.client.$schema, model, fields[i]!);
             if (typeof item === 'object' && item && 'kind' in item) {
+                const fieldDef = requireField(this.client.$schema, model, fields[i]!);
                 invariant(item.kind === 'ValueNode', 'expecting a ValueNode');
                 result.push({
                     node: ValueNode.create(
@@ -384,7 +405,15 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                     raw: (item as ValueNode).value,
                 });
             } else {
-                const value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType, !!fieldDef.array);
+                let value: unknown = item;
+
+                // many-to-many join table is not a model so we don't have field definitions,
+                // but there's no need to transform values anyway because they're the fields
+                // are all foreign keys
+                if (!isImplicitManyToManyJoinTable) {
+                    const fieldDef = requireField(this.client.$schema, model, fields[i]!);
+                    value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType, !!fieldDef.array);
+                }
                 if (Array.isArray(value)) {
                     result.push({
                         node: RawNode.createWithSql(this.dialect.buildArrayLiteralSQL(value)),
@@ -504,6 +533,12 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     buildPolicyFilter(model: GetModels<Schema>, alias: string | undefined, operation: CRUD) {
+        // first check if it's a many-to-many join table, and if so, handle specially
+        const m2mFilter = this.getModelPolicyFilterForManyToManyJoinTable(model, alias, operation);
+        if (m2mFilter) {
+            return m2mFilter;
+        }
+
         const policies = this.getModelPolicies(model, operation);
         if (policies.length === 0) {
             return falseNode(this.dialect);
@@ -592,8 +627,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         });
     }
 
-    private getModelPolicies(modelName: string, operation: PolicyOperation) {
-        const modelDef = requireModel(this.client.$schema, modelName);
+    private getModelPolicies(model: string, operation: PolicyOperation) {
+        const modelDef = requireModel(this.client.$schema, model);
         const result: Policy[] = [];
 
         const extractOperations = (expr: Expression) => {
@@ -621,6 +656,78 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             );
         }
         return result;
+    }
+
+    private isManyToManyJoinTable(tableName: string) {
+        return Object.values(this.client.$schema.models).some((modelDef) => {
+            return Object.values(modelDef.fields).some((field) => {
+                const m2m = getManyToManyRelation(this.client.$schema, modelDef.name, field.name);
+                return m2m?.joinTable === tableName;
+            });
+        });
+    }
+
+    private getModelPolicyFilterForManyToManyJoinTable(
+        tableName: string,
+        alias: string | undefined,
+        operation: PolicyOperation,
+    ): OperationNode | undefined {
+        // find the m2m relation for this join table
+        for (const model of Object.values(this.client.$schema.models)) {
+            for (const field of Object.values(model.fields)) {
+                const m2m = getManyToManyRelation(this.client.$schema, model.name, field.name);
+                if (m2m?.joinTable !== tableName) {
+                    continue;
+                }
+
+                // determine A/B side
+                const sortedRecords = [
+                    {
+                        model: model.name,
+                        field: field.name,
+                    },
+                    {
+                        model: m2m.otherModel,
+                        field: m2m.otherField,
+                    },
+                ].sort((a, b) =>
+                    // the implicit m2m join table's "A", "B" fk fields' order is determined
+                    // by model name's sort order, and when identical (for self-relations),
+                    // field name's sort order
+                    a.model !== b.model ? a.model.localeCompare(b.model) : a.field.localeCompare(b.field),
+                );
+
+                // join table's permission:
+                //   - read: requires both sides to be readable
+                //   - mutation: requires both sides to be updatable
+
+                const queries: SelectQueryBuilder<any, any, any>[] = [];
+                const eb = expressionBuilder<any, any>();
+
+                for (const [fk, entry] of zip(['A', 'B'], sortedRecords)) {
+                    const idFields = requireIdFields(this.client.$schema, entry.model);
+                    invariant(
+                        idFields.length === 1,
+                        'only single-field id is supported for implicit many-to-many join table',
+                    );
+
+                    const policyFilter = this.buildPolicyFilter(
+                        entry.model as GetModels<Schema>,
+                        undefined,
+                        operation === 'read' ? 'read' : 'update',
+                    );
+                    const query = eb
+                        .selectFrom(entry.model)
+                        .whereRef(`${entry.model}.${idFields[0]}`, '=', `${alias ?? tableName}.${fk}`)
+                        .select(new ExpressionWrapper(policyFilter).as(`$condition${fk}`));
+                    queries.push(query);
+                }
+
+                return eb.and(queries).toOperationNode();
+            }
+        }
+
+        return undefined;
     }
 
     // #endregion

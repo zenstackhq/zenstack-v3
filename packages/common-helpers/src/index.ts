@@ -4,3 +4,4 @@ export * from './param-case';
 export * from './sleep';
 export * from './tiny-invariant';
 export * from './upper-case-first';
+export * from './zip';

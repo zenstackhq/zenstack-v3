@@ -475,7 +475,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 entity: rightEntity,
             },
         ].sort((a, b) =>
-            // the implement m2m join table's "A", "B" fk fields' order is determined
+            // the implicit m2m join table's "A", "B" fk fields' order is determined
             // by model name's sort order, and when identical (for self-relations),
             // field name's sort order
             a.model !== b.model ? a.model.localeCompare(b.model) : a.field.localeCompare(b.field),

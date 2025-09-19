@@ -1048,14 +1048,29 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         for (const [field, value] of Object.entries(selections.select)) {
             const fieldDef = requireField(this.schema, model, field);
             const fieldModel = fieldDef.type;
-            const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field, fieldModel);
-
-            // build a nested query to count the number of records in the relation
-            let fieldCountQuery = eb.selectFrom(fieldModel).select(eb.fn.countAll().as(`_count$${field}`));
+            let fieldCountQuery: SelectQueryBuilder<any, any, any>;
 
             // join conditions
-            for (const [left, right] of joinPairs) {
-                fieldCountQuery = fieldCountQuery.whereRef(left, '=', right);
+            const m2m = getManyToManyRelation(this.schema, model, field);
+            if (m2m) {
+                // many-to-many relation, count the join table
+                fieldCountQuery = eb
+                    .selectFrom(fieldModel)
+                    .innerJoin(m2m.joinTable, (join) =>
+                        join
+                            .onRef(`${m2m.joinTable}.${m2m.otherFkName}`, '=', `${fieldModel}.${m2m.otherPKName}`)
+                            .onRef(`${m2m.joinTable}.${m2m.parentFkName}`, '=', `${parentAlias}.${m2m.parentPKName}`),
+                    )
+                    .select(eb.fn.countAll().as(`_count$${field}`));
+            } else {
+                // build a nested query to count the number of records in the relation
+                fieldCountQuery = eb.selectFrom(fieldModel).select(eb.fn.countAll().as(`_count$${field}`));
+
+                // join conditions
+                const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field, fieldModel);
+                for (const [left, right] of joinPairs) {
+                    fieldCountQuery = fieldCountQuery.whereRef(left, '=', right);
+                }
             }
 
             // merge _count filter

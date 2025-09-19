@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import type { Expression, ExpressionBuilder, ExpressionWrapper } from 'kysely';
 import { match } from 'ts-pattern';
 import { ExpressionUtils, type FieldDef, type GetModels, type ModelDef, type SchemaDef } from '../schema';
@@ -259,11 +260,18 @@ export function getManyToManyRelation(schema: SchemaDef, model: string, field: s
             orderedFK = sortedFieldNames[0] === field ? ['A', 'B'] : ['B', 'A'];
         }
 
+        const modelIdFields = requireIdFields(schema, model);
+        invariant(modelIdFields.length === 1, 'Only single-field ID is supported for many-to-many relation');
+        const otherIdFields = requireIdFields(schema, fieldDef.type);
+        invariant(otherIdFields.length === 1, 'Only single-field ID is supported for many-to-many relation');
+
         return {
             parentFkName: orderedFK[0],
+            parentPKName: modelIdFields[0]!,
             otherModel: fieldDef.type,
             otherField: fieldDef.relation.opposite,
             otherFkName: orderedFK[1],
+            otherPKName: otherIdFields[0]!,
             joinTable: fieldDef.relation.name
                 ? `_${fieldDef.relation.name}`
                 : `_${sortedModelNames[0]}To${sortedModelNames[1]}`,

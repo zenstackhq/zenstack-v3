@@ -338,6 +338,88 @@ model Post {
             });
             await expect(db.user.update({ where: { id: 3 }, data: { name: 'UpdatedUser3' } })).toResolveTruthy();
         });
+
+        it('works with unnamed many-to-many relation check', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    name String
+    groups Group[]
+    @@allow('create,read', true)
+    @@allow('update', groups?[!private])
+}
+
+model Group {
+    id Int @id
+    private Boolean
+    members User[]
+    @@allow('all', true)
+}
+`,
+                { usePrismaPush: true },
+            );
+
+            await db.$unuseAll().user.create({
+                data: {
+                    id: 1,
+                    name: 'User1',
+                    groups: {
+                        create: [
+                            { id: 1, private: true },
+                            { id: 2, private: false },
+                        ],
+                    },
+                },
+            });
+
+            await expect(db.user.update({ where: { id: 1 }, data: { name: 'User2' } })).toResolveTruthy();
+
+            await db.$unuseAll().group.update({ where: { id: 2 }, data: { private: true } });
+            // not satisfying update policy anymore
+            await expect(db.user.update({ where: { id: 1 }, data: { name: 'User3' } })).toBeRejectedNotFound();
+        });
+
+        it('works with named many-to-many relation check', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    name String
+    groups Group[] @relation("UserGroups")
+    @@allow('create,read', true)
+    @@allow('update', groups?[!private])
+}
+
+model Group {
+    id Int @id
+    private Boolean
+    members User[] @relation("UserGroups")
+    @@allow('all', true)
+}
+`,
+                { usePrismaPush: true },
+            );
+
+            await db.$unuseAll().user.create({
+                data: {
+                    id: 1,
+                    name: 'User1',
+                    groups: {
+                        create: [
+                            { id: 1, private: true },
+                            { id: 2, private: false },
+                        ],
+                    },
+                },
+            });
+
+            await expect(db.user.update({ where: { id: 1 }, data: { name: 'User2' } })).toResolveTruthy();
+
+            await db.$unuseAll().group.update({ where: { id: 2 }, data: { private: true } });
+            // not satisfying update policy anymore
+            await expect(db.user.update({ where: { id: 1 }, data: { name: 'User3' } })).toBeRejectedNotFound();
+        });
     });
 
     describe('Nested create tests', () => {
@@ -887,6 +969,135 @@ model Profile {
                     data: { user: { create: { id: 3, private: true } } },
                 }),
             ).toResolveTruthy();
+        });
+
+        it('works with many-to-many relation manipulation', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    private Boolean
+    groups Group[] @relation("UserGroups")
+    @@allow('create,read', true)
+    @@allow('update,delete', !private)
+}
+
+model Group {
+    id Int @id
+    private Boolean
+    members User[] @relation("UserGroups")
+    @@allow('create,read', true)
+    @@allow('update,delete', !private)
+}
+`,
+                { usePrismaPush: true },
+            );
+
+            await db.$unuseAll().user.create({ data: { id: 1, private: true } });
+            await db.$unuseAll().user.create({ data: { id: 2, private: false } });
+
+            // user not updatable
+            await expect(
+                db.user.update({ where: { id: 1 }, data: { groups: { create: { id: 1, private: false } } } }),
+            ).toBeRejectedByPolicy();
+
+            // group not updatable
+            await expect(
+                db.user.update({ where: { id: 2 }, data: { groups: { create: { id: 1, private: true } } } }),
+            ).toBeRejectedByPolicy();
+
+            // both updatable
+            await expect(
+                db.user.update({
+                    where: { id: 2 },
+                    data: { groups: { create: { id: 1, private: false } } },
+                    include: { groups: true },
+                }),
+            ).toResolveTruthy();
+
+            // disconnect
+            await expect(
+                db.user.update({ where: { id: 2 }, data: { groups: { disconnect: { id: 1 } } } }),
+            ).toResolveTruthy();
+
+            // set
+            await expect(
+                db.user.update({ where: { id: 2 }, data: { groups: { set: [{ id: 1 }] } } }),
+            ).toResolveTruthy();
+
+            // delete
+            await expect(
+                db.user.update({ where: { id: 2 }, data: { groups: { delete: { id: 1 } } } }),
+            ).toResolveTruthy();
+
+            // recreate group as private
+            await db.$unuseAll().group.create({ data: { id: 2, private: true } });
+
+            // connect rejected
+            await expect(
+                db.user.update({ where: { id: 2 }, data: { groups: { connect: { id: 2 } } } }),
+            ).toBeRejectedByPolicy();
+
+            // disconnect rejected
+            await db.$unuseAll().user.update({ where: { id: 2 }, data: { groups: { connect: { id: 2 } } } });
+            await expect(
+                db.user.update({
+                    where: { id: 2 },
+                    data: { groups: { disconnect: { id: 2 } } },
+                    include: { groups: true },
+                }),
+            ).resolves.toMatchObject({
+                groups: [{ id: 2 }], // verify not disconnected
+            });
+
+            // delete rejected
+            await expect(
+                db.user.update({
+                    where: { id: 2 },
+                    data: { groups: { delete: { id: 2 } } },
+                    include: { groups: true },
+                }),
+            ).toBeRejectedNotFound();
+
+            // set rejected
+            await expect(
+                db.user.update({
+                    where: { id: 2 },
+                    data: { groups: { set: [] } },
+                    include: { groups: true },
+                }),
+            ).resolves.toMatchObject({
+                groups: [{ id: 2 }], // verify not disconnected
+            });
+
+            await db.$unuseAll().group.update({ where: { id: 2 }, data: { private: false } });
+            await db.$unuseAll().group.create({ data: { id: 3, private: true } });
+
+            // set rejected
+            await expect(
+                db.user.update({
+                    where: { id: 2 },
+                    data: { groups: { set: [{ id: 3 }] } },
+                    include: { groups: true },
+                }),
+            ).toBeRejectedByPolicy();
+
+            // relation unchanged
+            await expect(db.user.findUnique({ where: { id: 2 }, include: { groups: true } })).resolves.toMatchObject({
+                groups: [{ id: 2 }],
+            });
+
+            // set success
+            await db.$unuseAll().group.update({ where: { id: 3 }, data: { private: false } });
+            await expect(
+                db.user.update({
+                    where: { id: 2 },
+                    data: { groups: { set: [{ id: 3 }] } },
+                    include: { groups: true },
+                }),
+            ).resolves.toMatchObject({
+                groups: [{ id: 3 }],
+            });
         });
     });
 

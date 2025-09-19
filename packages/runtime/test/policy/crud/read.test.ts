@@ -165,6 +165,86 @@ model Bar {
             });
         });
 
+        it('works with unnamed many-to-many relation read', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    groups Group[]
+    @@allow('all', true)
+}
+
+model Group {
+    id Int @id
+    private Boolean
+    users User[]
+    @@allow('read', !private)
+}
+`,
+                { usePrismaPush: true },
+            );
+
+            await db.$unuseAll().user.create({
+                data: {
+                    id: 1,
+                    groups: {
+                        create: [
+                            { id: 1, private: true },
+                            { id: 2, private: false },
+                        ],
+                    },
+                },
+            });
+            await expect(db.user.findFirst({ include: { groups: true } })).resolves.toMatchObject({
+                groups: [{ id: 2 }],
+            });
+            await expect(
+                db.user.findFirst({ where: { id: 1 }, select: { _count: { select: { groups: true } } } }),
+            ).resolves.toMatchObject({
+                _count: { groups: 1 },
+            });
+        });
+
+        it('works with named many-to-many relation read', async () => {
+            const db = await createPolicyTestClient(
+                `
+model User {
+    id Int @id
+    groups Group[] @relation("UserGroups")
+    @@allow('all', true)
+}
+
+model Group {
+    id Int @id
+    private Boolean
+    users User[] @relation("UserGroups")
+    @@allow('read', !private)
+}
+`,
+                { usePrismaPush: true },
+            );
+
+            await db.$unuseAll().user.create({
+                data: {
+                    id: 1,
+                    groups: {
+                        create: [
+                            { id: 1, private: true },
+                            { id: 2, private: false },
+                        ],
+                    },
+                },
+            });
+            await expect(db.user.findFirst({ include: { groups: true } })).resolves.toMatchObject({
+                groups: [{ id: 2 }],
+            });
+            await expect(
+                db.user.findFirst({ where: { id: 1 }, select: { _count: { select: { groups: true } } } }),
+            ).resolves.toMatchObject({
+                _count: { groups: 1 },
+            });
+        });
+
         it('works with filtered by to-one relation field', async () => {
             const db = await createPolicyTestClient(
                 `

@@ -273,4 +273,98 @@ model Profile {
             },
         });
     });
+
+    it('works with unnamed many-to-many relation', async () => {
+        const db = await createPolicyTestClient(
+            `
+model User {
+    id Int @id
+    groups Group[]
+    private Boolean
+    @@allow('create,read', true)
+    @@allow('update', !private)
+}
+
+model Group {
+    id Int @id
+    private Boolean
+    users User[]
+    @@allow('create,read', true)
+    @@allow('update', !private)
+}
+            `,
+            { usePrismaPush: true },
+        );
+
+        await expect(
+            db.user.create({
+                data: { id: 1, private: false, groups: { create: [{ id: 1, private: false }] } },
+            }),
+        ).toResolveTruthy();
+
+        await expect(
+            db.user.create({
+                data: { id: 2, private: true, groups: { create: [{ id: 2, private: false }] } },
+            }),
+        ).toBeRejectedByPolicy();
+
+        await expect(
+            db.user.create({
+                data: { id: 2, private: false, groups: { create: [{ id: 2, private: true }] } },
+            }),
+        ).toBeRejectedByPolicy();
+
+        await expect(
+            db.user.create({
+                data: { id: 2, private: true, groups: { create: [{ id: 2, private: true }] } },
+            }),
+        ).toBeRejectedByPolicy();
+    });
+
+    it('works with named many-to-many relation', async () => {
+        const db = await createPolicyTestClient(
+            `
+model User {
+    id Int @id
+    groups Group[] @relation("UserGroups")
+    private Boolean
+    @@allow('create,read', true)
+    @@allow('update', !private)
+}
+
+model Group {
+    id Int @id
+    private Boolean
+    users User[] @relation("UserGroups")
+    @@allow('create,read', true)
+    @@allow('update', !private)
+}
+            `,
+            { usePrismaPush: true },
+        );
+
+        await expect(
+            db.user.create({
+                data: { id: 1, private: false, groups: { create: [{ id: 1, private: false }] } },
+            }),
+        ).toResolveTruthy();
+
+        await expect(
+            db.user.create({
+                data: { id: 2, private: true, groups: { create: [{ id: 2, private: false }] } },
+            }),
+        ).toBeRejectedByPolicy();
+
+        await expect(
+            db.user.create({
+                data: { id: 2, private: false, groups: { create: [{ id: 2, private: true }] } },
+            }),
+        ).toBeRejectedByPolicy();
+
+        await expect(
+            db.user.create({
+                data: { id: 2, private: true, groups: { create: [{ id: 2, private: true }] } },
+            }),
+        ).toBeRejectedByPolicy();
+    });
 });

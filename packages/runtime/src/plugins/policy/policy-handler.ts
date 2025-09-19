@@ -1,4 +1,4 @@
-import { invariant, zip } from '@zenstackhq/common-helpers';
+import { invariant } from '@zenstackhq/common-helpers';
 import {
     AliasNode,
     BinaryOperationNode,
@@ -28,7 +28,6 @@ import {
     type OperationNode,
     type QueryResult,
     type RootOperationNode,
-    type SelectQueryBuilder,
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { ClientContract } from '../../client';
@@ -758,41 +757,33 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             return undefined;
         }
 
-        const sortedRecords = [
-            {
-                model: m2m.firstModel,
-                field: m2m.firstField,
-            },
-            {
-                model: m2m.secondModel,
-                field: m2m.secondField,
-            },
-        ];
-
         // join table's permission:
         //   - read: requires both sides to be readable
         //   - mutation: requires both sides to be updatable
 
-        const queries: SelectQueryBuilder<any, any, any>[] = [];
+        const checkForOperation = operation === 'read' ? 'read' : 'update';
         const eb = expressionBuilder<any, any>();
+        const joinTable = alias ?? tableName;
 
-        for (const [fk, entry] of zip(['A', 'B'], sortedRecords)) {
-            const idFields = requireIdFields(this.client.$schema, entry.model);
-            invariant(idFields.length === 1, 'only single-field id is supported for implicit many-to-many join table');
-
-            const policyFilter = this.buildPolicyFilter(
-                entry.model as GetModels<Schema>,
-                undefined,
-                operation === 'read' ? 'read' : 'update',
+        const aQuery = eb
+            .selectFrom(m2m.firstModel)
+            .whereRef(`${m2m.firstModel}.${m2m.firstIdField}`, '=', `${joinTable}.A`)
+            .select(() =>
+                new ExpressionWrapper(
+                    this.buildPolicyFilter(m2m.firstModel as GetModels<Schema>, undefined, checkForOperation),
+                ).as('$conditionA'),
             );
-            const query = eb
-                .selectFrom(entry.model)
-                .whereRef(`${entry.model}.${idFields[0]}`, '=', `${alias ?? tableName}.${fk}`)
-                .select(new ExpressionWrapper(policyFilter).as(`$condition${fk}`));
-            queries.push(query);
-        }
 
-        return eb.and(queries).toOperationNode();
+        const bQuery = eb
+            .selectFrom(m2m.secondModel)
+            .whereRef(`${m2m.secondModel}.${m2m.secondIdField}`, '=', `${joinTable}.B`)
+            .select(() =>
+                new ExpressionWrapper(
+                    this.buildPolicyFilter(m2m.secondModel as GetModels<Schema>, undefined, checkForOperation),
+                ).as('$conditionB'),
+            );
+
+        return eb.and([aQuery, bQuery]).toOperationNode();
     }
 
     // #endregion

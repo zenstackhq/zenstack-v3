@@ -24,7 +24,13 @@ import type { ClientContract, CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
-import { getModel, getRelationForeignKeyFieldPairs, requireField, requireIdFields } from '../../client/query-utils';
+import {
+    getManyToManyRelation,
+    getModel,
+    getRelationForeignKeyFieldPairs,
+    requireField,
+    requireIdFields,
+} from '../../client/query-utils';
 import type {
     BinaryExpression,
     BinaryOperator,
@@ -543,6 +549,11 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         relationModel: string,
         context: ExpressionTransformerContext<Schema>,
     ): SelectQueryNode {
+        const m2m = getManyToManyRelation(this.schema, context.model, field);
+        if (m2m) {
+            return this.transformManyToManyRelationAccess(m2m, context);
+        }
+
         const fromModel = context.model;
         const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(this.schema, fromModel, field);
 
@@ -578,6 +589,28 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             from: FromNode.create([TableNode.create(relationModel)]),
             where: WhereNode.create(condition),
         };
+    }
+
+    private transformManyToManyRelationAccess(
+        m2m: NonNullable<ReturnType<typeof getManyToManyRelation>>,
+        context: ExpressionTransformerContext<Schema>,
+    ) {
+        const eb = expressionBuilder<any, any>();
+        const relationQuery = eb
+            .selectFrom(m2m.otherModel)
+            // inner join with join table and additionally filter by the parent model
+            .innerJoin(m2m.joinTable, (join) =>
+                join
+                    // relation model pk to join table fk
+                    .onRef(`${m2m.otherModel}.${m2m.otherPKName}`, '=', `${m2m.joinTable}.${m2m.otherFkName}`)
+                    // parent model pk to join table fk
+                    .onRef(
+                        `${m2m.joinTable}.${m2m.parentFkName}`,
+                        '=',
+                        `${context.alias ?? context.model}.${m2m.parentPKName}`,
+                    ),
+            );
+        return relationQuery.toOperationNode();
     }
 
     private createColumnRef(column: string, context: ExpressionTransformerContext<Schema>): ReferenceNode {

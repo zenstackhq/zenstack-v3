@@ -310,6 +310,8 @@ export class TsSchemaGenerator {
                       ),
                   ]
                 : []),
+
+            ...(dm.isView ? [ts.factory.createPropertyAssignment('isView', ts.factory.createTrue())] : []),
         ];
 
         const computedFields = dm.fields.filter((f) => hasAttribute(f, '@computed'));

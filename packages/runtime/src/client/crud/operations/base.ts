@@ -279,7 +279,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
                 if (!ownedByModel) {
                     // assign fks from parent
-                    const parentFkFields = this.buildFkAssignments(
+                    const parentFkFields = await this.buildFkAssignments(
+                        kysely,
                         fromRelation.model,
                         fromRelation.field,
                         fromRelation.ids,
@@ -433,7 +434,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return { baseEntity, remainingFields };
     }
 
-    private buildFkAssignments(model: string, relationField: string, entity: any) {
+    private async buildFkAssignments(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        relationField: string,
+        entity: any,
+    ) {
         const parentFkFields: any = {};
 
         invariant(relationField, 'parentField must be defined if parentModel is defined');
@@ -443,7 +449,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         for (const pair of keyPairs) {
             if (!(pair.pk in entity)) {
-                throw new QueryError(`Field "${pair.pk}" not found in parent created data`);
+                // the relation may be using a non-id field as fk, so we read in-place
+                // to fetch that field
+                const extraRead = await this.readUnique(kysely, model, {
+                    where: entity,
+                    select: { [pair.pk]: true },
+                } as any);
+                if (!extraRead) {
+                    throw new QueryError(`Field "${pair.pk}" not found in parent created data`);
+                } else {
+                    // update the parent entity
+                    Object.assign(entity, extraRead);
+                }
             }
             Object.assign(parentFkFields, {
                 [pair.fk]: (entity as any)[pair.pk],
@@ -1411,7 +1428,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ...(enumerate(value) as { where: any; data: any }[]).map((item) => {
                             let where;
                             let data;
-                            if ('where' in item) {
+                            if ('data' in item && typeof item.data === 'object') {
                                 where = item.where;
                                 data = item.data;
                             } else {

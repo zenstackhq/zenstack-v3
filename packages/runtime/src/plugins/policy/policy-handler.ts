@@ -39,7 +39,7 @@ import type { ProceedKyselyQueryFunction } from '../../client/plugin';
 import { getManyToManyRelation, requireField, requireIdFields, requireModel } from '../../client/query-utils';
 import { ExpressionUtils, type BuiltinType, type Expression, type GetModels, type SchemaDef } from '../../schema';
 import { ColumnCollector } from './column-collector';
-import { RejectedByPolicyError } from './errors';
+import { RejectedByPolicyError, RejectedByPolicyReason } from './errors';
 import { ExpressionTransformer } from './expression-transformer';
 import type { Policy, PolicyOperation } from './types';
 import { buildIsFalse, conjunction, disjunction, falseNode, getTableName } from './utils';
@@ -66,7 +66,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     ) {
         if (!this.isCrudQueryNode(node)) {
             // non-CRUD queries are not allowed
-            throw new RejectedByPolicyError(undefined, 'non-CRUD queries are not allowed');
+            throw new RejectedByPolicyError(
+                undefined,
+                RejectedByPolicyReason.OTHER,
+                'non-CRUD queries are not allowed',
+            );
         }
 
         if (!this.isMutationQueryNode(node)) {
@@ -106,7 +110,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         } else {
             const readBackResult = await this.processReadBack(node, result, proceed);
             if (readBackResult.rows.length !== result.rows.length) {
-                throw new RejectedByPolicyError(mutationModel, 'result is not allowed to be read back');
+                throw new RejectedByPolicyError(
+                    mutationModel,
+                    RejectedByPolicyReason.CANNOT_READ_BACK,
+                    'result is not allowed to be read back',
+                );
             }
             return readBackResult;
         }
@@ -335,12 +343,14 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         if (!result.rows[0]?.$conditionA) {
             throw new RejectedByPolicyError(
                 m2m.firstModel as GetModels<Schema>,
+                RejectedByPolicyReason.CANNOT_READ_BACK,
                 `many-to-many relation participant model "${m2m.firstModel}" not updatable`,
             );
         }
         if (!result.rows[0]?.$conditionB) {
             throw new RejectedByPolicyError(
                 m2m.secondModel as GetModels<Schema>,
+                RejectedByPolicyReason.NO_ACCESS,
                 `many-to-many relation participant model "${m2m.secondModel}" not updatable`,
             );
         }

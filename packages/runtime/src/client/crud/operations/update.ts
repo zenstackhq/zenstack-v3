@@ -1,5 +1,5 @@
 import { match } from 'ts-pattern';
-import { RejectedByPolicyError } from '../../../plugins/policy/errors';
+import { RejectedByPolicyError, RejectedByPolicyReason } from '../../../plugins/policy/errors';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { UpdateArgs, UpdateManyAndReturnArgs, UpdateManyArgs, UpsertArgs, WhereInput } from '../../crud-types';
 import { getIdValues } from '../../query-utils';
@@ -48,7 +48,11 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             // update succeeded but result cannot be read back
             if (this.hasPolicyEnabled) {
                 // if access policy is enabled, we assume it's due to read violation (not guaranteed though)
-                throw new RejectedByPolicyError(this.model, 'result is not allowed to be read back');
+                throw new RejectedByPolicyError(
+                    this.model,
+                    RejectedByPolicyReason.CANNOT_READ_BACK,
+                    'result is not allowed to be read back',
+                );
             } else {
                 // this can happen if the entity is cascade deleted during the update, return null to
                 // be consistent with Prisma even though it doesn't comply with the method signature
@@ -71,16 +75,29 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             return [];
         }
 
-        return this.safeTransaction(async (tx) => {
+        const { readBackResult, updateResult } = await this.safeTransaction(async (tx) => {
             const updateResult = await this.updateMany(tx, this.model, args.where, args.data, args.limit, true);
-            return this.read(tx, this.model, {
+            const readBackResult = await this.read(tx, this.model, {
                 select: args.select,
                 omit: args.omit,
                 where: {
                     OR: updateResult.map((item) => getIdValues(this.schema, this.model, item) as any),
                 } as any, // TODO: fix type
             });
+
+            return { readBackResult, updateResult };
         });
+
+        if (readBackResult.length < updateResult.length && this.hasPolicyEnabled) {
+            // some of the updated entities cannot be read back
+            throw new RejectedByPolicyError(
+                this.model,
+                RejectedByPolicyReason.CANNOT_READ_BACK,
+                'result is not allowed to be read back',
+            );
+        }
+
+        return readBackResult;
     }
 
     private async runUpsert(args: UpsertArgs<Schema, GetModels<Schema>>) {
@@ -113,7 +130,11 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
         });
 
         if (!result && this.hasPolicyEnabled) {
-            throw new RejectedByPolicyError(this.model, 'result is not allowed to be read back');
+            throw new RejectedByPolicyError(
+                this.model,
+                RejectedByPolicyReason.CANNOT_READ_BACK,
+                'result is not allowed to be read back',
+            );
         }
 
         return result;

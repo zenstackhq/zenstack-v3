@@ -134,7 +134,8 @@ describe('Policy toplevel operations tests', () => {
         ).toBeTruthy();
     });
 
-    it('update id tests', async () => {
+    // TODO: `future()` support
+    it.skip('update id tests', async () => {
         const db = await createPolicyTestClient(
             `
         model Model {

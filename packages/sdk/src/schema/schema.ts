@@ -33,6 +33,7 @@ export type ModelDef = {
     computedFields?: Record<string, Function>;
     isDelegate?: boolean;
     subModels?: string[];
+    isView?: boolean;
 };
 
 export type AttributeApplication = {

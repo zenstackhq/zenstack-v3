@@ -29,7 +29,8 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             }
 
             // sort models so that target of fk constraints are created first
-            const sortedModels = this.sortModels(this.schema.models);
+            const models = Object.values(this.schema.models).filter((m) => !m.isView);
+            const sortedModels = this.sortModels(models);
             for (const modelDef of sortedModels) {
                 const createTable = this.createModelTable(tx, modelDef);
                 await createTable.execute();
@@ -37,10 +38,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         });
     }
 
-    private sortModels(models: Record<string, ModelDef>): ModelDef[] {
+    private sortModels(models: ModelDef[]): ModelDef[] {
         const graph: [ModelDef, ModelDef | undefined][] = [];
 
-        for (const model of Object.values(models)) {
+        for (const model of models) {
             let added = false;
 
             if (model.baseModel) {

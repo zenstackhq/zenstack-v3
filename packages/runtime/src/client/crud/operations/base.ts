@@ -1488,6 +1488,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const results: (unknown | undefined)[] = [];
             for (const d of _data) {
                 const ids = await this.getEntityIds(kysely, model, d);
+                if (!ids) {
+                    throw new NotFoundError(model);
+                }
                 const r = await this.handleManyToManyRelation(
                     kysely,
                     'connect',
@@ -1732,6 +1735,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const results: (unknown | undefined)[] = [];
             for (const d of _data) {
                 const ids = await this.getEntityIds(kysely, model, d);
+                if (!ids) {
+                    throw new NotFoundError(model);
+                }
                 results.push(
                     await this.handleManyToManyRelation(
                         kysely,

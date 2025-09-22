@@ -5,6 +5,11 @@ import { DataModel, TypeDef } from '../src/ast';
 describe('Mixin Tests', () => {
     it('supports model mixing types to Model', async () => {
         const model = await loadSchema(`
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
         type A {
             x String
         }
@@ -25,6 +30,11 @@ describe('Mixin Tests', () => {
 
     it('supports model mixing types to type', async () => {
         const model = await loadSchema(`
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
         type A {
             x String
         }
@@ -52,6 +62,11 @@ describe('Mixin Tests', () => {
     it('can detect cyclic mixins', async () => {
         await loadSchemaWithError(
             `
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
         type A with B {
             x String
         }

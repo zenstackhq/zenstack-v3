@@ -12,6 +12,11 @@ describe('Import tests', () => {
         fs.writeFileSync(
             path.join(name, 'a.zmodel'),
             `
+datasource db {
+  provider = 'sqlite'
+  url      = 'file:./dev.db'
+}
+        
 model A {
   id Int @id
   name String
@@ -48,6 +53,12 @@ enum Role {
             path.join(name, 'b.zmodel'),
             `
 import './a'
+
+datasource db {
+  provider = 'sqlite'
+  url      = 'file:./dev.db'
+}
+
 model User {
   id Int @id
   role Role
@@ -65,6 +76,12 @@ model User {
             path.join(name, 'a.zmodel'),
             `
 import './b'
+
+datasource db {
+  provider = 'sqlite'
+  url      = 'file:./dev.db'
+}
+
 model A {
   id Int @id
   b B?

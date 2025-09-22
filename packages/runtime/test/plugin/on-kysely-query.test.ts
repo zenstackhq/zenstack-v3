@@ -3,12 +3,17 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { type ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
 import { createTestClient } from '../utils';
+import { afterEach } from 'node:test';
 
 describe('On kysely query tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
         _client = await createTestClient(schema);
+    });
+
+    afterEach(async () => {
+        await _client.$disconnect();
     });
 
     it('intercepts queries', async () => {

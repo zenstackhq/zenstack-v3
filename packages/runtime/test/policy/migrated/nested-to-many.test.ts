@@ -381,7 +381,6 @@ describe('Policy tests to-many', () => {
                 },
             },
         });
-        console.log(r);
         expect(r.m2).toHaveLength(3);
     });
 

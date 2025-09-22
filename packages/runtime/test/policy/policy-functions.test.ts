@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createPolicyTestClient } from './utils';
 
 describe('policy functions tests', () => {
-    it('supports contains with case-sensitive field', async () => {
+    it('supports contains case-sensitive', async () => {
         const db = await createPolicyTestClient(
             `
             model Foo {
@@ -14,7 +14,49 @@ describe('policy functions tests', () => {
         );
 
         await expect(db.foo.create({ data: { string: 'bcd' } })).toBeRejectedByPolicy();
+        if (db.$schema.provider.type === 'sqlite') {
+            // sqlite is always case-insensitive
+            await expect(db.foo.create({ data: { string: 'Acd' } })).toResolveTruthy();
+        } else {
+            await expect(db.foo.create({ data: { string: 'Acd' } })).toBeRejectedByPolicy();
+        }
         await expect(db.foo.create({ data: { string: 'bac' } })).toResolveTruthy();
+    });
+
+    it('supports contains explicit case-sensitive', async () => {
+        const db = await createPolicyTestClient(
+            `
+            model Foo {
+                id String @id @default(cuid())
+                string String
+                @@allow('all', contains(string, 'a', false))
+            }
+            `,
+        );
+
+        await expect(db.foo.create({ data: { string: 'bcd' } })).toBeRejectedByPolicy();
+        if (db.$schema.provider.type === 'sqlite') {
+            // sqlite is always case-insensitive
+            await expect(db.foo.create({ data: { string: 'Acd' } })).toResolveTruthy();
+        } else {
+            await expect(db.foo.create({ data: { string: 'Acd' } })).toBeRejectedByPolicy();
+        }
+        await expect(db.foo.create({ data: { string: 'bac' } })).toResolveTruthy();
+    });
+
+    it('supports contains case-insensitive', async () => {
+        const db = await createPolicyTestClient(
+            `
+            model Foo {
+                id String @id @default(cuid())
+                string String
+                @@allow('all', contains(string, 'a', true))
+            }
+            `,
+        );
+
+        await expect(db.foo.create({ data: { string: 'bcd' } })).toBeRejectedByPolicy();
+        await expect(db.foo.create({ data: { string: 'Abc' } })).toResolveTruthy();
     });
 
     it('supports contains with case-sensitive non-field', async () => {
@@ -35,6 +77,12 @@ describe('policy functions tests', () => {
         await expect(db.foo.create({ data: {} })).toBeRejectedByPolicy();
         await expect(db.$setAuth({ id: 'user1', name: 'bcd' }).foo.create({ data: {} })).toBeRejectedByPolicy();
         await expect(db.$setAuth({ id: 'user1', name: 'bac' }).foo.create({ data: {} })).toResolveTruthy();
+        if (db.$schema.provider.type === 'sqlite') {
+            // sqlite is always case-insensitive
+            await expect(db.$setAuth({ id: 'user1', name: 'Abc' }).foo.create({ data: {} })).toResolveTruthy();
+        } else {
+            await expect(db.$setAuth({ id: 'user1', name: 'Abc' }).foo.create({ data: {} })).toBeRejectedByPolicy();
+        }
     });
 
     it('supports contains with auth()', async () => {

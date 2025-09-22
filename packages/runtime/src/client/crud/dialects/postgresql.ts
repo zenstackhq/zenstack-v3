@@ -63,6 +63,9 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
     }
 
     override transformOutput(value: unknown, type: BuiltinType) {
+        if (value === null || value === undefined) {
+            return value;
+        }
         return match(type)
             .with('DateTime', () => this.transformOutputDate(value))
             .with('Bytes', () => this.transformOutputBytes(value))
@@ -96,9 +99,12 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
     private transformOutputDate(value: unknown) {
         if (typeof value === 'string') {
             return new Date(value);
-        } else if (value instanceof Date) {
-            value.setTime(value.getTime() - value.getTimezoneOffset() * 60 * 1000);
-            return value;
+        } else if (value instanceof Date && this.options.fixPostgresTimezone !== false) {
+            // SPECIAL NOTES:
+            // node-pg has a terrible quirk that it returns the date value in local timezone
+            // as a `Date` object although for `DateTime` field the data in DB is stored in UTC
+            // see: https://github.com/brianc/node-postgres/issues/429
+            return new Date(value.getTime() - value.getTimezoneOffset() * 60 * 1000);
         } else {
             return value;
         }
@@ -459,5 +465,10 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
 
         return result;
+    }
+
+    override getStringCasingBehavior() {
+        // Postgres `LIKE` is case-sensitive, `ILIKE` is case-insensitive
+        return { supportsILike: true, likeCaseSensitive: true };
     }
 }

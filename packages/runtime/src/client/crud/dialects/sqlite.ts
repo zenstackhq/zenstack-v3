@@ -58,7 +58,9 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
     }
 
     override transformOutput(value: unknown, type: BuiltinType) {
-        if (this.schema.typeDefs && type in this.schema.typeDefs) {
+        if (value === null || value === undefined) {
+            return value;
+        } else if (this.schema.typeDefs && type in this.schema.typeDefs) {
             // typed JSON field
             return this.transformOutputJson(value);
         } else {
@@ -114,9 +116,15 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
     }
 
     private transformOutputJson(value: unknown) {
-        // better-sqlite3 returns JSON as string
-        invariant(typeof value === 'string', 'Expected string, got ' + typeof value);
-        return JSON.parse(value as string);
+        // better-sqlite3 typically returns JSON as string; be tolerant
+        if (typeof value === 'string') {
+            try {
+                return JSON.parse(value);
+            } catch (e) {
+                throw new QueryError('Invalid JSON returned', e);
+            }
+        }
+        return value;
     }
 
     override buildRelationSelection(
@@ -399,5 +407,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 // fallback to text
                 .otherwise(() => 'text')
         );
+    }
+
+    override getStringCasingBehavior() {
+        // SQLite `LIKE` is case-insensitive, and there is no `ILIKE`
+        return { supportsILike: false, likeCaseSensitive: false };
     }
 }

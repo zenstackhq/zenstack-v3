@@ -1264,5 +1264,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      */
     abstract getFieldSqlType(fieldDef: FieldDef): string;
 
+    /*
+     * Gets the string casing behavior for the dialect.
+     */
+    abstract getStringCasingBehavior(): { supportsILike: boolean; likeCaseSensitive: boolean };
+
     // #endregion
 }

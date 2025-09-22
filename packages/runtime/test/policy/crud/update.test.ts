@@ -156,7 +156,7 @@ model Profile {
             });
         });
 
-        it('works with to-one relation check owner side', async () => {
+        it('works with to-one relation check non-owner side', async () => {
             const db = await createPolicyTestClient(
                 `
 model User {
@@ -1242,7 +1242,7 @@ model Foo {
                 db.$qb
                     .insertInto('Foo')
                     .values({ id: 1, x: 5 })
-                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 5 }).where('id', '=', 1))
+                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 5 }).where('Foo.id', '=', 1))
                     .executeTakeFirst(),
             ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 0n });
             await expect(db.foo.count()).resolves.toBe(3);
@@ -1253,7 +1253,7 @@ model Foo {
                 db.$qb
                     .insertInto('Foo')
                     .values({ id: 2, x: 5 })
-                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 6 }).where('id', '=', 2))
+                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 6 }).where('Foo.id', '=', 2))
                     .executeTakeFirst(),
             ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 1n });
             await expect(db.foo.count()).resolves.toBe(3);

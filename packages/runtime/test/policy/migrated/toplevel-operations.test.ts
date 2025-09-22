@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { createPolicyTestClient } from '../utils';
-import { testLogger } from '../../utils';
 
 describe('Policy toplevel operations tests', () => {
     it('read tests', async () => {
@@ -221,7 +220,6 @@ describe('Policy toplevel operations tests', () => {
             @@allow('delete', value > 1)
         }
         `,
-            { log: testLogger },
         );
 
         await expect(db.model.delete({ where: { id: '1' } })).toBeRejectedNotFound();

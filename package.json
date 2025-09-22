@@ -7,7 +7,7 @@
         "build": "turbo run build",
         "watch": "turbo run watch build",
         "lint": "turbo run lint",
-        "test": "turbo run test",
+        "test": "vitest run",
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
         "pr": "gh pr create --fill-first --base dev",
         "merge-main": "gh pr create --title \"merge dev to main\" --body \"\" --base main --head dev",

@@ -196,16 +196,27 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         if (this.isNullNode(right)) {
-            return expr.op === '=='
-                ? BinaryOperationNode.create(left, OperatorNode.create('is'), right)
-                : BinaryOperationNode.create(left, OperatorNode.create('is not'), right);
+            return this.transformNullCheck(left, expr.op);
         } else if (this.isNullNode(left)) {
-            return expr.op === '=='
-                ? BinaryOperationNode.create(right, OperatorNode.create('is'), ValueNode.createImmediate(null))
-                : BinaryOperationNode.create(right, OperatorNode.create('is not'), ValueNode.createImmediate(null));
+            return this.transformNullCheck(right, expr.op);
+        } else {
+            return BinaryOperationNode.create(left, this.transformOperator(op), right);
         }
+    }
 
-        return BinaryOperationNode.create(left, this.transformOperator(op), right);
+    private transformNullCheck(expr: OperationNode, operator: BinaryOperator) {
+        invariant(operator === '==' || operator === '!=', 'operator must be "==" or "!=" for null comparison');
+        if (ValueNode.is(expr)) {
+            if (expr.value === null) {
+                return operator === '==' ? trueNode(this.dialect) : falseNode(this.dialect);
+            } else {
+                return operator === '==' ? falseNode(this.dialect) : trueNode(this.dialect);
+            }
+        } else {
+            return operator === '=='
+                ? BinaryOperationNode.create(expr, OperatorNode.create('is'), ValueNode.createImmediate(null))
+                : BinaryOperationNode.create(expr, OperatorNode.create('is not'), ValueNode.createImmediate(null));
+        }
     }
 
     private normalizeBinaryOperationOperands(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {

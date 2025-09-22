@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestClient } from '../utils';
 
-const PG_DB_NAME = 'client-api-scalar-list-tests';
-
 describe('Scalar list tests', () => {
     const schema = `
     model User {
@@ -18,7 +16,6 @@ describe('Scalar list tests', () => {
     beforeEach(async () => {
         client = await createTestClient(schema, {
             provider: 'postgresql',
-            dbName: PG_DB_NAME,
         });
     });
 

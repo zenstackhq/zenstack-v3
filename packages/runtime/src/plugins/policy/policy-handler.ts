@@ -19,6 +19,7 @@ import {
     ReturningNode,
     SelectionNode,
     SelectQueryNode,
+    sql,
     TableNode,
     UpdateQueryNode,
     ValueListNode,
@@ -362,11 +363,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         values: OperationNode[],
         proceed: ProceedKyselyQueryFunction,
     ) {
-        const allFields = Object.keys(requireModel(this.client.$schema, model).fields);
+        const allFields = Object.entries(requireModel(this.client.$schema, model).fields).filter(
+            ([, def]) => !def.relation,
+        );
         const allValues: OperationNode[] = [];
 
-        for (const fieldName of allFields) {
-            const index = fields.indexOf(fieldName);
+        for (const [name, _def] of allFields) {
+            const index = fields.indexOf(name);
             if (index >= 0) {
                 allValues.push(values[index]!);
             } else {
@@ -376,6 +379,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         // create a `SELECT column1 as field1, column2 as field2, ... FROM (VALUES (...))` table for policy evaluation
+        const eb = expressionBuilder<any, any>();
+
         const constTable: SelectQueryNode = {
             kind: 'SelectQueryNode',
             from: FromNode.create([
@@ -384,11 +389,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                     IdentifierNode.create('$t'),
                 ),
             ]),
-            selections: allFields.map((field, index) =>
-                SelectionNode.create(
-                    AliasNode.create(ColumnNode.create(`column${index + 1}`), IdentifierNode.create(field)),
-                ),
-            ),
+            selections: allFields.map(([name, def], index) => {
+                const castedColumnRef =
+                    sql`CAST(${eb.ref(`column${index + 1}`)} as ${sql.raw(this.dialect.getFieldSqlType(def))})`.as(
+                        name,
+                    );
+                return SelectionNode.create(castedColumnRef.toOperationNode());
+            }),
         };
 
         const filter = this.buildPolicyFilter(model, undefined, 'create');

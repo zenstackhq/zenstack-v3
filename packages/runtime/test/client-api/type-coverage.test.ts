@@ -1,10 +1,8 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { createTestClient } from '../utils';
+import { createTestClient, getTestDbProvider } from '../utils';
 
-const PG_DB_NAME = 'client-api-type-coverage-tests';
-
-describe.each(['sqlite', 'postgresql'] as const)('zmodel type coverage tests', (provider) => {
+describe('Zmodel type coverage tests', () => {
     it('supports all types - plain', async () => {
         const date = new Date();
         const data = {
@@ -37,7 +35,6 @@ describe.each(['sqlite', 'postgresql'] as const)('zmodel type coverage tests', (
                 Json Json
             }
             `,
-                { provider, dbName: PG_DB_NAME },
             );
 
             await db.foo.create({ data });
@@ -64,7 +61,6 @@ describe.each(['sqlite', 'postgresql'] as const)('zmodel type coverage tests', (
                 Json Json @default("{\\"foo\\":\\"bar\\"}")
             }
             `,
-                { provider, dbName: PG_DB_NAME },
             );
 
             await db.foo.create({ data: { id: '1' } });
@@ -84,7 +80,7 @@ describe.each(['sqlite', 'postgresql'] as const)('zmodel type coverage tests', (
     });
 
     it('supports all types - array', async () => {
-        if (provider === 'sqlite') {
+        if (getTestDbProvider() === 'sqlite') {
             return;
         }
 
@@ -120,7 +116,6 @@ describe.each(['sqlite', 'postgresql'] as const)('zmodel type coverage tests', (
                 Json Json[]
             }
             `,
-                { provider, dbName: PG_DB_NAME },
             );
 
             await db.foo.create({ data });
@@ -131,7 +126,7 @@ describe.each(['sqlite', 'postgresql'] as const)('zmodel type coverage tests', (
     });
 
     it('supports all types - array for plain json field', async () => {
-        if (provider === 'sqlite') {
+        if (getTestDbProvider() === 'sqlite') {
             return;
         }
 
@@ -149,7 +144,6 @@ describe.each(['sqlite', 'postgresql'] as const)('zmodel type coverage tests', (
                 Json Json
             }
             `,
-                { provider, dbName: PG_DB_NAME },
             );
 
             await db.foo.create({ data });

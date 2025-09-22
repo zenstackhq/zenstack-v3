@@ -1,16 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
-import { createClientSpecs } from './client-specs';
+import { createTestClient } from '../utils';
 import { createPosts, createUser } from './utils';
 
-const PG_DB_NAME = 'client-api-group-by-tests';
-
-describe.each(createClientSpecs(PG_DB_NAME))('Client groupBy tests', ({ createClient }) => {
+describe('Client groupBy tests', () => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        client = await createClient();
+        client = await createTestClient(schema);
     });
 
     afterEach(async () => {

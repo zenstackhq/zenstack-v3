@@ -366,7 +366,7 @@ describe('Policy tests to-many', () => {
                 where: { id: '1' },
                 data: {
                     m2: {
-                        create: [{ value: 0 }, { value: 1 }],
+                        create: [{ value: 5 }, { value: 0 }],
                     },
                 },
             }),

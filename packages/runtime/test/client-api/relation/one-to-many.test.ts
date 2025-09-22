@@ -1,20 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createTestClient } from '../../utils';
 
-const TEST_DB = 'client-api-relation-test-one-to-many';
+describe('One-to-many relation tests ', () => {
+    let client: any;
 
-describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as const }])(
-    'One-to-many relation tests for $provider',
-    ({ provider }) => {
-        let client: any;
+    afterEach(async () => {
+        await client?.$disconnect();
+    });
 
-        afterEach(async () => {
-            await client?.$disconnect();
-        });
-
-        it('works with unnamed one-to-many relation', async () => {
-            client = await createTestClient(
-                `
+    it('works with unnamed one-to-many relation', async () => {
+        client = await createTestClient(
+            `
             model User {
                 id Int @id @default(autoincrement())
                 name String
@@ -28,31 +24,27 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 userId Int
             }
         `,
-                {
-                    provider,
-                    dbName: TEST_DB,
-                },
-            );
+        );
 
-            await expect(
-                client.user.create({
-                    data: {
-                        name: 'User',
-                        posts: {
-                            create: [{ title: 'Post 1' }, { title: 'Post 2' }],
-                        },
+        await expect(
+            client.user.create({
+                data: {
+                    name: 'User',
+                    posts: {
+                        create: [{ title: 'Post 1' }, { title: 'Post 2' }],
                     },
-                    include: { posts: true },
-                }),
-            ).resolves.toMatchObject({
-                name: 'User',
-                posts: [expect.objectContaining({ title: 'Post 1' }), expect.objectContaining({ title: 'Post 2' })],
-            });
+                },
+                include: { posts: true },
+            }),
+        ).resolves.toMatchObject({
+            name: 'User',
+            posts: [expect.objectContaining({ title: 'Post 1' }), expect.objectContaining({ title: 'Post 2' })],
         });
+    });
 
-        it('works with named one-to-many relation', async () => {
-            client = await createTestClient(
-                `
+    it('works with named one-to-many relation', async () => {
+        client = await createTestClient(
+            `
             model User {
                 id Int @id @default(autoincrement())
                 name String
@@ -69,30 +61,25 @@ describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as cons
                 userId2 Int?
             }
         `,
-                {
-                    provider,
-                    dbName: TEST_DB,
-                },
-            );
+        );
 
-            await expect(
-                client.user.create({
-                    data: {
-                        name: 'User',
-                        posts1: {
-                            create: [{ title: 'Post 1' }, { title: 'Post 2' }],
-                        },
-                        posts2: {
-                            create: [{ title: 'Post 3' }, { title: 'Post 4' }],
-                        },
+        await expect(
+            client.user.create({
+                data: {
+                    name: 'User',
+                    posts1: {
+                        create: [{ title: 'Post 1' }, { title: 'Post 2' }],
                     },
-                    include: { posts1: true, posts2: true },
-                }),
-            ).resolves.toMatchObject({
-                name: 'User',
-                posts1: [expect.objectContaining({ title: 'Post 1' }), expect.objectContaining({ title: 'Post 2' })],
-                posts2: [expect.objectContaining({ title: 'Post 3' }), expect.objectContaining({ title: 'Post 4' })],
-            });
+                    posts2: {
+                        create: [{ title: 'Post 3' }, { title: 'Post 4' }],
+                    },
+                },
+                include: { posts1: true, posts2: true },
+            }),
+        ).resolves.toMatchObject({
+            name: 'User',
+            posts1: [expect.objectContaining({ title: 'Post 1' }), expect.objectContaining({ title: 'Post 2' })],
+            posts2: [expect.objectContaining({ title: 'Post 3' }), expect.objectContaining({ title: 'Post 4' })],
         });
-    },
-);
+    });
+});

@@ -1,15 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
-import { createClientSpecs } from './client-specs';
+import { createTestClient } from '../utils';
 
-const PG_DB_NAME = 'client-api-filter-tests';
-
-describe.each(createClientSpecs(PG_DB_NAME))('Client filter tests for $provider', ({ createClient, provider }) => {
+describe('Client filter tests ', () => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        client = await createClient();
+        client = await createTestClient(schema);
     });
 
     afterEach(async () => {
@@ -76,7 +74,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client filter tests for $provider'
             }),
         ).toResolveTruthy();
 
-        if (provider === 'sqlite') {
+        if (client.$schema.provider.type === 'sqlite') {
             // sqlite: equalities are case-sensitive, match is case-insensitive
             await expect(
                 client.user.findFirst({
@@ -126,7 +124,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client filter tests for $provider'
                     },
                 }),
             ).toResolveTruthy();
-        } else if (provider === 'postgresql') {
+        } else if (client.$schema.provider.type === 'postgresql') {
             // postgresql: default is case-sensitive, but can be toggled with "mode"
 
             await expect(

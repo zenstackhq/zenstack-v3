@@ -482,7 +482,7 @@ describe('deep nested operations tests', () => {
                     },
                 },
             }),
-        ).rejects.toThrow('constraint failed');
+        ).rejects.toThrow('constraint');
 
         // createMany skip duplicate
         await db.m1.update({

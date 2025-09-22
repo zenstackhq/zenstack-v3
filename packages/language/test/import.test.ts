@@ -67,7 +67,7 @@ model User {
         );
 
         const model = await expectLoaded(path.join(name, 'b.zmodel'));
-        expect((model.declarations[0] as DataModel).fields[1].type.reference?.ref?.name).toBe('Role');
+        expect((model.declarations[1] as DataModel).fields[1].type.reference?.ref?.name).toBe('Role');
     });
 
     it('supports cyclic imports', async () => {
@@ -103,7 +103,7 @@ model B {
         const modelB = await expectLoaded(path.join(name, 'b.zmodel'));
         expect((modelB.declarations[0] as DataModel).fields[1].type.reference?.ref?.name).toBe('A');
         const modelA = await expectLoaded(path.join(name, 'a.zmodel'));
-        expect((modelA.declarations[0] as DataModel).fields[1].type.reference?.ref?.name).toBe('B');
+        expect((modelA.declarations[1] as DataModel).fields[1].type.reference?.ref?.name).toBe('B');
     });
 
     async function expectLoaded(file: string) {

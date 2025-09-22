@@ -35,7 +35,8 @@ describe('View Policy Test', () => {
         );
 
         const rawDb = db.$unuseAll();
-        await rawDb.$executeRaw`CREATE VIEW UserInfo as select user.id, user.name, user.email, user.id as userId, count(post.id) as postCount from user left join post on user.id = post.authorId group by user.id;`;
+
+        await rawDb.$executeRaw`CREATE VIEW "UserInfo" as select "User"."id", "User"."name", "User"."email", "User"."id" as "userId", count("Post"."id") as "postCount" from "User" left join "Post" on "User"."id" = "Post"."authorId" group by "User"."id";`;
 
         await rawDb.user.create({
             data: {

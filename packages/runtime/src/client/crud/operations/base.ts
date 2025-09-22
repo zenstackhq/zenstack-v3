@@ -360,22 +360,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         const createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
 
-        // let createdEntity: any;
-        // try {
-        //     createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
-        // } catch (err) {
-        //     const { sql, parameters } = query.compile();
-        //     throw new QueryError(`Error during create: ${err}, sql: ${sql}, parameters: ${parameters}`);
-        // }
-
         if (Object.keys(postCreateRelations).length > 0) {
             // process nested creates that need to happen after the current entity is created
-            const relationPromises = Object.entries(postCreateRelations).map(([field, subPayload]) => {
-                return this.processNoneOwnedRelationForCreate(kysely, model, field, subPayload, createdEntity);
-            });
-
-            // await relation creation
-            await Promise.all(relationPromises);
+            for (const [field, subPayload] of Object.entries(postCreateRelations)) {
+                await this.processNoneOwnedRelationForCreate(kysely, model, field, subPayload, createdEntity);
+            }
         }
 
         if (fromRelation && m2m) {
@@ -605,7 +594,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return result;
     }
 
-    private processNoneOwnedRelationForCreate(
+    private async processNoneOwnedRelationForCreate(
         kysely: ToKysely<Schema>,
         contextModel: GetModels<Schema>,
         relationFieldName: string,
@@ -614,7 +603,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     ) {
         const relationFieldDef = this.requireField(contextModel, relationFieldName);
         const relationModel = relationFieldDef.type as GetModels<Schema>;
-        const tasks: Promise<unknown>[] = [];
         const fromRelationContext: FromRelationContext<Schema> = {
             model: contextModel,
             field: relationFieldName,
@@ -629,43 +617,38 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             switch (action) {
                 case 'create': {
                     // create with a parent entity
-                    tasks.push(
-                        ...enumerate(subPayload).map((item) =>
-                            this.create(kysely, relationModel, item, fromRelationContext),
-                        ),
-                    );
+                    for (const item of enumerate(subPayload)) {
+                        await this.create(kysely, relationModel, item, fromRelationContext);
+                    }
                     break;
                 }
 
                 case 'createMany': {
                     invariant(relationFieldDef.array, 'relation must be an array for createMany');
-                    tasks.push(
-                        this.createMany(
-                            kysely,
-                            relationModel,
-                            subPayload as { data: any; skipDuplicates: boolean },
-                            false,
-                            fromRelationContext,
-                        ),
+                    await this.createMany(
+                        kysely,
+                        relationModel,
+                        subPayload as { data: any; skipDuplicates: boolean },
+                        false,
+                        fromRelationContext,
                     );
                     break;
                 }
 
                 case 'connect': {
-                    tasks.push(this.connectRelation(kysely, relationModel, subPayload, fromRelationContext));
+                    await this.connectRelation(kysely, relationModel, subPayload, fromRelationContext);
                     break;
                 }
 
                 case 'connectOrCreate': {
-                    tasks.push(
-                        ...enumerate(subPayload).map((item) =>
-                            this.exists(kysely, relationModel, item.where).then((found) =>
-                                !found
-                                    ? this.create(kysely, relationModel, item.create, fromRelationContext)
-                                    : this.connectRelation(kysely, relationModel, found, fromRelationContext),
-                            ),
-                        ),
-                    );
+                    for (const item of enumerate(subPayload)) {
+                        const found = await this.exists(kysely, relationModel, item.where);
+                        if (!found) {
+                            await this.create(kysely, relationModel, item.create, fromRelationContext);
+                        } else {
+                            await this.connectRelation(kysely, relationModel, found, fromRelationContext);
+                        }
+                    }
                     break;
                 }
 
@@ -673,8 +656,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     throw new QueryError(`Invalid relation action: ${action}`);
             }
         }
-
-        return Promise.all(tasks);
     }
 
     protected async createMany<
@@ -1366,7 +1347,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         args: any,
         throwIfNotFound: boolean,
     ) {
-        const tasks: Promise<unknown>[] = [];
         const fieldModel = fieldDef.type as GetModels<Schema>;
         const fromRelationContext: FromRelationContext<Schema> = {
             model,
@@ -1382,117 +1362,101 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         !Array.isArray(value) || fieldDef.array,
                         'relation must be an array if create is an array',
                     );
-                    tasks.push(
-                        ...enumerate(value).map((item) => this.create(kysely, fieldModel, item, fromRelationContext)),
-                    );
+                    for (const item of enumerate(value)) {
+                        await this.create(kysely, fieldModel, item, fromRelationContext);
+                    }
                     break;
                 }
 
                 case 'createMany': {
                     invariant(fieldDef.array, 'relation must be an array for createMany');
-                    tasks.push(
-                        this.createMany(
-                            kysely,
-                            fieldModel,
-                            value as { data: any; skipDuplicates: boolean },
-                            false,
-                            fromRelationContext,
-                        ),
+                    await this.createMany(
+                        kysely,
+                        fieldModel,
+                        value as { data: any; skipDuplicates: boolean },
+                        false,
+                        fromRelationContext,
                     );
                     break;
                 }
 
                 case 'connect': {
-                    tasks.push(this.connectRelation(kysely, fieldModel, value, fromRelationContext));
+                    await this.connectRelation(kysely, fieldModel, value, fromRelationContext);
                     break;
                 }
 
                 case 'connectOrCreate': {
-                    tasks.push(this.connectOrCreateRelation(kysely, fieldModel, value, fromRelationContext));
+                    await this.connectOrCreateRelation(kysely, fieldModel, value, fromRelationContext);
                     break;
                 }
 
                 case 'disconnect': {
-                    tasks.push(this.disconnectRelation(kysely, fieldModel, value, fromRelationContext));
+                    await this.disconnectRelation(kysely, fieldModel, value, fromRelationContext);
                     break;
                 }
 
                 case 'set': {
                     invariant(fieldDef.array, 'relation must be an array');
-                    tasks.push(this.setRelation(kysely, fieldModel, value, fromRelationContext));
+                    await this.setRelation(kysely, fieldModel, value, fromRelationContext);
                     break;
                 }
 
                 case 'update': {
-                    tasks.push(
-                        ...(enumerate(value) as { where: any; data: any }[]).map((item) => {
-                            let where;
-                            let data;
-                            if ('data' in item && typeof item.data === 'object') {
-                                where = item.where;
-                                data = item.data;
-                            } else {
-                                where = undefined;
-                                data = item;
-                            }
-                            return this.update(
-                                kysely,
-                                fieldModel,
-                                where,
-                                data,
-                                fromRelationContext,
-                                true,
-                                throwIfNotFound,
-                            );
-                        }),
-                    );
+                    for (const _item of enumerate(value)) {
+                        const item = _item as { where: any; data: any };
+                        let where;
+                        let data;
+                        if ('data' in item && typeof item.data === 'object') {
+                            where = item.where;
+                            data = item.data;
+                        } else {
+                            where = undefined;
+                            data = item;
+                        }
+                        await this.update(kysely, fieldModel, where, data, fromRelationContext, true, throwIfNotFound);
+                    }
                     break;
                 }
 
                 case 'upsert': {
-                    tasks.push(
-                        ...(
-                            enumerate(value) as {
-                                where: any;
-                                create: any;
-                                update: any;
-                            }[]
-                        ).map(async (item) => {
-                            const updated = await this.update(
-                                kysely,
-                                fieldModel,
-                                item.where,
-                                item.update,
-                                fromRelationContext,
-                                true,
-                                false,
-                            );
-                            if (updated) {
-                                return updated;
-                            } else {
-                                return this.create(kysely, fieldModel, item.create, fromRelationContext);
-                            }
-                        }),
-                    );
+                    for (const _item of enumerate(value)) {
+                        const item = _item as {
+                            where: any;
+                            create: any;
+                            update: any;
+                        };
+
+                        const updated = await this.update(
+                            kysely,
+                            fieldModel,
+                            item.where,
+                            item.update,
+                            fromRelationContext,
+                            true,
+                            false,
+                        );
+                        if (!updated) {
+                            await this.create(kysely, fieldModel, item.create, fromRelationContext);
+                        }
+                    }
                     break;
                 }
 
                 case 'updateMany': {
-                    tasks.push(
-                        ...(enumerate(value) as { where: any; data: any }[]).map((item) =>
-                            this.update(kysely, fieldModel, item.where, item.data, fromRelationContext, false, false),
-                        ),
-                    );
+                    for (const _item of enumerate(value)) {
+                        const item = _item as { where: any; data: any };
+                        await this.update(kysely, fieldModel, item.where, item.data, fromRelationContext, false, false);
+                    }
                     break;
                 }
 
                 case 'delete': {
-                    tasks.push(this.deleteRelation(kysely, fieldModel, value, fromRelationContext, true));
+                    await this.deleteRelation(kysely, fieldModel, value, fromRelationContext, true);
                     break;
                 }
 
                 case 'deleteMany': {
-                    tasks.push(this.deleteRelation(kysely, fieldModel, value, fromRelationContext, false));
+                    await this.deleteRelation(kysely, fieldModel, value, fromRelationContext, false);
                     break;
                 }
 
@@ -1501,8 +1465,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
             }
         }
-
-        await Promise.all(tasks);
 
         return fromRelationContext.parentUpdates;
     }
@@ -1523,9 +1485,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
         if (m2m) {
             // handle many-to-many relation
-            const actions = _data.map(async (d) => {
+            const results: (unknown | undefined)[] = [];
+            for (const d of _data) {
                 const ids = await this.getEntityIds(kysely, model, d);
-                return this.handleManyToManyRelation(
+                const r = await this.handleManyToManyRelation(
                     kysely,
                     'connect',
                     fromRelation.model,
@@ -1536,8 +1499,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ids,
                     m2m.joinTable,
                 );
-            });
-            const results = await Promise.all(actions);
+                results.push(r);
+            }
 
             // validate connect result
             if (_data.length > results.filter((r) => !!r).length) {
@@ -1622,16 +1585,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return;
         }
 
-        return Promise.all(
-            _data.map(async ({ where, create }) => {
-                const existing = await this.exists(kysely, model, where);
-                if (existing) {
-                    return this.connectRelation(kysely, model, [where], fromRelation);
-                } else {
-                    return this.create(kysely, model, create, fromRelation);
-                }
-            }),
-        );
+        for (const { where, create } of _data) {
+            const existing = await this.exists(kysely, model, where);
+            if (existing) {
+                await this.connectRelation(kysely, model, [where], fromRelation);
+            } else {
+                await this.create(kysely, model, create, fromRelation);
+            }
+        }
     }
 
     protected async disconnectRelation(
@@ -1662,13 +1623,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
         if (m2m) {
             // handle many-to-many relation
-            const actions = disconnectConditions.map(async (d) => {
+            for (const d of disconnectConditions) {
                 const ids = await this.getEntityIds(kysely, model, d);
                 if (!ids) {
                     // not found
                     return;
                 }
-                return this.handleManyToManyRelation(
+                await this.handleManyToManyRelation(
                     kysely,
                     'disconnect',
                     fromRelation.model,
@@ -1679,8 +1640,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ids,
                     m2m.joinTable,
                 );
-            });
-            await Promise.all(actions);
+            }
         } else {
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
                 this.schema,
@@ -1769,21 +1729,23 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             await this.resetManyToManyRelation(kysely, fromRelation.model, fromRelation.field, fromRelation.ids);
 
             // connect new entities
-            const actions = _data.map(async (d) => {
+            const results: (unknown | undefined)[] = [];
+            for (const d of _data) {
                 const ids = await this.getEntityIds(kysely, model, d);
-                return this.handleManyToManyRelation(
-                    kysely,
-                    'connect',
-                    fromRelation.model,
-                    fromRelation.field,
-                    fromRelation.ids,
-                    m2m.otherModel,
-                    m2m.otherField,
-                    ids,
-                    m2m.joinTable,
+                results.push(
+                    await this.handleManyToManyRelation(
+                        kysely,
+                        'connect',
+                        fromRelation.model,
+                        fromRelation.field,
+                        fromRelation.ids,
+                        m2m.otherModel,
+                        m2m.otherField,
+                        ids,
+                        m2m.joinTable,
+                    ),
                 );
-            });
-            const results = await Promise.all(actions);
+            }
 
             // validate connect result
             if (_data.length > results.filter((r) => !!r).length) {

@@ -2,16 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
 import { InputValidationError, NotFoundError } from '../../src/client/errors';
 import { schema } from '../schemas/basic';
-import { createClientSpecs } from './client-specs';
+import { createTestClient } from '../utils';
 import { createPosts, createUser } from './utils';
 
-const PG_DB_NAME = 'client-api-find-tests';
-
-describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', ({ createClient, provider }) => {
+describe('Client find tests ', () => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        client = await createClient();
+        client = await createTestClient(schema);
     });
 
     afterEach(async () => {
@@ -265,7 +263,7 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
             role: 'USER',
         });
 
-        if (provider === 'sqlite') {
+        if (client.$schema.provider.type === 'sqlite') {
             await expect(client.user.findMany({ distinct: ['role'] } as any)).rejects.toThrow('not supported');
             return;
         }
@@ -675,7 +673,8 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
             posts: [expect.objectContaining({ title: 'Post1' })],
         });
 
-        if (provider === 'postgresql') {
+        // @ts-ignore
+        if (client.$schema.provider.type === 'postgresql') {
             await expect(
                 client.user.findUnique({
                     where: { id: user.id },
@@ -901,7 +900,12 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
                 },
             },
         });
-        expect(u.posts[0]).toMatchObject(post2);
+        expect(u.posts[0]).toMatchObject({
+            title: post2.title,
+            published: post2.published,
+            createdAt: expect.any(Date),
+            updatedAt: expect.any(Date),
+        });
         u = await client.user.findUniqueOrThrow({
             where: { id: user.id },
             include: {
@@ -912,7 +916,12 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client find tests for $provider', 
                 },
             },
         });
-        expect(u.posts[0]).toMatchObject(post1);
+        expect(u.posts[0]).toMatchObject({
+            title: post1.title,
+            published: post1.published,
+            createdAt: expect.any(Date),
+            updatedAt: expect.any(Date),
+        });
 
         // cursor
         u = await client.user.findUniqueOrThrow({

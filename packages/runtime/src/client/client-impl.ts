@@ -61,7 +61,7 @@ export class ClientImpl<Schema extends SchemaDef> {
         executor?: QueryExecutor,
     ) {
         this.$schema = schema;
-        this.$options = options ?? ({} as ClientOptions<Schema>);
+        this.$options = options;
 
         this.$options.functions = {
             ...BuiltinFunctions,
@@ -326,7 +326,7 @@ export class ClientImpl<Schema extends SchemaDef> {
 
 function createClientProxy<Schema extends SchemaDef>(client: ClientImpl<Schema>): ClientImpl<Schema> {
     const inputValidator = new InputValidator(client.$schema);
-    const resultProcessor = new ResultProcessor(client.$schema);
+    const resultProcessor = new ResultProcessor(client.$schema, client.$options);
 
     return new Proxy(client, {
         get: (target, prop, receiver) => {

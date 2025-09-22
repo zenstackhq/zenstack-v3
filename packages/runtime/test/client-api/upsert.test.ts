@@ -1,15 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
-import { createClientSpecs } from './client-specs';
+import { createTestClient } from '../utils';
 
-const PG_DB_NAME = 'client-api-upsert-tests';
-
-describe.each(createClientSpecs(PG_DB_NAME))('Client upsert tests', ({ createClient }) => {
+describe('Client upsert tests', () => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        client = await createClient();
+        client = await createTestClient(schema);
     });
 
     afterEach(async () => {

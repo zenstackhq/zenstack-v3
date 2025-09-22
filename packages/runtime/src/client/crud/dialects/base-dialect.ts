@@ -45,6 +45,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return value;
     }
 
+    transformOutput(value: unknown, _type: BuiltinType) {
+        return value;
+    }
+
     // #region common query builders
 
     buildSelectModel(eb: ExpressionBuilder<any, any>, model: string, modelAlias: string) {
@@ -1254,6 +1258,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Whether the dialect support inserting with `DEFAULT` as field value.
      */
     abstract get supportInsertWithDefault(): boolean;
+
+    /**
+     * Gets the SQL column type for the given field definition.
+     */
+    abstract getFieldSqlType(fieldDef: FieldDef): string;
 
     // #endregion
 }

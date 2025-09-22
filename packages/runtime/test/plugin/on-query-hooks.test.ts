@@ -1,17 +1,13 @@
-import SQLite from 'better-sqlite3';
-import { SqliteDialect } from 'kysely';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { definePlugin, ZenStackClient, type ClientContract } from '../../src/client';
+import { definePlugin, type ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
+import { createTestClient } from '../utils';
 
 describe('On query hooks tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = new ZenStackClient(schema, {
-            dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-        });
-        await _client.$pushSchema();
+        _client = await createTestClient(schema);
     });
 
     afterEach(async () => {

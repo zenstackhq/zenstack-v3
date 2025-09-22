@@ -4,7 +4,7 @@ import { createTestClient } from '../../utils';
 const TEST_DB = 'client-api-relation-test-self-relation';
 
 describe.each([{ provider: 'sqlite' as const }, { provider: 'postgresql' as const }])(
-    'Self relation tests for $provider',
+    'Self relation tests',
     ({ provider }) => {
         let client: any;
 

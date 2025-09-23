@@ -18,7 +18,6 @@ async function main() {
 async function generate(schemaPath: string) {
     const generator = new TsSchemaGenerator();
     const outputDir = path.dirname(schemaPath);
-    const tsPath = path.join(outputDir, 'schema.ts');
     const result = await loadDocument(schemaPath);
     if (!result.success) {
         throw new Error(`Failed to load schema from ${schemaPath}: ${result.errors}`);

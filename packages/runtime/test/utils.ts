@@ -2,7 +2,7 @@ import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import type { Model } from '@zenstackhq/language/ast';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
-import { createTestProject, generateTsSchema, getPluginModules } from '@zenstackhq/testtools';
+import { createTestProject, generateTsSchema } from '@zenstackhq/testtools';
 import SQLite from 'better-sqlite3';
 import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
 import { execSync } from 'node:child_process';
@@ -113,7 +113,7 @@ export async function createTestClient<Schema extends SchemaDef>(
     if (options?.usePrismaPush) {
         invariant(typeof schema === 'string' || schemaFile, 'a schema file must be provided when using prisma db push');
         if (!model) {
-            const r = await loadDocument(path.join(workDir, 'schema.zmodel'), getPluginModules());
+            const r = await loadDocument(path.join(workDir, 'schema.zmodel'));
             if (!r.success) {
                 throw new Error(r.errors.join('\n'));
             }

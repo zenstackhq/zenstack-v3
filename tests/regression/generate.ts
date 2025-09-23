@@ -18,9 +18,7 @@ async function main() {
 async function generate(schemaPath: string) {
     const generator = new TsSchemaGenerator();
     const outputDir = path.dirname(schemaPath);
-    const tsPath = path.join(outputDir, 'schema.ts');
-    const pluginModelFiles = glob.sync(path.resolve(dir, '../../packages/runtime/dist/**/plugin.zmodel'));
-    const result = await loadDocument(schemaPath, pluginModelFiles);
+    const result = await loadDocument(schemaPath);
     if (!result.success) {
         throw new Error(`Failed to load schema from ${schemaPath}: ${result.errors}`);
     }

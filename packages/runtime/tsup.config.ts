@@ -1,5 +1,4 @@
 import { defineConfig } from 'tsup';
-import fs from 'node:fs';
 
 export default defineConfig({
     entry: {
@@ -14,7 +13,4 @@ export default defineConfig({
     clean: true,
     dts: true,
     format: ['cjs', 'esm'],
-    async onSuccess() {
-        fs.cpSync('src/plugins/policy/plugin.zmodel', 'dist/plugins/policy/plugin.zmodel');
-    },
 });

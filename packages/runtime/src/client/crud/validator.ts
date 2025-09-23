@@ -2,10 +2,18 @@ import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
-import { z, ZodType } from 'zod';
-import { type BuiltinType, type EnumDef, type FieldDef, type GetModels, type SchemaDef } from '../../schema';
+import { z, ZodSchema, ZodType } from 'zod';
+import {
+    type BuiltinType,
+    type EnumDef,
+    type FieldDef,
+    type GetModels,
+    type ModelDef,
+    type SchemaDef,
+} from '../../schema';
 import { enumerate } from '../../utils/enumerate';
 import { extractFields } from '../../utils/object-utils';
+import { formatError } from '../../utils/zod-utils';
 import { AGGREGATE_OPERATORS, LOGICAL_COMBINATORS, NUMERIC_FIELD_TYPES } from '../constants';
 import {
     type AggregateArgs,
@@ -185,7 +193,7 @@ export class InputValidator<Schema extends SchemaDef> {
         }
         const { error } = schema.safeParse(args);
         if (error) {
-            throw new InputValidationError(`Invalid ${operation} args: ${error.message}`, error);
+            throw new InputValidationError(`Invalid ${operation} args: ${formatError(error)}`, error);
         }
         return args as T;
     }
@@ -594,10 +602,18 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         }
 
-        const toManyRelations = Object.values(modelDef.fields).filter((def) => def.relation && def.array);
+        const _countSchema = this.makeCountSelectionSchema(modelDef);
+        if (_countSchema) {
+            fields['_count'] = _countSchema;
+        }
 
+        return z.strictObject(fields);
+    }
+
+    private makeCountSelectionSchema(modelDef: ModelDef) {
+        const toManyRelations = Object.values(modelDef.fields).filter((def) => def.relation && def.array);
         if (toManyRelations.length > 0) {
-            fields['_count'] = z
+            return z
                 .union([
                     z.literal(true),
                     z.strictObject({
@@ -620,9 +636,9 @@ export class InputValidator<Schema extends SchemaDef> {
                     }),
                 ])
                 .optional();
+        } else {
+            return undefined;
         }
-
-        return z.strictObject(fields);
     }
 
     private makeRelationSelectIncludeSchema(fieldDef: FieldDef) {
@@ -674,6 +690,11 @@ export class InputValidator<Schema extends SchemaDef> {
             if (fieldDef.relation) {
                 fields[field] = this.makeRelationSelectIncludeSchema(fieldDef).optional();
             }
+        }
+
+        const _countSchema = this.makeCountSelectionSchema(modelDef);
+        if (_countSchema) {
+            fields['_count'] = _countSchema;
         }
 
         return z.strictObject(fields);
@@ -743,13 +764,15 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeCreateSchema(model: string) {
         const dataSchema = this.makeCreateDataSchema(model, false);
-        const schema = z.strictObject({
+        let schema: ZodSchema = z.strictObject({
             data: dataSchema,
             select: this.makeSelectSchema(model).optional(),
             include: this.makeIncludeSchema(model).optional(),
             omit: this.makeOmitSchema(model).optional(),
         });
-        return this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
     private makeCreateManySchema(model: string) {
@@ -913,7 +936,7 @@ export class InputValidator<Schema extends SchemaDef> {
             fields['update'] = array
                 ? this.orArray(
                       z.strictObject({
-                          where: this.makeWhereSchema(fieldType, true),
+                          where: this.makeWhereSchema(fieldType, true).optional(),
                           data: this.makeUpdateDataSchema(fieldType, withoutFields),
                       }),
                       true,
@@ -921,7 +944,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 : z
                       .union([
                           z.strictObject({
-                              where: this.makeWhereSchema(fieldType, true),
+                              where: this.makeWhereSchema(fieldType, true).optional(),
                               data: this.makeUpdateDataSchema(fieldType, withoutFields),
                           }),
                           this.makeUpdateDataSchema(fieldType, withoutFields),
@@ -1005,14 +1028,16 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Update
 
     private makeUpdateSchema(model: string) {
-        const schema = z.strictObject({
+        let schema: ZodSchema = z.strictObject({
             where: this.makeWhereSchema(model, true),
             data: this.makeUpdateDataSchema(model),
             select: this.makeSelectSchema(model).optional(),
             include: this.makeIncludeSchema(model).optional(),
             omit: this.makeOmitSchema(model).optional(),
         });
-        return this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
     private makeUpdateManySchema(model: string) {
@@ -1025,15 +1050,16 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeUpdateManyAndReturnSchema(model: string) {
         const base = this.makeUpdateManySchema(model);
-        const result = base.extend({
+        let schema: ZodSchema = base.extend({
             select: this.makeSelectSchema(model).optional(),
             omit: this.makeOmitSchema(model).optional(),
         });
-        return this.refineForSelectOmitMutuallyExclusive(result);
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
     private makeUpsertSchema(model: string) {
-        const schema = z.strictObject({
+        let schema: ZodSchema = z.strictObject({
             where: this.makeWhereSchema(model, true),
             create: this.makeCreateDataSchema(model, false),
             update: this.makeUpdateDataSchema(model),
@@ -1041,7 +1067,9 @@ export class InputValidator<Schema extends SchemaDef> {
             include: this.makeIncludeSchema(model).optional(),
             omit: this.makeOmitSchema(model).optional(),
         });
-        return this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
     private makeUpdateDataSchema(model: string, withoutFields: string[] = [], withoutRelationFields = false) {
@@ -1145,12 +1173,14 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Delete
 
     private makeDeleteSchema(model: GetModels<Schema>) {
-        const schema = z.strictObject({
+        let schema: ZodSchema = z.strictObject({
             where: this.makeWhereSchema(model, true),
             select: this.makeSelectSchema(model).optional(),
             include: this.makeIncludeSchema(model).optional(),
         });
-        return this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
     private makeDeleteManySchema(model: GetModels<Schema>) {

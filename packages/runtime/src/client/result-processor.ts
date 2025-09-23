@@ -1,12 +1,18 @@
-import { invariant } from '@zenstackhq/common-helpers';
-import Decimal from 'decimal.js';
-import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from './constants';
+import { getCrudDialect } from './crud/dialects';
+import type { BaseCrudDialect } from './crud/dialects/base-dialect';
+import type { ClientOptions } from './options';
 import { ensureArray, getField, getIdValues } from './query-utils';
 
 export class ResultProcessor<Schema extends SchemaDef> {
-    constructor(private readonly schema: Schema) {}
+    private dialect: BaseCrudDialect<Schema>;
+    constructor(
+        private readonly schema: Schema,
+        options: ClientOptions<Schema>,
+    ) {
+        this.dialect = getCrudDialect(schema, options);
+    }
 
     processResult(data: any, model: GetModels<Schema>, args?: any) {
         const result = this.doProcessResult(data, model);
@@ -43,7 +49,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 // merge delegate descendant fields
                 if (value) {
                     // descendant fields are packed as JSON
-                    const subRow = this.transformJson(value);
+                    const subRow = this.dialect.transformOutput(value, 'Json');
 
                     // process the sub-row
                     const subModel = key.slice(DELEGATE_JOINED_FIELD_PREFIX.length) as GetModels<Schema>;
@@ -87,10 +93,10 @@ export class ResultProcessor<Schema extends SchemaDef> {
     private processFieldValue(value: unknown, fieldDef: FieldDef) {
         const type = fieldDef.type as BuiltinType;
         if (Array.isArray(value)) {
-            value.forEach((v, i) => (value[i] = this.transformScalar(v, type)));
+            value.forEach((v, i) => (value[i] = this.dialect.transformOutput(v, type)));
             return value;
         } else {
-            return this.transformScalar(value, type);
+            return this.dialect.transformOutput(value, type);
         }
     }
 
@@ -105,62 +111,6 @@ export class ResultProcessor<Schema extends SchemaDef> {
             }
         }
         return this.doProcessResult(relationData, fieldDef.type as GetModels<Schema>);
-    }
-
-    private transformScalar(value: unknown, type: BuiltinType) {
-        if (this.schema.typeDefs && type in this.schema.typeDefs) {
-            // typed JSON field
-            return this.transformJson(value);
-        } else {
-            return match(type)
-                .with('Boolean', () => this.transformBoolean(value))
-                .with('DateTime', () => this.transformDate(value))
-                .with('Bytes', () => this.transformBytes(value))
-                .with('Decimal', () => this.transformDecimal(value))
-                .with('BigInt', () => this.transformBigInt(value))
-                .with('Json', () => this.transformJson(value))
-                .otherwise(() => value);
-        }
-    }
-
-    private transformDecimal(value: unknown) {
-        if (value instanceof Decimal) {
-            return value;
-        }
-        invariant(
-            typeof value === 'string' || typeof value === 'number' || value instanceof Decimal,
-            `Expected string, number or Decimal, got ${typeof value}`,
-        );
-        return new Decimal(value);
-    }
-
-    private transformBigInt(value: unknown) {
-        if (typeof value === 'bigint') {
-            return value;
-        }
-        invariant(
-            typeof value === 'string' || typeof value === 'number',
-            `Expected string or number, got ${typeof value}`,
-        );
-        return BigInt(value);
-    }
-
-    private transformBoolean(value: unknown) {
-        return !!value;
-    }
-
-    private transformDate(value: unknown) {
-        if (typeof value === 'number') {
-            return new Date(value);
-        } else if (typeof value === 'string') {
-            return new Date(Date.parse(value));
-        } else {
-            return value;
-        }
-    }
-
-    private transformBytes(value: unknown) {
-        return Buffer.isBuffer(value) ? Uint8Array.from(value) : value;
     }
 
     private fixReversedResult(data: any, model: GetModels<Schema>, args: any) {
@@ -189,15 +139,5 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 this.fixReversedResult(row[field], fieldDef.type as GetModels<Schema>, value);
             }
         }
-    }
-
-    private transformJson(value: unknown) {
-        return match(this.schema.provider.type)
-            .with('sqlite', () => {
-                // better-sqlite3 returns JSON as string
-                invariant(typeof value === 'string', 'Expected string, got ' + typeof value);
-                return JSON.parse(value as string);
-            })
-            .otherwise(() => value);
     }
 }

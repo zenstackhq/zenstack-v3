@@ -1,15 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
-import { createClientSpecs } from './client-specs';
+import { createTestClient } from '../utils';
 
-const PG_DB_NAME = 'client-api-raw-query-tests';
-
-describe.each(createClientSpecs(PG_DB_NAME))('Client raw query tests', ({ createClient, provider }) => {
+describe('Client raw query tests', () => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        client = await createClient();
+        client = await createTestClient(schema);
     });
 
     afterEach(async () => {
@@ -39,7 +37,8 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client raw query tests', ({ create
         });
 
         const sql =
-            provider === 'postgresql'
+            // @ts-ignore
+            client.$schema.provider.type === 'postgresql'
                 ? `UPDATE "User" SET "email" = $1 WHERE "id" = $2`
                 : `UPDATE "User" SET "email" = ? WHERE "id" = ?`;
         await expect(client.$executeRawUnsafe(sql, 'u2@test.com', '1')).resolves.toBe(1);
@@ -70,7 +69,8 @@ describe.each(createClientSpecs(PG_DB_NAME))('Client raw query tests', ({ create
         });
 
         const sql =
-            provider === 'postgresql'
+            // @ts-ignore
+            client.$schema.provider.type === 'postgresql'
                 ? `SELECT "User"."id", "User"."email" FROM "User" WHERE "User"."id" = $1`
                 : `SELECT "User"."id", "User"."email" FROM "User" WHERE "User"."id" = ?`;
         const users = await client.$queryRawUnsafe<{ id: string; email: string }[]>(sql, '1');

@@ -7,8 +7,29 @@ import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
 
 export type ZModelFunctionContext<Schema extends SchemaDef> = {
+    /**
+     * ZenStack client instance
+     */
+    client: ClientContract<Schema>;
+
+    /**
+     * Database dialect
+     */
     dialect: BaseCrudDialect<Schema>;
+
+    /**
+     * The containing model name
+     */
     model: GetModels<Schema>;
+
+    /**
+     * The alias name that can be used to refer to the containing model
+     */
+    modelAlias: string;
+
+    /**
+     * The CRUD operation being performed
+     */
     operation: CRUD;
 };
 
@@ -41,6 +62,16 @@ export type ClientOptions<Schema extends SchemaDef> = {
      * Logging configuration.
      */
     log?: KyselyConfig['log'];
+
+    /**
+     * Whether to automatically fix timezone for `DateTime` fields returned by node-pg. Defaults
+     * to `true`.
+     *
+     * Node-pg has a terrible quirk that it interprets the date value as local timezone (as a
+     * `Date` object) although for `DateTime` field the data in DB is stored in UTC.
+     * @see https://github.com/brianc/node-postgres/issues/429
+     */
+    fixPostgresTimezone?: boolean;
 } & (HasComputedFields<Schema> extends true
     ? {
           /**

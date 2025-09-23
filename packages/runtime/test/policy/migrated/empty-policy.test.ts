@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from './utils';
+import { createPolicyTestClient } from '../utils';
 
 describe('empty policy tests', () => {
     it('works with simple operations', async () => {

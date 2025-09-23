@@ -452,7 +452,7 @@ export type OmitInput<Schema extends SchemaDef, Model extends GetModels<Schema>>
 
 export type SelectIncludeOmit<Schema extends SchemaDef, Model extends GetModels<Schema>, AllowCount extends boolean> = {
     select?: SelectInput<Schema, Model, AllowCount, boolean>;
-    include?: IncludeInput<Schema, Model>;
+    include?: IncludeInput<Schema, Model, AllowCount>;
     omit?: OmitInput<Schema, Model>;
 };
 
@@ -463,14 +463,7 @@ export type SelectInput<
     AllowRelation extends boolean = true,
 > = {
     [Key in NonRelationFields<Schema, Model>]?: boolean;
-} & (AllowRelation extends true ? IncludeInput<Schema, Model> : {}) & // relation fields
-    // relation count
-    (AllowCount extends true
-        ? // _count is only allowed if the model has to-many relations
-          HasToManyRelations<Schema, Model> extends true
-            ? { _count?: SelectCount<Schema, Model> }
-            : {}
-        : {});
+} & (AllowRelation extends true ? IncludeInput<Schema, Model, AllowCount> : {});
 
 type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
     | boolean
@@ -484,7 +477,11 @@ type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
           };
       };
 
-export type IncludeInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+export type IncludeInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    AllowCount extends boolean = true,
+> = {
     [Key in RelationFields<Schema, Model>]?:
         | boolean
         | FindArgs<
@@ -498,7 +495,12 @@ export type IncludeInput<Schema extends SchemaDef, Model extends GetModels<Schem
                     ? true
                     : false
           >;
-};
+} & (AllowCount extends true
+    ? // _count is only allowed if the model has to-many relations
+      HasToManyRelations<Schema, Model> extends true
+        ? { _count?: SelectCount<Schema, Model> }
+        : {}
+    : {});
 
 export type Subset<T, U> = {
     [key in keyof T]: key extends keyof U ? T[key] : never;
@@ -674,7 +676,7 @@ export type FindUniqueArgs<Schema extends SchemaDef, Model extends GetModels<Sch
 
 export type CreateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     data: CreateInput<Schema, Model>;
-    select?: SelectInput<Schema, Model, true>;
+    select?: SelectInput<Schema, Model>;
     include?: IncludeInput<Schema, Model>;
     omit?: OmitInput<Schema, Model>;
 };
@@ -813,7 +815,7 @@ type NestedCreateManyInput<
 export type UpdateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     data: UpdateInput<Schema, Model>;
     where: WhereUniqueInput<Schema, Model>;
-    select?: SelectInput<Schema, Model, true>;
+    select?: SelectInput<Schema, Model>;
     include?: IncludeInput<Schema, Model>;
     omit?: OmitInput<Schema, Model>;
 };
@@ -841,7 +843,7 @@ export type UpsertArgs<Schema extends SchemaDef, Model extends GetModels<Schema>
     create: CreateInput<Schema, Model>;
     update: UpdateInput<Schema, Model>;
     where: WhereUniqueInput<Schema, Model>;
-    select?: SelectInput<Schema, Model, true>;
+    select?: SelectInput<Schema, Model>;
     include?: IncludeInput<Schema, Model>;
     omit?: OmitInput<Schema, Model>;
 };
@@ -958,7 +960,7 @@ type ToOneRelationUpdateInput<
 
 export type DeleteArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     where: WhereUniqueInput<Schema, Model>;
-    select?: SelectInput<Schema, Model, true>;
+    select?: SelectInput<Schema, Model>;
     include?: IncludeInput<Schema, Model>;
     omit?: OmitInput<Schema, Model>;
 };

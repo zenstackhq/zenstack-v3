@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/runtime",
-    "version": "3.0.0-beta.4",
+    "version": "3.0.0-beta.5",
     "description": "ZenStack Runtime",
     "type": "module",
     "scripts": {
@@ -8,6 +8,8 @@
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "test": "vitest run && pnpm test:typecheck",
+        "test:sqlite": "TEST_DB_PROVIDER=sqlite vitest run",
+        "test:postgresql": "TEST_DB_PROVIDER=postgresql vitest run",
         "test:generate": "tsx test/scripts/generate.ts",
         "test:typecheck": "tsc --project tsconfig.test.json",
         "pack": "pnpm pack"
@@ -73,7 +75,8 @@
         "toposort": "^2.0.2",
         "ts-pattern": "catalog:",
         "ulid": "^3.0.0",
-        "uuid": "^11.0.5"
+        "uuid": "^11.0.5",
+        "zod-validation-error": "catalog:"
     },
     "peerDependencies": {
         "better-sqlite3": "^12.2.0",

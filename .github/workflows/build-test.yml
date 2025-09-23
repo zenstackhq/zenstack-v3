@@ -34,6 +34,7 @@ jobs:
         strategy:
             matrix:
                 node-version: [20.x]
+                provider: [sqlite, postgresql]
 
         steps:
             - name: Checkout
@@ -76,4 +77,4 @@ jobs:
               run: pnpm run lint
 
             - name: Test
-              run: pnpm run test
+              run: TEST_DB_PROVIDER=${{ matrix.provider }} pnpm run test

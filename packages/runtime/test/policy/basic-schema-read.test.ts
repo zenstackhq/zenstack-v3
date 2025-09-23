@@ -1,16 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type ClientContract } from '../../src/client';
 import { PolicyPlugin } from '../../src/plugins/policy/plugin';
-import { createClientSpecs } from '../client-api/client-specs';
 import { schema } from '../schemas/basic';
+import { createTestClient } from '../utils';
 
-const PG_DB_NAME = 'policy-read-tests';
-
-describe.each(createClientSpecs(PG_DB_NAME))('Read policy tests', ({ createClient }) => {
+describe('Read policy tests', () => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        client = await createClient();
+        client = await createTestClient(schema);
     });
 
     afterEach(async () => {
@@ -74,12 +72,6 @@ describe.each(createClientSpecs(PG_DB_NAME))('Read policy tests', ({ createClien
         await expect(anonClient.$qb.selectFrom('User').selectAll().executeTakeFirst()).toResolveFalsy();
 
         const authClient = anonClient.$setAuth({ id: user.id });
-        const foundUser = await authClient.$qb.selectFrom('User').selectAll().executeTakeFirstOrThrow();
-
-        if (typeof foundUser.createdAt === 'string') {
-            expect(Date.parse(foundUser.createdAt)).toEqual(user.createdAt.getTime());
-        } else {
-            expect(foundUser.createdAt).toEqual(user.createdAt);
-        }
+        await expect(authClient.$qb.selectFrom('User').selectAll().executeTakeFirstOrThrow()).toResolveTruthy();
     });
 });

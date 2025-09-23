@@ -1,17 +1,18 @@
-import SQLite from 'better-sqlite3';
-import { InsertQueryNode, Kysely, PrimitiveValueListNode, SqliteDialect, ValuesNode, type QueryResult } from 'kysely';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { ZenStackClient, type ClientContract } from '../../src/client';
+import { InsertQueryNode, Kysely, PrimitiveValueListNode, ValuesNode, type QueryResult } from 'kysely';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { type ClientContract } from '../../src/client';
 import { schema } from '../schemas/basic';
+import { createTestClient } from '../utils';
 
 describe('On kysely query tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = new ZenStackClient(schema, {
-            dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-        });
-        await _client.$pushSchema();
+        _client = await createTestClient(schema);
+    });
+
+    afterEach(async () => {
+        await _client.$disconnect();
     });
 
     it('intercepts queries', async () => {

@@ -24,7 +24,6 @@ import {
     ensureArray,
     flattenCompoundUniqueFilters,
     getDelegateDescendantModels,
-    getIdFields,
     getManyToManyRelation,
     getRelationForeignKeyFieldPairs,
     isEnum,
@@ -32,6 +31,7 @@ import {
     isRelationField,
     makeDefaultOrderBy,
     requireField,
+    requireIdFields,
     requireModel,
 } from '../../query-utils';
 
@@ -42,6 +42,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     ) {}
 
     transformPrimitive(value: unknown, _type: BuiltinType, _forArrayField: boolean) {
+        return value;
+    }
+
+    transformOutput(value: unknown, _type: BuiltinType) {
         return value;
     }
 
@@ -366,10 +370,14 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             const m2m = getManyToManyRelation(this.schema, model, field);
             if (m2m) {
                 // many-to-many relation
-                const modelIdField = getIdFields(this.schema, model)[0]!;
-                const relationIdField = getIdFields(this.schema, relationModel)[0]!;
+
+                const modelIdFields = requireIdFields(this.schema, model);
+                invariant(modelIdFields.length === 1, 'many-to-many relation must have exactly one id field');
+                const relationIdFields = requireIdFields(this.schema, relationModel);
+                invariant(relationIdFields.length === 1, 'many-to-many relation must have exactly one id field');
+
                 return eb(
-                    sql.ref(`${relationFilterSelectAlias}.${relationIdField}`),
+                    sql.ref(`${relationFilterSelectAlias}.${relationIdFields[0]}`),
                     'in',
                     eb
                         .selectFrom(m2m.joinTable)
@@ -377,7 +385,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         .whereRef(
                             sql.ref(`${m2m.joinTable}.${m2m.parentFkName}`),
                             '=',
-                            sql.ref(`${modelAlias}.${modelIdField}`),
+                            sql.ref(`${modelAlias}.${modelIdFields[0]}`),
                         ),
                 );
             } else {
@@ -1012,7 +1020,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         otherModelAlias: string,
         query: SelectQueryBuilder<any, any, any>,
     ) {
-        const idFields = getIdFields(this.schema, thisModel);
+        const idFields = requireIdFields(this.schema, thisModel);
         query = query.leftJoin(otherModelAlias, (qb) => {
             for (const idField of idFields) {
                 qb = qb.onRef(`${thisModelAlias}.${idField}`, '=', `${otherModelAlias}.${idField}`);
@@ -1044,14 +1052,29 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         for (const [field, value] of Object.entries(selections.select)) {
             const fieldDef = requireField(this.schema, model, field);
             const fieldModel = fieldDef.type;
-            const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field, fieldModel);
-
-            // build a nested query to count the number of records in the relation
-            let fieldCountQuery = eb.selectFrom(fieldModel).select(eb.fn.countAll().as(`_count$${field}`));
+            let fieldCountQuery: SelectQueryBuilder<any, any, any>;
 
             // join conditions
-            for (const [left, right] of joinPairs) {
-                fieldCountQuery = fieldCountQuery.whereRef(left, '=', right);
+            const m2m = getManyToManyRelation(this.schema, model, field);
+            if (m2m) {
+                // many-to-many relation, count the join table
+                fieldCountQuery = eb
+                    .selectFrom(fieldModel)
+                    .innerJoin(m2m.joinTable, (join) =>
+                        join
+                            .onRef(`${m2m.joinTable}.${m2m.otherFkName}`, '=', `${fieldModel}.${m2m.otherPKName}`)
+                            .onRef(`${m2m.joinTable}.${m2m.parentFkName}`, '=', `${parentAlias}.${m2m.parentPKName}`),
+                    )
+                    .select(eb.fn.countAll().as(`_count$${field}`));
+            } else {
+                // build a nested query to count the number of records in the relation
+                fieldCountQuery = eb.selectFrom(fieldModel).select(eb.fn.countAll().as(`_count$${field}`));
+
+                // join conditions
+                const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field, fieldModel);
+                for (const [left, right] of joinPairs) {
+                    fieldCountQuery = fieldCountQuery.whereRef(left, '=', right);
+                }
             }
 
             // merge _count filter
@@ -1235,6 +1258,16 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Whether the dialect support inserting with `DEFAULT` as field value.
      */
     abstract get supportInsertWithDefault(): boolean;
+
+    /**
+     * Gets the SQL column type for the given field definition.
+     */
+    abstract getFieldSqlType(fieldDef: FieldDef): string;
+
+    /*
+     * Gets the string casing behavior for the dialect.
+     */
+    abstract getStringCasingBehavior(): { supportsILike: boolean; likeCaseSensitive: boolean };
 
     // #endregion
 }

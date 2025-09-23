@@ -31,3 +31,13 @@ attribute @@deny(_ operation: String @@@completionHint(["'create'", "'read'", "'
  * @param condition: a boolean expression that controls if the operation should be denied.
  */
 attribute @deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
+
+/**
+ * Checks if the current user can perform the given operation on the given field.
+ *
+ * @param field: The field to check access for
+ * @param operation: The operation to check access for. Can be "read", "create", "update", or "delete". If the operation is not provided,
+ * it defaults the operation of the containing policy rule.
+ */
+function check(field: Any, operation: String?): Boolean {
+} @@@expressionContext([AccessPolicy])

@@ -41,7 +41,7 @@ export async function generateTsSchema(
     const noPrelude = schemaText.includes('datasource ');
     fs.writeFileSync(zmodelPath, `${noPrelude ? '' : makePrelude(provider, dbUrl)}\n\n${schemaText}`);
 
-    const pluginModelFiles = glob.sync(path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel'));
+    const pluginModelFiles = getPluginModules();
     const result = await loadDocument(zmodelPath, pluginModelFiles);
     if (!result.success) {
         throw new Error(`Failed to load schema from ${zmodelPath}: ${result.errors}`);
@@ -59,7 +59,11 @@ export async function generateTsSchema(
     }
 
     // compile the generated TS schema
-    return compileAndLoad(workDir);
+    return { ...(await compileAndLoad(workDir)), model: result.model };
+}
+
+export function getPluginModules() {
+    return glob.sync(path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel'));
 }
 
 async function compileAndLoad(workDir: string) {

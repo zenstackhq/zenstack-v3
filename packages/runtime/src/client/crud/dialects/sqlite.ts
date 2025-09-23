@@ -1,5 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import type Decimal from 'decimal.js';
+import Decimal from 'decimal.js';
 import {
     ExpressionWrapper,
     sql,
@@ -9,15 +9,16 @@ import {
     type SelectQueryBuilder,
 } from 'kysely';
 import { match } from 'ts-pattern';
-import type { BuiltinType, GetModels, SchemaDef } from '../../../schema';
+import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
+import { QueryError } from '../../errors';
 import {
     getDelegateDescendantModels,
-    getIdFields,
     getManyToManyRelation,
     getRelationForeignKeyFieldPairs,
     requireField,
+    requireIdFields,
     requireModel,
 } from '../../query-utils';
 import { BaseCrudDialect } from './base-dialect';
@@ -41,13 +42,89 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             } else {
                 return match(type)
                     .with('Boolean', () => (value ? 1 : 0))
-                    .with('DateTime', () => (value instanceof Date ? value.toISOString() : value))
+                    .with('DateTime', () =>
+                        value instanceof Date
+                            ? value.toISOString()
+                            : typeof value === 'string'
+                              ? new Date(value).toISOString()
+                              : value,
+                    )
                     .with('Decimal', () => (value as Decimal).toString())
                     .with('Bytes', () => Buffer.from(value as Uint8Array))
                     .with('Json', () => JSON.stringify(value))
                     .otherwise(() => value);
             }
         }
+    }
+
+    override transformOutput(value: unknown, type: BuiltinType) {
+        if (value === null || value === undefined) {
+            return value;
+        } else if (this.schema.typeDefs && type in this.schema.typeDefs) {
+            // typed JSON field
+            return this.transformOutputJson(value);
+        } else {
+            return match(type)
+                .with('Boolean', () => this.transformOutputBoolean(value))
+                .with('DateTime', () => this.transformOutputDate(value))
+                .with('Bytes', () => this.transformOutputBytes(value))
+                .with('Decimal', () => this.transformOutputDecimal(value))
+                .with('BigInt', () => this.transformOutputBigInt(value))
+                .with('Json', () => this.transformOutputJson(value))
+                .otherwise(() => super.transformOutput(value, type));
+        }
+    }
+
+    private transformOutputDecimal(value: unknown) {
+        if (value instanceof Decimal) {
+            return value;
+        }
+        invariant(
+            typeof value === 'string' || typeof value === 'number' || value instanceof Decimal,
+            `Expected string, number or Decimal, got ${typeof value}`,
+        );
+        return new Decimal(value);
+    }
+
+    private transformOutputBigInt(value: unknown) {
+        if (typeof value === 'bigint') {
+            return value;
+        }
+        invariant(
+            typeof value === 'string' || typeof value === 'number',
+            `Expected string or number, got ${typeof value}`,
+        );
+        return BigInt(value);
+    }
+
+    private transformOutputBoolean(value: unknown) {
+        return !!value;
+    }
+
+    private transformOutputDate(value: unknown) {
+        if (typeof value === 'number') {
+            return new Date(value);
+        } else if (typeof value === 'string') {
+            return new Date(value);
+        } else {
+            return value;
+        }
+    }
+
+    private transformOutputBytes(value: unknown) {
+        return Buffer.isBuffer(value) ? Uint8Array.from(value) : value;
+    }
+
+    private transformOutputJson(value: unknown) {
+        // better-sqlite3 typically returns JSON as string; be tolerant
+        if (typeof value === 'string') {
+            try {
+                return JSON.parse(value);
+            } catch (e) {
+                throw new QueryError('Invalid JSON returned', e);
+            }
+        }
+        return value;
     }
 
     override buildRelationSelection(
@@ -213,8 +290,8 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         const m2m = getManyToManyRelation(this.schema, model, relationField);
         if (m2m) {
             // many-to-many relation
-            const parentIds = getIdFields(this.schema, model);
-            const relationIds = getIdFields(this.schema, relationModel);
+            const parentIds = requireIdFields(this.schema, model);
+            const relationIds = requireIdFields(this.schema, relationModel);
             invariant(parentIds.length === 1, 'many-to-many relation must have exactly one id field');
             invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
             selectModelQuery = selectModelQuery.where((eb) =>
@@ -300,5 +377,40 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
 
     override get supportInsertWithDefault() {
         return false;
+    }
+
+    override getFieldSqlType(fieldDef: FieldDef) {
+        // TODO: respect `@db.x` attributes
+        if (fieldDef.relation) {
+            throw new QueryError('Cannot get SQL type of a relation field');
+        }
+        if (fieldDef.array) {
+            throw new QueryError('SQLite does not support scalar list type');
+        }
+
+        if (this.schema.enums?.[fieldDef.type]) {
+            // enums are stored as text
+            return 'text';
+        }
+
+        return (
+            match(fieldDef.type)
+                .with('String', () => 'text')
+                .with('Boolean', () => 'integer')
+                .with('Int', () => 'integer')
+                .with('BigInt', () => 'integer')
+                .with('Float', () => 'real')
+                .with('Decimal', () => 'decimal')
+                .with('DateTime', () => 'numeric')
+                .with('Bytes', () => 'blob')
+                .with('Json', () => 'jsonb')
+                // fallback to text
+                .otherwise(() => 'text')
+        );
+    }
+
+    override getStringCasingBehavior() {
+        // SQLite `LIKE` is case-insensitive, and there is no `ILIKE`
+        return { supportsILike: false, likeCaseSensitive: false };
     }
 }

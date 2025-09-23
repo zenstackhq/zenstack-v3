@@ -3,6 +3,7 @@ import type { SchemaDef } from '../../../schema';
 import type { DeleteArgs, DeleteManyArgs } from '../../crud-types';
 import { NotFoundError } from '../../errors';
 import { BaseOperationHandler } from './base';
+import { RejectedByPolicyError, RejectedByPolicyReason } from '../../../plugins/policy';
 
 export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(operation: 'delete' | 'deleteMany', args: unknown | undefined) {
@@ -24,9 +25,6 @@ export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperat
             omit: args.omit,
             where: args.where,
         });
-        if (!existing) {
-            throw new NotFoundError(this.model);
-        }
 
         // TODO: avoid using transaction for simple delete
         await this.safeTransaction(async (tx) => {
@@ -35,6 +33,14 @@ export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperat
                 throw new NotFoundError(this.model);
             }
         });
+
+        if (!existing && this.hasPolicyEnabled) {
+            throw new RejectedByPolicyError(
+                this.model,
+                RejectedByPolicyReason.CANNOT_READ_BACK,
+                'result is not allowed to be read back',
+            );
+        }
 
         return existing;
     }

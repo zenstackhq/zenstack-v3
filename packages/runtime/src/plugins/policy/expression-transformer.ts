@@ -20,12 +20,17 @@ import {
     type OperationNode,
 } from 'kysely';
 import { match } from 'ts-pattern';
-import type { CRUD } from '../../client/contract';
+import type { ClientContract, CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
-import type { ClientOptions } from '../../client/options';
-import { getModel, getRelationForeignKeyFieldPairs, requireField } from '../../client/query-utils';
+import {
+    getManyToManyRelation,
+    getModel,
+    getRelationForeignKeyFieldPairs,
+    requireField,
+    requireIdFields,
+} from '../../client/query-utils';
 import type {
     BinaryExpression,
     BinaryOperator,
@@ -45,7 +50,7 @@ import {
     type SchemaDef,
 } from '../../schema';
 import { ExpressionEvaluator } from './expression-evaluator';
-import { conjunction, disjunction, logicalNot, trueNode } from './utils';
+import { conjunction, disjunction, falseNode, logicalNot, trueNode } from './utils';
 
 export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
@@ -72,12 +77,20 @@ function expr(kind: Expression['kind']) {
 export class ExpressionTransformer<Schema extends SchemaDef> {
     private readonly dialect: BaseCrudDialect<Schema>;
 
-    constructor(
-        private readonly schema: Schema,
-        private readonly clientOptions: ClientOptions<Schema>,
-        private readonly auth: unknown | undefined,
-    ) {
+    constructor(private readonly client: ClientContract<Schema>) {
         this.dialect = getCrudDialect(this.schema, this.clientOptions);
+    }
+
+    get schema() {
+        return this.client.$schema;
+    }
+
+    get clientOptions() {
+        return this.client.$options;
+    }
+
+    get auth() {
+        return this.client.$auth;
     }
 
     get authType() {
@@ -111,7 +124,6 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     @expr('field')
-    // @ts-expect-error
     private _field(expr: FieldExpression, context: ExpressionTransformerContext<Schema>) {
         const fieldDef = requireField(this.schema, context.model, expr.field);
         if (!fieldDef.relation) {
@@ -162,8 +174,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             return this.transformCollectionPredicate(expr, context);
         }
 
-        const left = this.transform(expr.left, context);
-        const right = this.transform(expr.right, context);
+        const { normalizedLeft, normalizedRight } = this.normalizeBinaryOperationOperands(expr, context);
+        const left = this.transform(normalizedLeft, context);
+        const right = this.transform(normalizedRight, context);
 
         if (op === 'in') {
             if (this.isNullNode(left)) {
@@ -183,16 +196,49 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         if (this.isNullNode(right)) {
-            return expr.op === '=='
-                ? BinaryOperationNode.create(left, OperatorNode.create('is'), right)
-                : BinaryOperationNode.create(left, OperatorNode.create('is not'), right);
+            return this.transformNullCheck(left, expr.op);
         } else if (this.isNullNode(left)) {
-            return expr.op === '=='
-                ? BinaryOperationNode.create(right, OperatorNode.create('is'), ValueNode.createImmediate(null))
-                : BinaryOperationNode.create(right, OperatorNode.create('is not'), ValueNode.createImmediate(null));
+            return this.transformNullCheck(right, expr.op);
+        } else {
+            return BinaryOperationNode.create(left, this.transformOperator(op), right);
         }
+    }
 
-        return BinaryOperationNode.create(left, this.transformOperator(op), right);
+    private transformNullCheck(expr: OperationNode, operator: BinaryOperator) {
+        invariant(operator === '==' || operator === '!=', 'operator must be "==" or "!=" for null comparison');
+        if (ValueNode.is(expr)) {
+            if (expr.value === null) {
+                return operator === '==' ? trueNode(this.dialect) : falseNode(this.dialect);
+            } else {
+                return operator === '==' ? falseNode(this.dialect) : trueNode(this.dialect);
+            }
+        } else {
+            return operator === '=='
+                ? BinaryOperationNode.create(expr, OperatorNode.create('is'), ValueNode.createImmediate(null))
+                : BinaryOperationNode.create(expr, OperatorNode.create('is not'), ValueNode.createImmediate(null));
+        }
+    }
+
+    private normalizeBinaryOperationOperands(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
+        // if relation fields are used directly in comparison, it can only be compared with null,
+        // so we normalize the args with the id field (use the first id field if multiple)
+        let normalizedLeft: Expression = expr.left;
+        if (this.isRelationField(expr.left, context.model)) {
+            invariant(ExpressionUtils.isNull(expr.right), 'only null comparison is supported for relation field');
+            const leftRelDef = this.getFieldDefFromFieldRef(expr.left, context.model);
+            invariant(leftRelDef, 'failed to get relation field definition');
+            const idFields = requireIdFields(this.schema, leftRelDef.type);
+            normalizedLeft = this.makeOrAppendMember(normalizedLeft, idFields[0]!);
+        }
+        let normalizedRight: Expression = expr.right;
+        if (this.isRelationField(expr.right, context.model)) {
+            invariant(ExpressionUtils.isNull(expr.left), 'only null comparison is supported for relation field');
+            const rightRelDef = this.getFieldDefFromFieldRef(expr.right, context.model);
+            invariant(rightRelDef, 'failed to get relation field definition');
+            const idFields = requireIdFields(this.schema, rightRelDef.type);
+            normalizedRight = this.makeOrAppendMember(normalizedRight, idFields[0]!);
+        }
+        return { normalizedLeft, normalizedRight };
     }
 
     private transformCollectionPredicate(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
@@ -211,11 +257,15 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         );
 
         let newContextModel: string;
-        if (ExpressionUtils.isField(expr.left)) {
-            const fieldDef = requireField(this.schema, context.model, expr.left.field);
+        const fieldDef = this.getFieldDefFromFieldRef(expr.left, context.model);
+        if (fieldDef) {
+            invariant(fieldDef.relation, `field is not a relation: ${JSON.stringify(expr.left)}`);
             newContextModel = fieldDef.type;
         } else {
-            invariant(ExpressionUtils.isField(expr.left.receiver));
+            invariant(
+                ExpressionUtils.isMember(expr.left) && ExpressionUtils.isField(expr.left.receiver),
+                'left operand must be member access with field receiver',
+            );
             const fieldDef = requireField(this.schema, context.model, expr.left.receiver.field);
             newContextModel = fieldDef.type;
             for (const member of expr.left.members) {
@@ -281,11 +331,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 .map((f) => f.name);
             invariant(idFields.length > 0, 'auth type model must have at least one id field');
 
+            // convert `auth() == other` into `auth().id == other.id`
             const conditions = idFields.map((fieldName) =>
                 ExpressionUtils.binary(
                     ExpressionUtils.member(authExpr, [fieldName]),
                     '==',
-                    ExpressionUtils.member(other, [fieldName]),
+                    this.makeOrAppendMember(other, fieldName),
                 ),
             );
             let result = this.buildAnd(conditions);
@@ -296,8 +347,22 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
     }
 
+    private makeOrAppendMember(other: Expression, fieldName: string): Expression {
+        if (ExpressionUtils.isMember(other)) {
+            return ExpressionUtils.member(other.receiver, [...other.members, fieldName]);
+        } else {
+            return ExpressionUtils.member(other, [fieldName]);
+        }
+    }
+
     private transformValue(value: unknown, type: BuiltinType) {
-        return ValueNode.create(this.dialect.transformPrimitive(value, type, false) ?? null);
+        if (value === true) {
+            return trueNode(this.dialect);
+        } else if (value === false) {
+            return falseNode(this.dialect);
+        } else {
+            return ValueNode.create(this.dialect.transformPrimitive(value, type, false) ?? null);
+        }
     }
 
     @expr('unary')
@@ -323,7 +388,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private transformCall(expr: CallExpression, context: ExpressionTransformerContext<Schema>) {
-        const func = this.clientOptions.functions?.[expr.function];
+        const func = this.getFunctionImpl(expr.function);
         if (!func) {
             throw new QueryError(`Function not implemented: ${expr.function}`);
         }
@@ -332,11 +397,28 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             eb,
             (expr.args ?? []).map((arg) => this.transformCallArg(eb, arg, context)),
             {
+                client: this.client,
                 dialect: this.dialect,
                 model: context.model,
+                modelAlias: context.alias ?? context.model,
                 operation: context.operation,
             },
         );
+    }
+
+    private getFunctionImpl(functionName: string) {
+        // check built-in functions
+        let func = this.clientOptions.functions?.[functionName];
+        if (!func) {
+            // check plugins
+            for (const plugin of this.clientOptions.plugins ?? []) {
+                if (plugin.functions?.[functionName]) {
+                    func = plugin.functions[functionName];
+                    break;
+                }
+            }
+        }
+        return func;
     }
 
     private transformCallArg(
@@ -387,16 +469,14 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
         if (ExpressionUtils.isThis(expr.receiver)) {
             if (expr.members.length === 1) {
-                // optimize for the simple this.scalar case
-                const fieldDef = requireField(this.schema, context.model, expr.members[0]!);
-                invariant(!fieldDef.relation, 'this.relation access should have been transformed into relation access');
-                return this.createColumnRef(expr.members[0]!, restContext);
+                // `this.relation` case, equivalent to field access
+                return this._field(ExpressionUtils.field(expr.members[0]!), context);
+            } else {
+                // transform the first segment into a relation access, then continue with the rest of the members
+                const firstMemberFieldDef = requireField(this.schema, context.model, expr.members[0]!);
+                receiver = this.transformRelationAccess(expr.members[0]!, firstMemberFieldDef.type, restContext);
+                members = expr.members.slice(1);
             }
-
-            // transform the first segment into a relation access, then continue with the rest of the members
-            const firstMemberFieldDef = requireField(this.schema, context.model, expr.members[0]!);
-            receiver = this.transformRelationAccess(expr.members[0]!, firstMemberFieldDef.type, restContext);
-            members = expr.members.slice(1);
         } else {
             receiver = this.transform(expr.receiver, restContext);
         }
@@ -484,6 +564,11 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         relationModel: string,
         context: ExpressionTransformerContext<Schema>,
     ): SelectQueryNode {
+        const m2m = getManyToManyRelation(this.schema, context.model, field);
+        if (m2m) {
+            return this.transformManyToManyRelationAccess(m2m, context);
+        }
+
         const fromModel = context.model;
         const { keyPairs, ownedByModel } = getRelationForeignKeyFieldPairs(this.schema, fromModel, field);
 
@@ -521,6 +606,28 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         };
     }
 
+    private transformManyToManyRelationAccess(
+        m2m: NonNullable<ReturnType<typeof getManyToManyRelation>>,
+        context: ExpressionTransformerContext<Schema>,
+    ) {
+        const eb = expressionBuilder<any, any>();
+        const relationQuery = eb
+            .selectFrom(m2m.otherModel)
+            // inner join with join table and additionally filter by the parent model
+            .innerJoin(m2m.joinTable, (join) =>
+                join
+                    // relation model pk to join table fk
+                    .onRef(`${m2m.otherModel}.${m2m.otherPKName}`, '=', `${m2m.joinTable}.${m2m.otherFkName}`)
+                    // parent model pk to join table fk
+                    .onRef(
+                        `${m2m.joinTable}.${m2m.parentFkName}`,
+                        '=',
+                        `${context.alias ?? context.model}.${m2m.parentPKName}`,
+                    ),
+            );
+        return relationQuery.toOperationNode();
+    }
+
     private createColumnRef(column: string, context: ExpressionTransformerContext<Schema>): ReferenceNode {
         return ReferenceNode.create(ColumnNode.create(column), TableNode.create(context.alias ?? context.model));
     }
@@ -548,6 +655,25 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             return conditions[0]!;
         } else {
             return conditions.reduce((acc, condition) => ExpressionUtils.binary(acc, '&&', condition));
+        }
+    }
+
+    private isRelationField(expr: Expression, model: GetModels<Schema>) {
+        const fieldDef = this.getFieldDefFromFieldRef(expr, model);
+        return !!fieldDef?.relation;
+    }
+
+    private getFieldDefFromFieldRef(expr: Expression, model: GetModels<Schema>): FieldDef | undefined {
+        if (ExpressionUtils.isField(expr)) {
+            return requireField(this.schema, model, expr.field);
+        } else if (
+            ExpressionUtils.isMember(expr) &&
+            expr.members.length === 1 &&
+            ExpressionUtils.isThis(expr.receiver)
+        ) {
+            return requireField(this.schema, model, expr.members[0]!);
+        } else {
+            return undefined;
         }
     }
 }

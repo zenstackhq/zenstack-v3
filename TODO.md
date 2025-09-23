@@ -99,9 +99,8 @@
 - [ ] Validation
 - [ ] Access Policy
     - [ ] Short-circuit pre-create check for scalar-field only policies
-    - [ ] Inject "replace into"
-    - [ ] Inject "on conflict do update"
-    - [ ] Inject "insert into select from"
+    - [x] Inject "on conflict do update"
+    - [x] `check` function
 - [x] Migration
 - [ ] Databases
     - [x] SQLite

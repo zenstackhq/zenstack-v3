@@ -4,10 +4,13 @@ import {
     BinaryOperationNode,
     ColumnNode,
     DeleteQueryNode,
+    expressionBuilder,
+    ExpressionWrapper,
     FromNode,
     FunctionNode,
     IdentifierNode,
     InsertQueryNode,
+    JoinNode,
     OperationNodeTransformer,
     OperatorNode,
     ParensNode,
@@ -16,6 +19,7 @@ import {
     ReturningNode,
     SelectionNode,
     SelectQueryNode,
+    sql,
     TableNode,
     UpdateQueryNode,
     ValueListNode,
@@ -31,12 +35,12 @@ import type { ClientContract } from '../../client';
 import type { CRUD } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
-import { InternalError } from '../../client/errors';
+import { InternalError, QueryError } from '../../client/errors';
 import type { ProceedKyselyQueryFunction } from '../../client/plugin';
-import { getIdFields, requireField, requireModel } from '../../client/query-utils';
+import { getManyToManyRelation, requireField, requireIdFields, requireModel } from '../../client/query-utils';
 import { ExpressionUtils, type BuiltinType, type Expression, type GetModels, type SchemaDef } from '../../schema';
 import { ColumnCollector } from './column-collector';
-import { RejectedByPolicyError } from './errors';
+import { RejectedByPolicyError, RejectedByPolicyReason } from './errors';
 import { ExpressionTransformer } from './expression-transformer';
 import type { Policy, PolicyOperation } from './types';
 import { buildIsFalse, conjunction, disjunction, falseNode, getTableName } from './utils';
@@ -63,97 +67,292 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     ) {
         if (!this.isCrudQueryNode(node)) {
             // non-CRUD queries are not allowed
-            throw new RejectedByPolicyError(undefined, 'non-CRUD queries are not allowed');
+            throw new RejectedByPolicyError(
+                undefined,
+                RejectedByPolicyReason.OTHER,
+                'non-CRUD queries are not allowed',
+            );
         }
 
         if (!this.isMutationQueryNode(node)) {
-            // transform and proceed read without transaction
+            // transform and proceed with read directly
             return proceed(this.transformNode(node));
         }
 
-        let mutationRequiresTransaction = false;
-        const mutationModel = this.getMutationModel(node);
+        const { mutationModel } = this.getMutationModel(node);
 
         if (InsertQueryNode.is(node)) {
-            // reject create if unconditional deny
-            const constCondition = this.tryGetConstantPolicy(mutationModel, 'create');
-            if (constCondition === false) {
-                throw new RejectedByPolicyError(mutationModel);
-            } else if (constCondition === undefined) {
-                mutationRequiresTransaction = true;
+            // pre-create policy evaluation happens before execution of the query
+            const isManyToManyJoinTable = this.isManyToManyJoinTable(mutationModel);
+            let needCheckPreCreate = true;
+
+            // many-to-many join table is not a model so can't have policies on it
+            if (!isManyToManyJoinTable) {
+                // check constant policies
+                const constCondition = this.tryGetConstantPolicy(mutationModel, 'create');
+                if (constCondition === true) {
+                    needCheckPreCreate = false;
+                } else if (constCondition === false) {
+                    throw new RejectedByPolicyError(mutationModel);
+                }
+            }
+
+            if (needCheckPreCreate) {
+                await this.enforcePreCreatePolicy(node, mutationModel, isManyToManyJoinTable, proceed);
             }
         }
 
-        if (!mutationRequiresTransaction && !node.returning) {
-            // transform and proceed mutation without transaction
-            return proceed(this.transformNode(node));
-        }
+        // proceed with query
 
-        if (InsertQueryNode.is(node)) {
-            await this.enforcePreCreatePolicy(node, proceed);
-        }
-        const transformedNode = this.transformNode(node);
-        const result = await proceed(transformedNode);
+        const result = await proceed(this.transformNode(node));
 
-        if (!this.onlyReturningId(node)) {
+        if (!node.returning || this.onlyReturningId(node)) {
+            return result;
+        } else {
             const readBackResult = await this.processReadBack(node, result, proceed);
             if (readBackResult.rows.length !== result.rows.length) {
-                throw new RejectedByPolicyError(mutationModel, 'result is not allowed to be read back');
+                throw new RejectedByPolicyError(
+                    mutationModel,
+                    RejectedByPolicyReason.CANNOT_READ_BACK,
+                    'result is not allowed to be read back',
+                );
             }
             return readBackResult;
-        } else {
+        }
+    }
+
+    // #region overrides
+
+    protected override transformSelectQuery(node: SelectQueryNode) {
+        let whereNode = this.transformNode(node.where);
+
+        // get combined policy filter for all froms, and merge into where clause
+        const policyFilter = this.createPolicyFilterForFrom(node.from);
+        if (policyFilter) {
+            whereNode = WhereNode.create(
+                whereNode?.where ? conjunction(this.dialect, [whereNode.where, policyFilter]) : policyFilter,
+            );
+        }
+
+        const baseResult = super.transformSelectQuery({
+            ...node,
+            where: undefined,
+        });
+
+        return {
+            ...baseResult,
+            where: whereNode,
+        };
+    }
+
+    protected override transformJoin(node: JoinNode) {
+        const table = this.extractTableName(node.table);
+        if (!table) {
+            // unable to extract table name, can be a subquery, which will be handled when nested transformation happens
+            return super.transformJoin(node);
+        }
+
+        // build a nested query with policy filter applied
+        const filter = this.buildPolicyFilter(table.model, table.alias, 'read');
+        const nestedSelect: SelectQueryNode = {
+            kind: 'SelectQueryNode',
+            from: FromNode.create([node.table]),
+            selections: [SelectionNode.createSelectAll()],
+            where: WhereNode.create(filter),
+        };
+        return {
+            ...node,
+            table: AliasNode.create(ParensNode.create(nestedSelect), IdentifierNode.create(table.alias ?? table.model)),
+        };
+    }
+
+    protected override transformInsertQuery(node: InsertQueryNode) {
+        // pre-insert check is done in `handle()`
+
+        let onConflict = node.onConflict;
+
+        if (onConflict?.updates) {
+            // for "on conflict do update", we need to apply policy filter to the "where" clause
+            const { mutationModel, alias } = this.getMutationModel(node);
+            const filter = this.buildPolicyFilter(mutationModel, alias, 'update');
+            if (onConflict.updateWhere) {
+                onConflict = {
+                    ...onConflict,
+                    updateWhere: WhereNode.create(conjunction(this.dialect, [onConflict.updateWhere.where, filter])),
+                };
+            } else {
+                onConflict = {
+                    ...onConflict,
+                    updateWhere: WhereNode.create(filter),
+                };
+            }
+        }
+
+        // merge updated onConflict
+        const processedNode = onConflict ? { ...node, onConflict } : node;
+
+        const result = super.transformInsertQuery(processedNode);
+
+        if (!node.returning) {
             return result;
         }
 
-        // TODO: run in transaction
-        // let readBackError = false;
-
-        // transform and post-process in a transaction
-        // const result = await transaction(async (txProceed) => {
-        //     if (InsertQueryNode.is(node)) {
-        //         await this.enforcePreCreatePolicy(node, txProceed);
-        //     }
-        //     const transformedNode = this.transformNode(node);
-        //     const result = await txProceed(transformedNode);
-
-        //     if (!this.onlyReturningId(node)) {
-        //         const readBackResult = await this.processReadBack(node, result, txProceed);
-        //         if (readBackResult.rows.length !== result.rows.length) {
-        //             readBackError = true;
-        //         }
-        //         return readBackResult;
-        //     } else {
-        //         return result;
-        //     }
-        // });
-
-        // if (readBackError) {
-        //     throw new RejectedByPolicyError(mutationModel, 'result is not allowed to be read back');
-        // }
-
-        // return result;
+        if (this.onlyReturningId(node)) {
+            return result;
+        } else {
+            // only return ID fields, that's enough for reading back the inserted row
+            const { mutationModel } = this.getMutationModel(node);
+            const idFields = requireIdFields(this.client.$schema, mutationModel);
+            return {
+                ...result,
+                returning: ReturningNode.create(
+                    idFields.map((field) => SelectionNode.create(ColumnNode.create(field))),
+                ),
+            };
+        }
     }
+
+    protected override transformUpdateQuery(node: UpdateQueryNode) {
+        const result = super.transformUpdateQuery(node);
+        const { mutationModel, alias } = this.getMutationModel(node);
+        let filter = this.buildPolicyFilter(mutationModel, alias, 'update');
+
+        if (node.from) {
+            // for update with from (join), we need to merge join tables' policy filters to the "where" clause
+            const joinFilter = this.createPolicyFilterForFrom(node.from);
+            if (joinFilter) {
+                filter = conjunction(this.dialect, [filter, joinFilter]);
+            }
+        }
+
+        return {
+            ...result,
+            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
+        };
+    }
+
+    protected override transformDeleteQuery(node: DeleteQueryNode) {
+        const result = super.transformDeleteQuery(node);
+        const { mutationModel, alias } = this.getMutationModel(node);
+        let filter = this.buildPolicyFilter(mutationModel, alias, 'delete');
+
+        if (node.using) {
+            // for delete with using (join), we need to merge join tables' policy filters to the "where" clause
+            const joinFilter = this.createPolicyFilterForTables(node.using.tables);
+            if (joinFilter) {
+                filter = conjunction(this.dialect, [filter, joinFilter]);
+            }
+        }
+
+        return {
+            ...result,
+            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
+        };
+    }
+
+    // #endregion
+
+    // #region helpers
 
     private onlyReturningId(node: MutationQueryNode) {
         if (!node.returning) {
             return true;
         }
-        const idFields = getIdFields(this.client.$schema, this.getMutationModel(node));
+        const { mutationModel } = this.getMutationModel(node);
+        const idFields = requireIdFields(this.client.$schema, mutationModel);
         const collector = new ColumnCollector();
         const selectedColumns = collector.collect(node.returning);
         return selectedColumns.every((c) => idFields.includes(c));
     }
 
-    private async enforcePreCreatePolicy(node: InsertQueryNode, proceed: ProceedKyselyQueryFunction) {
-        const model = this.getMutationModel(node);
+    private async enforcePreCreatePolicy(
+        node: InsertQueryNode,
+        mutationModel: GetModels<Schema>,
+        isManyToManyJoinTable: boolean,
+        proceed: ProceedKyselyQueryFunction,
+    ) {
         const fields = node.columns?.map((c) => c.column.name) ?? [];
-        const valueRows = node.values ? this.unwrapCreateValueRows(node.values, model, fields) : [[]];
+        const valueRows = node.values
+            ? this.unwrapCreateValueRows(node.values, mutationModel, fields, isManyToManyJoinTable)
+            : [[]];
         for (const values of valueRows) {
-            await this.enforcePreCreatePolicyForOne(
-                model,
-                fields,
-                values.map((v) => v.node),
-                proceed,
+            if (isManyToManyJoinTable) {
+                await this.enforcePreCreatePolicyForManyToManyJoinTable(
+                    mutationModel,
+                    fields,
+                    values.map((v) => v.node),
+                    proceed,
+                );
+            } else {
+                await this.enforcePreCreatePolicyForOne(
+                    mutationModel,
+                    fields,
+                    values.map((v) => v.node),
+                    proceed,
+                );
+            }
+        }
+    }
+
+    private async enforcePreCreatePolicyForManyToManyJoinTable(
+        tableName: GetModels<Schema>,
+        fields: string[],
+        values: OperationNode[],
+        proceed: ProceedKyselyQueryFunction,
+    ) {
+        const m2m = this.resolveManyToManyJoinTable(tableName);
+        invariant(m2m);
+
+        // m2m create requires both sides to be updatable
+        invariant(fields.includes('A') && fields.includes('B'), 'many-to-many join table must have A and B fk fields');
+
+        const aIndex = fields.indexOf('A');
+        const aNode = values[aIndex]!;
+        const bIndex = fields.indexOf('B');
+        const bNode = values[bIndex]!;
+        invariant(ValueNode.is(aNode) && ValueNode.is(bNode), 'A and B values must be ValueNode');
+
+        const aValue = aNode.value;
+        const bValue = bNode.value;
+        invariant(aValue !== null && aValue !== undefined, 'A value cannot be null or undefined');
+        invariant(bValue !== null && bValue !== undefined, 'B value cannot be null or undefined');
+
+        const eb = expressionBuilder<any, any>();
+
+        const filterA = this.buildPolicyFilter(m2m.firstModel as GetModels<Schema>, undefined, 'update');
+        const queryA = eb
+            .selectFrom(m2m.firstModel)
+            .where(eb(eb.ref(`${m2m.firstModel}.${m2m.firstIdField}`), '=', aValue))
+            .select(() => new ExpressionWrapper(filterA).as('$t'));
+
+        const filterB = this.buildPolicyFilter(m2m.secondModel as GetModels<Schema>, undefined, 'update');
+        const queryB = eb
+            .selectFrom(m2m.secondModel)
+            .where(eb(eb.ref(`${m2m.secondModel}.${m2m.secondIdField}`), '=', bValue))
+            .select(() => new ExpressionWrapper(filterB).as('$t'));
+
+        // select both conditions in one query
+        const queryNode: SelectQueryNode = {
+            kind: 'SelectQueryNode',
+            selections: [
+                SelectionNode.create(AliasNode.create(queryA.toOperationNode(), IdentifierNode.create('$conditionA'))),
+                SelectionNode.create(AliasNode.create(queryB.toOperationNode(), IdentifierNode.create('$conditionB'))),
+            ],
+        };
+
+        const result = await proceed(queryNode);
+        if (!result.rows[0]?.$conditionA) {
+            throw new RejectedByPolicyError(
+                m2m.firstModel as GetModels<Schema>,
+                RejectedByPolicyReason.CANNOT_READ_BACK,
+                `many-to-many relation participant model "${m2m.firstModel}" not updatable`,
+            );
+        }
+        if (!result.rows[0]?.$conditionB) {
+            throw new RejectedByPolicyError(
+                m2m.secondModel as GetModels<Schema>,
+                RejectedByPolicyReason.NO_ACCESS,
+                `many-to-many relation participant model "${m2m.secondModel}" not updatable`,
             );
         }
     }
@@ -164,11 +363,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         values: OperationNode[],
         proceed: ProceedKyselyQueryFunction,
     ) {
-        const allFields = Object.keys(requireModel(this.client.$schema, model).fields);
+        const allFields = Object.entries(requireModel(this.client.$schema, model).fields).filter(
+            ([, def]) => !def.relation,
+        );
         const allValues: OperationNode[] = [];
 
-        for (const fieldName of allFields) {
-            const index = fields.indexOf(fieldName);
+        for (const [name, _def] of allFields) {
+            const index = fields.indexOf(name);
             if (index >= 0) {
                 allValues.push(values[index]!);
             } else {
@@ -178,6 +379,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         // create a `SELECT column1 as field1, column2 as field2, ... FROM (VALUES (...))` table for policy evaluation
+        const eb = expressionBuilder<any, any>();
+
         const constTable: SelectQueryNode = {
             kind: 'SelectQueryNode',
             from: FromNode.create([
@@ -186,11 +389,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                     IdentifierNode.create('$t'),
                 ),
             ]),
-            selections: allFields.map((field, index) =>
-                SelectionNode.create(
-                    AliasNode.create(ColumnNode.create(`column${index + 1}`), IdentifierNode.create(field)),
-                ),
-            ),
+            selections: allFields.map(([name, def], index) => {
+                const castedColumnRef =
+                    sql`CAST(${eb.ref(`column${index + 1}`)} as ${sql.raw(this.dialect.getFieldSqlType(def))})`.as(
+                        name,
+                    );
+                return SelectionNode.create(castedColumnRef.toOperationNode());
+            }),
         };
 
         const filter = this.buildPolicyFilter(model, undefined, 'create');
@@ -219,23 +424,33 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
     }
 
-    private unwrapCreateValueRows(node: OperationNode, model: GetModels<Schema>, fields: string[]) {
+    private unwrapCreateValueRows(
+        node: OperationNode,
+        model: GetModels<Schema>,
+        fields: string[],
+        isManyToManyJoinTable: boolean,
+    ) {
         if (ValuesNode.is(node)) {
-            return node.values.map((v) => this.unwrapCreateValueRow(v.values, model, fields));
+            return node.values.map((v) => this.unwrapCreateValueRow(v.values, model, fields, isManyToManyJoinTable));
         } else if (PrimitiveValueListNode.is(node)) {
-            return [this.unwrapCreateValueRow(node.values, model, fields)];
+            return [this.unwrapCreateValueRow(node.values, model, fields, isManyToManyJoinTable)];
         } else {
             throw new InternalError(`Unexpected node kind: ${node.kind} for unwrapping create values`);
         }
     }
 
-    private unwrapCreateValueRow(data: readonly unknown[], model: GetModels<Schema>, fields: string[]) {
+    private unwrapCreateValueRow(
+        data: readonly unknown[],
+        model: GetModels<Schema>,
+        fields: string[],
+        isImplicitManyToManyJoinTable: boolean,
+    ) {
         invariant(data.length === fields.length, 'data length must match fields length');
         const result: { node: OperationNode; raw: unknown }[] = [];
         for (let i = 0; i < data.length; i++) {
             const item = data[i]!;
-            const fieldDef = requireField(this.client.$schema, model, fields[i]!);
             if (typeof item === 'object' && item && 'kind' in item) {
+                const fieldDef = requireField(this.client.$schema, model, fields[i]!);
                 invariant(item.kind === 'ValueNode', 'expecting a ValueNode');
                 result.push({
                     node: ValueNode.create(
@@ -248,7 +463,15 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                     raw: (item as ValueNode).value,
                 });
             } else {
-                const value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType, !!fieldDef.array);
+                let value: unknown = item;
+
+                // many-to-many join table is not a model so we don't have field definitions,
+                // but there's no need to transform values anyway because they're the fields
+                // are all foreign keys
+                if (!isImplicitManyToManyJoinTable) {
+                    const fieldDef = requireField(this.client.$schema, model, fields[i]!);
+                    value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType, !!fieldDef.array);
+                }
                 if (Array.isArray(value)) {
                     result.push({
                         node: RawNode.createWithSql(this.dialect.buildArrayLiteralSQL(value)),
@@ -297,17 +520,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         // do a select (with policy) in place of returning
-        const table = this.getMutationModel(node);
-        if (!table) {
-            throw new InternalError(`Unable to get table name for query node: ${node}`);
-        }
-
-        const idConditions = this.buildIdConditions(table, result.rows);
-        const policyFilter = this.buildPolicyFilter(table, undefined, 'read');
+        const { mutationModel } = this.getMutationModel(node);
+        const idConditions = this.buildIdConditions(mutationModel, result.rows);
+        const policyFilter = this.buildPolicyFilter(mutationModel, undefined, 'read');
 
         const select: SelectQueryNode = {
             kind: 'SelectQueryNode',
-            from: FromNode.create([TableNode.create(table)]),
+            from: FromNode.create([TableNode.create(mutationModel)]),
             where: WhereNode.create(conjunction(this.dialect, [idConditions, policyFilter])),
             selections: node.returning.selections,
         };
@@ -316,7 +535,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     private buildIdConditions(table: string, rows: any[]): OperationNode {
-        const idFields = getIdFields(this.client.$schema, table);
+        const idFields = requireIdFields(this.client.$schema, table);
         return disjunction(
             this.dialect,
             rows.map((row) =>
@@ -336,13 +555,23 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
     private getMutationModel(node: InsertQueryNode | UpdateQueryNode | DeleteQueryNode) {
         const r = match(node)
-            .when(InsertQueryNode.is, (node) => getTableName(node.into) as GetModels<Schema>)
-            .when(UpdateQueryNode.is, (node) => getTableName(node.table) as GetModels<Schema>)
+            .when(InsertQueryNode.is, (node) => ({
+                mutationModel: getTableName(node.into) as GetModels<Schema>,
+                alias: undefined,
+            }))
+            .when(UpdateQueryNode.is, (node) => {
+                if (!node.table) {
+                    throw new QueryError('Update query must have a table');
+                }
+                const r = this.extractTableName(node.table);
+                return r ? { mutationModel: r.model, alias: r.alias } : undefined;
+            })
             .when(DeleteQueryNode.is, (node) => {
                 if (node.from.froms.length !== 1) {
-                    throw new InternalError('Only one from table is supported for delete');
+                    throw new QueryError('Only one from table is supported for delete');
                 }
-                return getTableName(node.from.froms[0]) as GetModels<Schema>;
+                const r = this.extractTableName(node.from.froms[0]!);
+                return r ? { mutationModel: r.model, alias: r.alias } : undefined;
             })
             .exhaustive();
         if (!r) {
@@ -361,7 +590,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node);
     }
 
-    private buildPolicyFilter(model: GetModels<Schema>, alias: string | undefined, operation: CRUD) {
+    buildPolicyFilter(model: GetModels<Schema>, alias: string | undefined, operation: CRUD) {
+        // first check if it's a many-to-many join table, and if so, handle specially
+        const m2mFilter = this.getModelPolicyFilterForManyToManyJoinTable(model, alias, operation);
+        if (m2mFilter) {
+            return m2mFilter;
+        }
+
         const policies = this.getModelPolicies(model, operation);
         if (policies.length === 0) {
             return falseNode(this.dialect);
@@ -369,11 +604,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const allows = policies
             .filter((policy) => policy.kind === 'allow')
-            .map((policy) => this.transformPolicyCondition(model, alias, operation, policy));
+            .map((policy) => this.compilePolicyCondition(model, alias, operation, policy));
 
         const denies = policies
             .filter((policy) => policy.kind === 'deny')
-            .map((policy) => this.transformPolicyCondition(model, alias, operation, policy));
+            .map((policy) => this.compilePolicyCondition(model, alias, operation, policy));
 
         let combinedPolicy: OperationNode;
 
@@ -397,82 +632,18 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return combinedPolicy;
     }
 
-    protected override transformSelectQuery(node: SelectQueryNode) {
-        let whereNode = node.where;
-
-        node.from?.froms.forEach((from) => {
-            const extractResult = this.extractTableName(from);
-            if (extractResult) {
-                const { model, alias } = extractResult;
-                const filter = this.buildPolicyFilter(model, alias, 'read');
-                whereNode = WhereNode.create(
-                    whereNode?.where ? conjunction(this.dialect, [whereNode.where, filter]) : filter,
-                );
-            }
-        });
-
-        const baseResult = super.transformSelectQuery({
-            ...node,
-            where: undefined,
-        });
-
-        return {
-            ...baseResult,
-            where: whereNode,
-        };
-    }
-
-    protected override transformInsertQuery(node: InsertQueryNode) {
-        const result = super.transformInsertQuery(node);
-        if (!node.returning) {
-            return result;
+    private extractTableName(node: OperationNode): { model: GetModels<Schema>; alias?: string } | undefined {
+        if (TableNode.is(node)) {
+            return { model: node.table.identifier.name as GetModels<Schema> };
         }
-        if (this.onlyReturningId(node)) {
-            return result;
-        } else {
-            // only return ID fields, that's enough for reading back the inserted row
-            const idFields = getIdFields(this.client.$schema, this.getMutationModel(node));
-            return {
-                ...result,
-                returning: ReturningNode.create(
-                    idFields.map((field) => SelectionNode.create(ColumnNode.create(field))),
-                ),
-            };
-        }
-    }
-
-    protected override transformUpdateQuery(node: UpdateQueryNode) {
-        const result = super.transformUpdateQuery(node);
-        const mutationModel = this.getMutationModel(node);
-        const filter = this.buildPolicyFilter(mutationModel, undefined, 'update');
-        return {
-            ...result,
-            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
-        };
-    }
-
-    protected override transformDeleteQuery(node: DeleteQueryNode) {
-        const result = super.transformDeleteQuery(node);
-        const mutationModel = this.getMutationModel(node);
-        const filter = this.buildPolicyFilter(mutationModel, undefined, 'delete');
-        return {
-            ...result,
-            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
-        };
-    }
-
-    private extractTableName(from: OperationNode): { model: GetModels<Schema>; alias?: string } | undefined {
-        if (TableNode.is(from)) {
-            return { model: from.table.identifier.name as GetModels<Schema> };
-        }
-        if (AliasNode.is(from)) {
-            const inner = this.extractTableName(from.node);
+        if (AliasNode.is(node)) {
+            const inner = this.extractTableName(node.node);
             if (!inner) {
                 return undefined;
             }
             return {
                 model: inner.model,
-                alias: IdentifierNode.is(from.alias) ? from.alias.name : undefined,
+                alias: IdentifierNode.is(node.alias) ? node.alias.name : undefined,
             };
         } else {
             // this can happen for subqueries, which will be handled when nested
@@ -481,25 +652,41 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
     }
 
-    private transformPolicyCondition(
+    private createPolicyFilterForFrom(node: FromNode | undefined) {
+        if (!node) {
+            return undefined;
+        }
+        return this.createPolicyFilterForTables(node.froms);
+    }
+
+    private createPolicyFilterForTables(tables: readonly OperationNode[]) {
+        return tables.reduce<OperationNode | undefined>((acc, table) => {
+            const extractResult = this.extractTableName(table);
+            if (extractResult) {
+                const { model, alias } = extractResult;
+                const filter = this.buildPolicyFilter(model, alias, 'read');
+                return acc ? conjunction(this.dialect, [acc, filter]) : filter;
+            }
+            return acc;
+        }, undefined);
+    }
+
+    private compilePolicyCondition(
         model: GetModels<Schema>,
         alias: string | undefined,
         operation: CRUD,
         policy: Policy,
     ) {
-        return new ExpressionTransformer(this.client.$schema, this.client.$options, this.client.$auth).transform(
-            policy.condition,
-            {
-                model,
-                alias,
-                operation,
-                auth: this.client.$auth,
-            },
-        );
+        return new ExpressionTransformer(this.client).transform(policy.condition, {
+            model,
+            alias,
+            operation,
+            auth: this.client.$auth,
+        });
     }
 
-    private getModelPolicies(modelName: string, operation: PolicyOperation) {
-        const modelDef = requireModel(this.client.$schema, modelName);
+    private getModelPolicies(model: string, operation: PolicyOperation) {
+        const modelDef = requireModel(this.client.$schema, model);
         const result: Policy[] = [];
 
         const extractOperations = (expr: Expression) => {
@@ -528,4 +715,93 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
         return result;
     }
+
+    private resolveManyToManyJoinTable(tableName: string) {
+        for (const model of Object.values(this.client.$schema.models)) {
+            for (const field of Object.values(model.fields)) {
+                const m2m = getManyToManyRelation(this.client.$schema, model.name, field.name);
+                if (m2m?.joinTable === tableName) {
+                    const sortedRecord = [
+                        {
+                            model: model.name,
+                            field: field.name,
+                        },
+                        {
+                            model: m2m.otherModel,
+                            field: m2m.otherField,
+                        },
+                    ].sort(this.manyToManySorter);
+
+                    const firstIdFields = requireIdFields(this.client.$schema, sortedRecord[0]!.model);
+                    const secondIdFields = requireIdFields(this.client.$schema, sortedRecord[1]!.model);
+                    invariant(
+                        firstIdFields.length === 1 && secondIdFields.length === 1,
+                        'only single-field id is supported for implicit many-to-many join table',
+                    );
+
+                    return {
+                        firstModel: sortedRecord[0]!.model,
+                        firstField: sortedRecord[0]!.field,
+                        firstIdField: firstIdFields[0]!,
+                        secondModel: sortedRecord[1]!.model,
+                        secondField: sortedRecord[1]!.field,
+                        secondIdField: secondIdFields[0]!,
+                    };
+                }
+            }
+        }
+        return undefined;
+    }
+
+    private manyToManySorter(a: { model: string; field: string }, b: { model: string; field: string }): number {
+        // the implicit m2m join table's "A", "B" fk fields' order is determined
+        // by model name's sort order, and when identical (for self-relations),
+        // field name's sort order
+        return a.model !== b.model ? a.model.localeCompare(b.model) : a.field.localeCompare(b.field);
+    }
+
+    private isManyToManyJoinTable(tableName: string) {
+        return !!this.resolveManyToManyJoinTable(tableName);
+    }
+
+    private getModelPolicyFilterForManyToManyJoinTable(
+        tableName: string,
+        alias: string | undefined,
+        operation: PolicyOperation,
+    ): OperationNode | undefined {
+        const m2m = this.resolveManyToManyJoinTable(tableName);
+        if (!m2m) {
+            return undefined;
+        }
+
+        // join table's permission:
+        //   - read: requires both sides to be readable
+        //   - mutation: requires both sides to be updatable
+
+        const checkForOperation = operation === 'read' ? 'read' : 'update';
+        const eb = expressionBuilder<any, any>();
+        const joinTable = alias ?? tableName;
+
+        const aQuery = eb
+            .selectFrom(m2m.firstModel)
+            .whereRef(`${m2m.firstModel}.${m2m.firstIdField}`, '=', `${joinTable}.A`)
+            .select(() =>
+                new ExpressionWrapper(
+                    this.buildPolicyFilter(m2m.firstModel as GetModels<Schema>, undefined, checkForOperation),
+                ).as('$conditionA'),
+            );
+
+        const bQuery = eb
+            .selectFrom(m2m.secondModel)
+            .whereRef(`${m2m.secondModel}.${m2m.secondIdField}`, '=', `${joinTable}.B`)
+            .select(() =>
+                new ExpressionWrapper(
+                    this.buildPolicyFilter(m2m.secondModel as GetModels<Schema>, undefined, checkForOperation),
+                ).as('$conditionB'),
+            );
+
+        return eb.and([aQuery, bQuery]).toOperationNode();
+    }
+
+    // #endregion
 }

@@ -1,39 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { createPolicyTestClient } from './utils';
+import { createPolicyTestClient } from '../utils';
 
-describe('currentOperation tests', () => {
-    it('works with specific rules', async () => {
+describe('currentModel tests', () => {
+    it('works in models', async () => {
         const db = await createPolicyTestClient(
             `
             model User {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation() == 'create')
+                @@allow('create', currentModel() == 'User')
             }
+
             model Post {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation() == 'read')
-            }
-            `,
-        );
-
-        await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
-    });
-
-    it('works with all rule', async () => {
-        const db = await createPolicyTestClient(
-            `
-            model User {
-                id Int @id
-                @@allow('read', true)
-                @@allow('all', currentOperation() == 'create')
-            }
-            model Post {
-                id Int @id
-                @@allow('read', true)
-                @@allow('create', currentOperation() == 'read')
+                @@allow('create', currentModel() == 'User')
             }
             `,
         );
@@ -48,12 +29,13 @@ describe('currentOperation tests', () => {
             model User {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation('upper') == 'CREATE')
+                @@allow('create', currentModel('upper') == 'USER')
             }
+
             model Post {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation('upper') == 'READ')
+                @@allow('create', currentModel('upper') == 'Post')
             }
             `,
         );
@@ -68,12 +50,13 @@ describe('currentOperation tests', () => {
             model User {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation('lower') == 'create')
+                @@allow('create', currentModel('lower') == 'user')
             }
+
             model Post {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation('lower') == 'read')
+                @@allow('create', currentModel('lower') == 'Post')
             }
             `,
         );
@@ -85,15 +68,16 @@ describe('currentOperation tests', () => {
     it('works with capitalization', async () => {
         const db = await createPolicyTestClient(
             `
-            model User {
+            model user {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation('capitalize') == 'Create')
+                @@allow('create', currentModel('capitalize') == 'User')
             }
-            model Post {
+
+            model post {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation('capitalize') == 'create')
+                @@allow('create', currentModel('capitalize') == 'post')
             }
             `,
         );
@@ -105,15 +89,63 @@ describe('currentOperation tests', () => {
     it('works with uncapitalization', async () => {
         const db = await createPolicyTestClient(
             `
-            model User {
+            model USER {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation('uncapitalize') == 'create')
+                @@allow('create', currentModel('uncapitalize') == 'uSER')
             }
-            model Post {
+
+            model POST {
                 id Int @id
                 @@allow('read', true)
-                @@allow('create', currentOperation('uncapitalize') == 'read')
+                @@allow('create', currentModel('uncapitalize') == 'POST')
+            }
+            `,
+        );
+
+        await expect(db.USER.create({ data: { id: 1 } })).toResolveTruthy();
+        await expect(db.POST.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+    });
+
+    // TODO: abstract base support
+    it.skip('works when inherited from abstract base', async () => {
+        const db = await createPolicyTestClient(
+            `
+            abstract model Base {
+                id Int @id
+                @@allow('read', true)
+                @@allow('create', currentModel() == 'User')
+            }
+
+            model User extends Base {
+            }
+
+            model Post extends Base {
+            }
+            `,
+        );
+
+        await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
+        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+    });
+
+    // TODO: delegate support
+    it.skip('works when inherited from delegate base', async () => {
+        const db = await createPolicyTestClient(
+            `
+            model Base {
+                id Int @id
+                type String
+                @@delegate(type)
+
+                @@allow('read', true)
+                @@allow('create', currentModel() == 'User')
+            }
+
+            model User extends Base {
+            }
+
+            model Post extends Base {
             }
             `,
         );
@@ -127,11 +159,11 @@ describe('currentOperation tests', () => {
             createPolicyTestClient(
                 `
             model User {
-                id String @default(currentOperation())
+                id String @default(currentModel())
             }
             `,
             ),
-        ).rejects.toThrow('function "currentOperation" is not allowed in the current context: DefaultValue');
+        ).rejects.toThrow('function "currentModel" is not allowed in the current context: DefaultValue');
     });
 
     it('complains when casing argument is invalid', async () => {
@@ -140,7 +172,7 @@ describe('currentOperation tests', () => {
                 `
             model User {
                 id String @id
-                @@allow('create', currentOperation('foo') == 'User')
+                @@allow('create', currentModel('foo') == 'User')
             }
             `,
             ),

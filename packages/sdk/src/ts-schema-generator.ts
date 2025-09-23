@@ -310,6 +310,8 @@ export class TsSchemaGenerator {
                       ),
                   ]
                 : []),
+
+            ...(dm.isView ? [ts.factory.createPropertyAssignment('isView', ts.factory.createTrue())] : []),
         ];
 
         const computedFields = dm.fields.filter((f) => hasAttribute(f, '@computed'));
@@ -376,7 +378,7 @@ export class TsSchemaGenerator {
                     undefined,
                     undefined,
                     [
-                        // parameter: `context: { currentModel: string }`
+                        // parameter: `context: { modelAlias: string }`
                         ts.factory.createParameterDeclaration(
                             undefined,
                             undefined,
@@ -385,7 +387,7 @@ export class TsSchemaGenerator {
                             ts.factory.createTypeLiteralNode([
                                 ts.factory.createPropertySignature(
                                     undefined,
-                                    'currentModel',
+                                    'modelAlias',
                                     undefined,
                                     ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
                                 ),

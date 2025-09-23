@@ -1,30 +1,26 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
+import type { Model } from '@zenstackhq/language/ast';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
-import { createTestProject, generateTsSchema } from '@zenstackhq/testtools';
+import { createTestProject, generateTsSchema, getPluginModules } from '@zenstackhq/testtools';
 import SQLite from 'better-sqlite3';
 import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
 import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client as PGClient, Pool } from 'pg';
+import { expect } from 'vitest';
 import type { ClientContract, ClientOptions } from '../src/client';
 import { ZenStackClient } from '../src/client';
 import type { SchemaDef } from '../src/schema';
 
-type SqliteSchema = SchemaDef & { provider: { type: 'sqlite' } };
-type PostgresSchema = SchemaDef & { provider: { type: 'postgresql' } };
-
-export async function makeSqliteClient<Schema extends SqliteSchema>(
-    schema: Schema,
-    extraOptions?: Partial<ClientOptions<Schema>>,
-): Promise<ClientContract<Schema>> {
-    const client = new ZenStackClient(schema, {
-        ...extraOptions,
-        dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-    } as unknown as ClientOptions<Schema>);
-    await client.$pushSchema();
-    return client;
+export function getTestDbProvider() {
+    const val = process.env['TEST_DB_PROVIDER'] ?? 'sqlite';
+    if (!['sqlite', 'postgresql'].includes(val!)) {
+        throw new Error(`Invalid TEST_DB_PROVIDER value: ${val}`);
+    }
+    return val as 'sqlite' | 'postgresql';
 }
 
 const TEST_PG_CONFIG = {
@@ -33,30 +29,6 @@ const TEST_PG_CONFIG = {
     user: process.env['TEST_PG_USER'] ?? 'postgres',
     password: process.env['TEST_PG_PASSWORD'] ?? 'postgres',
 };
-
-export async function makePostgresClient<Schema extends PostgresSchema>(
-    schema: Schema,
-    dbName: string,
-    extraOptions?: Partial<ClientOptions<Schema>>,
-): Promise<ClientContract<Schema>> {
-    invariant(dbName, 'dbName is required');
-    const pgClient = new PGClient(TEST_PG_CONFIG);
-    await pgClient.connect();
-    await pgClient.query(`DROP DATABASE IF EXISTS "${dbName}"`);
-    await pgClient.query(`CREATE DATABASE "${dbName}"`);
-
-    const client = new ZenStackClient(schema, {
-        ...extraOptions,
-        dialect: new PostgresDialect({
-            pool: new Pool({
-                ...TEST_PG_CONFIG,
-                database: dbName,
-            }),
-        }),
-    } as unknown as ClientOptions<Schema>);
-    await client.$pushSchema();
-    return client;
-}
 
 export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptions<Schema>, 'dialect'> & {
     provider?: 'sqlite' | 'postgresql';
@@ -82,25 +54,22 @@ export async function createTestClient<Schema extends SchemaDef>(
 ): Promise<any> {
     let workDir = options?.workDir;
     let _schema: Schema;
-    const provider = options?.provider ?? 'sqlite';
+    const provider = options?.provider ?? getTestDbProvider() ?? 'sqlite';
 
-    let dbName = options?.dbName;
-    if (!dbName) {
-        if (provider === 'sqlite') {
-            dbName = './test.db';
-        } else {
-            throw new Error(`dbName is required for ${provider} provider`);
-        }
-    }
+    const dbName = options?.dbName ?? getTestDbName(provider);
+    console.log(`Using provider: ${provider}, db: ${dbName}`);
 
     const dbUrl =
         provider === 'sqlite'
             ? `file:${dbName}`
             : `postgres://${TEST_PG_CONFIG.user}:${TEST_PG_CONFIG.password}@${TEST_PG_CONFIG.host}:${TEST_PG_CONFIG.port}/${dbName}`;
 
+    let model: Model | undefined;
+
     if (typeof schema === 'string') {
         const generated = await generateTsSchema(schema, provider, dbUrl, options?.extraSourceFiles);
         workDir = generated.workDir;
+        model = generated.model;
         // replace schema's provider
         _schema = {
             ...generated.schema,
@@ -143,16 +112,19 @@ export async function createTestClient<Schema extends SchemaDef>(
 
     if (options?.usePrismaPush) {
         invariant(typeof schema === 'string' || schemaFile, 'a schema file must be provided when using prisma db push');
-        const r = await loadDocument(path.resolve(workDir!, 'schema.zmodel'));
-        if (!r.success) {
-            throw new Error(r.errors.join('\n'));
+        if (!model) {
+            const r = await loadDocument(path.join(workDir, 'schema.zmodel'), getPluginModules());
+            if (!r.success) {
+                throw new Error(r.errors.join('\n'));
+            }
+            model = r.model;
         }
-        const prismaSchema = new PrismaSchemaGenerator(r.model);
+        const prismaSchema = new PrismaSchemaGenerator(model);
         const prismaSchemaText = await prismaSchema.generate();
         fs.writeFileSync(path.resolve(workDir!, 'schema.prisma'), prismaSchemaText);
         execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {
             cwd: workDir,
-            stdio: 'inherit',
+            stdio: 'ignore',
         });
     } else {
         if (provider === 'postgresql') {
@@ -195,4 +167,27 @@ export async function createTestClient<Schema extends SchemaDef>(
 
 export function testLogger(e: LogEvent) {
     console.log(e.query.sql, e.query.parameters);
+}
+
+function getTestDbName(provider: string) {
+    if (provider === 'sqlite') {
+        return './test.db';
+    }
+    const testName = expect.getState().currentTestName;
+    const testPath = expect.getState().testPath ?? '';
+    invariant(testName);
+    // digest test name
+    const digest = createHash('md5')
+        .update(testName + testPath)
+        .digest('hex');
+    // compute a database name based on test name
+    return (
+        'test_' +
+        testName
+            .toLowerCase()
+            .replace(/[^a-z0-9_]/g, '_')
+            .replace(/_+/g, '_')
+            .substring(0, 30) +
+        digest.slice(0, 6)
+    );
 }

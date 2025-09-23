@@ -1,9 +1,9 @@
 import path from 'path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from './utils';
-import { QueryError } from '../../src';
+import { createPolicyTestClient } from '../utils';
+import { QueryError } from '../../../src';
 
-describe('With Policy: multi-field unique', () => {
+describe('Policy tests multi-field unique', () => {
     let origDir: string;
 
     beforeAll(async () => {

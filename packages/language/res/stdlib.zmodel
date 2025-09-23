@@ -123,8 +123,10 @@ function future(): Any {
 } @@@expressionContext([AccessPolicy])
 
 /**
- * If the field value contains the search string. By default, the search is case-sensitive,
- * but you can override the behavior with the "caseInSensitive" argument.
+ * Checks if the field value contains the search string. By default, the search is case-sensitive, and
+ * "LIKE" operator is used to match. If `caseInSensitive` is true, "ILIKE" operator is used if
+ * supported, otherwise it still falls back to "LIKE" and delivers whatever the database's 
+ * behavior is.
  */
 function contains(field: String, search: String, caseInSensitive: Boolean?): Boolean {
 } @@@expressionContext([AccessPolicy, ValidationRule])
@@ -136,15 +138,21 @@ function search(field: String, search: String): Boolean {
 } @@@expressionContext([AccessPolicy])
 
 /**
- * If the field value starts with the search string
+ * Checks the field value starts with the search string. By default, the search is case-sensitive, and
+ * "LIKE" operator is used to match. If `caseInSensitive` is true, "ILIKE" operator is used if
+ * supported, otherwise it still falls back to "LIKE" and delivers whatever the database's 
+ * behavior is.
  */
-function startsWith(field: String, search: String): Boolean {
+function startsWith(field: String, search: String, caseInSensitive: Boolean?): Boolean {
 } @@@expressionContext([AccessPolicy, ValidationRule])
 
 /**
- * If the field value ends with the search string
+ * Checks if the field value ends with the search string. By default, the search is case-sensitive, and
+ * "LIKE" operator is used to match. If `caseInSensitive` is true, "ILIKE" operator is used if
+ * supported, otherwise it still falls back to "LIKE" and delivers whatever the database's 
+ * behavior is.
  */
-function endsWith(field: String, search: String): Boolean {
+function endsWith(field: String, search: String, caseInSensitive: Boolean?): Boolean {
 } @@@expressionContext([AccessPolicy, ValidationRule])
 
 /**
@@ -593,16 +601,6 @@ function datetime(field: String): Boolean {
  */
 function url(field: String): Boolean {
 } @@@expressionContext([ValidationRule])
-
-/**
- * Checks if the current user can perform the given operation on the given field.
- *
- * @param field: The field to check access for
- * @param operation: The operation to check access for. Can be "read", "create", "update", or "delete". If the operation is not provided,
- * it defaults the operation of the containing policy rule.
- */
-function check(field: Any, operation: String?): Boolean {
-} @@@expressionContext([AccessPolicy])
 
 //////////////////////////////////////////////
 // End validation attributes and functions

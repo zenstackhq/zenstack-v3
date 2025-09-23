@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import type { Expression, ExpressionBuilder, ExpressionWrapper } from 'kysely';
 import { match } from 'ts-pattern';
 import { ExpressionUtils, type FieldDef, type GetModels, type ModelDef, type SchemaDef } from '../schema';
@@ -55,8 +56,8 @@ export function requireField(schema: SchemaDef, modelOrType: string, field: stri
 }
 
 export function getIdFields<Schema extends SchemaDef>(schema: SchemaDef, model: GetModels<Schema>) {
-    const modelDef = requireModel(schema, model);
-    return modelDef?.idFields as GetModels<Schema>[];
+    const modelDef = getModel(schema, model);
+    return modelDef?.idFields;
 }
 
 export function requireIdFields(schema: SchemaDef, model: string) {
@@ -194,7 +195,7 @@ export function buildFieldRef<Schema extends SchemaDef>(
         if (!computer) {
             throw new QueryError(`Computed field "${field}" implementation not provided for model "${model}"`);
         }
-        return computer(eb, { currentModel: modelAlias });
+        return computer(eb, { modelAlias });
     }
 }
 
@@ -231,7 +232,7 @@ export function buildJoinPairs(
 }
 
 export function makeDefaultOrderBy<Schema extends SchemaDef>(schema: SchemaDef, model: string) {
-    const idFields = getIdFields(schema, model);
+    const idFields = requireIdFields(schema, model);
     return idFields.map((f) => ({ [f]: 'asc' }) as OrderBy<Schema, GetModels<Schema>, true, false>);
 }
 
@@ -259,11 +260,18 @@ export function getManyToManyRelation(schema: SchemaDef, model: string, field: s
             orderedFK = sortedFieldNames[0] === field ? ['A', 'B'] : ['B', 'A'];
         }
 
+        const modelIdFields = requireIdFields(schema, model);
+        invariant(modelIdFields.length === 1, 'Only single-field ID is supported for many-to-many relation');
+        const otherIdFields = requireIdFields(schema, fieldDef.type);
+        invariant(otherIdFields.length === 1, 'Only single-field ID is supported for many-to-many relation');
+
         return {
             parentFkName: orderedFK[0],
+            parentPKName: modelIdFields[0]!,
             otherModel: fieldDef.type,
             otherField: fieldDef.relation.opposite,
             otherFkName: orderedFK[1],
+            otherPKName: otherIdFields[0]!,
             joinTable: fieldDef.relation.name
                 ? `_${fieldDef.relation.name}`
                 : `_${sortedModelNames[0]}To${sortedModelNames[1]}`,
@@ -318,7 +326,7 @@ export function safeJSONStringify(value: unknown) {
 }
 
 export function extractIdFields(entity: any, schema: SchemaDef, model: string) {
-    const idFields = getIdFields(schema, model);
+    const idFields = requireIdFields(schema, model);
     return extractFields(entity, idFields);
 }
 

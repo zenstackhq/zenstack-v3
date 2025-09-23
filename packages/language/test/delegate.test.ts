@@ -5,6 +5,11 @@ import { loadSchema, loadSchemaWithError } from './utils';
 describe('Delegate Tests', () => {
     it('supports inheriting from delegate', async () => {
         const model = await loadSchema(`
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
         model A {
             id Int @id @default(autoincrement())
             x String
@@ -24,6 +29,11 @@ describe('Delegate Tests', () => {
     it('rejects inheriting from non-delegate models', async () => {
         await loadSchemaWithError(
             `
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
         model A {
             id Int @id @default(autoincrement())
             x String
@@ -40,6 +50,11 @@ describe('Delegate Tests', () => {
     it('can detect cyclic inherits', async () => {
         await loadSchemaWithError(
             `
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
         model A extends B {
             x String
             @@delegate(x)
@@ -57,6 +72,11 @@ describe('Delegate Tests', () => {
     it('can detect duplicated fields from base model', async () => {
         await loadSchemaWithError(
             `
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
         model A {
             id String @id
             x String
@@ -74,6 +94,11 @@ describe('Delegate Tests', () => {
     it('can detect duplicated attributes from base model', async () => {
         await loadSchemaWithError(
             `
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
         model A {
             id String @id
             x String

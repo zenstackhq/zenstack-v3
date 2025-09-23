@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from './utils';
+import { createPolicyTestClient } from '../utils';
 
 describe('field comparison tests', () => {
     it('works with policies involving field comparison', async () => {

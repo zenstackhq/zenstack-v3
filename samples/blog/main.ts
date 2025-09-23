@@ -8,10 +8,10 @@ async function main() {
         dialect: new SqliteDialect({ database: new SQLite('./zenstack/dev.db') }),
         computedFields: {
             User: {
-                postCount: (eb, { currentModel }) =>
+                postCount: (eb, { modelAlias }) =>
                     eb
                         .selectFrom('Post')
-                        .whereRef('Post.authorId', '=', sql.ref(`${currentModel}.id`))
+                        .whereRef('Post.authorId', '=', sql.ref(`${modelAlias}.id`))
                         .select(({ fn }) => fn.countAll<number>().as('postCount')),
             },
         },

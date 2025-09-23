@@ -1,4 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
+import Decimal from 'decimal.js';
 import {
     sql,
     type Expression,
@@ -11,18 +12,24 @@ import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
+import { QueryError } from '../../errors';
+import type { ClientOptions } from '../../options';
 import {
     buildJoinPairs,
     getDelegateDescendantModels,
-    getIdFields,
     getManyToManyRelation,
     isRelationField,
     requireField,
+    requireIdFields,
     requireModel,
 } from '../../query-utils';
 import { BaseCrudDialect } from './base-dialect';
 
 export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
+    constructor(schema: Schema, options: ClientOptions<Schema>) {
+        super(schema, options);
+    }
+
     override get provider() {
         return 'postgresql' as const;
     }
@@ -44,11 +51,67 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         } else {
             return match(type)
                 .with('DateTime', () =>
-                    value instanceof Date ? value : typeof value === 'string' ? new Date(value) : value,
+                    value instanceof Date
+                        ? value.toISOString()
+                        : typeof value === 'string'
+                          ? new Date(value).toISOString()
+                          : value,
                 )
                 .with('Decimal', () => (value !== null ? value.toString() : value))
                 .otherwise(() => value);
         }
+    }
+
+    override transformOutput(value: unknown, type: BuiltinType) {
+        if (value === null || value === undefined) {
+            return value;
+        }
+        return match(type)
+            .with('DateTime', () => this.transformOutputDate(value))
+            .with('Bytes', () => this.transformOutputBytes(value))
+            .with('BigInt', () => this.transformOutputBigInt(value))
+            .with('Decimal', () => this.transformDecimal(value))
+            .otherwise(() => super.transformOutput(value, type));
+    }
+
+    private transformOutputBigInt(value: unknown) {
+        if (typeof value === 'bigint') {
+            return value;
+        }
+        invariant(
+            typeof value === 'string' || typeof value === 'number',
+            `Expected string or number, got ${typeof value}`,
+        );
+        return BigInt(value);
+    }
+
+    private transformDecimal(value: unknown) {
+        if (value instanceof Decimal) {
+            return value;
+        }
+        invariant(
+            typeof value === 'string' || typeof value === 'number' || value instanceof Decimal,
+            `Expected string, number or Decimal, got ${typeof value}`,
+        );
+        return new Decimal(value);
+    }
+
+    private transformOutputDate(value: unknown) {
+        if (typeof value === 'string') {
+            return new Date(value);
+        } else if (value instanceof Date && this.options.fixPostgresTimezone !== false) {
+            // SPECIAL NOTES:
+            // node-pg has a terrible quirk that it returns the date value in local timezone
+            // as a `Date` object although for `DateTime` field the data in DB is stored in UTC
+            // see: https://github.com/brianc/node-postgres/issues/429
+            return new Date(value.getTime() - value.getTimezoneOffset() * 60 * 1000);
+        } else {
+            return value;
+        }
+    }
+
+    private transformOutputBytes(value: unknown) {
+        return Buffer.isBuffer(value) ? Uint8Array.from(value) : value;
     }
 
     override buildRelationSelection(
@@ -157,8 +220,8 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         const m2m = getManyToManyRelation(this.schema, model, relationField);
         if (m2m) {
             // many-to-many relation
-            const parentIds = getIdFields(this.schema, model);
-            const relationIds = getIdFields(this.schema, relationModel);
+            const parentIds = requireIdFields(this.schema, model);
+            const relationIds = requireIdFields(this.schema, relationModel);
             invariant(parentIds.length === 1, 'many-to-many relation must have exactly one id field');
             invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
             query = query.where((eb) =>
@@ -369,5 +432,43 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
     override get supportInsertWithDefault() {
         return true;
+    }
+
+    override getFieldSqlType(fieldDef: FieldDef) {
+        // TODO: respect `@db.x` attributes
+        if (fieldDef.relation) {
+            throw new QueryError('Cannot get SQL type of a relation field');
+        }
+
+        let result: string;
+
+        if (this.schema.enums?.[fieldDef.type]) {
+            // enums are treated as text
+            result = 'text';
+        } else {
+            result = match(fieldDef.type)
+                .with('String', () => 'text')
+                .with('Boolean', () => 'boolean')
+                .with('Int', () => 'integer')
+                .with('BigInt', () => 'bigint')
+                .with('Float', () => 'double precision')
+                .with('Decimal', () => 'decimal')
+                .with('DateTime', () => 'timestamp')
+                .with('Bytes', () => 'bytea')
+                .with('Json', () => 'jsonb')
+                // fallback to text
+                .otherwise(() => 'text');
+        }
+
+        if (fieldDef.array) {
+            result += '[]';
+        }
+
+        return result;
+    }
+
+    override getStringCasingBehavior() {
+        // Postgres `LIKE` is case-sensitive, `ILIKE` is case-insensitive
+        return { supportsILike: true, likeCaseSensitive: true };
     }
 }

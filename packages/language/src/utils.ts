@@ -357,8 +357,9 @@ export function getFieldReference(expr: Expression): DataField | undefined {
     }
 }
 
+// TODO: move to policy plugin
 export function isCheckInvocation(node: AstNode) {
-    return isInvocationExpr(node) && node.function.ref?.name === 'check' && isFromStdlib(node.function.ref);
+    return isInvocationExpr(node) && node.function.ref?.name === 'check';
 }
 
 export function resolveTransitiveImports(documents: LangiumDocuments, model: Model) {

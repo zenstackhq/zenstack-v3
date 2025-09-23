@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from './utils';
+import { createPolicyTestClient } from '../utils';
 
 describe('auth() tests', () => {
     it('works with string id non-null test', async () => {
@@ -536,7 +536,7 @@ model Post {
         );
 
         await expect(db.user.create({ data: { id: 'userId-1' } })).toResolveTruthy();
-        await expect(db.post.create({ data: { title: 'title' } })).rejects.toThrow('constraint failed');
+        await expect(db.post.create({ data: { title: 'title' } })).rejects.toThrow('constraint');
         await expect(db.post.findMany({})).toResolveTruthy();
     });
 

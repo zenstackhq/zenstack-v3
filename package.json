@@ -1,13 +1,13 @@
 {
     "name": "zenstack-v3",
-    "version": "3.0.0-beta.4",
+    "version": "3.0.0-beta.5",
     "description": "ZenStack",
     "packageManager": "pnpm@10.12.1",
     "scripts": {
         "build": "turbo run build",
         "watch": "turbo run watch build",
         "lint": "turbo run lint",
-        "test": "turbo run test",
+        "test": "vitest run",
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
         "pr": "gh pr create --fill-first --base dev",
         "merge-main": "gh pr create --title \"merge dev to main\" --body \"\" --base main --head dev",

@@ -12,6 +12,11 @@ describe('Import tests', () => {
         fs.writeFileSync(
             path.join(name, 'a.zmodel'),
             `
+datasource db {
+  provider = 'sqlite'
+  url      = 'file:./dev.db'
+}
+        
 model A {
   id Int @id
   name String
@@ -48,6 +53,12 @@ enum Role {
             path.join(name, 'b.zmodel'),
             `
 import './a'
+
+datasource db {
+  provider = 'sqlite'
+  url      = 'file:./dev.db'
+}
+
 model User {
   id Int @id
   role Role
@@ -56,7 +67,7 @@ model User {
         );
 
         const model = await expectLoaded(path.join(name, 'b.zmodel'));
-        expect((model.declarations[0] as DataModel).fields[1].type.reference?.ref?.name).toBe('Role');
+        expect((model.declarations[1] as DataModel).fields[1].type.reference?.ref?.name).toBe('Role');
     });
 
     it('supports cyclic imports', async () => {
@@ -65,6 +76,12 @@ model User {
             path.join(name, 'a.zmodel'),
             `
 import './b'
+
+datasource db {
+  provider = 'sqlite'
+  url      = 'file:./dev.db'
+}
+
 model A {
   id Int @id
   b B?
@@ -86,7 +103,7 @@ model B {
         const modelB = await expectLoaded(path.join(name, 'b.zmodel'));
         expect((modelB.declarations[0] as DataModel).fields[1].type.reference?.ref?.name).toBe('A');
         const modelA = await expectLoaded(path.join(name, 'a.zmodel'));
-        expect((modelA.declarations[0] as DataModel).fields[1].type.reference?.ref?.name).toBe('B');
+        expect((modelA.declarations[1] as DataModel).fields[1].type.reference?.ref?.name).toBe('B');
     });
 
     async function expectLoaded(file: string) {

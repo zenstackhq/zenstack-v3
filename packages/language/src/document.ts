@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDataSource, type Model } from './ast';
 import { STD_LIB_MODULE_NAME } from './constants';
-import { createZModelServices } from './module';
+import { createZModelServices, type ZModelServices } from './module';
 import { getDataModelAndTypeDefs, getDocument, hasAttribute, resolveImport, resolveTransitiveImports } from './utils';
 
 /**
@@ -15,7 +15,7 @@ export async function loadDocument(
     fileName: string,
     additionalModelFiles: string[] = [],
 ): Promise<
-    { success: true; model: Model; warnings: string[] } | { success: false; errors: string[]; warnings: string[] }
+    { success: true; model: Model; warnings: string[], services: ZModelServices } | { success: false; errors: string[]; warnings: string[] }
 > {
     const { ZModelLanguage: services } = createZModelServices(false);
     const extensions = services.LanguageMetaData.fileExtensions;
@@ -125,6 +125,7 @@ export async function loadDocument(
     return {
         success: true,
         model: document.parseResult.value as Model,
+        services,
         warnings,
     };
 }

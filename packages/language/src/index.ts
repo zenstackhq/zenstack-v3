@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDataSource, type AstNode, type Model } from './ast';
 import { STD_LIB_MODULE_NAME } from './constants';
-import { createZModelLanguageServices } from './module';
+import { createZModelLanguageServices, type ZModelServices } from './module';
 import { getDataModelAndTypeDefs, getDocument, hasAttribute, resolveImport, resolveTransitiveImports } from './utils';
 
 export function createZModelServices() {
@@ -22,7 +22,7 @@ export async function loadDocument(
     fileName: string,
     pluginModelFiles: string[] = [],
 ): Promise<
-    { success: true; model: Model; warnings: string[] } | { success: false; errors: string[]; warnings: string[] }
+    { success: true; model: Model; warnings: string[], services: ZModelServices } | { success: false; errors: string[]; warnings: string[] }
 > {
     const { ZModelLanguage: services } = createZModelServices();
     const extensions = services.LanguageMetaData.fileExtensions;
@@ -131,6 +131,7 @@ export async function loadDocument(
     return {
         success: true,
         model: document.parseResult.value as Model,
+        services,
         warnings,
     };
 }

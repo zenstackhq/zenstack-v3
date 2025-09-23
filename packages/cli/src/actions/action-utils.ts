@@ -47,6 +47,20 @@ export async function loadSchemaDocument(schemaFile: string) {
     return loadResult.model;
 }
 
+export async function loadSchemaDocumentWithServices(schemaFile: string) {
+    const loadResult = await loadDocument(schemaFile);
+    if (!loadResult.success) {
+        loadResult.errors.forEach((err) => {
+            console.error(colors.red(err));
+        });
+        throw new CliError('Schema contains errors. See above for details.');
+    }
+    loadResult.warnings.forEach((warn) => {
+        console.warn(colors.yellow(warn));
+    });
+    return { services: loadResult.services, model: loadResult.model };
+}
+
 export function handleSubProcessError(err: unknown) {
     if (err instanceof Error && 'status' in err && typeof err.status === 'number') {
         process.exit(err.status);

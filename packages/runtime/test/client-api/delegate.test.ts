@@ -302,7 +302,7 @@ describe('Delegate model tests ', () => {
         });
     });
 
-    describe('Delegate filter tests', async () => {
+    describe('Delegate filter tests', () => {
         beforeEach(async () => {
             const u = await client.user.create({
                 data: {
@@ -546,7 +546,7 @@ describe('Delegate model tests ', () => {
         });
     });
 
-    describe('Delegate update tests', async () => {
+    describe('Delegate update tests', () => {
         beforeEach(async () => {
             const u = await client.user.create({
                 data: {

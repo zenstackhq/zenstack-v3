@@ -56,7 +56,7 @@ jobs:
               if: matrix.runtime == 'bun'
               uses: oven-sh/setup-bun@v2
               with:
-                  bun-version: latest
+                  bun-version: 1.x
 
             - name: Get pnpm store directory
               id: pnpm-cache

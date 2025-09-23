@@ -33,7 +33,7 @@ jobs:
 
         strategy:
             matrix:
-                node-version: [20.x]
+                runtime: [node, bun]
                 provider: [sqlite, postgresql]
 
         steps:
@@ -45,11 +45,18 @@ jobs:
               with:
                   version: 10.12.1
 
-            - name: Use Node.js ${{ matrix.node-version }}
+            - name: Use Node.js 20.x
+              if: matrix.runtime == 'node'
               uses: buildjet/setup-node@v3
               with:
-                  node-version: ${{ matrix.node-version }}
+                  node-version: 20.x
                   cache: 'pnpm'
+
+            - name: Use Bun 1.x
+              if: matrix.runtime == 'bun'
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: latest
 
             - name: Get pnpm store directory
               id: pnpm-cache
@@ -76,5 +83,10 @@ jobs:
             - name: Lint
               run: pnpm run lint
 
-            - name: Test
+            - name: Test Node.js
+              if: matrix.runtime == 'node'
               run: TEST_DB_PROVIDER=${{ matrix.provider }} pnpm run test
+
+            - name: Test Bun
+              if: matrix.runtime == 'bun'
+              run: TEST_DB_PROVIDER=${{ matrix.provider }} bun run test

@@ -1,5 +1,4 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { glob } from 'glob';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,7 +9,7 @@ export async function loadSchema(schema: string) {
     // create a temp file
     const tempFile = path.join(os.tmpdir(), `zenstack-schema-${crypto.randomUUID()}.zmodel`);
     fs.writeFileSync(tempFile, schema);
-    const r = await loadDocument(tempFile, getPluginModels());
+    const r = await loadDocument(tempFile);
     expect(r).toSatisfy(
         (r) => r.success,
         `Failed to load schema: ${(r as any).errors?.map((e) => e.toString()).join(', ')}`,
@@ -23,7 +22,7 @@ export async function loadSchemaWithError(schema: string, error: string | RegExp
     // create a temp file
     const tempFile = path.join(os.tmpdir(), `zenstack-schema-${crypto.randomUUID()}.zmodel`);
     fs.writeFileSync(tempFile, schema);
-    const r = await loadDocument(tempFile, getPluginModels());
+    const r = await loadDocument(tempFile);
     expect(r.success).toBe(false);
     invariant(!r.success);
     if (typeof error === 'string') {
@@ -37,7 +36,4 @@ export async function loadSchemaWithError(schema: string, error: string | RegExp
             `Expected error message to match "${error}" but got: ${r.errors.map((e) => e.toString()).join(', ')}`,
         );
     }
-}
-function getPluginModels() {
-    return glob.sync(path.resolve(__dirname, '../../runtime/src/plugins/**/plugin.zmodel'));
 }

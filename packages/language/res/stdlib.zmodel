@@ -117,12 +117,6 @@ function dbgenerated(expr: String?): Any {
 } @@@expressionContext([DefaultValue])
 
 /**
- * Gets entities value before an update. Only valid when used in a "update" policy rule.
- */
-function future(): Any {
-} @@@expressionContext([AccessPolicy])
-
-/**
  * Checks if the field value contains the search string. By default, the search is case-sensitive, and
  * "LIKE" operator is used to match. If `caseInSensitive` is true, "ILIKE" operator is used if
  * supported, otherwise it still falls back to "LIKE" and delivers whatever the database's 
@@ -663,3 +657,56 @@ attribute @meta(_ name: String, _ value: Any)
  * Marks an attribute as deprecated.
  */
 attribute @@@deprecated(_ message: String)
+
+/* --- Policy Plugin --- */
+
+/**
+ * Defines an access policy that allows a set of operations when the given condition is true.
+ *
+ * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
+ * @param condition: a boolean expression that controls if the operation should be allowed.
+ */
+attribute @@allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
+
+/**
+ * Defines an access policy that allows the annotated field to be read or updated.
+ * You can pass a third argument as `true` to make it override the model-level policies.
+ *
+ * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
+ * @param condition: a boolean expression that controls if the operation should be allowed.
+ * @param override: a boolean value that controls if the field-level policy should override the model-level policy.
+ */
+attribute @allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean, _ override: Boolean?)
+
+/**
+ * Defines an access policy that denies a set of operations when the given condition is true.
+ *
+ * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
+ * @param condition: a boolean expression that controls if the operation should be denied.
+ */
+attribute @@deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
+
+/**
+ * Defines an access policy that denies the annotated field to be read or updated.
+ *
+ * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
+ * @param condition: a boolean expression that controls if the operation should be denied.
+ */
+attribute @deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
+
+/**
+ * Checks if the current user can perform the given operation on the given field.
+ *
+ * @param field: The field to check access for
+ * @param operation: The operation to check access for. Can be "read", "create", "update", or "delete". If the operation is not provided,
+ * it defaults the operation of the containing policy rule.
+ */
+function check(field: Any, operation: String?): Boolean {
+} @@@expressionContext([AccessPolicy])
+
+/**
+ * Gets entities value before an update. Only valid when used in a "update" policy rule.
+ */
+function future(): Any {
+} @@@expressionContext([AccessPolicy])
+

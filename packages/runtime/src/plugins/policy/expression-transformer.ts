@@ -225,13 +225,17 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         let normalizedLeft: Expression = expr.left;
         if (this.isRelationField(expr.left, context.model)) {
             invariant(ExpressionUtils.isNull(expr.right), 'only null comparison is supported for relation field');
-            const idFields = requireIdFields(this.schema, context.model);
+            const leftRelDef = this.getFieldDefFromFieldRef(expr.left, context.model);
+            invariant(leftRelDef, 'failed to get relation field definition');
+            const idFields = requireIdFields(this.schema, leftRelDef.type);
             normalizedLeft = this.makeOrAppendMember(normalizedLeft, idFields[0]!);
         }
         let normalizedRight: Expression = expr.right;
         if (this.isRelationField(expr.right, context.model)) {
             invariant(ExpressionUtils.isNull(expr.left), 'only null comparison is supported for relation field');
-            const idFields = requireIdFields(this.schema, context.model);
+            const rightRelDef = this.getFieldDefFromFieldRef(expr.right, context.model);
+            invariant(rightRelDef, 'failed to get relation field definition');
+            const idFields = requireIdFields(this.schema, rightRelDef.type);
             normalizedRight = this.makeOrAppendMember(normalizedRight, idFields[0]!);
         }
         return { normalizedLeft, normalizedRight };

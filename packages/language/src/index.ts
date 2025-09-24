@@ -70,7 +70,11 @@ export async function loadDocument(
 
     // build the document together with standard library, plugin modules, and imported documents
     await services.shared.workspace.DocumentBuilder.build([stdLib, ...pluginDocs, document, ...importedDocuments], {
-        validation: true,
+        validation: {
+            stopAfterLexingErrors: true,
+            stopAfterParsingErrors: true,
+            stopAfterLinkingErrors: true,
+        },
     });
 
     const diagnostics = langiumDocuments.all

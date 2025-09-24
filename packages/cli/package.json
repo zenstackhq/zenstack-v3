@@ -36,6 +36,7 @@
         "./package.json": "./package.json"
     },
     "dependencies": {
+        "@dotenvx/dotenvx": "^1.51.0",
         "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/orm": "workspace:*",

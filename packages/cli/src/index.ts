@@ -144,6 +144,14 @@ function createProgram() {
         .action((options) => dbAction('push', options));
 
     dbCommand
+        .command('pull')
+        .description('Introspect your database.')
+        .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
+        .addOption(new Option('--out <path>', 'add custom output path for the introspected schema'))
+        .action((options) => dbAction('pull', options));
+
+    dbCommand
         .command('seed')
         .description('Seed the database')
         .allowExcessArguments(true)

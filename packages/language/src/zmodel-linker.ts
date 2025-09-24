@@ -95,9 +95,16 @@ export class ZModelLinker extends DefaultLinker {
     }
 
     private linkReference(refInfo: ReferenceInfo, document: LangiumDocument, extraScopes: ScopeProvider[]) {
-        if (this.resolveFromScopeProviders(refInfo.reference, document, extraScopes)) {
+        const defaultRef = refInfo.reference as DefaultReference;
+        if (defaultRef._ref) {
+            // already linked
             return;
         }
+        if (this.resolveFromScopeProviders(refInfo.reference, document, extraScopes)) {
+            // resolved from additional scope provider
+            return;
+        }
+        // default linking
         this.doLink(refInfo, document);
     }
 

@@ -9,6 +9,7 @@ import {
 } from 'langium/lsp';
 import { ZModelGeneratedModule, ZModelGeneratedSharedModule, ZModelLanguageMetaData } from './generated/module';
 import { ZModelValidator, registerValidationChecks } from './validator';
+import { ZModelDocumentBuilder } from './zmodel-document-builder';
 import { ZModelLinker } from './zmodel-linker';
 import { ZModelScopeComputation, ZModelScopeProvider } from './zmodel-scope';
 import { ZModelWorkspaceManager } from './zmodel-workspace-manager';
@@ -49,6 +50,7 @@ export type ZModelSharedServices = LangiumSharedServices;
 
 export const ZModelSharedModule: Module<ZModelSharedServices, DeepPartial<ZModelSharedServices>> = {
     workspace: {
+        DocumentBuilder: (services) => new ZModelDocumentBuilder(services),
         WorkspaceManager: (services) => new ZModelWorkspaceManager(services),
     },
 };

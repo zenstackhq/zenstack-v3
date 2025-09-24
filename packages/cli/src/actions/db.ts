@@ -1,5 +1,6 @@
 import { ZModelCodeGenerator } from '@zenstackhq/sdk';
 import fs from 'node:fs';
+import path from 'node:path';
 import { execPackage } from '../utils/exec-utils';
 import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError, loadSchemaDocumentWithServices } from './action-utils';
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
@@ -14,6 +15,7 @@ type PushOptions = {
 
 type PullOptions = {
     schema?: string;
+    out?: string;
 };
 
 /**
@@ -60,7 +62,7 @@ async function runPush(options: PushOptions) {
 async function runPull(options: PullOptions) {
     const schemaFile = getSchemaFile(options.schema);
     const { model, services } = await loadSchemaDocumentWithServices(schemaFile);
-
+    await import("@dotenvx/dotenvx/config")
     const SUPPORTED_PROVIDERS = ['sqlite', 'postgresql']
     const datasource = getDatasource(model)
 
@@ -82,16 +84,16 @@ async function runPull(options: PullOptions) {
 
     const { enums, tables } = await provider.introspect(datasource.url)
 
-    syncEnums(enums, model)
+    syncEnums({ dbEnums: enums, model, services })
 
     const resolveRelations: Relation[] = []
     for (const table of tables) {
-        const relations = syncTable({ table, model, provider })
+        const relations = syncTable({ table, model, provider, services })
         resolveRelations.push(...relations)
     }
 
-    for (const rel of resolveRelations) {
-        syncRelation(model, rel, services);
+    for (const relation of resolveRelations) {
+        syncRelation({ model, relation, services });
     }
 
     for (const d of model.declarations) {
@@ -104,6 +106,14 @@ async function runPull(options: PullOptions) {
 
     model.declarations = model.declarations.filter((d) => d !== undefined)
 
-    const zmpdelSchema = await new ZModelCodeGenerator().generate(model)
-    fs.writeFileSync(schemaFile, zmpdelSchema)
+    const generator = await new ZModelCodeGenerator();
+
+    const zmodelSchema = await generator.generate(model)
+
+    console.log(options.out ? `Writing to ${options.out}` : schemaFile);
+
+    const outPath = options.out ? path.resolve(options.out) : schemaFile;
+    console.log(outPath);
+
+    fs.writeFileSync(outPath, zmodelSchema)
 }

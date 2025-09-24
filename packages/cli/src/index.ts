@@ -121,6 +121,14 @@ function createProgram() {
         .addOption(new Option('--force-reset', 'force a reset of the database before push'))
         .action((options) => dbAction('push', options));
 
+    dbCommand
+        .command('pull')
+        .description('Introspect your database.')
+        .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
+        .addOption(new Option('--out <path>', 'add custom output path for the introspected schema'))
+        .action((options) => dbAction('pull', options));
+
     program
         .command('info')
         .description('Get information of installed ZenStack packages.')

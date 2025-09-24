@@ -1,11 +1,13 @@
 import type { ZModelServices } from '@zenstackhq/language'
 import {
+  AbstractDeclaration,
   DataField,
+  DataModel,
+  Enum,
   EnumField,
   isInvocationExpr,
-  type AbstractDeclaration,
   type Attribute,
-  type Model,
+  type Model
 } from '@zenstackhq/language/ast'
 import { getStringLiteral } from '@zenstackhq/language/utils'
 import type {
@@ -28,10 +30,20 @@ export function getDatasource(model: Model) {
   }
 
   const urlField = datasource.fields.find((f) => f.name === 'url')!
+
   let url = getStringLiteral(urlField.value)
 
   if (!url && isInvocationExpr(urlField.value)) {
-    url = process.env[getStringLiteral(urlField.value.args[0]) as string]!
+    const envName = getStringLiteral(urlField.value.args[0]?.value)
+    if (!envName) {
+      throw new Error('The url field must be a string literal or an env().')
+    }
+    if (!process.env[envName]) {
+      throw new Error(
+        `Environment variable ${envName} is not set, please set it to the database connection string.`
+      )
+    }
+    url = process.env[envName]
   }
 
   if (!url) {
@@ -62,6 +74,19 @@ export function getDbName(
   return attrValue.value
 }
 
+
+export function getDeclarationRef<T extends AbstractDeclaration>(type: T["$type"], name: string, services: ZModelServices) {
+  return services.shared.workspace.IndexManager.allElements(type).find((m) => m.node && getDbName(m.node as T) === name)?.node as T | undefined
+}
+
+export function getEnumRef(name: string, services: ZModelServices) {
+  return getDeclarationRef<Enum>('Enum', name, services);
+}
+
+export function getModelRef(name: string, services: ZModelServices) {
+  return getDeclarationRef<DataModel>('DataModel', name, services);
+}
+
 export function getAttributeRef(name: string, services: ZModelServices) {
-  return services.shared.workspace.IndexManager.allElements("Attribute").find(a => a.name === name) as Attribute | undefined
+  return getDeclarationRef<Attribute>('Attribute', name, services);
 }

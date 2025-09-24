@@ -1,22 +1,26 @@
-import { DefaultDocumentBuilder, type BuildOptions, type LangiumDocument } from 'langium';
+import { DefaultDocumentBuilder, type LangiumSharedCoreServices } from 'langium';
 
 export class ZModelDocumentBuilder extends DefaultDocumentBuilder {
-    override buildDocuments(documents: LangiumDocument[], options: BuildOptions, cancelToken: any): Promise<void> {
-        return super.buildDocuments(
-            documents,
-            {
-                ...options,
-                validation:
-                    // force overriding validation options
-                    options.validation === false || options.validation === undefined
-                        ? options.validation
-                        : {
-                              stopAfterLexingErrors: true,
-                              stopAfterParsingErrors: true,
-                              stopAfterLinkingErrors: true,
-                          },
-            },
-            cancelToken,
-        );
+    constructor(services: LangiumSharedCoreServices) {
+        super(services);
+
+        // override update build options to skip validation when there are
+        // errors in the previous stages
+        let validationOptions = this.updateBuildOptions.validation;
+        const stopFlags = {
+            stopAfterLinkingErrors: true,
+            stopAfterLexingErrors: true,
+            stopAfterParsingErrors: true,
+        };
+        if (validationOptions === true) {
+            validationOptions = stopFlags;
+        } else if (typeof validationOptions === 'object') {
+            validationOptions = { ...validationOptions, ...stopFlags };
+        }
+
+        this.updateBuildOptions = {
+            ...this.updateBuildOptions,
+            validation: validationOptions,
+        };
     }
 }

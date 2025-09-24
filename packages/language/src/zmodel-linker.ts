@@ -11,7 +11,6 @@ import {
     type LinkingError,
     type Reference,
     interruptAndCheck,
-    isReference,
 } from 'langium';
 import { match } from 'ts-pattern';
 import {
@@ -495,13 +494,7 @@ export class ZModelLinker extends DefaultLinker {
     }
 
     private resolveDefault(node: AstNode, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
-        for (const [property, value] of Object.entries(node)) {
-            if (!property.startsWith('$')) {
-                if (isReference(value)) {
-                    this.linkReference(node, property, document, extraScopes);
-                }
-            }
-        }
+        AstUtils.streamReferences(node).forEach((ref) => this.doLink(ref, document));
         for (const child of AstUtils.streamContents(node)) {
             this.resolve(child, document, extraScopes);
         }

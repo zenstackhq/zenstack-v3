@@ -28,6 +28,7 @@ import {
     LiteralExpr,
     MemberAccessExpr,
     Model,
+    ModelImport,
     NullExpr,
     NumberLiteral,
     ObjectExpr,

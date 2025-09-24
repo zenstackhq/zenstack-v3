@@ -1,5 +1,6 @@
 import type { ZModelServices } from '@zenstackhq/language'
 import type {
+    ArrayExpr,
     Attribute,
     AttributeArg,
     DataField,
@@ -9,18 +10,20 @@ import type {
     Enum,
     EnumField,
     Model,
+    ReferenceExpr,
+    StringLiteral,
     UnsupportedFieldType
 } from '@zenstackhq/language/ast'
+import { getStringLiteral } from '@zenstackhq/language/utils'
 import type { IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider'
-import { getAttributeRef, getDbName } from './utils'
+import { getAttributeRef, getDbName, getEnumRef, getModelRef } from './utils'
 
-export function syncEnums(dbEnums: IntrospectedEnum[], model: Model) {
+export function syncEnums({ dbEnums, model, services }: { dbEnums: IntrospectedEnum[], model: Model, services: ZModelServices }) {
     for (const dbEnum of dbEnums) {
-        let schemaEnum = model.declarations.find(
-            (d) => d.$type === 'Enum' && getDbName(d) === dbEnum.enum_type
-        ) as Enum | undefined
+        let schemaEnum = getEnumRef(dbEnum.enum_type, services);
 
         if (!schemaEnum) {
+            console.log(`Adding enum for type ${dbEnum.enum_type}`);
             schemaEnum = {
                 $type: 'Enum' as const,
                 $container: model,
@@ -66,17 +69,29 @@ export function syncTable({
     model,
     provider,
     table,
+    services
 }: {
     table: IntrospectedTable
     model: Model
     provider: IntrospectionProvider
+    services: ZModelServices
 }) {
+    const idAttribute = getAttributeRef('@id', services)
+    const uniqueAttribute = getAttributeRef('@unique', services)
+    const relationAttribute = getAttributeRef('@relation', services)
+    const fieldMapAttribute = getAttributeRef('@map', services)
+    const tableMapAttribute = getAttributeRef('@@map', services)
+
+    if (!idAttribute || !uniqueAttribute || !relationAttribute || !fieldMapAttribute || !tableMapAttribute) {
+        throw new Error('Cannot find required attributes in the model.')
+    }
+
     const relations: Relation[] = []
-    let modelTable = model.declarations.find(
-        (d) => d.$type === 'DataModel' && getDbName(d) === table.name
-    ) as DataModel | undefined
+    let modelTable = getModelRef(table.name, services)
 
     if (!modelTable) {
+        console.log(`Adding model for table ${table.name}`);
+
         modelTable = {
             $type: 'DataModel' as const,
             $container: model,
@@ -96,7 +111,7 @@ export function syncTable({
                 schema: table.schema,
                 table: table.name,
                 column: col.name,
-                type: col.unique ? 'one' : 'many',
+                type: 'one',
                 fk_name: col.foreign_key_name!,
                 nullable: col.nullable,
                 references: {
@@ -115,67 +130,54 @@ export function syncTable({
         )
         if (!existingField) {
             const builtinType = provider.getBuiltinType(col.datatype)
-            const unsupported: UnsupportedFieldType = {
-                get $container() {
-                    return type
-                },
-                $type: 'UnsupportedFieldType' as const,
-                value: {
-                    get $container() {
-                        return unsupported
-                    },
-                    $type: 'StringLiteral',
-                    value: col.datatype,
-                },
-            }
-
-            const type: DataFieldType = {
-                get $container() {
-                    return field
-                },
-                $type: 'DataFieldType' as const,
-                type: builtinType.type === 'Unsupported' ? undefined : builtinType.type,
-                array: builtinType.isArray,
-                unsupported:
-                    builtinType.type === 'Unsupported' ? unsupported : undefined,
-                optional: col.nullable,
-                reference: col.options.length
-                    ? {
+            const field: DataField = {
+                $type: 'DataField' as const,
+                get type() {
+                    return {
+                        $container: this,
+                        $type: 'DataFieldType' as const,
+                        type: builtinType.type === 'Unsupported' ? undefined : builtinType.type,
+                        array: builtinType.isArray,
+                        get unsupported() {
+                            return builtinType.type === 'Unsupported' ? {
+                                $container: this,
+                                $type: 'UnsupportedFieldType' as const,
+                                get value() {
+                                    return {
+                                        $container: this,
+                                        $type: 'StringLiteral',
+                                        value: col.datatype,
+                                    } satisfies StringLiteral
+                                },
+                            } satisfies UnsupportedFieldType : undefined
+                        },
+                        optional: col.nullable,
+                        reference: col.options.length
+                            ? {
                         $refText: col.datatype,
                         ref: model.declarations.find(
                             (d) => d.$type === 'Enum' && getDbName(d) === col.datatype
-                        ) as Enum | undefined,
-                    }
-                    : undefined,
-            }
-
-            const field: DataField = {
-                $type: 'DataField' as const,
-                type,
+                                ) as Enum | undefined,
+                            }
+                            : undefined,
+                    } satisfies DataFieldType
+                },
                 $container: modelTable!,
                 name: fieldName,
                 get attributes() {
                     if (fieldPrefix !== '') return []
 
-                    const attr: DataFieldAttribute = {
+                    return [{
                         $type: 'DataFieldAttribute' as const,
-                        get $container() {
-                            return field
-                        },
+                        $container: this,
                         decl: {
                             $refText: '@map',
-                            ref: model.$document?.references.find(
-                                (r) =>
-                                    //@ts-ignore
-                                    r.ref.$type === 'Attribute' && r.ref.name === '@map'
-                            )?.ref as Attribute,
+                            ref: fieldMapAttribute,
                         },
                         get args() {
-                            const arg: AttributeArg = {
+                            return [{
                                 $type: 'AttributeArg' as const,
-                                get $container() {
-                                    return attr
-                                },
+                                $container: this,
                                 name: 'name',
                                 $resolvedParam: {
                                     name: 'name',
@@ -183,17 +185,13 @@ export function syncTable({
                                 get value() {
                                     return {
                                         $type: 'StringLiteral' as const,
-                                        $container: arg,
+                                        $container: this,
                                         value: col.name,
                                     }
                                 },
-                            }
-
-                            return [arg]
+                            }] satisfies AttributeArg[]
                         },
-                    }
-
-                    return [attr]
+                    }] satisfies DataFieldAttribute[]
                 },
                 comments: [],
             }
@@ -205,10 +203,16 @@ export function syncTable({
     return relations
 }
 
-export function syncRelation(model: Model, relation: Relation, services: ZModelServices) {
+export function syncRelation({ model, relation, services }: { model: Model, relation: Relation, services: ZModelServices }) {
     const idAttribute = getAttributeRef('@id', services)
     const uniqueAttribute = getAttributeRef('@unique', services)
     const relationAttribute = getAttributeRef('@relation', services)
+    const fieldMapAttribute = getAttributeRef('@map', services)
+    const tableMapAttribute = getAttributeRef('@@map', services)
+
+    if (!idAttribute || !uniqueAttribute || !relationAttribute || !fieldMapAttribute || !tableMapAttribute) {
+        throw new Error('Cannot find required attributes in the model.')
+    }
 
     if (!idAttribute || !uniqueAttribute || !relationAttribute) {
         throw new Error('Cannot find required attributes in the model.')

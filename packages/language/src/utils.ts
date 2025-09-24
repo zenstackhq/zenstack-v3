@@ -517,13 +517,15 @@ export function getAllFields(
 
     const fields: DataField[] = [];
     for (const mixin of decl.mixins) {
-        invariant(mixin.ref, `Mixin ${mixin.$refText} is not resolved`);
-        fields.push(...getAllFields(mixin.ref, includeIgnored, seen));
+        if (mixin.ref) {
+            fields.push(...getAllFields(mixin.ref, includeIgnored, seen));
+        }
     }
 
     if (isDataModel(decl) && decl.baseModel) {
-        invariant(decl.baseModel.ref, `Base model ${decl.baseModel.$refText} is not resolved`);
-        fields.push(...getAllFields(decl.baseModel.ref, includeIgnored, seen));
+        if (decl.baseModel.ref) {
+            fields.push(...getAllFields(decl.baseModel.ref, includeIgnored, seen));
+        }
     }
 
     fields.push(...decl.fields.filter((f) => includeIgnored || !hasAttribute(f, '@ignore')));
@@ -541,13 +543,15 @@ export function getAllAttributes(
 
     const attributes: DataModelAttribute[] = [];
     for (const mixin of decl.mixins) {
-        invariant(mixin.ref, `Mixin ${mixin.$refText} is not resolved`);
-        attributes.push(...getAllAttributes(mixin.ref, seen));
+        if (mixin.ref) {
+            attributes.push(...getAllAttributes(mixin.ref, seen));
+        }
     }
 
     if (isDataModel(decl) && decl.baseModel) {
-        invariant(decl.baseModel.ref, `Base model ${decl.baseModel.$refText} is not resolved`);
-        attributes.push(...getAllAttributes(decl.baseModel.ref, seen));
+        if (decl.baseModel.ref) {
+            attributes.push(...getAllAttributes(decl.baseModel.ref, seen));
+        }
     }
 
     attributes.push(...decl.attributes);

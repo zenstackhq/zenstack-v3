@@ -48,7 +48,7 @@ export async function loadSchemaDocument(schemaFile: string) {
 }
 
 export async function loadSchemaDocumentWithServices(schemaFile: string) {
-    const loadResult = await loadDocument(schemaFile);
+    const loadResult = await loadDocument(schemaFile, [], true);
     if (!loadResult.success) {
         loadResult.errors.forEach((err) => {
             console.error(colors.red(err));

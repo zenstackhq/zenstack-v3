@@ -2,7 +2,7 @@ import { describe, it } from 'vitest';
 import { loadSchema, loadSchemaWithError } from './utils';
 
 describe('Expression Validation Tests', () => {
-    it('should reject model comparison', async () => {
+    it('should reject model comparison1', async () => {
         await loadSchemaWithError(
             `
             model User {
@@ -15,6 +15,7 @@ describe('Expression Validation Tests', () => {
                 id Int @id
                 title String
                 author User @relation(fields: [authorId], references: [id])
+                authorId Int
                 @@allow('all', author == this)
             }
         `,
@@ -22,7 +23,7 @@ describe('Expression Validation Tests', () => {
         );
     });
 
-    it('should reject model comparison', async () => {
+    it('should reject model comparison2', async () => {
         await loadSchemaWithError(
             `
             model User {

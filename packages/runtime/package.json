@@ -53,12 +53,12 @@
         },
         "./plugins/policy": {
             "import": {
-                "types": "./dist/plugins/index.d.ts",
-                "default": "./dist/plugins/index.js"
+                "types": "./dist/plugins/policy/index.d.ts",
+                "default": "./dist/plugins/policy/index.js"
             },
             "require": {
-                "types": "./dist/plugins/index.d.cts",
-                "default": "./dist/plugins/index.cjs"
+                "types": "./dist/plugins/policy/index.d.cts",
+                "default": "./dist/plugins/policy/index.cjs"
             }
         },
         "./package.json": {

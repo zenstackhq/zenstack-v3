@@ -104,10 +104,18 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 }`;
     }
 
+    @gen(ModelImport)
+    private _generateModelImport(ast: ModelImport) {
+        return `import '${ast.path}'`;
+    }
+
     @gen(Enum)
     private _generateEnum(ast: Enum) {
         return `enum ${ast.name} {
-${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
+${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${ast.attributes.length > 0
+                ? '\n\n' + ast.attributes.map((x) => this.indent + this.generate(x)).join('\n')
+                : ''
+            }
 }`;
     }
 

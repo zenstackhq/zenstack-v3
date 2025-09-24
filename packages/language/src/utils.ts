@@ -1,4 +1,3 @@
-import { invariant } from '@zenstackhq/common-helpers';
 import { AstUtils, URI, type AstNode, type LangiumDocument, type LangiumDocuments, type Reference } from 'langium';
 import fs from 'node:fs';
 import path from 'path';

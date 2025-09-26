@@ -1,3 +1,4 @@
+import type { Model } from '@zenstackhq/language/ast';
 import { ZModelCodeGenerator } from '@zenstackhq/sdk';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -5,7 +6,7 @@ import { execPackage } from '../utils/exec-utils';
 import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError, loadSchemaDocumentWithServices } from './action-utils';
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers } from './pull/provider';
-import { getDatasource, getDbName } from './pull/utils';
+import { getDatasource } from './pull/utils';
 
 type PushOptions = {
     schema?: string;
@@ -84,31 +85,35 @@ async function runPull(options: PullOptions) {
 
     const { enums, tables } = await provider.introspect(datasource.url)
 
-    syncEnums({ dbEnums: enums, model, services })
+    const newModel: Model = {
+        $type: 'Model',
+        $container: undefined,
+        $containerProperty: undefined,
+        $containerIndex: undefined,
+        declarations: [...model.declarations.filter(d => ["DataSource"].includes(d.$type))],
+        imports: [],
+    };
 
-    const resolveRelations: Relation[] = []
+
+    syncEnums({ dbEnums: enums, model: newModel, services })
+
+
+
+    const resolvedRelations: Relation[] = []
     for (const table of tables) {
-        const relations = syncTable({ table, model, provider, services })
-        resolveRelations.push(...relations)
+        const relations = syncTable({ table, model: newModel, provider, services })
+        resolvedRelations.push(...relations)
     }
 
-    for (const relation of resolveRelations) {
-        syncRelation({ model, relation, services });
+    for (const relation of resolvedRelations) {
+        syncRelation({ model: newModel, relation, services });
     }
 
-    for (const d of model.declarations) {
-        if (d.$type !== 'DataModel') continue
-        const found = tables.find((t) => getDbName(d) === t.name)
-        if (!found) {
-            delete (d.$container as any)[d.$containerProperty!][d.$containerIndex!]
-        }
-    }
-
-    model.declarations = model.declarations.filter((d) => d !== undefined)
+    //TODO: diff models and apply changes only
 
     const generator = await new ZModelCodeGenerator();
 
-    const zmodelSchema = await generator.generate(model)
+    const zmodelSchema = await generator.generate(newModel)
 
     console.log(options.out ? `Writing to ${options.out}` : schemaFile);
 

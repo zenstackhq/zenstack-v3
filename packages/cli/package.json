@@ -29,6 +29,7 @@
         "pack": "pnpm pack"
     },
     "dependencies": {
+        "@dotenvx/dotenvx": "^1.51.0",
         "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
@@ -46,6 +47,7 @@
     },
     "devDependencies": {
         "@types/better-sqlite3": "^7.6.13",
+        "@types/pg": "^8.11.11",
         "@types/semver": "^7.7.0",
         "@types/tmp": "catalog:",
         "@zenstackhq/eslint-config": "workspace:*",
@@ -54,6 +56,7 @@
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "better-sqlite3": "^12.2.0",
+        "pg": "^8.16.3",
         "tmp": "catalog:"
     }
 }

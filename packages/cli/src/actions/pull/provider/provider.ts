@@ -1,11 +1,14 @@
-import type { BuiltinType } from '@zenstackhq/language/ast'
+import type { BuiltinType, DataFieldAttribute, Enum, InvocationExpr, LiteralExpr, ReferenceExpr } from '@zenstackhq/language/ast'
+import type { AstNode } from '../../../../../language/dist/ast.cjs';
+import type { ZModelServices } from '@zenstackhq/language';
 
-export type Cascade = "NO ACTION" | "RESTRICT"| "CASCADE" | "SET NULL" | "SET DEFAULT" | null;
+export type Cascade = "NO ACTION" | "RESTRICT" | "CASCADE" | "SET NULL" | "SET DEFAULT" | null;
 
 export interface IntrospectedTable {
   schema: string
   name: string
   type: 'table' | 'view'
+  definition: string | null
   columns: {
     name: string
     datatype: string
@@ -21,6 +24,7 @@ export interface IntrospectedTable {
     nullable: boolean
     options: string[]
     unique: boolean
+    default: string | null
   }[]
 }
 
@@ -41,4 +45,5 @@ export interface IntrospectionProvider {
     type: BuiltinType | 'Unsupported'
     isArray: boolean
   }
+  getDefaultValue<T extends AstNode>(args: { fieldName: string, defaultValue: string, container: T, services: ZModelServices, enums: Enum[] }): LiteralExpr | InvocationExpr | DataFieldAttribute | DataFieldAttribute[] | ReferenceExpr | undefined
 }

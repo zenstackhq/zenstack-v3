@@ -82,8 +82,8 @@ export const sqlite: IntrospectionProvider = {
             }
 
             // List user tables and views (exclude internal sqlite_*)
-            const tablesRaw = all<{ name: string; type: 'table' | 'view' }>(
-                "SELECT name, type FROM sqlite_schema WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            const tablesRaw = all<{ name: string; type: 'table' | 'view'; definition: string | null }>(
+                "SELECT name, type, sql AS definition FROM sqlite_schema WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name"
             )
 
             const tables: IntrospectedTable[] = []
@@ -173,12 +173,13 @@ export const sqlite: IntrospectionProvider = {
                         pk: !!c.pk,
                         computed: hidden === 2,
                         nullable: c.notnull !== 1,
+                        default: c.dflt_value,
                         options: [],
                         unique: uniqueSingleColumn.has(c.name),
                     })
                 }
 
-                tables.push({ schema, name: tableName, columns, type: t.type })
+                tables.push({ schema, name: tableName, columns, type: t.type, definition: t.definition })
             }
 
             const enums: IntrospectedEnum[] = [] // SQLite doesn't support enums
@@ -188,4 +189,8 @@ export const sqlite: IntrospectionProvider = {
             db.close()
         }
     },
+
+    getDefaultValue(_args) {
+        throw new Error('Not implemented yet for SQLite')
+    }
 }

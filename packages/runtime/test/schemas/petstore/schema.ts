@@ -92,7 +92,7 @@ export const schema = {
             },
             attributes: [
                 { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("read") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.field("orderId"), "==", ExpressionUtils._null()), "||", ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("order"), ["user"]), "==", ExpressionUtils.call("auth"))) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("update") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.call("before"), ["name"]), "==", ExpressionUtils.field("name")), "&&", ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.call("before"), ["category"]), "==", ExpressionUtils.field("category"))), "&&", ExpressionUtils.binary(ExpressionUtils.field("orderId"), "==", ExpressionUtils._null())) }] }
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("post-update") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.call("before"), ["name"]), "==", ExpressionUtils.field("name")), "&&", ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.call("before"), ["category"]), "==", ExpressionUtils.field("category"))), "&&", ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.call("before"), ["orderId"]), "==", ExpressionUtils._null())) }] }
             ],
             idFields: ["id"],
             uniqueFields: {

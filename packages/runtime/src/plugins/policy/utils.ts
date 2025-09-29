@@ -13,7 +13,7 @@ import {
     ValueNode,
 } from 'kysely';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
-import type { SchemaDef } from '../../schema';
+import { ExpressionUtils, type Expression, type SchemaDef } from '../../schema';
 
 /**
  * Creates a `true` value node.
@@ -153,4 +153,8 @@ export function getTableName(node: OperationNode | undefined) {
         return getTableName(node.table);
     }
     return undefined;
+}
+
+export function isBeforeInvocation(expr: Expression) {
+    return ExpressionUtils.isCall(expr) && expr.function === 'before';
 }

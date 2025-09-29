@@ -1,7 +1,7 @@
 import type { Dialect, Expression, ExpressionBuilder, KyselyConfig } from 'kysely';
 import type { GetModel, GetModels, ProcedureDef, SchemaDef } from '../schema';
 import type { PrependParameter } from '../utils/type-utils';
-import type { ClientContract, CRUD, ProcedureFunc } from './contract';
+import type { ClientContract, CRUD_EXT, ProcedureFunc } from './contract';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
 import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
@@ -30,7 +30,7 @@ export type ZModelFunctionContext<Schema extends SchemaDef> = {
     /**
      * The CRUD operation being performed
      */
-    operation: CRUD;
+    operation: CRUD_EXT;
 };
 
 export type ZModelFunction<Schema extends SchemaDef> = (

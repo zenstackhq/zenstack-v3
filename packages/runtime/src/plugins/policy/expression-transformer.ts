@@ -20,7 +20,7 @@ import {
     type OperationNode,
 } from 'kysely';
 import { match } from 'ts-pattern';
-import type { ClientContract, CRUD } from '../../client/contract';
+import type { ClientContract, CRUD_EXT } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
@@ -50,13 +50,12 @@ import {
     type SchemaDef,
 } from '../../schema';
 import { ExpressionEvaluator } from './expression-evaluator';
-import { conjunction, disjunction, falseNode, logicalNot, trueNode } from './utils';
+import { conjunction, disjunction, falseNode, isBeforeInvocation, logicalNot, trueNode } from './utils';
 
 export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
     alias?: string;
-    operation: CRUD;
-    auth?: any;
+    operation: CRUD_EXT;
     memberFilter?: OperationNode;
     memberSelect?: SelectionNode;
 };
@@ -439,7 +438,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         if (this.isAuthMember(arg)) {
-            const valNode = this.valueMemberAccess(context.auth, arg as MemberExpression, this.authType);
+            const valNode = this.valueMemberAccess(this.auth, arg as MemberExpression, this.authType);
             return valNode ? eb.val(valNode.value) : eb.val(null);
         }
 
@@ -453,9 +452,18 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     @expr('member')
     // @ts-ignore
     private _member(expr: MemberExpression, context: ExpressionTransformerContext<Schema>) {
-        // auth() member access
+        // `auth()` member access
         if (this.isAuthCall(expr.receiver)) {
             return this.valueMemberAccess(this.auth, expr, this.authType);
+        }
+
+        // `before()` member access
+        if (isBeforeInvocation(expr.receiver)) {
+            // policy handler creates a join table named `$before` using entity value before update,
+            // we can directly reference the column from there
+            invariant(context.operation === 'post-update', 'before() can only be used in post-update policy');
+            invariant(expr.members.length === 1, 'before() can only be followed by a scalar field access');
+            return ReferenceNode.create(ColumnNode.create(expr.members[0]!), TableNode.create('$before'));
         }
 
         invariant(

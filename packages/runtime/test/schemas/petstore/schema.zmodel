@@ -36,7 +36,7 @@ model Pet {
     @@allow('read', orderId == null || order.user == auth())
 
     // only allow update to 'orderId' field if it's not set yet (unsold)
-    @@allow('update', name == future().name && category == future().category && orderId == null )
+    @@allow('post-update', before().name == name && before().category == category && before().orderId == null)
 }
 
 model Order {

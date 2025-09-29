@@ -57,7 +57,7 @@ import {
     getAuthDecl,
     getContainingDataModel,
     isAuthInvocation,
-    isFutureExpr,
+    isBeforeInvocation,
     isMemberContainer,
     mapBuiltinTypeToExpressionType,
 } from './utils';
@@ -292,8 +292,8 @@ export class ZModelLinker extends DefaultLinker {
                 if (authDecl) {
                     node.$resolvedType = { decl: authDecl, nullable: true };
                 }
-            } else if (isFutureExpr(node)) {
-                // future() function is resolved to current model
+            } else if (isBeforeInvocation(node)) {
+                // before() function is resolved to current model
                 node.$resolvedType = { decl: getContainingDataModel(node) };
             } else {
                 this.resolveToDeclaredType(node, funcDecl.returnType);

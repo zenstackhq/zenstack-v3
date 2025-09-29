@@ -37,7 +37,7 @@ import {
     getRecursiveBases,
     isAuthInvocation,
     isCollectionPredicate,
-    isFutureInvocation,
+    isBeforeInvocation,
     resolveImportUri,
 } from './utils';
 
@@ -170,8 +170,8 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
                     return this.createScopeForAuth(node, globalScope);
                 }
 
-                if (isFutureInvocation(operand)) {
-                    // resolve `future()` to the containing model
+                if (isBeforeInvocation(operand)) {
+                    // resolve `before()` to the containing model
                     return this.createScopeForContainingModel(node, globalScope);
                 }
                 return EMPTY_SCOPE;

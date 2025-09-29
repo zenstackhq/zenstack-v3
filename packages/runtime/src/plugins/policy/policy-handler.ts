@@ -161,7 +161,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
             const postUpdateQuery = eb
                 .selectFrom(mutationModel)
-                .select(() => [eb.fn('COUNT', [eb.lit(1)]).as('$count')])
+                .select(() => [eb(eb.fn('COUNT', [eb.lit(1)]), '=', result.rows.length).as('$condition')])
                 .where(() => new ExpressionWrapper(conjunction(this.dialect, [idConditions, postUpdateFilter])))
                 .$if(!!beforeUpdateInfo, (qb) =>
                     qb.leftJoin(
@@ -177,7 +177,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 );
 
             const postUpdateResult = await proceed(postUpdateQuery.toOperationNode());
-            if (postUpdateResult.rows[0]?.$count !== result.rows.length) {
+            if (!postUpdateResult.rows[0]?.$condition) {
                 throw new RejectedByPolicyError(
                     mutationModel,
                     RejectedByPolicyReason.NO_ACCESS,

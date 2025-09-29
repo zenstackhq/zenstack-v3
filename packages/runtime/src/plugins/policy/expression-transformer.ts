@@ -461,6 +461,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         if (isBeforeInvocation(expr.receiver)) {
             // policy handler creates a join table named `$before` using entity value before update,
             // we can directly reference the column from there
+            invariant(context.operation === 'post-update', 'before() can only be used in post-update policy');
             invariant(expr.members.length === 1, 'before() can only be followed by a scalar field access');
             return ReferenceNode.create(ColumnNode.create(expr.members[0]!), TableNode.create('$before'));
         }

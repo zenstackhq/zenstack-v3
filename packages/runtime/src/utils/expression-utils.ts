@@ -14,7 +14,7 @@ import type {
 
 export class ExpressionVisitor {
     visit(expr: Expression): void {
-        return match(expr)
+        match(expr)
             .with({ kind: 'literal' }, (e) => this.visitLiteral(e))
             .with({ kind: 'array' }, (e) => this.visitArray(e))
             .with({ kind: 'field' }, (e) => this.visitField(e))

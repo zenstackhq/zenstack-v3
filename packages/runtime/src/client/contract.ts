@@ -214,9 +214,19 @@ export interface ClientConstructor {
 export type CRUD = 'create' | 'read' | 'update' | 'delete';
 
 /**
+ * Extended CRUD operations including 'post-update'.
+ */
+export type CRUD_EXT = CRUD | 'post-update';
+
+/**
  * CRUD operations.
  */
 export const CRUD = ['create', 'read', 'update', 'delete'] as const;
+
+/**
+ * Extended CRUD operations including 'post-update'.
+ */
+export const CRUD_EXT = [...CRUD, 'post-update'] as const;
 
 //#region Model operations
 

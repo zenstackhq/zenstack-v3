@@ -23,10 +23,10 @@ import {
     getAllAttributes,
     getStringLiteral,
     isAuthOrAuthMemberAccess,
+    isBeforeInvocation,
     isCollectionPredicate,
     isDataFieldReference,
     isDelegateModel,
-    isFutureExpr,
     isRelationshipField,
     mapBuiltinTypeToExpressionType,
     resolved,
@@ -166,7 +166,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
             });
             return;
         }
-        this.validatePolicyKinds(kind, ['create', 'read', 'update', 'delete', 'all'], attr, accept);
+        this.validatePolicyKinds(kind, ['create', 'read', 'update', 'post-update', 'delete', 'all'], attr, accept);
 
         if ((kind === 'create' || kind === 'all') && attr.args[1]?.value) {
             // "create" rules cannot access non-owned relations because the entity does not exist yet, so
@@ -251,8 +251,8 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         const kindItems = this.validatePolicyKinds(kind, ['read', 'update', 'all'], attr, accept);
 
         const expr = attr.args[1]?.value;
-        if (expr && AstUtils.streamAst(expr).some((node) => isFutureExpr(node))) {
-            accept('error', `"future()" is not allowed in field-level policy rules`, { node: expr });
+        if (expr && AstUtils.streamAst(expr).some((node) => isBeforeInvocation(node))) {
+            accept('error', `"before()" is not allowed in field-level policy rules`, { node: expr });
         }
 
         // 'update' rules are not allowed for relation fields

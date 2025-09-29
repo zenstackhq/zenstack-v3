@@ -145,10 +145,6 @@ export function isRelationshipField(field: DataField) {
     return isDataModel(field.type.reference?.ref);
 }
 
-export function isFutureExpr(node: AstNode) {
-    return isInvocationExpr(node) && node.function.ref?.name === 'future' && isFromStdlib(node.function.ref);
-}
-
 export function isDelegateModel(node: AstNode) {
     return isDataModel(node) && hasAttribute(node, '@@delegate');
 }
@@ -450,8 +446,8 @@ export function getAuthDecl(decls: (DataModel | TypeDef)[]) {
     return authModel;
 }
 
-export function isFutureInvocation(node: AstNode) {
-    return isInvocationExpr(node) && node.function.ref?.name === 'future' && isFromStdlib(node.function.ref);
+export function isBeforeInvocation(node: AstNode) {
+    return isInvocationExpr(node) && node.function.ref?.name === 'before' && isFromStdlib(node.function.ref);
 }
 
 export function isCollectionPredicate(node: AstNode): node is BinaryExpr {

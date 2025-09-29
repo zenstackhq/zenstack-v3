@@ -173,6 +173,13 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
             // there can't possibly be a fk that points to it
             this.rejectNonOwnedRelationInExpression(attr.args[1].value, accept);
         }
+
+        if (kind !== 'post-update' && attr.args[1]?.value) {
+            const beforeCall = AstUtils.streamAst(attr.args[1]?.value).find(isBeforeInvocation);
+            if (beforeCall) {
+                accept('error', `"before()" is only allowed in "post-update" policy rules`, { node: beforeCall });
+            }
+        }
     }
 
     private rejectNonOwnedRelationInExpression(expr: Expression, accept: ValidationAcceptor) {

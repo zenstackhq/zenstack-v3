@@ -705,7 +705,7 @@ function check(field: Any, operation: String?): Boolean {
 } @@@expressionContext([AccessPolicy])
 
 /**
- * Gets entity's value before an update. Only valid when used in a "update" policy rule.
+ * Gets entity's value before an update. Only valid when used in a "post-update" policy rule.
  */
 function before(): Any {
 } @@@expressionContext([AccessPolicy])

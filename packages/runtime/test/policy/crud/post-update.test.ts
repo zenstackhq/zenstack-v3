@@ -126,8 +126,7 @@ describe('Policy post-update tests', () => {
         await expect(db.foo.findUnique({ where: { id: 2 } })).resolves.toMatchObject({ x: 3 });
     });
 
-    // TODO: fix transaction issue
-    it.skip('works with query builder API', async () => {
+    it('works with query builder API', async () => {
         const db = await createPolicyTestClient(
             `
             model Foo {
@@ -153,14 +152,16 @@ describe('Policy post-update tests', () => {
         await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 1 });
         await expect(db.foo.findUnique({ where: { id: 2 } })).resolves.toMatchObject({ x: 2 });
 
-        await expect(db.$qb.updateTable('Foo').set({ x: 2 }).where('id', '=', 1).execute()).resolves.toMatchObject({
-            numAffectedRows: 1n,
+        await expect(
+            db.$qb.updateTable('Foo').set({ x: 2 }).where('id', '=', 1).executeTakeFirst(),
+        ).resolves.toMatchObject({
+            numUpdatedRows: 1n,
         });
         // check updated
         await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 2 });
 
-        await expect(db.$qb.updateTable('Foo').set({ x: 3 }).execute()).resolves.toMatchObject({
-            numAffectedRows: 2n,
+        await expect(db.$qb.updateTable('Foo').set({ x: 3 }).executeTakeFirst()).resolves.toMatchObject({
+            numUpdatedRows: 2n,
         });
         // check updated
         await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 3 });

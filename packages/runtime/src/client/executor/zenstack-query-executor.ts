@@ -25,7 +25,7 @@ import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
 import { TransactionIsolationLevel, type ClientContract } from '../contract';
-import { InternalError, QueryError } from '../errors';
+import { InternalError, QueryError, ZenStackError } from '../errors';
 import { stripAlias } from '../kysely-utils';
 import type { AfterEntityMutationCallback, OnKyselyQueryCallback } from '../plugin';
 import { QueryNameMapper } from './name-mapper';
@@ -94,7 +94,13 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 if (startedTx) {
                     await this.driver.rollbackTransaction(connection);
                 }
-                throw err;
+                if (err instanceof ZenStackError) {
+                    throw err;
+                } else {
+                    // wrap error
+                    const message = `Failed to execute query: ${err}, sql: ${compiledQuery?.sql}`;
+                    throw new QueryError(message, err);
+                }
             }
         });
     }
@@ -162,84 +168,75 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     ) {
         let compiled: CompiledQuery | undefined;
 
-        try {
-            if (this.suppressMutationHooks || !this.isMutationNode(query) || !this.hasEntityMutationPlugins) {
-                // no need to handle mutation hooks, just proceed
-                const finalQuery = this.nameMapper.transformNode(query);
-                compiled = this.compileQuery(finalQuery);
-                if (parameters) {
-                    compiled = { ...compiled, parameters };
-                }
-                return connection.executeQuery<any>(compiled);
-            }
-
-            if (
-                (InsertQueryNode.is(query) || UpdateQueryNode.is(query)) &&
-                this.hasEntityMutationPluginsWithAfterMutationHooks
-            ) {
-                // need to make sure the query node has "returnAll" for insert and update queries
-                // so that after-mutation hooks can get the mutated entities with all fields
-                query = {
-                    ...query,
-                    returning: ReturningNode.create([SelectionNode.createSelectAll()]),
-                };
-            }
+        if (this.suppressMutationHooks || !this.isMutationNode(query) || !this.hasEntityMutationPlugins) {
+            // no need to handle mutation hooks, just proceed
             const finalQuery = this.nameMapper.transformNode(query);
             compiled = this.compileQuery(finalQuery);
             if (parameters) {
                 compiled = { ...compiled, parameters };
             }
-
-            // the client passed to hooks needs to be in sync with current in-transaction
-            // status so that it doesn't try to create a nested one
-            const currentlyInTx = this.driver.isTransactionConnection(connection);
-
-            const connectionClient = this.createClientForConnection(connection, currentlyInTx);
-
-            const mutationInfo = this.getMutationInfo(finalQuery);
-
-            // cache already loaded before-mutation entities
-            let beforeMutationEntities: Record<string, unknown>[] | undefined;
-            const loadBeforeMutationEntities = async () => {
-                if (beforeMutationEntities === undefined && (UpdateQueryNode.is(query) || DeleteQueryNode.is(query))) {
-                    beforeMutationEntities = await this.loadEntities(
-                        mutationInfo.model,
-                        mutationInfo.where,
-                        connection,
-                    );
-                }
-                return beforeMutationEntities;
-            };
-
-            // call before mutation hooks
-            await this.callBeforeMutationHooks(
-                finalQuery,
-                mutationInfo,
-                loadBeforeMutationEntities,
-                connectionClient,
-                queryId,
-            );
-
-            const result = await connection.executeQuery<any>(compiled);
-
-            if (!this.driver.isTransactionConnection(connection)) {
-                // not in a transaction, just call all after-mutation hooks
-                await this.callAfterMutationHooks(result, finalQuery, mutationInfo, connectionClient, 'all', queryId);
-            } else {
-                // run after-mutation hooks that are requested to be run inside tx
-                await this.callAfterMutationHooks(result, finalQuery, mutationInfo, connectionClient, 'inTx', queryId);
-
-                // register other after-mutation hooks to be run after the tx is committed
-                this.driver.registerTransactionCommitCallback(connection, () =>
-                    this.callAfterMutationHooks(result, finalQuery, mutationInfo, connectionClient, 'outTx', queryId),
-                );
-            }
-
-            return result;
-        } catch (err) {
-            const message = `Failed to execute query: ${err}, sql: ${compiled?.sql}`;
-            throw new QueryError(message, err);
+            return connection.executeQuery<any>(compiled);
         }
+
+        if (
+            (InsertQueryNode.is(query) || UpdateQueryNode.is(query)) &&
+            this.hasEntityMutationPluginsWithAfterMutationHooks
+        ) {
+            // need to make sure the query node has "returnAll" for insert and update queries
+            // so that after-mutation hooks can get the mutated entities with all fields
+            query = {
+                ...query,
+                returning: ReturningNode.create([SelectionNode.createSelectAll()]),
+            };
+        }
+        const finalQuery = this.nameMapper.transformNode(query);
+        compiled = this.compileQuery(finalQuery);
+        if (parameters) {
+            compiled = { ...compiled, parameters };
+        }
+
+        // the client passed to hooks needs to be in sync with current in-transaction
+        // status so that it doesn't try to create a nested one
+        const currentlyInTx = this.driver.isTransactionConnection(connection);
+
+        const connectionClient = this.createClientForConnection(connection, currentlyInTx);
+
+        const mutationInfo = this.getMutationInfo(finalQuery);
+
+        // cache already loaded before-mutation entities
+        let beforeMutationEntities: Record<string, unknown>[] | undefined;
+        const loadBeforeMutationEntities = async () => {
+            if (beforeMutationEntities === undefined && (UpdateQueryNode.is(query) || DeleteQueryNode.is(query))) {
+                beforeMutationEntities = await this.loadEntities(mutationInfo.model, mutationInfo.where, connection);
+            }
+            return beforeMutationEntities;
+        };
+
+        // call before mutation hooks
+        await this.callBeforeMutationHooks(
+            finalQuery,
+            mutationInfo,
+            loadBeforeMutationEntities,
+            connectionClient,
+            queryId,
+        );
+
+        const result = await connection.executeQuery<any>(compiled);
+
+        if (!this.driver.isTransactionConnection(connection)) {
+            // not in a transaction, just call all after-mutation hooks
+            await this.callAfterMutationHooks(result, finalQuery, mutationInfo, connectionClient, 'all', queryId);
+        } else {
+            // run after-mutation hooks that are requested to be run inside tx
+            await this.callAfterMutationHooks(result, finalQuery, mutationInfo, connectionClient, 'inTx', queryId);
+
+            // register other after-mutation hooks to be run after the tx is committed
+            this.driver.registerTransactionCommitCallback(connection, () =>
+                this.callAfterMutationHooks(result, finalQuery, mutationInfo, connectionClient, 'outTx', queryId),
+            );
+        }
+
+        return result;
     }
 
     private createClientForConnection(connection: DatabaseConnection, inTx: boolean) {

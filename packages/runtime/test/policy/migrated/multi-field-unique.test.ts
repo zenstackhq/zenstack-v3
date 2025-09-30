@@ -1,19 +1,8 @@
-import path from 'path';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from '../utils';
+import { describe, expect, it } from 'vitest';
 import { QueryError } from '../../../src';
+import { createPolicyTestClient } from '../utils';
 
 describe('Policy tests multi-field unique', () => {
-    let origDir: string;
-
-    beforeAll(async () => {
-        origDir = path.resolve('.');
-    });
-
-    afterEach(() => {
-        process.chdir(origDir);
-    });
-
     it('toplevel crud test unnamed constraint', async () => {
         const db = await createPolicyTestClient(
             `

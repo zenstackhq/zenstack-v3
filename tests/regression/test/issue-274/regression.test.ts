@@ -23,7 +23,5 @@ model User {
 }
 `);
 
-    process.chdir(dir);
-
-    execSync('node node_modules/@zenstackhq/cli/dist/index.js migrate dev --name init');
+    execSync('node node_modules/@zenstackhq/cli/dist/index.js migrate dev --name init', { cwd: dir });
 });

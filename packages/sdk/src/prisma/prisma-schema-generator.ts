@@ -18,10 +18,8 @@ import {
     InvocationExpr,
     isArrayExpr,
     isDataModel,
-    isExpression,
     isInvocationExpr,
     isLiteralExpr,
-    isModel,
     isNullExpr,
     isReferenceExpr,
     isStringLiteral,
@@ -271,12 +269,7 @@ export class PrismaSchemaGenerator {
             return false;
         }
 
-        return AstUtils.streamAst(expr).some((node) => isExpression(node) && isAuthInvocation(node));
-    }
-
-    private isFromPlugin(node: AstNode | undefined) {
-        const model = AstUtils.getContainerOfType(node, isModel);
-        return !!model && !!model.$document && model.$document.uri.path.endsWith('plugin.zmodel');
+        return AstUtils.streamAst(expr).some(isAuthInvocation);
     }
 
     private isInheritedFromDelegate(field: DataField, contextModel: DataModel) {

@@ -370,8 +370,7 @@ describe('Todo Policy Tests', () => {
         expect(r1.lists).toHaveLength(1);
     });
 
-    // TODO: `future()` support
-    it.skip('post-update checks', async () => {
+    it('post-update checks', async () => {
         await createSpaceAndUsers(db.$unuseAll());
 
         const user1Db = db.$setAuth({ id: user1.id });

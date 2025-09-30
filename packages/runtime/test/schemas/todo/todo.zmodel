@@ -117,10 +117,9 @@ model List {
 
     // when create, owner must be set to current user, and user must be in the space
     // update is not allowed to change owner
-    @@allow('update', ownerId == auth().id && space.members?[userId == auth().id]
-    // TODO: future() support
-    //   && future().ownerId == ownerId
-    )
+    @@allow('update', ownerId == auth().id && space.members?[userId == auth().id])
+
+    @@deny('post-update', before().ownerId != ownerId)
 
     // can be deleted by owner
     @@allow('delete', ownerId == auth().id)
@@ -147,7 +146,6 @@ model Todo {
     @@allow('all', list.ownerId == auth().id)
     @@allow('all', list.space.members?[userId == auth().id] && !list.private)
 
-    // TODO: future() support
-    // // update is not allowed to change owner
-    // @@deny('update', future().owner != owner)
+    // update is not allowed to change owner
+    @@deny('post-update', before().ownerId != ownerId)
 }

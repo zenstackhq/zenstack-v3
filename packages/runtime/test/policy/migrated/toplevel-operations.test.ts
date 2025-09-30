@@ -133,8 +133,7 @@ describe('Policy toplevel operations tests', () => {
         ).toBeTruthy();
     });
 
-    // TODO: `future()` support
-    it.skip('update id tests', async () => {
+    it('update id tests', async () => {
         const db = await createPolicyTestClient(
             `
         model Model {
@@ -143,7 +142,8 @@ describe('Policy toplevel operations tests', () => {
         
             @@allow('read', value > 1)
             @@allow('create', value > 0)
-            @@allow('update', value > 1 && future().value > 2)
+            @@allow('update', value > 1)
+            @@allow('post-update', value > 2)
         }
         `,
         );
@@ -164,7 +164,7 @@ describe('Policy toplevel operations tests', () => {
                     value: 1,
                 },
             }),
-        ).toBeRejectedNotFound();
+        ).toBeRejectedByPolicy();
 
         // update success
         await expect(

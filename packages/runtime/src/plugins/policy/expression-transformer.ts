@@ -523,7 +523,6 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 });
 
                 if (currNode) {
-                    invariant(SelectQueryNode.is(currNode), 'expected select query node');
                     currNode = {
                         ...relation,
                         selections: [

@@ -101,6 +101,7 @@
     - [ ] Short-circuit pre-create check for scalar-field only policies
     - [x] Inject "on conflict do update"
     - [x] `check` function
+    - [ ] Custom functions
     - [ ] Accessing tables not in the schema
 - [x] Migration
 - [ ] Databases

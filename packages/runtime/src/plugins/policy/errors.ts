@@ -1,3 +1,5 @@
+import { ZenStackError } from '../../client';
+
 /**
  * Reason code for policy rejection.
  */
@@ -21,7 +23,7 @@ export enum RejectedByPolicyReason {
 /**
  * Error thrown when an operation is rejected by access policy.
  */
-export class RejectedByPolicyError extends Error {
+export class RejectedByPolicyError extends ZenStackError {
     constructor(
         public readonly model: string | undefined,
         public readonly reason: RejectedByPolicyReason = RejectedByPolicyReason.NO_ACCESS,

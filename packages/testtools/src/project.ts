@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import tmp from 'tmp';
 
-export function createTestProject() {
+export function createTestProject(zmodelContent?: string) {
     const { name: workDir } = tmp.dirSync({ unsafeCleanup: true });
 
     fs.mkdirSync(path.join(workDir, 'node_modules'));
@@ -62,6 +62,10 @@ export function createTestProject() {
             4,
         ),
     );
+
+    if (zmodelContent) {
+        fs.writeFileSync(path.join(workDir, 'schema.zmodel'), zmodelContent);
+    }
 
     return workDir;
 }

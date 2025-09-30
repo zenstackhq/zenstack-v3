@@ -197,8 +197,7 @@ describe('With Policy:nested to-one', () => {
         ).toBeRejectedNotFound();
     });
 
-    // TODO: `future()` support
-    it.skip('nested update id tests', async () => {
+    it('nested update id tests', async () => {
         const db = await createPolicyTestClient(
             `
         model M1 {
@@ -216,7 +215,8 @@ describe('With Policy:nested to-one', () => {
         
             @@allow('read', true)
             @@allow('create', value > 0)
-            @@allow('update', value > 1 && future().value > 2)
+            @@allow('update', value > 1)
+            @@allow('post-update', value > 2)
         }
         `,
         );

@@ -383,8 +383,7 @@ describe('todo sample tests', () => {
         expect(r1?.lists).toHaveLength(1);
     });
 
-    // TODO: `future()` support
-    it.skip('works with post-update checks', async () => {
+    it('works with post-update checks', async () => {
         const anonDb = await createPolicyTestClient(schema);
         await createSpaceAndUsers(anonDb.$unuseAll());
 

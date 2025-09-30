@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createPolicyTestClient } from '../utils';
 import { schema } from '../../schemas/petstore/schema';
 
-// TODO: `future()` support
-describe.skip('Pet Store Policy Tests', () => {
+describe('Pet Store Policy Tests', () => {
     it('crud', async () => {
         const petData = [
             {

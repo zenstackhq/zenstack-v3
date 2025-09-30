@@ -57,8 +57,7 @@ describe('Policy tests multiple id fields', () => {
         ).toResolveTruthy();
     });
 
-    // TODO: `future()` support
-    it.skip('multi-id fields id update', async () => {
+    it('multi-id fields id update', async () => {
         const db = await createPolicyTestClient(
             `
         model A {
@@ -70,7 +69,8 @@ describe('Policy tests multiple id fields', () => {
 
             @@allow('read', true)
             @@allow('create', value > 0)
-            @@allow('update', value > 0 && future().value > 1)
+            @@allow('update', value > 0)
+            @@allow('post-update', value > 1)
         }
 
         model B {
@@ -319,8 +319,7 @@ describe('Policy tests multiple id fields', () => {
         expect(await db.c.findUnique({ where: { id: 1 } })).toEqual(expect.objectContaining({ v: 6 }));
     });
 
-    // TODO: `future()` support
-    it.skip('multi-id fields nested id update', async () => {
+    it('multi-id fields nested id update', async () => {
         const db = await createPolicyTestClient(
             `
         model A {
@@ -333,7 +332,8 @@ describe('Policy tests multiple id fields', () => {
 
             @@allow('read', true)
             @@allow('create', value > 0)
-            @@allow('update', value > 0 && future().value > 1)
+            @@allow('update', value > 0)
+            @@allow('post-update', value > 1)
         }
 
         model B {
@@ -369,7 +369,7 @@ describe('Policy tests multiple id fields', () => {
                         upsert: {
                             where: { x_y: { x: '2', y: 2 } },
                             update: { x: '3', y: 3, value: 0 },
-                            create: { x: '4', y: '4', value: 4 },
+                            create: { x: '4', y: 4, value: 4 },
                         },
                     },
                 },
@@ -384,7 +384,7 @@ describe('Policy tests multiple id fields', () => {
                         upsert: {
                             where: { x_y: { x: '2', y: 2 } },
                             update: { x: '3', y: 3, value: 3 },
-                            create: { x: '4', y: '4', value: 4 },
+                            create: { x: '4', y: 4, value: 4 },
                         },
                     },
                 },

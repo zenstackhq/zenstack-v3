@@ -35,6 +35,8 @@ model Pet {
     // unsold pets are readable to all; sold ones are readable to buyers only
     @@allow('read', orderId == null || order.user == auth())
 
+    @@allow('update', auth() != null)
+
     // only allow update to 'orderId' field if it's not set yet (unsold)
     @@allow('post-update', before().name == name && before().category == category && before().orderId == null)
 }

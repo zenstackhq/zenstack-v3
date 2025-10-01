@@ -124,7 +124,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         // --- Post mutation work ---
 
-        if (hasPostUpdatePolicies) {
+        if (hasPostUpdatePolicies && result.rows.length > 0) {
             // entities updated filter
             const idConditions = this.buildIdConditions(mutationModel, result.rows);
 

@@ -1,4 +1,4 @@
-import type { CRUD } from '../../client/contract';
+import type { CRUD_EXT } from '../../client/contract';
 import type { Expression } from '../../schema';
 
 /**
@@ -9,7 +9,7 @@ export type PolicyKind = 'allow' | 'deny';
 /**
  * Access policy operation.
  */
-export type PolicyOperation = CRUD | 'all';
+export type PolicyOperation = CRUD_EXT | 'all';
 
 /**
  * Access policy definition.

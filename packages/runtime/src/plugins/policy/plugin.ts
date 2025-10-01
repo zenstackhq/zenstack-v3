@@ -22,8 +22,8 @@ export class PolicyPlugin<Schema extends SchemaDef> implements RuntimePlugin<Sch
         };
     }
 
-    onKyselyQuery({ query, client, proceed /*, transaction*/ }: OnKyselyQueryArgs<Schema>) {
+    onKyselyQuery({ query, client, proceed }: OnKyselyQueryArgs<Schema>) {
         const handler = new PolicyHandler<Schema>(client);
-        return handler.handle(query, proceed /*, transaction*/);
+        return handler.handle(query, proceed);
     }
 }

@@ -1296,8 +1296,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return { count: Number(result.numAffectedRows) } as Result;
         } else {
             const idFields = requireIdFields(this.schema, model);
-            const result = await query.returning(idFields as any).execute();
-            return result as Result;
+            const finalQuery = query.returning(idFields as any);
+            const result = await this.executeQuery(kysely, finalQuery, 'update');
+            return result.rows as Result;
         }
     }
 

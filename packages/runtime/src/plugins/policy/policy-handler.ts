@@ -16,7 +16,9 @@ import {
     ParensNode,
     PrimitiveValueListNode,
     RawNode,
+    ReferenceNode,
     ReturningNode,
+    SelectAllNode,
     SelectionNode,
     SelectQueryNode,
     sql,
@@ -32,18 +34,26 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { ClientContract } from '../../client';
-import type { CRUD } from '../../client/contract';
+import { type CRUD_EXT } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
 import { InternalError, QueryError } from '../../client/errors';
 import type { ProceedKyselyQueryFunction } from '../../client/plugin';
 import { getManyToManyRelation, requireField, requireIdFields, requireModel } from '../../client/query-utils';
-import { ExpressionUtils, type BuiltinType, type Expression, type GetModels, type SchemaDef } from '../../schema';
+import {
+    ExpressionUtils,
+    type BuiltinType,
+    type Expression,
+    type GetModels,
+    type MemberExpression,
+    type SchemaDef,
+} from '../../schema';
+import { ExpressionVisitor } from '../../utils/expression-utils';
 import { ColumnCollector } from './column-collector';
 import { RejectedByPolicyError, RejectedByPolicyReason } from './errors';
 import { ExpressionTransformer } from './expression-transformer';
 import type { Policy, PolicyOperation } from './types';
-import { buildIsFalse, conjunction, disjunction, falseNode, getTableName } from './utils';
+import { buildIsFalse, conjunction, disjunction, falseNode, getTableName, isBeforeInvocation, trueNode } from './utils';
 
 export type CrudQueryNode = SelectQueryNode | InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
 
@@ -61,10 +71,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return this.client.$qb;
     }
 
-    async handle(
-        node: RootOperationNode,
-        proceed: ProceedKyselyQueryFunction /*, transaction: OnKyselyQueryTransaction*/,
-    ) {
+    async handle(node: RootOperationNode, proceed: ProceedKyselyQueryFunction) {
         if (!this.isCrudQueryNode(node)) {
             // non-CRUD queries are not allowed
             throw new RejectedByPolicyError(
@@ -80,6 +87,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         const { mutationModel } = this.getMutationModel(node);
+
+        // --- Pre mutation work ---
 
         if (InsertQueryNode.is(node)) {
             // pre-create policy evaluation happens before execution of the query
@@ -102,12 +111,86 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             }
         }
 
+        const hasPostUpdatePolicies = UpdateQueryNode.is(node) && this.hasPostUpdatePolicies(mutationModel);
+
+        let beforeUpdateInfo: Awaited<ReturnType<typeof this.loadBeforeUpdateEntities>> | undefined;
+        if (hasPostUpdatePolicies) {
+            beforeUpdateInfo = await this.loadBeforeUpdateEntities(mutationModel, node.where, proceed);
+        }
+
         // proceed with query
 
         const result = await proceed(this.transformNode(node));
 
+        // --- Post mutation work ---
+
+        if (hasPostUpdatePolicies && result.rows.length > 0) {
+            // entities updated filter
+            const idConditions = this.buildIdConditions(mutationModel, result.rows);
+
+            // post-update policy filter
+            const postUpdateFilter = this.buildPolicyFilter(mutationModel, undefined, 'post-update');
+
+            // read the post-update row with filter applied
+
+            const eb = expressionBuilder<any, any>();
+
+            // create a `SELECT column1 as field1, column2 as field2, ... FROM (VALUES (...))` table for before-update rows
+            const beforeUpdateTable: SelectQueryNode | undefined = beforeUpdateInfo
+                ? {
+                      kind: 'SelectQueryNode',
+                      from: FromNode.create([
+                          ParensNode.create(
+                              ValuesNode.create(
+                                  beforeUpdateInfo!.rows.map((r) =>
+                                      PrimitiveValueListNode.create(beforeUpdateInfo!.fields.map((f) => r[f])),
+                                  ),
+                              ),
+                          ),
+                      ]),
+                      selections: beforeUpdateInfo.fields.map((name, index) => {
+                          const def = requireField(this.client.$schema, mutationModel, name);
+                          const castedColumnRef =
+                              sql`CAST(${eb.ref(`column${index + 1}`)} as ${sql.raw(this.dialect.getFieldSqlType(def))})`.as(
+                                  name,
+                              );
+                          return SelectionNode.create(castedColumnRef.toOperationNode());
+                      }),
+                  }
+                : undefined;
+
+            const postUpdateQuery = eb
+                .selectFrom(mutationModel)
+                .select(() => [eb(eb.fn('COUNT', [eb.lit(1)]), '=', result.rows.length).as('$condition')])
+                .where(() => new ExpressionWrapper(conjunction(this.dialect, [idConditions, postUpdateFilter])))
+                .$if(!!beforeUpdateInfo, (qb) =>
+                    qb.leftJoin(
+                        () => new ExpressionWrapper(beforeUpdateTable!).as('$before'),
+                        (join) => {
+                            const idFields = requireIdFields(this.client.$schema, mutationModel);
+                            return idFields.reduce(
+                                (acc, f) => acc.onRef(`${mutationModel}.${f}`, '=', `$before.${f}`),
+                                join,
+                            );
+                        },
+                    ),
+                );
+
+            const postUpdateResult = await proceed(postUpdateQuery.toOperationNode());
+            if (!postUpdateResult.rows[0]?.$condition) {
+                throw new RejectedByPolicyError(
+                    mutationModel,
+                    RejectedByPolicyReason.NO_ACCESS,
+                    'some or all updated rows failed to pass post-update policy check',
+                );
+            }
+        }
+
+        // --- Read back ---
+
         if (!node.returning || this.onlyReturningId(node)) {
-            return result;
+            // no need to check read back
+            return this.postProcessMutationResult(result, node);
         } else {
             const readBackResult = await this.processReadBack(node, result, proceed);
             if (readBackResult.rows.length !== result.rows.length) {
@@ -119,6 +202,75 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             }
             return readBackResult;
         }
+    }
+
+    // correction to kysely mutation result may be needed because we might have added
+    // returning clause to the query and caused changes to the result shape
+    private postProcessMutationResult(result: QueryResult<any>, node: MutationQueryNode) {
+        if (node.returning) {
+            return result;
+        } else {
+            return {
+                ...result,
+                rows: [],
+                numAffectedRows: result.numAffectedRows ?? BigInt(result.rows.length),
+            };
+        }
+    }
+
+    hasPostUpdatePolicies(model: GetModels<Schema>) {
+        const policies = this.getModelPolicies(model, 'post-update');
+        return policies.length > 0;
+    }
+
+    private async loadBeforeUpdateEntities(
+        model: GetModels<Schema>,
+        where: WhereNode | undefined,
+        proceed: ProceedKyselyQueryFunction,
+    ) {
+        const beforeUpdateAccessFields = this.getFieldsAccessForBeforeUpdatePolicies(model);
+        if (!beforeUpdateAccessFields || beforeUpdateAccessFields.length === 0) {
+            return undefined;
+        }
+        const query: SelectQueryNode = {
+            kind: 'SelectQueryNode',
+            from: FromNode.create([TableNode.create(model)]),
+            where,
+            selections: [...beforeUpdateAccessFields.map((f) => SelectionNode.create(ColumnNode.create(f)))],
+        };
+        const result = await proceed(query);
+        return { fields: beforeUpdateAccessFields, rows: result.rows };
+    }
+
+    private getFieldsAccessForBeforeUpdatePolicies(model: GetModels<Schema>) {
+        const policies = this.getModelPolicies(model, 'post-update');
+        if (policies.length === 0) {
+            return undefined;
+        }
+
+        const fields = new Set<string>();
+        const fieldCollector = new (class extends ExpressionVisitor {
+            protected override visitMember(e: MemberExpression): void {
+                if (isBeforeInvocation(e.receiver)) {
+                    invariant(e.members.length === 1, 'before() can only be followed by a scalar field access');
+                    fields.add(e.members[0]!);
+                }
+                super.visitMember(e);
+            }
+        })();
+
+        for (const policy of policies) {
+            fieldCollector.visit(policy.condition);
+        }
+
+        if (fields.size === 0) {
+            return undefined;
+        }
+
+        // make sure id fields are included
+        requireIdFields(this.client.$schema, model).forEach((f) => fields.add(f));
+
+        return Array.from(fields).sort();
     }
 
     // #region overrides
@@ -193,23 +345,19 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const result = super.transformInsertQuery(processedNode);
 
-        if (!node.returning) {
-            return result;
-        }
-
-        if (this.onlyReturningId(node)) {
-            return result;
-        } else {
-            // only return ID fields, that's enough for reading back the inserted row
+        // if any field is to be returned, we select ID fields here which will be used
+        // for reading back post-insert
+        let returning = result.returning;
+        if (returning) {
             const { mutationModel } = this.getMutationModel(node);
             const idFields = requireIdFields(this.client.$schema, mutationModel);
-            return {
-                ...result,
-                returning: ReturningNode.create(
-                    idFields.map((field) => SelectionNode.create(ColumnNode.create(field))),
-                ),
-            };
+            returning = ReturningNode.create(idFields.map((f) => SelectionNode.create(ColumnNode.create(f))));
         }
+
+        return {
+            ...result,
+            returning,
+        };
     }
 
     protected override transformUpdateQuery(node: UpdateQueryNode) {
@@ -225,9 +373,23 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             }
         }
 
+        let returning = result.returning;
+
+        // regarding returning:
+        // 1. if fields are to be returned, we only select id fields here which will be used for reading back
+        //    post-update
+        // 2. if there are post-update policies, we need to make sure id fields are selected for joining with
+        //    before-update rows
+
+        if (returning || this.hasPostUpdatePolicies(mutationModel)) {
+            const idFields = requireIdFields(this.client.$schema, mutationModel);
+            returning = ReturningNode.create(idFields.map((f) => SelectionNode.create(ColumnNode.create(f))));
+        }
+
         return {
             ...result,
             where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
+            returning,
         };
     }
 
@@ -260,6 +422,19 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
         const { mutationModel } = this.getMutationModel(node);
         const idFields = requireIdFields(this.client.$schema, mutationModel);
+
+        if (node.returning.selections.some((s) => SelectAllNode.is(s.selection))) {
+            const modelDef = requireModel(this.client.$schema, mutationModel);
+            if (Object.keys(modelDef.fields).some((f) => !idFields.includes(f))) {
+                // there are fields other than ID fields
+                return false;
+            } else {
+                // select all but model only has ID fields
+                return true;
+            }
+        }
+
+        // analyze selected columns
         const collector = new ColumnCollector();
         const selectedColumns = collector.collect(node.returning);
         return selectedColumns.every((c) => idFields.includes(c));
@@ -543,7 +718,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                     this.dialect,
                     idFields.map((field) =>
                         BinaryOperationNode.create(
-                            ColumnNode.create(field),
+                            ReferenceNode.create(ColumnNode.create(field), TableNode.create(table)),
                             OperatorNode.create('='),
                             ValueNode.create(row[field]),
                         ),
@@ -590,7 +765,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node);
     }
 
-    buildPolicyFilter(model: GetModels<Schema>, alias: string | undefined, operation: CRUD) {
+    buildPolicyFilter(model: GetModels<Schema>, alias: string | undefined, operation: CRUD_EXT): OperationNode {
         // first check if it's a many-to-many join table, and if so, handle specially
         const m2mFilter = this.getModelPolicyFilterForManyToManyJoinTable(model, alias, operation);
         if (m2mFilter) {
@@ -598,9 +773,6 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         const policies = this.getModelPolicies(model, operation);
-        if (policies.length === 0) {
-            return falseNode(this.dialect);
-        }
 
         const allows = policies
             .filter((policy) => policy.kind === 'allow')
@@ -610,25 +782,33 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             .filter((policy) => policy.kind === 'deny')
             .map((policy) => this.compilePolicyCondition(model, alias, operation, policy));
 
+        // 'post-update' is by default allowed, other operations are by default denied
         let combinedPolicy: OperationNode;
 
         if (allows.length === 0) {
-            // constant false
-            combinedPolicy = falseNode(this.dialect);
+            // no allow rules
+            if (operation === 'post-update') {
+                // post-update is allowed if no allow rules are defined
+                combinedPolicy = trueNode(this.dialect);
+            } else {
+                // other operations are denied by default
+                combinedPolicy = falseNode(this.dialect);
+            }
         } else {
             // or(...allows)
             combinedPolicy = disjunction(this.dialect, allows);
-
-            // and(...!denies)
-            if (denies.length !== 0) {
-                const combinedDenies = conjunction(
-                    this.dialect,
-                    denies.map((d) => buildIsFalse(d, this.dialect)),
-                );
-                // or(...allows) && and(...!denies)
-                combinedPolicy = conjunction(this.dialect, [combinedPolicy, combinedDenies]);
-            }
         }
+
+        // and(...!denies)
+        if (denies.length !== 0) {
+            const combinedDenies = conjunction(
+                this.dialect,
+                denies.map((d) => buildIsFalse(d, this.dialect)),
+            );
+            // or(...allows) && and(...!denies)
+            combinedPolicy = conjunction(this.dialect, [combinedPolicy, combinedDenies]);
+        }
+
         return combinedPolicy;
     }
 
@@ -674,14 +854,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     private compilePolicyCondition(
         model: GetModels<Schema>,
         alias: string | undefined,
-        operation: CRUD,
+        operation: CRUD_EXT,
         policy: Policy,
     ) {
         return new ExpressionTransformer(this.client).transform(policy.condition, {
             model,
             alias,
             operation,
-            auth: this.client.$auth,
         });
     }
 
@@ -710,7 +889,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                                 condition: attr.args![1]!.value,
                             }) as const,
                     )
-                    .filter((policy) => policy.operations.includes('all') || policy.operations.includes(operation)),
+                    .filter(
+                        (policy) =>
+                            (operation !== 'post-update' && policy.operations.includes('all')) ||
+                            policy.operations.includes(operation),
+                    ),
             );
         }
         return result;

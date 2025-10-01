@@ -10,8 +10,8 @@ import {
     type LangiumDocument,
     type LinkingError,
     type Reference,
+    type ReferenceInfo,
     interruptAndCheck,
-    isReference,
 } from 'langium';
 import { match } from 'ts-pattern';
 import {
@@ -57,7 +57,7 @@ import {
     getAuthDecl,
     getContainingDataModel,
     isAuthInvocation,
-    isFutureExpr,
+    isBeforeInvocation,
     isMemberContainer,
     mapBuiltinTypeToExpressionType,
 } from './utils';
@@ -94,18 +94,18 @@ export class ZModelLinker extends DefaultLinker {
         document.state = DocumentState.Linked;
     }
 
-    private linkReference(
-        container: AstNode,
-        property: string,
-        document: LangiumDocument,
-        extraScopes: ScopeProvider[],
-    ) {
-        if (this.resolveFromScopeProviders(container, property, document, extraScopes)) {
+    private linkReference(refInfo: ReferenceInfo, document: LangiumDocument, extraScopes: ScopeProvider[]) {
+        const defaultRef = refInfo.reference as DefaultReference;
+        if (defaultRef._ref) {
+            // already linked
             return;
         }
-
-        const reference: DefaultReference = (container as any)[property];
-        this.doLink({ reference, container, property }, document);
+        if (this.resolveFromScopeProviders(refInfo.reference, document, extraScopes)) {
+            // resolved from additional scope provider
+            return;
+        }
+        // default linking
+        this.doLink(refInfo, document);
     }
 
     //#endregion
@@ -113,12 +113,10 @@ export class ZModelLinker extends DefaultLinker {
     //#region Expression type resolving
 
     private resolveFromScopeProviders(
-        node: AstNode,
-        property: string,
+        reference: DefaultReference,
         document: LangiumDocument,
         providers: ScopeProvider[],
     ) {
-        const reference: DefaultReference = (node as any)[property];
         for (const provider of providers) {
             const target = provider(reference.$refText);
             if (target) {
@@ -276,7 +274,7 @@ export class ZModelLinker extends DefaultLinker {
     }
 
     private resolveInvocation(node: InvocationExpr, document: LangiumDocument, extraScopes: ScopeProvider[]) {
-        this.linkReference(node, 'function', document, extraScopes);
+        this.linkReference({ reference: node.function, container: node, property: 'function' }, document, extraScopes);
         node.args.forEach((arg) => this.resolve(arg, document, extraScopes));
         if (node.function.ref) {
             const funcDecl = node.function.ref as FunctionDecl;
@@ -294,8 +292,8 @@ export class ZModelLinker extends DefaultLinker {
                 if (authDecl) {
                     node.$resolvedType = { decl: authDecl, nullable: true };
                 }
-            } else if (isFutureExpr(node)) {
-                // future() function is resolved to current model
+            } else if (isBeforeInvocation(node)) {
+                // before() function is resolved to current model
                 node.$resolvedType = { decl: getContainingDataModel(node) };
             } else {
                 this.resolveToDeclaredType(node, funcDecl.returnType);
@@ -401,7 +399,7 @@ export class ZModelLinker extends DefaultLinker {
                 if (isArrayExpr(node.value)) {
                     node.value.items.forEach((item) => {
                         if (isReferenceExpr(item)) {
-                            const resolved = this.resolveFromScopeProviders(item, 'target', document, [scopeProvider]);
+                            const resolved = this.resolveFromScopeProviders(item.target, document, [scopeProvider]);
                             if (resolved) {
                                 this.resolveToDeclaredType(item, (resolved as DataField).type);
                             } else {
@@ -414,7 +412,7 @@ export class ZModelLinker extends DefaultLinker {
                         this.resolveToBuiltinTypeOrDecl(node.value, node.value.items[0].$resolvedType.decl, true);
                     }
                 } else if (isReferenceExpr(node.value)) {
-                    const resolved = this.resolveFromScopeProviders(node.value, 'target', document, [scopeProvider]);
+                    const resolved = this.resolveFromScopeProviders(node.value.target, document, [scopeProvider]);
                     if (resolved) {
                         this.resolveToDeclaredType(node.value, (resolved as DataField).type);
                     } else {
@@ -495,13 +493,9 @@ export class ZModelLinker extends DefaultLinker {
     }
 
     private resolveDefault(node: AstNode, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
-        for (const [property, value] of Object.entries(node)) {
-            if (!property.startsWith('$')) {
-                if (isReference(value)) {
-                    this.linkReference(node, property, document, extraScopes);
-                }
-            }
-        }
+        AstUtils.streamReferences(node).forEach((ref) => {
+            this.linkReference(ref, document, extraScopes);
+        });
         for (const child of AstUtils.streamContents(node)) {
             this.resolve(child, document, extraScopes);
         }

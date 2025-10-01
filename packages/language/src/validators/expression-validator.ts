@@ -11,6 +11,7 @@ import {
     isNullExpr,
     isReferenceExpr,
     isThisExpr,
+    MemberAccessExpr,
     type ExpressionType,
 } from '../generated/ast';
 
@@ -18,6 +19,7 @@ import {
     findUpAst,
     isAuthInvocation,
     isAuthOrAuthMemberAccess,
+    isBeforeInvocation,
     isDataFieldReference,
     isEnumFieldReference,
     typeAssignable,
@@ -59,9 +61,18 @@ export default class ExpressionValidator implements AstValidator<Expression> {
 
         // extra validations by expression type
         switch (expr.$type) {
+            case 'MemberAccessExpr':
+                this.validateMemberAccessExpr(expr, accept);
+                break;
             case 'BinaryExpr':
                 this.validateBinaryExpr(expr, accept);
                 break;
+        }
+    }
+
+    private validateMemberAccessExpr(expr: MemberAccessExpr, accept: ValidationAcceptor) {
+        if (isBeforeInvocation(expr.operand) && isDataModel(expr.$resolvedType?.decl)) {
+            accept('error', 'relation fields cannot be accessed from `before()`', { node: expr });
         }
     }
 

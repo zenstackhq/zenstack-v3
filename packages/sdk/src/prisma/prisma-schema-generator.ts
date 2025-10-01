@@ -20,7 +20,6 @@ import {
     isDataModel,
     isInvocationExpr,
     isLiteralExpr,
-    isModel,
     isNullExpr,
     isReferenceExpr,
     isStringLiteral,
@@ -31,7 +30,7 @@ import {
     StringLiteral,
     type AstNode,
 } from '@zenstackhq/language/ast';
-import { getAllAttributes, getAllFields, isDelegateModel } from '@zenstackhq/language/utils';
+import { getAllAttributes, getAllFields, isAuthInvocation, isDelegateModel } from '@zenstackhq/language/utils';
 import { AstUtils } from 'langium';
 import { match } from 'ts-pattern';
 import { ModelUtils, ZModelCodeGenerator } from '..';
@@ -242,8 +241,8 @@ export class PrismaSchemaGenerator {
 
         const attributes = field.attributes
             .filter((attr) => this.isPrismaAttribute(attr))
-            // `@default` with calling functions from plugin is handled outside Prisma
-            .filter((attr) => !this.isDefaultWithPluginInvocation(attr))
+            // `@default` using `auth()` is handled outside Prisma
+            .filter((attr) => !this.isDefaultWithAuthInvocation(attr))
             .filter(
                 (attr) =>
                     // when building physical schema, exclude `@default` for id fields inherited from delegate base
@@ -260,7 +259,7 @@ export class PrismaSchemaGenerator {
         return result;
     }
 
-    private isDefaultWithPluginInvocation(attr: DataFieldAttribute) {
+    private isDefaultWithAuthInvocation(attr: DataFieldAttribute) {
         if (attr.decl.ref?.name !== '@default') {
             return false;
         }
@@ -270,12 +269,7 @@ export class PrismaSchemaGenerator {
             return false;
         }
 
-        return AstUtils.streamAst(expr).some((node) => isInvocationExpr(node) && this.isFromPlugin(node.function.ref));
-    }
-
-    private isFromPlugin(node: AstNode | undefined) {
-        const model = AstUtils.getContainerOfType(node, isModel);
-        return !!model && !!model.$document && model.$document.uri.path.endsWith('plugin.zmodel');
+        return AstUtils.streamAst(expr).some(isAuthInvocation);
     }
 
     private isInheritedFromDelegate(field: DataField, contextModel: DataModel) {

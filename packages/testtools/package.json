@@ -31,7 +31,6 @@
         }
     },
     "dependencies": {
-        "@types/pg": "^8.11.11",
         "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
@@ -50,6 +49,7 @@
         "@types/better-sqlite3": "^7.6.13",
         "@types/node": "catalog:",
         "@types/tmp": "catalog:",
+        "@types/pg": "^8.11.11",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "copyfiles": "^2.4.1",

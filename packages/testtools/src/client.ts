@@ -182,7 +182,7 @@ export async function createPolicyTestClient<Schema extends SchemaDef>(
         schema as any,
         {
             ...options,
-            plugins: [new PolicyPlugin()],
+            plugins: [...(options?.plugins ?? []), new PolicyPlugin()],
         } as any,
     );
 }

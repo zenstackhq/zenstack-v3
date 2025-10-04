@@ -1,9 +1,8 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import { ExpressionWrapper, ValueNode, type Expression, type ExpressionBuilder } from 'kysely';
+import { QueryUtils } from '../../client';
 import { CRUD } from '../../client/contract';
-import { extractFieldName } from '../../client/kysely-utils';
 import type { ZModelFunction, ZModelFunctionContext } from '../../client/options';
-import { buildJoinPairs, requireField } from '../../client/query-utils';
 import { PolicyHandler } from './policy-handler';
 
 /**
@@ -31,9 +30,9 @@ export const check: ZModelFunction<any> = (
     }
 
     // first argument must be a field reference
-    const fieldName = extractFieldName(arg1Node);
+    const fieldName = QueryUtils.extractFieldName(arg1Node);
     invariant(fieldName, 'Failed to extract field name from the first argument of "check" function');
-    const fieldDef = requireField(client.$schema, model, fieldName);
+    const fieldDef = QueryUtils.requireField(client.$schema, model, fieldName);
     invariant(fieldDef.relation, `Field "${fieldName}" is not a relation field in model "${model}"`);
     invariant(!fieldDef.array, `Field "${fieldName}" is a to-many relation, which is not supported by "check"`);
     const relationModel = fieldDef.type;
@@ -43,7 +42,7 @@ export const check: ZModelFunction<any> = (
     const policyHandler = new PolicyHandler(client);
 
     // join with parent model
-    const joinPairs = buildJoinPairs(client.$schema, model, modelAlias, fieldName, relationModel);
+    const joinPairs = QueryUtils.buildJoinPairs(client.$schema, model, modelAlias, fieldName, relationModel);
     const joinCondition =
         joinPairs.length === 1
             ? eb(eb.ref(joinPairs[0]![0]), '=', eb.ref(joinPairs[0]![1]))

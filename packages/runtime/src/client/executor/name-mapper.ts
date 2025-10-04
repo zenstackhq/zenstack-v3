@@ -17,8 +17,7 @@ import {
     type OperationNode,
 } from 'kysely';
 import type { FieldDef, ModelDef, SchemaDef } from '../../schema';
-import { extractFieldName, extractModelName, stripAlias } from '../kysely-utils';
-import { getModel, requireModel } from '../query-utils';
+import { extractFieldName, extractModelName, getModel, requireModel, stripAlias } from '../query-utils';
 
 type Scope = {
     model?: string;

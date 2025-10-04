@@ -1,9 +1,11 @@
+export { sql } from 'kysely';
 export { ZenStackClient } from './client-impl';
-export type { ClientConstructor, ClientContract } from './contract';
+export { CRUD, type ClientConstructor, type ClientContract } from './contract';
 export type * from './crud-types';
+export { getCrudDialect } from './crud/dialects';
 export * from './errors';
 export type { ClientOptions } from './options';
 export { definePlugin } from './plugin';
 export type { ZenStackPromise } from './promise';
 export type { ToKysely } from './query-builder';
-export { sql } from 'kysely';
+export * as QueryUtils from './query-utils';

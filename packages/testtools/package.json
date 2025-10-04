@@ -4,7 +4,7 @@
     "description": "ZenStack Test Tools",
     "type": "module",
     "scripts": {
-        "build": "tsc --noEmit && tsup-node",
+        "build": "tsc --noEmit && tsup-node && copyfiles -f ./src/types.d.ts ./dist",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "pack": "pnpm pack"
@@ -25,25 +25,34 @@
                 "types": "./dist/index.d.cts",
                 "default": "./dist/index.cjs"
             }
+        },
+        "./types": {
+            "types": "./dist/types.d.ts"
         }
     },
     "dependencies": {
+        "@types/pg": "^8.11.11",
+        "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/runtime": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "glob": "^11.0.2",
-        "tmp": "catalog:",
-        "ts-pattern": "catalog:",
+        "kysely": "catalog:",
         "prisma": "catalog:",
-        "typescript": "catalog:"
+        "tmp": "catalog:",
+        "ts-pattern": "catalog:"
     },
     "peerDependencies": {
-        "better-sqlite3": "^12.2.0",
-        "pg": "^8.13.1"
+        "better-sqlite3": "catalog:",
+        "pg": "catalog:"
     },
     "devDependencies": {
+        "@types/better-sqlite3": "^7.6.13",
         "@types/node": "catalog:",
         "@types/tmp": "catalog:",
         "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*"
+        "@zenstackhq/typescript-config": "workspace:*",
+        "copyfiles": "^2.4.1",
+        "typescript": "catalog:"
     }
 }

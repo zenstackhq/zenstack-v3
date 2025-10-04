@@ -53,7 +53,7 @@
         "@zenstackhq/testtools": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
-        "better-sqlite3": "^12.2.0",
+        "better-sqlite3": "catalog:",
         "tmp": "catalog:"
     }
 }

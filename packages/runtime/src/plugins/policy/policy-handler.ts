@@ -34,12 +34,12 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { ClientContract } from '../../client';
+import { QueryUtils } from '../../client';
 import { type CRUD_EXT } from '../../client/contract';
 import { getCrudDialect } from '../../client/crud/dialects';
 import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
-import { InternalError, QueryError } from '../../client/errors';
+import { InternalError, QueryError, RejectedByPolicyError, RejectedByPolicyReason } from '../../client/errors';
 import type { ProceedKyselyQueryFunction } from '../../client/plugin';
-import { getManyToManyRelation, requireField, requireIdFields, requireModel } from '../../client/query-utils';
 import {
     ExpressionUtils,
     type BuiltinType,
@@ -50,7 +50,6 @@ import {
 } from '../../schema';
 import { ExpressionVisitor } from '../../utils/expression-utils';
 import { ColumnCollector } from './column-collector';
-import { RejectedByPolicyError, RejectedByPolicyReason } from './errors';
 import { ExpressionTransformer } from './expression-transformer';
 import type { Policy, PolicyOperation } from './types';
 import { buildIsFalse, conjunction, disjunction, falseNode, getTableName, isBeforeInvocation, trueNode } from './utils';
@@ -149,7 +148,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                           ),
                       ]),
                       selections: beforeUpdateInfo.fields.map((name, index) => {
-                          const def = requireField(this.client.$schema, mutationModel, name);
+                          const def = QueryUtils.requireField(this.client.$schema, mutationModel, name);
                           const castedColumnRef =
                               sql`CAST(${eb.ref(`column${index + 1}`)} as ${sql.raw(this.dialect.getFieldSqlType(def))})`.as(
                                   name,
@@ -167,7 +166,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                     qb.leftJoin(
                         () => new ExpressionWrapper(beforeUpdateTable!).as('$before'),
                         (join) => {
-                            const idFields = requireIdFields(this.client.$schema, mutationModel);
+                            const idFields = QueryUtils.requireIdFields(this.client.$schema, mutationModel);
                             return idFields.reduce(
                                 (acc, f) => acc.onRef(`${mutationModel}.${f}`, '=', `$before.${f}`),
                                 join,
@@ -268,7 +267,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         // make sure id fields are included
-        requireIdFields(this.client.$schema, model).forEach((f) => fields.add(f));
+        QueryUtils.requireIdFields(this.client.$schema, model).forEach((f) => fields.add(f));
 
         return Array.from(fields).sort();
     }
@@ -350,7 +349,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         let returning = result.returning;
         if (returning) {
             const { mutationModel } = this.getMutationModel(node);
-            const idFields = requireIdFields(this.client.$schema, mutationModel);
+            const idFields = QueryUtils.requireIdFields(this.client.$schema, mutationModel);
             returning = ReturningNode.create(idFields.map((f) => SelectionNode.create(ColumnNode.create(f))));
         }
 
@@ -382,7 +381,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         //    before-update rows
 
         if (returning || this.hasPostUpdatePolicies(mutationModel)) {
-            const idFields = requireIdFields(this.client.$schema, mutationModel);
+            const idFields = QueryUtils.requireIdFields(this.client.$schema, mutationModel);
             returning = ReturningNode.create(idFields.map((f) => SelectionNode.create(ColumnNode.create(f))));
         }
 
@@ -421,10 +420,10 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             return true;
         }
         const { mutationModel } = this.getMutationModel(node);
-        const idFields = requireIdFields(this.client.$schema, mutationModel);
+        const idFields = QueryUtils.requireIdFields(this.client.$schema, mutationModel);
 
         if (node.returning.selections.some((s) => SelectAllNode.is(s.selection))) {
-            const modelDef = requireModel(this.client.$schema, mutationModel);
+            const modelDef = QueryUtils.requireModel(this.client.$schema, mutationModel);
             if (Object.keys(modelDef.fields).some((f) => !idFields.includes(f))) {
                 // there are fields other than ID fields
                 return false;
@@ -538,7 +537,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         values: OperationNode[],
         proceed: ProceedKyselyQueryFunction,
     ) {
-        const allFields = Object.entries(requireModel(this.client.$schema, model).fields).filter(
+        const allFields = Object.entries(QueryUtils.requireModel(this.client.$schema, model).fields).filter(
             ([, def]) => !def.relation,
         );
         const allValues: OperationNode[] = [];
@@ -625,7 +624,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         for (let i = 0; i < data.length; i++) {
             const item = data[i]!;
             if (typeof item === 'object' && item && 'kind' in item) {
-                const fieldDef = requireField(this.client.$schema, model, fields[i]!);
+                const fieldDef = QueryUtils.requireField(this.client.$schema, model, fields[i]!);
                 invariant(item.kind === 'ValueNode', 'expecting a ValueNode');
                 result.push({
                     node: ValueNode.create(
@@ -644,7 +643,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 // but there's no need to transform values anyway because they're the fields
                 // are all foreign keys
                 if (!isImplicitManyToManyJoinTable) {
-                    const fieldDef = requireField(this.client.$schema, model, fields[i]!);
+                    const fieldDef = QueryUtils.requireField(this.client.$schema, model, fields[i]!);
                     value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType, !!fieldDef.array);
                 }
                 if (Array.isArray(value)) {
@@ -710,7 +709,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     private buildIdConditions(table: string, rows: any[]): OperationNode {
-        const idFields = requireIdFields(this.client.$schema, table);
+        const idFields = QueryUtils.requireIdFields(this.client.$schema, table);
         return disjunction(
             this.dialect,
             rows.map((row) =>
@@ -865,7 +864,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     private getModelPolicies(model: string, operation: PolicyOperation) {
-        const modelDef = requireModel(this.client.$schema, model);
+        const modelDef = QueryUtils.requireModel(this.client.$schema, model);
         const result: Policy[] = [];
 
         const extractOperations = (expr: Expression) => {
@@ -902,7 +901,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     private resolveManyToManyJoinTable(tableName: string) {
         for (const model of Object.values(this.client.$schema.models)) {
             for (const field of Object.values(model.fields)) {
-                const m2m = getManyToManyRelation(this.client.$schema, model.name, field.name);
+                const m2m = QueryUtils.getManyToManyRelation(this.client.$schema, model.name, field.name);
                 if (m2m?.joinTable === tableName) {
                     const sortedRecord = [
                         {
@@ -915,8 +914,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                         },
                     ].sort(this.manyToManySorter);
 
-                    const firstIdFields = requireIdFields(this.client.$schema, sortedRecord[0]!.model);
-                    const secondIdFields = requireIdFields(this.client.$schema, sortedRecord[1]!.model);
+                    const firstIdFields = QueryUtils.requireIdFields(this.client.$schema, sortedRecord[0]!.model);
+                    const secondIdFields = QueryUtils.requireIdFields(this.client.$schema, sortedRecord[1]!.model);
                     invariant(
                         firstIdFields.length === 1 && secondIdFields.length === 1,
                         'only single-field id is supported for implicit many-to-many join table',

@@ -1,5 +1,5 @@
+import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { type ClientContract } from '@zenstackhq/runtime';
-import { PolicyPlugin } from '@zenstackhq/runtime/plugins/policy';
 import { createTestClient } from '@zenstackhq/testtools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { schema } from '../schemas/basic';
@@ -23,7 +23,7 @@ describe('Read policy tests', () => {
         });
 
         // anonymous auth context by default
-        const anonClient = client.$use(new PolicyPlugin());
+        const anonClient = client.$use(new PolicyPlugin<typeof schema>());
         await expect(anonClient.user.findFirst()).toResolveNull();
 
         const authClient = anonClient.$setAuth({

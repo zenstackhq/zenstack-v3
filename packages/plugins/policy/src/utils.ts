@@ -1,3 +1,5 @@
+import type { BaseCrudDialect } from '@zenstackhq/runtime';
+import { ExpressionUtils, type Expression, type SchemaDef } from '@zenstackhq/runtime/schema';
 import type { OperationNode } from 'kysely';
 import {
     AliasNode,
@@ -12,8 +14,6 @@ import {
     UnaryOperationNode,
     ValueNode,
 } from 'kysely';
-import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
-import { ExpressionUtils, type Expression, type SchemaDef } from '../../schema';
 
 /**
  * Creates a `true` value node.

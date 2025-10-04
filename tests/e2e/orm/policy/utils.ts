@@ -1,5 +1,5 @@
+import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import type { ClientContract } from '@zenstackhq/runtime';
-import { PolicyPlugin } from '@zenstackhq/runtime/plugins/policy';
 import type { SchemaDef } from '@zenstackhq/runtime/schema';
 import { createTestClient, type CreateTestClientOptions } from '@zenstackhq/testtools';
 

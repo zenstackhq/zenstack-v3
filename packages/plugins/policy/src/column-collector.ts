@@ -1,5 +1,5 @@
 import type { ColumnNode, OperationNode } from 'kysely';
-import { DefaultOperationNodeVisitor } from '../../utils/default-operation-node-visitor';
+import { DefaultOperationNodeVisitor } from '@zenstackhq/sdk';
 
 /**
  * Collects all column names from a query.

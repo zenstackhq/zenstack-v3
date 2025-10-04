@@ -1,4 +1,23 @@
 import { invariant } from '@zenstackhq/common-helpers';
+import type { BaseCrudDialect, ClientContract, ProceedKyselyQueryFunction } from '@zenstackhq/runtime';
+import {
+    getCrudDialect,
+    InternalError,
+    QueryError,
+    QueryUtils,
+    RejectedByPolicyError,
+    RejectedByPolicyReason,
+    type CRUD_EXT,
+} from '@zenstackhq/runtime';
+import {
+    ExpressionUtils,
+    type BuiltinType,
+    type Expression,
+    type GetModels,
+    type MemberExpression,
+    type SchemaDef,
+} from '@zenstackhq/runtime/schema';
+import { ExpressionVisitor } from '@zenstackhq/sdk';
 import {
     AliasNode,
     BinaryOperationNode,
@@ -33,22 +52,6 @@ import {
     type RootOperationNode,
 } from 'kysely';
 import { match } from 'ts-pattern';
-import type { ClientContract } from '../../client';
-import { QueryUtils } from '../../client';
-import { type CRUD_EXT } from '../../client/contract';
-import { getCrudDialect } from '../../client/crud/dialects';
-import type { BaseCrudDialect } from '../../client/crud/dialects/base-dialect';
-import { InternalError, QueryError, RejectedByPolicyError, RejectedByPolicyReason } from '../../client/errors';
-import type { ProceedKyselyQueryFunction } from '../../client/plugin';
-import {
-    ExpressionUtils,
-    type BuiltinType,
-    type Expression,
-    type GetModels,
-    type MemberExpression,
-    type SchemaDef,
-} from '../../schema';
-import { ExpressionVisitor } from '../../utils/expression-utils';
 import { ColumnCollector } from './column-collector';
 import { ExpressionTransformer } from './expression-transformer';
 import type { Policy, PolicyOperation } from './types';

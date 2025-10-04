@@ -1,10 +1,10 @@
 {
-    "name": "@zenstackhq/testtools",
+    "name": "@zenstackhq/plugin-policy",
     "version": "3.0.0-beta.8",
-    "description": "ZenStack Test Tools",
+    "description": "ZenStack Policy Plugin",
     "type": "module",
     "scripts": {
-        "build": "tsc --noEmit && tsup-node && copyfiles -f ./src/types.d.ts ./dist",
+        "build": "tsc --noEmit && tsup-node",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "pack": "pnpm pack"
@@ -26,34 +26,25 @@
                 "default": "./dist/index.cjs"
             }
         },
-        "./types": {
-            "types": "./dist/types.d.ts"
+        "./package.json": {
+            "import": "./package.json",
+            "require": "./package.json"
         }
     },
     "dependencies": {
         "@zenstackhq/common-helpers": "workspace:*",
-        "@zenstackhq/language": "workspace:*",
-        "@zenstackhq/runtime": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
-        "@zenstackhq/plugin-policy": "workspace:*",
-        "glob": "^11.0.2",
-        "kysely": "catalog:",
-        "prisma": "catalog:",
-        "tmp": "catalog:",
+        "@zenstackhq/runtime": "workspace:*",
         "ts-pattern": "catalog:"
     },
     "peerDependencies": {
-        "better-sqlite3": "catalog:",
-        "pg": "catalog:"
+        "kysely": "catalog:"
     },
     "devDependencies": {
         "@types/better-sqlite3": "^7.6.13",
-        "@types/node": "catalog:",
-        "@types/tmp": "catalog:",
-        "@types/pg": "^8.11.11",
+        "@types/pg": "^8.0.0",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "copyfiles": "^2.4.1",
-        "typescript": "catalog:"
+        "@zenstackhq/vitest-config": "workspace:*"
     }
 }

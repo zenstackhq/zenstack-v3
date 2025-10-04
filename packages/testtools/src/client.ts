@@ -1,8 +1,8 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import type { Model } from '@zenstackhq/language/ast';
+import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { ZenStackClient, type ClientContract, type ClientOptions } from '@zenstackhq/runtime';
-import { PolicyPlugin } from '@zenstackhq/runtime/plugins/policy';
 import type { SchemaDef } from '@zenstackhq/runtime/schema';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import SQLite from 'better-sqlite3';

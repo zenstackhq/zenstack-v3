@@ -10,7 +10,7 @@ import type {
     NullExpression,
     ThisExpression,
     UnaryExpression,
-} from '../schema';
+} from './schema';
 
 export class ExpressionVisitor {
     visit(expr: Expression): void {

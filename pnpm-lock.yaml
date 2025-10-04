@@ -501,6 +501,9 @@ importers:
 
   tests/e2e:
     dependencies:
+      '@paralleldrive/cuid2':
+        specifier: ^2.2.2
+        version: 2.2.2
       '@zenstackhq/cli':
         specifier: workspace:*
         version: link:../../packages/cli

@@ -12,9 +12,10 @@
         "test:postgresql": "TEST_DB_PROVIDER=postgresql vitest run"
     },
     "dependencies": {
+        "@paralleldrive/cuid2": "^2.2.2",
+        "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
-        "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/testtools": "workspace:*",
         "better-sqlite3": "catalog:",

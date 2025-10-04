@@ -37,7 +37,6 @@ export class NotFoundError extends ZenStackError {
 
 /**
  * Reason code for policy rejection.
- * @todo move to policy plugin package
  */
 export enum RejectedByPolicyReason {
     /**
@@ -58,7 +57,6 @@ export enum RejectedByPolicyReason {
 
 /**
  * Error thrown when an operation is rejected by access policy.
- * @todo move to policy plugin package
  */
 export class RejectedByPolicyError extends ZenStackError {
     constructor(

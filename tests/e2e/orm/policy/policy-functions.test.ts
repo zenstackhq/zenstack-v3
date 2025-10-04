@@ -1,5 +1,5 @@
+import { createPolicyTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from './utils';
 
 describe('policy functions tests', () => {
     it('supports contains case-sensitive', async () => {

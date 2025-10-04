@@ -1,5 +1,5 @@
+import { createPolicyTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from './utils';
 
 describe('Reference Equality Tests', () => {
     it('works with create and auth equality', async () => {

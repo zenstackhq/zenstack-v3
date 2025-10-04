@@ -48,7 +48,6 @@ describe('prisma omit', () => {
         found = await db.user.findFirst({
             select: { value: true, profile: { omit: { level: true } } },
         });
-        console.log(found);
         expect(found.age).toBeUndefined();
         expect(found.value).toEqual(10);
         expect(found.profile.level).toBeUndefined();

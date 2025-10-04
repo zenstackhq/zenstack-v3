@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { schema } from '../schemas/todo/schema';
-import { createPolicyTestClient } from './utils';
+import { createPolicyTestClient } from '@zenstackhq/testtools';
 
 describe('todo sample tests', () => {
     it('works with user CRUD', async () => {

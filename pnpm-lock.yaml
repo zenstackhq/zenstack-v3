@@ -392,9 +392,6 @@ importers:
 
   packages/testtools:
     dependencies:
-      '@types/pg':
-        specifier: ^8.11.11
-        version: 8.11.11
       '@zenstackhq/common-helpers':
         specifier: workspace:*
         version: link:../common-helpers
@@ -435,6 +432,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 20.17.24
+      '@types/pg':
+        specifier: ^8.11.11
+        version: 8.11.11
       '@types/tmp':
         specifier: 'catalog:'
         version: 0.2.6

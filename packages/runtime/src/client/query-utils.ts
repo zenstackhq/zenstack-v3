@@ -1,5 +1,14 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import type { Expression, ExpressionBuilder, ExpressionWrapper } from 'kysely';
+import {
+    AliasNode,
+    ColumnNode,
+    ReferenceNode,
+    TableNode,
+    type Expression,
+    type ExpressionBuilder,
+    type ExpressionWrapper,
+    type OperationNode,
+} from 'kysely';
 import { match } from 'ts-pattern';
 import { ExpressionUtils, type FieldDef, type GetModels, type ModelDef, type SchemaDef } from '../schema';
 import { extractFields } from '../utils/object-utils';
@@ -366,4 +375,36 @@ export function aggregate(eb: ExpressionBuilder<any, any>, expr: Expression<any>
         .with('_min', () => eb.fn.min(expr))
         .with('_max', () => eb.fn.max(expr))
         .exhaustive();
+}
+
+/**
+ * Strips alias from the node if it exists.
+ */
+export function stripAlias(node: OperationNode) {
+    if (AliasNode.is(node)) {
+        return { alias: node.alias, node: node.node };
+    } else {
+        return { alias: undefined, node };
+    }
+}
+
+/**
+ * Extracts model name from an OperationNode.
+ */
+export function extractModelName(node: OperationNode) {
+    const { node: innerNode } = stripAlias(node);
+    return TableNode.is(innerNode!) ? innerNode!.table.identifier.name : undefined;
+}
+
+/**
+ * Extracts field name from an OperationNode.
+ */
+export function extractFieldName(node: OperationNode) {
+    if (ReferenceNode.is(node) && ColumnNode.is(node.column)) {
+        return node.column.column.name;
+    } else if (ColumnNode.is(node)) {
+        return node.column.name;
+    } else {
+        return undefined;
+    }
 }

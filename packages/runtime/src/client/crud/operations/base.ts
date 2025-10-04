@@ -14,7 +14,6 @@ import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
 import type { ClientContract } from '../..';
-import { PolicyPlugin } from '../../../plugins/policy';
 import type { BuiltinType, Expression, FieldDef } from '../../../schema';
 import { ExpressionUtils, type GetModels, type ModelDef, type SchemaDef } from '../../../schema';
 import { clone } from '../../../utils/clone';
@@ -108,7 +107,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     // TODO: this is not clean, needs a better solution
     protected get hasPolicyEnabled() {
-        return this.options.plugins?.some((plugin) => plugin instanceof PolicyPlugin);
+        return this.options.plugins?.some((plugin) => plugin.constructor.name === 'PolicyPlugin');
     }
 
     protected requireModel(model: string) {

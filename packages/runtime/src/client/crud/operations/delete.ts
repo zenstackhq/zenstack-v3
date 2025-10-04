@@ -1,9 +1,8 @@
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { DeleteArgs, DeleteManyArgs } from '../../crud-types';
-import { NotFoundError } from '../../errors';
+import { NotFoundError, RejectedByPolicyError, RejectedByPolicyReason } from '../../errors';
 import { BaseOperationHandler } from './base';
-import { RejectedByPolicyError, RejectedByPolicyReason } from '../../../plugins/policy';
 
 export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
     async handle(operation: 'delete' | 'deleteMany', args: unknown | undefined) {

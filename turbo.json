@@ -7,7 +7,7 @@
             "outputs": ["dist/**"]
         },
         "watch": {
-            "dependsOn": ["^watch"],
+            "dependsOn": ["^build"],
             "inputs": ["src/**", "zenstack/*.zmodel"],
             "outputs": []
         },

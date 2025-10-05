@@ -1,10 +1,14 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { loadDocument } from '@zenstackhq/language';
 import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import type { SchemaDef } from '@zenstackhq/sdk/schema';
 import { execSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { match } from 'ts-pattern';
+import { expect } from 'vitest';
 import { createTestProject } from './project';
 
 function makePrelude(provider: 'sqlite' | 'postgresql', dbUrl?: string) {
@@ -85,4 +89,45 @@ export async function generateTsSchemaInPlace(schemaPath: string) {
     const generator = new TsSchemaGenerator();
     await generator.generate(result.model, workDir);
     return compileAndLoad(workDir);
+}
+
+export async function loadSchema(schema: string) {
+    if (!schema.includes('datasource ')) {
+        schema = `${makePrelude('sqlite')}\n\n${schema}`;
+    }
+
+    // create a temp file
+    const tempFile = path.join(os.tmpdir(), `zenstack-schema-${crypto.randomUUID()}.zmodel`);
+    fs.writeFileSync(tempFile, schema);
+    const r = await loadDocument(tempFile);
+    expect(r).toSatisfy(
+        (r) => r.success,
+        `Failed to load schema: ${(r as any).errors?.map((e: any) => e.toString()).join(', ')}`,
+    );
+    invariant(r.success);
+    return r.model;
+}
+
+export async function loadSchemaWithError(schema: string, error: string | RegExp) {
+    if (!schema.includes('datasource ')) {
+        schema = `${makePrelude('sqlite')}\n\n${schema}`;
+    }
+
+    // create a temp file
+    const tempFile = path.join(os.tmpdir(), `zenstack-schema-${crypto.randomUUID()}.zmodel`);
+    fs.writeFileSync(tempFile, schema);
+    const r = await loadDocument(tempFile);
+    expect(r.success).toBe(false);
+    invariant(!r.success);
+    if (typeof error === 'string') {
+        expect(r).toSatisfy(
+            (r) => r.errors.some((e: any) => e.toString().toLowerCase().includes(error.toLowerCase())),
+            `Expected error message to include "${error}" but got: ${r.errors.map((e: any) => e.toString()).join(', ')}`,
+        );
+    } else {
+        expect(r).toSatisfy(
+            (r) => r.errors.some((e: any) => error.test(e)),
+            `Expected error message to match "${error}" but got: ${r.errors.map((e: any) => e.toString()).join(', ')}`,
+        );
+    }
 }

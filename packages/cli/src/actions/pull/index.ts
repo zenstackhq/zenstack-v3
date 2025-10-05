@@ -1,481 +1,371 @@
-import type { ZModelServices } from '@zenstackhq/language'
-import type {
-    ArrayExpr,
-    AttributeArg,
-    DataField,
-    DataFieldAttribute,
-    DataFieldType,
-    DataModel,
-    Enum,
-    EnumField,
-    Model,
-    ReferenceExpr,
-    StringLiteral,
-    UnsupportedFieldType
-} from '@zenstackhq/language/ast'
-import type { IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider'
-import { getAttributeRef, getDbName } from './utils'
+import type { ZModelServices } from '@zenstackhq/language';
+import { isEnum, type DataField, type DataModel, type Enum, type Model } from '@zenstackhq/language/ast';
+import { DataFieldFactory, DataModelFactory, EnumFactory } from '@zenstackhq/language/factory';
+import type { PullOptions } from '../db';
+import type { IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider';
+import { getAttributeRef, getDbName } from './utils';
 
-export function syncEnums({ dbEnums, model }: { dbEnums: IntrospectedEnum[], model: Model, services: ZModelServices }) {
+export function syncEnums({
+    dbEnums,
+    model,
+    options: options,
+    services,
+}: {
+    dbEnums: IntrospectedEnum[];
+    model: Model;
+    services: ZModelServices;
+    options: PullOptions;
+}) {
     for (const dbEnum of dbEnums) {
-        const schemaEnum = {
-            $type: 'Enum' as const,
-            $container: model,
-            name: dbEnum.enum_type,
-            attributes: [],
-            comments: [],
-            get fields() {
-                return dbEnum.values.map((v): EnumField => ({
-                    $type: 'EnumField' as const,
-                    $container: schemaEnum,
-                    name: v,
-                    attributes: [],
-                    comments: [],
-                }));
-            }
-        }
-        model.declarations.push(schemaEnum)
+        const { modified, name } = resolveNameCasing(options, dbEnum.enum_type);
+        if (modified) console.log(`Mapping enum ${dbEnum.enum_type} to ${name}`);
+        const factory = new EnumFactory().setName(name);
+        if (modified)
+            factory.addAttribute((builder) =>
+                builder
+                    .setDecl(getAttributeRef('@@map', services)!)
+                    .addArg((argBuilder) => argBuilder.StringLiteral.setValue(dbEnum.enum_type)),
+            );
+
+        dbEnum.values.map((v) => {
+            const { name, modified } = resolveNameCasing(options, v);
+            factory.addField((builder) => {
+                builder.setName(name);
+                if (modified)
+                    builder.addAttribute((builder) =>
+                        builder
+                            .setDecl(getAttributeRef('@map', services)!)
+                            .addArg((argBuilder) => argBuilder.StringLiteral.setValue(v)),
+                    );
+
+                return builder;
+            });
+        });
+        model.declarations.push(factory.get({ $container: model }));
     }
+}
+
+function resolveNameCasing(options: PullOptions, originalName: string) {
+    let name: string;
+
+    switch (options.naming) {
+        case 'pascal':
+            name = toPascalCase(originalName);
+            break;
+        case 'camel':
+            name = toCamelCase(originalName);
+            break;
+        case 'snake':
+            name = toSnakeCase(originalName);
+            break;
+        case 'kebab':
+            name = toKebabCase(originalName);
+            break;
+        case 'none':
+        default:
+            name = originalName;
+            break;
+    }
+
+    return {
+        modified: options.alwaysMap ? true : name !== originalName,
+        name,
+    };
+}
+
+function toPascalCase(str: string): string {
+    return str.replace(/[_\- ]+(\w)/g, (_, c) => c.toUpperCase()).replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function toCamelCase(str: string): string {
+    return str.replace(/[_\- ]+(\w)/g, (_, c) => c.toUpperCase()).replace(/^\w/, (c) => c.toLowerCase());
+}
+
+function toSnakeCase(str: string): string {
+    return str
+        .replace(/[- ]+/g, '_')
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .toLowerCase();
+}
+
+function toKebabCase(str: string): string {
+    return str
+        .replace(/[_ ]+/g, '-')
+        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+        .toLowerCase();
 }
 
 export type Relation = {
-    schema: string
-    table: string
-    column: string
-    type: 'one' | 'many'
-    fk_name: string
-    nullable: boolean
+    schema: string;
+    table: string;
+    column: string;
+    type: 'one' | 'many';
+    fk_name: string;
+    nullable: boolean;
     references: {
-        schema: string | null
-        table: string | null
-        column: string | null
-        type: 'one' | 'many'
-    }
-}
+        schema: string | null;
+        table: string | null;
+        column: string | null;
+        type: 'one' | 'many';
+    };
+};
 
 export function syncTable({
     model,
     provider,
     table,
-    services
+    services,
+    options,
 }: {
-    table: IntrospectedTable
-    model: Model
-    provider: IntrospectionProvider
-    services: ZModelServices
+    table: IntrospectedTable;
+    model: Model;
+    provider: IntrospectionProvider;
+    services: ZModelServices;
+    options: PullOptions;
 }) {
-    const idAttribute = getAttributeRef('@id', services)
-    const uniqueAttribute = getAttributeRef('@unique', services)
-    const modelUniqueAttribute = getAttributeRef('@@unique', services)
-    const relationAttribute = getAttributeRef('@relation', services)
-    const fieldMapAttribute = getAttributeRef('@map', services)
-    const tableMapAttribute = getAttributeRef('@@map', services)
+    const idAttribute = getAttributeRef('@id', services);
+    const modelIdAttribute = getAttributeRef('@@id', services);
+    const uniqueAttribute = getAttributeRef('@unique', services);
+    const modelUniqueAttribute = getAttributeRef('@@unique', services);
+    const relationAttribute = getAttributeRef('@relation', services);
+    const fieldMapAttribute = getAttributeRef('@map', services);
+    const tableMapAttribute = getAttributeRef('@@map', services);
+    const modelindexAttribute = getAttributeRef('@@index', services);
 
-    if (!idAttribute || !uniqueAttribute || !relationAttribute || !fieldMapAttribute || !tableMapAttribute) {
-        throw new Error('Cannot find required attributes in the model.')
+    if (
+        !idAttribute ||
+        !uniqueAttribute ||
+        !relationAttribute ||
+        !fieldMapAttribute ||
+        !tableMapAttribute ||
+        !modelIdAttribute ||
+        !modelUniqueAttribute ||
+        !modelindexAttribute
+    ) {
+        throw new Error('Cannot find required attributes in the model.');
     }
 
-    const relations: Relation[] = []
-    const modelTable: DataModel = {
-        $type: 'DataModel' as const,
-        $container: model,
-        name: table.name,
-        fields: [],
-        attributes: [],
-        comments: [],
-        isView: false,
-        mixins: [],
+    const relations: Relation[] = [];
+    const { name, modified } = resolveNameCasing({ ...options, naming: 'pascal' }, table.name);
+    const multiPk = table.columns.filter((c) => c.pk).length > 1;
+
+    const modelFactory = new DataModelFactory().setName(name).setIsView(table.type === 'view');
+    modelFactory.setContainer(model);
+    if (modified) {
+        modelFactory.addAttribute((builder) =>
+            builder.setDecl(tableMapAttribute).addArg((argBuilder) => argBuilder.StringLiteral.setValue(table.name)),
+        );
     }
-    model.declarations.push(modelTable)
 
-    modelTable.fields = table.columns.map((col) => {
-        if (col.default) console.log(`${table.name}.${col.name} -> ${col.default}`);
+    if (multiPk) {
+        const pkColumns = table.columns.filter((c) => c.pk).map((c) => c.name);
+        modelFactory.addAttribute((builder) =>
+            builder.setDecl(modelIdAttribute).addArg((argBuilder) => {
+                const arrayExpr = argBuilder.ArrayExpr;
+                pkColumns.map((c) => {
+                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c)!;
+                    arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
+                });
+                return arrayExpr;
+            }),
+        );
+    }
 
-        if (col.foreign_key_table) {
+    table.columns.forEach((column) => {
+        if (column.foreign_key_table) {
             relations.push({
                 schema: table.schema,
                 table: table.name,
-                column: col.name,
+                column: column.name,
                 type: 'one',
-                fk_name: col.foreign_key_name!,
-                nullable: col.nullable,
+                fk_name: column.foreign_key_name!,
+                nullable: column.nullable,
                 references: {
-                    schema: col.foreign_key_schema,
-                    table: col.foreign_key_table,
-                    column: col.foreign_key_column,
-                    type: col.unique ? 'one' : 'many',
+                    schema: column.foreign_key_schema,
+                    table: column.foreign_key_table,
+                    column: column.foreign_key_column,
+                    type: column.unique ? 'one' : 'many',
                 },
-            })
+            });
         }
 
-        const fieldPrefix = /[0-9]/g.test(col.name.charAt(0)) ? '_' : ''
-        const fieldName = `${fieldPrefix}${col.name}`
+        const fieldPrefix = /[0-9]/g.test(column.name.charAt(0)) ? '_' : '';
+        const { name: _name, modified } = resolveNameCasing(options, column.name);
+        const name = `${fieldPrefix}${_name}`;
 
-        const builtinType = provider.getBuiltinType(col.datatype)
-        const field: DataField = {
-            $type: 'DataField' as const,
-            get type() {
-                return {
-                    $container: this,
-                    $type: 'DataFieldType' as const,
-                    type: builtinType.type === 'Unsupported' ? undefined : builtinType.type,
-                    array: builtinType.isArray,
-                    get unsupported() {
-                        return builtinType.type === 'Unsupported' ? {
-                            $container: this,
-                            $type: 'UnsupportedFieldType' as const,
-                            get value() {
-                                return {
-                                    $container: this,
-                                    $type: 'StringLiteral',
-                                    value: col.datatype,
-                                } satisfies StringLiteral
-                            },
-                        } satisfies UnsupportedFieldType : undefined
-                    },
-                    optional: col.nullable,
-                    reference: col.options.length
-                        ? {
-                            $refText: col.datatype,
-                            ref: model.declarations.find(
-                                (d) => d.$type === 'Enum' && getDbName(d) === col.datatype
-                            ) as Enum | undefined,
-                        }
-                        : undefined,
-                } satisfies DataFieldType
-            },
-            $container: modelTable!,
-            name: fieldName,
-            get attributes() {
-                if (fieldPrefix !== '') return []
+        const builtinType = provider.getBuiltinType(column.datatype);
 
-                const getDefaultAttrs = () => {
-                    if (!col.default) return [];
+        modelFactory.addField((builder) => {
+            builder.setName(name);
+            builder.setType((typeBuilder) => {
+                typeBuilder.setArray(builtinType.isArray);
+                typeBuilder.setOptional(column.nullable);
 
-                    const defaultValue = col.default && provider.getDefaultValue({
-                        fieldName: col.name,
-                        defaultValue: col.default,
-                        container: this,
-                        services,
-                        enums: model.declarations.filter((d) => d.$type === 'Enum') as Enum[],
-                    })
-
-                    if (!defaultValue) return [];
-
-                    if (Array.isArray(defaultValue)) {
-                        return defaultValue;
-                    }
-
-                    if (defaultValue?.$type === 'DataFieldAttribute') {
-                        return [defaultValue];
-                    }
-
-                    return [{
-                        $type: 'DataFieldAttribute' as const,
-                        $container: this,
-                        decl: {
-                            $refText: 'default',
-                            ref: getAttributeRef('@default', services)
-                        },
-                        get args() {
-                            return [{
-                                $type: 'AttributeArg' as const,
-                                $container: this,
-                                name: '',
-                                $resolvedParam: {
-                                    name: '',
-                                },
-                                get value() {
-                                    return { ...defaultValue, $container: this }
-                                },
-                            }] satisfies AttributeArg[]
-                        },
-                    } satisfies DataFieldAttribute];
+                if (builtinType.type != 'Unsupported') {
+                    typeBuilder.setType(builtinType.type);
+                } else {
+                    typeBuilder.setUnsupported((unsupportedBuilder) =>
+                        unsupportedBuilder.setValue((lt) => lt.StringLiteral.setValue(column.datatype)),
+                    );
                 }
 
-                return [
-                    ...(col.pk ? [{
-                        $type: 'DataFieldAttribute' as const,
-                        $container: this,
-                        args: [],
-                        decl: {
-                            $refText: '@id',
-                            ref: idAttribute,
-                        },
-                    }] : []) satisfies DataFieldAttribute[],
-                    ...getDefaultAttrs(),
-                    {
-                        $type: 'DataFieldAttribute' as const,
-                        $container: this,
-                        decl: {
-                            $refText: '@map',
-                            ref: fieldMapAttribute,
-                        },
-                        get args() {
-                            return [{
-                                $type: 'AttributeArg' as const,
-                                $container: this,
-                                name: '',
-                                $resolvedParam: {
-                                    name: '',
-                                },
-                                get value() {
-                                    return {
-                                        $type: 'StringLiteral' as const,
-                                        $container: this,
-                                        value: col.name,
-                                    }
-                                },
-                            }
-                            ] satisfies AttributeArg[]
-                        },
+                if (column.options.length > 0) {
+                    const ref = model.declarations.find((d) => isEnum(d) && getDbName(d) === column.datatype) as
+                        | Enum
+                        | undefined;
+
+                    if (ref) {
+                        typeBuilder.setReference(ref);
                     }
-                ] satisfies DataFieldAttribute[]
-            },
-            comments: [],
-        }
-        return field
-    })
+                }
 
-    const uniqieColumns = table.columns.filter((c) => c.unique && !c.pk).map((c) => c.name)
+                return typeBuilder;
+            });
+
+            if (column.default) {
+                const defaultValuesAttrs = column.default
+                    ? provider.getDefaultValue({
+                          fieldName: column.name,
+                          defaultValue: column.default,
+                          services,
+                          enums: model.declarations.filter((d) => d.$type === 'Enum') as Enum[],
+                      })
+                    : [];
+                defaultValuesAttrs.forEach(builder.addAttribute);
+            }
+
+            if (column.pk && !multiPk) {
+                builder.addAttribute((b) => b.setDecl(idAttribute));
+            }
+
+            if (column.unique)
+                builder.addAttribute((b) => {
+                    b.setDecl(uniqueAttribute);
+                    if (column.unique_name) b.addArg((ab) => ab.StringLiteral.setValue(column.unique_name!), 'map');
+
+                    return b;
+                });
+            if (modified)
+                builder.addAttribute((ab) =>
+                    ab.setDecl(fieldMapAttribute).addArg((ab) => ab.StringLiteral.setValue(column.name), 'name'),
+                );
+
+            return builder;
+        });
+    });
+
+    const uniqieColumns = table.columns.filter((c) => c.unique && !c.pk).map((c) => c.name);
     if (uniqieColumns.length > 0) {
-        modelTable.attributes.push({
-            $type: 'DataModelAttribute' as const,
-            $container: modelTable,
-            decl: {
-                $refText: '@unique',
-                ref: modelUniqueAttribute,
-            },
-            get args() {
-                return uniqieColumns.map((c) => ({
-                    $type: 'AttributeArg' as const,
-                    $container: this,
-                    name: '',
-                    $resolvedParam: {
-                        name: '',
-                    },
-                    get value() {
-                        return {
-                            $type: 'ArrayExpr' as const,
-                            $container: this,
-                            get items() {
-                                return [{
-                                    $container: this,
-                                    $type: 'ReferenceExpr' as const,
-                                    target: {
-                                        $refText: c,
-                                        ref: modelTable.fields.find((f) => f.name === c),
-                                    },
-                                    args: [],
-                                }] satisfies ReferenceExpr[]
-                            }
-                        } as ArrayExpr
-                    },
-                })) satisfies AttributeArg[]
-            },
-        })
-
-        return relations
+        modelFactory.addAttribute((builder) =>
+            builder.setDecl(modelUniqueAttribute).addArg((argBuilder) => {
+                const arrayExpr = argBuilder.ArrayExpr;
+                uniqieColumns.map((c) => {
+                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c)!;
+                    arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
+                });
+                return arrayExpr;
+            }),
+        );
     }
 
-    return relations
+    model.declarations.push(modelFactory.node);
+
+    table.indexes.forEach((index) => {
+        modelFactory.addAttribute((builder) =>
+            builder.setDecl(modelindexAttribute).addArg((argBuilder) => {
+                const arrayExpr = argBuilder.ArrayExpr;
+                index.columns.map((c) => {
+                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c.name)!;
+                    arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
+                });
+                return arrayExpr;
+            }),
+        );
+    });
+
+    return relations;
 }
 
-export function syncRelation({ model, relation, services }: { model: Model, relation: Relation, services: ZModelServices }) {
-    const idAttribute = getAttributeRef('@id', services)
-    const uniqueAttribute = getAttributeRef('@unique', services)
-    const relationAttribute = getAttributeRef('@relation', services)
-    const fieldMapAttribute = getAttributeRef('@map', services)
-    const tableMapAttribute = getAttributeRef('@@map', services)
+export function syncRelation({
+    model,
+    relation,
+    services,
+}: {
+    model: Model;
+    relation: Relation;
+    services: ZModelServices;
+    options: PullOptions;
+}) {
+    const idAttribute = getAttributeRef('@id', services);
+    const uniqueAttribute = getAttributeRef('@unique', services);
+    const relationAttribute = getAttributeRef('@relation', services);
+    const fieldMapAttribute = getAttributeRef('@map', services);
+    const tableMapAttribute = getAttributeRef('@@map', services);
 
     if (!idAttribute || !uniqueAttribute || !relationAttribute || !fieldMapAttribute || !tableMapAttribute) {
-        throw new Error('Cannot find required attributes in the model.')
+        throw new Error('Cannot find required attributes in the model.');
     }
 
-    const sourceModel = model.declarations.find(
-        (d) => d.$type === 'DataModel' && getDbName(d) === relation.table
-    ) as DataModel | undefined
-    if (!sourceModel) return
+    const sourceModel = model.declarations.find((d) => d.$type === 'DataModel' && getDbName(d) === relation.table) as
+        | DataModel
+        | undefined;
+    if (!sourceModel) return;
 
-    const sourceField = sourceModel.fields.find(
-        (f) => getDbName(f) === relation.column
-    ) as DataField | undefined
-    if (!sourceField) return
+    const sourceField = sourceModel.fields.find((f) => getDbName(f) === relation.column) as DataField | undefined;
+    if (!sourceField) return;
 
     const targetModel = model.declarations.find(
-        (d) => d.$type === 'DataModel' && getDbName(d) === relation.references.table
-    ) as DataModel | undefined
-    if (!targetModel) return
+        (d) => d.$type === 'DataModel' && getDbName(d) === relation.references.table,
+    ) as DataModel | undefined;
+    if (!targetModel) return;
 
-    const targetField = targetModel.fields.find(
-        (f) => getDbName(f) === relation.references.column
-    )
-    if (!targetField) return
+    const targetField = targetModel.fields.find((f) => getDbName(f) === relation.references.column);
+    if (!targetField) return;
 
     //TODO: Finish relation sync
 
-    const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : ''
+    const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : '';
 
-    sourceModel.fields.push({
-        $type: 'DataField' as const,
-        $container: sourceModel,
-        name: `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`,
-        comments: [],
-        get type() {
-            return {
-                $container: this,
-                $type: 'DataFieldType' as const,
-                reference: {
-                    ref: targetModel,
-                    $refText: targetModel.name,
-                },
-                optional: relation.nullable,
-                //TODO
-                array: relation.type === 'many',
-            } satisfies DataFieldType
-        },
-        get attributes() {
-            return [{
-                $type: 'DataFieldAttribute' as const,
-                $container: this,
-                decl: {
-                    $refText: '@relation',
-                    ref: relationAttribute,
-                },
-                get args() {
-                    return [{
-                        $type: 'AttributeArg' as const,
-                        $container: this,
-                        name: '',
-                        $resolvedParam: {
-                            name: '',
-                        },
-                        get value() {
-                            return {
-                                $type: 'StringLiteral' as const,
-                                $container: this,
-                                value: relation.fk_name,
-                            } satisfies StringLiteral
-                        },
-                    },
-                    {
-                        $type: 'AttributeArg' as const,
-                        $container: this,
-                        name: 'fields',
-                        $resolvedParam: {
-                            name: 'fields',
-                        },
-                        get value() {
-                            return {
-                                $type: 'ArrayExpr' as const,
-                                $container: this,
-                                get items() {
-                                    return [{
-                                        $container: this,
-                                        $type: 'ReferenceExpr' as const,
-                                        target: {
-                                            ref: sourceField,
-                                            $refText: sourceField.name,
-                                        },
-                                        args: [],
-                                    }] satisfies ReferenceExpr[]
-                                },
-                            } satisfies ArrayExpr
-                        },
-                    }, {
-                        $type: 'AttributeArg' as const,
-                        $container: this,
-                        name: 'references',
-                        $resolvedParam: {
-                            name: 'references',
-                        },
-                        get value() {
-                            return {
-                                $type: 'ArrayExpr' as const,
-                                $container: this,
-                                get items() {
-                                    return [{
-                                        $container: this,
-                                        $type: 'ReferenceExpr' as const,
-                                        target: {
-                                            ref: targetField,
-                                            $refText: targetField.name,
-                                        },
-                                        args: [],
-                                    }] satisfies ReferenceExpr[]
-                                },
-                            } satisfies ArrayExpr
-                        },
-                    }, {
-                        $type: 'AttributeArg' as const,
-                        $container: this,
-                        name: 'map',
-                        $resolvedParam: {
-                            name: 'map',
-                        },
-                        get value() {
-                            return {
-                                $type: 'StringLiteral' as const,
-                                $container: this,
-                                value: relation.fk_name,
-                            } satisfies StringLiteral
-                        },
-                    }] satisfies AttributeArg[]
-                },
-            }] satisfies DataFieldAttribute[]
-        },
-    })
+    const relationName = `${sourceModel.name}_${relation.column}To${targetModel.name}_${relation.references.column}`;
 
-    const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : ''
-    const oppositeFieldName = relation.type === 'one'
-        ? `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}s`
-        : `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
+    const sourceFieldFactory = new DataFieldFactory()
+        .setContainer(sourceModel)
+        .setName(
+            `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`,
+        )
+        .setType((tb) =>
+            tb
+                .setOptional(relation.nullable)
+                .setArray(relation.type === 'many')
+                .setReference(targetModel),
+        )
+        .addAttribute((ab) =>
+            ab
+                .setDecl(relationAttribute)
+                .addArg((ab) => ab.StringLiteral.setValue(relationName))
+                .addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(sourceField)), 'fields')
+                .addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(targetField)), 'references')
+                .addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.StringLiteral.setValue(relation.fk_name)), 'map'),
+        );
 
-    targetModel.fields.push({
-        $type: 'DataField' as const,
-        $container: targetModel,
-        name: oppositeFieldName,
-        get type() {
-            return {
-                $container: this,
-                $type: 'DataFieldType' as const,
-                reference: {
-                    ref: sourceModel,
-                    $refText: sourceModel.name,
-                },
-                optional: relation.references.type === 'one' && relation.nullable,
-                array: relation.references.type === 'many',
-            } satisfies DataFieldType
-        },
-        get attributes() {
-            return [
-                {
-                    $type: 'DataFieldAttribute' as const,
-                    $container: this,
-                    decl: {
-                        $refText: '@relation',
-                        ref: relationAttribute,
-                    },
-                    get args() {
-                        return [{
-                            $type: 'AttributeArg' as const,
-                            $container: this,
-                            name: '',
-                            $resolvedParam: {
-                                name: '',
-                            },
-                            get value() {
-                                return {
-                                    $type: 'StringLiteral' as const,
-                                    $container: this,
-                                    value: relation.fk_name,
-                                } satisfies StringLiteral
-                            },
-                        }] satisfies AttributeArg[]
-                    }
-                }
-            ] satisfies DataFieldAttribute[]
-        },
-        comments: [],
-    })
+    sourceModel.fields.push(sourceFieldFactory.node);
+
+    const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : '';
+    const oppositeFieldName =
+        relation.type === 'one'
+            ? `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}s`
+            : `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`;
+
+    const targetFieldFactory = new DataFieldFactory()
+        .setContainer(targetModel)
+        .setName(oppositeFieldName)
+        .setType((tb) =>
+            tb
+                .setOptional(relation.references.type === 'one')
+                .setArray(relation.references.type === 'many')
+                .setReference(sourceModel),
+        )
+        .addAttribute((ab) => ab.setDecl(relationAttribute).addArg((ab) => ab.StringLiteral.setValue(relationName)));
+
+    targetModel.fields.push(targetFieldFactory.node);
 }

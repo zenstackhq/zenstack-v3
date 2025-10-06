@@ -151,23 +151,10 @@ export function syncTable({
 
     const modelFactory = new DataModelFactory().setName(name).setIsView(table.type === 'view');
     modelFactory.setContainer(model);
+
     if (modified) {
         modelFactory.addAttribute((builder) =>
             builder.setDecl(tableMapAttribute).addArg((argBuilder) => argBuilder.StringLiteral.setValue(table.name)),
-        );
-    }
-
-    if (multiPk) {
-        const pkColumns = table.columns.filter((c) => c.pk).map((c) => c.name);
-        modelFactory.addAttribute((builder) =>
-            builder.setDecl(modelIdAttribute).addArg((argBuilder) => {
-                const arrayExpr = argBuilder.ArrayExpr;
-                pkColumns.map((c) => {
-                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c)!;
-                    arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
-                });
-                return arrayExpr;
-            }),
         );
     }
 
@@ -231,7 +218,7 @@ export function syncTable({
                           enums: model.declarations.filter((d) => d.$type === 'Enum') as Enum[],
                       })
                     : [];
-                defaultValuesAttrs.forEach(builder.addAttribute);
+                defaultValuesAttrs.forEach(builder.addAttribute.bind(builder));
             }
 
             if (column.pk && !multiPk) {
@@ -254,6 +241,20 @@ export function syncTable({
         });
     });
 
+    const pkColumns = table.columns.filter((c) => c.pk).map((c) => c.name);
+    if (multiPk) {
+        modelFactory.addAttribute((builder) =>
+            builder.setDecl(modelIdAttribute).addArg((argBuilder) => {
+                const arrayExpr = argBuilder.ArrayExpr;
+                pkColumns.map((c) => {
+                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c)!;
+                    arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
+                });
+                return arrayExpr;
+            }),
+        );
+    }
+
     const uniqieColumns = table.columns.filter((c) => c.unique && !c.pk).map((c) => c.name);
     if (uniqieColumns.length > 0) {
         modelFactory.addAttribute((builder) =>
@@ -268,20 +269,50 @@ export function syncTable({
         );
     }
 
-    model.declarations.push(modelFactory.node);
-
     table.indexes.forEach((index) => {
+        if (index.predicate) {
+            //These constraints are not supported by Zenstack, because Zenstack currently does not fully support check constraints. Read more: https://pris.ly/d/check-constraints
+            console.log(
+                'These constraints are not supported by Zenstack. Read more: https://pris.ly/d/check-constraints',
+                `- Model: "${table.name}", constraint: "${index.name}"`,
+            );
+            return;
+        }
+        if (index.columns.find((c) => c.expression)) {
+            console.log(
+                'These constraints are not supported by Zenstack. Read more: https://pris.ly/d/check-constraints',
+                `- Model: "${table.name}", constraint: "${index.name}"`,
+            );
+            return;
+        }
+
+        if (index.columns.length === 1 && index.columns.find((c) => pkColumns.includes(c.name))) {
+            //skip primary key
+            return;
+        }
+
         modelFactory.addAttribute((builder) =>
-            builder.setDecl(modelindexAttribute).addArg((argBuilder) => {
-                const arrayExpr = argBuilder.ArrayExpr;
-                index.columns.map((c) => {
-                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c.name)!;
-                    arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
-                });
-                return arrayExpr;
-            }),
+            builder
+                .setDecl(index.unique ? modelUniqueAttribute : modelindexAttribute)
+                .addArg((argBuilder) => {
+                    const arrayExpr = argBuilder.ArrayExpr;
+                    index.columns.map((c) => {
+                        const ref = modelFactory.node.fields.find((f) => getDbName(f) === c.name)!;
+                        if (!ref) console.log(c, table.name);
+                        arrayExpr.addItem((itemBuilder) => {
+                            const refExpr = itemBuilder.ReferenceExpr.setTarget(ref);
+                            if (c.order !== 'ASC') refExpr.addArg((ab) => ab.StringLiteral.setValue('DESC'), 'sort');
+
+                            return refExpr;
+                        });
+                    });
+                    return arrayExpr;
+                })
+                .addArg((argBuilder) => argBuilder.StringLiteral.setValue(index.name), 'map'),
         );
     });
+
+    model.declarations.push(modelFactory.node);
 
     return relations;
 }
@@ -327,12 +358,15 @@ export function syncRelation({
     const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : '';
 
     const relationName = `${sourceModel.name}_${relation.column}To${targetModel.name}_${relation.references.column}`;
+    let sourceFieldName = `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`;
+
+    if (sourceModel.fields.find((f) => f.name === sourceFieldName)) {
+        sourceFieldName = `${sourceFieldName}To${targetModel.name.charAt(0).toLowerCase()}${targetModel.name.slice(1)}_${relation.references.column}`;
+    }
 
     const sourceFieldFactory = new DataFieldFactory()
         .setContainer(sourceModel)
-        .setName(
-            `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`,
-        )
+        .setName(sourceFieldName)
         .setType((tb) =>
             tb
                 .setOptional(relation.nullable)
@@ -345,7 +379,7 @@ export function syncRelation({
                 .addArg((ab) => ab.StringLiteral.setValue(relationName))
                 .addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(sourceField)), 'fields')
                 .addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(targetField)), 'references')
-                .addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.StringLiteral.setValue(relation.fk_name)), 'map'),
+                .addArg((ab) => ab.StringLiteral.setValue(relation.fk_name), 'map'),
         );
 
     sourceModel.fields.push(sourceFieldFactory.node);

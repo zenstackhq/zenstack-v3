@@ -110,8 +110,12 @@ export class ReferenceExprFactory extends AstFactory<ReferenceExpr> {
         return this;
     }
 
-    addArg(builder: (a: ReferenceArgFactory) => ReferenceArgFactory) {
-        this.args.push(builder(new ReferenceArgFactory()));
+    addArg(builder: (a: ExpressionBuilder) => AstFactory<Expression>, name?: string) {
+        const arg = new ReferenceArgFactory().setValue(builder);
+        if (name) {
+            arg.setName(name);
+        }
+        this.args.push(arg);
         this.update({
             args: this.args,
         });

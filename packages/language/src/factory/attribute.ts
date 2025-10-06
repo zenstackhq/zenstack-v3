@@ -18,7 +18,7 @@ export class DataFieldAttributeFactory extends AstFactory<DataFieldAttribute> {
     args: AttributeArgFactory[] = [];
     decl?: Reference<Attribute>;
     constructor() {
-        super({ type: DataFieldAttribute });
+        super({ type: DataFieldAttribute, node: { args: [] } });
     }
     setDecl(decl: Attribute) {
         this.decl = {
@@ -47,7 +47,7 @@ export class DataModelAttributeFactory extends AstFactory<DataModelAttribute> {
     args: AttributeArgFactory[] = [];
     decl?: Reference<Attribute>;
     constructor() {
-        super({ type: DataModelAttribute });
+        super({ type: DataModelAttribute, node: { args: [] } });
     }
     setDecl(decl: Attribute) {
         this.decl = {
@@ -102,7 +102,7 @@ export class InternalAttributeFactory extends AstFactory<InternalAttribute> {
     args: AttributeArgFactory[] = [];
 
     constructor() {
-        super({ type: InternalAttribute });
+        super({ type: InternalAttribute, node: { args: [] } });
     }
 
     setDecl(decl: Attribute) {

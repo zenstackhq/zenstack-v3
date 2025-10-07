@@ -304,16 +304,37 @@ export function flattenCompoundUniqueFilters(schema: SchemaDef, model: string, f
         return filter;
     }
 
-    const result: any = {};
+    const flattenedResult: any = {};
+    const restFilter: any = {};
+
     for (const [key, value] of Object.entries(filter)) {
         if (compoundUniques.some(({ name }) => name === key)) {
             // flatten the compound field
-            Object.assign(result, value);
+            Object.assign(flattenedResult, value);
         } else {
-            result[key] = value;
+            restFilter[key] = value;
         }
     }
-    return result;
+
+    if (Object.keys(flattenedResult).length === 0) {
+        // nothing flattened
+        return filter;
+    } else if (Object.keys(restFilter).length === 0) {
+        // all flattened
+        return flattenedResult;
+    } else {
+        const flattenedKeys = Object.keys(flattenedResult);
+        const restKeys = Object.keys(restFilter);
+        if (flattenedKeys.some((k) => restKeys.includes(k))) {
+            // keys overlap, cannot merge directly, build an AND clause
+            return {
+                AND: [flattenedResult, restFilter],
+            };
+        } else {
+            // safe to merge directly
+            return { ...flattenedResult, ...restFilter };
+        }
+    }
 }
 
 export function ensureArray<T>(value: T | T[]): T[] {

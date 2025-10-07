@@ -4,17 +4,18 @@ import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
 import { z, ZodSchema, ZodType } from 'zod';
 import {
+    type AttributeApplication,
     type BuiltinType,
     type EnumDef,
     type FieldDef,
     type GetModels,
     type ModelDef,
     type SchemaDef,
-} from '../../schema';
-import { enumerate } from '../../utils/enumerate';
-import { extractFields } from '../../utils/object-utils';
-import { formatError } from '../../utils/zod-utils';
-import { AGGREGATE_OPERATORS, LOGICAL_COMBINATORS, NUMERIC_FIELD_TYPES } from '../constants';
+} from '../../../schema';
+import { enumerate } from '../../../utils/enumerate';
+import { extractFields } from '../../../utils/object-utils';
+import { formatError } from '../../../utils/zod-utils';
+import { AGGREGATE_OPERATORS, LOGICAL_COMBINATORS, NUMERIC_FIELD_TYPES } from '../../constants';
 import {
     type AggregateArgs,
     type CountArgs,
@@ -29,8 +30,8 @@ import {
     type UpdateManyAndReturnArgs,
     type UpdateManyArgs,
     type UpsertArgs,
-} from '../crud-types';
-import { InputValidationError, InternalError } from '../errors';
+} from '../../crud-types';
+import { InputValidationError, InternalError } from '../../errors';
 import {
     fieldHasDefaultValue,
     getDiscriminatorField,
@@ -38,7 +39,8 @@ import {
     getUniqueFields,
     requireField,
     requireModel,
-} from '../query-utils';
+} from '../../query-utils';
+import { addCustomValidation, addNumberValidation, addStringValidation } from './utils';
 
 type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema>, options: Options) => ZodType;
 
@@ -191,11 +193,14 @@ export class InputValidator<Schema extends SchemaDef> {
             schema = getSchema(model, options);
             this.schemaCache.set(cacheKey!, schema);
         }
-        const { error } = schema.safeParse(args);
+        const { error, data } = schema.safeParse(args);
         if (error) {
-            throw new InputValidationError(`Invalid ${operation} args: ${formatError(error)}`, error);
+            throw new InputValidationError(
+                `Invalid ${operation} args for model "${model}": ${formatError(error)}`,
+                error,
+            );
         }
-        return args as T;
+        return data as T;
     }
 
     // #region Find
@@ -235,13 +240,13 @@ export class InputValidator<Schema extends SchemaDef> {
         return result;
     }
 
-    private makePrimitiveSchema(type: string) {
+    private makePrimitiveSchema(type: string, attributes?: AttributeApplication[]) {
         if (this.schema.typeDefs && type in this.schema.typeDefs) {
             return this.makeTypeDefSchema(type);
         } else {
             return match(type)
-                .with('String', () => z.string())
-                .with('Int', () => z.number().int())
+                .with('String', () => addStringValidation(z.string(), attributes))
+                .with('Int', () => addNumberValidation(z.number().int(), attributes))
                 .with('Float', () => z.number())
                 .with('Boolean', () => z.boolean())
                 .with('BigInt', () => z.union([z.number().int(), z.bigint()]))
@@ -860,7 +865,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     uncheckedVariantFields[field] = fieldSchema;
                 }
             } else {
-                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type);
+                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
 
                 if (fieldDef.array) {
                     fieldSchema = z
@@ -889,14 +894,17 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         });
 
+        const uncheckedCreateSchema = addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes);
+        const checkedCreateSchema = addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes);
+
         if (!hasRelation) {
-            return this.orArray(z.strictObject(uncheckedVariantFields), canBeArray);
+            return this.orArray(uncheckedCreateSchema, canBeArray);
         } else {
             return z.union([
-                z.strictObject(uncheckedVariantFields),
-                z.strictObject(checkedVariantFields),
-                ...(canBeArray ? [z.array(z.strictObject(uncheckedVariantFields))] : []),
-                ...(canBeArray ? [z.array(z.strictObject(checkedVariantFields))] : []),
+                uncheckedCreateSchema,
+                checkedCreateSchema,
+                ...(canBeArray ? [z.array(uncheckedCreateSchema)] : []),
+                ...(canBeArray ? [z.array(checkedCreateSchema)] : []),
             ]);
         }
     }
@@ -1112,7 +1120,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     uncheckedVariantFields[field] = fieldSchema;
                 }
             } else {
-                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type).optional();
+                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes).optional();
 
                 if (this.isNumericField(fieldDef)) {
                     fieldSchema = z.union([
@@ -1161,10 +1169,12 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         });
 
+        const uncheckedUpdateSchema = addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes);
+        const checkedUpdateSchema = addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes);
         if (!hasRelation) {
-            return z.strictObject(uncheckedVariantFields);
+            return uncheckedUpdateSchema;
         } else {
-            return z.union([z.strictObject(uncheckedVariantFields), z.strictObject(checkedVariantFields)]);
+            return z.union([uncheckedUpdateSchema, checkedUpdateSchema]);
         }
     }
 

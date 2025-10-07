@@ -134,7 +134,7 @@ importers:
         version: 0.2.6
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../eslint-config
+        version: link:../config/eslint-config
       '@zenstackhq/runtime':
         specifier: workspace:*
         version: link:../runtime
@@ -143,10 +143,10 @@ importers:
         version: link:../testtools
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
+        version: link:../config/typescript-config
       '@zenstackhq/vitest-config':
         specifier: workspace:*
-        version: link:../vitest-config
+        version: link:../config/vitest-config
       better-sqlite3:
         specifier: 'catalog:'
         version: 12.2.0
@@ -158,10 +158,16 @@ importers:
     devDependencies:
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../eslint-config
+        version: link:../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
+        version: link:../config/typescript-config
+
+  packages/config/eslint-config: {}
+
+  packages/config/typescript-config: {}
+
+  packages/config/vitest-config: {}
 
   packages/create-zenstack:
     dependencies:
@@ -177,10 +183,10 @@ importers:
     devDependencies:
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../eslint-config
+        version: link:../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
+        version: link:../config/typescript-config
 
   packages/dialects/sql.js:
     devDependencies:
@@ -189,21 +195,19 @@ importers:
         version: 1.4.9
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../../eslint-config
+        version: link:../../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../../typescript-config
+        version: link:../../config/typescript-config
       '@zenstackhq/vitest-config':
         specifier: workspace:*
-        version: link:../../vitest-config
+        version: link:../../config/vitest-config
       kysely:
         specifier: 'catalog:'
         version: 0.27.6
       sql.js:
         specifier: ^1.13.0
         version: 1.13.0
-
-  packages/eslint-config: {}
 
   packages/ide/vscode:
     dependencies:
@@ -225,10 +229,10 @@ importers:
         version: 1.101.0
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../../eslint-config
+        version: link:../../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../../typescript-config
+        version: link:../../config/typescript-config
 
   packages/language:
     dependencies:
@@ -253,13 +257,13 @@ importers:
         version: link:../common-helpers
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../eslint-config
+        version: link:../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
+        version: link:../config/typescript-config
       '@zenstackhq/vitest-config':
         specifier: workspace:*
-        version: link:../vitest-config
+        version: link:../config/vitest-config
       glob:
         specifier: ^11.0.2
         version: 11.0.2
@@ -296,13 +300,13 @@ importers:
         version: 8.11.11
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../../eslint-config
+        version: link:../../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../../typescript-config
+        version: link:../../config/typescript-config
       '@zenstackhq/vitest-config':
         specifier: workspace:*
-        version: link:../../vitest-config
+        version: link:../../config/vitest-config
 
   packages/runtime:
     dependencies:
@@ -357,7 +361,7 @@ importers:
         version: 2.0.7
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../eslint-config
+        version: link:../config/eslint-config
       '@zenstackhq/language':
         specifier: workspace:*
         version: link:../language
@@ -366,10 +370,10 @@ importers:
         version: link:../sdk
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
+        version: link:../config/typescript-config
       '@zenstackhq/vitest-config':
         specifier: workspace:*
-        version: link:../vitest-config
+        version: link:../config/vitest-config
       tsx:
         specifier: ^4.19.2
         version: 4.19.2
@@ -397,10 +401,10 @@ importers:
     devDependencies:
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../eslint-config
+        version: link:../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
+        version: link:../config/typescript-config
       decimal.js:
         specifier: ^10.4.3
         version: 10.4.3
@@ -419,10 +423,10 @@ importers:
     devDependencies:
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../eslint-config
+        version: link:../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
+        version: link:../config/typescript-config
 
   packages/testtools:
     dependencies:
@@ -477,20 +481,16 @@ importers:
         version: 0.2.6
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../eslint-config
+        version: link:../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
+        version: link:../config/typescript-config
       copyfiles:
         specifier: ^2.4.1
         version: 2.4.1
       typescript:
         specifier: 'catalog:'
         version: 5.8.3
-
-  packages/typescript-config: {}
-
-  packages/vitest-config: {}
 
   packages/zod:
     dependencies:
@@ -503,10 +503,10 @@ importers:
     devDependencies:
       '@zenstackhq/eslint-config':
         specifier: workspace:*
-        version: link:../eslint-config
+        version: link:../config/eslint-config
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
+        version: link:../config/typescript-config
       zod:
         specifier: ~3.25.0
         version: 3.25.76
@@ -531,7 +531,7 @@ importers:
         version: link:../../packages/cli
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../packages/config/typescript-config
       prisma:
         specifier: 'catalog:'
         version: 6.14.0(typescript@5.8.3)
@@ -580,10 +580,10 @@ importers:
         version: 11.0.0
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../packages/config/typescript-config
       '@zenstackhq/vitest-config':
         specifier: workspace:*
-        version: link:../../packages/vitest-config
+        version: link:../../packages/config/vitest-config
 
   tests/regression:
     dependencies:
@@ -605,10 +605,10 @@ importers:
         version: link:../../packages/sdk
       '@zenstackhq/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../packages/config/typescript-config
       '@zenstackhq/vitest-config':
         specifier: workspace:*
-        version: link:../../packages/vitest-config
+        version: link:../../packages/config/vitest-config
 
 packages:
 

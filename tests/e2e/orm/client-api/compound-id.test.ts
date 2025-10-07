@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { createTestClient } from '@zenstackhq/testtools';
+import { describe, expect, it } from 'vitest';
 
 describe('Compound ID tests', () => {
     describe('to-one relation', () => {

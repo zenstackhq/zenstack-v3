@@ -1,4 +1,4 @@
-import { NotFoundError, RejectedByPolicyError } from '@zenstackhq/runtime';
+import { InputValidationError, NotFoundError, RejectedByPolicyError } from '@zenstackhq/runtime';
 import { expect } from 'vitest';
 
 function isPromise(value: any) {
@@ -17,6 +17,18 @@ function expectError(err: any, errorType: any) {
             pass: false,
         };
     }
+}
+
+function expectErrorMessages(expectedMessages: string[], message: string) {
+    for (const m of expectedMessages) {
+        if (!message.includes(m)) {
+            return {
+                message: () => `expected message not found in error: ${m}, got message: ${message}`,
+                pass: false,
+            };
+        }
+    }
+    return undefined;
 }
 
 expect.extend({
@@ -84,20 +96,36 @@ expect.extend({
             await received;
         } catch (err) {
             if (expectedMessages && err instanceof RejectedByPolicyError) {
-                const message = err.message || '';
-                for (const m of expectedMessages) {
-                    if (!message.includes(m)) {
-                        return {
-                            message: () => `expected message not found in error: ${m}, got message: ${message}`,
-                            pass: false,
-                        };
-                    }
+                const r = expectErrorMessages(expectedMessages, err.message || '');
+                if (r) {
+                    return r;
                 }
             }
             return expectError(err, RejectedByPolicyError);
         }
         return {
             message: () => `expected PolicyError, got no error`,
+            pass: false,
+        };
+    },
+
+    async toBeRejectedByValidation(received: Promise<unknown>, expectedMessages?: string[]) {
+        if (!isPromise(received)) {
+            return { message: () => 'a promise is expected', pass: false };
+        }
+        try {
+            await received;
+        } catch (err) {
+            if (expectedMessages && err instanceof InputValidationError) {
+                const r = expectErrorMessages(expectedMessages, err.message || '');
+                if (r) {
+                    return r;
+                }
+            }
+            return expectError(err, InputValidationError);
+        }
+        return {
+            message: () => `expected InputValidationError, got no error`,
             pass: false,
         };
     },

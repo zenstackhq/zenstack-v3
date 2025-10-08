@@ -7,6 +7,7 @@ interface CustomMatchers<R = unknown> {
     toResolveWithLength: (length: number) => Promise<R>;
     toBeRejectedNotFound: () => Promise<R>;
     toBeRejectedByPolicy: (expectedMessages?: string[]) => Promise<R>;
+    toBeRejectedByValidation: (expectedMessages?: string[]) => Promise<R>;
 }
 
 declare module 'vitest' {

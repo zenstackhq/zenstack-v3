@@ -1,6 +1,6 @@
+import { createTestClient, getTestDbProvider } from '@zenstackhq/testtools';
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { createTestClient, getTestDbProvider } from '@zenstackhq/testtools';
 
 describe('Zmodel type coverage tests', () => {
     it('supports all types - plain', async () => {

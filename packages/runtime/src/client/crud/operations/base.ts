@@ -131,15 +131,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         model: GetModels<Schema>,
         filter: any,
     ): Promise<unknown | undefined> {
-        const idFields = requireIdFields(this.schema, model);
-        const _filter = flattenCompoundUniqueFilters(this.schema, model, filter);
-        const query = kysely
-            .selectFrom(model)
-            .where((eb) => eb.and(_filter))
-            .select(idFields.map((f) => kysely.dynamic.ref(f)))
-            .limit(1)
-            .modifyEnd(this.makeContextComment({ model, operation: 'read' }));
-        return this.executeQueryTakeFirst(kysely, query, 'exists');
+        return this.readUnique(kysely, model, {
+            where: filter,
+            select: this.makeIdSelect(model),
+        });
     }
 
     protected async read(

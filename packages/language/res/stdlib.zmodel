@@ -543,22 +543,22 @@ attribute @upper() @@@targetField([StringField]) @@@validation
 /**
  * Validates a number field is greater than the given value.
  */
-attribute @gt(_ value: Int, _ message: String?) @@@targetField([IntField, FloatField, DecimalField]) @@@validation
+attribute @gt(_ value: Any, _ message: String?) @@@targetField([IntField, FloatField, DecimalField, BigIntField]) @@@validation
 
 /**
  * Validates a number field is greater than or equal to the given value.
  */
-attribute @gte(_ value: Int, _ message: String?) @@@targetField([IntField, FloatField, DecimalField]) @@@validation
+attribute @gte(_ value: Any, _ message: String?) @@@targetField([IntField, FloatField, DecimalField, BigIntField]) @@@validation
 
 /**
  * Validates a number field is less than the given value.
  */
-attribute @lt(_ value: Int, _ message: String?) @@@targetField([IntField, FloatField, DecimalField]) @@@validation
+attribute @lt(_ value: Any, _ message: String?) @@@targetField([IntField, FloatField, DecimalField, BigIntField]) @@@validation
 
 /**
  * Validates a number field is less than or equal to the given value.
  */
-attribute @lte(_ value: Int, _ message: String?) @@@targetField([IntField, FloatField, DecimalField]) @@@validation
+attribute @lte(_ value: Any, _ message: String?) @@@targetField([IntField, FloatField, DecimalField, BigIntField]) @@@validation
 
 /**
  * Validates the entity with a complex condition.

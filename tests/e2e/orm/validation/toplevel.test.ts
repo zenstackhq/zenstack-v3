@@ -1,4 +1,4 @@
-import { createTestClient } from '@zenstackhq/testtools';
+import { createTestClient, loadSchemaWithError } from '@zenstackhq/testtools';
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
 
@@ -169,5 +169,41 @@ describe('Toplevel field validation tests', () => {
 
         // satisfies all
         await expect(db.foo.create({ data: { int1: '3.3', int2: new Decimal(3.9) } })).toResolveTruthy();
+    });
+
+    it('rejects accessing relation fields', async () => {
+        await loadSchemaWithError(
+            `
+        model Foo {
+            id Int @id @default(autoincrement())
+            bars Bar[]
+            @@validate(bars != null)
+        }
+
+        model Bar {
+            id Int @id @default(autoincrement())
+            foo Foo @relation(fields: [fooId], references: [id])
+            fooId Int
+        }
+            `,
+            'cannot use relation fields',
+        );
+
+        await loadSchemaWithError(
+            `
+        model Foo {
+            id Int @id @default(autoincrement())
+            bars Bar[]
+            @@validate(bars.fooId > 0)
+        }
+
+        model Bar {
+            id Int @id @default(autoincrement())
+            foo Foo @relation(fields: [fooId], references: [id])
+            fooId Int
+        }
+            `,
+            'cannot use relation fields',
+        );
     });
 });

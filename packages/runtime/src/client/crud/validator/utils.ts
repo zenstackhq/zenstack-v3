@@ -8,7 +8,7 @@ import type {
     MemberExpression,
     UnaryExpression,
 } from '@zenstackhq/sdk/schema';
-import { Decimal } from 'decimal.js';
+import Decimal from 'decimal.js';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';
 import { ExpressionUtils } from '../../../schema';
@@ -275,8 +275,8 @@ function evalBinary(data: any, expr: BinaryExpression) {
     return match(expr.op)
         .with('&&', () => Boolean(left) && Boolean(right))
         .with('||', () => Boolean(left) || Boolean(right))
-        .with('==', () => left == right) // eslint-disable-line eqeqeq
-        .with('!=', () => left != right) // eslint-disable-line eqeqeq
+        .with('==', () => left == right)
+        .with('!=', () => left != right)
         .with('<', () => (left as any) < (right as any))
         .with('<=', () => (left as any) <= (right as any))
         .with('>', () => (left as any) > (right as any))

@@ -1,5 +1,5 @@
 import { createTestClient, getTestDbProvider } from '@zenstackhq/testtools';
-import { Decimal } from 'decimal.js';
+import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
 
 describe('Zmodel type coverage tests', () => {

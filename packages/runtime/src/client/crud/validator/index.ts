@@ -1,5 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { Decimal } from 'decimal.js';
+import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
 import { z, ZodSchema, ZodType } from 'zod';

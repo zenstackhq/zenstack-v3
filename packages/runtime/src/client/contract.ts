@@ -1,4 +1,4 @@
-import type { Decimal } from 'decimal.js';
+import type Decimal from 'decimal.js';
 import { type GetModels, type IsDelegateModel, type ProcedureDef, type SchemaDef } from '../schema';
 import type { AuthType } from '../schema/auth';
 import type { OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';

@@ -1,4 +1,4 @@
-import type { Decimal } from 'decimal.js';
+import type Decimal from 'decimal.js';
 import type { Expression } from './expression';
 
 export type DataSourceProviderType = 'sqlite' | 'postgresql';

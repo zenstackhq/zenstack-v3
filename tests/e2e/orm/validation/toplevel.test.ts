@@ -1,5 +1,5 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { Decimal } from 'decimal.js';
+import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
 
 describe('Toplevel field validation tests', () => {

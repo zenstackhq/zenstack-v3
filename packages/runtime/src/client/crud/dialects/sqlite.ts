@@ -1,5 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 import {
     ExpressionWrapper,
     sql,

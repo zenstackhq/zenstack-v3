@@ -1,4 +1,4 @@
-import type Decimal from 'decimal.js';
+import type { Decimal } from 'decimal.js';
 
 export type Optional<T extends object, K extends keyof T = keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 

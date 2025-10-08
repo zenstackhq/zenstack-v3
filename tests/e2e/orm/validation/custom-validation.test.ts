@@ -39,13 +39,13 @@ describe('Custom validation tests', () => {
             { provider: 'postgresql' },
         );
 
-        await db.foo.create({ data: { id: 1 } });
+        await db.foo.create({ data: { id: 100 } });
 
         for (const action of ['create', 'update']) {
             const _t =
                 action === 'create'
-                    ? (data: any) => db.foo.create({ data: { id: 2, ...data } })
-                    : (data: any) => db.foo.update({ where: { id: 1 }, data });
+                    ? (data: any) => db.foo.create({ data })
+                    : (data: any) => db.foo.update({ where: { id: 100 }, data });
             // violates length
             await expect(_t({ str1: 'abd@efg.com' })).toBeRejectedByValidation(['invalid fields']);
             await expect(_t({ str1: 'a@b.c' })).toBeRejectedByValidation(['invalid fields']);
@@ -91,7 +91,7 @@ describe('Custom validation tests', () => {
                 thrown = true;
                 expect((err as any).cause.issues[0].path).toEqual(['data', 'x', 'y']);
             }
-            expect(thrown);
+            expect(thrown).toBe(true);
 
             // satisfies all
             await expect(

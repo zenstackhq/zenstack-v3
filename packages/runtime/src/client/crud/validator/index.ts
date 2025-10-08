@@ -1,5 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
 import { z, ZodSchema, ZodType } from 'zod';
@@ -40,7 +40,13 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import { addCustomValidation, addNumberValidation, addStringValidation } from './utils';
+import {
+    addBigIntValidation,
+    addCustomValidation,
+    addDecimalValidation,
+    addNumberValidation,
+    addStringValidation,
+} from './utils';
 
 type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema>, options: Options) => ZodType;
 
@@ -247,10 +253,21 @@ export class InputValidator<Schema extends SchemaDef> {
             return match(type)
                 .with('String', () => addStringValidation(z.string(), attributes))
                 .with('Int', () => addNumberValidation(z.number().int(), attributes))
-                .with('Float', () => z.number())
+                .with('Float', () => addNumberValidation(z.number(), attributes))
                 .with('Boolean', () => z.boolean())
-                .with('BigInt', () => z.union([z.number().int(), z.bigint()]))
-                .with('Decimal', () => z.union([z.number(), z.instanceof(Decimal), z.string()]))
+                .with('BigInt', () =>
+                    z.union([
+                        addNumberValidation(z.number().int(), attributes),
+                        addBigIntValidation(z.bigint(), attributes),
+                    ]),
+                )
+                .with('Decimal', () =>
+                    z.union([
+                        addNumberValidation(z.number(), attributes),
+                        addDecimalValidation(z.instanceof(Decimal), attributes),
+                        addDecimalValidation(z.string(), attributes),
+                    ]),
+                )
                 .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
                 .with('Bytes', () => z.instanceof(Uint8Array))
                 .otherwise(() => z.unknown());

@@ -1,9 +1,11 @@
 import { createTestClient } from '@zenstackhq/testtools';
+import { Decimal } from 'decimal.js';
 import { describe, expect, it } from 'vitest';
 
 describe('Toplevel field validation tests', () => {
     it('works with string fields', async () => {
-        const db = await createTestClient(`
+        const db = await createTestClient(
+            `
         model Foo {
             id Int @id @default(autoincrement())
             str1 String? @length(2, 4) @startsWith('a') @endsWith('b') @contains('m') @regex('b{2}')
@@ -13,19 +15,22 @@ describe('Toplevel field validation tests', () => {
             str5 String? @trim @lower
             str6 String? @upper
         }
-        `);
+        `,
+        );
 
-        await db.foo.create({ data: { id: 1 } });
+        await db.foo.create({ data: { id: 100 } });
 
         for (const action of ['create', 'update', 'upsert', 'updateMany']) {
+            console.log(`Testing action: ${action}`);
             const _t =
                 action === 'create'
                     ? (data: any) => db.foo.create({ data })
                     : action === 'update'
-                      ? (data: any) => db.foo.update({ where: { id: 1 }, data })
+                      ? (data: any) => db.foo.update({ where: { id: 100 }, data })
                       : action === 'upsert'
-                        ? (data: any) => db.foo.upsert({ where: { id: 1 }, create: data, update: data })
-                        : (data: any) => db.foo.updateMany({ where: { id: 1 }, data });
+                        ? (data: any) =>
+                              db.foo.upsert({ where: { id: 100 }, create: { id: 101, ...data }, update: data })
+                        : (data: any) => db.foo.updateMany({ where: { id: 100 }, data });
 
             // violates @length min
             await expect(_t({ str1: 'a' })).toBeRejectedByValidation();
@@ -83,36 +88,86 @@ describe('Toplevel field validation tests', () => {
     });
 
     it('works with number fields', async () => {
-        const db = await createTestClient(`
+        const db = await createTestClient(
+            `
         model Foo {
             id Int @id @default(autoincrement())
             int1 Int? @gt(2) @lt(4)
             int2 Int? @gte(2) @lte(4)
         }
-        `);
+        `,
+        );
 
-        await db.foo.create({ data: { id: 1 } });
+        // violates @gt
+        await expect(db.foo.create({ data: { int1: 1 } })).toBeRejectedByValidation();
 
-        for (const action of ['create', 'update']) {
-            const _t =
-                action === 'create'
-                    ? (data: any) => db.foo.create({ data })
-                    : (data: any) => db.foo.update({ where: { id: 1 }, data });
+        // violates @lt
+        await expect(db.foo.create({ data: { int1: 4 } })).toBeRejectedByValidation();
 
-            // violates @gt
-            await expect(_t({ int1: 1 })).toBeRejectedByValidation();
+        // violates @gte
+        await expect(db.foo.create({ data: { int2: 1 } })).toBeRejectedByValidation();
 
-            // violates @lt
-            await expect(_t({ int1: 4 })).toBeRejectedByValidation();
+        // violates @lte
+        await expect(db.foo.create({ data: { int2: 5 } })).toBeRejectedByValidation();
 
-            // violates @gte
-            await expect(_t({ int2: 1 })).toBeRejectedByValidation();
+        // satisfies all
+        await expect(db.foo.create({ data: { int1: 3, int2: 4 } })).toResolveTruthy();
+    });
 
-            // violates @lte
-            await expect(_t({ int2: 5 })).toBeRejectedByValidation();
-
-            // satisfies all
-            await expect(_t({ int1: 3, int2: 4 })).toResolveTruthy();
+    it('works with bigint fields', async () => {
+        const db = await createTestClient(
+            `
+        model Foo {
+            id Int @id @default(autoincrement())
+            int1 BigInt? @gt(2) @lt(4)
+            int2 BigInt? @gte(2) @lte(4)
         }
+        `,
+        );
+
+        // violates @gt
+        await expect(db.foo.create({ data: { int1: 1 } })).toBeRejectedByValidation();
+
+        // violates @lt
+        await expect(db.foo.create({ data: { int1: 4 } })).toBeRejectedByValidation();
+
+        // violates @gte
+        await expect(db.foo.create({ data: { int2: 1n } })).toBeRejectedByValidation();
+
+        // violates @lte
+        await expect(db.foo.create({ data: { int2: 5n } })).toBeRejectedByValidation();
+
+        // satisfies all
+        await expect(db.foo.create({ data: { int1: 3, int2: 4 } })).toResolveTruthy();
+    });
+
+    it('works with decimal fields', async () => {
+        const db = await createTestClient(
+            `
+        model Foo {
+            id Int @id @default(autoincrement())
+            int1 Decimal? @gt(2) @lt(4)
+            int2 Decimal? @gte(2) @lte(4)
+        }
+        `,
+        );
+
+        // violates @gt
+        await expect(db.foo.create({ data: { int1: 1 } })).toBeRejectedByValidation();
+
+        // violates @lt
+        await expect(db.foo.create({ data: { int1: new Decimal(4) } })).toBeRejectedByValidation();
+
+        // invalid decimal string
+        await expect(db.foo.create({ data: { int2: 'f1.2' } })).toBeRejectedByValidation();
+
+        // violates @gte
+        await expect(db.foo.create({ data: { int2: '1.1' } })).toBeRejectedByValidation();
+
+        // violates @lte
+        await expect(db.foo.create({ data: { int2: '5.12345678' } })).toBeRejectedByValidation();
+
+        // satisfies all
+        await expect(db.foo.create({ data: { int1: '3.3', int2: new Decimal(3.9) } })).toResolveTruthy();
     });
 });

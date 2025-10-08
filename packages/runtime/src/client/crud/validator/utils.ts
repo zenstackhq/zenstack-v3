@@ -8,6 +8,7 @@ import type {
     MemberExpression,
     UnaryExpression,
 } from '@zenstackhq/sdk/schema';
+import { Decimal } from 'decimal.js';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';
 import { ExpressionUtils } from '../../../schema';
@@ -25,62 +26,63 @@ export function addStringValidation(schema: z.ZodString, attributes: AttributeAp
         return schema;
     }
 
+    let result = schema;
     for (const attr of attributes) {
         match(attr.name)
             .with('@length', () => {
                 const min = getArgValue<number>(attr.args?.[0]?.value);
                 if (min !== undefined) {
-                    schema = schema.min(min);
+                    result = result.min(min);
                 }
                 const max = getArgValue<number>(attr.args?.[1]?.value);
                 if (max !== undefined) {
-                    schema = schema.max(max);
+                    result = result.max(max);
                 }
             })
             .with('@startsWith', () => {
                 const value = getArgValue<string>(attr.args?.[0]?.value);
                 if (value !== undefined) {
-                    schema = schema.startsWith(value);
+                    result = result.startsWith(value);
                 }
             })
             .with('@endsWith', () => {
                 const value = getArgValue<string>(attr.args?.[0]?.value);
                 if (value !== undefined) {
-                    schema = schema.endsWith(value);
+                    result = result.endsWith(value);
                 }
             })
             .with('@contains', () => {
                 const value = getArgValue<string>(attr.args?.[0]?.value);
                 if (value !== undefined) {
-                    schema = schema.includes(value);
+                    result = result.includes(value);
                 }
             })
             .with('@regex', () => {
                 const pattern = getArgValue<string>(attr.args?.[0]?.value);
                 if (pattern !== undefined) {
-                    schema = schema.regex(new RegExp(pattern));
+                    result = result.regex(new RegExp(pattern));
                 }
             })
             .with('@email', () => {
-                schema = schema.email();
+                result = result.email();
             })
             .with('@datetime', () => {
-                schema = schema.datetime();
+                result = result.datetime();
             })
             .with('@url', () => {
-                schema = schema.url();
+                result = result.url();
             })
             .with('@trim', () => {
-                schema = schema.trim();
+                result = result.trim();
             })
             .with('@lower', () => {
-                schema = schema.toLowerCase();
+                result = result.toLowerCase();
             })
             .with('@upper', () => {
-                schema = schema.toUpperCase();
+                result = result.toUpperCase();
             });
     }
-    return schema;
+    return result;
 }
 
 export function addNumberValidation(schema: z.ZodNumber, attributes: AttributeApplication[] | undefined): z.ZodSchema {
@@ -88,6 +90,7 @@ export function addNumberValidation(schema: z.ZodNumber, attributes: AttributeAp
         return schema;
     }
 
+    let result = schema;
     for (const attr of attributes) {
         const val = getArgValue<number>(attr.args?.[0]?.value);
         if (val === undefined) {
@@ -95,25 +98,108 @@ export function addNumberValidation(schema: z.ZodNumber, attributes: AttributeAp
         }
         match(attr.name)
             .with('@gt', () => {
-                schema = schema.gt(val);
+                result = result.gt(val);
             })
             .with('@gte', () => {
-                schema = schema.gte(val);
+                result = result.gte(val);
             })
             .with('@lt', () => {
-                schema = schema.lt(val);
+                result = result.lt(val);
             })
             .with('@lte', () => {
-                schema = schema.lte(val);
-            })
-            .with('@lt', () => {
-                schema = schema.lt(val);
-            })
-            .with('@lte', () => {
-                schema = schema.lte(val);
+                result = result.lte(val);
             });
     }
-    return schema;
+    return result;
+}
+
+export function addBigIntValidation(schema: z.ZodBigInt, attributes: AttributeApplication[] | undefined): z.ZodSchema {
+    if (!attributes || attributes.length === 0) {
+        return schema;
+    }
+
+    let result = schema;
+    for (const attr of attributes) {
+        const val = getArgValue<number>(attr.args?.[0]?.value);
+        if (val === undefined) {
+            continue;
+        }
+        const bigIntVal = BigInt(val);
+        match(attr.name)
+            .with('@gt', () => {
+                result = result.gt(bigIntVal);
+            })
+            .with('@gte', () => {
+                result = result.gte(bigIntVal);
+            })
+            .with('@lt', () => {
+                result = result.lt(bigIntVal);
+            })
+            .with('@lte', () => {
+                result = result.lte(bigIntVal);
+            });
+    }
+    return result;
+}
+
+export function addDecimalValidation(
+    schema: z.ZodType<Decimal> | z.ZodString,
+    attributes: AttributeApplication[] | undefined,
+): z.ZodSchema {
+    let result: z.ZodSchema = schema;
+
+    // parse string to Decimal
+    if (schema instanceof z.ZodString) {
+        result = schema
+            .superRefine((v, ctx) => {
+                try {
+                    new Decimal(v);
+                } catch (err) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: `Invalid decimal: ${err}`,
+                    });
+                }
+            })
+            .transform((val) => new Decimal(val));
+    }
+
+    // add validations
+
+    function refine(schema: z.ZodSchema, op: 'gt' | 'gte' | 'lt' | 'lte', value: number) {
+        return schema.superRefine((v, ctx) => {
+            const base = z.number();
+            const { error } = base[op](value).safeParse((v as Decimal).toNumber());
+            error?.errors.forEach((e) => {
+                ctx.addIssue(e);
+            });
+        });
+    }
+
+    if (attributes) {
+        for (const attr of attributes) {
+            const val = getArgValue<number>(attr.args?.[0]?.value);
+            if (val === undefined) {
+                continue;
+            }
+
+            match(attr.name)
+                .with('@gt', () => {
+                    result = refine(result, 'gt', val);
+                })
+                .with('@gte', () => {
+                    result = refine(result, 'gte', val);
+                })
+                .with('@lt', () => {
+                    result = refine(result, 'lt', val);
+                })
+                .with('@lte', () => {
+                    result = refine(result, 'lte', val);
+                });
+        }
+    }
+
+    return result;
 }
 
 export function addCustomValidation(schema: z.ZodSchema, attributes: AttributeApplication[] | undefined): z.ZodSchema {
@@ -122,6 +208,7 @@ export function addCustomValidation(schema: z.ZodSchema, attributes: AttributeAp
         return schema;
     }
 
+    let result = schema;
     for (const attr of attrs) {
         const expr = attr.args?.[0]?.value;
         if (!expr) {
@@ -133,9 +220,9 @@ export function addCustomValidation(schema: z.ZodSchema, attributes: AttributeAp
         if (pathExpr && ExpressionUtils.isArray(pathExpr)) {
             path = pathExpr.items.map((e) => ExpressionUtils.getLiteralValue(e) as string);
         }
-        schema = applyValidation(schema, expr, message, path);
+        result = applyValidation(result, expr, message, path);
     }
-    return schema;
+    return result;
 }
 
 function applyValidation(
@@ -245,10 +332,10 @@ function evalCall(data: any, expr: CallExpression) {
 
                 const min = getArgValue<number>(expr.args?.[1]);
                 const max = getArgValue<number>(expr.args?.[2]);
-                if (min && fieldArg.length < min) {
+                if (min !== undefined && fieldArg.length < min) {
                     return false;
                 }
-                if (max && fieldArg.length > max) {
+                if (max !== undefined && fieldArg.length > max) {
                     return false;
                 }
                 return true;

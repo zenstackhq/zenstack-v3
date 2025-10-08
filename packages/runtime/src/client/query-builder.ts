@@ -1,4 +1,4 @@
-import type Decimal from 'decimal.js';
+import { type Decimal } from 'decimal.js';
 import type { Generated, Kysely } from 'kysely';
 import type {
     FieldHasDefault,

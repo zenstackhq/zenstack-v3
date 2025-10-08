@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 describe('Nested field validation tests', () => {
     it('works with nested create/update', async () => {
-        const db = await createTestClient(`
+        const db = await createTestClient(
+            `
         model User {
             id Int @id @default(autoincrement())
             profile Profile?
@@ -16,7 +17,8 @@ describe('Nested field validation tests', () => {
             userId Int @unique
             @@validate(contains(email, 'zenstack'), 'email must be a zenstack email')
         }
-        `);
+        `,
+        );
 
         await db.user.create({ data: { id: 1 } });
 

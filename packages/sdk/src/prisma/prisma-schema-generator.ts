@@ -171,7 +171,9 @@ export class PrismaSchemaGenerator {
         }
 
         const allAttributes = getAllAttributes(decl);
-        for (const attr of allAttributes.filter((attr) => this.isPrismaAttribute(attr))) {
+        for (const attr of allAttributes.filter(
+            (attr) => this.isPrismaAttribute(attr) && !this.isInheritedMapAttribute(attr, decl),
+        )) {
             this.generateContainerAttribute(model, attr);
         }
 
@@ -183,6 +185,15 @@ export class PrismaSchemaGenerator {
 
         // generate reverse relation fields on concrete models
         this.generateDelegateRelationForConcrete(model, decl);
+    }
+
+    private isInheritedMapAttribute(attr: DataModelAttribute, contextModel: DataModel) {
+        if (attr.$container === contextModel) {
+            return false;
+        }
+
+        const attrName = attr.decl.ref?.name ?? attr.decl.$refText;
+        return attrName === '@@map';
     }
 
     private isPrismaAttribute(attr: DataModelAttribute | DataFieldAttribute) {

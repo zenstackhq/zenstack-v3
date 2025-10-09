@@ -360,4 +360,66 @@ model User extends Base {
         expect(schema.enums).toMatchObject({ Role: expect.any(Object) });
         expect(schema.models).toMatchObject({ User: expect.any(Object) });
     });
+
+    it('generates correct default literal function arguments', async () => {
+        const { schema } = await generateTsSchema(`
+model User {
+    id String @id @default(uuid(7))
+}
+        `);
+
+        expect(schema.models).toMatchObject({
+            User: {
+                name: "User",
+                fields: {
+                    id: {
+                        name: "id",
+                        type: "String",
+                        id: true,
+                        attributes: [
+                            {
+                                name: "@id"
+                            },
+                            {
+                                name: "@default",
+                                args: [
+                                    {
+                                        name: "value",
+                                        value: {
+                                            kind: "call",
+                                            function: "uuid",
+                                            args: [
+                                                {
+                                                    kind: "literal",
+                                                    value: 7
+                                                }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        default: {
+                            kind: "call",
+                            function: "uuid",
+                            args: [
+                                {
+                                    kind: "literal",
+                                    value: 7
+                                }
+                            ]
+                        }
+                    }
+                },
+                idFields: [
+                    "id"
+                ],
+                uniqueFields: {
+                    id: {
+                        type: "String"
+                    }
+                }
+            }
+        });
+    });
 });

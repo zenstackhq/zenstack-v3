@@ -4,18 +4,18 @@ import { it } from 'vitest';
 it('verifies issue 971', async () => {
     await loadSchema(
         `
-abstract model Level1 {
+type Level1 {
     id String @id @default(cuid())
     URL String?
     @@validate(URL != null, "URL must be provided") // works
 }
-abstract model Level2 extends Level1 {
+type Level2 with Level1 {
     @@validate(URL != null, "URL must be provided") // works 
 }
-abstract model Level3 extends Level2 {
+type Level3 with Level2 {
     @@validate(URL != null, "URL must be provided") // doesn't work
 }
-model Foo extends Level3 {
+model Foo with Level3 {
 }
             `,
     );

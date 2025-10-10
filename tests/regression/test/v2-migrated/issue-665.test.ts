@@ -18,7 +18,7 @@ model User {
             `,
     );
 
-    await db.$unuseAll.user.create({ data: { id: 1, username: 'test', password: 'test', admin: true } });
+    await db.$unuseAll().user.create({ data: { id: 1, username: 'test', password: 'test', admin: true } });
 
     // admin
     let r = await db.$setAuth({ id: 1, admin: true }).user.findFirst();

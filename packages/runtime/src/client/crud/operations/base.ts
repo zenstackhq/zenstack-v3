@@ -939,17 +939,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             combinedWhere = Object.keys(combinedWhere).length > 0 ? { AND: [parentWhere, combinedWhere] } : parentWhere;
         }
 
-        // fill in automatically updated fields
         const modelDef = this.requireModel(model);
         let finalData = data;
-        for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
-            if (fieldDef.updatedAt) {
-                if (finalData === data) {
-                    finalData = clone(data);
-                }
-                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
-            }
-        }
 
         if (Object.keys(finalData).length === 0) {
             // nothing to update, return the original filter so that caller can identify the entity
@@ -1023,6 +1014,19 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (Object.keys(parentUpdates).length > 0) {
                     // merge field updates propagated from nested relation processing
                     Object.assign(updateFields, parentUpdates);
+                }
+            }
+        }
+
+        // fill in automatically updated fields
+        const scalarFields = Object.values(modelDef.fields)
+            .filter((f) => !f.relation)
+            .map((f) => f.name);
+        if (Object.keys(updateFields).some((f) => scalarFields.includes(f))) {
+            // if any scalar fields are being updated, also update the `updatedAt` fields
+            for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
+                if (fieldDef.updatedAt) {
+                    updateFields[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
                 }
             }
         }
@@ -2073,22 +2077,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    // Given a unique filter of a model, return the entity ids by trying to
-    // reused the filter if it's a complete id filter (without extra fields)
-    // otherwise, read the entity by the filter
+    // Given a unique filter of a model, load the entity and return its id fields
     private getEntityIds(kysely: ToKysely<Schema>, model: GetModels<Schema>, uniqueFilter: any) {
-        const idFields: string[] = requireIdFields(this.schema, model);
-        if (
-            // all id fields are provided
-            idFields.every((f) => f in uniqueFilter && uniqueFilter[f] !== undefined) &&
-            // no non-id filter exists
-            Object.keys(uniqueFilter).every((k) => idFields.includes(k))
-        ) {
-            return uniqueFilter;
-        }
-
         return this.readUnique(kysely, model, {
             where: uniqueFilter,
+            select: this.makeIdSelect(model),
         });
     }
 

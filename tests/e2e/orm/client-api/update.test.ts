@@ -114,6 +114,21 @@ describe('Client update tests', () => {
             ).resolves.toMatchObject({ id: 'user2' });
         });
 
+        it('does not update updatedAt if no other scalar fields are updated', async () => {
+            const user = await createUser(client, 'u1@test.com');
+            const originalUpdatedAt = user.updatedAt;
+
+            await client.user.update({
+                where: { id: user.id },
+                data: {
+                    posts: { create: { title: 'Post1' } },
+                },
+            });
+
+            const updatedUser = await client.user.findUnique({ where: { id: user.id } });
+            expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
+        });
+
         it('works with numeric incremental update', async () => {
             await createUser(client, 'u1@test.com', {
                 profile: { create: { id: '1', bio: 'bio' } },

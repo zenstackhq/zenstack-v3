@@ -590,6 +590,9 @@ importers:
       '@zenstackhq/testtools':
         specifier: workspace:*
         version: link:../../packages/testtools
+      decimal.js:
+        specifier: ^10.4.3
+        version: 10.4.3
     devDependencies:
       '@zenstackhq/cli':
         specifier: workspace:*

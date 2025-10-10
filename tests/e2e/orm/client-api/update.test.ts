@@ -38,7 +38,8 @@ describe('Client update tests', () => {
                 email: user.email,
                 name: user.name,
             });
-            expect(updated.updatedAt.getTime()).toBeGreaterThan(user.updatedAt.getTime());
+            // should not update updatedAt
+            expect(updated.updatedAt.getTime()).toEqual(user.updatedAt.getTime());
 
             // id as filter
             updated = await client.user.update({

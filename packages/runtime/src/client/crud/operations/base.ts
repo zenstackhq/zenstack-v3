@@ -942,6 +942,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const modelDef = this.requireModel(model);
         let finalData = data;
 
+        // fill in automatically updated fields
+        const autoUpdatedFields: string[] = [];
+        for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
+            if (fieldDef.updatedAt) {
+                if (finalData === data) {
+                    finalData = clone(data);
+                }
+                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                autoUpdatedFields.push(fieldName);
+            }
+        }
+
         if (Object.keys(finalData).length === 0) {
             // nothing to update, return the original filter so that caller can identify the entity
             return combinedWhere;
@@ -1018,20 +1030,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
 
-        // fill in automatically updated fields
-        const scalarFields = Object.values(modelDef.fields)
-            .filter((f) => !f.relation)
-            .map((f) => f.name);
-        if (Object.keys(updateFields).some((f) => scalarFields.includes(f))) {
-            // if any scalar fields are being updated, also update the `updatedAt` fields
-            for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
-                if (fieldDef.updatedAt) {
-                    updateFields[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
-                }
-            }
+        let hasFieldUpdate = Object.keys(updateFields).length > 0;
+        if (hasFieldUpdate) {
+            // check if only updating auto-updated fields, if so, we can skip the update
+            hasFieldUpdate = Object.keys(updateFields).some((f) => !autoUpdatedFields.includes(f));
         }
 
-        if (Object.keys(updateFields).length === 0) {
+        if (!hasFieldUpdate) {
             // nothing to update, return the filter so that the caller can identify the entity
             return combinedWhere;
         } else {

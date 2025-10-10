@@ -10,7 +10,7 @@ describe('prisma omit', () => {
               name String
               profile Profile?
               age Int
-              value Int @allow('read', age > 20)
+              value Int
               @@allow('all', age > 18)
             }
             

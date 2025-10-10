@@ -36,8 +36,8 @@ import {
     getAuthDecl,
     getRecursiveBases,
     isAuthInvocation,
-    isCollectionPredicate,
     isBeforeInvocation,
+    isCollectionPredicate,
     resolveImportUri,
 } from './utils';
 
@@ -75,7 +75,7 @@ export class ZModelScopeComputation extends DefaultScopeComputation {
 
     override processNode(node: AstNode, document: LangiumDocument<AstNode>, scopes: PrecomputedScopes) {
         super.processNode(node, document, scopes);
-        if (isDataModel(node)) {
+        if (isDataModel(node) || isTypeDef(node)) {
             // add base fields to the scope recursively
             const bases = getRecursiveBases(node);
             for (const base of bases) {

@@ -58,7 +58,6 @@ export async function createTestClient<Schema extends SchemaDef>(
     const provider = options?.provider ?? getTestDbProvider() ?? 'sqlite';
 
     const dbName = options?.dbName ?? getTestDbName(provider);
-    console.log(`Using provider: ${provider}, db: ${dbName}`);
 
     const dbUrl =
         provider === 'sqlite'

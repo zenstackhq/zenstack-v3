@@ -976,9 +976,14 @@ export class InputValidator<Schema extends SchemaDef> {
                       ])
                       .optional();
 
+            let upsertWhere = this.makeWhereSchema(fieldType, true);
+            if (!fieldDef.array) {
+                // to-one relation, can upsert without where clause
+                upsertWhere = upsertWhere.optional();
+            }
             fields['upsert'] = this.orArray(
                 z.strictObject({
-                    where: this.makeWhereSchema(fieldType, true),
+                    where: upsertWhere,
                     create: this.makeCreateDataSchema(fieldType, false, withoutFields),
                     update: this.makeUpdateDataSchema(fieldType, withoutFields),
                 }),

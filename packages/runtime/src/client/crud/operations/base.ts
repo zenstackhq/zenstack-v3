@@ -939,15 +939,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             combinedWhere = Object.keys(combinedWhere).length > 0 ? { AND: [parentWhere, combinedWhere] } : parentWhere;
         }
 
-        // fill in automatically updated fields
         const modelDef = this.requireModel(model);
         let finalData = data;
+
+        // fill in automatically updated fields
+        const autoUpdatedFields: string[] = [];
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
             if (fieldDef.updatedAt) {
                 if (finalData === data) {
                     finalData = clone(data);
                 }
                 finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                autoUpdatedFields.push(fieldName);
             }
         }
 
@@ -1027,7 +1030,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
 
-        if (Object.keys(updateFields).length === 0) {
+        let hasFieldUpdate = Object.keys(updateFields).length > 0;
+        if (hasFieldUpdate) {
+            // check if only updating auto-updated fields, if so, we can skip the update
+            hasFieldUpdate = Object.keys(updateFields).some((f) => !autoUpdatedFields.includes(f));
+        }
+
+        if (!hasFieldUpdate) {
             // nothing to update, return the filter so that the caller can identify the entity
             return combinedWhere;
         } else {
@@ -2073,22 +2082,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    // Given a unique filter of a model, return the entity ids by trying to
-    // reused the filter if it's a complete id filter (without extra fields)
-    // otherwise, read the entity by the filter
+    // Given a unique filter of a model, load the entity and return its id fields
     private getEntityIds(kysely: ToKysely<Schema>, model: GetModels<Schema>, uniqueFilter: any) {
-        const idFields: string[] = requireIdFields(this.schema, model);
-        if (
-            // all id fields are provided
-            idFields.every((f) => f in uniqueFilter && uniqueFilter[f] !== undefined) &&
-            // no non-id filter exists
-            Object.keys(uniqueFilter).every((k) => idFields.includes(k))
-        ) {
-            return uniqueFilter;
-        }
-
         return this.readUnique(kysely, model, {
             where: uniqueFilter,
+            select: this.makeIdSelect(model),
         });
     }
 

@@ -38,7 +38,8 @@ describe('Client update tests', () => {
                 email: user.email,
                 name: user.name,
             });
-            expect(updated.updatedAt.getTime()).toBeGreaterThan(user.updatedAt.getTime());
+            // should not update updatedAt
+            expect(updated.updatedAt.getTime()).toEqual(user.updatedAt.getTime());
 
             // id as filter
             updated = await client.user.update({
@@ -112,6 +113,21 @@ describe('Client update tests', () => {
                     data: { id: 'user2' },
                 }),
             ).resolves.toMatchObject({ id: 'user2' });
+        });
+
+        it('does not update updatedAt if no other scalar fields are updated', async () => {
+            const user = await createUser(client, 'u1@test.com');
+            const originalUpdatedAt = user.updatedAt;
+
+            await client.user.update({
+                where: { id: user.id },
+                data: {
+                    posts: { create: { title: 'Post1' } },
+                },
+            });
+
+            const updatedUser = await client.user.findUnique({ where: { id: user.id } });
+            expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
         });
 
         it('works with numeric incremental update', async () => {

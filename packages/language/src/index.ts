@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDataSource, type AstNode, type Model } from './ast';
 import { STD_LIB_MODULE_NAME } from './constants';
-import { createZModelLanguageServices } from './module';
+import { createZModelLanguageServices, type ZModelServices } from './module';
 import { getDataModelAndTypeDefs, getDocument, hasAttribute, resolveImport, resolveTransitiveImports } from './utils';
 
 export function createZModelServices() {
@@ -21,8 +21,9 @@ export class DocumentLoadError extends Error {
 export async function loadDocument(
     fileName: string,
     pluginModelFiles: string[] = [],
+    keepImports: boolean = false,
 ): Promise<
-    { success: true; model: Model; warnings: string[] } | { success: false; errors: string[]; warnings: string[] }
+    { success: true; model: Model; warnings: string[], services: ZModelServices } | { success: false; errors: string[]; warnings: string[] }
 > {
     const { ZModelLanguage: services } = createZModelServices();
     const extensions = services.LanguageMetaData.fileExtensions;
@@ -109,14 +110,17 @@ export async function loadDocument(
 
     const model = document.parseResult.value as Model;
 
-    // merge all declarations into the main document
-    const imported = mergeImportsDeclarations(langiumDocuments, model);
+    if (keepImports === false) {
+        
+        // merge all declarations into the main document
+        const imported = mergeImportsDeclarations(langiumDocuments, model);
 
     // remove imported documents
     imported.forEach((model) => {
-        langiumDocuments.deleteDocument(model.$document!.uri);
-        services.shared.workspace.IndexManager.remove(model.$document!.uri);
-    });
+            langiumDocuments.deleteDocument(model.$document!.uri);
+            services.shared.workspace.IndexManager.remove(model.$document!.uri);
+        });
+    }
 
     // extra validation after merging imported declarations
     const additionalErrors = validationAfterImportMerge(model);
@@ -131,6 +135,7 @@ export async function loadDocument(
     return {
         success: true,
         model: document.parseResult.value as Model,
+        services,
         warnings,
     };
 }

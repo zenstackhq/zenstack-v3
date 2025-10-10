@@ -294,7 +294,7 @@ model Bar {
 
             await db.$unuseAll().foo.create({ data: { id: 1 } });
             await expect(db.foo.findMany()).resolves.toHaveLength(0);
-            await db.foo.update({ where: { id: 1 }, data: { bar: { create: { id: 1, y: 0 } } } });
+            await db.$unuseAll().foo.update({ where: { id: 1 }, data: { bar: { create: { id: 1, y: 0 } } } });
             await expect(db.foo.findMany()).resolves.toHaveLength(1);
         });
 

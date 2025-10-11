@@ -826,6 +826,15 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         let result = query;
+
+        const buildFieldRef = (model: string, field: string, modelAlias: string) => {
+            const fieldDef = requireField(this.schema, model, field);
+            const eb = expressionBuilder<any, any>();
+            return fieldDef.originModel
+                ? this.fieldRef(fieldDef.originModel, field, eb, fieldDef.originModel)
+                : this.fieldRef(model, field, eb, modelAlias);
+        };
+
         enumerate(orderBy).forEach((orderBy) => {
             for (const [field, value] of Object.entries<any>(orderBy)) {
                 if (!value) {
@@ -838,8 +847,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     for (const [k, v] of Object.entries<SortOrder>(value)) {
                         invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                         result = result.orderBy(
-                            (eb) =>
-                                aggregate(eb, this.fieldRef(model, k, eb, modelAlias), field as AGGREGATE_OPERATORS),
+                            (eb) => aggregate(eb, buildFieldRef(model, k, modelAlias), field as AGGREGATE_OPERATORS),
                             sql.raw(this.negateSort(v, negated)),
                         );
                     }
@@ -852,7 +860,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         for (const [k, v] of Object.entries<string>(value)) {
                             invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                             result = result.orderBy(
-                                (eb) => eb.fn.count(this.fieldRef(model, k, eb, modelAlias)),
+                                (eb) => eb.fn.count(buildFieldRef(model, k, modelAlias)),
                                 sql.raw(this.negateSort(v, negated)),
                             );
                         }
@@ -865,7 +873,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 const fieldDef = requireField(this.schema, model, field);
 
                 if (!fieldDef.relation) {
-                    const fieldRef = this.fieldRef(model, field, expressionBuilder(), modelAlias);
+                    const fieldRef = buildFieldRef(model, field, modelAlias);
                     if (value === 'asc' || value === 'desc') {
                         result = result.orderBy(fieldRef, this.negateSort(value, negated));
                     } else if (

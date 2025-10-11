@@ -91,14 +91,29 @@ export async function generateTsSchemaInPlace(schemaPath: string) {
     return compileAndLoad(workDir);
 }
 
-export async function loadSchema(schema: string) {
+export async function loadSchema(schema: string, additionalSchemas?: Record<string, string>) {
     if (!schema.includes('datasource ')) {
         schema = `${makePrelude('sqlite')}\n\n${schema}`;
     }
 
+    // create a temp folder
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zenstack-schema'));
+
     // create a temp file
-    const tempFile = path.join(os.tmpdir(), `zenstack-schema-${crypto.randomUUID()}.zmodel`);
+    const tempFile = path.join(tempDir, `schema.zmodel`);
     fs.writeFileSync(tempFile, schema);
+
+    if (additionalSchemas) {
+        for (const [fileName, content] of Object.entries(additionalSchemas)) {
+            let name = fileName;
+            if (!name.endsWith('.zmodel')) {
+                name += '.zmodel';
+            }
+            const filePath = path.join(tempDir, name);
+            fs.writeFileSync(filePath, content);
+        }
+    }
+
     const r = await loadDocument(tempFile);
     expect(r).toSatisfy(
         (r) => r.success,

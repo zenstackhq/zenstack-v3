@@ -143,7 +143,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         args: FindArgs<Schema, GetModels<Schema>, true> | undefined,
     ): Promise<any[]> {
         // table
-        let query = this.dialect.buildSelectModel(expressionBuilder(), model, model);
+        let query = this.dialect.buildSelectModel(model, model);
 
         if (args) {
             query = this.dialect.buildFilterSortTake(model, args, query, model);
@@ -1043,7 +1043,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const idFields = requireIdFields(this.schema, model);
             const query = kysely
                 .updateTable(model)
-                .where((eb) => this.dialect.buildFilter(eb, model, model, combinedWhere))
+                .where(() => this.dialect.buildFilter(model, model, combinedWhere))
                 .set(updateFields)
                 .returning(idFields as any)
                 .modifyEnd(
@@ -1155,7 +1155,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const key = Object.keys(payload)[0];
         const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, false);
         const eb = expressionBuilder<any, any>();
-        const fieldRef = this.dialect.fieldRef(model, field, eb);
+        const fieldRef = this.dialect.fieldRef(model, field);
 
         return match(key)
             .with('set', () => value)
@@ -1178,7 +1178,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const key = Object.keys(payload)[0];
         const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, true);
         const eb = expressionBuilder<any, any>();
-        const fieldRef = this.dialect.fieldRef(model, field, eb);
+        const fieldRef = this.dialect.fieldRef(model, field);
 
         return match(key)
             .with('set', () => value)
@@ -1273,7 +1273,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (!shouldFallbackToIdFilter) {
             // simple filter
             query = query
-                .where((eb) => this.dialect.buildFilter(eb, model, model, where))
+                .where(() => this.dialect.buildFilter(model, model, where))
                 .$if(limit !== undefined, (qb) => qb.limit(limit!));
         } else {
             query = query.where((eb) =>
@@ -1284,8 +1284,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ),
                     'in',
                     this.dialect
-                        .buildSelectModel(eb, filterModel, filterModel)
-                        .where(this.dialect.buildFilter(eb, filterModel, filterModel, where))
+                        .buildSelectModel(filterModel, filterModel)
+                        .where(this.dialect.buildFilter(filterModel, filterModel, where))
                         .select(this.buildIdFieldRefs(kysely, filterModel))
                         .$if(limit !== undefined, (qb) => qb.limit(limit!)),
                 ),
@@ -1968,7 +1968,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         if (!needIdFilter) {
-            query = query.where((eb) => this.dialect.buildFilter(eb, model, model, where));
+            query = query.where(() => this.dialect.buildFilter(model, model, where));
         } else {
             query = query.where((eb) =>
                 eb(
@@ -1978,8 +1978,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ),
                     'in',
                     this.dialect
-                        .buildSelectModel(eb, filterModel, filterModel)
-                        .where((eb) => this.dialect.buildFilter(eb, filterModel, filterModel, where))
+                        .buildSelectModel(filterModel, filterModel)
+                        .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
                         .select(this.buildIdFieldRefs(kysely, filterModel))
                         .$if(limit !== undefined, (qb) => qb.limit(limit!)),
                 ),

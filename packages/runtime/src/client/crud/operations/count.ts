@@ -1,4 +1,3 @@
-import type { ExpressionBuilder } from 'kysely';
 import { sql } from 'kysely';
 import type { SchemaDef } from '../../../schema';
 import { BaseOperationHandler } from './base';
@@ -16,8 +15,8 @@ export class CountOperationHandler<Schema extends SchemaDef> extends BaseOperati
             // nested query for filtering and pagination
 
             let subQuery = this.dialect
-                .buildSelectModel(eb as ExpressionBuilder<any, any>, this.model, this.model)
-                .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, parsedArgs?.where));
+                .buildSelectModel(this.model, this.model)
+                .where(() => this.dialect.buildFilter(this.model, this.model, parsedArgs?.where));
 
             if (parsedArgs?.select && typeof parsedArgs.select === 'object') {
                 // select fields

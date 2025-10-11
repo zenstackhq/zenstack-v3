@@ -1,4 +1,3 @@
-import { expressionBuilder } from 'kysely';
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import { aggregate, getField } from '../../query-utils';

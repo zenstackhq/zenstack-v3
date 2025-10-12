@@ -1,4 +1,3 @@
-import { sql } from 'kysely';
 import type { SchemaDef } from '../../../schema';
 import { BaseOperationHandler } from './base';
 

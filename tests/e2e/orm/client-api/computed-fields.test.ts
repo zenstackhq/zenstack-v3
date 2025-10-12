@@ -1,4 +1,3 @@
-import { sql } from '@zenstackhq/runtime/helpers';
 import { createTestClient } from '@zenstackhq/testtools';
 import { afterEach, describe, expect, it } from 'vitest';
 

@@ -1,4 +1,3 @@
-import { sql } from 'kysely';
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import { getField } from '../../query-utils';

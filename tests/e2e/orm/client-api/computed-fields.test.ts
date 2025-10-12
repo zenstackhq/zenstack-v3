@@ -226,7 +226,7 @@ model Post {
                         postCount: (eb: any, context: { modelAlias: string }) =>
                             eb
                                 .selectFrom('Post')
-                                .whereRef('Post.authorId', '=', sql.ref(`${context.modelAlias}.id`))
+                                .whereRef('Post.authorId', '=', eb.ref(`${context.modelAlias}.id`))
                                 .select(() => eb.fn.countAll().as('count')),
                     },
                 },

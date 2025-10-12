@@ -231,7 +231,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         } else {
             const joinPairs = buildJoinPairs(this.schema, model, parentAlias, relationField, relationModelAlias);
             query = query.where((eb) =>
-                this.and(...joinPairs.map(([left, right]) => eb(sql.ref(left), '=', sql.ref(right)))),
+                this.and(...joinPairs.map(([left, right]) => eb(this.eb.ref(left), '=', this.eb.ref(right)))),
             );
         }
         return query;

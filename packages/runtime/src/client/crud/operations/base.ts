@@ -1540,7 +1540,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (!relationFieldDef.array) {
                     const query = kysely
                         .updateTable(model)
-                        .where((eb) => eb.and(keyPairs.map(({ fk, pk }) => eb(sql.ref(fk), '=', fromRelation.ids[pk]))))
+                        .where((eb) =>
+                            eb.and(keyPairs.map(({ fk, pk }) => eb(eb.ref(fk as any), '=', fromRelation.ids[pk]))),
+                        )
                         .set(keyPairs.reduce((acc, { fk }) => ({ ...acc, [fk]: null }), {} as any))
                         .modifyEnd(
                             this.makeContextComment({

@@ -38,10 +38,10 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 this.modelToTableMap.set(modelName, mappedName);
             }
 
-            for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
+            for (const fieldDef of this.getModelFields(modelDef)) {
                 const mappedName = this.getMappedName(fieldDef);
                 if (mappedName) {
-                    this.fieldToColumnMap.set(`${modelName}.${fieldName}`, mappedName);
+                    this.fieldToColumnMap.set(`${modelName}.${fieldDef.name}`, mappedName);
                 }
             }
         }
@@ -72,11 +72,14 @@ export class QueryNameMapper extends OperationNodeTransformer {
                       on: this.transformNode(join.on),
                   }))
                 : undefined;
+            const selections = this.processSelectQuerySelections(node);
+            const baseResult = super.transformSelectQuery(node);
+
             return {
-                ...super.transformSelectQuery(node),
+                ...baseResult,
                 from: FromNode.create(processedFroms.map((f) => f.node)),
                 joins,
-                selections: this.processSelectQuerySelections(node),
+                selections,
             };
         });
     }
@@ -132,7 +135,8 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 mappedTableName ? TableNode.create(mappedTableName) : undefined,
             );
         } else {
-            return super.transformReference(node);
+            // no name mapping needed
+            return node;
         }
     }
 
@@ -270,7 +274,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
                     if (!modelDef) {
                         continue;
                     }
-                    if (modelDef.fields[name]) {
+                    if (this.getModelFields(modelDef).some((f) => f.name === name)) {
                         return scope;
                     }
                 }

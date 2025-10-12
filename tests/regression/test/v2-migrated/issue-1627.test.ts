@@ -1,8 +1,8 @@
-import { createTestClient } from '@zenstackhq/testtools';
+import { createPolicyTestClient } from '@zenstackhq/testtools';
 import { expect, it } from 'vitest';
 
 it('verifies issue 1627', async () => {
-    const db = await createTestClient(
+    const db = await createPolicyTestClient(
         `
 model User {
   id          String @id

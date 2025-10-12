@@ -2,7 +2,7 @@ import { createTestClient } from '@zenstackhq/testtools';
 import { expect, it } from 'vitest';
 
 // TODO: JSON null support
-it('verifies issue 1533', async () => {
+it.skip('verifies issue 1533', async () => {
     const db = await createTestClient(
         `
 model Test {

@@ -1,4 +1,3 @@
-import { expressionBuilder } from 'kysely';
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import { aggregate, getField } from '../../query-utils';
@@ -19,7 +18,7 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
             let subQuery = eb
                 .selectFrom(this.model)
                 .selectAll()
-                .where((eb1) => this.dialect.buildFilter(eb1, this.model, this.model, parsedArgs?.where));
+                .where(() => this.dialect.buildFilter(this.model, this.model, parsedArgs?.where));
 
             // skip & take
             const skip = parsedArgs?.skip;
@@ -44,7 +43,7 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
             return subQuery.as('$sub');
         });
 
-        const fieldRef = (field: string) => this.dialect.fieldRef(this.model, field, expressionBuilder(), '$sub');
+        const fieldRef = (field: string) => this.dialect.fieldRef(this.model, field, '$sub');
 
         // groupBy
         const bys = typeof parsedArgs.by === 'string' ? [parsedArgs.by] : (parsedArgs.by as string[]);
@@ -56,7 +55,7 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
         }
 
         if (parsedArgs.having) {
-            query = query.having((eb) => this.dialect.buildFilter(eb, this.model, '$sub', parsedArgs.having));
+            query = query.having(() => this.dialect.buildFilter(this.model, '$sub', parsedArgs.having));
         }
 
         // select all by fields

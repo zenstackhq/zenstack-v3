@@ -24,7 +24,7 @@ model Post {
         `,
     );
 
-    const user = await db.$unuseAll().user.create({
+    const user = await db.user.create({
         data: { name: 'Me' },
     });
 

@@ -127,6 +127,20 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         // --- Post mutation work ---
 
         if (hasPostUpdatePolicies && result.rows.length > 0) {
+            // verify if before-update rows and post-update rows still id-match
+            if (beforeUpdateInfo) {
+                invariant(beforeUpdateInfo.rows.length === result.rows.length);
+                const idFields = QueryUtils.requireIdFields(this.client.$schema, mutationModel);
+                for (const postRow of result.rows) {
+                    const beforeRow = beforeUpdateInfo.rows.find((r) => idFields.every((f) => r[f] === postRow[f]));
+                    if (!beforeRow) {
+                        throw new QueryError(
+                            'Before-update and after-update rows do not match by id. If you have post-update policies on a model, updating id fields is not supported.',
+                        );
+                    }
+                }
+            }
+
             // entities updated filter
             const idConditions = this.buildIdConditions(mutationModel, result.rows);
 
@@ -234,10 +248,15 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         if (!beforeUpdateAccessFields || beforeUpdateAccessFields.length === 0) {
             return undefined;
         }
+
+        // combine update's where with policy filter
+        const policyFilter = this.buildPolicyFilter(model, model, 'update');
+        const combinedFilter = where ? conjunction(this.dialect, [where.where, policyFilter]) : policyFilter;
+
         const query: SelectQueryNode = {
             kind: 'SelectQueryNode',
             from: FromNode.create([TableNode.create(model)]),
-            where,
+            where: WhereNode.create(combinedFilter),
             selections: [...beforeUpdateAccessFields.map((f) => SelectionNode.create(ColumnNode.create(f)))],
         };
         const result = await proceed(query);

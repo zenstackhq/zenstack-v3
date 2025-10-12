@@ -153,7 +153,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
                 if (this.canJoinWithoutNestedSelect(relationModelDef, payload)) {
                     // build join directly
-                    tbl = this.buildModelSelect(eb, relationModel, relationSelectName, payload, false);
+                    tbl = this.buildModelSelect(relationModel, relationSelectName, payload, false);
 
                     // parent join filter
                     tbl = this.buildRelationJoinFilter(
@@ -167,13 +167,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 } else {
                     // join with a nested query
                     tbl = eb.selectFrom(() => {
-                        let subQuery = this.buildModelSelect(
-                            eb,
-                            relationModel,
-                            `${relationSelectName}$t`,
-                            payload,
-                            true,
-                        );
+                        let subQuery = this.buildModelSelect(relationModel, `${relationSelectName}$t`, payload, true);
 
                         // parent join filter
                         subQuery = this.buildRelationJoinFilter(
@@ -237,7 +231,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         } else {
             const joinPairs = buildJoinPairs(this.schema, model, parentAlias, relationField, relationModelAlias);
             query = query.where((eb) =>
-                this.and(eb, ...joinPairs.map(([left, right]) => eb(sql.ref(left), '=', sql.ref(right)))),
+                this.and(...joinPairs.map(([left, right]) => eb(sql.ref(left), '=', sql.ref(right)))),
             );
         }
         return query;
@@ -303,10 +297,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 ...Object.entries(relationModelDef.fields)
                     .filter(([, value]) => !value.relation)
                     .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
-                    .map(([field]) => [
-                        sql.lit(field),
-                        this.fieldRef(relationModel, field, eb, relationModelAlias, false),
-                    ])
+                    .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, relationModelAlias, false)])
                     .flatMap((v) => v),
             );
         } else if (payload.select) {
@@ -329,7 +320,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                                 ? // reference the synthesized JSON field
                                   eb.ref(`${parentResultName}$${field}.$data`)
                                 : // reference a plain field
-                                  this.fieldRef(relationModel, field, eb, relationModelAlias, false);
+                                  this.fieldRef(relationModel, field, relationModelAlias, false);
                             return [sql.lit(field), fieldValue];
                         }
                     })
@@ -396,8 +387,8 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         return query;
     }
 
-    override buildJsonObject(eb: ExpressionBuilder<any, any>, value: Record<string, Expression<unknown>>) {
-        return eb.fn(
+    override buildJsonObject(value: Record<string, Expression<unknown>>) {
+        return this.eb.fn(
             'jsonb_build_object',
             Object.entries(value).flatMap(([key, value]) => [sql.lit(key), value]),
         );
@@ -415,11 +406,8 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         return true;
     }
 
-    override buildArrayLength(
-        eb: ExpressionBuilder<any, any>,
-        array: Expression<unknown>,
-    ): ExpressionWrapper<any, any, number> {
-        return eb.fn('array_length', [array]);
+    override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
+        return this.eb.fn('array_length', [array]);
     }
 
     override buildArrayLiteralSQL(values: unknown[]): string {

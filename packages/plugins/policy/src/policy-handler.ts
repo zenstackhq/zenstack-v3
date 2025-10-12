@@ -248,10 +248,15 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         if (!beforeUpdateAccessFields || beforeUpdateAccessFields.length === 0) {
             return undefined;
         }
+
+        // combine update's where with policy filter
+        const policyFilter = this.buildPolicyFilter(model, model, 'update');
+        const combinedFilter = where ? conjunction(this.dialect, [where.where, policyFilter]) : policyFilter;
+
         const query: SelectQueryNode = {
             kind: 'SelectQueryNode',
             from: FromNode.create([TableNode.create(model)]),
-            where,
+            where: WhereNode.create(combinedFilter),
             selections: [...beforeUpdateAccessFields.map((f) => SelectionNode.create(ColumnNode.create(f)))],
         };
         const result = await proceed(query);

@@ -1,4 +1,3 @@
-import { sql } from 'kysely';
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import { getField } from '../../query-utils';
@@ -80,7 +79,9 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
                                     );
                                 } else {
                                     query = query.select((eb) =>
-                                        eb.cast(eb.fn.count(sql.ref(`$sub.${field}`)), 'integer').as(`${key}.${field}`),
+                                        eb
+                                            .cast(eb.fn.count(eb.ref(`$sub.${field}` as any)), 'integer')
+                                            .as(`${key}.${field}`),
                                     );
                                 }
                             }
@@ -102,7 +103,7 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
                                     .with('_max', () => eb.fn.max)
                                     .with('_min', () => eb.fn.min)
                                     .exhaustive();
-                                return fn(sql.ref(`$sub.${field}`)).as(`${key}.${field}`);
+                                return fn(eb.ref(`$sub.${field}` as any)).as(`${key}.${field}`);
                             });
                         }
                     });

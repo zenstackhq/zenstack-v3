@@ -1,4 +1,4 @@
-import { createPolicyTestClient, testLogger } from '@zenstackhq/testtools';
+import { createPolicyTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
 
 describe('Regression for issue 1235', () => {
@@ -11,7 +11,6 @@ model Post {
     @@allow('all', true)
 }
             `,
-            { log: testLogger },
         );
 
         const post = await db.post.create({ data: {} });

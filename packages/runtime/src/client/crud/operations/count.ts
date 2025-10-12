@@ -1,4 +1,3 @@
-import { sql } from 'kysely';
 import type { SchemaDef } from '../../../schema';
 import { BaseOperationHandler } from './base';
 
@@ -40,7 +39,7 @@ export class CountOperationHandler<Schema extends SchemaDef> extends BaseOperati
                 Object.keys(parsedArgs.select!).map((key) =>
                     key === '_all'
                         ? eb.cast(eb.fn.countAll(), 'integer').as('_all')
-                        : eb.cast(eb.fn.count(sql.ref(`${subQueryName}.${key}`)), 'integer').as(key),
+                        : eb.cast(eb.fn.count(eb.ref(`${subQueryName}.${key}` as any)), 'integer').as(key),
                 ),
             );
             const result = await this.executeQuery(this.kysely, query, 'count');

@@ -102,7 +102,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         if ('distinct' in args && (args as any).distinct) {
             const distinct = ensureArray((args as any).distinct) as string[];
             if (this.supportsDistinctOn) {
-                result = result.distinctOn(distinct.map((f) => sql.ref(`${modelAlias}.${f}`)));
+                result = result.distinctOn(distinct.map((f) => this.eb.ref(`${modelAlias}.${f}`)));
             } else {
                 throw new QueryError(`"distinct" is not supported by "${this.schema.provider.type}" provider`);
             }
@@ -248,7 +248,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
             if (ownedByModel && !fieldDef.originModel) {
                 // can be short-circuited to FK null check
-                return this.and(...keyPairs.map(({ fk }) => this.eb(sql.ref(`${modelAlias}.${fk}`), 'is', null)));
+                return this.and(...keyPairs.map(({ fk }) => this.eb(this.eb.ref(`${modelAlias}.${fk}`), 'is', null)));
             } else {
                 // translate it to `{ is: null }` filter
                 return this.buildToOneRelationFilter(model, modelAlias, field, fieldDef, { is: null });
@@ -268,7 +268,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
         const joinSelect = this.eb
             .selectFrom(`${fieldDef.type} as ${joinAlias}`)
-            .where(() => this.and(...joinPairs.map(([left, right]) => this.eb(sql.ref(left), '=', sql.ref(right)))))
+            .where(() =>
+                this.and(...joinPairs.map(([left, right]) => this.eb(this.eb.ref(left), '=', this.eb.ref(right)))),
+            )
             .select(() => this.eb.fn.count(this.eb.lit(1)).as(filterResultField));
 
         const conditions: Expression<SqlBool>[] = [];
@@ -331,7 +333,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     ) {
         // null check needs to be converted to fk "is null" checks
         if (payload === null) {
-            return this.eb(sql.ref(`${modelAlias}.${field}`), 'is', null);
+            return this.eb(this.eb.ref(`${modelAlias}.${field}`), 'is', null);
         }
 
         const relationModel = fieldDef.type;
@@ -351,15 +353,15 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 invariant(relationIdFields.length === 1, 'many-to-many relation must have exactly one id field');
 
                 return eb(
-                    sql.ref(`${relationFilterSelectAlias}.${relationIdFields[0]}`),
+                    this.eb.ref(`${relationFilterSelectAlias}.${relationIdFields[0]}`),
                     'in',
                     eb
                         .selectFrom(m2m.joinTable)
                         .select(`${m2m.joinTable}.${m2m.otherFkName}`)
                         .whereRef(
-                            sql.ref(`${m2m.joinTable}.${m2m.parentFkName}`),
+                            this.eb.ref(`${m2m.joinTable}.${m2m.parentFkName}`),
                             '=',
-                            sql.ref(`${modelAlias}.${modelIdFields[0]}`),
+                            this.eb.ref(`${modelAlias}.${modelIdFields[0]}`),
                         ),
                 );
             } else {
@@ -370,12 +372,20 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     if (relationKeyPairs.ownedByModel) {
                         result = this.and(
                             result,
-                            eb(sql.ref(`${modelAlias}.${fk}`), '=', sql.ref(`${relationFilterSelectAlias}.${pk}`)),
+                            eb(
+                                this.eb.ref(`${modelAlias}.${fk}`),
+                                '=',
+                                this.eb.ref(`${relationFilterSelectAlias}.${pk}`),
+                            ),
                         );
                     } else {
                         result = this.and(
                             result,
-                            eb(sql.ref(`${modelAlias}.${pk}`), '=', sql.ref(`${relationFilterSelectAlias}.${fk}`)),
+                            eb(
+                                this.eb.ref(`${modelAlias}.${pk}`),
+                                '=',
+                                this.eb.ref(`${relationFilterSelectAlias}.${fk}`),
+                            ),
                         );
                     }
                 }
@@ -833,7 +843,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                 const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, subQueryAlias);
                                 subQuery = subQuery.where(() =>
                                     this.and(
-                                        ...joinPairs.map(([left, right]) => eb(sql.ref(left), '=', sql.ref(right))),
+                                        ...joinPairs.map(([left, right]) =>
+                                            eb(this.eb.ref(left), '=', this.eb.ref(right)),
+                                        ),
                                     ),
                                 );
                                 subQuery = subQuery.select(() => eb.fn.count(eb.lit(1)).as('_count'));
@@ -845,7 +857,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         result = result.leftJoin(relationModel, (join) => {
                             const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, relationModel);
                             return join.on((eb) =>
-                                this.and(...joinPairs.map(([left, right]) => eb(sql.ref(left), '=', sql.ref(right)))),
+                                this.and(
+                                    ...joinPairs.map(([left, right]) => eb(this.eb.ref(left), '=', this.eb.ref(right))),
+                                ),
                             );
                         });
                         result = this.buildOrderBy(result, fieldDef.type, relationModel, value, false, negated);
@@ -934,7 +948,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             return query.select(() => this.fieldRef(model, field, modelAlias).as(field));
         } else if (!fieldDef.originModel) {
             // regular field
-            return query.select(sql.ref(`${modelAlias}.${field}`).as(field));
+            return query.select(this.eb.ref(`${modelAlias}.${field}`).as(field));
         } else {
             return this.buildSelectField(query, fieldDef.originModel, fieldDef.originModel, field);
         }

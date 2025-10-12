@@ -100,7 +100,7 @@ export const isEmpty: ZModelFunction<any> = (eb, args, { dialect }: ZModelFuncti
     if (!field) {
         throw new Error('"field" parameter is required');
     }
-    return eb(dialect.buildArrayLength(eb, field), '=', sql.lit(0));
+    return eb(dialect.buildArrayLength(field), '=', sql.lit(0));
 };
 
 export const now: ZModelFunction<any> = () => sql.raw('CURRENT_TIMESTAMP');

@@ -54,7 +54,7 @@ export async function generateTsSchema(
 
     if (extraSourceFiles) {
         for (const [fileName, content] of Object.entries(extraSourceFiles)) {
-            const filePath = path.resolve(workDir, `${fileName}.ts`);
+            const filePath = path.resolve(workDir, !fileName.endsWith('.ts') ? `${fileName}.ts` : fileName);
             fs.mkdirSync(path.dirname(filePath), { recursive: true });
             fs.writeFileSync(filePath, content);
         }

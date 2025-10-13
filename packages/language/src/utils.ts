@@ -166,10 +166,11 @@ export function getRecursiveBases(
         return result;
     }
     seen.add(decl);
-    decl.mixins.forEach((mixin) => {
-        // avoid using mixin.ref since this function can be called before linking
+    const bases = [...decl.mixins, ...(isDataModel(decl) && decl.baseModel ? [decl.baseModel] : [])];
+    bases.forEach((base) => {
+        // avoid using .ref since this function can be called before linking
         const baseDecl = decl.$container.declarations.find(
-            (d): d is TypeDef => isTypeDef(d) && d.name === mixin.$refText,
+            (d): d is TypeDef | DataModel => isTypeDef(d) || (isDataModel(d) && d.name === base.$refText),
         );
         if (baseDecl) {
             if (!includeDelegate && isDelegateModel(baseDecl)) {

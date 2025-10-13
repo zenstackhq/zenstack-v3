@@ -677,7 +677,9 @@ export class InputValidator<Schema extends SchemaDef> {
             ...(fieldDef.array
                 ? {
                       // to-many relations can be ordered, skipped, taken, and cursor-located
-                      orderBy: z.lazy(() => this.makeOrderBySchema(fieldDef.type, true, false)).optional(),
+                      orderBy: z
+                          .lazy(() => this.orArray(this.makeOrderBySchema(fieldDef.type, true, false), true))
+                          .optional(),
                       skip: this.makeSkipSchema().optional(),
                       take: this.makeTakeSchema().optional(),
                       cursor: this.makeCursorSchema(fieldDef.type).optional(),

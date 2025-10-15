@@ -145,6 +145,7 @@ export function addBigIntValidation(schema: z.ZodBigInt, attributes: AttributeAp
 export function addDecimalValidation(
     schema: z.ZodType<Decimal> | z.ZodString,
     attributes: AttributeApplication[] | undefined,
+    addExtraValidation: boolean,
 ): z.ZodSchema {
     let result: z.ZodSchema = schema;
 
@@ -176,7 +177,7 @@ export function addDecimalValidation(
         });
     }
 
-    if (attributes) {
+    if (attributes && addExtraValidation) {
         for (const attr of attributes) {
             const val = getArgValue<number>(attr.args?.[0]?.value);
             if (val === undefined) {

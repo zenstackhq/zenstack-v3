@@ -281,10 +281,8 @@ export class InputValidator<Schema extends SchemaDef> {
                 .with('Decimal', () => {
                     return z.union([
                         this.extraValidationsEnabled ? addNumberValidation(z.number(), attributes) : z.number(),
-                        this.extraValidationsEnabled
-                            ? addDecimalValidation(z.instanceof(Decimal), attributes)
-                            : z.instanceof(Decimal),
-                        this.extraValidationsEnabled ? addDecimalValidation(z.string(), attributes) : z.string(),
+                        addDecimalValidation(z.instanceof(Decimal), attributes, this.extraValidationsEnabled),
+                        addDecimalValidation(z.string(), attributes, this.extraValidationsEnabled),
                     ]);
                 })
                 .with('DateTime', () => z.union([z.date(), z.string().datetime()]))

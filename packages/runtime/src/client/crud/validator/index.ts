@@ -279,17 +279,13 @@ export class InputValidator<Schema extends SchemaDef> {
                     ]),
                 )
                 .with('Decimal', () => {
-                    const options: [z.ZodSchema, z.ZodSchema, ...z.ZodSchema[]] = [
-                        z.number(),
-                        z.instanceof(Decimal),
-                        z.string(),
-                    ];
-                    if (this.extraValidationsEnabled) {
-                        for (let i = 0; i < options.length; i++) {
-                            options[i] = addDecimalValidation(options[i]!, attributes);
-                        }
-                    }
-                    return z.union(options);
+                    return z.union([
+                        this.extraValidationsEnabled ? addNumberValidation(z.number(), attributes) : z.number(),
+                        this.extraValidationsEnabled
+                            ? addDecimalValidation(z.instanceof(Decimal), attributes)
+                            : z.instanceof(Decimal),
+                        this.extraValidationsEnabled ? addDecimalValidation(z.string(), attributes) : z.string(),
+                    ]);
                 })
                 .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
                 .with('Bytes', () => z.instanceof(Uint8Array))

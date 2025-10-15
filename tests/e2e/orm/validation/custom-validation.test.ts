@@ -108,4 +108,51 @@ describe('Custom validation tests', () => {
             ).toResolveTruthy();
         }
     });
+
+    it('allows disabling validation', async () => {
+        const db = await createTestClient(
+            `
+            model User {
+                id Int @id @default(autoincrement())
+                email String @unique @email
+                @@allow('all', true)
+            }
+            `,
+        );
+
+        await expect(
+            db.user.create({
+                data: {
+                    email: 'xyz',
+                },
+            }),
+        ).toBeRejectedByValidation();
+
+        await expect(
+            db.$setInputValidation(false).user.create({
+                data: {
+                    id: 1,
+                    email: 'xyz',
+                },
+            }),
+        ).toResolveTruthy();
+
+        await expect(
+            db.$setInputValidation(false).user.update({
+                where: { id: 1 },
+                data: {
+                    email: 'abc',
+                },
+            }),
+        ).toResolveTruthy();
+
+        // original client not affected
+        await expect(
+            db.user.create({
+                data: {
+                    email: 'xyz',
+                },
+            }),
+        ).toBeRejectedByValidation();
+    });
 });

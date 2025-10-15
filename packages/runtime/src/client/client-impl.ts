@@ -288,6 +288,14 @@ export class ClientImpl<Schema extends SchemaDef> {
         return this.auth;
     }
 
+    $setInputValidation(enable: boolean) {
+        const newOptions: ClientOptions<Schema> = {
+            ...this.options,
+            validateInput: enable,
+        };
+        return new ClientImpl<Schema>(this.schema, newOptions, this);
+    }
+
     $executeRaw(query: TemplateStringsArray, ...values: any[]) {
         return createZenStackPromise(async () => {
             const result = await sql(query, ...values).execute(this.kysely);
@@ -325,7 +333,7 @@ export class ClientImpl<Schema extends SchemaDef> {
 }
 
 function createClientProxy<Schema extends SchemaDef>(client: ClientImpl<Schema>): ClientImpl<Schema> {
-    const inputValidator = new InputValidator(client.$schema);
+    const inputValidator = new InputValidator(client as unknown as ClientContract<Schema>);
     const resultProcessor = new ResultProcessor(client.$schema, client.$options);
 
     return new Proxy(client, {

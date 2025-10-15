@@ -16,6 +16,7 @@ import { enumerate } from '../../../utils/enumerate';
 import { extractFields } from '../../../utils/object-utils';
 import { formatError } from '../../../utils/zod-utils';
 import { AGGREGATE_OPERATORS, LOGICAL_COMBINATORS, NUMERIC_FIELD_TYPES } from '../../constants';
+import type { ClientContract } from '../../contract';
 import {
     type AggregateArgs,
     type CountArgs,
@@ -53,7 +54,15 @@ type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema
 export class InputValidator<Schema extends SchemaDef> {
     private schemaCache = new Map<string, ZodType>();
 
-    constructor(private readonly schema: Schema) {}
+    constructor(private readonly client: ClientContract<Schema>) {}
+
+    private get schema() {
+        return this.client.$schema;
+    }
+
+    private get extraValidationsEnabled() {
+        return this.client.$options.validateInput !== false;
+    }
 
     validateFindArgs(model: GetModels<Schema>, args: unknown, options: { unique: boolean; findOne: boolean }) {
         return this.validate<
@@ -251,23 +260,37 @@ export class InputValidator<Schema extends SchemaDef> {
             return this.makeTypeDefSchema(type);
         } else {
             return match(type)
-                .with('String', () => addStringValidation(z.string(), attributes))
-                .with('Int', () => addNumberValidation(z.number().int(), attributes))
-                .with('Float', () => addNumberValidation(z.number(), attributes))
+                .with('String', () =>
+                    this.extraValidationsEnabled ? addStringValidation(z.string(), attributes) : z.string(),
+                )
+                .with('Int', () =>
+                    this.extraValidationsEnabled ? addNumberValidation(z.number().int(), attributes) : z.number().int(),
+                )
+                .with('Float', () =>
+                    this.extraValidationsEnabled ? addNumberValidation(z.number(), attributes) : z.number(),
+                )
                 .with('Boolean', () => z.boolean())
                 .with('BigInt', () =>
                     z.union([
-                        addNumberValidation(z.number().int(), attributes),
-                        addBigIntValidation(z.bigint(), attributes),
+                        this.extraValidationsEnabled
+                            ? addNumberValidation(z.number().int(), attributes)
+                            : z.number().int(),
+                        this.extraValidationsEnabled ? addBigIntValidation(z.bigint(), attributes) : z.bigint(),
                     ]),
                 )
-                .with('Decimal', () =>
-                    z.union([
-                        addNumberValidation(z.number(), attributes),
-                        addDecimalValidation(z.instanceof(Decimal), attributes),
-                        addDecimalValidation(z.string(), attributes),
-                    ]),
-                )
+                .with('Decimal', () => {
+                    const options: [z.ZodSchema, z.ZodSchema, ...z.ZodSchema[]] = [
+                        z.number(),
+                        z.instanceof(Decimal),
+                        z.string(),
+                    ];
+                    if (this.extraValidationsEnabled) {
+                        for (let i = 0; i < options.length; i++) {
+                            options[i] = addDecimalValidation(options[i]!, attributes);
+                        }
+                    }
+                    return z.union(options);
+                })
                 .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
                 .with('Bytes', () => z.instanceof(Uint8Array))
                 .otherwise(() => z.unknown());

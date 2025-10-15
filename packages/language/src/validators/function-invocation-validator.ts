@@ -66,12 +66,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
             }
 
             // validate the context allowed for the function
-            const exprContext = match(containerAttribute?.decl.$refText)
-                .with('@default', () => ExpressionContext.DefaultValue)
-                .with(P.union('@@allow', '@@deny', '@allow', '@deny'), () => ExpressionContext.AccessPolicy)
-                .with('@@validate', () => ExpressionContext.ValidationRule)
-                .with('@@index', () => ExpressionContext.Index)
-                .otherwise(() => undefined);
+            const exprContext = this.getExpressionContext(containerAttribute);
 
             // get the context allowed for the function
             const funcAllowedContext = getFunctionExpressionContext(funcDecl);
@@ -101,6 +96,24 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         if (checker) {
             checker.value.call(this, expr, accept);
         }
+    }
+
+    private getExpressionContext(containerAttribute: DataModelAttribute | DataFieldAttribute | undefined) {
+        if (!containerAttribute) {
+            return undefined;
+        }
+        if (this.isValidationAttribute(containerAttribute)) {
+            return ExpressionContext.ValidationRule;
+        }
+        return match(containerAttribute?.decl.$refText)
+            .with('@default', () => ExpressionContext.DefaultValue)
+            .with(P.union('@@allow', '@@deny', '@allow', '@deny'), () => ExpressionContext.AccessPolicy)
+            .with('@@index', () => ExpressionContext.Index)
+            .otherwise(() => undefined);
+    }
+
+    private isValidationAttribute(attr: DataModelAttribute | DataFieldAttribute) {
+        return !!attr.decl.ref?.attributes.some((attr) => attr.decl.$refText === '@@@validation');
     }
 
     private validateArgs(funcDecl: FunctionDecl, args: Argument[], accept: ValidationAcceptor) {

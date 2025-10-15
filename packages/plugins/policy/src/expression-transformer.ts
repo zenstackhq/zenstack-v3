@@ -575,20 +575,34 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         const fromModel = context.model;
+        const relationFieldDef = QueryUtils.requireField(this.schema, fromModel, field);
         const { keyPairs, ownedByModel } = QueryUtils.getRelationForeignKeyFieldPairs(this.schema, fromModel, field);
 
         let condition: OperationNode;
         if (ownedByModel) {
             // `fromModel` owns the fk
+
             condition = conjunction(
                 this.dialect,
-                keyPairs.map(({ fk, pk }) =>
-                    BinaryOperationNode.create(
-                        ReferenceNode.create(ColumnNode.create(fk), TableNode.create(context.alias ?? fromModel)),
+                keyPairs.map(({ fk, pk }) => {
+                    let fkRef: OperationNode = ReferenceNode.create(
+                        ColumnNode.create(fk),
+                        TableNode.create(context.alias ?? fromModel),
+                    );
+                    if (relationFieldDef.originModel && relationFieldDef.originModel !== fromModel) {
+                        fkRef = this.buildDelegateBaseFieldSelect(
+                            fromModel,
+                            context.alias ?? fromModel,
+                            fk,
+                            relationFieldDef.originModel,
+                        );
+                    }
+                    return BinaryOperationNode.create(
+                        fkRef,
                         OperatorNode.create('='),
                         ReferenceNode.create(ColumnNode.create(pk), TableNode.create(relationModel)),
-                    ),
-                ),
+                    );
+                }),
             );
         } else {
             // `relationModel` owns the fk
@@ -633,8 +647,47 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         return relationQuery.toOperationNode();
     }
 
-    private createColumnRef(column: string, context: ExpressionTransformerContext<Schema>): ReferenceNode {
-        return ReferenceNode.create(ColumnNode.create(column), TableNode.create(context.alias ?? context.model));
+    private createColumnRef(column: string, context: ExpressionTransformerContext<Schema>) {
+        // if field comes from a delegate base model, we need to use the join alias
+        // of that base model
+
+        const tableName = context.alias ?? context.model;
+
+        // "create" policies evaluate table from "VALUES" node so no join from delegate bases are
+        // created and thus we should directly use the model table name
+        if (context.operation === 'create') {
+            return ReferenceNode.create(ColumnNode.create(column), TableNode.create(tableName));
+        }
+
+        const fieldDef = QueryUtils.requireField(this.schema, context.model, column);
+        if (!fieldDef.originModel || fieldDef.originModel === context.model) {
+            return ReferenceNode.create(ColumnNode.create(column), TableNode.create(tableName));
+        }
+
+        return this.buildDelegateBaseFieldSelect(context.model, tableName, column, fieldDef.originModel);
+    }
+
+    private buildDelegateBaseFieldSelect(model: string, modelAlias: string, field: string, baseModel: string) {
+        const idFields = QueryUtils.requireIdFields(this.client.$schema, model);
+        return {
+            kind: 'SelectQueryNode',
+            from: FromNode.create([TableNode.create(baseModel)]),
+            selections: [
+                SelectionNode.create(ReferenceNode.create(ColumnNode.create(field), TableNode.create(baseModel))),
+            ],
+            where: WhereNode.create(
+                conjunction(
+                    this.dialect,
+                    idFields.map((idField) =>
+                        BinaryOperationNode.create(
+                            ReferenceNode.create(ColumnNode.create(idField), TableNode.create(baseModel)),
+                            OperatorNode.create('='),
+                            ReferenceNode.create(ColumnNode.create(idField), TableNode.create(modelAlias)),
+                        ),
+                    ),
+                ),
+            ),
+        } satisfies SelectQueryNode;
     }
 
     private isAuthCall(value: unknown): value is CallExpression {

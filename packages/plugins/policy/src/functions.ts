@@ -36,18 +36,60 @@ export const check: ZModelFunction<any> = (
     invariant(!fieldDef.array, `Field "${fieldName}" is a to-many relation, which is not supported by "check"`);
     const relationModel = fieldDef.type;
 
-    const op = arg2Node ? (arg2Node.value as CRUD) : operation;
+    // build the join condition between the current model and the related model
+    const joinConditions: Expression<any>[] = [];
+    const fkInfo = QueryUtils.getRelationForeignKeyFieldPairs(client.$schema, model, fieldName);
+    const idFields = QueryUtils.requireIdFields(client.$schema, model);
 
-    const policyHandler = new PolicyHandler(client);
+    // helper to build a base model select for delegate models
+    const buildBaseSelect = (baseModel: string, field: string): Expression<any> => {
+        return eb
+            .selectFrom(baseModel)
+            .select(field)
+            .where(
+                eb.and(
+                    idFields.map((idField) =>
+                        eb(eb.ref(`${fieldDef.originModel}.${idField}`), '=', eb.ref(`${modelAlias}.${idField}`)),
+                    ),
+                ),
+            );
+    };
 
-    // join with parent model
-    const joinPairs = QueryUtils.buildJoinPairs(client.$schema, model, modelAlias, fieldName, relationModel);
-    const joinCondition =
-        joinPairs.length === 1
-            ? eb(eb.ref(joinPairs[0]![0]), '=', eb.ref(joinPairs[0]![1]))
-            : eb.and(joinPairs.map(([left, right]) => eb(eb.ref(left), '=', eb.ref(right))));
+    if (fkInfo.ownedByModel) {
+        // model owns the relation
+        joinConditions.push(
+            ...fkInfo.keyPairs.map(({ fk, pk }) => {
+                let fkRef: Expression<any>;
+                if (fieldDef.originModel && fieldDef.originModel !== model) {
+                    // relation is actually defined in a delegate base model, select from there
+                    fkRef = buildBaseSelect(fieldDef.originModel, fk);
+                } else {
+                    fkRef = eb.ref(`${modelAlias}.${fk}`);
+                }
+                return eb(fkRef, '=', eb.ref(`${relationModel}.${pk}`));
+            }),
+        );
+    } else {
+        // related model owns the relation
+        joinConditions.push(
+            ...fkInfo.keyPairs.map(({ fk, pk }) => {
+                let pkRef: Expression<any>;
+                if (fieldDef.originModel && fieldDef.originModel !== model) {
+                    // relation is actually defined in a delegate base model, select from there
+                    pkRef = buildBaseSelect(fieldDef.originModel, pk);
+                } else {
+                    pkRef = eb.ref(`${modelAlias}.${pk}`);
+                }
+                return eb(pkRef, '=', eb.ref(`${relationModel}.${fk}`));
+            }),
+        );
+    }
+
+    const joinCondition = joinConditions.length === 1 ? joinConditions[0]! : eb.and(joinConditions);
 
     // policy condition of the related model
+    const policyHandler = new PolicyHandler(client);
+    const op = arg2Node ? (arg2Node.value as CRUD) : operation;
     const policyCondition = policyHandler.buildPolicyFilter(relationModel, undefined, op);
 
     // build the final nested select that evaluates the policy condition

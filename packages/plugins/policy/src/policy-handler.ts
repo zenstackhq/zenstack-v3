@@ -297,6 +297,10 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     // #region overrides
 
     protected override transformSelectQuery(node: SelectQueryNode) {
+        if (!node.from) {
+            return super.transformSelectQuery(node);
+        }
+
         let whereNode = this.transformNode(node.where);
 
         // get combined policy filter for all froms, and merge into where clause
@@ -327,6 +331,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         // build a nested query with policy filter applied
         const filter = this.buildPolicyFilter(table.model, table.alias, 'read');
+
         const nestedSelect: SelectQueryNode = {
             kind: 'SelectQueryNode',
             from: FromNode.create([node.table]),

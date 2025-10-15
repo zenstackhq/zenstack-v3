@@ -104,6 +104,12 @@ export type ClientContract<Schema extends SchemaDef> = {
     $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema>;
 
     /**
+     * Returns a new client enabling/disabling input validations expressed with attributes like
+     * `@email`, `@regex`, `@@validate`, etc.
+     */
+    $setInputValidation(enable: boolean): ClientContract<Schema>;
+
+    /**
      * The Kysely query builder instance.
      */
     readonly $qb: ToKysely<Schema>;

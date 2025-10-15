@@ -16,6 +16,7 @@ import { enumerate } from '../../../utils/enumerate';
 import { extractFields } from '../../../utils/object-utils';
 import { formatError } from '../../../utils/zod-utils';
 import { AGGREGATE_OPERATORS, LOGICAL_COMBINATORS, NUMERIC_FIELD_TYPES } from '../../constants';
+import type { ClientContract } from '../../contract';
 import {
     type AggregateArgs,
     type CountArgs,
@@ -53,7 +54,15 @@ type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema
 export class InputValidator<Schema extends SchemaDef> {
     private schemaCache = new Map<string, ZodType>();
 
-    constructor(private readonly schema: Schema) {}
+    constructor(private readonly client: ClientContract<Schema>) {}
+
+    private get schema() {
+        return this.client.$schema;
+    }
+
+    private get extraValidationsEnabled() {
+        return this.client.$options.validateInput !== false;
+    }
 
     validateFindArgs(model: GetModels<Schema>, args: unknown, options: { unique: boolean; findOne: boolean }) {
         return this.validate<
@@ -251,23 +260,31 @@ export class InputValidator<Schema extends SchemaDef> {
             return this.makeTypeDefSchema(type);
         } else {
             return match(type)
-                .with('String', () => addStringValidation(z.string(), attributes))
-                .with('Int', () => addNumberValidation(z.number().int(), attributes))
-                .with('Float', () => addNumberValidation(z.number(), attributes))
+                .with('String', () =>
+                    this.extraValidationsEnabled ? addStringValidation(z.string(), attributes) : z.string(),
+                )
+                .with('Int', () =>
+                    this.extraValidationsEnabled ? addNumberValidation(z.number().int(), attributes) : z.number().int(),
+                )
+                .with('Float', () =>
+                    this.extraValidationsEnabled ? addNumberValidation(z.number(), attributes) : z.number(),
+                )
                 .with('Boolean', () => z.boolean())
                 .with('BigInt', () =>
                     z.union([
-                        addNumberValidation(z.number().int(), attributes),
-                        addBigIntValidation(z.bigint(), attributes),
+                        this.extraValidationsEnabled
+                            ? addNumberValidation(z.number().int(), attributes)
+                            : z.number().int(),
+                        this.extraValidationsEnabled ? addBigIntValidation(z.bigint(), attributes) : z.bigint(),
                     ]),
                 )
-                .with('Decimal', () =>
-                    z.union([
-                        addNumberValidation(z.number(), attributes),
-                        addDecimalValidation(z.instanceof(Decimal), attributes),
-                        addDecimalValidation(z.string(), attributes),
-                    ]),
-                )
+                .with('Decimal', () => {
+                    return z.union([
+                        this.extraValidationsEnabled ? addNumberValidation(z.number(), attributes) : z.number(),
+                        addDecimalValidation(z.instanceof(Decimal), attributes, this.extraValidationsEnabled),
+                        addDecimalValidation(z.string(), attributes, this.extraValidationsEnabled),
+                    ]);
+                })
                 .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
                 .with('Bytes', () => z.instanceof(Uint8Array))
                 .otherwise(() => z.unknown());
@@ -913,8 +930,12 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         });
 
-        const uncheckedCreateSchema = addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes);
-        const checkedCreateSchema = addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes);
+        const uncheckedCreateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes)
+            : z.strictObject(uncheckedVariantFields);
+        const checkedCreateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes)
+            : z.strictObject(checkedVariantFields);
 
         if (!hasRelation) {
             return this.orArray(uncheckedCreateSchema, canBeArray);
@@ -1193,8 +1214,12 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         });
 
-        const uncheckedUpdateSchema = addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes);
-        const checkedUpdateSchema = addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes);
+        const uncheckedUpdateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes)
+            : z.strictObject(uncheckedVariantFields);
+        const checkedUpdateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes)
+            : z.strictObject(checkedVariantFields);
         if (!hasRelation) {
             return uncheckedUpdateSchema;
         } else {

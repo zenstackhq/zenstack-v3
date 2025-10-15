@@ -115,6 +115,7 @@ describe('Custom validation tests', () => {
             model User {
                 id Int @id @default(autoincrement())
                 email String @unique @email
+                @@validate(length(email, 8))
                 @@allow('all', true)
             }
             `,
@@ -124,6 +125,13 @@ describe('Custom validation tests', () => {
             db.user.create({
                 data: {
                     email: 'xyz',
+                },
+            }),
+        ).toBeRejectedByValidation();
+        await expect(
+            db.user.create({
+                data: {
+                    email: 'a@b.com',
                 },
             }),
         ).toBeRejectedByValidation();
@@ -141,7 +149,7 @@ describe('Custom validation tests', () => {
             db.$setInputValidation(false).user.update({
                 where: { id: 1 },
                 data: {
-                    email: 'abc',
+                    email: 'a@b.com',
                 },
             }),
         ).toResolveTruthy();
@@ -151,6 +159,13 @@ describe('Custom validation tests', () => {
             db.user.create({
                 data: {
                     email: 'xyz',
+                },
+            }),
+        ).toBeRejectedByValidation();
+        await expect(
+            db.user.create({
+                data: {
+                    email: 'a@b.com',
                 },
             }),
         ).toBeRejectedByValidation();

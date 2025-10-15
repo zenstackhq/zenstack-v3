@@ -936,8 +936,12 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         });
 
-        const uncheckedCreateSchema = addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes);
-        const checkedCreateSchema = addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes);
+        const uncheckedCreateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes)
+            : z.strictObject(uncheckedVariantFields);
+        const checkedCreateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes)
+            : z.strictObject(checkedVariantFields);
 
         if (!hasRelation) {
             return this.orArray(uncheckedCreateSchema, canBeArray);
@@ -1216,8 +1220,12 @@ export class InputValidator<Schema extends SchemaDef> {
             }
         });
 
-        const uncheckedUpdateSchema = addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes);
-        const checkedUpdateSchema = addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes);
+        const uncheckedUpdateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes)
+            : z.strictObject(uncheckedVariantFields);
+        const checkedUpdateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes)
+            : z.strictObject(checkedVariantFields);
         if (!hasRelation) {
             return uncheckedUpdateSchema;
         } else {

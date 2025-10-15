@@ -113,7 +113,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
     }
 
     private isValidationAttribute(attr: DataModelAttribute | DataFieldAttribute) {
-        return attr.decl.ref?.attributes.some((attr) => attr.decl.$refText === '@@@validation');
+        return !!attr.decl.ref?.attributes.some((attr) => attr.decl.$refText === '@@@validation');
     }
 
     private validateArgs(funcDecl: FunctionDecl, args: Argument[], accept: ValidationAcceptor) {

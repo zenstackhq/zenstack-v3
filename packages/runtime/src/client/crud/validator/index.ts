@@ -1195,7 +1195,7 @@ export class InputValidator<Schema extends SchemaDef> {
                             z
                                 .object({
                                     set: arraySchema.optional(),
-                                    push: z.union([fieldSchema, arraySchema]).optional(),
+                                    push: z.union([fieldSchema, fieldSchema.array()]).optional(),
                                 })
                                 .refine(
                                     (v) => Object.keys(v).length === 1,

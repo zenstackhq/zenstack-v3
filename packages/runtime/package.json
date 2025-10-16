@@ -1,17 +1,12 @@
 {
     "name": "@zenstackhq/runtime",
-    "version": "3.0.0-beta.8",
+    "version": "3.0.0-beta.9",
     "description": "ZenStack Runtime",
     "type": "module",
     "scripts": {
-        "build": "tsc --project tsconfig.build.json --noEmit && tsup-node && pnpm test:generate",
+        "build": "tsc --noEmit && tsup-node",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
-        "test": "vitest run && pnpm test:typecheck",
-        "test:sqlite": "TEST_DB_PROVIDER=sqlite vitest run",
-        "test:postgresql": "TEST_DB_PROVIDER=postgresql vitest run",
-        "test:generate": "tsx test/scripts/generate.ts",
-        "test:typecheck": "tsc --project tsconfig.test.json",
         "pack": "pnpm pack"
     },
     "keywords": [],
@@ -79,9 +74,9 @@
         "zod-validation-error": "catalog:"
     },
     "peerDependencies": {
-        "better-sqlite3": "^12.2.0",
+        "better-sqlite3": "catalog:",
         "kysely": "catalog:",
-        "pg": "^8.13.1",
+        "pg": "catalog:",
         "zod": "catalog:"
     },
     "peerDependenciesMeta": {
@@ -99,7 +94,6 @@
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
-        "@zenstackhq/testtools": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "tsx": "^4.19.2",

@@ -1,4 +1,4 @@
-import type { Decimal } from 'decimal.js';
+import type Decimal from 'decimal.js';
 import { type GetModels, type IsDelegateModel, type ProcedureDef, type SchemaDef } from '../schema';
 import type { AuthType } from '../schema/auth';
 import type { OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
@@ -102,6 +102,12 @@ export type ClientContract<Schema extends SchemaDef> = {
      * Sets the current user identity.
      */
     $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema>;
+
+    /**
+     * Returns a new client enabling/disabling input validations expressed with attributes like
+     * `@email`, `@regex`, `@@validate`, etc.
+     */
+    $setInputValidation(enable: boolean): ClientContract<Schema>;
 
     /**
      * The Kysely query builder instance.

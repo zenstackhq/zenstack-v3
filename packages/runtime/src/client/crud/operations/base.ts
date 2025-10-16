@@ -14,7 +14,6 @@ import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
 import type { ClientContract } from '../..';
-import { PolicyPlugin } from '../../../plugins/policy';
 import type { BuiltinType, Expression, FieldDef } from '../../../schema';
 import { ExpressionUtils, type GetModels, type ModelDef, type SchemaDef } from '../../../schema';
 import { clone } from '../../../utils/clone';
@@ -108,7 +107,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     // TODO: this is not clean, needs a better solution
     protected get hasPolicyEnabled() {
-        return this.options.plugins?.some((plugin) => plugin instanceof PolicyPlugin);
+        return this.options.plugins?.some((plugin) => plugin.constructor.name === 'PolicyPlugin');
     }
 
     protected requireModel(model: string) {
@@ -132,15 +131,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         model: GetModels<Schema>,
         filter: any,
     ): Promise<unknown | undefined> {
-        const idFields = requireIdFields(this.schema, model);
-        const _filter = flattenCompoundUniqueFilters(this.schema, model, filter);
-        const query = kysely
-            .selectFrom(model)
-            .where((eb) => eb.and(_filter))
-            .select(idFields.map((f) => kysely.dynamic.ref(f)))
-            .limit(1)
-            .modifyEnd(this.makeContextComment({ model, operation: 'read' }));
-        return this.executeQueryTakeFirst(kysely, query, 'exists');
+        return this.readUnique(kysely, model, {
+            where: filter,
+            select: this.makeIdSelect(model),
+        });
     }
 
     protected async read(
@@ -149,7 +143,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         args: FindArgs<Schema, GetModels<Schema>, true> | undefined,
     ): Promise<any[]> {
         // table
-        let query = this.dialect.buildSelectModel(expressionBuilder(), model, model);
+        let query = this.dialect.buildSelectModel(model, model);
 
         if (args) {
             query = this.dialect.buildFilterSortTake(model, args, query, model);
@@ -828,16 +822,20 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 continue;
             }
             if (!(field in data)) {
-                if (typeof fields[field]?.default === 'object' && 'kind' in fields[field].default) {
-                    const generated = this.evalGenerator(fields[field].default);
+                if (typeof fieldDef?.default === 'object' && 'kind' in fieldDef.default) {
+                    const generated = this.evalGenerator(fieldDef.default);
                     if (generated !== undefined) {
-                        values[field] = generated;
+                        values[field] = this.dialect.transformPrimitive(
+                            generated,
+                            fieldDef.type as BuiltinType,
+                            !!fieldDef.array,
+                        );
                     }
-                } else if (fields[field]?.updatedAt) {
+                } else if (fieldDef?.updatedAt) {
                     // TODO: should this work at kysely level instead?
                     values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
-                } else if (fields[field]?.default !== undefined) {
-                    let value = fields[field].default;
+                } else if (fieldDef?.default !== undefined) {
+                    let value = fieldDef.default;
                     if (fieldDef.type === 'Json') {
                         // Schema uses JSON string for default value of Json fields
                         if (fieldDef.array && Array.isArray(value)) {
@@ -848,8 +846,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     }
                     values[field] = this.dialect.transformPrimitive(
                         value,
-                        fields[field].type as BuiltinType,
-                        !!fields[field].array,
+                        fieldDef.type as BuiltinType,
+                        !!fieldDef.array,
                     );
                 }
             }
@@ -945,15 +943,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             combinedWhere = Object.keys(combinedWhere).length > 0 ? { AND: [parentWhere, combinedWhere] } : parentWhere;
         }
 
-        // fill in automatically updated fields
         const modelDef = this.requireModel(model);
         let finalData = data;
+
+        // fill in automatically updated fields
+        const autoUpdatedFields: string[] = [];
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
             if (fieldDef.updatedAt) {
                 if (finalData === data) {
                     finalData = clone(data);
                 }
                 finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                autoUpdatedFields.push(fieldName);
             }
         }
 
@@ -1033,14 +1034,20 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
 
-        if (Object.keys(updateFields).length === 0) {
+        let hasFieldUpdate = Object.keys(updateFields).length > 0;
+        if (hasFieldUpdate) {
+            // check if only updating auto-updated fields, if so, we can skip the update
+            hasFieldUpdate = Object.keys(updateFields).some((f) => !autoUpdatedFields.includes(f));
+        }
+
+        if (!hasFieldUpdate) {
             // nothing to update, return the filter so that the caller can identify the entity
             return combinedWhere;
         } else {
             const idFields = requireIdFields(this.schema, model);
             const query = kysely
                 .updateTable(model)
-                .where((eb) => this.dialect.buildFilter(eb, model, model, combinedWhere))
+                .where(() => this.dialect.buildFilter(model, model, combinedWhere))
                 .set(updateFields)
                 .returning(idFields as any)
                 .modifyEnd(
@@ -1152,7 +1159,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const key = Object.keys(payload)[0];
         const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, false);
         const eb = expressionBuilder<any, any>();
-        const fieldRef = this.dialect.fieldRef(model, field, eb);
+        const fieldRef = this.dialect.fieldRef(model, field);
 
         return match(key)
             .with('set', () => value)
@@ -1175,7 +1182,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const key = Object.keys(payload)[0];
         const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, true);
         const eb = expressionBuilder<any, any>();
-        const fieldRef = this.dialect.fieldRef(model, field, eb);
+        const fieldRef = this.dialect.fieldRef(model, field);
 
         return match(key)
             .with('set', () => value)
@@ -1270,7 +1277,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (!shouldFallbackToIdFilter) {
             // simple filter
             query = query
-                .where((eb) => this.dialect.buildFilter(eb, model, model, where))
+                .where(() => this.dialect.buildFilter(model, model, where))
                 .$if(limit !== undefined, (qb) => qb.limit(limit!));
         } else {
             query = query.where((eb) =>
@@ -1281,8 +1288,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ),
                     'in',
                     this.dialect
-                        .buildSelectModel(eb, filterModel, filterModel)
-                        .where(this.dialect.buildFilter(eb, filterModel, filterModel, where))
+                        .buildSelectModel(filterModel, filterModel)
+                        .where(this.dialect.buildFilter(filterModel, filterModel, where))
                         .select(this.buildIdFieldRefs(kysely, filterModel))
                         .$if(limit !== undefined, (qb) => qb.limit(limit!)),
                 ),
@@ -1537,7 +1544,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (!relationFieldDef.array) {
                     const query = kysely
                         .updateTable(model)
-                        .where((eb) => eb.and(keyPairs.map(({ fk, pk }) => eb(sql.ref(fk), '=', fromRelation.ids[pk]))))
+                        .where((eb) =>
+                            eb.and(keyPairs.map(({ fk, pk }) => eb(eb.ref(fk as any), '=', fromRelation.ids[pk]))),
+                        )
                         .set(keyPairs.reduce((acc, { fk }) => ({ ...acc, [fk]: null }), {} as any))
                         .modifyEnd(
                             this.makeContextComment({
@@ -1965,7 +1974,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         if (!needIdFilter) {
-            query = query.where((eb) => this.dialect.buildFilter(eb, model, model, where));
+            query = query.where(() => this.dialect.buildFilter(model, model, where));
         } else {
             query = query.where((eb) =>
                 eb(
@@ -1975,8 +1984,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     ),
                     'in',
                     this.dialect
-                        .buildSelectModel(eb, filterModel, filterModel)
-                        .where((eb) => this.dialect.buildFilter(eb, filterModel, filterModel, where))
+                        .buildSelectModel(filterModel, filterModel)
+                        .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
                         .select(this.buildIdFieldRefs(kysely, filterModel))
                         .$if(limit !== undefined, (qb) => qb.limit(limit!)),
                 ),
@@ -2079,22 +2088,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    // Given a unique filter of a model, return the entity ids by trying to
-    // reused the filter if it's a complete id filter (without extra fields)
-    // otherwise, read the entity by the filter
+    // Given a unique filter of a model, load the entity and return its id fields
     private getEntityIds(kysely: ToKysely<Schema>, model: GetModels<Schema>, uniqueFilter: any) {
-        const idFields: string[] = requireIdFields(this.schema, model);
-        if (
-            // all id fields are provided
-            idFields.every((f) => f in uniqueFilter && uniqueFilter[f] !== undefined) &&
-            // no non-id filter exists
-            Object.keys(uniqueFilter).every((k) => idFields.includes(k))
-        ) {
-            return uniqueFilter;
-        }
-
         return this.readUnique(kysely, model, {
             where: uniqueFilter,
+            select: this.makeIdSelect(model),
         });
     }
 

@@ -13,6 +13,7 @@ import {
     isDataFieldAttribute,
     isDataModel,
     isDataModelAttribute,
+    isStringLiteral,
 } from '../generated/ast';
 import {
     getFunctionExpressionContext,
@@ -66,12 +67,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
             }
 
             // validate the context allowed for the function
-            const exprContext = match(containerAttribute?.decl.$refText)
-                .with('@default', () => ExpressionContext.DefaultValue)
-                .with(P.union('@@allow', '@@deny', '@allow', '@deny'), () => ExpressionContext.AccessPolicy)
-                .with('@@validate', () => ExpressionContext.ValidationRule)
-                .with('@@index', () => ExpressionContext.Index)
-                .otherwise(() => undefined);
+            const exprContext = this.getExpressionContext(containerAttribute);
 
             // get the context allowed for the function
             const funcAllowedContext = getFunctionExpressionContext(funcDecl);
@@ -101,6 +97,24 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         if (checker) {
             checker.value.call(this, expr, accept);
         }
+    }
+
+    private getExpressionContext(containerAttribute: DataModelAttribute | DataFieldAttribute | undefined) {
+        if (!containerAttribute) {
+            return undefined;
+        }
+        if (this.isValidationAttribute(containerAttribute)) {
+            return ExpressionContext.ValidationRule;
+        }
+        return match(containerAttribute?.decl.$refText)
+            .with('@default', () => ExpressionContext.DefaultValue)
+            .with(P.union('@@allow', '@@deny', '@allow', '@deny'), () => ExpressionContext.AccessPolicy)
+            .with('@@index', () => ExpressionContext.Index)
+            .otherwise(() => undefined);
+    }
+
+    private isValidationAttribute(attr: DataModelAttribute | DataFieldAttribute) {
+        return !!attr.decl.ref?.attributes.some((attr) => attr.decl.$refText === '@@@validation');
     }
 
     private validateArgs(funcDecl: FunctionDecl, args: Argument[], accept: ValidationAcceptor) {
@@ -168,6 +182,53 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         }
 
         return true;
+    }
+
+    @func('length')
+    // @ts-expect-error
+    private _checkLength(expr: InvocationExpr, accept: ValidationAcceptor) {
+        const msg = 'argument must be a string or list field';
+        const fieldArg = expr.args[0]!.value;
+        if (!isDataFieldReference(fieldArg)) {
+            accept('error', msg, {
+                node: expr.args[0]!,
+            });
+            return;
+        }
+
+        if (isDataModel(fieldArg.$resolvedType?.decl)) {
+            accept('error', msg, {
+                node: expr.args[0]!,
+            });
+            return;
+        }
+
+        if (!fieldArg.$resolvedType?.array && fieldArg.$resolvedType?.decl !== 'String') {
+            accept('error', msg, {
+                node: expr.args[0]!,
+            });
+        }
+    }
+
+    @func('regex')
+    // @ts-expect-error
+    private _checkRegex(expr: InvocationExpr, accept: ValidationAcceptor) {
+        const regex = expr.args[1]?.value;
+        if (!isStringLiteral(regex)) {
+            accept('error', 'second argument must be a string literal', {
+                node: expr.args[1]!,
+            });
+            return;
+        }
+
+        try {
+            // try to create a RegExp object to verify the pattern
+            new RegExp(regex.value);
+        } catch (e) {
+            accept('error', 'invalid regular expression: ' + (e as Error).message, {
+                node: expr.args[1]!,
+            });
+        }
     }
 
     // TODO: move this to policy plugin

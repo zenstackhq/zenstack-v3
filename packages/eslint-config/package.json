@@ -1,7 +1,0 @@
-{
-    "name": "@zenstackhq/eslint-config",
-    "version": "3.0.0-beta.8",
-    "type": "module",
-    "private": true,
-    "license": "MIT"
-}

@@ -155,7 +155,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
 
         if (this.canJoinWithoutNestedSelect(relationModelDef, payload)) {
             // join without needing a nested select on relation model
-            tbl = this.buildModelSelect(eb, relationModel, subQueryName, payload, false);
+            tbl = this.buildModelSelect(relationModel, subQueryName, payload, false);
 
             // add parent join filter
             tbl = this.buildRelationJoinFilter(tbl, model, relationField, subQueryName, parentAlias);
@@ -166,7 +166,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 const selectModelAlias = `${parentAlias}$${relationField}$sub`;
 
                 // select all fields
-                let selectModelQuery = this.buildModelSelect(eb, relationModel, selectModelAlias, payload, true);
+                let selectModelQuery = this.buildModelSelect(relationModel, selectModelAlias, payload, true);
 
                 // add parent join filter
                 selectModelQuery = this.buildRelationJoinFilter(
@@ -203,10 +203,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                     ...Object.entries(relationModelDef.fields)
                         .filter(([, value]) => !value.relation)
                         .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
-                        .map(([field]) => [
-                            sql.lit(field),
-                            this.fieldRef(relationModel, field, eb, subQueryName, false),
-                        ])
+                        .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, subQueryName, false)])
                         .flatMap((v) => v),
                 );
             } else if (payload.select) {
@@ -237,7 +234,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                                 } else {
                                     return [
                                         sql.lit(field),
-                                        this.fieldRef(relationModel, field, eb, subQueryName, false) as ArgsType,
+                                        this.fieldRef(relationModel, field, subQueryName, false) as ArgsType,
                                     ];
                                 }
                             }
@@ -345,8 +342,8 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return query;
     }
 
-    override buildJsonObject(eb: ExpressionBuilder<any, any>, value: Record<string, Expression<unknown>>) {
-        return eb.fn(
+    override buildJsonObject(value: Record<string, Expression<unknown>>) {
+        return this.eb.fn(
             'json_object',
             Object.entries(value).flatMap(([key, value]) => [sql.lit(key), value]),
         );
@@ -364,11 +361,8 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return false;
     }
 
-    override buildArrayLength(
-        eb: ExpressionBuilder<any, any>,
-        array: Expression<unknown>,
-    ): ExpressionWrapper<any, any, number> {
-        return eb.fn('json_array_length', [array]);
+    override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
+        return this.eb.fn('json_array_length', [array]);
     }
 
     override buildArrayLiteralSQL(_values: unknown[]): string {

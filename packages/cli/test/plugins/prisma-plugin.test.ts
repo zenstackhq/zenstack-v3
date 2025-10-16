@@ -57,4 +57,25 @@ model User {
         runCli('generate', workDir);
         expect(fs.existsSync(path.join(workDir, 'prisma/schema.prisma'))).toBe(true);
     });
+
+    it('can generate a Prisma schema with custom output relative to zenstack.output', () => {
+        const workDir = createProject(`
+plugin prisma {
+    provider = '@core/prisma'
+    output = './schema.prisma'
+}
+
+model User {
+    id String @id @default(cuid())
+}
+`);
+
+        const pkgJson = JSON.parse(fs.readFileSync(path.join(workDir, 'package.json'), 'utf8'));
+        pkgJson.zenstack = {
+            output: './relative',
+        };
+        fs.writeFileSync(path.join(workDir, 'package.json'), JSON.stringify(pkgJson, null, 2));
+        runCli('generate', workDir);
+        expect(fs.existsSync(path.join(workDir, 'relative/schema.prisma'))).toBe(true);
+    });
 });

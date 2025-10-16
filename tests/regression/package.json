@@ -1,6 +1,6 @@
 {
     "name": "regression",
-    "version": "3.0.0-beta.8",
+    "version": "3.0.0-beta.9",
     "private": true,
     "type": "module",
     "scripts": {
@@ -8,13 +8,14 @@
         "test": "pnpm generate && tsc && vitest run"
     },
     "dependencies": {
-        "@zenstackhq/testtools": "workspace:*"
+        "@zenstackhq/testtools": "workspace:*",
+        "decimal.js": "^10.4.3"
     },
     "devDependencies": {
         "@zenstackhq/cli": "workspace:*",
-        "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*"
     }

@@ -56,7 +56,6 @@
         - [x] Array update
         - [x] Strict typing for checked/unchecked input
     - [x] Upsert
-        - [ ] Implement with "on conflict"
     - [x] Delete
     - [x] Aggregation
         - [x] Count
@@ -86,7 +85,7 @@
         - [ ] Global omit
         - [ ] DbNull vs JsonNull
         - [ ] Migrate to tsdown
-        - [ ] @default validation
+        - [x] @default validation
     - [ ] Benchmark
 - [x] Plugin
     - [x] Post-mutation hooks should be called after transaction is committed
@@ -96,7 +95,7 @@
     - [x] ZModel
     - [x] Runtime
     - [x] Typing
-- [ ] Validation
+- [x] Validation
 - [ ] Access Policy
     - [ ] Short-circuit pre-create check for scalar-field only policies
     - [x] Inject "on conflict do update"

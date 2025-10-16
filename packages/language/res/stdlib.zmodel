@@ -48,6 +48,7 @@ enum AttributeTargetField {
     BytesField
     ModelField
     TypeDefField
+    ListField
 }
 
 /**
@@ -486,9 +487,9 @@ attribute @db.ByteA() @@@targetField([BytesField]) @@@prisma
 //////////////////////////////////////////////
 
 /**
- * Validates length of a string field.
+ * Validates length of a string field or list field.
  */
-attribute @length(_ min: Int?, _ max: Int?, _ message: String?) @@@targetField([StringField]) @@@validation
+attribute @length(_ min: Int?, _ max: Int?, _ message: String?) @@@targetField([StringField, ListField]) @@@validation
 
 /**
  * Validates a string field value starts with the given text.
@@ -543,22 +544,22 @@ attribute @upper() @@@targetField([StringField]) @@@validation
 /**
  * Validates a number field is greater than the given value.
  */
-attribute @gt(_ value: Int, _ message: String?) @@@targetField([IntField, FloatField, DecimalField]) @@@validation
+attribute @gt(_ value: Any, _ message: String?) @@@targetField([IntField, FloatField, DecimalField, BigIntField]) @@@validation
 
 /**
  * Validates a number field is greater than or equal to the given value.
  */
-attribute @gte(_ value: Int, _ message: String?) @@@targetField([IntField, FloatField, DecimalField]) @@@validation
+attribute @gte(_ value: Any, _ message: String?) @@@targetField([IntField, FloatField, DecimalField, BigIntField]) @@@validation
 
 /**
  * Validates a number field is less than the given value.
  */
-attribute @lt(_ value: Int, _ message: String?) @@@targetField([IntField, FloatField, DecimalField]) @@@validation
+attribute @lt(_ value: Any, _ message: String?) @@@targetField([IntField, FloatField, DecimalField, BigIntField]) @@@validation
 
 /**
  * Validates a number field is less than or equal to the given value.
  */
-attribute @lte(_ value: Int, _ message: String?) @@@targetField([IntField, FloatField, DecimalField]) @@@validation
+attribute @lte(_ value: Any, _ message: String?) @@@targetField([IntField, FloatField, DecimalField, BigIntField]) @@@validation
 
 /**
  * Validates the entity with a complex condition.
@@ -566,9 +567,9 @@ attribute @lte(_ value: Int, _ message: String?) @@@targetField([IntField, Float
 attribute @@validate(_ value: Boolean, _ message: String?, _ path: String[]?) @@@validation
 
 /**
- * Validates length of a string field.
+ * Returns the length of a string field or a list field.
  */
-function length(field: String, min: Int, max: Int?): Boolean {
+function length(field: Any): Int {
 } @@@expressionContext([ValidationRule])
 
 
@@ -581,19 +582,19 @@ function regex(field: String, regex: String): Boolean {
 /**
  * Validates a string field value is a valid email address.
  */
-function email(field: String): Boolean {
+function isEmail(field: String): Boolean {
 } @@@expressionContext([ValidationRule])
 
 /**
  * Validates a string field value is a valid ISO datetime.
  */
-function datetime(field: String): Boolean {
+function isDateTime(field: String): Boolean {
 } @@@expressionContext([ValidationRule])
 
 /**
  * Validates a string field value is a valid url.
  */
-function url(field: String): Boolean {
+function isUrl(field: String): Boolean {
 } @@@expressionContext([ValidationRule])
 
 //////////////////////////////////////////////
@@ -676,7 +677,7 @@ attribute @@allow(_ operation: String @@@completionHint(["'create'", "'read'", "
  * @param condition: a boolean expression that controls if the operation should be allowed.
  * @param override: a boolean value that controls if the field-level policy should override the model-level policy.
  */
-attribute @allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean, _ override: Boolean?)
+// attribute @allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean, _ override: Boolean?)
 
 /**
  * Defines an access policy that denies a set of operations when the given condition is true.
@@ -692,7 +693,7 @@ attribute @@deny(_ operation: String @@@completionHint(["'create'", "'read'", "'
  * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
  * @param condition: a boolean expression that controls if the operation should be denied.
  */
-attribute @deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
+// attribute @deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
 
 /**
  * Checks if the current user can perform the given operation on the given field.

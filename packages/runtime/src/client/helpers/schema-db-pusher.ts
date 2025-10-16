@@ -162,9 +162,21 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 if (fieldDef.unique) {
                     continue;
                 }
+                if (fieldDef.originModel && fieldDef.originModel !== modelDef.name) {
+                    // field is inherited from a base model, skip
+                    continue;
+                }
                 table = table.addUniqueConstraint(`unique_${modelDef.name}_${key}`, [this.getColumnName(fieldDef)]);
             } else {
-                // multi-field constraint
+                // multi-field constraint, if any field is inherited from base model, skip
+                if (
+                    Object.keys(value).some((f) => {
+                        const fDef = modelDef.fields[f]!;
+                        return fDef.originModel && fDef.originModel !== modelDef.name;
+                    })
+                ) {
+                    continue;
+                }
                 table = table.addUniqueConstraint(
                     `unique_${modelDef.name}_${key}`,
                     Object.keys(value).map((f) => this.getColumnName(modelDef.fields[f]!)),

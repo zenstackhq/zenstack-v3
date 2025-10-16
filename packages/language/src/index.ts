@@ -20,7 +20,7 @@ export class DocumentLoadError extends Error {
 
 export async function loadDocument(
     fileName: string,
-    pluginModelFiles: string[] = [],
+    additionalModelFiles: string[] = [],
 ): Promise<
     { success: true; model: Model; warnings: string[] } | { success: false; errors: string[]; warnings: string[] }
 > {
@@ -50,9 +50,9 @@ export async function loadDocument(
         URI.file(path.resolve(path.join(_dirname, '../res', STD_LIB_MODULE_NAME))),
     );
 
-    // load plugin model files
+    // load additional model files
     const pluginDocs = await Promise.all(
-        pluginModelFiles.map((file) =>
+        additionalModelFiles.map((file) =>
             services.shared.workspace.LangiumDocuments.getOrCreateDocument(URI.file(path.resolve(file))),
         ),
     );

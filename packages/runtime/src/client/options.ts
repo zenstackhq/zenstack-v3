@@ -72,6 +72,12 @@ export type ClientOptions<Schema extends SchemaDef> = {
      * @see https://github.com/brianc/node-postgres/issues/429
      */
     fixPostgresTimezone?: boolean;
+
+    /**
+     * Whether to enable input validations expressed with attributes like `@email`, `@regex`,
+     * `@@validate`, etc. Defaults to `true`.
+     */
+    validateInput?: boolean;
 } & (HasComputedFields<Schema> extends true
     ? {
           /**

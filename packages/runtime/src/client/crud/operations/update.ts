@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
-import { RejectedByPolicyError, RejectedByPolicyReason } from '../../../plugins/policy/errors';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { UpdateArgs, UpdateManyAndReturnArgs, UpdateManyArgs, UpsertArgs, WhereInput } from '../../crud-types';
+import { RejectedByPolicyError, RejectedByPolicyReason } from '../../errors';
 import { getIdValues } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 

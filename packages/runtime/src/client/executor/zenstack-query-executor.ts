@@ -26,8 +26,8 @@ import type { GetModels, SchemaDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
 import { TransactionIsolationLevel, type ClientContract } from '../contract';
 import { InternalError, QueryError, ZenStackError } from '../errors';
-import { stripAlias } from '../kysely-utils';
 import type { AfterEntityMutationCallback, OnKyselyQueryCallback } from '../plugin';
+import { stripAlias } from '../query-utils';
 import { QueryNameMapper } from './name-mapper';
 import type { ZenStackDriver } from './zenstack-driver';
 

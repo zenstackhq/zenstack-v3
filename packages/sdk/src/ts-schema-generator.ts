@@ -507,7 +507,11 @@ export class TsSchemaGenerator {
                                 ...(defaultValue.args.length > 0
                                     ? [
                                           ts.factory.createArrayLiteralExpression(
-                                              defaultValue.args.map((arg) => this.createLiteralNode(arg)),
+                                              defaultValue.args.map((arg) =>
+                                                  this.createExpressionUtilsCall('literal', [
+                                                      this.createLiteralNode(arg),
+                                                  ]),
+                                              ),
                                           ),
                                       ]
                                     : []),

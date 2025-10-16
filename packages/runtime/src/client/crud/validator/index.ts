@@ -45,6 +45,7 @@ import {
     addBigIntValidation,
     addCustomValidation,
     addDecimalValidation,
+    addListValidation,
     addNumberValidation,
     addStringValidation,
 } from './utils';
@@ -904,11 +905,12 @@ export class InputValidator<Schema extends SchemaDef> {
                 let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
 
                 if (fieldDef.array) {
+                    fieldSchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
                     fieldSchema = z
                         .union([
-                            z.array(fieldSchema),
+                            fieldSchema,
                             z.strictObject({
-                                set: z.array(fieldSchema),
+                                set: fieldSchema,
                             }),
                         ])
                         .optional();
@@ -1186,13 +1188,14 @@ export class InputValidator<Schema extends SchemaDef> {
                 }
 
                 if (fieldDef.array) {
+                    const arraySchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
                     fieldSchema = z
                         .union([
-                            fieldSchema.array(),
+                            arraySchema,
                             z
                                 .object({
-                                    set: z.array(fieldSchema).optional(),
-                                    push: this.orArray(fieldSchema, true).optional(),
+                                    set: arraySchema.optional(),
+                                    push: z.union([fieldSchema, arraySchema]).optional(),
                                 })
                                 .refine(
                                     (v) => Object.keys(v).length === 1,

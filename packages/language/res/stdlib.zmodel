@@ -48,6 +48,7 @@ enum AttributeTargetField {
     BytesField
     ModelField
     TypeDefField
+    ListField
 }
 
 /**
@@ -486,9 +487,9 @@ attribute @db.ByteA() @@@targetField([BytesField]) @@@prisma
 //////////////////////////////////////////////
 
 /**
- * Validates length of a string field.
+ * Validates length of a string field or list field.
  */
-attribute @length(_ min: Int?, _ max: Int?, _ message: String?) @@@targetField([StringField]) @@@validation
+attribute @length(_ min: Int?, _ max: Int?, _ message: String?) @@@targetField([StringField, ListField]) @@@validation
 
 /**
  * Validates a string field value starts with the given text.
@@ -566,9 +567,9 @@ attribute @lte(_ value: Any, _ message: String?) @@@targetField([IntField, Float
 attribute @@validate(_ value: Boolean, _ message: String?, _ path: String[]?) @@@validation
 
 /**
- * Validates length of a string field.
+ * Returns the length of a string field or a list field.
  */
-function length(field: String, min: Int, max: Int?): Boolean {
+function length(field: Any): Int {
 } @@@expressionContext([ValidationRule])
 
 
@@ -581,19 +582,19 @@ function regex(field: String, regex: String): Boolean {
 /**
  * Validates a string field value is a valid email address.
  */
-function email(field: String): Boolean {
+function isEmail(field: String): Boolean {
 } @@@expressionContext([ValidationRule])
 
 /**
  * Validates a string field value is a valid ISO datetime.
  */
-function datetime(field: String): Boolean {
+function isDateTime(field: String): Boolean {
 } @@@expressionContext([ValidationRule])
 
 /**
  * Validates a string field value is a valid url.
  */
-function url(field: String): Boolean {
+function isUrl(field: String): Boolean {
 } @@@expressionContext([ValidationRule])
 
 //////////////////////////////////////////////

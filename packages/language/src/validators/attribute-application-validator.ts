@@ -491,6 +491,9 @@ function isValidAttributeTarget(attrDecl: Attribute, targetDecl: DataField) {
             case 'TypeDefField':
                 allowed = allowed || isTypeDef(targetDecl.type.reference?.ref);
                 break;
+            case 'ListField':
+                allowed = allowed || (!isDataModel(targetDecl.type.reference?.ref) && targetDecl.type.array);
+                break;
             default:
                 break;
         }

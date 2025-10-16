@@ -1,4 +1,4 @@
-import { createTestClient } from '@zenstackhq/testtools';
+import { createTestClient, loadSchemaWithError } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
 
 describe('Custom validation tests', () => {
@@ -15,9 +15,10 @@ describe('Custom validation tests', () => {
             int1 Int?
             list1 Int[]
             list2 Int[]
+            list3 Int[]
 
             @@validate(
-                (str1 == null || length(str1, 8, 10))
+                (str1 == null || (length(str1) >= 8 && length(str1) <= 10))
                 && (int1 == null || (int1 > 1 && int1 < 4)),
                 'invalid fields')
 
@@ -25,15 +26,17 @@ describe('Custom validation tests', () => {
 
             @@validate(str2 == null || regex(str2, '^x.*z$'), 'invalid str2')
 
-            @@validate(str3 == null || email(str3), 'invalid str3')
+            @@validate(str3 == null || isEmail(str3), 'invalid str3')
 
-            @@validate(str4 == null || url(str4), 'invalid str4')
+            @@validate(str4 == null || isUrl(str4), 'invalid str4')
 
-            @@validate(str5 == null || datetime(str5), 'invalid str5')
+            @@validate(str5 == null || isDateTime(str5), 'invalid str5')
 
             @@validate(list1 == null || (has(list1, 1) && hasSome(list1, [2, 3]) && hasEvery(list1, [4, 5])), 'invalid list1')
 
             @@validate(list2 == null || isEmpty(list2), 'invalid list2', ['x', 'y'])
+
+            @@validate(list3 == null || length(list3) <2 , 'invalid list3')
         }
         `,
             { provider: 'postgresql' },
@@ -93,6 +96,9 @@ describe('Custom validation tests', () => {
             }
             expect(thrown).toBe(true);
 
+            // validates list length
+            await expect(_t({ list3: [1, 2] })).toBeRejectedByValidation(['invalid list3']);
+
             // satisfies all
             await expect(
                 _t({
@@ -104,6 +110,7 @@ describe('Custom validation tests', () => {
                     int1: 2,
                     list1: [1, 2, 4, 5],
                     list2: [],
+                    list3: [1],
                 }),
             ).toResolveTruthy();
         }
@@ -115,7 +122,7 @@ describe('Custom validation tests', () => {
             model User {
                 id Int @id @default(autoincrement())
                 email String @unique @email
-                @@validate(length(email, 8))
+                @@validate(length(email) >= 8)
                 @@allow('all', true)
             }
             `,
@@ -169,5 +176,62 @@ describe('Custom validation tests', () => {
                 },
             }),
         ).toBeRejectedByValidation();
+    });
+
+    it('checks arg type for validation functions', async () => {
+        // length() on relation field
+        await loadSchemaWithError(
+            `
+        model Foo {
+            id Int @id @default(autoincrement())
+            bars Bar[]
+            @@validate(length(bars) > 0)
+        }
+
+        model Bar {
+            id Int @id @default(autoincrement())
+            foo Foo @relation(fields: [fooId], references: [id])
+            fooId Int
+        }
+        `,
+            'argument must be a string or list field',
+        );
+
+        // length() on non-string/list field
+        await loadSchemaWithError(
+            `
+        model Foo {
+            id Int @id @default(autoincrement())
+            x Int
+            @@validate(length(x) > 0)
+        }
+        `,
+            'argument must be a string or list field',
+        );
+
+        // invalid regex pattern
+        await loadSchemaWithError(
+            `
+        model Foo {
+            id Int @id @default(autoincrement())
+            x String
+            @@validate(regex(x, '[abc'))
+        }
+        `,
+            'invalid regular expression',
+        );
+
+        // using field as regex pattern
+        await loadSchemaWithError(
+            `
+        model Foo {
+            id Int @id @default(autoincrement())
+            x String
+            y String
+            @@validate(regex(x, y))
+        }
+        `,
+            'second argument must be a string literal',
+        );
     });
 });

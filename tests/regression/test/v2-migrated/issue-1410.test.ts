@@ -1,9 +1,10 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1410', async () => {
-    const db = await createTestClient(
-        `
+describe('Regression for issue #1410', () => {
+    it('verifies issue 1410', async () => {
+        const db = await createTestClient(
+            `
             model Drink {
               id                Int   @id @default(autoincrement())
               slug              String @unique
@@ -124,20 +125,21 @@ it('verifies issue 1410', async () => {
               @@allow('all', true)
             }
             `,
-    );
+        );
 
-    await db.beer.findMany({
-        include: { style: true, manufacturer: true },
-        where: { NOT: { gluten: true } },
-    });
+        await db.beer.findMany({
+            include: { style: true, manufacturer: true },
+            where: { NOT: { gluten: true } },
+        });
 
-    await db.beer.findMany({
-        include: { style: true, manufacturer: true },
-        where: { AND: [{ gluten: true }, { abv: { gt: 50 } }] },
-    });
+        await db.beer.findMany({
+            include: { style: true, manufacturer: true },
+            where: { AND: [{ gluten: true }, { abv: { gt: 50 } }] },
+        });
 
-    await db.beer.findMany({
-        include: { style: true, manufacturer: true },
-        where: { OR: [{ AND: [{ NOT: { gluten: true } }] }, { abv: { gt: 50 } }] },
+        await db.beer.findMany({
+            include: { style: true, manufacturer: true },
+            where: { OR: [{ AND: [{ NOT: { gluten: true } }] }, { abv: { gt: 50 } }] },
+        });
     });
 });

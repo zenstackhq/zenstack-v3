@@ -1,9 +1,10 @@
 import { createPolicyTestClient } from '@zenstackhq/testtools';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-it('verifies issue 1123', async () => {
-    const db = await createPolicyTestClient(
-        `
+describe('Regression for issue #1123', () => {
+    it('verifies issue 1123', async () => {
+        const db = await createPolicyTestClient(
+            `
 model Content {
     id String @id @default(cuid())
     published Boolean @default(false)
@@ -12,7 +13,7 @@ model Content {
     @@delegate(contentType)
     @@allow('all', true)
 }
-    
+
 model Post extends Content {
     title String
 }
@@ -28,16 +29,19 @@ model Like {
     @@allow('all', true)
 }
             `,
-    );
+        );
 
-    await db.post.create({
-        data: {
-            title: 'a post',
-            likes: { create: {} },
-        },
-    });
+        await db.post.create({
+            data: {
+                title: 'a post',
+                likes: { create: {} },
+            },
+        });
 
-    await expect(db.content.findFirst({ include: { _count: { select: { likes: true } } } })).resolves.toMatchObject({
-        _count: { likes: 1 },
+        await expect(db.content.findFirst({ include: { _count: { select: { likes: true } } } })).resolves.toMatchObject(
+            {
+                _count: { likes: 1 },
+            },
+        );
     });
 });

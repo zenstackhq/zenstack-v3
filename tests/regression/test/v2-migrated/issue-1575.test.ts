@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1575', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1575', () => {
+    it('verifies issue 1575', async () => {
+        await loadSchema(
+            `
 model UserAssets {
     id       String @id @default(cuid())
     videoId         String
@@ -25,5 +26,6 @@ model Movie extends Asset {
     duration    Int
 }
             `,
-    );
+        );
+    });
 });

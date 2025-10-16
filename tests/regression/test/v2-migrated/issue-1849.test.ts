@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1849', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1849', () => {
+    it('verifies issue 1849', async () => {
+        await loadSchema(
+            `
 import './enum'
 
 datasource db {
@@ -15,13 +16,14 @@ model Post {
   id Int @id
   status Status @default(PUBLISHED)
 }`,
-        {
-            enum: `
-enum Status { 
+            {
+                enum: `
+enum Status {
   PENDING
   PUBLISHED
-}            
+}
 `,
-        },
-    );
+            },
+        );
+    });
 });

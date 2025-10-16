@@ -1,29 +1,31 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-it('verifies issue 1585', async () => {
-    const db = await createTestClient(
-        `
-            model Asset {
-                id Int @id @default(autoincrement())
-                type String
-                views Int
+describe('Regression for issue #1585', () => {
+    it('verifies issue 1585', async () => {
+        const db = await createTestClient(
+            `
+                model Asset {
+                    id Int @id @default(autoincrement())
+                    type String
+                    views Int
 
-                @@allow('all', true)
-                @@delegate(type)
-            }
+                    @@allow('all', true)
+                    @@delegate(type)
+                }
             
-            model Post extends Asset {
-                title String
-            }
-            `,
-    );
+                model Post extends Asset {
+                    title String
+                }
+                `,
+        );
 
-    await db.post.create({ data: { title: 'Post1', views: 0 } });
-    await db.post.create({ data: { title: 'Post2', views: 1 } });
-    await expect(
-        db.post.count({
-            where: { views: { gt: 0 } },
-        }),
-    ).resolves.toBe(1);
+        await db.post.create({ data: { title: 'Post1', views: 0 } });
+        await db.post.create({ data: { title: 'Post2', views: 1 } });
+        await expect(
+            db.post.count({
+                where: { views: { gt: 0 } },
+            }),
+        ).resolves.toBe(1);
+    });
 });

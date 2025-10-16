@@ -1,9 +1,10 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1763', async () => {
-    await createTestClient(
-        `
+describe('Regression for issue #1763', () => {
+    it('verifies issue 1763', async () => {
+        await createTestClient(
+            `
 model Post {
     id   Int    @id @default(autoincrement())
     name String
@@ -20,9 +21,9 @@ model ConcretePost extends Post {
 }
             `,
 
-        {
-            extraSourceFiles: {
-                main: `
+            {
+                extraSourceFiles: {
+                    main: `
 import { ZenStackClient } from '@zenstackhq/runtime';
 import { schema } from './schema';
 
@@ -36,7 +37,8 @@ async function test() {
         },
     });
 }`,
+                },
             },
-        },
-    );
+        );
+    });
 });

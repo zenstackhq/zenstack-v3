@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1416', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1416', () => {
+    it('verifies issue 1416', async () => {
+        await loadSchema(
+            `
 model User {
   id   String @id @default(cuid())
   role String
@@ -32,5 +33,6 @@ model MyEntity extends Entity {
   foo String
 }
             `,
-    );
+        );
+    });
 });

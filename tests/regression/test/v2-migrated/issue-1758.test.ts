@@ -1,9 +1,10 @@
 import { loadSchemaWithError } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1758', async () => {
-    await loadSchemaWithError(
-        `
+describe('Regression for issue #1758', () => {
+    it('verifies issue 1758', async () => {
+        await loadSchemaWithError(
+            `
 model Organization {
     id       String @id @default(cuid())
     contents Content[] @relation("OrganizationContents")
@@ -22,6 +23,7 @@ model Store extends Content {
     @@unique([organizationId, name])
 }
             `,
-        'Cannot use fields inherited from a polymorphic base model in `@@unique`',
-    );
+            'Cannot use fields inherited from a polymorphic base model in `@@unique`',
+        );
+    });
 });

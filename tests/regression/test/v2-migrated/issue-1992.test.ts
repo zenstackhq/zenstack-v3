@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1992', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1992', () => {
+    it('verifies issue 1992', async () => {
+        await loadSchema(
+            `
 enum MyAppUserType {
     Local
     Google
@@ -56,5 +57,6 @@ model MyAppUserFolder {
     user      MyAppUser    @relation(fields: [userId], references: [id])
 }
             `,
-    );
+        );
+    });
 });

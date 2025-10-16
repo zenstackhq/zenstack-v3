@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1551', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1551', () => {
+    it('verifies issue 1551', async () => {
+        await loadSchema(
+            `
 model User {
     id Int @id
     profile Profile? @relation(fields: [profileId], references: [id])
@@ -19,8 +20,9 @@ model Profile {
 }
 
 model IndividualProfile extends Profile {
-    name String    
+    name String
 }
             `,
-    );
+        );
+    });
 });

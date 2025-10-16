@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1835', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1835', () => {
+    it('verifies issue 1835', async () => {
+        await loadSchema(
+            `
 enum Enum {
     SOME_VALUE
     ANOTHER_VALUE
@@ -19,5 +20,6 @@ model AnotherModel {
     id String @id @default(cuid())
 }
 `,
-    );
+        );
+    });
 });

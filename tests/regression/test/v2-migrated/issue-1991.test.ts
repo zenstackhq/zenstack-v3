@@ -1,9 +1,10 @@
 import { createPolicyTestClient } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1991', async () => {
-    await createPolicyTestClient(
-        `
+describe('Regression for issue #1991', () => {
+    it('verifies issue 1991', async () => {
+        await createPolicyTestClient(
+            `
 type FooMetadata {
     isLocked Boolean
 }
@@ -22,10 +23,10 @@ model FooOption {
     meta FooOptionMetadata @json
 }
             `,
-        {
-            provider: 'postgresql',
-            extraSourceFiles: {
-                main: `
+            {
+                provider: 'postgresql',
+                extraSourceFiles: {
+                    main: `
                         import { ZenStackClient } from '@zenstackhq/runtime';
                         import { schema } from './schema';
 
@@ -35,7 +36,8 @@ model FooOption {
                             data: { meta: { color: 'red' } }
                         })
                         `,
+                },
             },
-        },
-    );
+        );
+    });
 });

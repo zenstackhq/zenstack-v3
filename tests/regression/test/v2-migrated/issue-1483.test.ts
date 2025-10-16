@@ -1,9 +1,10 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-it('verifies issue 1483', async () => {
-    const db = await createTestClient(
-        `
+describe('Regression for issue #1483', () => {
+    it('verifies issue 1483', async () => {
+        const db = await createTestClient(
+            `
 model User {
     @@auth
     id    String @id
@@ -38,30 +39,31 @@ model Edit {
     @@allow('all', true)
 }
             `,
-    );
+        );
 
-    await db.edit.deleteMany({});
-    await db.person.deleteMany({});
-    await db.user.deleteMany({});
+        await db.edit.deleteMany({});
+        await db.person.deleteMany({});
+        await db.user.deleteMany({});
 
-    const person = await db.person.create({
-        data: {
-            name: 'test',
-        },
-    });
-
-    await db.edit.create({
-        data: {
-            entityId: person.id,
-        },
-    });
-
-    await expect(
-        db.edit.findMany({
-            include: {
-                author: true,
-                entity: true,
+        const person = await db.person.create({
+            data: {
+                name: 'test',
             },
-        }),
-    ).resolves.toHaveLength(1);
+        });
+
+        await db.edit.create({
+            data: {
+                entityId: person.id,
+            },
+        });
+
+        await expect(
+            db.edit.findMany({
+                include: {
+                    author: true,
+                    entity: true,
+                },
+            }),
+        ).resolves.toHaveLength(1);
+    });
 });

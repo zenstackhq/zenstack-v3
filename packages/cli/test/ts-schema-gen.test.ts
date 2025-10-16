@@ -370,56 +370,54 @@ model User {
 
         expect(schema.models).toMatchObject({
             User: {
-                name: "User",
+                name: 'User',
                 fields: {
                     id: {
-                        name: "id",
-                        type: "String",
+                        name: 'id',
+                        type: 'String',
                         id: true,
                         attributes: [
                             {
-                                name: "@id"
+                                name: '@id',
                             },
                             {
-                                name: "@default",
+                                name: '@default',
                                 args: [
                                     {
-                                        name: "value",
+                                        name: 'value',
                                         value: {
-                                            kind: "call",
-                                            function: "uuid",
+                                            kind: 'call',
+                                            function: 'uuid',
                                             args: [
                                                 {
-                                                    kind: "literal",
-                                                    value: 7
-                                                }
-                                            ]
-                                        }
-                                    }
-                                ]
-                            }
+                                                    kind: 'literal',
+                                                    value: 7,
+                                                },
+                                            ],
+                                        },
+                                    },
+                                ],
+                            },
                         ],
                         default: {
-                            kind: "call",
-                            function: "uuid",
+                            kind: 'call',
+                            function: 'uuid',
                             args: [
                                 {
-                                    kind: "literal",
-                                    value: 7
-                                }
-                            ]
-                        }
-                    }
+                                    kind: 'literal',
+                                    value: 7,
+                                },
+                            ],
+                        },
+                    },
                 },
-                idFields: [
-                    "id"
-                ],
+                idFields: ['id'],
                 uniqueFields: {
                     id: {
-                        type: "String"
-                    }
-                }
-            }
+                        type: 'String',
+                    },
+                },
+            },
         });
     });
 });

@@ -822,16 +822,20 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 continue;
             }
             if (!(field in data)) {
-                if (typeof fields[field]?.default === 'object' && 'kind' in fields[field].default) {
-                    const generated = this.evalGenerator(fields[field].default);
+                if (typeof fieldDef?.default === 'object' && 'kind' in fieldDef.default) {
+                    const generated = this.evalGenerator(fieldDef.default);
                     if (generated !== undefined) {
-                        values[field] = generated;
+                        values[field] = this.dialect.transformPrimitive(
+                            generated,
+                            fieldDef.type as BuiltinType,
+                            !!fieldDef.array,
+                        );
                     }
-                } else if (fields[field]?.updatedAt) {
+                } else if (fieldDef?.updatedAt) {
                     // TODO: should this work at kysely level instead?
                     values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
-                } else if (fields[field]?.default !== undefined) {
-                    let value = fields[field].default;
+                } else if (fieldDef?.default !== undefined) {
+                    let value = fieldDef.default;
                     if (fieldDef.type === 'Json') {
                         // Schema uses JSON string for default value of Json fields
                         if (fieldDef.array && Array.isArray(value)) {
@@ -842,8 +846,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     }
                     values[field] = this.dialect.transformPrimitive(
                         value,
-                        fields[field].type as BuiltinType,
-                        !!fields[field].array,
+                        fieldDef.type as BuiltinType,
+                        !!fieldDef.array,
                     );
                 }
             }

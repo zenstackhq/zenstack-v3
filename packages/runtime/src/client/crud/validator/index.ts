@@ -45,6 +45,7 @@ import {
     addBigIntValidation,
     addCustomValidation,
     addDecimalValidation,
+    addListValidation,
     addNumberValidation,
     addStringValidation,
 } from './utils';
@@ -904,11 +905,12 @@ export class InputValidator<Schema extends SchemaDef> {
                 let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
 
                 if (fieldDef.array) {
+                    fieldSchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
                     fieldSchema = z
                         .union([
-                            z.array(fieldSchema),
+                            fieldSchema,
                             z.strictObject({
-                                set: z.array(fieldSchema),
+                                set: fieldSchema,
                             }),
                         ])
                         .optional();
@@ -1165,14 +1167,14 @@ export class InputValidator<Schema extends SchemaDef> {
                     uncheckedVariantFields[field] = fieldSchema;
                 }
             } else {
-                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes).optional();
+                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
 
                 if (this.isNumericField(fieldDef)) {
                     fieldSchema = z.union([
                         fieldSchema,
                         z
                             .object({
-                                set: this.nullableIf(z.number().optional(), !!fieldDef.optional),
+                                set: this.nullableIf(z.number().optional(), !!fieldDef.optional).optional(),
                                 increment: z.number().optional(),
                                 decrement: z.number().optional(),
                                 multiply: z.number().optional(),
@@ -1186,25 +1188,24 @@ export class InputValidator<Schema extends SchemaDef> {
                 }
 
                 if (fieldDef.array) {
-                    fieldSchema = z
-                        .union([
-                            fieldSchema.array(),
-                            z
-                                .object({
-                                    set: z.array(fieldSchema).optional(),
-                                    push: this.orArray(fieldSchema, true).optional(),
-                                })
-                                .refine(
-                                    (v) => Object.keys(v).length === 1,
-                                    'Only one of "set", "push" can be provided',
-                                ),
-                        ])
-                        .optional();
+                    const arraySchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
+                    fieldSchema = z.union([
+                        arraySchema,
+                        z
+                            .object({
+                                set: arraySchema.optional(),
+                                push: z.union([fieldSchema, fieldSchema.array()]).optional(),
+                            })
+                            .refine((v) => Object.keys(v).length === 1, 'Only one of "set", "push" can be provided'),
+                    ]);
                 }
 
                 if (fieldDef.optional) {
                     fieldSchema = fieldSchema.nullable();
                 }
+
+                // all fields are optional in update
+                fieldSchema = fieldSchema.optional();
 
                 uncheckedVariantFields[field] = fieldSchema;
                 if (!fieldDef.foreignKeyFor) {

@@ -203,6 +203,32 @@ export function addDecimalValidation(
     return result;
 }
 
+export function addListValidation(
+    schema: z.ZodArray<any>,
+    attributes: AttributeApplication[] | undefined,
+): z.ZodSchema {
+    if (!attributes || attributes.length === 0) {
+        return schema;
+    }
+
+    let result = schema;
+    for (const attr of attributes) {
+        match(attr.name)
+            .with('@length', () => {
+                const min = getArgValue<number>(attr.args?.[0]?.value);
+                if (min !== undefined) {
+                    result = result.min(min);
+                }
+                const max = getArgValue<number>(attr.args?.[1]?.value);
+                if (max !== undefined) {
+                    result = result.max(max);
+                }
+            })
+            .otherwise(() => {});
+    }
+    return result;
+}
+
 export function addCustomValidation(schema: z.ZodSchema, attributes: AttributeApplication[] | undefined): z.ZodSchema {
     const attrs = attributes?.filter((a) => a.name === '@@validate');
     if (!attrs || attrs.length === 0) {
@@ -329,17 +355,11 @@ function evalCall(data: any, expr: CallExpression) {
                 if (fieldArg === undefined || fieldArg === null) {
                     return false;
                 }
-                invariant(typeof fieldArg === 'string', `"${f}" first argument must be a string`);
-
-                const min = getArgValue<number>(expr.args?.[1]);
-                const max = getArgValue<number>(expr.args?.[2]);
-                if (min !== undefined && fieldArg.length < min) {
-                    return false;
-                }
-                if (max !== undefined && fieldArg.length > max) {
-                    return false;
-                }
-                return true;
+                invariant(
+                    typeof fieldArg === 'string' || Array.isArray(fieldArg),
+                    `"${f}" first argument must be a string or a list`,
+                );
+                return fieldArg.length;
             })
             .with(P.union('startsWith', 'endsWith', 'contains'), (f) => {
                 if (fieldArg === undefined || fieldArg === null) {
@@ -370,11 +390,17 @@ function evalCall(data: any, expr: CallExpression) {
                 invariant(pattern !== undefined, `"${f}" requires a pattern argument`);
                 return new RegExp(pattern).test(fieldArg);
             })
-            .with(P.union('email', 'url', 'datetime'), (f) => {
+            .with(P.union('isEmail', 'isUrl', 'isDateTime'), (f) => {
                 if (fieldArg === undefined || fieldArg === null) {
                     return false;
                 }
-                return z.string()[f]().safeParse(fieldArg).success;
+                invariant(typeof fieldArg === 'string', `"${f}" first argument must be a string`);
+                const fn = match(f)
+                    .with('isEmail', () => 'email' as const)
+                    .with('isUrl', () => 'url' as const)
+                    .with('isDateTime', () => 'datetime' as const)
+                    .exhaustive();
+                return z.string()[fn]().safeParse(fieldArg).success;
             })
             // list functions
             .with(P.union('has', 'hasEvery', 'hasSome'), (f) => {

@@ -171,6 +171,28 @@ describe('Toplevel field validation tests', () => {
         await expect(db.foo.create({ data: { int1: '3.3', int2: new Decimal(3.9) } })).toResolveTruthy();
     });
 
+    it('works with list fields', async () => {
+        const db = await createTestClient(
+            `
+        model Foo {
+            id Int @id @default(autoincrement())
+            list1 Int[] @length(2, 4)
+        }
+        `,
+            { provider: 'postgresql' },
+        );
+
+        await expect(db.foo.create({ data: { id: 1, list1: [1] } })).toBeRejectedByValidation();
+
+        await expect(db.foo.create({ data: { id: 1, list1: [1, 2, 3, 4, 5] } })).toBeRejectedByValidation();
+
+        await expect(db.foo.create({ data: { id: 1, list1: [1, 2, 3] } })).toResolveTruthy();
+
+        await expect(db.foo.update({ where: { id: 1 }, data: { list1: [1] } })).toBeRejectedByValidation();
+        await expect(db.foo.update({ where: { id: 1 }, data: { list1: [1, 2, 3, 4, 5] } })).toBeRejectedByValidation();
+        await expect(db.foo.update({ where: { id: 1 }, data: { list1: [2, 3, 4] } })).toResolveTruthy();
+    });
+
     it('rejects accessing relation fields', async () => {
         await loadSchemaWithError(
             `

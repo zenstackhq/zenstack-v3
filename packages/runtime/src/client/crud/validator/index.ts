@@ -1167,14 +1167,14 @@ export class InputValidator<Schema extends SchemaDef> {
                     uncheckedVariantFields[field] = fieldSchema;
                 }
             } else {
-                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes).optional();
+                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
 
                 if (this.isNumericField(fieldDef)) {
                     fieldSchema = z.union([
                         fieldSchema,
                         z
                             .object({
-                                set: this.nullableIf(z.number().optional(), !!fieldDef.optional),
+                                set: this.nullableIf(z.number().optional(), !!fieldDef.optional).optional(),
                                 increment: z.number().optional(),
                                 decrement: z.number().optional(),
                                 multiply: z.number().optional(),
@@ -1189,25 +1189,23 @@ export class InputValidator<Schema extends SchemaDef> {
 
                 if (fieldDef.array) {
                     const arraySchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
-                    fieldSchema = z
-                        .union([
-                            arraySchema,
-                            z
-                                .object({
-                                    set: arraySchema.optional(),
-                                    push: z.union([fieldSchema, fieldSchema.array()]).optional(),
-                                })
-                                .refine(
-                                    (v) => Object.keys(v).length === 1,
-                                    'Only one of "set", "push" can be provided',
-                                ),
-                        ])
-                        .optional();
+                    fieldSchema = z.union([
+                        arraySchema,
+                        z
+                            .object({
+                                set: arraySchema.optional(),
+                                push: z.union([fieldSchema, fieldSchema.array()]).optional(),
+                            })
+                            .refine((v) => Object.keys(v).length === 1, 'Only one of "set", "push" can be provided'),
+                    ]);
                 }
 
                 if (fieldDef.optional) {
                     fieldSchema = fieldSchema.nullable();
                 }
+
+                // all fields are optional in update
+                fieldSchema = fieldSchema.optional();
 
                 uncheckedVariantFields[field] = fieldSchema;
                 if (!fieldDef.foreignKeyFor) {

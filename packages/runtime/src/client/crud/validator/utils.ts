@@ -357,7 +357,7 @@ function evalCall(data: any, expr: CallExpression) {
                 }
                 invariant(
                     typeof fieldArg === 'string' || Array.isArray(fieldArg),
-                    `"${f}" first argument must be a string or an list`,
+                    `"${f}" first argument must be a string or a list`,
                 );
                 return fieldArg.length;
             })

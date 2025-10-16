@@ -365,9 +365,9 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
     if (dstType === 'ContextType') {
         // ContextType is inferred from the attribute's container's type
         if (isDataField(attr.$container)) {
-            // If the field is Typed JSON, and the param is @default, the argument must be a string
+            // If the field is Typed JSON, and the attribute is @default, the argument must be a string
             const dstIsTypedJson = hasAttribute(attr.$container, '@json');
-            if (dstIsTypedJson && param.default) {
+            if (dstIsTypedJson && attr.decl.ref?.name === '@default') {
                 return argResolvedType.decl === 'String';
             }
             dstIsArray = attr.$container.type.array;

@@ -1,9 +1,10 @@
 import { createPolicyTestClient } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1506', async () => {
-    await createPolicyTestClient(
-        `
+describe('Regression for issue #1506', () => {
+    it('verifies issue 1506', async () => {
+        await createPolicyTestClient(
+            `
 model A {
     id Int @id @default(autoincrement())
     value Int
@@ -31,5 +32,6 @@ model C {
     @@allow('read', true)
 }
             `,
-    );
+        );
+    });
 });

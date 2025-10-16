@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1415', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1415', () => {
+    it('verifies issue 1415', async () => {
+        await loadSchema(
+            `
 model User {
   id    String @id @default(cuid())
   prices Price[]
@@ -17,5 +18,6 @@ model Price {
   @@delegate(priceType)
 }
             `,
-    );
+        );
+    });
 });

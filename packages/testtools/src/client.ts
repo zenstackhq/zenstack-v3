@@ -37,6 +37,7 @@ export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptio
     usePrismaPush?: boolean;
     extraSourceFiles?: Record<string, string>;
     workDir?: string;
+    debug?: boolean;
 };
 
 export async function createTestClient<Schema extends SchemaDef>(
@@ -103,7 +104,9 @@ export async function createTestClient<Schema extends SchemaDef>(
     }
 
     invariant(workDir);
-    console.log(`Work directory: ${workDir}`);
+    if (options?.debug) {
+        console.log(`Work directory: ${workDir}`);
+    }
 
     const { plugins, ...rest } = options ?? {};
     const _options: ClientOptions<Schema> = {

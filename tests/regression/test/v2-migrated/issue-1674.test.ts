@@ -1,80 +1,82 @@
 import { createPolicyTestClient } from '@zenstackhq/testtools';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-it('verifies issue 1674', async () => {
-    const db = await createPolicyTestClient(
-        `
-model User {
-    id       String @id @default(cuid())
-    email    String @unique @email @length(6, 32)
-    posts    Post[]
+describe('Regression for issue #1674', () => {
+    it('verifies issue 1674', async () => {
+        const db = await createPolicyTestClient(
+            `
+    model User {
+        id       String @id @default(cuid())
+        email    String @unique @email @length(6, 32)
+        posts    Post[]
 
-    // everybody can signup
-    @@allow('create', true)
+        // everybody can signup
+        @@allow('create', true)
 
-    // full access by self
-    @@allow('all', auth() == this)
-}
+        // full access by self
+        @@allow('all', auth() == this)
+    }
 
-model Blog {
-    id        String   @id @default(cuid())
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    model Blog {
+        id        String   @id @default(cuid())
+        createdAt DateTime @default(now())
+        updatedAt DateTime @updatedAt
 
-    post      Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
-    postId String?
-}
+        post      Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
+        postId String?
+    }
 
-model Post {
-    id        String   @id @default(cuid())
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-    title     String   @length(1, 256)
-    content   String
-    published Boolean  @default(false)
-    author    User     @relation(fields: [authorId], references: [id])
-    authorId  String
+    model Post {
+        id        String   @id @default(cuid())
+        createdAt DateTime @default(now())
+        updatedAt DateTime @updatedAt
+        title     String   @length(1, 256)
+        content   String
+        published Boolean  @default(false)
+        author    User     @relation(fields: [authorId], references: [id])
+        authorId  String
 
-    blogs Blog[] 
+        blogs Blog[] 
 
-    type String
+        type String
 
-    @@delegate(type)
-}
+        @@delegate(type)
+    }
 
-model PostA extends Post {
-}
+    model PostA extends Post {
+    }
 
-model PostB extends Post {
-}
-            `,
-    );
+    model PostB extends Post {
+    }
+                `,
+        );
 
-    const user = await db.$unuseAll().user.create({
-        data: { email: 'abc@def.com' },
-    });
+        const user = await db.$unuseAll().user.create({
+            data: { email: 'abc@def.com' },
+        });
 
-    const blog = await db.$unuseAll().blog.create({
-        data: {},
-    });
+        const blog = await db.$unuseAll().blog.create({
+            data: {},
+        });
 
-    const authDb = db.$setAuth(user);
-    await expect(
-        authDb.postA.create({
-            data: {
-                content: 'content',
-                title: 'title',
-                blogs: {
-                    connect: {
-                        id: blog.id,
+        const authDb = db.$setAuth(user);
+        await expect(
+            authDb.postA.create({
+                data: {
+                    content: 'content',
+                    title: 'title',
+                    blogs: {
+                        connect: {
+                            id: blog.id,
+                        },
+                    },
+                    author: {
+                        connect: {
+                            id: user.id,
+                        },
                     },
                 },
-                author: {
-                    connect: {
-                        id: user.id,
-                    },
-                },
-            },
-        }),
-    ).toBeRejectedByPolicy();
+            }),
+        ).toBeRejectedByPolicy();
+    });
 });

@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1745', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1745', () => {
+    it('verifies issue 1745', async () => {
+        await loadSchema(
+            `
 datasource db {
     provider = 'postgresql'
     url      = env('DATABASE_URL')
@@ -90,5 +91,6 @@ model User with Base {
     @@allow('all', auth().isAdmin)
 }
         `,
-    );
+        );
+    });
 });

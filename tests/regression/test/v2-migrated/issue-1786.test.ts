@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1786', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1786', () => {
+    it('verifies issue 1786', async () => {
+        await loadSchema(
+            `
     model User {
         id       String @id @default(cuid())
         email    String @unique @email @length(6, 32)
@@ -40,7 +41,8 @@ it('verifies issue 1786', async () => {
     model Video extends Content {
         name String
         duration Int
-    }           
+    }
         `,
-    );
+        );
+    });
 });

@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('regression', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1179', () => {
+    it('regression', async () => {
+        await loadSchema(
+            `
 type Base {
   id String @id @default(uuid())
 }
@@ -22,5 +23,6 @@ model Post {
   @@allow('all', auth().id == userId)
 }
             `,
-    );
+        );
+    });
 });

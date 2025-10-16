@@ -1,79 +1,81 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-it('verifies issue 2246', async () => {
-    const db = await createTestClient(
-        `
-model Media {
-  id Int @id @default(autoincrement())
-  title String
-  mediaType String
+describe('Regression for issue #2246', () => {
+    it('verifies issue 2246', async () => {
+        const db = await createTestClient(
+            `
+    model Media {
+      id Int @id @default(autoincrement())
+      title String
+      mediaType String
   
-  @@delegate(mediaType)
-  @@allow('all', true)
-}
+      @@delegate(mediaType)
+      @@allow('all', true)
+    }
 
-model Movie extends Media {
-  director Director @relation(fields: [directorId], references: [id])
-  directorId Int
-  duration Int
-  rating String
-}
+    model Movie extends Media {
+      director Director @relation(fields: [directorId], references: [id])
+      directorId Int
+      duration Int
+      rating String
+    }
 
-model Director {
-  id Int @id @default(autoincrement())
-  name String
-  email String
-  movies Movie[]
+    model Director {
+      id Int @id @default(autoincrement())
+      name String
+      email String
+      movies Movie[]
   
-  @@allow('all', true)
-}
-            `,
-    );
+      @@allow('all', true)
+    }
+                `,
+        );
 
-    await db.director.create({
-        data: {
-            name: 'Christopher Nolan',
-            email: 'christopher.nolan@example.com',
-            movies: {
-                create: {
-                    title: 'Inception',
-                    duration: 148,
-                    rating: 'PG-13',
-                },
-            },
-        },
-    });
-
-    await expect(
-        db.director.findMany({
-            include: {
+        await db.director.create({
+            data: {
+                name: 'Christopher Nolan',
+                email: 'christopher.nolan@example.com',
                 movies: {
-                    where: { title: 'Inception' },
+                    create: {
+                        title: 'Inception',
+                        duration: 148,
+                        rating: 'PG-13',
+                    },
                 },
             },
-        }),
-    ).resolves.toHaveLength(1);
+        });
 
-    await expect(
-        db.director.findFirst({
-            include: {
-                _count: { select: { movies: { where: { title: 'Inception' } } } },
-            },
-        }),
-    ).resolves.toMatchObject({ _count: { movies: 1 } });
+        await expect(
+            db.director.findMany({
+                include: {
+                    movies: {
+                        where: { title: 'Inception' },
+                    },
+                },
+            }),
+        ).resolves.toHaveLength(1);
 
-    await expect(
-        db.movie.findMany({
-            where: { title: 'Interstellar' },
-        }),
-    ).resolves.toHaveLength(0);
+        await expect(
+            db.director.findFirst({
+                include: {
+                    _count: { select: { movies: { where: { title: 'Inception' } } } },
+                },
+            }),
+        ).resolves.toMatchObject({ _count: { movies: 1 } });
 
-    await expect(
-        db.director.findFirst({
-            include: {
-                _count: { select: { movies: { where: { title: 'Interstellar' } } } },
-            },
-        }),
-    ).resolves.toMatchObject({ _count: { movies: 0 } });
+        await expect(
+            db.movie.findMany({
+                where: { title: 'Interstellar' },
+            }),
+        ).resolves.toHaveLength(0);
+
+        await expect(
+            db.director.findFirst({
+                include: {
+                    _count: { select: { movies: { where: { title: 'Interstellar' } } } },
+                },
+            }),
+        ).resolves.toMatchObject({ _count: { movies: 0 } });
+    });
 });

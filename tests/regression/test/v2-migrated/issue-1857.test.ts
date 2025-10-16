@@ -1,9 +1,10 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1857', async () => {
-    await createTestClient(
-        `
+describe('Regression for issue #1857', () => {
+    it('verifies issue 1857', async () => {
+        await createTestClient(
+            `
             type JSONContent {
                 type String
                 text String?
@@ -15,12 +16,12 @@ it('verifies issue 1857', async () => {
                 @@allow('all', true)
             }
             `,
-        {
-            extraSourceFiles: {
-                main: `
+            {
+                extraSourceFiles: {
+                    main: `
             import { ZenStackClient } from '@zenstackhq/runtime';
             import { schema } from './schema';
-            
+
             async function main() {
                 const db = new ZenStackClient(schema, {} as any);
                 await db.post.create({
@@ -30,10 +31,11 @@ it('verifies issue 1857', async () => {
                 });
             }
                 `,
+                },
             },
-        },
-    );
+        );
 
-    // TODO: zod schema support
-    // zodSchemas.models.JSONContentSchema.parse({ type: 'foo', text: null });
+        // TODO: zod schema support
+        // zodSchemas.models.JSONContentSchema.parse({ type: 'foo', text: null });
+    });
 });

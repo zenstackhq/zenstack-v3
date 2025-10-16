@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1388', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1388', () => {
+    it('verifies issue 1388', async () => {
+        await loadSchema(
+            `
 import './auth'
 import './post'
 
@@ -12,14 +13,14 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 `,
-        {
-            auth: `
+            {
+                auth: `
 model User {
   id   String @id @default(cuid())
   role String
-}  
+}
   `,
-            post: `
+                post: `
 model Post {
   id        String  @id @default(nanoid(6))
   title String
@@ -27,6 +28,7 @@ model Post {
   @@allow('all', auth().id == 'user1')
 }
   `,
-        },
-    );
+            },
+        );
+    });
 });

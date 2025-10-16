@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1167', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1167', () => {
+    it('verifies issue 1167', async () => {
+        await loadSchema(
+            `
 model FileAsset {
     id String @id @default(cuid())
     delegate_type String
@@ -15,5 +16,6 @@ model ImageAsset extends FileAsset {
     @@map("image_assets")
 }
             `,
-    );
+        );
+    });
 });

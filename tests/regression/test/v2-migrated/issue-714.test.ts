@@ -1,9 +1,10 @@
 import { createPolicyTestClient } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 714', async () => {
-    const db = await createPolicyTestClient(
-        `        
+describe('Regression for issue #714', () => {
+    it('verifies issue 714', async () => {
+        const db = await createPolicyTestClient(
+            `
         model User {
             id Int @id @default(autoincrement())
             username String @unique
@@ -79,67 +80,68 @@ it('verifies issue 714', async () => {
             companyId Int
         
             @@allow('all', true)
-        }            
+        }
         `,
-        { usePrismaPush: true },
-    );
+            { usePrismaPush: true },
+        );
 
-    await db.user.create({
-        data: {
-            username: 'test@example.com',
-        },
-    });
+        await db.user.create({
+            data: {
+                username: 'test@example.com',
+            },
+        });
 
-    await db.company.create({
-        data: {
-            name: 'My Company',
-            companyUsers: {
-                create: {
-                    dummyField: '',
-                    user: {
-                        connect: {
-                            id: 1,
-                        },
-                    },
-                },
-            },
-            propertyUsers: {
-                connect: {
-                    id: 1,
-                },
-            },
-            properties: {
-                create: [
-                    {
-                        name: 'Test',
-                    },
-                ],
-            },
-        },
-    });
-
-    await db.property.update({
-        data: {
-            users: {
-                create: {
-                    dummyField: '',
-                    roles: {
-                        createMany: {
-                            data: {
-                                type: 'Owner',
+        await db.company.create({
+            data: {
+                name: 'My Company',
+                companyUsers: {
+                    create: {
+                        dummyField: '',
+                        user: {
+                            connect: {
+                                id: 1,
                             },
                         },
                     },
-                    user: {
-                        connect: {
-                            id: 1,
+                },
+                propertyUsers: {
+                    connect: {
+                        id: 1,
+                    },
+                },
+                properties: {
+                    create: [
+                        {
+                            name: 'Test',
+                        },
+                    ],
+                },
+            },
+        });
+
+        await db.property.update({
+            data: {
+                users: {
+                    create: {
+                        dummyField: '',
+                        roles: {
+                            createMany: {
+                                data: {
+                                    type: 'Owner',
+                                },
+                            },
+                        },
+                        user: {
+                            connect: {
+                                id: 1,
+                            },
                         },
                     },
                 },
             },
-        },
-        where: {
-            id: 1,
-        },
+            where: {
+                id: 1,
+            },
+        });
     });
 });

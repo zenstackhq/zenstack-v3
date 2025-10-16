@@ -1,9 +1,10 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-it('verifies issue 1467', async () => {
-    const db = await createTestClient(
-        `
+describe('Regression for issue #1467', () => {
+    it('verifies issue 1467', async () => {
+        const db = await createTestClient(
+            `
     model User {
         id   Int    @id @default(autoincrement())
         type String
@@ -27,18 +28,19 @@ it('verifies issue 1467', async () => {
     model Beer extends Drink {
     }
             `,
-    );
+        );
 
-    await db.beer.create({
-        data: { id: 1, name: 'Beer1' },
+        await db.beer.create({
+            data: { id: 1, name: 'Beer1' },
+        });
+
+        await db.container.create({ data: { drink: { connect: { id: 1 } } } });
+        await db.container.create({ data: { drink: { connect: { id: 1 } } } });
+
+        const beers = await db.beer.findFirst({
+            select: { id: true, name: true, _count: { select: { containers: true } } },
+            orderBy: { name: 'asc' },
+        });
+        expect(beers).toMatchObject({ _count: { containers: 2 } });
     });
-
-    await db.container.create({ data: { drink: { connect: { id: 1 } } } });
-    await db.container.create({ data: { drink: { connect: { id: 1 } } } });
-
-    const beers = await db.beer.findFirst({
-        select: { id: true, name: true, _count: { select: { containers: true } } },
-        orderBy: { name: 'asc' },
-    });
-    expect(beers).toMatchObject({ _count: { containers: 2 } });
 });

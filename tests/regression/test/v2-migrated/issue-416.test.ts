@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 416', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #416', () => {
+    it('verifies issue 416', async () => {
+        await loadSchema(
+            `
 datasource db {
     provider = "postgresql"
     url      = env("DATABASE_URL")
@@ -16,5 +17,6 @@ model Example {
     json Json @default("{\\"theme\\": \\"light\\", \\"consoleDrawer\\": false}")
 }
         `,
-    );
+        );
+    });
 });

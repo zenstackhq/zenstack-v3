@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1693', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1693', () => {
+    it('verifies issue 1693', async () => {
+        await loadSchema(
+            `
 model Animal {
     id String @id @default(uuid())
     animalType String @default("")
@@ -14,5 +15,6 @@ model Dog extends Animal {
     name String
 }
             `,
-    );
+        );
+    });
 });

@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 735', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #735', () => {
+    it('verifies issue 735', async () => {
+        await loadSchema(
+            `
         model MyModel {
             id String @id @default(cuid())
             view String
@@ -15,5 +16,6 @@ it('verifies issue 735', async () => {
             name String
         }
         `,
-    );
+        );
+    });
 });

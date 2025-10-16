@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1257', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1257', () => {
+    it('verifies issue 1257', async () => {
+        await loadSchema(
+            `
 import "./user"
 import "./image"
 
@@ -11,13 +12,13 @@ datasource db {
   provider   = "postgresql"
   url       = env("DATABASE_URL")
 }`,
-        {
-            base: `
+            {
+                base: `
 type Base {
   id Int @id @default(autoincrement())
 }
 `,
-            user: `
+                user: `
 import "./base"
 import "./image"
 
@@ -31,7 +32,7 @@ model User with Base {
   @@auth
 }
 `,
-            image: `
+                image: `
 import "./user"
 import "./base"
 
@@ -43,6 +44,7 @@ model Image with Base {
     @@allow('all', auth().role == Admin)
 }
 `,
-        },
-    );
+            },
+        );
+    });
 });

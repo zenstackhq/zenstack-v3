@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1381', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1381', () => {
+    it('verifies issue 1381', async () => {
+        await loadSchema(
+            `
 enum MemberRole {
     owner
     admin
@@ -49,7 +50,8 @@ model Option {
     space.type in [contractor, public] &&
     space.memberships?[space.type in [contractor, public] && auth() == user && role in [owner, admin]]
   )
-}     
+}
             `,
-    );
+        );
+    });
 });

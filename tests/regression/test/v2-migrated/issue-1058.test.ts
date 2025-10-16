@@ -1,8 +1,9 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1058', async () => {
-    const schema = `
+describe('Regression for issue #1058', () => {
+    it('verifies issue 1058', async () => {
+        const schema = `
         model User {
           id String @id @default(cuid())
           name String
@@ -45,8 +46,9 @@ it('verifies issue 1058', async () => {
           entity Entity @relation(fields: [entityId], references: [id], onUpdate: NoAction)
           userId String
           user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-        } 
+        }
         `;
 
-    await createTestClient(schema, { provider: 'postgresql' });
+        await createTestClient(schema, { provider: 'postgresql' });
+    });
 });

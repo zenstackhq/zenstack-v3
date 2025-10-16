@@ -1,9 +1,10 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-it('verifies issue 1520', async () => {
-    const db = await createTestClient(
-        `
+describe('Regression for issue #1520', () => {
+    it('verifies issue 1520', async () => {
+        const db = await createTestClient(
+            `
 model Course {
     id        Int      @id @default(autoincrement())
     title String
@@ -25,43 +26,44 @@ model Notification {
 }
 
 model AddedToGroupNotification extends Notification {
-    groupId Int   
+    groupId Int
     group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 }
 
 model AddedToCourseNotification extends Notification {
-    courseId Int    
+    courseId Int
     course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }
             `,
-    );
+        );
 
-    const r = await db.course.create({
-        data: {
-            title: 'English classes',
-            addedToNotifications: {
-                createMany: {
-                    data: [
-                        {
-                            id: 1,
-                            receiverId: 1,
-                            senderId: 2,
-                        },
-                    ],
+        const r = await db.course.create({
+            data: {
+                title: 'English classes',
+                addedToNotifications: {
+                    createMany: {
+                        data: [
+                            {
+                                id: 1,
+                                receiverId: 1,
+                                senderId: 2,
+                            },
+                        ],
+                    },
                 },
             },
-        },
-        include: { addedToNotifications: true },
-    });
+            include: { addedToNotifications: true },
+        });
 
-    expect(r.addedToNotifications).toEqual(
-        expect.arrayContaining([
-            expect.objectContaining({
-                id: 1,
-                courseId: 1,
-                receiverId: 1,
-                senderId: 2,
-            }),
-        ]),
-    );
+        expect(r.addedToNotifications).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    id: 1,
+                    courseId: 1,
+                    receiverId: 1,
+                    senderId: 2,
+                }),
+            ]),
+        );
+    });
 });

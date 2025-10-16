@@ -1,9 +1,10 @@
 import { loadSchema } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1695', async () => {
-    await loadSchema(
-        `
+describe('Regression for issue #1695', () => {
+    it('verifies issue 1695', async () => {
+        await loadSchema(
+            `
 type SoftDelete {
     deleted Int @default(0)
 }
@@ -17,5 +18,6 @@ model MyModel with SoftDelete {
     @@deny('read', this.deleted != 0)
 }
             `,
-    );
+        );
+    });
 });

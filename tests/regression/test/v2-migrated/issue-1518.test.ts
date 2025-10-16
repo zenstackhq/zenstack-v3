@@ -1,9 +1,10 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { it } from 'vitest';
+import { describe, it } from 'vitest';
 
-it('verifies issue 1518', async () => {
-    const db = await createTestClient(
-        `
+describe('Regression for issue #1518', () => {
+    it('verifies issue 1518', async () => {
+        const db = await createTestClient(
+            `
 model Activity {
     id        String       @id @default(uuid())
     title     String
@@ -18,13 +19,14 @@ model TaskActivity extends Activity {
     @@allow('all', true)
 }
             `,
-    );
+        );
 
-    await db.taskActivity.create({
-        data: {
-            id: '00000000-0000-0000-0000-111111111111',
-            title: 'Test Activity',
-            description: 'Description of task',
-        },
+        await db.taskActivity.create({
+            data: {
+                id: '00000000-0000-0000-0000-111111111111',
+                title: 'Test Activity',
+                description: 'Description of task',
+            },
+        });
     });
 });

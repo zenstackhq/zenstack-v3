@@ -1,9 +1,10 @@
 import { createTestClient } from '@zenstackhq/testtools';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-it('verifies issue 1427', async () => {
-    const db = await createTestClient(
-        `
+describe('Regression for issue #1427', () => {
+    it('verifies issue 1427', async () => {
+        const db = await createTestClient(
+            `
 model User {
     id   String @id @default(cuid())
     name String
@@ -18,23 +19,24 @@ model Profile {
     @@allow('all', true)
 }
             `,
-    );
+        );
 
-    await db.$unuseAll().user.create({
-        data: {
-            name: 'John',
-            profile: {
-                create: {},
+        await db.$unuseAll().user.create({
+            data: {
+                name: 'John',
+                profile: {
+                    create: {},
+                },
             },
-        },
-    });
+        });
 
-    const found = await db.user.findFirst({
-        select: {
-            id: true,
-            name: true,
-            profile: false,
-        },
+        const found = await db.user.findFirst({
+            select: {
+                id: true,
+                name: true,
+                profile: false,
+            },
+        });
+        expect(found.profile).toBeUndefined();
     });
-    expect(found.profile).toBeUndefined();
 });

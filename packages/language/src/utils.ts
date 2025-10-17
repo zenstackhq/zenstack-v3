@@ -1,7 +1,8 @@
 import { AstUtils, URI, type AstNode, type LangiumDocument, type LangiumDocuments, type Reference } from 'langium';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PLUGIN_MODULE_NAME, STD_LIB_MODULE_NAME, type ExpressionContext } from './constants';
 import {
     isArrayExpr,
@@ -607,17 +608,22 @@ export function getPluginDocuments(model: Model, schemaPath: string): string[] {
         }
 
         if (!pluginModelFile) {
-            try {
-                if (typeof import.meta.resolve === 'function') {
+            if (typeof import.meta.resolve === 'function') {
+                try {
                     // try loading as a ESM module
                     const resolvedUrl = import.meta.resolve(`${provider}/${PLUGIN_MODULE_NAME}`);
                     pluginModelFile = fileURLToPath(resolvedUrl);
-                } else {
-                    // try loading as a CJS module
-                    pluginModelFile = require.resolve(`${provider}/${PLUGIN_MODULE_NAME}`, {
-                        paths: [path.dirname(schemaPath)],
-                    });
+                } catch {
+                    // noop
                 }
+            }
+        }
+
+        if (!pluginModelFile) {
+            // try loading as a CJS module
+            try {
+                const require = createRequire(pathToFileURL(schemaPath));
+                pluginModelFile = require.resolve(`${provider}/${PLUGIN_MODULE_NAME}`);
             } catch {
                 // noop
             }

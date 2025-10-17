@@ -2,7 +2,7 @@ import { isAstNode, URI, type AstNode, type LangiumDocument, type LangiumDocumen
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isDataSource, Model } from './ast';
+import { isDataSource, type Model } from './ast';
 import { STD_LIB_MODULE_NAME } from './constants';
 import { createZModelServices } from './module';
 import { getDataModelAndTypeDefs, getDocument, hasAttribute, resolveImport, resolveTransitiveImports } from './utils';

@@ -10,7 +10,7 @@ import {
 import { NodeFileSystem } from 'langium/node';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Model } from './ast';
+import type { Model } from './ast';
 import { ZModelGeneratedModule, ZModelGeneratedSharedModule, ZModelLanguageMetaData } from './generated/module';
 import { getPluginDocuments } from './utils';
 import { registerValidationChecks, ZModelValidator } from './validator';

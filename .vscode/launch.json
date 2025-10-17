@@ -11,7 +11,7 @@
             "skipFiles": ["<node_internals>/**"],
             "type": "node",
             "args": ["generate"],
-            "cwd": "${workspaceFolder}/samples/blog/zenstack"
+            "cwd": "${workspaceFolder}/samples/blog"
         },
         {
             "name": "Debug with TSX",

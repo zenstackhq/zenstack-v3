@@ -282,9 +282,6 @@ importers:
       '@zenstackhq/runtime':
         specifier: workspace:*
         version: link:../../runtime
-      '@zenstackhq/sdk':
-        specifier: workspace:*
-        version: link:../../sdk
       kysely:
         specifier: 'catalog:'
         version: 0.27.6
@@ -510,6 +507,9 @@ importers:
 
   samples/blog:
     dependencies:
+      '@zenstackhq/plugin-policy':
+        specifier: workspace:*
+        version: link:../../packages/plugins/policy
       '@zenstackhq/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime

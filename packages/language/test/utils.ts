@@ -5,11 +5,13 @@ import path from 'node:path';
 import { expect } from 'vitest';
 import { loadDocument } from '../src';
 
+const pluginDocs = [path.resolve(__dirname, '../../plugins/policy/plugin.zmodel')];
+
 export async function loadSchema(schema: string) {
     // create a temp file
     const tempFile = path.join(os.tmpdir(), `zenstack-schema-${crypto.randomUUID()}.zmodel`);
     fs.writeFileSync(tempFile, schema);
-    const r = await loadDocument(tempFile);
+    const r = await loadDocument(tempFile, pluginDocs);
     expect(r).toSatisfy(
         (r) => r.success,
         `Failed to load schema: ${(r as any).errors?.map((e) => e.toString()).join(', ')}`,
@@ -22,7 +24,8 @@ export async function loadSchemaWithError(schema: string, error: string | RegExp
     // create a temp file
     const tempFile = path.join(os.tmpdir(), `zenstack-schema-${crypto.randomUUID()}.zmodel`);
     fs.writeFileSync(tempFile, schema);
-    const r = await loadDocument(tempFile);
+
+    const r = await loadDocument(tempFile, pluginDocs);
     expect(r.success).toBe(false);
     invariant(!r.success);
     if (typeof error === 'string') {

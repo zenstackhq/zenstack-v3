@@ -1,3 +1,4 @@
+import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { ZenStackClient } from '@zenstackhq/runtime';
 import SQLite from 'better-sqlite3';
 import { sql, SqliteDialect } from 'kysely';
@@ -89,6 +90,17 @@ async function main() {
         },
     });
     console.log('User found with computed field:', userWithMorePosts);
+
+    // policy-enabled read
+    const authDb = db.$use(new PolicyPlugin());
+    const user1Db = authDb.$setAuth({ id: user1.id });
+    const user2Db = authDb.$setAuth({ id: user2.id });
+
+    console.log('Posts readable to', user1.email);
+    console.table(await user1Db.post.findMany({ select: { title: true, published: true } }));
+
+    console.log('Posts readable to', user2.email);
+    console.table(await user2Db.post.findMany({ select: { title: true, published: true } }));
 }
 
 main();

@@ -9,8 +9,6 @@ import { schema as $schema, type SchemaType as $Schema } from "./schema";
 import { type ModelResult as $ModelResult, type TypeDefResult as $TypeDefResult } from "@zenstackhq/runtime";
 /**
  * User model
- *
- * Represents a user of the blog.
  */
 export type User = $ModelResult<$Schema, "User">;
 /**

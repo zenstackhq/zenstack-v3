@@ -3,7 +3,6 @@ import {
     isLiteralExpr,
     isModel,
     isTypeDef,
-    Model,
     type AstNode,
     type Attribute,
     type AttributeParam,
@@ -14,6 +13,7 @@ import {
     type Enum,
     type EnumField,
     type FunctionDecl,
+    type Model,
     type Reference,
     type TypeDef,
 } from '@zenstackhq/language/ast';

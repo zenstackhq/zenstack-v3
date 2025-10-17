@@ -64,7 +64,7 @@ async function runPlugins(schemaFile: string, model: Model, outputPath: string, 
     for (const plugin of plugins) {
         const provider = getPluginProvider(plugin);
 
-        let cliPlugin: CliPlugin;
+        let cliPlugin: CliPlugin | undefined;
         if (provider.startsWith('@core/')) {
             cliPlugin = (corePlugins as any)[provider.slice('@core/'.length)];
             if (!cliPlugin) {
@@ -78,12 +78,14 @@ async function runPlugins(schemaFile: string, model: Model, outputPath: string, 
             }
             try {
                 cliPlugin = (await import(moduleSpec)).default as CliPlugin;
-            } catch (error) {
-                throw new CliError(`Failed to load plugin ${provider}: ${error}`);
+            } catch {
+                // plugin may not export a generator so we simply ignore the error here
             }
         }
 
-        processedPlugins.push({ cliPlugin, pluginOptions: getPluginOptions(plugin) });
+        if (cliPlugin) {
+            processedPlugins.push({ cliPlugin, pluginOptions: getPluginOptions(plugin) });
+        }
     }
 
     const defaultPlugins = [corePlugins['typescript']].reverse();

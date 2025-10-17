@@ -69,6 +69,10 @@ export const schema = {
                     relation: { opposite: "user" }
                 }
             },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("read,create") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils._this(), "==", ExpressionUtils.call("auth")) }] }
+            ],
             idFields: ["id"],
             uniqueFields: {
                 id: { type: "String" },
@@ -132,6 +136,9 @@ export const schema = {
                     ]
                 }
             },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.call("check", [ExpressionUtils.field("user")]) }] }
+            ],
             idFields: ["id"],
             uniqueFields: {
                 id: { type: "String" },
@@ -188,6 +195,10 @@ export const schema = {
                     ]
                 }
             },
+            attributes: [
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("read") }, { name: "condition", value: ExpressionUtils.field("published") }] },
+                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.field("author"), "==", ExpressionUtils.call("auth")) }] }
+            ],
             idFields: ["id"],
             uniqueFields: {
                 id: { type: "String" }

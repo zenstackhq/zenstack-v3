@@ -1,5 +1,4 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { loadDocument } from '@zenstackhq/language';
 import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import type { SchemaDef } from '@zenstackhq/sdk/schema';
 import { execSync } from 'node:child_process';
@@ -10,6 +9,7 @@ import path from 'node:path';
 import { match } from 'ts-pattern';
 import { expect } from 'vitest';
 import { createTestProject } from './project';
+import { loadDocumentWithPlugins } from './utils';
 
 function makePrelude(provider: 'sqlite' | 'postgresql', dbUrl?: string) {
     return match(provider)
@@ -44,7 +44,7 @@ export async function generateTsSchema(
     const noPrelude = schemaText.includes('datasource ');
     fs.writeFileSync(zmodelPath, `${noPrelude ? '' : makePrelude(provider, dbUrl)}\n\n${schemaText}`);
 
-    const result = await loadDocument(zmodelPath);
+    const result = await loadDocumentWithPlugins(zmodelPath);
     if (!result.success) {
         throw new Error(`Failed to load schema from ${zmodelPath}: ${result.errors}`);
     }
@@ -82,7 +82,7 @@ export function generateTsSchemaFromFile(filePath: string) {
 
 export async function generateTsSchemaInPlace(schemaPath: string) {
     const workDir = path.dirname(schemaPath);
-    const result = await loadDocument(schemaPath);
+    const result = await loadDocumentWithPlugins(schemaPath);
     if (!result.success) {
         throw new Error(`Failed to load schema from ${schemaPath}: ${result.errors}`);
     }
@@ -114,7 +114,7 @@ export async function loadSchema(schema: string, additionalSchemas?: Record<stri
         }
     }
 
-    const r = await loadDocument(tempFile);
+    const r = await loadDocumentWithPlugins(tempFile);
     expect(r).toSatisfy(
         (r) => r.success,
         `Failed to load schema: ${(r as any).errors?.map((e: any) => e.toString()).join(', ')}`,
@@ -131,7 +131,7 @@ export async function loadSchemaWithError(schema: string, error: string | RegExp
     // create a temp file
     const tempFile = path.join(os.tmpdir(), `zenstack-schema-${crypto.randomUUID()}.zmodel`);
     fs.writeFileSync(tempFile, schema);
-    const r = await loadDocument(tempFile);
+    const r = await loadDocumentWithPlugins(tempFile);
     expect(r.success).toBe(false);
     invariant(!r.success);
     if (typeof error === 'string') {

@@ -20,7 +20,6 @@ import {
     getLiteral,
     isCheckInvocation,
     isDataFieldReference,
-    isFromStdlib,
     typeAssignable,
 } from '../utils';
 import type { AstValidator } from './common';
@@ -52,43 +51,39 @@ export default class FunctionInvocationValidator implements AstValidator<Express
             return;
         }
 
-        if (isFromStdlib(funcDecl)) {
-            // validate standard library functions
-
-            // find the containing attribute context for the invocation
-            let curr: AstNode | undefined = expr.$container;
-            let containerAttribute: DataModelAttribute | DataFieldAttribute | undefined;
-            while (curr) {
-                if (isDataModelAttribute(curr) || isDataFieldAttribute(curr)) {
-                    containerAttribute = curr;
-                    break;
-                }
-                curr = curr.$container;
+        // find the containing attribute context for the invocation
+        let curr: AstNode | undefined = expr.$container;
+        let containerAttribute: DataModelAttribute | DataFieldAttribute | undefined;
+        while (curr) {
+            if (isDataModelAttribute(curr) || isDataFieldAttribute(curr)) {
+                containerAttribute = curr;
+                break;
             }
+            curr = curr.$container;
+        }
 
-            // validate the context allowed for the function
-            const exprContext = this.getExpressionContext(containerAttribute);
+        // validate the context allowed for the function
+        const exprContext = this.getExpressionContext(containerAttribute);
 
-            // get the context allowed for the function
-            const funcAllowedContext = getFunctionExpressionContext(funcDecl);
+        // get the context allowed for the function
+        const funcAllowedContext = getFunctionExpressionContext(funcDecl);
 
-            if (exprContext && !funcAllowedContext.includes(exprContext)) {
-                accept('error', `function "${funcDecl.name}" is not allowed in the current context: ${exprContext}`, {
-                    node: expr,
+        if (exprContext && !funcAllowedContext.includes(exprContext)) {
+            accept('error', `function "${funcDecl.name}" is not allowed in the current context: ${exprContext}`, {
+                node: expr,
+            });
+            return;
+        }
+
+        // TODO: express function validation rules declaratively in ZModel
+
+        const allCasing = ['original', 'upper', 'lower', 'capitalize', 'uncapitalize'];
+        if (['currentModel', 'currentOperation'].includes(funcDecl.name)) {
+            const arg = getLiteral<string>(expr.args[0]?.value);
+            if (arg && !allCasing.includes(arg)) {
+                accept('error', `argument must be one of: ${allCasing.map((c) => '"' + c + '"').join(', ')}`, {
+                    node: expr.args[0]!,
                 });
-                return;
-            }
-
-            // TODO: express function validation rules declaratively in ZModel
-
-            const allCasing = ['original', 'upper', 'lower', 'capitalize', 'uncapitalize'];
-            if (['currentModel', 'currentOperation'].includes(funcDecl.name)) {
-                const arg = getLiteral<string>(expr.args[0]?.value);
-                if (arg && !allCasing.includes(arg)) {
-                    accept('error', `argument must be one of: ${allCasing.map((c) => '"' + c + '"').join(', ')}`, {
-                        node: expr.args[0]!,
-                    });
-                }
             }
         }
 

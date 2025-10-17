@@ -51,7 +51,7 @@ export async function loadDocument(
     );
 
     // load additional model files
-    const pluginDocs = await Promise.all(
+    const additionalDocs = await Promise.all(
         additionalModelFiles.map((file) =>
             services.shared.workspace.LangiumDocuments.getOrCreateDocument(URI.file(path.resolve(file))),
         ),
@@ -69,7 +69,7 @@ export async function loadDocument(
     }
 
     // build the document together with standard library, plugin modules, and imported documents
-    await services.shared.workspace.DocumentBuilder.build([stdLib, ...pluginDocs, document, ...importedDocuments], {
+    await services.shared.workspace.DocumentBuilder.build([stdLib, ...additionalDocs, document, ...importedDocuments], {
         validation: {
             stopAfterLexingErrors: true,
             stopAfterParsingErrors: true,

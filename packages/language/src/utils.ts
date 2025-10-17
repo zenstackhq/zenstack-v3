@@ -447,8 +447,9 @@ export function getAuthDecl(decls: (DataModel | TypeDef)[]) {
     return authModel;
 }
 
+// TODO: move to policy plugin
 export function isBeforeInvocation(node: AstNode) {
-    return isInvocationExpr(node) && node.function.ref?.name === 'before' && isFromStdlib(node.function.ref);
+    return isInvocationExpr(node) && node.function.ref?.name === 'before';
 }
 
 export function isCollectionPredicate(node: AstNode): node is BinaryExpr {

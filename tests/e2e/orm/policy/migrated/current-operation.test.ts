@@ -127,7 +127,7 @@ describe('currentOperation tests', () => {
             createPolicyTestClient(
                 `
             model User {
-                id String @default(currentOperation())
+                id String @id @default(currentOperation())
             }
             `,
             ),

@@ -158,7 +158,7 @@ describe('currentModel tests', () => {
             createPolicyTestClient(
                 `
             model User {
-                id String @default(currentModel())
+                id String @id @default(currentModel())
             }
             `,
             ),

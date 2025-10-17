@@ -1,4 +1,4 @@
-import { createZModelServices, loadDocument, type ZModelServices } from '@zenstackhq/language';
+import { loadDocument, type ZModelServices } from '@zenstackhq/language';
 import { isDataSource, isPlugin, Model } from '@zenstackhq/language/ast';
 import { getLiteral } from '@zenstackhq/language/utils';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
@@ -37,9 +37,7 @@ export function getSchemaFile(file?: string) {
 }
 
 export async function loadSchemaDocument(schemaFile: string) {
-    const { ZModelLanguage: services } = createZModelServices();
-    const pluginDocs = await getPluginDocuments(services, schemaFile);
-    const loadResult = await loadDocument(schemaFile, pluginDocs);
+    const loadResult = await loadDocument(schemaFile);
     if (!loadResult.success) {
         loadResult.errors.forEach((err) => {
             console.error(colors.red(err));

@@ -100,11 +100,11 @@ export function createZModelLanguageServices(
         for (const doc of documents) {
             if (doc.parseResult.lexerErrors.length > 0 || doc.parseResult.parserErrors.length > 0) {
                 // balk if there are lexer or parser errors
-                return;
+                continue;
             }
 
             if (doc.uri.scheme !== 'file') {
-                return;
+                continue;
             }
 
             const schemaPath = fileURLToPath(doc.uri.toString());

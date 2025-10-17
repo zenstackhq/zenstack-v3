@@ -82,9 +82,12 @@ async function runDev(prismaSchemaFile: string, options: DevOptions) {
 
 async function runReset(prismaSchemaFile: string, options: ResetOptions) {
     try {
-        const cmd = ['prisma migrate reset', ` --schema "${prismaSchemaFile}"`, options.force ? ' --force' : ''].join(
-            '',
-        );
+        const cmd = [
+            'prisma migrate reset',
+            ` --schema "${prismaSchemaFile}"`,
+            ' --skip-generate',
+            options.force ? ' --force' : ''
+        ].join('');
 
         await execPackage(cmd);
     } catch (err) {

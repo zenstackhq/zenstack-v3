@@ -1,7 +1,7 @@
 /**
  * Defines an access policy that allows a set of operations when the given condition is true.
  *
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
+ * @param operation: comma-separated list of "create", "read", "update", "post-update", " "delete". Use "all" to denote all operations.
  * @param condition: a boolean expression that controls if the operation should be allowed.
  */
 attribute @@allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'post-update'","'delete'", "'all'"]), _ condition: Boolean)
@@ -10,16 +10,16 @@ attribute @@allow(_ operation: String @@@completionHint(["'create'", "'read'", "
  * Defines an access policy that allows the annotated field to be read or updated.
  * You can pass a third argument as `true` to make it override the model-level policies.
  *
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
+ * @param operation: comma-separated list of "create", "read", "update", "post-update", "delete". Use "all" to denote all operations.
  * @param condition: a boolean expression that controls if the operation should be allowed.
  * @param override: a boolean value that controls if the field-level policy should override the model-level policy.
  */
-// attribute @allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean, _ override: Boolean?)
+// attribute @allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'post-update'", "'delete'", "'all'"]), _ condition: Boolean, _ override: Boolean?)
 
 /**
  * Defines an access policy that denies a set of operations when the given condition is true.
  *
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
+ * @param operation: comma-separated list of "create", "read", "update", "post-update", "delete". Use "all" to denote all operations.
  * @param condition: a boolean expression that controls if the operation should be denied.
  */
 attribute @@deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'post-update'","'delete'", "'all'"]), _ condition: Boolean)
@@ -27,7 +27,7 @@ attribute @@deny(_ operation: String @@@completionHint(["'create'", "'read'", "'
 /**
  * Defines an access policy that denies the annotated field to be read or updated.
  *
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
+ * @param operation: comma-separated list of "create", "read", "update", "post-update", "delete". Use "all" to denote all operations.
  * @param condition: a boolean expression that controls if the operation should be denied.
  */
 // attribute @deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
@@ -36,7 +36,7 @@ attribute @@deny(_ operation: String @@@completionHint(["'create'", "'read'", "'
  * Checks if the current user can perform the given operation on the given field.
  *
  * @param field: The field to check access for
- * @param operation: The operation to check access for. Can be "read", "create", "update", or "delete". If the operation is not provided,
+ * @param operation: The operation to check access for. Can be "read", "create", "update", "post-update", or "delete". If the operation is not provided,
  * it defaults the operation of the containing policy rule.
  */
 function check(field: Any, operation: String?): Boolean {

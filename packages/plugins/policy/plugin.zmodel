@@ -1,7 +1,7 @@
 /**
  * Defines an access policy that allows a set of operations when the given condition is true.
  *
- * @param operation: comma-separated list of "create", "read", "update", "post-update", " "delete". Use "all" to denote all operations.
+ * @param operation: comma-separated list of "create", "read", "update", "post-update", "delete". Use "all" to denote all operations.
  * @param condition: a boolean expression that controls if the operation should be allowed.
  */
 attribute @@allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'post-update'","'delete'", "'all'"]), _ condition: Boolean)

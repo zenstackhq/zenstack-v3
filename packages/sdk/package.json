@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/sdk",
-    "version": "3.0.0-beta.9",
+    "version": "3.0.0-beta.10",
     "description": "ZenStack SDK",
     "type": "module",
     "scripts": {

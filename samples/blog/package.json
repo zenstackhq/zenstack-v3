@@ -1,6 +1,6 @@
 {
     "name": "sample-blog",
-    "version": "3.0.0-beta.9",
+    "version": "3.0.0-beta.10",
     "description": "",
     "main": "index.js",
     "scripts": {
@@ -15,6 +15,7 @@
     "license": "MIT",
     "dependencies": {
         "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/plugin-policy": "workspace:*",
         "better-sqlite3": "^12.2.0",
         "kysely": "catalog:"
     },

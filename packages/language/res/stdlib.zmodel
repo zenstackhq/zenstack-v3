@@ -175,29 +175,6 @@ function isEmpty(field: Any[]): Boolean {
 } @@@expressionContext([AccessPolicy, ValidationRule])
 
 /**
- * The name of the model for which the policy rule is defined. If the rule is
- * inherited to a sub model, this function returns the name of the sub model.
- *
- * @param optional parameter to control the casing of the returned value. Valid
- * values are "original", "upper", "lower", "capitalize", "uncapitalize". Defaults
- * to "original".
- */
-function currentModel(casing: String?): String {
-} @@@expressionContext([AccessPolicy])
-
-/**
- * The operation for which the policy rule is defined for. Note that a rule with
- * "all" operation is expanded to "create", "read", "update", and "delete" rules,
- * and the function returns corresponding value for each expanded version.
- *
- * @param optional parameter to control the casing of the returned value. Valid
- * values are "original", "upper", "lower", "capitalize", "uncapitalize". Defaults
- * to "original".
- */
-function currentOperation(casing: String?): String {
-} @@@expressionContext([AccessPolicy])
-
-/**
  * Marks an attribute to be only applicable to certain field types.
  */
 attribute @@@targetField(_ targetField: AttributeTargetField[])
@@ -658,56 +635,3 @@ attribute @meta(_ name: String, _ value: Any)
  * Marks an attribute as deprecated.
  */
 attribute @@@deprecated(_ message: String)
-
-/* --- Policy Plugin --- */
-
-/**
- * Defines an access policy that allows a set of operations when the given condition is true.
- *
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
- * @param condition: a boolean expression that controls if the operation should be allowed.
- */
-attribute @@allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'post-update'","'delete'", "'all'"]), _ condition: Boolean)
-
-/**
- * Defines an access policy that allows the annotated field to be read or updated.
- * You can pass a third argument as `true` to make it override the model-level policies.
- *
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
- * @param condition: a boolean expression that controls if the operation should be allowed.
- * @param override: a boolean value that controls if the field-level policy should override the model-level policy.
- */
-// attribute @allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean, _ override: Boolean?)
-
-/**
- * Defines an access policy that denies a set of operations when the given condition is true.
- *
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
- * @param condition: a boolean expression that controls if the operation should be denied.
- */
-attribute @@deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'post-update'","'delete'", "'all'"]), _ condition: Boolean)
-
-/**
- * Defines an access policy that denies the annotated field to be read or updated.
- *
- * @param operation: comma-separated list of "create", "read", "update", "delete". Use "all" to denote all operations.
- * @param condition: a boolean expression that controls if the operation should be denied.
- */
-// attribute @deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
-
-/**
- * Checks if the current user can perform the given operation on the given field.
- *
- * @param field: The field to check access for
- * @param operation: The operation to check access for. Can be "read", "create", "update", or "delete". If the operation is not provided,
- * it defaults the operation of the containing policy rule.
- */
-function check(field: Any, operation: String?): Boolean {
-} @@@expressionContext([AccessPolicy])
-
-/**
- * Gets entity's value before an update. Only valid when used in a "post-update" policy rule.
- */
-function before(): Any {
-} @@@expressionContext([AccessPolicy])
-

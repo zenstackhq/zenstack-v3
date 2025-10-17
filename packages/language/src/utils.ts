@@ -1,10 +1,10 @@
 import { AstUtils, URI, type AstNode, type LangiumDocument, type LangiumDocuments, type Reference } from 'langium';
 import fs from 'node:fs';
-import path from 'path';
-import { STD_LIB_MODULE_NAME, type ExpressionContext } from './constants';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { PLUGIN_MODULE_NAME, STD_LIB_MODULE_NAME, type ExpressionContext } from './constants';
 import {
-    BinaryExpr,
-    ConfigExpr,
     isArrayExpr,
     isBinaryExpr,
     isConfigArrayExpr,
@@ -17,15 +17,15 @@ import {
     isMemberAccessExpr,
     isModel,
     isObjectExpr,
+    isPlugin,
     isReferenceExpr,
     isStringLiteral,
     isTypeDef,
-    Model,
-    ModelImport,
-    ReferenceExpr,
     type Attribute,
     type AttributeParam,
+    type BinaryExpr,
     type BuiltinType,
+    type ConfigExpr,
     type DataField,
     type DataFieldAttribute,
     type DataModel,
@@ -35,6 +35,9 @@ import {
     type Expression,
     type ExpressionType,
     type FunctionDecl,
+    type Model,
+    type ModelImport,
+    type ReferenceExpr,
     type TypeDef,
 } from './generated/ast';
 
@@ -447,8 +450,9 @@ export function getAuthDecl(decls: (DataModel | TypeDef)[]) {
     return authModel;
 }
 
+// TODO: move to policy plugin
 export function isBeforeInvocation(node: AstNode) {
-    return isInvocationExpr(node) && node.function.ref?.name === 'before' && isFromStdlib(node.function.ref);
+    return isInvocationExpr(node) && node.function.ref?.name === 'before';
 }
 
 export function isCollectionPredicate(node: AstNode): node is BinaryExpr {
@@ -570,6 +574,91 @@ export function getDocument<T extends AstNode = AstNode>(node: AstNode): Langium
         throw new Error('AST node has no document.');
     }
     return result as LangiumDocument<T>;
+}
+
+export function getPluginDocuments(model: Model, schemaPath: string): string[] {
+    // traverse plugins and collect "plugin.zmodel" documents
+    const result: string[] = [];
+    for (const decl of model.declarations.filter(isPlugin)) {
+        const providerField = decl.fields.find((f) => f.name === 'provider');
+        if (!providerField) {
+            continue;
+        }
+
+        const provider = getLiteral<string>(providerField.value);
+        if (!provider) {
+            continue;
+        }
+
+        let pluginModelFile: string | undefined;
+
+        // first try to treat provider as a path
+        let providerPath = path.resolve(path.dirname(schemaPath), provider);
+        if (fs.existsSync(providerPath)) {
+            if (fs.statSync(providerPath).isDirectory()) {
+                providerPath = path.join(providerPath, 'index.js');
+            }
+
+            // try plugin.zmodel next to the provider file
+            pluginModelFile = path.resolve(path.dirname(providerPath), PLUGIN_MODULE_NAME);
+            if (!fs.existsSync(pluginModelFile)) {
+                // try to find upwards
+                pluginModelFile = findUp([PLUGIN_MODULE_NAME], path.dirname(providerPath));
+            }
+        }
+
+        if (!pluginModelFile) {
+            if (typeof import.meta.resolve === 'function') {
+                try {
+                    // try loading as a ESM module
+                    const resolvedUrl = import.meta.resolve(`${provider}/${PLUGIN_MODULE_NAME}`);
+                    pluginModelFile = fileURLToPath(resolvedUrl);
+                } catch {
+                    // noop
+                }
+            }
+        }
+
+        if (!pluginModelFile) {
+            // try loading as a CJS module
+            try {
+                const require = createRequire(pathToFileURL(schemaPath));
+                pluginModelFile = require.resolve(`${provider}/${PLUGIN_MODULE_NAME}`);
+            } catch {
+                // noop
+            }
+        }
+
+        if (pluginModelFile && fs.existsSync(pluginModelFile)) {
+            result.push(pluginModelFile);
+        }
+    }
+    return result;
+}
+
+type FindUpResult<Multiple extends boolean> = Multiple extends true ? string[] | undefined : string | undefined;
+
+function findUp<Multiple extends boolean = false>(
+    names: string[],
+    cwd: string = process.cwd(),
+    multiple: Multiple = false as Multiple,
+    result: string[] = [],
+): FindUpResult<Multiple> {
+    if (!names.some((name) => !!name)) {
+        return undefined;
+    }
+    const target = names.find((name) => fs.existsSync(path.join(cwd, name)));
+    if (multiple === false && target) {
+        return path.join(cwd, target) as FindUpResult<Multiple>;
+    }
+    if (target) {
+        result.push(path.join(cwd, target));
+    }
+    const up = path.resolve(cwd, '..');
+    if (up === cwd) {
+        return (multiple && result.length > 0 ? result : undefined) as FindUpResult<Multiple>;
+    }
+    return findUp(names, up, multiple, result);
 }
 
 /**

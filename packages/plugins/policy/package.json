@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/plugin-policy",
-    "version": "3.0.0-beta.9",
+    "version": "3.0.0-beta.10",
     "description": "ZenStack Policy Plugin",
     "type": "module",
     "scripts": {
@@ -13,7 +13,8 @@
     "author": "ZenStack Team",
     "license": "MIT",
     "files": [
-        "dist"
+        "dist",
+        "plugin.zmodel"
     ],
     "exports": {
         ".": {
@@ -26,6 +27,10 @@
                 "default": "./dist/index.cjs"
             }
         },
+        "./plugin.zmodel": {
+            "import": "./plugin.zmodel",
+            "require": "./plugin.zmodel"
+        },
         "./package.json": {
             "import": "./package.json",
             "require": "./package.json"
@@ -33,7 +38,6 @@
     },
     "dependencies": {
         "@zenstackhq/common-helpers": "workspace:*",
-        "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/runtime": "workspace:*",
         "ts-pattern": "catalog:"
     },

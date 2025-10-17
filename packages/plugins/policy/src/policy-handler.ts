@@ -7,6 +7,7 @@ import {
     QueryUtils,
     RejectedByPolicyError,
     RejectedByPolicyReason,
+    SchemaUtils,
     type CRUD_EXT,
 } from '@zenstackhq/runtime';
 import {
@@ -17,7 +18,6 @@ import {
     type MemberExpression,
     type SchemaDef,
 } from '@zenstackhq/runtime/schema';
-import { ExpressionVisitor } from '@zenstackhq/sdk';
 import {
     AliasNode,
     BinaryOperationNode,
@@ -270,7 +270,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         const fields = new Set<string>();
-        const fieldCollector = new (class extends ExpressionVisitor {
+        const fieldCollector = new (class extends SchemaUtils.ExpressionVisitor {
             protected override visitMember(e: MemberExpression): void {
                 if (isBeforeInvocation(e.receiver)) {
                     invariant(e.members.length === 1, 'before() can only be followed by a scalar field access');

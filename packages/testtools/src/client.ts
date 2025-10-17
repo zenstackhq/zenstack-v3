@@ -1,5 +1,4 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { loadDocument } from '@zenstackhq/language';
 import type { Model } from '@zenstackhq/language/ast';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { ZenStackClient, type ClientContract, type ClientOptions } from '@zenstackhq/runtime';
@@ -15,6 +14,7 @@ import { Client as PGClient, Pool } from 'pg';
 import { expect } from 'vitest';
 import { createTestProject } from './project';
 import { generateTsSchema } from './schema';
+import { loadDocumentWithPlugins } from './utils';
 
 export function getTestDbProvider() {
     const val = process.env['TEST_DB_PROVIDER'] ?? 'sqlite';
@@ -116,7 +116,7 @@ export async function createTestClient<Schema extends SchemaDef>(
     if (options?.usePrismaPush) {
         invariant(typeof schema === 'string' || schemaFile, 'a schema file must be provided when using prisma db push');
         if (!model) {
-            const r = await loadDocument(path.join(workDir, 'schema.zmodel'));
+            const r = await loadDocumentWithPlugins(path.join(workDir, 'schema.zmodel'));
             if (!r.success) {
                 throw new Error(r.errors.join('\n'));
             }

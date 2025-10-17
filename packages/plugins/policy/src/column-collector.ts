@@ -1,10 +1,10 @@
+import { KyselyUtils } from '@zenstackhq/runtime';
 import type { ColumnNode, OperationNode } from 'kysely';
-import { DefaultOperationNodeVisitor } from '@zenstackhq/sdk';
 
 /**
  * Collects all column names from a query.
  */
-export class ColumnCollector extends DefaultOperationNodeVisitor {
+export class ColumnCollector extends KyselyUtils.DefaultOperationNodeVisitor {
     private columns: string[] = [];
 
     collect(node: OperationNode) {

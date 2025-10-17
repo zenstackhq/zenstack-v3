@@ -94,25 +94,27 @@ export function createZModelLanguageServices(
 
     // when documents reach Parsed state, inspect plugin declarations and load corresponding
     // plugin zmodel docs
-    shared.workspace.DocumentBuilder.onBuildPhase(DocumentState.Parsed, async (documents) => {
-        for (const doc of documents) {
-            if (doc.parseResult.lexerErrors.length > 0 || doc.parseResult.parserErrors.length > 0) {
-                // balk if there are lexer or parser errors
-                continue;
-            }
+    shared.workspace.DocumentBuilder.onDocumentPhase(DocumentState.Parsed, async (doc) => {
+        if (doc.parseResult.lexerErrors.length > 0 || doc.parseResult.parserErrors.length > 0) {
+            // balk if there are lexer or parser errors
+            return;
+        }
 
-            const schemaPath = fileURLToPath(doc.uri.toString());
-            const pluginSchemas = getPluginDocuments(doc.parseResult.value as Model, schemaPath);
-            for (const plugin of pluginSchemas) {
-                // load the plugin model document
-                const pluginDoc = await shared.workspace.LangiumDocuments.getOrCreateDocument(
-                    URI.file(path.resolve(plugin)),
-                );
-                // add to indexer so the plugin model's definitions are globally visible
-                shared.workspace.IndexManager.updateContent(pluginDoc);
-                if (logToConsole) {
-                    console.log(`Loaded plugin model: ${plugin}`);
-                }
+        if (doc.uri.scheme !== 'file') {
+            return;
+        }
+
+        const schemaPath = fileURLToPath(doc.uri.toString());
+        const pluginSchemas = getPluginDocuments(doc.parseResult.value as Model, schemaPath);
+        for (const plugin of pluginSchemas) {
+            // load the plugin model document
+            const pluginDoc = await shared.workspace.LangiumDocuments.getOrCreateDocument(
+                URI.file(path.resolve(plugin)),
+            );
+            // add to indexer so the plugin model's definitions are globally visible
+            shared.workspace.IndexManager.updateContent(pluginDoc);
+            if (logToConsole) {
+                console.log(`Loaded plugin model: ${plugin}`);
             }
         }
     });

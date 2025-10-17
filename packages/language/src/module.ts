@@ -94,7 +94,7 @@ export function createZModelLanguageServices(
 
     // when documents reach Parsed state, inspect plugin declarations and load corresponding
     // plugin zmodel docs
-    // Note we must use `noBuildPhase` instead of `onDocumentPhase` here because the latter is
+    // Note we must use `onBuildPhase` instead of `onDocumentPhase` here because the latter is
     // not called when not running inside a language server.
     shared.workspace.DocumentBuilder.onBuildPhase(DocumentState.Parsed, async (documents) => {
         for (const doc of documents) {

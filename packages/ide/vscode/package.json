@@ -11,6 +11,7 @@
     },
     "scripts": {
         "build": "tsc --noEmit && tsup",
+        "watch": "tsup --watch",
         "lint": "eslint src --ext ts",
         "vscode:publish": "pnpm build && vsce publish --no-dependencies --follow-symlinks",
         "vscode:package": "pnpm build && vsce package --no-dependencies --follow-symlinks"

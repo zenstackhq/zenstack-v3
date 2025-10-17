@@ -7,10 +7,13 @@ import { createConnection, ProposedFeatures } from 'vscode-languageserver/node.j
 const connection = createConnection(ProposedFeatures.all);
 
 // Inject the shared services and language-specific services
-const { shared } = createZModelLanguageServices({
-    connection,
-    ...NodeFileSystem,
-});
+const { shared } = createZModelLanguageServices(
+    {
+        connection,
+        ...NodeFileSystem,
+    },
+    true,
+);
 
 // Start the language server with the shared services
 startLanguageServer(shared);

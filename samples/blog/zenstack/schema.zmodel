@@ -10,6 +10,7 @@ enum Role {
 }
 
 plugin policy {
+    // due to pnpm layout we can't directly use package name here
     provider = '../node_modules/@zenstackhq/plugin-policy/dist/index.js'
 }
 

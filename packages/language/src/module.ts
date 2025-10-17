@@ -1,4 +1,4 @@
-import { inject, type DeepPartial, type Module } from 'langium';
+import { DocumentState, inject, URI, type DeepPartial, type Module } from 'langium';
 import {
     createDefaultModule,
     createDefaultSharedModule,
@@ -7,8 +7,13 @@ import {
     type LangiumSharedServices,
     type PartialLangiumServices,
 } from 'langium/lsp';
+import { NodeFileSystem } from 'langium/node';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Model } from './ast';
 import { ZModelGeneratedModule, ZModelGeneratedSharedModule, ZModelLanguageMetaData } from './generated/module';
-import { ZModelValidator, registerValidationChecks } from './validator';
+import { getPluginDocuments } from './utils';
+import { registerValidationChecks, ZModelValidator } from './validator';
 import { ZModelDocumentBuilder } from './zmodel-document-builder';
 import { ZModelLinker } from './zmodel-linker';
 import { ZModelScopeComputation, ZModelScopeProvider } from './zmodel-scope';
@@ -70,7 +75,10 @@ export const ZModelSharedModule: Module<ZModelSharedServices, DeepPartial<ZModel
  * @param context Optional module context with the LSP connection
  * @returns An object wrapping the shared services and the language-specific services
  */
-export function createZModelLanguageServices(context: DefaultSharedModuleContext): {
+export function createZModelLanguageServices(
+    context: DefaultSharedModuleContext,
+    logToConsole = false,
+): {
     shared: LangiumSharedServices;
     ZModelLanguage: ZModelServices;
 } {
@@ -83,5 +91,36 @@ export function createZModelLanguageServices(context: DefaultSharedModuleContext
         // Therefore, initialize the configuration provider instantly
         shared.workspace.ConfigurationProvider.initialized({});
     }
+
+    // when documents reach Parsed state, inspect plugin declarations and load corresponding
+    // plugin zmodel docs
+    shared.workspace.DocumentBuilder.onBuildPhase(DocumentState.Parsed, async (documents) => {
+        for (const doc of documents) {
+            if (doc.parseResult.lexerErrors.length > 0 || doc.parseResult.parserErrors.length > 0) {
+                // balk if there are lexer or parser errors
+                continue;
+            }
+
+            const schemaPath = fileURLToPath(doc.uri.toString());
+            const pluginSchemas = getPluginDocuments(doc.parseResult.value as Model, schemaPath);
+            for (const plugin of pluginSchemas) {
+                // load the plugin model document
+                const pluginDoc = await shared.workspace.LangiumDocuments.getOrCreateDocument(
+                    URI.file(path.resolve(plugin)),
+                );
+                // add to indexer so the plugin model's definitions are globally visible
+                shared.workspace.IndexManager.updateContent(pluginDoc);
+                if (logToConsole) {
+                    console.log(`Loaded plugin model: ${plugin}`);
+                }
+            }
+        }
+    });
+
     return { shared, ZModelLanguage };
+}
+
+// TODO: proper logging system
+export function createZModelServices(logToConsole = false) {
+    return createZModelLanguageServices(NodeFileSystem, logToConsole);
 }

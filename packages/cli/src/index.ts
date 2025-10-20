@@ -148,7 +148,8 @@ function createProgram() {
         .description('Introspect your database.')
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
-        .addOption(new Option('--out <path>', 'add custom output path for the introspected schema'))
+        .addOption(new Option('-e, --exclude-schemas <schemas...>', 'exclude specific schemas from introspection'))
+        .addOption(new Option('-o, --out <path>', 'add custom output path for the introspected schema'))
         .action((options) => dbAction('pull', options));
 
     dbCommand

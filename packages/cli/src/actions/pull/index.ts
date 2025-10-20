@@ -41,6 +41,15 @@ export function syncEnums({
                 return builder;
             });
         });
+
+        if (dbEnum.schema_name && dbEnum.schema_name != '' && dbEnum.schema_name !== 'public') {
+            factory.addAttribute((b) =>
+                b
+                    .setDecl(getAttributeRef('@@schema', services))
+                    .addArg((a) => a.StringLiteral.setValue(dbEnum.schema_name)),
+            );
+        }
+
         model.declarations.push(factory.get({ $container: model }));
     }
 }
@@ -315,6 +324,12 @@ export function syncTable({
                 .addArg((argBuilder) => argBuilder.StringLiteral.setValue(index.name), 'map'),
         );
     });
+
+    if (table.schema && table.schema != '' && table.schema !== 'public') {
+        modelFactory.addAttribute((b) =>
+            b.setDecl(getAttributeRef('@@schema', services)).addArg((a) => a.StringLiteral.setValue(table.schema)),
+        );
+    }
 
     model.declarations.push(modelFactory.node);
 

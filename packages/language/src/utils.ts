@@ -445,7 +445,7 @@ export function getAllDeclarationsIncludingImports(documents: LangiumDocuments, 
 export function getAuthDecl(decls: (DataModel | TypeDef)[]) {
     let authModel = decls.find((d) => hasAttribute(d, '@@auth'));
     if (!authModel) {
-        authModel = decls.find((d) => (isDataModel(d) || isTypeDef(d)) && d.name === 'User');
+        authModel = decls.find((d) => d.name === 'User');
     }
     return authModel;
 }

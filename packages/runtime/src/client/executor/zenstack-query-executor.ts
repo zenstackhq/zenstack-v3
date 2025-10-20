@@ -60,7 +60,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         }
     }
 
-    private schemaHasMappedNames<Schema extends SchemaDef>(schema: Schema) {
+    private schemaHasMappedNames(schema: Schema) {
         const hasMapAttr = (decl: ModelDef | TypeDefDef) => {
             if (decl.attributes?.some((attr) => attr.name === '@@map')) {
                 return true;

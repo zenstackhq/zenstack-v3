@@ -234,7 +234,9 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 
     async $connect() {
-        await this.kysely.connection().execute(async () => {});
+        await this.kysely.connection().execute(async (conn) => {
+            await conn.executeQuery(sql`select 1`.compile(this.kysely));
+        });
     }
 
     async $disconnect() {

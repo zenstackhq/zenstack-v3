@@ -268,12 +268,12 @@ export function syncTable({
         );
     }
 
-    const uniqieColumns = table.columns.filter((c) => c.unique && !c.pk).map((c) => c.name);
-    if (uniqieColumns.length > 0) {
+    const uniqueColumns = table.columns.filter((c) => c.unique && !c.pk).map((c) => c.name);
+    if (uniqueColumns.length > 0) {
         modelFactory.addAttribute((builder) =>
             builder.setDecl(modelUniqueAttribute).addArg((argBuilder) => {
                 const arrayExpr = argBuilder.ArrayExpr;
-                uniqieColumns.forEach((c) => {
+                uniqueColumns.forEach((c) => {
                     const ref = modelFactory.node.fields.find((f) => getDbName(f) === c);
                     if (!ref) {
                         throw new Error(`Field ${c} not found`);

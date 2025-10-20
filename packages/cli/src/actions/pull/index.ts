@@ -42,12 +42,17 @@ export function syncEnums({
             });
         });
 
-        if (dbEnum.schema_name && dbEnum.schema_name != '' && dbEnum.schema_name !== 'public') {
-            factory.addAttribute((b) =>
-                b
-                    .setDecl(getAttributeRef('@@schema', services))
-                    .addArg((a) => a.StringLiteral.setValue(dbEnum.schema_name)),
-            );
+        try {
+            if (dbEnum.schema_name && dbEnum.schema_name !== '' && dbEnum.schema_name !== 'public') {
+                factory.addAttribute((b) =>
+                    b
+                        .setDecl(getAttributeRef('@@schema', services))
+                        .addArg((a) => a.StringLiteral.setValue(dbEnum.schema_name)),
+                );
+            }
+        } catch (_error: unknown) {
+            //Waiting to support multi-schema
+            //TODO: remove catch after multi-schema support is implemented
         }
 
         model.declarations.push(factory.get({ $container: model }));
@@ -325,10 +330,15 @@ export function syncTable({
         );
     });
 
-    if (table.schema && table.schema != '' && table.schema !== 'public') {
-        modelFactory.addAttribute((b) =>
-            b.setDecl(getAttributeRef('@@schema', services)).addArg((a) => a.StringLiteral.setValue(table.schema)),
-        );
+    try {
+        if (table.schema && table.schema !== '' && table.schema !== 'public') {
+            modelFactory.addAttribute((b) =>
+                b.setDecl(getAttributeRef('@@schema', services)).addArg((a) => a.StringLiteral.setValue(table.schema)),
+            );
+        }
+    } catch (_error: unknown) {
+      //Waiting to support multi-schema
+      //TODO: remove catch after multi-schema support is implemented
     }
 
     model.declarations.push(modelFactory.node);

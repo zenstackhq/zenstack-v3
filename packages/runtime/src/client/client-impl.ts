@@ -233,6 +233,10 @@ export class ClientImpl<Schema extends SchemaDef> {
         return (procOptions[name] as Function).apply(this, [this, ...args]);
     }
 
+    async $connect() {
+        await this.kysely.connection().execute(async () => {});
+    }
+
     async $disconnect() {
         await this.kysely.destroy();
     }

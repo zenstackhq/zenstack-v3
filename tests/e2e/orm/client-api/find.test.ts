@@ -187,6 +187,7 @@ describe('Client find tests ', () => {
         await expect(
             client.user.findMany({
                 cursor: { id: user2.id },
+                orderBy: { id: 'asc' },
             }),
         ).resolves.toEqual([user2, user3]);
 
@@ -195,6 +196,7 @@ describe('Client find tests ', () => {
             client.user.findMany({
                 skip: 1,
                 cursor: { id: user1.id },
+                orderBy: { id: 'asc' },
             }),
         ).resolves.toEqual([user2, user3]);
 
@@ -221,6 +223,7 @@ describe('Client find tests ', () => {
             client.user.findMany({
                 skip: 1,
                 cursor: { id: user1.id, role: 'ADMIN' },
+                orderBy: { id: 'asc' },
             }),
         ).resolves.toEqual([user2, user3]);
 
@@ -238,6 +241,7 @@ describe('Client find tests ', () => {
                 skip: 1,
                 take: -2,
                 cursor: { id: user3.id },
+                orderBy: { id: 'asc' },
             }),
         ).resolves.toEqual([user1, user2]);
     });
@@ -343,6 +347,7 @@ describe('Client find tests ', () => {
                     posts: {
                         skip: 1,
                         take: -2,
+                        orderBy: { id: 'asc' },
                     },
                 },
             }),

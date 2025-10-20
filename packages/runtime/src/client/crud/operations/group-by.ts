@@ -11,51 +11,33 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
         // parse args
         const parsedArgs = this.inputValidator.validateGroupByArgs(this.model, normalizedArgs);
 
-        let query = this.kysely.selectFrom((eb) => {
-            // nested query for filtering and pagination
+        let query = this.kysely
+            .selectFrom(this.model)
+            .where(() => this.dialect.buildFilter(this.model, this.model, parsedArgs?.where));
 
-            // where
-            let subQuery = eb
-                .selectFrom(this.model)
-                .selectAll()
-                .where(() => this.dialect.buildFilter(this.model, this.model, parsedArgs?.where));
-
-            // skip & take
-            const skip = parsedArgs?.skip;
-            let take = parsedArgs?.take;
-            let negateOrderBy = false;
-            if (take !== undefined && take < 0) {
-                negateOrderBy = true;
-                take = -take;
-            }
-            subQuery = this.dialect.buildSkipTake(subQuery, skip, take);
-
-            // default orderBy
-            subQuery = this.dialect.buildOrderBy(
-                subQuery,
-                this.model,
-                this.model,
-                undefined,
-                skip !== undefined || take !== undefined,
-                negateOrderBy,
-            );
-
-            return subQuery.as('$sub');
-        });
-
-        const fieldRef = (field: string) => this.dialect.fieldRef(this.model, field, '$sub');
+        const fieldRef = (field: string) => this.dialect.fieldRef(this.model, field);
 
         // groupBy
         const bys = typeof parsedArgs.by === 'string' ? [parsedArgs.by] : (parsedArgs.by as string[]);
         query = query.groupBy(bys.map((by) => fieldRef(by)));
 
+        // skip & take
+        const skip = parsedArgs?.skip;
+        let take = parsedArgs?.take;
+        let negateOrderBy = false;
+        if (take !== undefined && take < 0) {
+            negateOrderBy = true;
+            take = -take;
+        }
+        query = this.dialect.buildSkipTake(query, skip, take);
+
         // orderBy
         if (parsedArgs.orderBy) {
-            query = this.dialect.buildOrderBy(query, this.model, '$sub', parsedArgs.orderBy, false, false);
+            query = this.dialect.buildOrderBy(query, this.model, this.model, parsedArgs.orderBy, negateOrderBy);
         }
 
         if (parsedArgs.having) {
-            query = query.having(() => this.dialect.buildFilter(this.model, '$sub', parsedArgs.having));
+            query = query.having(() => this.dialect.buildFilter(this.model, this.model, parsedArgs.having));
         }
 
         // select all by fields

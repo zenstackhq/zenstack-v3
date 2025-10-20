@@ -151,7 +151,12 @@ export type ClientContract<Schema extends SchemaDef> = {
     $unuseAll(): ClientContract<Schema>;
 
     /**
-     * Disconnects the underlying Kysely instance from the database.
+     * Eagerly connects to the database.
+     */
+    $connect(): Promise<void>;
+
+    /**
+     * Explicitly disconnects from the database.
      */
     $disconnect(): Promise<void>;
 

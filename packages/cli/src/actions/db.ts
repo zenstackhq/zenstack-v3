@@ -1,4 +1,4 @@
-import type { Model } from '@zenstackhq/language/ast';
+import { Model, Enum, DataModel } from '@zenstackhq/language/ast';
 import { ZModelCodeGenerator } from '@zenstackhq/sdk';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,7 +6,7 @@ import { execPrisma } from '../utils/exec-utils';
 import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError, requireDataSourceUrl, loadSchemaDocumentWithServices } from './action-utils';
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers } from './pull/provider';
-import { getDatasource } from './pull/utils';
+import { getDatasource, getDbName } from './pull/utils';
 import { config } from '@dotenvx/dotenvx';
 
 type PushOptions = {
@@ -115,18 +115,93 @@ async function runPull(options: PullOptions) {
             syncRelation({ model: newModel, relation, services, options });
         }
 
-        //TODO: diff models and apply changes only
+        const cwd = new URL(`file://${process.cwd()}`).pathname;
+        const docs = services.shared.workspace.LangiumDocuments.all
+            .filter(({ uri }) => uri.path.toLowerCase().startsWith(cwd.toLowerCase()))
+            .toArray();
+        const docsSet = new Set(docs.map((d) => d.uri.toString()));
+        console.log(docsSet);
+        newModel.declarations
+            .filter((d) => [DataModel, Enum].includes(d.$type))
+            .forEach((_declaration) => {
+                const declaration = _declaration as DataModel | Enum;
+                const declarations = services.shared.workspace.IndexManager.allElements(declaration.$type, docsSet);
+                const originalModel = declarations.find((d) => getDbName(d.node as any) === getDbName(declaration))
+                    ?.node as DataModel | Enum | undefined;
+                if (!originalModel) {
+                    model.declarations.push(declaration);
+                    (declaration as any).$container = model;
+                    return;
+                }
 
-        const generator = new ZModelCodeGenerator();
+                declaration.fields.forEach((f) => {
+                    const originalField = originalModel.fields.find((d) => getDbName(d) === getDbName(f));
 
-        const zmodelSchema = generator.generate(newModel);
+                    if (!originalField) {
+                        console.log(`Added field ${f.name} to ${originalModel.name}`);
+                        (f as any).$container = originalModel;
+                        originalModel.fields.push(f as any);
+                        return;
+                    }
+                    //TODO: update field
+                });
+                originalModel.fields
+                    .filter((f) => !declaration.fields.find((d) => getDbName(d) === getDbName(f)))
+                    .forEach((f) => {
+                        const model = f.$container;
+                        const index = model.fields.findIndex((d) => d === f);
+                        model.fields.splice(index, 1);
+                        console.log(`Delete field ${f.name}`);
+                    });
+            });
 
-        console.log(options.out ? `Writing to ${options.out}` : schemaFile);
+        services.shared.workspace.IndexManager.allElements('DataModel', docsSet)
+            .filter(
+                (declaration) =>
+                    !newModel.declarations.find((d) => getDbName(d) === getDbName(declaration.node as any)),
+            )
+            .forEach((decl) => {
+                const model = decl.node!.$container as Model;
+                const index = model.declarations.findIndex((d) => d === decl.node);
+                model.declarations.splice(index, 1);
+                console.log(`Delete model ${decl.name}`);
+            });
+        services.shared.workspace.IndexManager.allElements('Enum', docsSet)
+            .filter(
+                (declaration) =>
+                    !newModel.declarations.find((d) => getDbName(d) === getDbName(declaration.node as any)),
+            )
+            .forEach((decl) => {
+                const model = decl.node!.$container as Model;
+                const index = model.declarations.findIndex((d) => d === decl.node);
+                model.declarations.splice(index, 1);
+                console.log(`Delete enum ${decl.name}`);
+            });
 
-        const outPath = options.out ? path.resolve(options.out) : schemaFile;
-        console.log(outPath);
+        if (options.out && !fs.lstatSync(options.out).isFile()) {
+            throw new Error(`Output path ${options.out} is not a file`);
+        }
 
-        fs.writeFileSync(outPath, zmodelSchema);
+        const generator = new ZModelCodeGenerator({
+            //TODO: make configurable
+            quote: 'double',
+        });
+
+        if (options.out) {
+            const zmodelSchema = generator.generate(newModel);
+
+            console.log(`Writing to ${options.out}`);
+
+            const outPath = options.out ? path.resolve(options.out) : schemaFile;
+
+            fs.writeFileSync(outPath, zmodelSchema);
+        } else {
+            docs.forEach(({ uri, parseResult: { value: model } }) => {
+                const zmodelSchema = generator.generate(model);
+                console.log(`Writing to ${uri.path}`);
+                fs.writeFileSync(uri.fsPath, zmodelSchema);
+            });
+        }
     } catch (error) {
         console.log(error);
         throw error;

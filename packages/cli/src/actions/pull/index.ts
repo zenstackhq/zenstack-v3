@@ -8,7 +8,7 @@ import { getAttributeRef, getDbName } from './utils';
 export function syncEnums({
     dbEnums,
     model,
-    options: options,
+    options,
     services,
 }: {
     dbEnums: IntrospectedEnum[];
@@ -23,18 +23,18 @@ export function syncEnums({
         if (modified)
             factory.addAttribute((builder) =>
                 builder
-                    .setDecl(getAttributeRef('@@map', services)!)
+                    .setDecl(getAttributeRef('@@map', services))
                     .addArg((argBuilder) => argBuilder.StringLiteral.setValue(dbEnum.enum_type)),
             );
 
-        dbEnum.values.map((v) => {
+        dbEnum.values.forEach((v) => {
             const { name, modified } = resolveNameCasing(options, v);
             factory.addField((builder) => {
                 builder.setName(name);
                 if (modified)
                     builder.addAttribute((builder) =>
                         builder
-                            .setDecl(getAttributeRef('@map', services)!)
+                            .setDecl(getAttributeRef('@map', services))
                             .addArg((argBuilder) => argBuilder.StringLiteral.setValue(v)),
                     );
 
@@ -46,7 +46,7 @@ export function syncEnums({
 }
 
 function resolveNameCasing(options: PullOptions, originalName: string) {
-    let name: string;
+    let name = originalName;
 
     switch (options.naming) {
         case 'pascal':
@@ -60,10 +60,6 @@ function resolveNameCasing(options: PullOptions, originalName: string) {
             break;
         case 'kebab':
             name = toKebabCase(originalName);
-            break;
-        case 'none':
-        default:
-            name = originalName;
             break;
     }
 
@@ -188,7 +184,7 @@ export function syncTable({
                 typeBuilder.setArray(builtinType.isArray);
                 typeBuilder.setOptional(column.nullable);
 
-                if (builtinType.type != 'Unsupported') {
+                if (builtinType.type !== 'Unsupported') {
                     typeBuilder.setType(builtinType.type);
                 } else {
                     typeBuilder.setUnsupported((unsupportedBuilder) =>
@@ -246,8 +242,11 @@ export function syncTable({
         modelFactory.addAttribute((builder) =>
             builder.setDecl(modelIdAttribute).addArg((argBuilder) => {
                 const arrayExpr = argBuilder.ArrayExpr;
-                pkColumns.map((c) => {
-                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c)!;
+                pkColumns.forEach((c) => {
+                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c);
+                    if (!ref) {
+                        throw new Error(`Field ${c} not found`);
+                    }
                     arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
                 });
                 return arrayExpr;
@@ -260,8 +259,11 @@ export function syncTable({
         modelFactory.addAttribute((builder) =>
             builder.setDecl(modelUniqueAttribute).addArg((argBuilder) => {
                 const arrayExpr = argBuilder.ArrayExpr;
-                uniqieColumns.map((c) => {
-                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c)!;
+                uniqieColumns.forEach((c) => {
+                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c);
+                    if (!ref) {
+                        throw new Error(`Field ${c} not found`);
+                    }
                     arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
                 });
                 return arrayExpr;
@@ -296,9 +298,11 @@ export function syncTable({
                 .setDecl(index.unique ? modelUniqueAttribute : modelindexAttribute)
                 .addArg((argBuilder) => {
                     const arrayExpr = argBuilder.ArrayExpr;
-                    index.columns.map((c) => {
-                        const ref = modelFactory.node.fields.find((f) => getDbName(f) === c.name)!;
-                        if (!ref) console.log(c, table.name);
+                    index.columns.forEach((c) => {
+                        const ref = modelFactory.node.fields.find((f) => getDbName(f) === c.name);
+                        if (!ref) {
+                            throw new Error(`Column ${c.name} not found in model ${table.name}`);
+                        }
                         arrayExpr.addItem((itemBuilder) => {
                             const refExpr = itemBuilder.ReferenceExpr.setTarget(ref);
                             if (c.order !== 'ASC') refExpr.addArg((ab) => ab.StringLiteral.setValue('DESC'), 'sort');

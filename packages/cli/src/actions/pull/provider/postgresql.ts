@@ -61,48 +61,6 @@ export const postgresql: IntrospectionProvider = {
             case 'json':
             case 'jsonb':
                 return { type: 'Json', isArray };
-
-            // unsupported or postgres-specific
-            case 'time':
-            case 'timetz':
-            case 'interval':
-            case 'money':
-            case 'xml':
-            case 'bit':
-            case 'varbit':
-            case 'cidr':
-            case 'inet':
-            case 'macaddr':
-            case 'macaddr8':
-            case 'point':
-            case 'line':
-            case 'lseg':
-            case 'box':
-            case 'path':
-            case 'polygon':
-            case 'circle':
-            case 'tsvector':
-            case 'tsquery':
-            case 'jsonpath':
-            case 'hstore':
-            case 'oid':
-            case 'name':
-            case 'regclass':
-            case 'regproc':
-            case 'regprocedure':
-            case 'regoper':
-            case 'regoperator':
-            case 'regtype':
-            case 'regconfig':
-            case 'regdictionary':
-            case 'pg_lsn':
-            case 'txid_snapshot':
-            case 'int4range':
-            case 'int8range':
-            case 'numrange':
-            case 'tsrange':
-            case 'tstzrange':
-            case 'daterange':
             default:
                 return { type: 'Unsupported' as const, isArray };
         }
@@ -123,13 +81,13 @@ export const postgresql: IntrospectionProvider = {
         const val = defaultValue.trim();
         const factories: DataFieldAttributeFactory[] = [];
 
-        const defaultAttr = new DataFieldAttributeFactory().setDecl(getAttributeRef('@default', services)!);
+        const defaultAttr = new DataFieldAttributeFactory().setDecl(getAttributeRef('@default', services));
 
         if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
-            factories.push(defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services)!)));
+            factories.push(defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services))));
 
             if (fieldName.toLowerCase() === 'updatedat' || fieldName.toLowerCase() === 'updated_at') {
-                factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)!));
+                factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)));
             }
             return factories;
         }

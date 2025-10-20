@@ -20,12 +20,13 @@ export type PullOptions = {
     out?: string;
     naming?: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none';
     alwaysMap?: boolean;
+    excludeSchemas: string[];
 };
 
 /**
  * CLI action for db related commands
  */
-export async function run(command: string, options: PushOptions) {
+export async function run(command: string, options: any) {
     switch (command) {
         case 'push':
             await runPush(options);
@@ -89,7 +90,9 @@ async function runPull(options: PullOptions) {
             throw new Error(`No introspection provider found for: ${datasource.provider}`);
         }
 
-        const { enums, tables } = await provider.introspect(datasource.url);
+        const { enums: allEnums, tables: allTables } = await provider.introspect(datasource.url);
+        const enums = allEnums.filter((e) => !options.excludeSchemas.includes(e.schema_name));
+        const tables = allTables.filter((t) => !options.excludeSchemas.includes(t.schema));
 
         const newModel: Model = {
             $type: 'Model',

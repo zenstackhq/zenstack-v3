@@ -1,11 +1,11 @@
 import type { ZModelServices } from '@zenstackhq/language';
 import {
-    AbstractDeclaration,
-    DataField,
-    DataModel,
-    Enum,
-    EnumField,
-    FunctionDecl,
+    type AbstractDeclaration,
+    type DataField,
+    type DataModel,
+    type Enum,
+    type EnumField,
+    type FunctionDecl,
     isInvocationExpr,
     type Attribute,
     type Model,
@@ -15,8 +15,10 @@ import type { DataSourceProviderType } from '@zenstackhq/sdk/schema';
 import type { Reference } from 'langium';
 
 export function getAttribute(model: Model, attrName: string) {
-    const references = model.$document!.references as Reference<AbstractDeclaration>[];
-    return references.find((a) => a.ref!.$type === 'Attribute' && a.ref!.name === attrName)?.ref as
+    if (!model.$document) throw new Error('Model is not associated with a document.');
+
+    const references = model.$document.references as Reference<AbstractDeclaration>[];
+    return references.find((a) => a.ref?.$type === 'Attribute' && a.ref?.name === attrName)?.ref as
         | Attribute
         | undefined;
 }
@@ -27,7 +29,9 @@ export function getDatasource(model: Model) {
         throw new Error('No datasource declaration found in the schema.');
     }
 
-    const urlField = datasource.fields.find((f) => f.name === 'url')!;
+    const urlField = datasource.fields.find((f) => f.name === 'url');
+
+    if (!urlField) throw new Error(`No url field found in the datasource declaration.`);
 
     let url = getStringLiteral(urlField.value);
 
@@ -73,9 +77,11 @@ export function getDeclarationRef<T extends AbstractDeclaration>(
     name: string,
     services: ZModelServices,
 ) {
-    return services.shared.workspace.IndexManager.allElements(type).find(
+    const node = services.shared.workspace.IndexManager.allElements(type).find(
         (m) => m.node && getDbName(m.node as T) === name,
-    )?.node as T | undefined;
+    )?.node;
+    if (!node) throw new Error(`Declaration not found: ${name}`);
+    return node as T;
 }
 
 export function getEnumRef(name: string, services: ZModelServices) {

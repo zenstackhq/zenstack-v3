@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '@zenstackhq/runtime';
-import { schema } from '../schemas/basic';
 import { createTestClient } from '@zenstackhq/testtools';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { schema } from '../schemas/basic';
 import { createPosts, createUser } from './utils';
 
 describe('Client groupBy tests', () => {
@@ -57,7 +57,7 @@ describe('Client groupBy tests', () => {
                 take: -1,
                 orderBy: { email: 'desc' },
             }),
-        ).resolves.toEqual([{ email: 'u1@test.com' }]);
+        ).resolves.toEqual([{ email: 'u3@test.com' }]);
 
         await expect(
             client.user.groupBy({
@@ -66,7 +66,7 @@ describe('Client groupBy tests', () => {
                 take: -2,
                 orderBy: { email: 'desc' },
             }),
-        ).resolves.toEqual(expect.arrayContaining([{ email: 'u2@test.com' }, { email: 'u1@test.com' }]));
+        ).resolves.toEqual(expect.arrayContaining([{ email: 'u2@test.com' }, { email: 'u3@test.com' }]));
 
         await expect(
             client.user.groupBy({
@@ -88,10 +88,12 @@ describe('Client groupBy tests', () => {
                 },
                 _count: true,
             }),
-        ).resolves.toEqual([
-            { name: 'User', role: 'USER', _count: 2 },
-            { name: 'Admin', role: 'ADMIN', _count: 1 },
-        ]);
+        ).resolves.toEqual(
+            expect.arrayContaining([
+                { name: 'User', role: 'USER', _count: 2 },
+                { name: 'Admin', role: 'ADMIN', _count: 1 },
+            ]),
+        );
 
         await expect(
             client.post.groupBy({

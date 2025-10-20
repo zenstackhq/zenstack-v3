@@ -22,7 +22,7 @@ import {
     type RootOperationNode,
 } from 'kysely';
 import { match } from 'ts-pattern';
-import type { GetModels, SchemaDef } from '../../schema';
+import type { GetModels, ModelDef, SchemaDef, TypeDefDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
 import { TransactionIsolationLevel, type ClientContract } from '../contract';
 import { InternalError, QueryError, ZenStackError } from '../errors';
@@ -42,7 +42,7 @@ type MutationInfo<Schema extends SchemaDef> = {
 };
 
 export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQueryExecutor {
-    private readonly nameMapper: QueryNameMapper;
+    private readonly nameMapper: QueryNameMapper | undefined;
 
     constructor(
         private client: ClientImpl<Schema>,
@@ -54,7 +54,21 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         private suppressMutationHooks: boolean = false,
     ) {
         super(compiler, adapter, connectionProvider, plugins);
-        this.nameMapper = new QueryNameMapper(client.$schema);
+
+        if (this.schemaHasMappedNames(client.$schema)) {
+            this.nameMapper = new QueryNameMapper(client.$schema);
+        }
+    }
+
+    private schemaHasMappedNames(schema: Schema) {
+        const hasMapAttr = (decl: ModelDef | TypeDefDef) => {
+            if (decl.attributes?.some((attr) => attr.name === '@@map')) {
+                return true;
+            }
+            return Object.values(decl.fields).some((field) => field.attributes?.some((attr) => attr.name === '@map'));
+        };
+
+        return Object.values(schema.models).some(hasMapAttr) || Object.values(schema.typeDefs ?? []).some(hasMapAttr);
     }
 
     private get kysely() {
@@ -170,7 +184,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
 
         if (this.suppressMutationHooks || !this.isMutationNode(query) || !this.hasEntityMutationPlugins) {
             // no need to handle mutation hooks, just proceed
-            const finalQuery = this.nameMapper.transformNode(query);
+            const finalQuery = this.processNameMapping(query);
             compiled = this.compileQuery(finalQuery);
             if (parameters) {
                 compiled = { ...compiled, parameters };
@@ -189,7 +203,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 returning: ReturningNode.create([SelectionNode.createSelectAll()]),
             };
         }
-        const finalQuery = this.nameMapper.transformNode(query);
+        const finalQuery = this.processNameMapping(query);
         compiled = this.compileQuery(finalQuery);
         if (parameters) {
             compiled = { ...compiled, parameters };
@@ -237,6 +251,10 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         }
 
         return result;
+    }
+
+    private processNameMapping<Node extends RootOperationNode>(query: Node): Node {
+        return this.nameMapper?.transformNode(query) ?? query;
     }
 
     private createClientForConnection(connection: DatabaseConnection, inTx: boolean) {

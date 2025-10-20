@@ -233,6 +233,12 @@ export class ClientImpl<Schema extends SchemaDef> {
         return (procOptions[name] as Function).apply(this, [this, ...args]);
     }
 
+    async $connect() {
+        await this.kysely.connection().execute(async (conn) => {
+            await conn.executeQuery(sql`select 1`.compile(this.kysely));
+        });
+    }
+
     async $disconnect() {
         await this.kysely.destroy();
     }

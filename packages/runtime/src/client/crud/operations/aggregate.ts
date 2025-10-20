@@ -52,14 +52,7 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
             subQuery = this.dialect.buildSkipTake(subQuery, skip, take);
 
             // orderBy
-            subQuery = this.dialect.buildOrderBy(
-                subQuery,
-                this.model,
-                this.model,
-                parsedArgs.orderBy,
-                skip !== undefined || take !== undefined,
-                negateOrderBy,
-            );
+            subQuery = this.dialect.buildOrderBy(subQuery, this.model, this.model, parsedArgs.orderBy, negateOrderBy);
 
             return subQuery.as('$sub');
         });

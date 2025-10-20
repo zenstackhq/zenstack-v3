@@ -89,14 +89,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         result = this.buildSkipTake(result, skip, take);
 
         // orderBy
-        result = this.buildOrderBy(
-            result,
-            model,
-            modelAlias,
-            args.orderBy,
-            skip !== undefined || take !== undefined,
-            negateOrderBy,
-        );
+        result = this.buildOrderBy(result, model, modelAlias, args.orderBy, negateOrderBy);
 
         // distinct
         if ('distinct' in args && (args as any).distinct) {
@@ -748,15 +741,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         model: string,
         modelAlias: string,
         orderBy: OrArray<OrderBy<Schema, GetModels<Schema>, boolean, boolean>> | undefined,
-        useDefaultIfEmpty: boolean,
         negated: boolean,
     ) {
         if (!orderBy) {
-            if (useDefaultIfEmpty) {
-                orderBy = makeDefaultOrderBy(this.schema, model);
-            } else {
-                return query;
-            }
+            return query;
         }
 
         let result = query;
@@ -862,7 +850,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                 ),
                             );
                         });
-                        result = this.buildOrderBy(result, fieldDef.type, relationModel, value, false, negated);
+                        result = this.buildOrderBy(result, fieldDef.type, relationModel, value, negated);
                     }
                 }
             }

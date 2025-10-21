@@ -12,6 +12,8 @@ export interface IntrospectedTable {
     columns: {
         name: string;
         datatype: string;
+        length: number | null;
+        precision: number | null;
         datatype_schema: string;
         foreign_key_schema: string | null;
         foreign_key_table: string | null;

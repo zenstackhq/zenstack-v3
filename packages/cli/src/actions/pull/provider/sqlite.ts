@@ -189,6 +189,8 @@ export const sqlite: IntrospectionProvider = {
                     columns.push({
                         name: c.name,
                         datatype: c.type || '',
+                        length: null,
+                        precision: null,
                         datatype_schema: schema,
                         foreign_key_schema: fk?.foreign_key_schema ?? null,
                         foreign_key_table: fk?.foreign_key_table ?? null,

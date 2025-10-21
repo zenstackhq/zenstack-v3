@@ -19,7 +19,6 @@ import { InternalError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
     aggregate,
-    buildFieldRef,
     buildJoinPairs,
     ensureArray,
     flattenCompoundUniqueFilters,
@@ -89,14 +88,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         result = this.buildSkipTake(result, skip, take);
 
         // orderBy
-        result = this.buildOrderBy(
-            result,
-            model,
-            modelAlias,
-            args.orderBy,
-            skip !== undefined || take !== undefined,
-            negateOrderBy,
-        );
+        result = this.buildOrderBy(result, model, modelAlias, args.orderBy, negateOrderBy);
 
         // distinct
         if ('distinct' in args && (args as any).distinct) {
@@ -748,15 +740,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         model: string,
         modelAlias: string,
         orderBy: OrArray<OrderBy<Schema, GetModels<Schema>, boolean, boolean>> | undefined,
-        useDefaultIfEmpty: boolean,
         negated: boolean,
     ) {
         if (!orderBy) {
-            if (useDefaultIfEmpty) {
-                orderBy = makeDefaultOrderBy(this.schema, model);
-            } else {
-                return query;
-            }
+            return query;
         }
 
         let result = query;
@@ -862,7 +849,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                 ),
                             );
                         });
-                        result = this.buildOrderBy(result, fieldDef.type, relationModel, value, false, negated);
+                        result = this.buildOrderBy(result, fieldDef.type, relationModel, value, negated);
                     }
                 }
             }
@@ -943,15 +930,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         field: string,
     ): SelectQueryBuilder<any, any, any> {
         const fieldDef = requireField(this.schema, model, field);
-        if (fieldDef.computed) {
-            // TODO: computed field from delegate base?
-            return query.select(() => this.fieldRef(model, field, modelAlias).as(field));
-        } else if (!fieldDef.originModel) {
-            // regular field
-            return query.select(this.eb.ref(`${modelAlias}.${field}`).as(field));
-        } else {
-            return this.buildSelectField(query, fieldDef.originModel, fieldDef.originModel, field);
-        }
+
+        // if field is defined on a delegate base, the base model is joined with its
+        // model name from outer query, so we should use it directly as the alias
+        const fieldModel = fieldDef.originModel ?? model;
+        const alias = fieldDef.originModel ?? modelAlias;
+
+        return query.select(() => this.fieldRef(fieldModel, field, alias).as(field));
     }
 
     buildDelegateJoin(
@@ -1083,7 +1068,26 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     fieldRef(model: string, field: string, modelAlias?: string, inlineComputedField = true) {
-        return buildFieldRef(this.schema, model, field, this.options, this.eb, modelAlias, inlineComputedField);
+        const fieldDef = requireField(this.schema, model, field);
+
+        if (!fieldDef.computed) {
+            // regular field
+            return this.eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
+        } else {
+            // computed field
+            if (!inlineComputedField) {
+                return this.eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
+            }
+            let computer: Function | undefined;
+            if ('computedFields' in this.options) {
+                const computedFields = this.options.computedFields as Record<string, any>;
+                computer = computedFields?.[fieldDef.originModel ?? model]?.[field];
+            }
+            if (!computer) {
+                throw new QueryError(`Computed field "${field}" implementation not provided for model "${model}"`);
+            }
+            return computer(this.eb, { modelAlias });
+        }
     }
 
     protected canJoinWithoutNestedSelect(

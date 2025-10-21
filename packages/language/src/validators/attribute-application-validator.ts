@@ -290,11 +290,13 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         }
     }
 
-    @check('@@unique')
     @check('@@id')
+    @check('@@index')
+    @check('@@unique')
     // @ts-expect-error
-    private _checkUnique(attr: AttributeApplication, accept: ValidationAcceptor) {
+    private _checkConstraint(attr: AttributeApplication, accept: ValidationAcceptor) {
         const fields = attr.args[0]?.value;
+        const attrName = attr.decl.ref?.name;
         if (!fields) {
             accept('error', `expects an array of field references`, {
                 node: attr.args[0]!,
@@ -303,7 +305,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         }
         if (isArrayExpr(fields)) {
             if (fields.items.length === 0) {
-                accept('error', `\`@@unique\` expects at least one field reference`, { node: fields });
+                accept('error', `\`${attrName}\` expects at least one field reference`, { node: fields });
                 return;
             }
             fields.items.forEach((item) => {
@@ -321,7 +323,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
                 }
 
                 if (item.target.ref.$container !== attr.$container && isDelegateModel(item.target.ref.$container)) {
-                    accept('error', `Cannot use fields inherited from a polymorphic base model in \`@@unique\``, {
+                    accept('error', `Cannot use fields inherited from a polymorphic base model in \`${attrName}\``, {
                         node: item,
                     });
                 }

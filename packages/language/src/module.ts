@@ -94,10 +94,16 @@ export function createZModelLanguageServices(
 
     // when documents reach Parsed state, inspect plugin declarations and load corresponding
     // plugin zmodel docs
+    // Note we must use `onBuildPhase` instead of `onDocumentPhase` here because the latter is
+    // not called when not running inside a language server.
     shared.workspace.DocumentBuilder.onBuildPhase(DocumentState.Parsed, async (documents) => {
         for (const doc of documents) {
             if (doc.parseResult.lexerErrors.length > 0 || doc.parseResult.parserErrors.length > 0) {
                 // balk if there are lexer or parser errors
+                continue;
+            }
+
+            if (doc.uri.scheme !== 'file') {
                 continue;
             }
 

@@ -50,11 +50,11 @@ import {
     addStringValidation,
 } from './utils';
 
+const schemaCache = new WeakMap<SchemaDef, Map<string, ZodType>>();
+
 type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema>, options: Options) => ZodType;
 
 export class InputValidator<Schema extends SchemaDef> {
-    private schemaCache = new Map<string, ZodType>();
-
     constructor(private readonly client: ClientContract<Schema>) {}
 
     private get schema() {
@@ -192,6 +192,24 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
+    private getSchemaCache(cacheKey: string) {
+        let thisCache = schemaCache.get(this.schema);
+        if (!thisCache) {
+            thisCache = new Map<string, ZodType>();
+            schemaCache.set(this.schema, thisCache);
+        }
+        return thisCache.get(cacheKey);
+    }
+
+    private setSchemaCache(cacheKey: string, schema: ZodType) {
+        let thisCache = schemaCache.get(this.schema);
+        if (!thisCache) {
+            thisCache = new Map<string, ZodType>();
+            schemaCache.set(this.schema, thisCache);
+        }
+        return thisCache.set(cacheKey, schema);
+    }
+
     private validate<T, Options = undefined>(
         model: GetModels<Schema>,
         operation: string,
@@ -200,14 +218,16 @@ export class InputValidator<Schema extends SchemaDef> {
         args: unknown,
     ) {
         const cacheKey = stableStringify({
+            type: 'model',
             model,
             operation,
             options,
+            extraValidationsEnabled: this.extraValidationsEnabled,
         });
-        let schema = this.schemaCache.get(cacheKey!);
+        let schema = this.getSchemaCache(cacheKey!);
         if (!schema) {
             schema = getSchema(model, options);
-            this.schemaCache.set(cacheKey!, schema);
+            this.setSchemaCache(cacheKey!, schema);
         }
         const { error, data } = schema.safeParse(args);
         if (error) {
@@ -293,8 +313,12 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeTypeDefSchema(type: string): z.ZodType {
-        const key = `$typedef-${type}`;
-        let schema = this.schemaCache.get(key);
+        const key = stableStringify({
+            type: 'typedef',
+            name: type,
+            extraValidationsEnabled: this.extraValidationsEnabled,
+        });
+        let schema = this.getSchemaCache(key!);
         if (schema) {
             return schema;
         }
@@ -316,7 +340,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 ),
             )
             .passthrough();
-        this.schemaCache.set(key, schema);
+        this.setSchemaCache(key!, schema);
         return schema;
     }
 

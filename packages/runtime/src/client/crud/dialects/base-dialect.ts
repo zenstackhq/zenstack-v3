@@ -931,14 +931,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     ): SelectQueryBuilder<any, any, any> {
         const fieldDef = requireField(this.schema, model, field);
 
-        if (!fieldDef.originModel) {
-            // field defined on this model
-            return query.select(() => this.fieldRef(model, field, modelAlias).as(field));
-        } else {
-            // field defined on a delegate base, build a select with the origin model
-            // name (the model is already joined from outer query)
-            return this.buildSelectField(query, fieldDef.originModel, fieldDef.originModel, field);
-        }
+        // if field is defined on a delegate base, the base model is joined with its
+        // model name from outer query, so we should use it directly as the alias
+        const fieldModel = fieldDef.originModel ?? model;
+        const alias = fieldDef.originModel ?? modelAlias;
+
+        return query.select(() => this.fieldRef(fieldModel, field, alias).as(field));
     }
 
     buildDelegateJoin(

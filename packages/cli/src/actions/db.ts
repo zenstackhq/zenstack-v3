@@ -17,10 +17,13 @@ type PushOptions = {
 
 export type PullOptions = {
     schema?: string;
-    out?: string;
-    naming?: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none';
-    alwaysMap?: boolean;
     excludeSchemas?: string[];
+    out?: string;
+    modelCasing: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none';
+    fieldCasing: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none';
+    alwaysMap: boolean;
+    quote: 'single' | 'double';
+    indent: number;
 };
 
 /**
@@ -281,9 +284,8 @@ async function runPull(options: PullOptions) {
         }
 
         const generator = new ZModelCodeGenerator({
-            //TODO: make configurable
-            quote: 'double',
-            indent: 2,
+            quote: options.quote,
+            indent: options.indent,
         });
 
         if (options.out) {

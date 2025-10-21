@@ -9,7 +9,7 @@ import {
     isInvocationExpr,
     type Attribute,
     type Model,
-    StringLiteral,
+    type StringLiteral,
 } from '@zenstackhq/language/ast';
 import { getStringLiteral } from '@zenstackhq/language/utils';
 import type { DataSourceProviderType } from '@zenstackhq/sdk/schema';

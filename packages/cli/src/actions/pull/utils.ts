@@ -9,6 +9,7 @@ import {
     isInvocationExpr,
     type Attribute,
     type Model,
+    StringLiteral,
 } from '@zenstackhq/language/ast';
 import { getStringLiteral } from '@zenstackhq/language/utils';
 import type { DataSourceProviderType } from '@zenstackhq/sdk/schema';
@@ -61,13 +62,39 @@ export function getDatasource(model: Model) {
     };
 }
 
-export function getDbName(decl: AbstractDeclaration | DataField | EnumField): string {
+export function getDbName(decl: AbstractDeclaration | DataField | EnumField, includeSchema: boolean = false): string {
     if (!('attributes' in decl)) return decl.name;
+
+    const schemaAttr = decl.attributes.find((a) => a.decl.ref?.name === '@@schema');
+    const schemaAttrValue = schemaAttr?.args[0]?.value;
+    let schema: string;
+    if (schemaAttrValue?.$type !== 'StringLiteral') schema = 'public';
+    if (!schemaAttr) schema = 'public';
+    else schema = (schemaAttr.args[0]?.value as any)?.value as string;
+
+    const formatName = (name: string) => `${schema && includeSchema ? `${schema}.` : ''}${name}`;
+
     const nameAttr = decl.attributes.find((a) => a.decl.ref?.name === '@@map' || a.decl.ref?.name === '@map');
-    if (!nameAttr) return decl.name;
+    if (!nameAttr) return formatName(decl.name);
     const attrValue = nameAttr.args[0]?.value;
 
-    if (attrValue?.$type !== 'StringLiteral') return decl.name;
+    if (attrValue?.$type !== 'StringLiteral') return formatName(decl.name);
+
+    return formatName(attrValue.value);
+}
+
+export function getRelationFkName(decl: DataField): string | undefined {
+    const relationAttr = decl?.attributes.find((a) => a.decl.ref?.name === '@relation');
+    const schemaAttrValue = relationAttr?.args.find((a) => a.name === 'map')?.value as StringLiteral;
+    return schemaAttrValue?.value;
+}
+
+export function getDbSchemaName(decl: DataModel | Enum): string {
+    const schemaAttr = decl.attributes.find((a) => a.decl.ref?.name === '@@schema');
+    if (!schemaAttr) return 'public';
+    const attrValue = schemaAttr.args[0]?.value;
+
+    if (attrValue?.$type !== 'StringLiteral') return 'public';
 
     return attrValue.value;
 }

@@ -100,7 +100,10 @@ export class ZModelCodeGenerator {
 
     @gen(Model)
     private _generateModel(ast: Model) {
-        return `${ast.imports.map((d) => this.generate(d)).join('\n')}${ast.imports.length > 0 ? '\n\n' : ''}${ast.declarations.map((d) => this.generate(d)).join('\n\n')}`;
+        return `${ast.imports.map((d) => this.generate(d)).join('\n')}${ast.imports.length > 0 ? '\n\n' : ''}${ast.declarations
+            .sort((d) => (d.$type === 'Enum' ? 1 : 0))
+            .map((d) => this.generate(d))
+            .join('\n\n')}`;
     }
 
     @gen(DataSource)

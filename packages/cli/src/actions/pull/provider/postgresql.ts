@@ -1,7 +1,7 @@
+import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { Client } from 'pg';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
-import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 
 export const postgresql: IntrospectionProvider = {
     getBuiltinType(type) {
@@ -49,6 +49,7 @@ export const postgresql: IntrospectionProvider = {
 
             // dates/times
             case 'date':
+            case 'time':
             case 'timestamp':
             case 'timestamptz':
                 return { type: 'DateTime', isArray };
@@ -91,24 +92,63 @@ export const postgresql: IntrospectionProvider = {
             }
             return factories;
         }
+        if (val.startsWith('nextval(')) {
+            factories.push(
+                defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services))),
+            );
+            return factories;
+        }
+        if (val.includes('(') && val.includes(')')) {
+            factories.push(
+                defaultAttr.addArg((a) =>
+                    a.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
+                        a.setValue((v) => v.StringLiteral.setValue(val)),
+                    ),
+                ),
+            );
+            return factories;
+        }
 
         if (val.includes('::')) {
-            const [enumValue, enumName] = val
-                .replace(/'|"/g, '')
+            const [value, type] = val
+                .replace(/'/g, '')
                 .split('::')
                 .map((s) => s.trim()) as [string, string];
-            const enumDef = enums.find((e) => getDbName(e) === enumName);
-            if (!enumDef) {
-                return [];
-            }
-            const enumField = enumDef.fields.find((v) => getDbName(v) === enumValue);
-            if (!enumField) {
-                throw new Error(
-                    `Enum value ${enumValue} not found in enum ${enumName} for default value ${defaultValue}`,
-                );
+            switch (type) {
+                case 'character varying':
+                case 'uuid':
+                case 'json':
+                case 'jsonb':
+                    if (value === 'NULL') return [];
+                    factories.push(defaultAttr.addArg((a) => a.StringLiteral.setValue(value)));
+                    break;
+                case 'real':
+                    factories.push(defaultAttr.addArg((a) => a.NumberLiteral.setValue(value)));
+                    break;
+                default: {
+                    const enumDef = enums.find((e) => getDbName(e, true) === type);
+                    if (!enumDef) {
+                        factories.push(
+                            defaultAttr.addArg((a) =>
+                                a.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
+                                    a.setValue((v) => v.StringLiteral.setValue(val)),
+                                ),
+                            ),
+                        );
+                        break;
+                    }
+                    const enumField = enumDef.fields.find((v) => getDbName(v) === value);
+                    if (!enumField) {
+                        throw new Error(
+                            `Enum value ${value} not found in enum ${type} for default value ${defaultValue}`,
+                        );
+                    }
+
+                    factories.push(defaultAttr.addArg((ab) => ab.ReferenceExpr.setTarget(enumField)));
+                    break;
+                }
             }
 
-            factories.push(defaultAttr.addArg((ab) => ab.ReferenceExpr.setTarget(enumField)));
             return factories;
         }
 
@@ -161,6 +201,8 @@ SELECT
         "att"."attname" AS "name",
         "typ"."typname" AS "datatype",
         "tns"."nspname" AS "datatype_schema",
+        "c"."character_maximum_length" AS "length",
+        COALESCE("c"."numeric_precision", "c"."datetime_precision") AS "precision",
         "fk_ns"."nspname" AS "foreign_key_schema",
         "fk_cls"."relname" AS "foreign_key_table",
         "fk_att"."attname" AS "foreign_key_column",
@@ -234,10 +276,18 @@ SELECT
           ),
           '[]'
         ) AS "options"
-      FROM "pg_catalog"."pg_attribute" AS "att"
-      INNER JOIN "pg_catalog"."pg_type" AS "typ" ON "typ"."oid" = "att"."atttypid"
-      INNER JOIN "pg_catalog"."pg_namespace" AS "tns" ON "tns"."oid" = "typ"."typnamespace"
-      LEFT JOIN "pg_catalog"."pg_constraint" AS "pk_con" ON "pk_con"."contype" = 'p'
+      
+            FROM "pg_catalog"."pg_attribute" AS "att"
+
+            INNER JOIN "pg_catalog"."pg_type" AS "typ" ON "typ"."oid" = "att"."atttypid"
+
+            INNER JOIN "pg_catalog"."pg_namespace" AS "tns" ON "tns"."oid" = "typ"."typnamespace"
+
+            LEFT JOIN "information_schema"."columns" AS "c" ON "c"."table_schema" = "ns"."nspname"
+              AND "c"."table_name" = "cls"."relname"
+              AND "c"."column_name" = "att"."attname"
+            LEFT JOIN "pg_catalog"."pg_constraint" AS "pk_con" ON "pk_con"."contype" = 'p'
+
         AND "pk_con"."conrelid" = "cls"."oid"
         AND "att"."attnum" = ANY ("pk_con"."conkey")
       LEFT JOIN "pg_catalog"."pg_constraint" AS "fk_con" ON "fk_con"."contype" = 'f'

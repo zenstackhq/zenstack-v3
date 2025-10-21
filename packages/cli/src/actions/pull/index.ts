@@ -1,10 +1,10 @@
 import type { ZModelServices } from '@zenstackhq/language';
 import { Attribute, isEnum, type DataField, type DataModel, type Enum, type Model } from '@zenstackhq/language/ast';
 import {
-  DataFieldAttributeFactory,
-  DataFieldFactory,
-  DataModelFactory,
-  EnumFactory
+    DataFieldAttributeFactory,
+    DataFieldFactory,
+    DataModelFactory,
+    EnumFactory,
 } from '@zenstackhq/language/factory';
 import type { PullOptions } from '../db';
 import type { Cascade, IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider';
@@ -22,10 +22,10 @@ export function syncEnums({
     options: PullOptions;
 }) {
     for (const dbEnum of dbEnums) {
-        const { modified, name } = resolveNameCasing(options, dbEnum.enum_type);
+        const { modified, name } = resolveNameCasing(options.modelCasing, dbEnum.enum_type);
         if (modified) console.log(`Mapping enum ${dbEnum.enum_type} to ${name}`);
         const factory = new EnumFactory().setName(name);
-        if (modified)
+        if (modified || options.alwaysMap)
             factory.addAttribute((builder) =>
                 builder
                     .setDecl(getAttributeRef('@@map', services))
@@ -33,10 +33,10 @@ export function syncEnums({
             );
 
         dbEnum.values.forEach((v) => {
-            const { name, modified } = resolveNameCasing(options, v);
+            const { name, modified } = resolveNameCasing(options.fieldCasing, v);
             factory.addField((builder) => {
                 builder.setName(name);
-                if (modified)
+                if (modified || options.alwaysMap)
                     builder.addAttribute((builder) =>
                         builder
                             .setDecl(getAttributeRef('@map', services))
@@ -64,10 +64,11 @@ export function syncEnums({
     }
 }
 
-function resolveNameCasing(options: PullOptions, originalName: string) {
+function resolveNameCasing(casing: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none', originalName: string) {
     let name = originalName;
+    const fieldPrefix = /[0-9]/g.test(name.charAt(0)) ? '_' : '';
 
-    switch (options.naming) {
+    switch (casing) {
         case 'pascal':
             name = toPascalCase(originalName);
             break;
@@ -83,8 +84,8 @@ function resolveNameCasing(options: PullOptions, originalName: string) {
     }
 
     return {
-        modified: options.alwaysMap ? true : name !== originalName,
-        name,
+        modified: name !== originalName || fieldPrefix !== '',
+        name: `${fieldPrefix}${name}`,
     };
 }
 
@@ -163,13 +164,13 @@ export function syncTable({
     }
 
     const relations: Relation[] = [];
-    const { name, modified } = resolveNameCasing({ ...options, naming: 'pascal' }, table.name);
+    const { name, modified } = resolveNameCasing(options.modelCasing, table.name);
     const multiPk = table.columns.filter((c) => c.pk).length > 1;
 
     const modelFactory = new DataModelFactory().setName(name).setIsView(table.type === 'view');
     modelFactory.setContainer(model);
 
-    if (modified) {
+    if (modified || options.alwaysMap) {
         modelFactory.addAttribute((builder) =>
             builder.setDecl(tableMapAttribute).addArg((argBuilder) => argBuilder.StringLiteral.setValue(table.name)),
         );
@@ -195,10 +196,7 @@ export function syncTable({
             });
         }
 
-        const fieldPrefix = /[0-9]/g.test(column.name.charAt(0)) ? '_' : '';
-        const { name: _name, modified: _modified } = resolveNameCasing(options, column.name);
-        const name = `${fieldPrefix}${_name}`;
-        const modified = fieldPrefix !== '' || _modified;
+        const { name, modified } = resolveNameCasing(options.fieldCasing, column.name);
 
         const builtinType = provider.getBuiltinType(column.datatype);
 
@@ -252,7 +250,7 @@ export function syncTable({
                     return b;
                 });
             }
-            if (modified) {
+            if (modified || options.alwaysMap) {
                 builder.addAttribute((ab) =>
                     ab.setDecl(fieldMapAttribute).addArg((ab) => ab.StringLiteral.setValue(column.name)),
                 );

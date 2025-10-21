@@ -6,7 +6,6 @@ import {
     TableNode,
     type Expression,
     type ExpressionBuilder,
-    type ExpressionWrapper,
     type OperationNode,
 } from 'kysely';
 import { match } from 'ts-pattern';
@@ -15,7 +14,6 @@ import { extractFields } from '../utils/object-utils';
 import type { AGGREGATE_OPERATORS } from './constants';
 import type { OrderBy } from './crud-types';
 import { InternalError, QueryError } from './errors';
-import type { ClientOptions } from './options';
 
 export function hasModel(schema: SchemaDef, model: string) {
     return Object.keys(schema.models)
@@ -178,34 +176,6 @@ export function getIdValues(schema: SchemaDef, model: string, data: any): Record
         throw new InternalError(`ID fields not defined for model "${model}"`);
     }
     return idFields.reduce((acc, field) => ({ ...acc, [field]: data[field] }), {});
-}
-
-export function buildFieldRef<Schema extends SchemaDef>(
-    schema: Schema,
-    model: string,
-    field: string,
-    options: ClientOptions<Schema>,
-    eb: ExpressionBuilder<any, any>,
-    modelAlias?: string,
-    inlineComputedField = true,
-): ExpressionWrapper<any, any, unknown> {
-    const fieldDef = requireField(schema, model, field);
-    if (!fieldDef.computed) {
-        return eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
-    } else {
-        if (!inlineComputedField) {
-            return eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
-        }
-        let computer: Function | undefined;
-        if ('computedFields' in options) {
-            const computedFields = options.computedFields as Record<string, any>;
-            computer = computedFields?.[model]?.[field];
-        }
-        if (!computer) {
-            throw new QueryError(`Computed field "${field}" implementation not provided for model "${model}"`);
-        }
-        return computer(eb, { modelAlias });
-    }
 }
 
 export function fieldHasDefaultValue(fieldDef: FieldDef) {

@@ -32,10 +32,9 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
         query = this.dialect.buildSkipTake(query, skip, take);
 
         // orderBy
-        if (parsedArgs.orderBy) {
-            query = this.dialect.buildOrderBy(query, this.model, this.model, parsedArgs.orderBy, negateOrderBy);
-        }
+        query = this.dialect.buildOrderBy(query, this.model, this.model, parsedArgs.orderBy, negateOrderBy);
 
+        // having
         if (parsedArgs.having) {
             query = query.having(() => this.dialect.buildFilter(this.model, this.model, parsedArgs.having));
         }

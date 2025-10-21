@@ -294,7 +294,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     @check('@@index')
     @check('@@unique')
     // @ts-expect-error
-    private _checkUnique(attr: AttributeApplication, accept: ValidationAcceptor) {
+    private _checkConstraint(attr: AttributeApplication, accept: ValidationAcceptor) {
         const fields = attr.args[0]?.value;
         const attrName = attr.decl.ref?.name;
         if (!fields) {

@@ -55,7 +55,8 @@ export function syncEnums({
                         .addArg((a) => a.StringLiteral.setValue(dbEnum.schema_name)),
                 );
             }
-        } catch (_error: unknown) {
+        } catch (error: any) {
+            if (error?.message !== `Declaration not found: @@schema`) throw error;
             //Waiting to support multi-schema
             //TODO: remove catch after multi-schema support is implemented
         }
@@ -362,7 +363,8 @@ export function syncTable({
                 b.setDecl(getAttributeRef('@@schema', services)).addArg((a) => a.StringLiteral.setValue(table.schema)),
             );
         }
-    } catch (_error: unknown) {
+    } catch (error: any) {
+        if (error?.message !== `Declaration not found: @@schema`) throw error;
         //Waiting to support multi-schema
         //TODO: remove catch after multi-schema support is implemented
     }

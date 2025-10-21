@@ -1,9 +1,15 @@
 import type { ZModelServices } from '@zenstackhq/language';
-import { isEnum, type DataField, type DataModel, type Enum, type Model } from '@zenstackhq/language/ast';
-import { DataFieldFactory, DataModelFactory, EnumFactory } from '@zenstackhq/language/factory';
+import { isEnum, type DataField, type DataModel, type Enum, type Model, Attribute } from '@zenstackhq/language/ast';
+import {
+    DataFieldFactory,
+    DataModelFactory,
+    EnumFactory,
+    ModelFactory,
+    DataFieldAttributeFactory,
+} from '@zenstackhq/language/factory';
 import type { PullOptions } from '../db';
-import type { IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider';
-import { getAttributeRef, getDbName } from './utils';
+import type { IntrospectedEnum, IntrospectedTable, IntrospectionProvider, Cascade } from './provider';
+import { getAttributeRef, getDbName, getEnumRef } from './utils';
 
 export function syncEnums({
     dbEnums,
@@ -111,6 +117,8 @@ export type Relation = {
     column: string;
     type: 'one' | 'many';
     fk_name: string;
+    foreign_key_on_update: Cascade;
+    foreign_key_on_delete: Cascade;
     nullable: boolean;
     references: {
         schema: string | null;
@@ -176,6 +184,8 @@ export function syncTable({
                 column: column.name,
                 type: 'one',
                 fk_name: column.foreign_key_name!,
+                foreign_key_on_delete: column.foreign_key_on_delete,
+                foreign_key_on_update: column.foreign_key_on_update,
                 nullable: column.nullable,
                 references: {
                     schema: column.foreign_key_schema,
@@ -187,8 +197,9 @@ export function syncTable({
         }
 
         const fieldPrefix = /[0-9]/g.test(column.name.charAt(0)) ? '_' : '';
-        const { name: _name, modified } = resolveNameCasing(options, column.name);
+        const { name: _name, modified: _modified } = resolveNameCasing(options, column.name);
         const name = `${fieldPrefix}${_name}`;
+        const modified = fieldPrefix !== '' || _modified;
 
         const builtinType = provider.getBuiltinType(column.datatype);
 
@@ -198,21 +209,22 @@ export function syncTable({
                 typeBuilder.setArray(builtinType.isArray);
                 typeBuilder.setOptional(column.nullable);
 
-                if (builtinType.type !== 'Unsupported') {
-                    typeBuilder.setType(builtinType.type);
-                } else {
-                    typeBuilder.setUnsupported((unsupportedBuilder) =>
-                        unsupportedBuilder.setValue((lt) => lt.StringLiteral.setValue(column.datatype)),
-                    );
-                }
-
                 if (column.options.length > 0) {
                     const ref = model.declarations.find((d) => isEnum(d) && getDbName(d) === column.datatype) as
                         | Enum
                         | undefined;
 
-                    if (ref) {
-                        typeBuilder.setReference(ref);
+                    if (!ref) {
+                        throw new Error(`Enum ${column.datatype} not found`);
+                    }
+                    typeBuilder.setReference(ref);
+                } else {
+                    if (builtinType.type !== 'Unsupported') {
+                        typeBuilder.setType(builtinType.type);
+                    } else {
+                        typeBuilder.setUnsupported((unsupportedBuilder) =>
+                            unsupportedBuilder.setValue((lt) => lt.StringLiteral.setValue(column.datatype)),
+                        );
                     }
                 }
 
@@ -220,14 +232,12 @@ export function syncTable({
             });
 
             if (column.default) {
-                const defaultValuesAttrs = column.default
-                    ? provider.getDefaultValue({
-                          fieldName: column.name,
-                          defaultValue: column.default,
-                          services,
-                          enums: model.declarations.filter((d) => d.$type === 'Enum') as Enum[],
-                      })
-                    : [];
+                const defaultValuesAttrs = provider.getDefaultValue({
+                    fieldName: column.name,
+                    defaultValue: column.default,
+                    services,
+                    enums: model.declarations.filter((d) => d.$type === 'Enum') as Enum[],
+                });
                 defaultValuesAttrs.forEach(builder.addAttribute.bind(builder));
             }
 
@@ -235,17 +245,31 @@ export function syncTable({
                 builder.addAttribute((b) => b.setDecl(idAttribute));
             }
 
-            if (column.unique)
+            if (column.unique && !column.pk) {
                 builder.addAttribute((b) => {
                     b.setDecl(uniqueAttribute);
                     if (column.unique_name) b.addArg((ab) => ab.StringLiteral.setValue(column.unique_name!), 'map');
 
                     return b;
                 });
-            if (modified)
+            }
+            if (modified) {
                 builder.addAttribute((ab) =>
-                    ab.setDecl(fieldMapAttribute).addArg((ab) => ab.StringLiteral.setValue(column.name), 'name'),
+                    ab.setDecl(fieldMapAttribute).addArg((ab) => ab.StringLiteral.setValue(column.name)),
                 );
+            }
+
+            const dbAttr = services.shared.workspace.IndexManager.allElements('Attribute').find(
+                (d) => d.name.toLowerCase() === `@db.${column.datatype.toLowerCase()}`,
+            )?.node as Attribute | undefined;
+            //TODO: exclude default types like text in postgres
+            //because Zenstack string = text in postgres so unnecessary to map to default types
+            if (dbAttr && !['text'].includes(column.datatype)) {
+                const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
+                if (column.length || column.precision)
+                    dbAttrFactory.addArg((a) => a.NumberLiteral.setValue(column.length! || column.precision!));
+                builder.addAttribute(dbAttrFactory);
+            }
 
             return builder;
         });
@@ -282,6 +306,11 @@ export function syncTable({
                 });
                 return arrayExpr;
             }),
+        );
+    } else {
+        modelFactory.addAttribute((a) => a.setDecl(getAttributeRef('@@ignore', services)));
+        modelFactory.comments.push(
+            '/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Zenstack Client.',
         );
     }
 
@@ -337,8 +366,8 @@ export function syncTable({
             );
         }
     } catch (_error: unknown) {
-      //Waiting to support multi-schema
-      //TODO: remove catch after multi-schema support is implemented
+        //Waiting to support multi-schema
+        //TODO: remove catch after multi-schema support is implemented
     }
 
     model.declarations.push(modelFactory.node);
@@ -350,17 +379,24 @@ export function syncRelation({
     model,
     relation,
     services,
+    selfRelation,
+    simmilarRelations,
 }: {
     model: Model;
     relation: Relation;
     services: ZModelServices;
     options: PullOptions;
+    //self included
+    simmilarRelations: number;
+    selfRelation: boolean;
 }) {
     const idAttribute = getAttributeRef('@id', services);
     const uniqueAttribute = getAttributeRef('@unique', services);
     const relationAttribute = getAttributeRef('@relation', services);
     const fieldMapAttribute = getAttributeRef('@map', services);
     const tableMapAttribute = getAttributeRef('@@map', services);
+
+    const includeRelationName = selfRelation || simmilarRelations > 1;
 
     if (!idAttribute || !uniqueAttribute || !relationAttribute || !fieldMapAttribute || !tableMapAttribute) {
         throw new Error('Cannot find required attributes in the model.');
@@ -382,11 +418,9 @@ export function syncRelation({
     const targetField = targetModel.fields.find((f) => getDbName(f) === relation.references.column);
     if (!targetField) return;
 
-    //TODO: Finish relation sync
-
     const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : '';
 
-    const relationName = `${sourceModel.name}_${relation.column}To${targetModel.name}_${relation.references.column}`;
+    const relationName = `${relation.table}${simmilarRelations > 1 ? `_${relation.column}` : ''}To${relation.references.table}`;
     let sourceFieldName = `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`;
 
     if (sourceModel.fields.find((f) => f.name === sourceFieldName)) {
@@ -402,14 +436,38 @@ export function syncRelation({
                 .setArray(relation.type === 'many')
                 .setReference(targetModel),
         )
-        .addAttribute((ab) =>
-            ab
-                .setDecl(relationAttribute)
-                .addArg((ab) => ab.StringLiteral.setValue(relationName))
-                .addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(sourceField)), 'fields')
-                .addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(targetField)), 'references')
-                .addArg((ab) => ab.StringLiteral.setValue(relation.fk_name), 'map'),
-        );
+        .addAttribute((ab) => {
+            ab.setDecl(relationAttribute);
+            if (includeRelationName) ab.addArg((ab) => ab.StringLiteral.setValue(relationName));
+            ab.addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(sourceField)), 'fields').addArg(
+                (ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(targetField)),
+                'references',
+            );
+
+            if (relation.foreign_key_on_delete && relation.foreign_key_on_delete !== 'SET NULL') {
+                const enumRef = getEnumRef('ReferentialAction', services);
+                if (!enumRef) throw new Error('ReferentialAction enum not found');
+                const enumFieldRef = enumRef.fields.find(
+                    (f) => f.name.toLowerCase() === relation.foreign_key_on_delete!.replace(/ /g, '').toLowerCase(),
+                );
+                if (!enumFieldRef) throw new Error(`ReferentialAction ${relation.foreign_key_on_delete} not found`);
+                ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onDelete');
+            }
+
+            if (relation.foreign_key_on_update && relation.foreign_key_on_update !== 'SET NULL') {
+                const enumRef = getEnumRef('ReferentialAction', services);
+                if (!enumRef) throw new Error('ReferentialAction enum not found');
+                const enumFieldRef = enumRef.fields.find(
+                    (f) => f.name.toLowerCase() === relation.foreign_key_on_update!.replace(/ /g, '').toLowerCase(),
+                );
+                if (!enumFieldRef) throw new Error(`ReferentialAction ${relation.foreign_key_on_update} not found`);
+                ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onUpdate');
+            }
+
+            ab.addArg((ab) => ab.StringLiteral.setValue(relation.fk_name), 'map');
+
+            return ab;
+        });
 
     sourceModel.fields.push(sourceFieldFactory.node);
 
@@ -427,8 +485,11 @@ export function syncRelation({
                 .setOptional(relation.references.type === 'one')
                 .setArray(relation.references.type === 'many')
                 .setReference(sourceModel),
-        )
-        .addAttribute((ab) => ab.setDecl(relationAttribute).addArg((ab) => ab.StringLiteral.setValue(relationName)));
+        );
+    if (includeRelationName)
+        targetFieldFactory.addAttribute((ab) =>
+            ab.setDecl(relationAttribute).addArg((ab) => ab.StringLiteral.setValue(relationName)),
+        );
 
     targetModel.fields.push(targetFieldFactory.node);
 }

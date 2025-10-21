@@ -1,4 +1,4 @@
-import { Model, Enum, DataModel } from '@zenstackhq/language/ast';
+import { Model, Enum, DataModel, DataField } from '@zenstackhq/language/ast';
 import { ZModelCodeGenerator } from '@zenstackhq/sdk';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,7 +6,7 @@ import { execPrisma } from '../utils/exec-utils';
 import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError, requireDataSourceUrl, loadSchemaDocumentWithServices } from './action-utils';
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers } from './pull/provider';
-import { getDatasource, getDbName } from './pull/utils';
+import { getDatasource, getDbName, getRelationFkName } from './pull/utils';
 import { config } from '@dotenvx/dotenvx';
 
 type PushOptions = {
@@ -20,7 +20,7 @@ export type PullOptions = {
     out?: string;
     naming?: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none';
     alwaysMap?: boolean;
-    excludeSchemas: string[];
+    excludeSchemas?: string[];
 };
 
 /**
@@ -91,8 +91,8 @@ async function runPull(options: PullOptions) {
         }
 
         const { enums: allEnums, tables: allTables } = await provider.introspect(datasource.url);
-        const enums = allEnums.filter((e) => !options.excludeSchemas.includes(e.schema_name));
-        const tables = allTables.filter((t) => !options.excludeSchemas.includes(t.schema));
+        const enums = allEnums.filter((e) => !options.excludeSchemas?.includes(e.schema_name));
+        const tables = allTables.filter((t) => !options.excludeSchemas?.includes(t.schema));
 
         const newModel: Model = {
             $type: 'Model',
@@ -112,7 +112,28 @@ async function runPull(options: PullOptions) {
         }
 
         for (const relation of resolvedRelations) {
-            syncRelation({ model: newModel, relation, services, options });
+            const simmilarRelations = resolvedRelations.filter((rr) => {
+                return (
+                    (rr.schema === relation.schema &&
+                        rr.table === relation.table &&
+                        rr.references.schema === relation.references.schema &&
+                        rr.references.table === relation.references.table) ||
+                    (rr.schema === relation.references.schema &&
+                        rr.column === relation.references.column &&
+                        rr.references.schema === relation.schema &&
+                        rr.references.table === relation.table)
+                );
+            }).length;
+            const selfRelation =
+                relation.references.schema === relation.schema && relation.references.table === relation.table;
+            syncRelation({
+                model: newModel,
+                relation,
+                services,
+                options,
+                selfRelation,
+                simmilarRelations,
+            });
         }
 
         const cwd = new URL(`file://${process.cwd()}`).pathname;
@@ -120,40 +141,6 @@ async function runPull(options: PullOptions) {
             .filter(({ uri }) => uri.path.toLowerCase().startsWith(cwd.toLowerCase()))
             .toArray();
         const docsSet = new Set(docs.map((d) => d.uri.toString()));
-        console.log(docsSet);
-        newModel.declarations
-            .filter((d) => [DataModel, Enum].includes(d.$type))
-            .forEach((_declaration) => {
-                const declaration = _declaration as DataModel | Enum;
-                const declarations = services.shared.workspace.IndexManager.allElements(declaration.$type, docsSet);
-                const originalModel = declarations.find((d) => getDbName(d.node as any) === getDbName(declaration))
-                    ?.node as DataModel | Enum | undefined;
-                if (!originalModel) {
-                    model.declarations.push(declaration);
-                    (declaration as any).$container = model;
-                    return;
-                }
-
-                declaration.fields.forEach((f) => {
-                    const originalField = originalModel.fields.find((d) => getDbName(d) === getDbName(f));
-
-                    if (!originalField) {
-                        console.log(`Added field ${f.name} to ${originalModel.name}`);
-                        (f as any).$container = originalModel;
-                        originalModel.fields.push(f as any);
-                        return;
-                    }
-                    //TODO: update field
-                });
-                originalModel.fields
-                    .filter((f) => !declaration.fields.find((d) => getDbName(d) === getDbName(f)))
-                    .forEach((f) => {
-                        const model = f.$container;
-                        const index = model.fields.findIndex((d) => d === f);
-                        model.fields.splice(index, 1);
-                        console.log(`Delete field ${f.name}`);
-                    });
-            });
 
         services.shared.workspace.IndexManager.allElements('DataModel', docsSet)
             .filter(
@@ -178,6 +165,117 @@ async function runPull(options: PullOptions) {
                 console.log(`Delete enum ${decl.name}`);
             });
 
+        newModel.declarations
+            .filter((d) => [DataModel, Enum].includes(d.$type))
+            .forEach((_declaration) => {
+                const declaration = _declaration as DataModel | Enum;
+                const declarations = services.shared.workspace.IndexManager.allElements(
+                    declaration.$type,
+                    docsSet,
+                ).toArray();
+                const originalModel = declarations.find((d) => getDbName(d.node as any) === getDbName(declaration))
+                    ?.node as DataModel | Enum | undefined;
+                if (!originalModel) {
+                    model.declarations.push(declaration);
+                    (declaration as any).$container = model;
+                    declaration.fields.forEach((f) => {
+                        if (f.$type === 'DataField' && f.type.reference?.ref) {
+                            const ref = declarations.find(
+                                (d) => getDbName(d.node as any) === getDbName(f.type.reference!.ref as any),
+                            )?.node;
+                            if (ref) (f.type.reference.ref as any) = ref;
+                        }
+                    });
+                    return;
+                }
+
+                declaration.fields.forEach((f) => {
+                    const originalField = originalModel.fields.find(
+                        (d) =>
+                            getDbName(d) === getDbName(f) ||
+                            (getRelationFkName(d as any) === getRelationFkName(f as any) &&
+                                !!getRelationFkName(d as any) &&
+                                !!getRelationFkName(f as any)),
+                    );
+
+                    if (!originalField) {
+                        //console.log(`Added field ${f.name} to ${originalModel.name}`);
+                        (f as any).$container = originalModel;
+                        originalModel.fields.push(f as any);
+                        if (f.$type === 'DataField' && f.type.reference?.ref) {
+                            const ref = declarations.find(
+                                (d) => getDbName(d.node as any) === getDbName(f.type.reference!.ref as any),
+                            )?.node as DataModel | undefined;
+                            if (ref) {
+                                (f.type.reference.$refText as any) = ref.name;
+                                (f.type.reference.ref as any) = ref;
+                            }
+                        }
+                        return;
+                    }
+
+                    if (originalField.$type === 'DataField') {
+                        const field = f as DataField;
+                        originalField.type = field.type;
+                        if (field.type.reference) {
+                            const ref = declarations.find(
+                                (d) => getDbName(d.node as any) === getDbName(field.type.reference!.ref as any),
+                            )?.node as DataModel | undefined;
+                            if (ref) {
+                                (field.type.reference.$refText as any) = ref.name;
+                                (field.type.reference.ref as any) = ref;
+                            }
+                        }
+
+                        (originalField.type.$container as any) = originalField;
+                    }
+
+                    f.attributes.forEach((attr) => {
+                        const originalAttribute = originalField.attributes.find(
+                            (d) => d.decl.$refText === attr.decl.$refText,
+                        );
+
+                        if (!originalAttribute) {
+                            //console.log(`Added Attribute ${attr.decl.$refText} to ${f.name}`);
+                            (f as any).$container = originalField;
+                            originalField.attributes.push(attr as any);
+                            return;
+                        }
+
+                        originalAttribute.args = attr.args;
+                        attr.args.forEach((a) => {
+                            (a.$container as any) = originalAttribute;
+                        });
+                    });
+
+                    originalField.attributes
+                        .filter((attr) => !f.attributes.find((d) => d.decl.$refText === attr.decl.$refText))
+                        .forEach((attr) => {
+                            const field = attr.$container;
+                            const index = field.attributes.findIndex((d) => d === attr);
+                            field.attributes.splice(index, 1);
+                            //console.log(`Delete attribute from field:${field.name} ${attr.decl.$refText}`);
+                        });
+                });
+                originalModel.fields
+                    .filter(
+                        (f) =>
+                            !declaration.fields.find(
+                                (d) =>
+                                    getDbName(d) === getDbName(f) ||
+                                    (getRelationFkName(d as any) === getRelationFkName(f as any) &&
+                                        !!getRelationFkName(d as any) &&
+                                        !!getRelationFkName(f as any)),
+                            ),
+                    )
+                    .forEach((f) => {
+                        const model = f.$container;
+                        const index = model.fields.findIndex((d) => d === f);
+                        model.fields.splice(index, 1);
+                        //console.log(`Delete field ${f.name}`);
+                    });
+            });
+
         if (options.out && !fs.lstatSync(options.out).isFile()) {
             throw new Error(`Output path ${options.out} is not a file`);
         }
@@ -185,6 +283,7 @@ async function runPull(options: PullOptions) {
         const generator = new ZModelCodeGenerator({
             //TODO: make configurable
             quote: 'double',
+            indent: 2,
         });
 
         if (options.out) {

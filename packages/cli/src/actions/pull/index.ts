@@ -1,14 +1,13 @@
 import type { ZModelServices } from '@zenstackhq/language';
-import { isEnum, type DataField, type DataModel, type Enum, type Model, Attribute } from '@zenstackhq/language/ast';
+import { Attribute, isEnum, type DataField, type DataModel, type Enum, type Model } from '@zenstackhq/language/ast';
 import {
-    DataFieldFactory,
-    DataModelFactory,
-    EnumFactory,
-    ModelFactory,
-    DataFieldAttributeFactory,
+  DataFieldAttributeFactory,
+  DataFieldFactory,
+  DataModelFactory,
+  EnumFactory
 } from '@zenstackhq/language/factory';
 import type { PullOptions } from '../db';
-import type { IntrospectedEnum, IntrospectedTable, IntrospectionProvider, Cascade } from './provider';
+import type { Cascade, IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider';
 import { getAttributeRef, getDbName, getEnumRef } from './utils';
 
 export function syncEnums({

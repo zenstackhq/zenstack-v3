@@ -19,7 +19,6 @@ import { InternalError, QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
     aggregate,
-    buildFieldRef,
     buildJoinPairs,
     ensureArray,
     flattenCompoundUniqueFilters,
@@ -931,13 +930,13 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         field: string,
     ): SelectQueryBuilder<any, any, any> {
         const fieldDef = requireField(this.schema, model, field);
-        if (fieldDef.computed) {
-            // TODO: computed field from delegate base?
+
+        if (!fieldDef.originModel) {
+            // field defined on this model
             return query.select(() => this.fieldRef(model, field, modelAlias).as(field));
-        } else if (!fieldDef.originModel) {
-            // regular field
-            return query.select(this.eb.ref(`${modelAlias}.${field}`).as(field));
         } else {
+            // field defined on a delegate base, build a select with the origin model
+            // name (the model is already joined from outer query)
             return this.buildSelectField(query, fieldDef.originModel, fieldDef.originModel, field);
         }
     }
@@ -1071,7 +1070,26 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     fieldRef(model: string, field: string, modelAlias?: string, inlineComputedField = true) {
-        return buildFieldRef(this.schema, model, field, this.options, this.eb, modelAlias, inlineComputedField);
+        const fieldDef = requireField(this.schema, model, field);
+
+        if (!fieldDef.computed) {
+            // regular field
+            return this.eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
+        } else {
+            // computed field
+            if (!inlineComputedField) {
+                return this.eb.ref(modelAlias ? `${modelAlias}.${field}` : field);
+            }
+            let computer: Function | undefined;
+            if ('computedFields' in this.options) {
+                const computedFields = this.options.computedFields as Record<string, any>;
+                computer = computedFields?.[fieldDef.originModel ?? model]?.[field];
+            }
+            if (!computer) {
+                throw new QueryError(`Computed field "${field}" implementation not provided for model "${model}"`);
+            }
+            return computer(this.eb, { modelAlias });
+        }
     }
 
     protected canJoinWithoutNestedSelect(

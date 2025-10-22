@@ -2,6 +2,7 @@ import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { Client } from 'pg';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
+import type { BuiltinType } from '@zenstackhq/language/ast';
 
 export const postgresql: IntrospectionProvider = {
     getBuiltinType(type) {
@@ -77,6 +78,28 @@ export const postgresql: IntrospectionProvider = {
             enums,
             tables,
         };
+    },
+    getDefaultDatabaseType(type: BuiltinType) {
+        switch (type) {
+            case 'String':
+                return { type: 'text' };
+            case 'Boolean':
+                return { type: 'boolean' };
+            case 'Int':
+                return { type: 'integer' };
+            case 'BigInt':
+                return { type: 'bigint' };
+            case 'Float':
+                return { type: 'double precision' };
+            case 'Decimal':
+                return { type: 'decimal' };
+            case 'DateTime':
+                return { type: 'timestamp', precisition: 3 };
+            case 'Json':
+                return { type: 'jsonb' };
+            case 'Bytes':
+                return { type: 'bytea' };
+        }
     },
     getDefaultValue({ defaultValue, fieldName, services, enums }) {
         const val = defaultValue.trim();
@@ -276,7 +299,7 @@ SELECT
           ),
           '[]'
         ) AS "options"
-      
+
             FROM "pg_catalog"."pg_attribute" AS "att"
 
             INNER JOIN "pg_catalog"."pg_type" AS "typ" ON "typ"."oid" = "att"."atttypid"

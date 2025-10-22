@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '@zenstackhq/runtime';
-import { schema } from '../schemas/basic';
 import { createTestClient } from '@zenstackhq/testtools';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { schema } from '../schemas/basic';
 
 describe('Client upsert tests', () => {
     let client: ClientContract<typeof schema>;
@@ -35,22 +35,22 @@ describe('Client upsert tests', () => {
         });
 
         // update
-        await expect(
-            client.user.upsert({
-                where: { id: '1' },
-                create: {
-                    id: '2',
-                    email: 'u2@test.com',
-                    name: 'New',
-                },
-                update: { name: 'Updated' },
-                include: { profile: true },
-            }),
-        ).resolves.toMatchObject({
+        const r = await client.user.upsert({
+            where: { id: '1' },
+            create: {
+                id: '2',
+                email: 'u2@test.com',
+                name: 'New',
+            },
+            update: { name: 'Updated' },
+            select: { id: true, name: true },
+        });
+        expect(r).toMatchObject({
             id: '1',
             name: 'Updated',
-            profile: { bio: 'My bio' },
         });
+        // @ts-expect-error
+        expect(r.email).toBeUndefined();
 
         // id update
         await expect(
@@ -66,6 +66,7 @@ describe('Client upsert tests', () => {
         ).resolves.toMatchObject({
             id: '3',
             name: 'Updated',
+            email: 'u1@test.com',
         });
     });
 });

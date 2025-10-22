@@ -25,26 +25,39 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
     }
 
     private async runUpdate(args: UpdateArgs<Schema, GetModels<Schema>>) {
-        const readBackResult = await this.safeTransaction(async (tx) => {
-            const updateResult = await this.update(tx, this.model, args.where, args.data);
-            // updated can be undefined if there's nothing to update, in that case we'll use the original
-            // filter to read back the entity
-            const readFilter = updateResult ?? args.where;
-            let readBackResult: any = undefined;
-            try {
+        // analyze if we need to read back the update record, or just return the updated result
+        const { needReadBack, selectedFields } = this.needReadBack(args);
+
+        const result = await this.safeTransaction(async (tx) => {
+            const updateResult = await this.update(
+                tx,
+                this.model,
+                args.where,
+                args.data,
+                undefined,
+                undefined,
+                undefined,
+                selectedFields,
+            );
+
+            if (needReadBack) {
+                // updated can be undefined if there's nothing to update, in that case we'll use the original
+                // filter to read back the entity
+                const readFilter = updateResult ?? args.where;
+                let readBackResult: any = undefined;
                 readBackResult = await this.readUnique(tx, this.model, {
                     select: args.select,
                     include: args.include,
                     omit: args.omit,
                     where: readFilter as WhereInput<Schema, GetModels<Schema>, false>,
                 });
-            } catch {
-                // commit the update even if read-back failed
+                return readBackResult;
+            } else {
+                return updateResult;
             }
-            return readBackResult;
         });
 
-        if (!readBackResult) {
+        if (!result) {
             // update succeeded but result cannot be read back
             if (this.hasPolicyEnabled) {
                 // if access policy is enabled, we assume it's due to read violation (not guaranteed though)
@@ -59,7 +72,7 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
                 return null;
             }
         } else {
-            return readBackResult;
+            return result;
         }
     }
 
@@ -75,17 +88,34 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             return [];
         }
 
-        const { readBackResult, updateResult } = await this.safeTransaction(async (tx) => {
-            const updateResult = await this.updateMany(tx, this.model, args.where, args.data, args.limit, true);
-            const readBackResult = await this.read(tx, this.model, {
-                select: args.select,
-                omit: args.omit,
-                where: {
-                    OR: updateResult.map((item) => getIdValues(this.schema, this.model, item) as any),
-                } as any, // TODO: fix type
-            });
+        // analyze if we need to read back the updated record, or just return the update result
+        const { needReadBack, selectedFields } = this.needReadBack(args);
 
-            return { readBackResult, updateResult };
+        const { readBackResult, updateResult } = await this.safeTransaction(async (tx) => {
+            const updateResult = await this.updateMany(
+                tx,
+                this.model,
+                args.where,
+                args.data,
+                args.limit,
+                true,
+                undefined,
+                selectedFields,
+            );
+
+            if (needReadBack) {
+                const readBackResult = await this.read(tx, this.model, {
+                    select: args.select,
+                    omit: args.omit,
+                    where: {
+                        OR: updateResult.map((item) => getIdValues(this.schema, this.model, item) as any),
+                    } as any, // TODO: fix type
+                });
+
+                return { readBackResult, updateResult };
+            } else {
+                return { readBackResult: updateResult, updateResult };
+            }
         });
 
         if (readBackResult.length < updateResult.length && this.hasPolicyEnabled) {
@@ -101,6 +131,9 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
     }
 
     private async runUpsert(args: UpsertArgs<Schema, GetModels<Schema>>) {
+        // analyze if we need to read back the updated record, or just return the update result
+        const { needReadBack, selectedFields } = this.needReadBack(args);
+
         const result = await this.safeTransaction(async (tx) => {
             let mutationResult: unknown = await this.update(
                 tx,
@@ -110,23 +143,28 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
                 undefined,
                 true,
                 false,
+                selectedFields,
             );
 
             if (!mutationResult) {
                 // non-existing, create
-                mutationResult = await this.create(tx, this.model, args.create);
+                mutationResult = await this.create(tx, this.model, args.create, undefined, undefined, selectedFields);
             }
 
-            return this.readUnique(tx, this.model, {
-                select: args.select,
-                include: args.include,
-                omit: args.omit,
-                where: getIdValues(this.schema, this.model, mutationResult) as WhereInput<
-                    Schema,
-                    GetModels<Schema>,
-                    false
-                >,
-            });
+            if (needReadBack) {
+                return this.readUnique(tx, this.model, {
+                    select: args.select,
+                    include: args.include,
+                    omit: args.omit,
+                    where: getIdValues(this.schema, this.model, mutationResult) as WhereInput<
+                        Schema,
+                        GetModels<Schema>,
+                        false
+                    >,
+                });
+            } else {
+                return mutationResult;
+            }
         });
 
         if (!result && this.hasPolicyEnabled) {
@@ -138,5 +176,32 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
         }
 
         return result;
+    }
+
+    private needReadBack(args: any) {
+        const baseResult = this.mutationNeedsReadBack(this.model, args);
+        if (baseResult.needReadBack) {
+            return baseResult;
+        }
+
+        // further check if we're not updating any non-relation fields, because if so,
+        // SQL "returning" is not effective, we need to always read back
+
+        const modelDef = this.requireModel(this.model);
+        const nonRelationFields = Object.entries(modelDef.fields)
+            .filter(([_, def]) => !def.relation)
+            .map(([name, _]) => name);
+
+        // update/updateMany payload
+        if (args.data && !Object.keys(args.data).some((field) => nonRelationFields.includes(field))) {
+            return { needReadBack: true, selectedFields: undefined };
+        }
+
+        // upsert payload
+        if (args.update && !Object.keys(args.update).some((field: string) => nonRelationFields.includes(field))) {
+            return { needReadBack: true, selectedFields: undefined };
+        }
+
+        return baseResult;
     }
 }

@@ -7,6 +7,7 @@ import {
     UpdateResult,
     type Compilable,
     type IsolationLevel,
+    type QueryResult,
     type SelectQueryBuilder,
 } from 'kysely';
 import { nanoid } from 'nanoid';
@@ -248,6 +249,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         data: any,
         fromRelation?: FromRelationContext<Schema>,
         creatingForDelegate = false,
+        returnFields?: string[],
     ): Promise<unknown> {
         const modelDef = this.requireModel(model);
 
@@ -339,12 +341,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         const updatedData = this.fillGeneratedAndDefaultValues(modelDef, createFields);
-        const idFields = requireIdFields(this.schema, model);
+
+        // return id fields if no returnFields specified
+        returnFields = returnFields ?? requireIdFields(this.schema, model);
+
         const query = kysely
             .insertInto(model)
             .$if(Object.keys(updatedData).length === 0, (qb) => qb.defaultValues())
             .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
-            .returning(idFields as any)
+            .returning(returnFields as any)
             .modifyEnd(
                 this.makeContextComment({
                     model,
@@ -661,6 +666,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         input: { data: any; skipDuplicates?: boolean },
         returnData: ReturnData,
         fromRelation?: FromRelationContext<Schema>,
+        fieldsToReturn?: string[],
     ): Promise<Result> {
         if (!input.data || (Array.isArray(input.data) && input.data.length === 0)) {
             // nothing todo
@@ -763,8 +769,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const result = await this.executeQuery(kysely, query, 'createMany');
             return { count: Number(result.numAffectedRows) } as Result;
         } else {
-            const idFields = requireIdFields(this.schema, model);
-            const result = await query.returning(idFields as any).execute();
+            fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
+            const result = await query.returning(fieldsToReturn as any).execute();
             return result as Result;
         }
     }
@@ -899,6 +905,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fromRelation?: FromRelationContext<Schema>,
         allowRelationUpdate = true,
         throwIfNotFound = true,
+        fieldsToReturn?: string[],
     ): Promise<unknown> {
         if (!data || typeof data !== 'object') {
             throw new InternalError('data must be an object');
@@ -1044,12 +1051,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             // nothing to update, return the filter so that the caller can identify the entity
             return combinedWhere;
         } else {
-            const idFields = requireIdFields(this.schema, model);
+            fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
             const query = kysely
                 .updateTable(model)
                 .where(() => this.dialect.buildFilter(model, model, combinedWhere))
                 .set(updateFields)
-                .returning(idFields as any)
+                .returning(fieldsToReturn as any)
                 .modifyEnd(
                     this.makeContextComment({
                         model,
@@ -1058,16 +1065,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 );
 
             const updatedEntity = await this.executeQueryTakeFirst(kysely, query, 'update');
-
-            // try {
-            //     updatedEntity = await this.executeQueryTakeFirst(kysely, query, 'update');
-            // } catch (err) {
-            //     const { sql, parameters } = query.compile();
-            //     throw new QueryError(
-            //         `Error during update: ${err}, sql: ${sql}, parameters: ${parameters}`
-            //     );
-            // }
-
             if (!updatedEntity) {
                 if (throwIfNotFound) {
                     throw new NotFoundError(model);
@@ -1214,6 +1211,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         limit: number | undefined,
         returnData: ReturnData,
         filterModel?: GetModels<Schema>,
+        fieldsToReturn?: string[],
     ): Promise<Result> {
         if (typeof data !== 'object') {
             throw new InternalError('data must be an object');
@@ -1302,8 +1300,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const result = await this.executeQuery(kysely, query, 'update');
             return { count: Number(result.numAffectedRows) } as Result;
         } else {
-            const idFields = requireIdFields(this.schema, model);
-            const finalQuery = query.returning(idFields as any);
+            fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
+            const finalQuery = query.returning(fieldsToReturn as any);
             const result = await this.executeQuery(kysely, finalQuery, 'update');
             return result.rows as Result;
         }
@@ -1861,7 +1859,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             expectedDeleteCount = deleteConditions.length;
         }
 
-        let deleteResult: { count: number };
+        let deleteResult: QueryResult<unknown>;
         let deleteFromModel: GetModels<Schema>;
         const m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
 
@@ -1926,7 +1924,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // validate result
-        if (throwForNotFound && expectedDeleteCount > deleteResult.count) {
+        if (throwForNotFound && expectedDeleteCount > deleteResult.rows.length) {
             // some entities were not deleted
             throw new NotFoundError(deleteFromModel);
         }
@@ -1944,7 +1942,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         where: any,
         limit?: number,
         filterModel?: GetModels<Schema>,
-    ): Promise<{ count: number }> {
+        fieldsToReturn?: string[],
+    ): Promise<QueryResult<unknown>> {
         filterModel ??= model;
 
         const modelDef = this.requireModel(model);
@@ -1957,7 +1956,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return this.processBaseModelDelete(kysely, modelDef.baseModel, where, limit, filterModel);
         }
 
-        let query = kysely.deleteFrom(model);
+        fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
+        let query = kysely.deleteFrom(model).returning(fieldsToReturn as any);
+
         let needIdFilter = false;
 
         if (limit !== undefined && !this.dialect.supportsDeleteWithLimit) {
@@ -1999,8 +2000,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
 
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
-        const result = await this.executeQuery(kysely, query, 'delete');
-        return { count: Number(result.numAffectedRows) };
+        return this.executeQuery(kysely, query, 'delete');
     }
 
     private async processDelegateRelationDelete(
@@ -2139,5 +2139,57 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             throw new QueryError('No rows found');
         }
         return result.rows[0];
+    }
+
+    protected mutationNeedsReadBack(model: string, args: any) {
+        if (this.hasPolicyEnabled) {
+            // TODO: refactor this check
+            // policy enforcement always requires read back
+            return { needReadBack: true, selectedFields: undefined };
+        }
+
+        if (args.include && typeof args.include === 'object' && Object.keys(args.include).length > 0) {
+            // includes present, need read back to fetch relations
+            return { needReadBack: true, selectedFields: undefined };
+        }
+
+        const modelDef = this.requireModel(model);
+
+        if (modelDef.baseModel || modelDef.isDelegate) {
+            // polymorphic model, need read back
+            return { needReadBack: true, selectedFields: undefined };
+        }
+
+        const allFields = Object.keys(modelDef.fields);
+        const relationFields = Object.values(modelDef.fields)
+            .filter((f) => f.relation)
+            .map((f) => f.name);
+        const computedFields = Object.values(modelDef.fields)
+            .filter((f) => f.computed)
+            .map((f) => f.name);
+        const omit = Object.entries(args.omit ?? {})
+            .filter(([, v]) => v)
+            .map(([k]) => k);
+
+        const allFieldsSelected: string[] = [];
+
+        if (!args.select || typeof args.select !== 'object') {
+            // all non-relation fields selected
+            allFieldsSelected.push(...allFields.filter((f) => !relationFields.includes(f) && !omit.includes(f)));
+        } else {
+            // explicit select
+            allFieldsSelected.push(
+                ...Object.entries(args.select)
+                    .filter(([k, v]) => v && !omit.includes(k))
+                    .map(([k]) => k),
+            );
+        }
+
+        if (allFieldsSelected.some((f) => relationFields.includes(f) || computedFields.includes(f))) {
+            // relation or computed field selected, need read back
+            return { needReadBack: true, selectedFields: undefined };
+        } else {
+            return { needReadBack: false, selectedFields: allFieldsSelected };
+        }
     }
 }

@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '@zenstackhq/runtime';
-import { schema } from '../schemas/basic';
 import { createTestClient } from '@zenstackhq/testtools';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { schema } from '../schemas/basic';
 
 describe('Client updateMany tests', () => {
     let client: ClientContract<typeof schema>;
@@ -87,13 +87,20 @@ describe('Client updateMany tests', () => {
             data: { id: '2', email: 'u2@test.com', name: 'User2' },
         });
 
-        const r = await client.user.updateManyAndReturn({
+        await expect(
+            client.user.updateManyAndReturn({
+                where: { email: 'u1@test.com' },
+                data: { name: 'User1-new' },
+            }),
+        ).resolves.toMatchObject([{ id: '1', name: 'User1-new', email: 'u1@test.com' }]);
+
+        const r1 = await client.user.updateManyAndReturn({
             where: { email: 'u1@test.com' },
-            data: { name: 'User1-new' },
+            data: { name: 'User1-new1' },
             select: { id: true, name: true },
         });
-        expect(r).toMatchObject([{ id: '1', name: 'User1-new' }]);
+        expect(r1).toMatchObject([{ id: '1', name: 'User1-new1' }]);
         // @ts-expect-error
-        expect(r[0]!.email).toBeUndefined();
+        expect(r1[0]!.email).toBeUndefined();
     });
 });

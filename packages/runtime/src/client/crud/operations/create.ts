@@ -24,19 +24,27 @@ export class CreateOperationHandler<Schema extends SchemaDef> extends BaseOperat
     }
 
     private async runCreate(args: CreateArgs<Schema, GetModels<Schema>>) {
+        // analyze if we need to read back the created record, or just return the create result
+        const { needReadBack, selectedFields } = this.mutationNeedsReadBack(this.model, args);
+
         // TODO: avoid using transaction for simple create
         const result = await this.safeTransaction(async (tx) => {
-            const createResult = await this.create(tx, this.model, args.data);
-            return this.readUnique(tx, this.model, {
-                select: args.select,
-                include: args.include,
-                omit: args.omit,
-                where: getIdValues(this.schema, this.model, createResult) as WhereInput<
-                    Schema,
-                    GetModels<Schema>,
-                    false
-                >,
-            });
+            const createResult = await this.create(tx, this.model, args.data, undefined, false, selectedFields);
+
+            if (needReadBack) {
+                return this.readUnique(tx, this.model, {
+                    select: args.select,
+                    include: args.include,
+                    omit: args.omit,
+                    where: getIdValues(this.schema, this.model, createResult) as WhereInput<
+                        Schema,
+                        GetModels<Schema>,
+                        false
+                    >,
+                });
+            } else {
+                return createResult;
+            }
         });
 
         if (!result && this.hasPolicyEnabled) {
@@ -62,16 +70,24 @@ export class CreateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             return [];
         }
 
+        // analyze if we need to read back the created record, or just return the create result
+        const { needReadBack, selectedFields } = this.mutationNeedsReadBack(this.model, args);
+
         // TODO: avoid using transaction for simple create
         return this.safeTransaction(async (tx) => {
-            const createResult = await this.createMany(tx, this.model, args, true);
-            return this.read(tx, this.model, {
-                select: args.select,
-                omit: args.omit,
-                where: {
-                    OR: createResult.map((item) => getIdValues(this.schema, this.model, item) as any),
-                } as any, // TODO: fix type
-            });
+            const createResult = await this.createMany(tx, this.model, args, true, undefined, selectedFields);
+
+            if (needReadBack) {
+                return this.read(tx, this.model, {
+                    select: args.select,
+                    omit: args.omit,
+                    where: {
+                        OR: createResult.map((item) => getIdValues(this.schema, this.model, item) as any),
+                    } as any, // TODO: fix type
+                });
+            } else {
+                return createResult;
+            }
         });
     }
 }

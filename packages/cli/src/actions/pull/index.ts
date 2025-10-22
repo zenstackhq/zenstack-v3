@@ -1,5 +1,13 @@
 import type { ZModelServices } from '@zenstackhq/language';
-import { Attribute, isEnum, type DataField, type DataModel, type Enum, type Model } from '@zenstackhq/language/ast';
+import {
+    Attribute,
+    isEnum,
+    type DataField,
+    type DataModel,
+    type Enum,
+    type Model,
+    type BuiltinType,
+} from '@zenstackhq/language/ast';
 import {
     DataFieldAttributeFactory,
     DataFieldFactory,
@@ -260,9 +268,16 @@ export function syncTable({
             const dbAttr = services.shared.workspace.IndexManager.allElements('Attribute').find(
                 (d) => d.name.toLowerCase() === `@db.${column.datatype.toLowerCase()}`,
             )?.node as Attribute | undefined;
-            //TODO: exclude default types like text in postgres
-            //because Zenstack string = text in postgres so unnecessary to map to default types
-            if (dbAttr && !['text'].includes(column.datatype)) {
+
+            const defaultDatabaseType = provider.getDefaultDatabaseType(builtinType.type as BuiltinType);
+
+            if (
+                dbAttr &&
+                defaultDatabaseType &&
+                (defaultDatabaseType.type !== column.datatype ||
+                    (defaultDatabaseType.precisition &&
+                        defaultDatabaseType.precisition !== (column.length || column.precision)))
+            ) {
                 const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
                 if (column.length || column.precision)
                     dbAttrFactory.addArg((a) => a.NumberLiteral.setValue(column.length! || column.precision!));

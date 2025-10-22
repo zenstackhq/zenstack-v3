@@ -1,3 +1,4 @@
+import type { BuiltinType } from '@zenstackhq/language/ast';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
 
 // Note: We dynamically import better-sqlite3 inside the async function to avoid
@@ -68,6 +69,29 @@ export const sqlite: IntrospectionProvider = {
                 if (t.includes('dec') || t.includes('num')) return { type: 'Decimal', isArray };
                 return { type: 'Unsupported' as const, isArray };
             }
+        }
+    },
+
+    getDefaultDatabaseType(type: BuiltinType) {
+        switch (type) {
+            case 'String':
+                return { type: 'TEXT' };
+            case 'Boolean':
+                return { type: 'INTEGER' };
+            case 'Int':
+                return { type: 'INTEGER' };
+            case 'BigInt':
+                return { type: 'INTEGER' };
+            case 'Float':
+                return { type: 'REAL' };
+            case 'Decimal':
+                return { type: 'DECIMAL' };
+            case 'DateTime':
+                return { type: 'NUMERIC' };
+            case 'Json':
+                return { type: 'JSONB' };
+            case 'Bytes':
+                return { type: 'BLOB' };
         }
     },
 

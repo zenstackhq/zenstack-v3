@@ -64,6 +64,7 @@ export interface IntrospectionProvider {
         type: BuiltinType | 'Unsupported';
         isArray: boolean;
     };
+    getDefaultDatabaseType(type: BuiltinType): { precisition?: number; type: string } | undefined;
     getDefaultValue(args: {
         fieldName: string;
         defaultValue: string;

@@ -90,7 +90,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 // mutations are wrapped in tx if not already in one
                 if (this.isMutationNode(compiledQuery.query) && !this.driver.isTransactionConnection(connection)) {
                     await this.driver.beginTransaction(connection, {
-                        isolationLevel: TransactionIsolationLevel.RepeatableRead,
+                        isolationLevel: TransactionIsolationLevel.ReadCommitted,
                     });
                     startedTx = true;
                 }

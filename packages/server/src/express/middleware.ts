@@ -61,7 +61,7 @@ const factory = <Schema extends SchemaDef>(options: MiddlewareOptions<Schema>): 
             });
             if (sendResponse === false) {
                 // attach response and pass control to the next middleware
-                response.locals = {
+                response.locals['zenstack'] = {
                     status: r.status,
                     body: r.body,
                 };

@@ -101,8 +101,10 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
                     args = query?.['q']
                         ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
                         : {};
-                } catch {
-                    return this.makeBadInputErrorResponse('invalid "q" query parameter');
+                } catch (err) {
+                    return this.makeBadInputErrorResponse(
+                        err instanceof Error ? err.message : 'invalid "q" query parameter',
+                    );
                 }
                 break;
 

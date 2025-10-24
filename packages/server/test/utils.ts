@@ -3,7 +3,7 @@ import superjson from 'superjson';
 export const schema = `
 model User {
     id String @id @default(cuid())
-    createdAt DateTime @default (now())
+    createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
     email String @unique @email
     posts Post[]
@@ -14,7 +14,7 @@ model User {
 
 model Post {
     id String @id @default(cuid())
-    createdAt DateTime @default (now())
+    createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
     title String
     author User? @relation(fields: [authorId], references: [id])

@@ -284,9 +284,7 @@ describe('RPC API Handler Tests', () => {
     });
 
     it('validation error', async () => {
-        let handleRequest = makeHandler();
-
-        handleRequest = makeHandler();
+        const handleRequest = makeHandler();
 
         let r = await handleRequest({
             method: 'get',

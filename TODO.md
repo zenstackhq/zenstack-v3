@@ -86,7 +86,7 @@
         - [ ] DbNull vs JsonNull
         - [ ] Migrate to tsdown
         - [x] @default validation
-    - [ ] Benchmark
+    - [x] Benchmark
 - [x] Plugin
     - [x] Post-mutation hooks should be called after transaction is committed
 - [x] TypeDef and mixin

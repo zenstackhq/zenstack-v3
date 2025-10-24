@@ -197,9 +197,8 @@ function getTestDbName(provider: string) {
     if (provider === 'sqlite') {
         return './test.db';
     }
-    const testName = expect.getState().currentTestName;
+    const testName = expect.getState().currentTestName ?? 'unnamed';
     const testPath = expect.getState().testPath ?? '';
-    invariant(testName);
     // digest test name
     const digest = createHash('md5')
         .update(testName + testPath)

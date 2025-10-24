@@ -13,6 +13,7 @@
         "build": "pnpm langium:generate && tsc --noEmit && tsup-node",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
+        "test": "vitest run",
         "langium:generate": "langium generate",
         "langium:generate:production": "langium generate --mode=production",
         "pack": "pnpm pack"

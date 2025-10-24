@@ -1,4 +1,4 @@
-import { safeJSONStringify } from '@zenstackhq/common-helpers';
+import { lowerCaseFirst, safeJSONStringify } from '@zenstackhq/common-helpers';
 import {
     InputValidationError,
     NotFoundError,
@@ -34,12 +34,13 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
     async handleRequest({ client, method, path, query, requestBody }: RequestContext<Schema>): Promise<Response> {
         const parts = path.split('/').filter((p) => !!p);
         const op = parts.pop();
-        const model = parts.pop();
+        let model = parts.pop();
 
         if (parts.length !== 0 || !op || !model) {
             return this.makeBadInputErrorResponse('invalid request path');
         }
 
+        model = lowerCaseFirst(model);
         method = method.toUpperCase();
         let args: unknown;
         let resCode = 200;
@@ -155,7 +156,7 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
     }
 
     private isValidModel(client: ClientContract<Schema>, model: string) {
-        return Object.keys(client.$schema.models).some((m) => m.toLowerCase() === model.toLowerCase());
+        return Object.keys(client.$schema.models).some((m) => lowerCaseFirst(m) === lowerCaseFirst(model));
     }
 
     private makeBadInputErrorResponse(message: string) {
@@ -169,7 +170,7 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
 
     private makeGenericErrorResponse(err: unknown) {
         const resp = {
-            status: 400,
+            status: 500,
             body: { error: { message: (err as Error).message || 'unknown error' } },
         };
         log(this.options.log, 'debug', () => `sending error response: ${safeJSONStringify(resp)}`);

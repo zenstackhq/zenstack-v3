@@ -1,6 +1,6 @@
 {
     "name": "e2e",
-    "version": "3.0.0-beta.12",
+    "version": "3.0.0-beta.13",
     "private": true,
     "type": "module",
     "scripts": {
@@ -20,7 +20,7 @@
         "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/testtools": "workspace:*",
         "better-sqlite3": "catalog:",
-        "decimal.js": "^10.4.3",
+        "decimal.js": "catalog:",
         "kysely": "catalog:",
         "ulid": "^3.0.0",
         "uuid": "^11.0.5"

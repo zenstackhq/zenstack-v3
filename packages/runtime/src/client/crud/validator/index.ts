@@ -232,6 +232,7 @@ export class InputValidator<Schema extends SchemaDef> {
         const { error, data } = schema.safeParse(args);
         if (error) {
             throw new InputValidationError(
+                model,
                 `Invalid ${operation} args for model "${model}": ${formatError(error)}`,
                 error,
             );

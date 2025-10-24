@@ -1,5 +1,5 @@
 /**
- * Supported Prisma db providers
+ * Supported db providers
  */
 export const SUPPORTED_PROVIDERS = [
     'sqlite',

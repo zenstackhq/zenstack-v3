@@ -111,7 +111,12 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
     }
 
     private transformOutputBytes(value: unknown) {
-        return Buffer.isBuffer(value) ? Uint8Array.from(value) : value;
+        return Buffer.isBuffer(value)
+            ? Uint8Array.from(value)
+            : // node-pg encode bytea as hex string prefixed with \x when embedded in JSON
+              typeof value === 'string' && value.startsWith('\\x')
+              ? Uint8Array.from(Buffer.from(value.slice(2), 'hex'))
+              : value;
     }
 
     override buildRelationSelection(

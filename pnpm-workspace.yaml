@@ -16,3 +16,4 @@ catalog:
     'zod-validation-error': ^4.0.1
     'better-sqlite3': ^12.2.0
     'pg': ^8.13.1
+    'decimal.js': '^10.4.3'

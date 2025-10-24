@@ -104,7 +104,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 if (constCondition === true) {
                     needCheckPreCreate = false;
                 } else if (constCondition === false) {
-                    throw new RejectedByPolicyError(mutationModel);
+                    throw new RejectedByPolicyError(mutationModel, RejectedByPolicyReason.NO_ACCESS);
                 }
             }
 
@@ -621,7 +621,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const result = await proceed(preCreateCheck);
         if (!result.rows[0]?.$condition) {
-            throw new RejectedByPolicyError(model);
+            throw new RejectedByPolicyError(model, RejectedByPolicyReason.NO_ACCESS);
         }
     }
 

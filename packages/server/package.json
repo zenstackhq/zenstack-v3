@@ -24,14 +24,28 @@
         "dist"
     ],
     "exports": {
-        ".": {
+        "./package.json": {
+            "import": "./package.json",
+            "require": "./package.json"
+        },
+        "./api": {
             "import": {
-                "types": "./dist/index.d.ts",
-                "default": "./dist/index.js"
+                "types": "./dist/api.d.ts",
+                "default": "./dist/api.js"
             },
             "require": {
-                "types": "./dist/index.d.cts",
-                "default": "./dist/index.cjs"
+                "types": "./dist/api.d.cts",
+                "default": "./dist/api.cjs"
+            }
+        },
+        "./express": {
+            "import": {
+                "types": "./dist/express.d.ts",
+                "default": "./dist/express.js"
+            },
+            "require": {
+                "types": "./dist/express.d.cts",
+                "default": "./dist/express.cjs"
             }
         }
     },

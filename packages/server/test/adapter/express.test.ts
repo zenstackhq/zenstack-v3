@@ -3,8 +3,8 @@ import bodyParser from 'body-parser';
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
+import { ZenStackMiddleware } from '../../src/adapter/express';
 import { RPCApiHandler } from '../../src/api';
-import { ZenStackMiddleware } from '../../src/express';
 import { makeUrl, schema } from '../utils';
 
 describe('Express adapter tests - rpc handler', () => {

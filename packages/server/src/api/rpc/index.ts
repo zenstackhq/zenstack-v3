@@ -83,7 +83,7 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
             case 'updateMany':
             case 'updateManyAndReturn':
                 if (method !== 'PUT' && method !== 'PATCH') {
-                    return this.makeBadInputErrorResponse('invalid request method, only PUT AND PATCH are supported');
+                    return this.makeBadInputErrorResponse('invalid request method, only PUT or PATCH are supported');
                 }
                 if (!requestBody) {
                     return this.makeBadInputErrorResponse('missing request body');

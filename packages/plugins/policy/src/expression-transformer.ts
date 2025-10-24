@@ -7,7 +7,7 @@ import {
     type BaseCrudDialect,
     type ClientContract,
     type CRUD_EXT,
-} from '@zenstackhq/runtime';
+} from '@zenstackhq/orm';
 import type {
     BinaryExpression,
     BinaryOperator,
@@ -17,7 +17,7 @@ import type {
     LiteralExpression,
     MemberExpression,
     UnaryExpression,
-} from '@zenstackhq/runtime/schema';
+} from '@zenstackhq/orm/schema';
 import {
     ExpressionUtils,
     type ArrayExpression,
@@ -25,7 +25,7 @@ import {
     type Expression,
     type FieldExpression,
     type SchemaDef,
-} from '@zenstackhq/runtime/schema';
+} from '@zenstackhq/orm/schema';
 import {
     AliasNode,
     BinaryOperationNode,

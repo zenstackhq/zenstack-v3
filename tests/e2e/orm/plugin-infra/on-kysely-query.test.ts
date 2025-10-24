@@ -1,4 +1,4 @@
-import { type ClientContract } from '@zenstackhq/runtime';
+import { type ClientContract } from '@zenstackhq/orm';
 import { createTestClient } from '@zenstackhq/testtools';
 import { InsertQueryNode, Kysely, PrimitiveValueListNode, ValuesNode, type QueryResult } from 'kysely';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

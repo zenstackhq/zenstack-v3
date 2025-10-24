@@ -1,7 +1,7 @@
 {
-    "name": "@zenstackhq/runtime",
+    "name": "@zenstackhq/orm",
     "version": "3.0.0-beta.13",
-    "description": "ZenStack Runtime",
+    "description": "ZenStack ORM",
     "type": "module",
     "scripts": {
         "build": "tsc --noEmit && tsup-node",

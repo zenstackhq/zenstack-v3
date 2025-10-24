@@ -1,6 +1,6 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import type { ZModelFunction, ZModelFunctionContext } from '@zenstackhq/runtime';
-import { CRUD, QueryUtils } from '@zenstackhq/runtime';
+import type { ZModelFunction, ZModelFunctionContext } from '@zenstackhq/orm';
+import { CRUD, QueryUtils } from '@zenstackhq/orm';
 import { ExpressionWrapper, ValueNode, type Expression, type ExpressionBuilder } from 'kysely';
 import { PolicyHandler } from './policy-handler';
 

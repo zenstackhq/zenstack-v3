@@ -1,5 +1,5 @@
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
-import { ZenStackClient } from '@zenstackhq/runtime';
+import { ZenStackClient } from '@zenstackhq/orm';
 import SQLite from 'better-sqlite3';
 import { sql, SqliteDialect } from 'kysely';
 import { schema } from './zenstack/schema';

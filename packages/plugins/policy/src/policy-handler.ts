@@ -1,5 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import type { BaseCrudDialect, ClientContract, ProceedKyselyQueryFunction } from '@zenstackhq/runtime';
+import type { BaseCrudDialect, ClientContract, ProceedKyselyQueryFunction } from '@zenstackhq/orm';
 import {
     getCrudDialect,
     InternalError,
@@ -9,7 +9,7 @@ import {
     RejectedByPolicyReason,
     SchemaUtils,
     type CRUD_EXT,
-} from '@zenstackhq/runtime';
+} from '@zenstackhq/orm';
 import {
     ExpressionUtils,
     type BuiltinType,
@@ -17,7 +17,7 @@ import {
     type GetModels,
     type MemberExpression,
     type SchemaDef,
-} from '@zenstackhq/runtime/schema';
+} from '@zenstackhq/orm/schema';
 import {
     AliasNode,
     BinaryOperationNode,

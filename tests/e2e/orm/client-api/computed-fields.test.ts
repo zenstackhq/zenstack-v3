@@ -102,7 +102,7 @@ model User {
             {
                 extraSourceFiles: {
                     main: `
-import { ZenStackClient } from '@zenstackhq/runtime';
+import { ZenStackClient } from '@zenstackhq/orm';
 import { schema } from './schema';
 
 async function main() {
@@ -169,7 +169,7 @@ model User {
             {
                 extraSourceFiles: {
                     main: `
-import { ZenStackClient } from '@zenstackhq/runtime';
+import { ZenStackClient } from '@zenstackhq/orm';
 import { schema } from './schema';
 
 async function main() {

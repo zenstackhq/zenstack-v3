@@ -5,8 +5,8 @@ import type {
     UseQueryOptions,
     UseQueryResult,
 } from '@tanstack/react-query';
-import type { CreateArgs, FindArgs, ModelResult, SelectSubset } from '@zenstackhq/runtime';
-import type { GetModels, SchemaDef } from '@zenstackhq/runtime/schema';
+import type { CreateArgs, FindArgs, ModelResult, SelectSubset } from '@zenstackhq/orm';
+import type { GetModels, SchemaDef } from '@zenstackhq/orm/schema';
 
 export type toHooks<Schema extends SchemaDef> = {
     [Model in GetModels<Schema> as Uncapitalize<Model>]: ToModelHooks<Schema, Model>;

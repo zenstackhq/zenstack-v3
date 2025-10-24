@@ -47,7 +47,7 @@ Even without using advanced features, ZenStack offers the following benefits as 
 2. More TypeScript type inference, less code generation.
 3. Fully-typed query-builder API as a better escape hatch compared to Prisma's [raw queries](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries) or [typed SQL](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/typedsql).
 
-> Although ZenStack v3's runtime doesn't depend on Prisma anymore (specifically, `@prisma/client`), it still relies on Prisma to handle database migration. See [database migration](https://zenstack.dev/docs/3.x/orm/migration) for more details.
+> Although ZenStack v3's ORM runtime doesn't depend on Prisma anymore (specifically, `@prisma/client`), it still relies on Prisma to handle database migration. See [database migration](https://zenstack.dev/docs/3.x/orm/migration) for more details.
 
 # Quick start
 
@@ -77,7 +77,7 @@ Alternatively, you can set it up manually:
 
 ```bash
 npm install -D @zenstackhq/cli@next
-npm install @zenstackhq/runtime@next
+npm install @zenstackhq/orm@next
 ```
 
 Then create a `zenstack` folder and a `schema.zmodel` file in it.

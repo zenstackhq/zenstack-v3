@@ -10,7 +10,7 @@ import {
     type LiteralExpression,
     type MemberExpression,
     type UnaryExpression,
-} from '@zenstackhq/runtime/schema';
+} from '@zenstackhq/orm/schema';
 
 type ExpressionEvaluatorContext = {
     auth?: any;

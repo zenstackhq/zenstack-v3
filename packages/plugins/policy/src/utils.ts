@@ -1,5 +1,5 @@
-import type { BaseCrudDialect } from '@zenstackhq/runtime';
-import { ExpressionUtils, type Expression, type SchemaDef } from '@zenstackhq/runtime/schema';
+import type { BaseCrudDialect } from '@zenstackhq/orm';
+import { ExpressionUtils, type Expression, type SchemaDef } from '@zenstackhq/orm/schema';
 import type { OperationNode } from 'kysely';
 import {
     AliasNode,

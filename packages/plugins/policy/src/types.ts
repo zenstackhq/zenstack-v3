@@ -1,5 +1,5 @@
-import type { CRUD_EXT } from '@zenstackhq/runtime';
-import type { Expression } from '@zenstackhq/runtime/schema';
+import type { CRUD_EXT } from '@zenstackhq/orm';
+import type { Expression } from '@zenstackhq/orm/schema';
 
 /**
  * Access policy kind.

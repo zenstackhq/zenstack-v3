@@ -21,7 +21,7 @@
 - You can create a database client with the TypeScript schema like:
 
     ```ts
-    import { ZenStackClient } from '@zenstackhq/runtime';
+    import { ZenStackClient } from '@zenstackhq/orm';
     import { schema } from './zenstack/schema';
     import SQLite from 'better-sqlite3';
     import { SqliteDialect } from 'kysely';
@@ -78,7 +78,7 @@ When calling `createClient`, you need to provide implementation for the computed
 E.g.:
 
 ```ts
-import { createClient } from '@zenstackhq/runtime';
+import { createClient } from '@zenstackhq/orm';
 
 const db = createClient({
     computedFields: {

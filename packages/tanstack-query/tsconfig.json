@@ -1,4 +1,12 @@
 {
     "extends": "@zenstackhq/typescript-config/base.json",
-    "include": ["src/**/*.ts", "test/**/*.ts"]
+    "include": [
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "test/react.test.tsx"
+    ],
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "skipLibCheck": true
+    }
 }

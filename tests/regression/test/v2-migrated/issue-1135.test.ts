@@ -31,7 +31,7 @@ model Person extends Entity {
             {
                 extraSourceFiles: {
                     'main.ts': `
-import { ZenStackClient } from '@zenstackhq/runtime';
+import { ZenStackClient } from '@zenstackhq/orm';
 import { schema } from './schema';
 
 const db = new ZenStackClient(schema, {} as any);

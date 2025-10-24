@@ -1,5 +1,5 @@
-import { type OnKyselyQueryArgs, type RuntimePlugin } from '@zenstackhq/runtime';
-import type { SchemaDef } from '@zenstackhq/runtime/schema';
+import { type OnKyselyQueryArgs, type RuntimePlugin } from '@zenstackhq/orm';
+import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { check } from './functions';
 import { PolicyHandler } from './policy-handler';
 

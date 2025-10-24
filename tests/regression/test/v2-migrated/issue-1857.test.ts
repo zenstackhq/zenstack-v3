@@ -19,7 +19,7 @@ describe('Regression for issue #1857', () => {
             {
                 extraSourceFiles: {
                     main: `
-            import { ZenStackClient } from '@zenstackhq/runtime';
+            import { ZenStackClient } from '@zenstackhq/orm';
             import { schema } from './schema';
 
             async function main() {

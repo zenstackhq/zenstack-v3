@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ClientContract } from '@zenstackhq/runtime';
-import { InputValidationError, NotFoundError } from '@zenstackhq/runtime';
+import type { ClientContract } from '@zenstackhq/orm';
+import { InputValidationError, NotFoundError } from '@zenstackhq/orm';
 import { schema } from '../schemas/basic';
 import { createTestClient } from '@zenstackhq/testtools';
 import { createPosts, createUser } from './utils';

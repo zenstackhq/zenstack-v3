@@ -25,7 +25,7 @@
         }
     },
     "dependencies": {
-        "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
         "ts-pattern": "catalog:"
     },
     "devDependencies": {

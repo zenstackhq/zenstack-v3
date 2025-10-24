@@ -5,8 +5,8 @@ import {
     RejectedByPolicyError,
     ZenStackError,
     type ClientContract,
-} from '@zenstackhq/runtime';
-import type { SchemaDef } from '@zenstackhq/runtime/schema';
+} from '@zenstackhq/orm';
+import type { SchemaDef } from '@zenstackhq/orm/schema';
 import SuperJSON from 'superjson';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
 import { log, registerCustomSerializers } from '../utils';

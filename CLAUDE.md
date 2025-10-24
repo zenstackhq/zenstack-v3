@@ -19,8 +19,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Testing
 
-- Runtime package tests: `pnpm test` (includes vitest, typing generation, and typecheck)
-- CLI tests: `pnpm test`
 - E2E tests are in `tests/e2e/` directory
 
 ### ZenStack CLI Commands
@@ -35,7 +33,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Core Components
 
-- **@zenstackhq/runtime** - Main database client and ORM engine built on Kysely
+- **@zenstackhq/orm** - ORM engine built above Kysely
 - **@zenstackhq/cli** - Command line interface and project management
 - **@zenstackhq/language** - ZModel language specification and parser (uses Langium)
 - **@zenstackhq/sdk** - Code generation utilities and schema processing
@@ -56,14 +54,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Package Dependencies
 
-- **Runtime**: Depends on Kysely, Zod, and various utility libraries
+- **ORM**: Depends on Kysely, Zod, and various utility libraries
 - **CLI**: Depends on language package, Commander.js, and Prisma (for migrations)
 - **Language**: Uses Langium for grammar parsing and AST generation
 - **Database Support**: SQLite (better-sqlite3) and PostgreSQL (pg) only
 
 ### Testing Strategy
 
-- Runtime package has comprehensive client API tests and policy tests
+- ORM package has comprehensive client API tests and policy tests
 - CLI has action-specific tests for commands
 - E2E tests validate real-world schema compatibility (cal.com, formbricks, trigger.dev)
 - Type coverage tests ensure TypeScript inference works correctly

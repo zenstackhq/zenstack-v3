@@ -14,7 +14,7 @@
     "author": "",
     "license": "MIT",
     "dependencies": {
-        "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/plugin-policy": "workspace:*",
         "better-sqlite3": "^12.2.0",
         "kysely": "catalog:"

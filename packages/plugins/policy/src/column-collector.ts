@@ -1,4 +1,4 @@
-import { KyselyUtils } from '@zenstackhq/runtime';
+import { KyselyUtils } from '@zenstackhq/orm';
 import type { ColumnNode, OperationNode } from 'kysely';
 
 /**

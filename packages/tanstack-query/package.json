@@ -25,7 +25,7 @@
         }
     },
     "dependencies": {
-        "@zenstackhq/runtime": "workspace:*"
+        "@zenstackhq/orm": "workspace:*"
     },
     "devDependencies": {
         "@zenstackhq/eslint-config": "workspace:*",

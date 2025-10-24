@@ -1,5 +1,5 @@
-import { ClientContract } from '@zenstackhq/runtime';
-import { SchemaDef } from '@zenstackhq/runtime/schema';
+import { ClientContract } from '@zenstackhq/orm';
+import { SchemaDef } from '@zenstackhq/orm/schema';
 import { createPolicyTestClient, createTestClient } from '@zenstackhq/testtools';
 import Decimal from 'decimal.js';
 import SuperJSON from 'superjson';

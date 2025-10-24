@@ -49,7 +49,7 @@
         "@types/semver": "^7.7.0",
         "@types/tmp": "catalog:",
         "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/testtools": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",

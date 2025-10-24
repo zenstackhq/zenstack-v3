@@ -1,5 +1,5 @@
-import type { ClientContract } from '@zenstackhq/runtime';
-import type { SchemaDef } from '@zenstackhq/runtime/schema';
+import type { ClientContract } from '@zenstackhq/orm';
+import type { SchemaDef } from '@zenstackhq/orm/schema';
 import type { Handler, Request, Response } from 'express';
 import type { ApiHandler } from '../types';
 

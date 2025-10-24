@@ -1,5 +1,5 @@
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
-import { type ClientContract } from '@zenstackhq/runtime';
+import { type ClientContract } from '@zenstackhq/orm';
 import { createTestClient } from '@zenstackhq/testtools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { schema } from '../schemas/basic';

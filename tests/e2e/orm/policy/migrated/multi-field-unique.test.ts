@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { QueryError } from '@zenstackhq/runtime';
+import { QueryError } from '@zenstackhq/orm';
 import { createPolicyTestClient } from '@zenstackhq/testtools';
 
 describe('Policy tests multi-field unique', () => {

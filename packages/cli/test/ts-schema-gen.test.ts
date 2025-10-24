@@ -1,4 +1,4 @@
-import { ExpressionUtils } from '@zenstackhq/runtime/schema';
+import { ExpressionUtils } from '@zenstackhq/orm/schema';
 import { createTestProject, generateTsSchema, generateTsSchemaInPlace } from '@zenstackhq/testtools';
 import fs from 'node:fs';
 import path from 'node:path';

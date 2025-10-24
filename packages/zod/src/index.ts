@@ -1,4 +1,4 @@
-import type { FieldDef, GetModels, SchemaDef } from '@zenstackhq/runtime/schema';
+import type { FieldDef, GetModels, SchemaDef } from '@zenstackhq/orm/schema';
 import { match, P } from 'ts-pattern';
 import { z, ZodType } from 'zod';
 import type { SelectSchema } from './types';

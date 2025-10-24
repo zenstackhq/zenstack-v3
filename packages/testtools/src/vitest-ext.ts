@@ -1,4 +1,4 @@
-import { InputValidationError, NotFoundError, RejectedByPolicyError } from '@zenstackhq/runtime';
+import { InputValidationError, NotFoundError, RejectedByPolicyError } from '@zenstackhq/orm';
 import { expect } from 'vitest';
 
 function isPromise(value: any) {

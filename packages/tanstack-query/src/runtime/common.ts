@@ -1,5 +1,5 @@
+import type { AggregateArgs, AggregateResult, BatchResult, CountArgs, CountResult, CreateArgs, CreateManyAndReturnArgs, CreateManyArgs, CrudOperation, DeleteArgs, DeleteManyArgs, FindFirstArgs, FindManyArgs, FindUniqueArgs, GroupByArgs, GroupByResult, ModelResult, UpdateArgs, UpdateManyAndReturnArgs, UpdateManyArgs, UpsertArgs } from '@zenstackhq/runtime';
 import type { GetModels, SchemaDef } from '@zenstackhq/runtime/schema';
-import type { CrudOperation, FindArgs, AggregateArgs, CountArgs, CreateArgs, UpdateArgs, CreateManyArgs, UpdateManyArgs, CreateManyAndReturnArgs, DeleteArgs, DeleteManyArgs, FindUniqueArgs, GroupByArgs, UpdateManyAndReturnArgs, UpsertArgs } from '@zenstackhq/runtime';
 
 /**
  * The default query endpoint.
@@ -51,9 +51,9 @@ export type ExtraQueryOptions = {
     optimisticUpdate?: boolean;
 };
 
-export type CrudOperationTypeMap<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    findFirst: FindArgs<Schema, Model, false>,
-    findMany: FindArgs<Schema, Model, true>,
+export type CrudOperationArgsMap<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    findFirst: FindFirstArgs<Schema, Model>,
+    findMany: FindManyArgs<Schema, Model>,
     findUnique: FindUniqueArgs<Schema, Model>,
     create: CreateArgs<Schema, Model>,
     createMany: CreateManyArgs<Schema, Model>,
@@ -69,6 +69,24 @@ export type CrudOperationTypeMap<Schema extends SchemaDef, Model extends GetMode
     groupBy: GroupByArgs<Schema, Model>,
 };
 
+export type CrudOperationResultsMap<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    findFirst: ModelResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['findFirst']> | null;
+    findMany: ModelResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['findMany']>[];
+    findUnique: ModelResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['findUnique']>;
+    create: ModelResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['create']>;
+    createMany: BatchResult;
+    createManyAndReturn: ModelResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['createManyAndReturn']>[];
+    upsert: ModelResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['upsert']>;
+    update: ModelResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['update']>;
+    updateMany: BatchResult;
+    updateManyAndReturn: ModelResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['updateManyAndReturn']>[];
+    delete: ModelResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['delete']>;
+    deleteMany: BatchResult;
+    count: CountResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['count']>;
+    aggregate: AggregateResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['aggregate']>;
+    groupBy: GroupByResult<Schema, Model, CrudOperationArgsMap<Schema, Model>['groupBy']>;
+};
+
 export type QueryOperation = Extract<
     CrudOperation,
     'findFirst' | 'findMany' | 'findUnique' | 'count' | 'aggregate' | 'groupBy'
@@ -82,29 +100,43 @@ export type QueryKey<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Operation extends CrudOperation,
+    Args extends OperationArgs<Schema, Model, Operation>,
 > = [
         prefix: typeof QUERY_KEY_PREFIX,
         model: Model,
-        operation: CrudOperation,
-        args: CrudOperationTypeMap<Schema, Model>[Operation],
+        operation: Operation,
+        args: Args,
         extraOptions: ExtraQueryOptions,
     ];
+
+export type OperationArgs<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Operation extends CrudOperation,
+> = CrudOperationArgsMap<Schema, Model>[Operation];
+
+export type OperationResult<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Operation extends CrudOperation,
+> = CrudOperationResultsMap<Schema, Model>[Operation];
 
 export function getQueryKey<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Operation extends CrudOperation,
+    Args extends OperationArgs<Schema, Model, Operation>,
 >(
     schema: Schema,
     model: Model,
-    operation: CrudOperation,
-    args: CrudOperationTypeMap<Schema, Model>[Operation],
+    operation: Operation,
+    args: Args,
 
     extraOptions: ExtraQueryOptions = {
         infinite: false,
         optimisticUpdate: true,
     },
-): QueryKey<Schema, Model, typeof operation> {
+): QueryKey<Schema, Model, Operation, Args> {
     const modelDef = schema.models[model];
     if (!modelDef) {
         throw new Error(`Model ${model} not found in schema`);
@@ -115,7 +147,7 @@ export function getQueryKey<
 
 export function isZenStackQueryKey(
     queryKey: readonly unknown[]
-): queryKey is QueryKey<SchemaDef, GetModels<SchemaDef>, CrudOperation> {
+): queryKey is QueryKey<SchemaDef, GetModels<SchemaDef>, CrudOperation, any> {
     if (queryKey.length < 5) {
         return false;
     }

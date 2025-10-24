@@ -1,98 +1,98 @@
-import { type SchemaDef, ExpressionUtils } from "@zenstackhq/runtime/schema";
+import { type SchemaDef, ExpressionUtils } from '@zenstackhq/runtime/schema';
 export const schema = {
     provider: {
-        type: "postgresql"
+        type: 'postgresql'
     },
     models: {
         User: {
-            name: "User",
+            name: 'User',
             fields: {
                 id: {
-                    name: "id",
-                    type: "String",
+                    name: 'id',
+                    type: 'String',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("uuid") }] }],
-                    default: ExpressionUtils.call("uuid")
+                    attributes: [{ name: '@id' }, { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('uuid') }] }],
+                    default: ExpressionUtils.call('uuid')
                 },
                 name: {
-                    name: "name",
-                    type: "String"
+                    name: 'name',
+                    type: 'String'
                 },
                 email: {
-                    name: "email",
-                    type: "String",
+                    name: 'email',
+                    type: 'String',
                     unique: true,
-                    attributes: [{ name: "@unique" }]
+                    attributes: [{ name: '@unique' }]
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now')
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    attributes: [{ name: '@updatedAt' }]
                 },
                 posts: {
-                    name: "posts",
-                    type: "Post",
+                    name: 'posts',
+                    type: 'Post',
                     array: true,
-                    relation: { opposite: "author" }
+                    relation: { opposite: 'author' }
                 }
             },
             attributes: [
-                { name: "@@map", args: [{ name: "name", value: ExpressionUtils.literal("users") }] }
+                { name: '@@map', args: [{ name: 'name', value: ExpressionUtils.literal('users') }] }
             ],
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "String" },
-                email: { type: "String" }
+                id: { type: 'String' },
+                email: { type: 'String' }
             }
         },
         Post: {
-            name: "Post",
+            name: 'Post',
             fields: {
                 id: {
-                    name: "id",
-                    type: "String",
+                    name: 'id',
+                    type: 'String',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
+                    attributes: [{ name: '@id' }, { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('cuid') }] }],
+                    default: ExpressionUtils.call('cuid')
                 },
                 title: {
-                    name: "title",
-                    type: "String"
+                    name: 'title',
+                    type: 'String'
                 },
                 published: {
-                    name: "published",
-                    type: "Boolean",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
+                    name: 'published',
+                    type: 'Boolean',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.literal(false) }] }],
                     default: false
                 },
                 author: {
-                    name: "author",
-                    type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "posts", fields: ["authorId"], references: ["id"], onDelete: "Cascade" }
+                    name: 'author',
+                    type: 'User',
+                    attributes: [{ name: '@relation', args: [{ name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('authorId')]) }, { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) }, { name: 'onDelete', value: ExpressionUtils.literal('Cascade') }] }],
+                    relation: { opposite: 'posts', fields: ['authorId'], references: ['id'], onDelete: 'Cascade' }
                 },
                 authorId: {
-                    name: "authorId",
-                    type: "String",
+                    name: 'authorId',
+                    type: 'String',
                     foreignKeyFor: [
-                        "author"
+                        'author'
                     ]
                 }
             },
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "String" }
+                id: { type: 'String' }
             }
         }
     },
-    authType: "User",
+    authType: 'User',
     plugins: {}
 } as const satisfies SchemaDef;
 export type SchemaType = typeof schema;

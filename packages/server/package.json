@@ -66,13 +66,19 @@
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "body-parser": "^2.2.0",
-        "supertest": "^7.1.4"
+        "supertest": "^7.1.4",
+        "express": "^5.0.0",
+        "next": "^15.0.0"
     },
     "peerDependencies": {
-        "express": "^5.0.0"
+        "express": "^5.0.0",
+        "next": "^15.0.0"
     },
     "peerDependenciesMeta": {
         "express": {
+            "optional": true
+        },
+        "next": {
             "optional": true
         }
     }

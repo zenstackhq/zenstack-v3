@@ -188,7 +188,7 @@ model M {
         };
 
         await makeTestClient('/m/create', makeClientOptions)
-            .post('/m/create')
+            .post('/')
             .send({ data: { value: 0 } })
             .expect(403)
             .expect((resp) => {

@@ -33,7 +33,7 @@ export interface PageRouteRequestHandlerOptions<Schema extends SchemaDef> extend
  */
 export interface AppRouteRequestHandlerOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
     /**
-     * Callback method for getting a Prisma instance for the given request.
+     * Callback for getting a ZenStackClient for the given request.
      */
     getClient: (req: NextRequest) => ClientContract<Schema> | Promise<ClientContract<Schema>>;
 

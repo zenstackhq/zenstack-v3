@@ -1,0 +1,64 @@
+{
+    "name": "@zenstackhq/server",
+    "version": "3.0.0-beta.12",
+    "description": "ZenStack automatic CRUD API handlers and server adapters",
+    "type": "module",
+    "scripts": {
+        "build": "tsc --noEmit && tsup-node",
+        "watch": "tsup-node --watch",
+        "lint": "eslint src --ext ts",
+        "pack": "pnpm pack"
+    },
+    "keywords": [
+        "fastify",
+        "express",
+        "nextjs",
+        "sveltekit",
+        "nuxtjs",
+        "elysia",
+        "tanstack-start"
+    ],
+    "author": "ZenStack Team",
+    "license": "MIT",
+    "files": [
+        "dist"
+    ],
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        }
+    },
+    "dependencies": {
+        "@zenstackhq/common-helpers": "workspace:*",
+        "@zenstackhq/runtime": "workspace:*",
+        "decimal.js": "catalog:",
+        "superjson": "^2.2.3",
+        "ts-pattern": "catalog:"
+    },
+    "devDependencies": {
+        "@types/body-parser": "^1.19.6",
+        "@types/express": "^5.0.3",
+        "@types/supertest": "^6.0.3",
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/testtools": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*",
+        "body-parser": "^2.2.0",
+        "supertest": "^7.1.4"
+    },
+    "peerDependencies": {
+        "express": ">=4.19.0"
+    },
+    "peerDependenciesMeta": {
+        "express": {
+            "optional": true
+        }
+    }
+}

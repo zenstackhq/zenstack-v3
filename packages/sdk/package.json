@@ -47,7 +47,7 @@
     "devDependencies": {
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "decimal.js": "^10.4.3",
+        "decimal.js": "catalog:",
         "kysely": "catalog:"
     }
 }

@@ -315,16 +315,6 @@ export function ensureArray<T>(value: T | T[]): T[] {
     }
 }
 
-export function safeJSONStringify(value: unknown) {
-    return JSON.stringify(value, (_, v) => {
-        if (typeof v === 'bigint') {
-            return v.toString();
-        } else {
-            return v;
-        }
-    });
-}
-
 export function extractIdFields(entity: any, schema: SchemaDef, model: string) {
     const idFields = requireIdFields(schema, model);
     return extractFields(entity, idFields);

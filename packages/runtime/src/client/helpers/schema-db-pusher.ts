@@ -294,9 +294,16 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             (cb) => {
                 if (fieldDef.relation?.onDelete) {
                     cb = cb.onDelete(this.mapCascadeAction(fieldDef.relation.onDelete));
+                } else if (fieldDef.optional) {
+                    cb = cb.onDelete('set null');
+                } else {
+                    cb = cb.onDelete('restrict');
                 }
+
                 if (fieldDef.relation?.onUpdate) {
                     cb = cb.onUpdate(this.mapCascadeAction(fieldDef.relation.onUpdate));
+                } else {
+                    cb = cb.onUpdate('cascade');
                 }
                 return cb;
             },

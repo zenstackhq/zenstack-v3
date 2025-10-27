@@ -42,9 +42,6 @@ catalogs:
     typescript:
       specifier: ^5.8.0
       version: 5.8.3
-    zod:
-      specifier: ^3.25.0 || ^4.0.0
-      version: 3.25.76
     zod-validation-error:
       specifier: ^4.0.1
       version: 4.0.1
@@ -476,7 +473,7 @@ importers:
         specifier: ^7.1.4
         version: 7.1.4
       zod:
-        specifier: 'catalog:'
+        specifier: ~3.25.0
         version: 3.25.76
 
   packages/tanstack-query:

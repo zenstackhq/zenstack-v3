@@ -17,7 +17,14 @@ registerCustomSerializers();
  * Options for {@link RPCApiHandler}
  */
 export type RPCApiHandlerOptions<Schema extends SchemaDef> = {
+    /**
+     * The schema
+     */
     schema: Schema;
+
+    /**
+     * Logging configuration
+     */
     log?: LogConfig;
 };
 
@@ -173,9 +180,13 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
     private makeGenericErrorResponse(err: unknown) {
         const resp = {
             status: 500,
-            body: { error: { message: (err as Error).message || 'unknown error' } },
+            body: { error: { message: err instanceof Error ? err.message : 'unknown error' } },
         };
-        log(this.options.log, 'debug', () => `sending error response: ${safeJSONStringify(resp)}`);
+        log(
+            this.options.log,
+            'debug',
+            () => `sending error response: ${safeJSONStringify(resp)}${err instanceof Error ? '\n' + err.stack : ''}`,
+        );
         return resp;
     }
 

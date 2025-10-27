@@ -59,11 +59,22 @@ describe('Client find tests ', () => {
         // skip
         await expect(client.user.findMany({ skip: 1 })).resolves.toHaveLength(2);
         await expect(client.user.findMany({ skip: 2 })).resolves.toHaveLength(1);
+
         // explicit sort
         await expect(
             client.user.findFirst({
                 skip: 2,
                 orderBy: { email: 'desc' },
+            }),
+        ).resolves.toMatchObject({
+            email: 'u02@test.com',
+        });
+
+        // allows duplicate sort fields
+        await expect(
+            client.user.findFirst({
+                skip: 2,
+                orderBy: [{ email: 'desc' }, { email: 'desc' }],
             }),
         ).resolves.toMatchObject({
             email: 'u02@test.com',
@@ -160,6 +171,11 @@ describe('Client find tests ', () => {
         await expect(
             client.user.findFirst({
                 orderBy: { profile: { bio: 'asc' } },
+            }),
+        ).resolves.toMatchObject(user1);
+        await expect(
+            client.user.findFirst({
+                orderBy: [{ profile: { bio: 'asc' } }, { profile: { bio: 'asc' } }],
             }),
         ).resolves.toMatchObject(user1);
         await expect(

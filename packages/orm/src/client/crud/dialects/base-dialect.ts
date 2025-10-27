@@ -1,9 +1,8 @@
-import { invariant, isPlainObject } from '@zenstackhq/common-helpers';
+import { enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers';
 import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { expressionBuilder, sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';
 import type { BuiltinType, DataSourceProviderType, FieldDef, GetModels, ModelDef, SchemaDef } from '../../../schema';
-import { enumerate } from '../../../utils/enumerate';
 import type { OrArray } from '../../../utils/type-utils';
 import { AGGREGATE_OPERATORS, DELEGATE_JOINED_FIELD_PREFIX, LOGICAL_COMBINATORS } from '../../constants';
 import type {
@@ -755,7 +754,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 : this.fieldRef(model, field, modelAlias);
         };
 
-        enumerate(orderBy).forEach((orderBy) => {
+        enumerate(orderBy).forEach((orderBy, index) => {
             for (const [field, value] of Object.entries<any>(orderBy)) {
                 if (!value) {
                     continue;
@@ -841,15 +840,16 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         }
                     } else {
                         // order by to-one relation
-                        result = result.leftJoin(relationModel, (join) => {
-                            const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, relationModel);
+                        const joinAlias = `${modelAlias}$orderBy$${index}`;
+                        result = result.leftJoin(`${relationModel} as ${joinAlias}`, (join) => {
+                            const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, joinAlias);
                             return join.on((eb) =>
                                 this.and(
                                     ...joinPairs.map(([left, right]) => eb(this.eb.ref(left), '=', this.eb.ref(right))),
                                 ),
                             );
                         });
-                        result = this.buildOrderBy(result, fieldDef.type, relationModel, value, negated);
+                        result = this.buildOrderBy(result, relationModel, joinAlias, value, negated);
                     }
                 }
             }

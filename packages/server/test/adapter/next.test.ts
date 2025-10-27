@@ -5,7 +5,7 @@ import { apiResolver } from 'next/dist/server/api-utils/node/api-resolver';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { NextRequestHandler, type PageRouteRequestHandlerOptions } from '../../src/adapter/next';
-import { RPCApiHandler } from '../../src/api';
+import { RestApiHandler, RPCApiHandler } from '../../src/api';
 
 function makeTestClient(
     apiPath: string,
@@ -232,67 +232,60 @@ model M {
     });
 });
 
-// describe('Next.js adapter tests - rest handler', () => {
-//     let origDir: string;
+describe('Next.js adapter tests - rest handler', () => {
+    it('adapter test - rest', async () => {
+        const model = `
+model M {
+    id String @id @default(cuid())
+    value Int
+}
+        `;
 
-//     beforeEach(() => {
-//         origDir = process.cwd();
-//     });
+        const client = await createTestClient(model);
 
-//     afterEach(() => {
-//         process.chdir(origDir);
-//     });
+        const options = {
+            getClient: () => client,
+            apiHandler: new RestApiHandler({ schema: client.$schema, endpoint: 'http://localhost/api' }),
+        };
 
-//     it('adapter test - rest', async () => {
-//         const model = `
-// model M {
-//     id String @id @default(cuid())
-//     value Int
-// }
-//         `;
+        await makeTestClient('/m', options)
+            .post('/')
+            .send({ data: { type: 'm', attributes: { id: '1', value: 1 } } })
+            .expect(201)
+            .expect((resp) => {
+                expect(resp.body.data.attributes.value).toBe(1);
+            });
 
-//         const { prisma, modelMeta } = await loadSchema(model);
+        await makeTestClient('/m/1', options)
+            .get('/')
+            .expect(200)
+            .expect((resp) => {
+                expect(resp.body.data.id).toBe('1');
+            });
 
-//         const options = { getPrisma: () => prisma, handler: Rest({ endpoint: 'http://localhost/api' }), modelMeta };
+        await makeTestClient('/m', options, undefined, { 'filter[value]': '1' })
+            .get('/')
+            .expect(200)
+            .expect((resp) => {
+                expect(resp.body.data).toHaveLength(1);
+            });
 
-//         await makeTestClient('/m', options)
-//             .post('/')
-//             .send({ data: { type: 'm', attributes: { id: '1', value: 1 } } })
-//             .expect(201)
-//             .expect((resp) => {
-//                 expect(resp.body.data.attributes.value).toBe(1);
-//             });
+        await makeTestClient('/m', options, undefined, { 'filter[value]': '2' })
+            .get('/')
+            .expect(200)
+            .expect((resp) => {
+                expect(resp.body.data).toHaveLength(0);
+            });
 
-//         await makeTestClient('/m/1', options)
-//             .get('/')
-//             .expect(200)
-//             .expect((resp) => {
-//                 expect(resp.body.data.id).toBe('1');
-//             });
+        await makeTestClient('/m/1', options)
+            .put('/')
+            .send({ data: { type: 'm', attributes: { value: 2 } } })
+            .expect(200)
+            .expect((resp) => {
+                expect(resp.body.data.attributes.value).toBe(2);
+            });
 
-//         await makeTestClient('/m', options, undefined, { 'filter[value]': '1' })
-//             .get('/')
-//             .expect(200)
-//             .expect((resp) => {
-//                 expect(resp.body.data).toHaveLength(1);
-//             });
-
-//         await makeTestClient('/m', options, undefined, { 'filter[value]': '2' })
-//             .get('/')
-//             .expect(200)
-//             .expect((resp) => {
-//                 expect(resp.body.data).toHaveLength(0);
-//             });
-
-//         await makeTestClient('/m/1', options)
-//             .put('/')
-//             .send({ data: { type: 'm', attributes: { value: 2 } } })
-//             .expect(200)
-//             .expect((resp) => {
-//                 expect(resp.body.data.attributes.value).toBe(2);
-//             });
-
-//         await makeTestClient('/m/1', options).del('/').expect(200);
-//         expect(await prisma.m.count()).toBe(0);
-//     });
-// });
+        await makeTestClient('/m/1', options).del('/').expect(200);
+        expect(await client.m.count()).toBe(0);
+    });
+});

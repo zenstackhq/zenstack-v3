@@ -58,6 +58,14 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                           : value,
                 )
                 .with('Decimal', () => (value !== null ? value.toString() : value))
+                .with('Json', () => {
+                    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                        // postgres requires simple JSON values to be stringified
+                        return JSON.stringify(value);
+                    } else {
+                        return value;
+                    }
+                })
                 .otherwise(() => value);
         }
     }

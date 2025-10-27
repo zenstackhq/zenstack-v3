@@ -1,6 +1,9 @@
 import { Decimal } from 'decimal.js';
 import SuperJSON from 'superjson';
 import { match } from 'ts-pattern';
+import { ZodError } from 'zod';
+import { fromError as fromError3 } from 'zod-validation-error/v3';
+import { fromError as fromError4 } from 'zod-validation-error/v4';
 import type { LogConfig, LogLevel } from '../types';
 
 export function log(logger: LogConfig | undefined, level: LogLevel, message: string | (() => string), error?: unknown) {
@@ -46,5 +49,16 @@ export function registerCustomSerializers() {
             },
             'Bytes',
         );
+    }
+}
+
+/**
+ * Format ZodError into a readable string
+ */
+export function getZodErrorMessage(error: ZodError): string {
+    if ('_zod' in error) {
+        return fromError4(error).toString();
+    } else {
+        return fromError3(error).toString();
     }
 }

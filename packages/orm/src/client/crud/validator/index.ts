@@ -1,4 +1,4 @@
-import { invariant } from '@zenstackhq/common-helpers';
+import { enumerate, invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
@@ -12,7 +12,6 @@ import {
     type ModelDef,
     type SchemaDef,
 } from '../../../schema';
-import { enumerate } from '../../../utils/enumerate';
 import { extractFields } from '../../../utils/object-utils';
 import { formatError } from '../../../utils/zod-utils';
 import { AGGREGATE_OPERATORS, LOGICAL_COMBINATORS, NUMERIC_FIELD_TYPES } from '../../constants';

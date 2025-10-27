@@ -5,6 +5,7 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { ZenStackMiddleware } from '../../src/adapter/express';
 import { RPCApiHandler } from '../../src/api';
+import { RestApiHandler } from '../../src/api/rest';
 import { makeUrl, schema } from '../utils';
 
 describe('Express adapter tests - rpc handler', () => {
@@ -91,86 +92,83 @@ describe('Express adapter tests - rpc handler', () => {
     });
 });
 
-// describe('Express adapter tests - rest handler', () => {
-//     it('run middleware', async () => {
-//         const { prisma, zodSchemas, modelMeta } = await loadSchema(schema);
+describe('Express adapter tests - rest handler', () => {
+    it('works with sending response', async () => {
+        const client = await createPolicyTestClient(schema);
 
-//         const app = express();
-//         app.use(bodyParser.json());
-//         app.use(
-//             '/api',
-//             ZenStackMiddleware({
-//                 getPrisma: () => prisma,
-//                 modelMeta,
-//                 zodSchemas,
-//                 handler: RESTAPIHandler({ endpoint: 'http://localhost/api' }),
-//             }),
-//         );
+        const app = express();
+        app.use(bodyParser.json());
+        app.use(
+            '/api',
+            ZenStackMiddleware({
+                apiHandler: new RestApiHandler({ schema: client.$schema, endpoint: 'http://localhost/api' }),
+                getClient: () => client.$unuseAll(),
+            }),
+        );
 
-//         let r = await request(app).get(makeUrl('/api/post/1'));
-//         expect(r.status).toBe(404);
+        let r = await request(app).get(makeUrl('/api/post/1'));
+        expect(r.status).toBe(404);
 
-//         r = await request(app)
-//             .post('/api/user')
-//             .send({
-//                 data: {
-//                     type: 'user',
-//                     attributes: {
-//                         id: 'user1',
-//                         email: 'user1@abc.com',
-//                     },
-//                 },
-//             });
-//         expect(r.status).toBe(201);
-//         expect(r.body).toMatchObject({
-//             jsonapi: { version: '1.1' },
-//             data: { type: 'user', id: 'user1', attributes: { email: 'user1@abc.com' } },
-//         });
+        r = await request(app)
+            .post('/api/user')
+            .send({
+                data: {
+                    type: 'User',
+                    attributes: {
+                        id: 'user1',
+                        email: 'user1@abc.com',
+                    },
+                },
+            });
+        expect(r.status).toBe(201);
+        expect(r.body).toMatchObject({
+            jsonapi: { version: '1.1' },
+            data: { type: 'User', id: 'user1', attributes: { email: 'user1@abc.com' } },
+        });
 
-//         r = await request(app).get('/api/user?filter[id]=user1');
-//         expect(r.body.data).toHaveLength(1);
+        r = await request(app).get('/api/user?filter[id]=user1');
+        expect(r.body.data).toHaveLength(1);
 
-//         r = await request(app).get('/api/user?filter[id]=user2');
-//         expect(r.body.data).toHaveLength(0);
+        r = await request(app).get('/api/user?filter[id]=user2');
+        expect(r.body.data).toHaveLength(0);
 
-//         r = await request(app).get('/api/user?filter[id]=user1&filter[email]=xyz');
-//         expect(r.body.data).toHaveLength(0);
+        r = await request(app).get('/api/user?filter[id]=user1&filter[email]=xyz');
+        expect(r.body.data).toHaveLength(0);
 
-//         r = await request(app)
-//             .put('/api/user/user1')
-//             .send({ data: { type: 'user', attributes: { email: 'user1@def.com' } } });
-//         expect(r.status).toBe(200);
-//         expect(r.body.data.attributes.email).toBe('user1@def.com');
+        r = await request(app)
+            .put('/api/user/user1')
+            .send({ data: { type: 'User', attributes: { email: 'user1@def.com' } } });
+        expect(r.status).toBe(200);
+        expect(r.body.data.attributes.email).toBe('user1@def.com');
 
-//         r = await request(app).delete(makeUrl('/api/user/user1'));
-//         expect(r.status).toBe(200);
-//         expect(await prisma.user.findMany()).toHaveLength(0);
-//     });
-// });
+        r = await request(app).delete(makeUrl('/api/user/user1'));
+        expect(r.status).toBe(200);
+        expect(await client.$unuseAll().user.findMany()).toHaveLength(0);
+    });
+});
 
-// describe('Express adapter tests - rest handler with custom middleware', () => {
-//     it('run middleware', async () => {
-//         const { prisma, zodSchemas, modelMeta } = await loadSchema(schema);
+describe('Express adapter tests - rest handler with custom middleware', () => {
+    it('run middleware', async () => {
+        const client = await createPolicyTestClient(schema);
 
-//         const app = express();
-//         app.use(bodyParser.json());
-//         app.use(
-//             '/api',
-//             ZenStackMiddleware({
-//                 getPrisma: () => prisma,
-//                 modelMeta,
-//                 zodSchemas,
-//                 handler: RESTAPIHandler({ endpoint: 'http://localhost/api' }),
-//                 sendResponse: false,
-//             }),
-//         );
+        const app = express();
+        app.use(bodyParser.json());
+        app.use(
+            '/api',
+            ZenStackMiddleware({
+                getClient: () => client.$unuseAll(),
+                apiHandler: new RestApiHandler({ schema: client.$schema, endpoint: 'http://localhost/api' }),
+                sendResponse: false,
+            }),
+        );
 
-//         app.use((req, res) => {
-//             res.status(res.locals.status).json({ message: res.locals.body });
-//         });
+        app.use((_req, res) => {
+            const zenstack = res.locals['zenstack'];
+            res.status(zenstack.status).json({ message: zenstack.body });
+        });
 
-//         const r = await request(app).get(makeUrl('/api/post/1'));
-//         expect(r.status).toBe(404);
-//         expect(r.body.message).toHaveProperty('errors');
-//     });
-// });
+        const r = await request(app).get(makeUrl('/api/post/1'));
+        expect(r.status).toBe(404);
+        expect(r.body.message).toHaveProperty('errors');
+    });
+});

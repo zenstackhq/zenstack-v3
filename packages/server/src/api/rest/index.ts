@@ -8,6 +8,7 @@ import {
     type ClientContract,
 } from '@zenstackhq/orm';
 import type { FieldDef, ModelDef, SchemaDef } from '@zenstackhq/orm/schema';
+import { Decimal } from 'decimal.js';
 import SuperJSON from 'superjson';
 import { Linker, Paginator, Relator, Serializer, type SerializerOptions } from 'ts-japi';
 import UrlPattern from 'url-pattern';
@@ -37,7 +38,7 @@ export type RestApiHandlerOptions<Schema extends SchemaDef = SchemaDef> = {
     /**
      * The default page size for limiting the number of results returned
      * from collection queries, including resource collection, related data
-     * of collection types, and relashionship of collection types.
+     * of collection types, and relationship of collection types.
      *
      * Defaults to 100. Set to Infinity to disable pagination.
      */
@@ -200,7 +201,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             title: 'Error occurred while executing the query',
         },
         unknownError: {
-            status: 400,
+            status: 500,
             title: 'Unknown error',
         },
     };
@@ -851,10 +852,20 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             body = SuperJSON.deserialize({ json: body, meta: body.meta.serialization });
         }
 
-        const parsed = this.createUpdatePayloadSchema.parse(body);
-        const attributes: any = parsed.data.attributes;
+        const parseResult = this.createUpdatePayloadSchema.safeParse(body);
+        if (!parseResult.success) {
+            return {
+                attributes: undefined,
+                relationships: undefined,
+                error: this.makeError('invalidPayload', getZodErrorMessage(parseResult.error)),
+            };
+        }
 
-        return { attributes, relationships: parsed.data.relationships };
+        return {
+            attributes: parseResult.data.data.attributes,
+            relationships: parseResult.data.data.relationships,
+            error: undefined,
+        };
     }
 
     private async processCreate(
@@ -868,7 +879,10 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             return this.makeUnsupportedModelError(type);
         }
 
-        const { attributes, relationships } = this.processRequestBody(requestBody);
+        const { attributes, relationships, error } = this.processRequestBody(requestBody);
+        if (error) {
+            return error;
+        }
 
         const createPayload: any = { data: { ...attributes } };
 
@@ -929,9 +943,16 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
 
         const modelName = typeInfo.name;
-        const { attributes, relationships } = this.processRequestBody(requestBody);
+        const { attributes, relationships, error } = this.processRequestBody(requestBody);
+        if (error) {
+            return error;
+        }
 
-        const matchFields = this.upsertMetaSchema.parse(requestBody).meta.matchFields;
+        const parseResult = this.upsertMetaSchema.safeParse(requestBody);
+        if (parseResult.error) {
+            return this.makeError('invalidPayload', getZodErrorMessage(parseResult.error));
+        }
+        const matchFields = parseResult.data.meta.matchFields;
         const uniqueFieldSets = this.getUniqueFieldSets(modelName);
 
         if (!uniqueFieldSets.some((set) => set.every((field) => matchFields.includes(field)))) {
@@ -942,7 +963,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             where: this.makeUpsertWhere(matchFields, attributes, typeInfo),
             create: { ...attributes },
             update: {
-                ...Object.fromEntries(Object.entries(attributes).filter((e) => !matchFields.includes(e[0]))),
+                ...Object.fromEntries(Object.entries(attributes ?? {}).filter((e) => !matchFields.includes(e[0]))),
             },
         };
 
@@ -1110,7 +1131,10 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             return this.makeUnsupportedModelError(type);
         }
 
-        const { attributes, relationships } = this.processRequestBody(requestBody);
+        const { attributes, relationships, error } = this.processRequestBody(requestBody);
+        if (error) {
+            return error;
+        }
 
         const updatePayload: any = {
             where: this.makeIdFilter(typeInfo.idFields, resourceId),
@@ -1198,9 +1222,11 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         const externalIdName = this.externalIdMapping[modelLower];
         for (const [name, info] of Object.entries(modelDef.uniqueFields)) {
             if (name === externalIdName) {
-                if (typeof info === 'string') {
-                    return [this.requireField(model, info)];
+                if (typeof info.type === 'string') {
+                    // single unique field
+                    return [this.requireField(model, info.type)];
                 } else {
+                    // compound unique fields
                     return Object.keys(info).map((f) => this.requireField(model, f));
                 }
             }
@@ -1561,18 +1587,30 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             }
 
             const type = fieldDef.type;
-            if (type === 'Int' || type === 'BigInt') {
+            if (type === 'Int') {
                 const parsed = parseInt(value);
                 if (isNaN(parsed)) {
                     throw new InvalidValueError(`invalid ${type} value: ${value}`);
                 }
                 return parsed;
-            } else if (type === 'Float' || type === 'Decimal') {
+            } else if (type === 'BigInt') {
+                try {
+                    return BigInt(value);
+                } catch {
+                    throw new InvalidValueError(`invalid ${type} value: ${value}`);
+                }
+            } else if (type === 'Float') {
                 const parsed = parseFloat(value);
                 if (isNaN(parsed)) {
                     throw new InvalidValueError(`invalid ${type} value: ${value}`);
                 }
                 return parsed;
+            } else if (type === 'Decimal') {
+                try {
+                    return new Decimal(value);
+                } catch {
+                    throw new InvalidValueError(`invalid ${type} value: ${value}`);
+                }
             } else if (type === 'Boolean') {
                 if (value === 'true') {
                     return true;
@@ -1592,6 +1630,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             if (
                 key.startsWith('filter[') ||
                 key.startsWith('sort[') ||
+                key === 'include' ||
                 key.startsWith('include[') ||
                 key.startsWith('fields[')
             ) {
@@ -1678,7 +1717,6 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             let curr = item;
             let currType = typeInfo;
 
-            const idFields = this.getIdFields(typeInfo.name);
             for (const filterValue of enumerate(value)) {
                 for (let i = 0; i < filterKeys.length; i++) {
                     // extract filter operation from (optional) trailing $op
@@ -1697,6 +1735,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
                         };
                     }
 
+                    const idFields = this.getIdFields(currType.name);
                     const fieldDef =
                         filterKey === 'id'
                             ? Object.values(currType.fields).find((f) => idFields.some((idf) => idf.name === f.name))

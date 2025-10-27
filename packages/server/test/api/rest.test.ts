@@ -4,7 +4,7 @@ import { createPolicyTestClient, createTestClient } from '@zenstackhq/testtools'
 import { Decimal } from 'decimal.js';
 import SuperJSON from 'superjson';
 import { beforeEach, describe, expect, it } from 'vitest';
-import makeHandler from '../../src/api/rest';
+import { RestApiHandler } from '../../src/api/rest';
 
 const idDivider = '_';
 
@@ -12,7 +12,7 @@ describe('REST server tests', () => {
     let client: ClientContract<SchemaDef>;
     let handler: (any: any) => Promise<{ status: number; body: any }>;
 
-    describe('REST server tests - regular prisma', () => {
+    describe('REST server tests - regular client', () => {
         const schema = `
     type Address {
         city String
@@ -87,8 +87,12 @@ describe('REST server tests', () => {
 
         beforeEach(async () => {
             client = await createTestClient(schema);
-            const _handler = makeHandler({ schema: client.$schema, endpoint: 'http://localhost/api', pageSize: 5 });
-            handler = (args) => _handler({ ...args, url: new URL(`http://localhost/${args.path}`) });
+            const _handler = new RestApiHandler({
+                schema: client.$schema,
+                endpoint: 'http://localhost/api',
+                pageSize: 5,
+            });
+            handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
         });
 
         describe('CRUD', () => {
@@ -2567,8 +2571,12 @@ describe('REST server tests', () => {
         beforeEach(async () => {
             client = await createPolicyTestClient(schema);
 
-            const _handler = makeHandler({ schema: client.$schema, endpoint: 'http://localhost/api', pageSize: 5 });
-            handler = (args) => _handler({ ...args, url: new URL(`http://localhost/${args.path}`) });
+            const _handler = new RestApiHandler({
+                schema: client.$schema,
+                endpoint: 'http://localhost/api',
+                pageSize: 5,
+            });
+            handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
         });
 
         it('update policy rejection test', async () => {
@@ -2673,8 +2681,12 @@ describe('REST server tests', () => {
         beforeEach(async () => {
             client = await createPolicyTestClient(schema);
 
-            const _handler = makeHandler({ schema: client.$schema, endpoint: 'http://localhost/api', pageSize: 5 });
-            handler = (args) => _handler({ ...args, url: new URL(`http://localhost/${args.path}`) });
+            const _handler = new RestApiHandler({
+                schema: client.$schema,
+                endpoint: 'http://localhost/api',
+                pageSize: 5,
+            });
+            handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
         });
 
         it('crud test', async () => {
@@ -2745,8 +2757,12 @@ describe('REST server tests', () => {
         it('field types', async () => {
             const client = await createTestClient(schema, { provider: 'postgresql' });
 
-            const _handler = makeHandler({ schema: client.$schema, endpoint: 'http://localhost/api', pageSize: 5 });
-            handler = (args) => _handler({ ...args, url: new URL(`http://localhost/${args.path}`) });
+            const _handler = new RestApiHandler({
+                schema: client.$schema,
+                endpoint: 'http://localhost/api',
+                pageSize: 5,
+            });
+            handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
 
             await client.bar.create({ data: { id: 1, bytes: Buffer.from([7, 8, 9]) } });
 
@@ -2887,19 +2903,18 @@ describe('REST server tests', () => {
     }
     `;
         const idDivider = ':';
-        const dbName = 'restful-compound-id-custom-separator';
 
         beforeEach(async () => {
             client = await createTestClient(schema);
 
-            const _handler = makeHandler({
+            const _handler = new RestApiHandler({
                 schema: client.$schema,
                 endpoint: 'http://localhost/api',
                 pageSize: 5,
                 idDivider,
                 urlSegmentCharset: 'a-zA-Z0-9-_~ %@.:',
             });
-            handler = (args) => _handler({ ...args, url: new URL(`http://localhost/${args.path}`) });
+            handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
         });
 
         it('POST', async () => {
@@ -2992,14 +3007,14 @@ describe('REST server tests', () => {
         beforeEach(async () => {
             client = await createTestClient(schema);
 
-            const _handler = makeHandler({
+            const _handler = new RestApiHandler({
                 schema: client.$schema,
                 endpoint: 'http://localhost/api',
                 modelNameMapping: {
                     User: 'myUser',
                 },
             });
-            handler = (args) => _handler({ ...args, url: new URL(`http://localhost/${args.path}`) });
+            handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
         });
 
         it('works with name mapping', async () => {
@@ -3090,14 +3105,14 @@ describe('REST server tests', () => {
         beforeEach(async () => {
             client = await createTestClient(schema);
 
-            const _handler = makeHandler({
+            const _handler = new RestApiHandler({
                 schema: client.$schema,
                 endpoint: 'http://localhost/api',
                 externalIdMapping: {
                     User: 'name_source',
                 },
             });
-            handler = (args) => _handler({ ...args, url: new URL(`http://localhost/${args.path}`) });
+            handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
         });
 
         it('works with id mapping', async () => {

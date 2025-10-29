@@ -1,17 +1,12 @@
 import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import type { Handler, Request, Response } from 'express';
-import type { ApiHandler } from '../../types';
+import type { CommonAdapterOptions } from '../common';
 
 /**
  * Express middleware options
  */
-export interface MiddlewareOptions<Schema extends SchemaDef> {
-    /**
-     * The API handler to process requests
-     */
-    apiHandler: ApiHandler<Schema>;
-
+export interface MiddlewareOptions<Schema extends SchemaDef>  extends CommonAdapterOptions<Schema> {
     /**
      * Callback for getting a ZenStackClient for the given request
      */

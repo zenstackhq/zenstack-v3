@@ -36,7 +36,7 @@ export default function factory<Schema extends SchemaDef>(
             res.status(r.status).send(r.body);
         } catch (err) {
             log(options.apiHandler.log, 'error', `An unhandled error occurred while processing the request: ${err}${err instanceof Error ? '\n' + err.stack : ''}`);
-            res.status(500).send({ message: 'An unhandled error occurred' });
+            res.status(500).send({ message: 'An internal server error occurred' });
         }
     };
 }

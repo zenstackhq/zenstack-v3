@@ -72,7 +72,7 @@ const factory = <Schema extends SchemaDef>(options: MiddlewareOptions<Schema>): 
                 throw err;
             }
             log(options.apiHandler.log, 'error', `An unhandled error occurred while processing the request: ${err}${err instanceof Error ? '\n' + err.stack : ''}`);
-            return response.status(500).json({ message: `An unhandled error occurred` });
+            return response.status(500).json({ message: `An internal server error occurred` });
         }
     };
 };

@@ -45,7 +45,7 @@ const pluginHandler: FastifyPluginCallback<PluginOptions<SchemaDef>> = (fastify,
             reply.status(response.status).send(response.body);
         } catch (err) {
             log(options.apiHandler.log, 'error', `An unhandled error occurred while processing the request: ${err}${err instanceof Error ? '\n' + err.stack : ''}`);
-            reply.status(500).send({ message: `An unhandled error occurred` });
+            reply.status(500).send({ message: `An internal server error occurred` });
         }
 
         return reply;

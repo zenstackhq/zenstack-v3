@@ -285,6 +285,10 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return this.options.schema;
     }
 
+    get log(): LogConfig | undefined {
+        return this.options.log;
+    }
+
     private buildUrlPatternMap(urlSegmentNameCharset: string): Record<UrlPatterns, UrlPattern> {
         const options = { segmentValueCharset: urlSegmentNameCharset };
 

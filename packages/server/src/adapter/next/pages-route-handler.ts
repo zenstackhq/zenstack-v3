@@ -1,6 +1,7 @@
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { PageRouteRequestHandlerOptions } from '.';
+import { log } from '../../api/utils';
 
 /**
  * Creates a Next.js API endpoint "pages" router request handler that handles ZenStack CRUD requests.
@@ -34,7 +35,8 @@ export default function factory<Schema extends SchemaDef>(
             });
             res.status(r.status).send(r.body);
         } catch (err) {
-            res.status(500).send({ message: `An unhandled error occurred: ${err}` });
+            log(options.apiHandler.log, 'error', `An unhandled error occurred while processing the request: ${err}${err instanceof Error ? '\n' + err.stack : ''}`);
+            res.status(500).send({ message: 'An unhandled error occurred' });
         }
     };
 }

@@ -71,6 +71,11 @@ export interface ApiHandler<Schema extends SchemaDef> {
     get schema(): Schema;
 
     /**
+     * Logging configuration.
+     */
+    get log(): LogConfig | undefined;
+
+    /**
      * Handle an API request.
      */
     handleRequest(context: RequestContext<Schema>): Promise<Response>;

@@ -1,6 +1,7 @@
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { NextRequest, NextResponse } from 'next/server';
 import type { AppRouteRequestHandlerOptions } from '.';
+import { log } from '../../api/utils';
 
 type Context = { params: Promise<{ path: string[] }> };
 
@@ -58,7 +59,8 @@ export default function factory<Schema extends SchemaDef>(
             });
             return NextResponse.json(r.body, { status: r.status });
         } catch (err) {
-            return NextResponse.json({ message: `An unhandled error occurred: ${err}` }, { status: 500 });
+            log(options.apiHandler.log, 'error', `An unhandled error occurred while processing the request: ${err}${err instanceof Error ? '\n' + err.stack : ''}`);
+            return NextResponse.json({ message: 'An internal server error occurred' }, { status: 500 });
         }
     };
 }

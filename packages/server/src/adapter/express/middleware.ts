@@ -1,6 +1,7 @@
 import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import type { Handler, Request, Response } from 'express';
+import { log } from '../../api/utils';
 import type { CommonAdapterOptions } from '../common';
 
 /**
@@ -70,7 +71,8 @@ const factory = <Schema extends SchemaDef>(options: MiddlewareOptions<Schema>): 
             if (sendResponse === false) {
                 throw err;
             }
-            return response.status(500).json({ message: `An unhandled error occurred: ${err}` });
+            log(options.apiHandler.log, 'error', `An unhandled error occurred while processing the request: ${err}${err instanceof Error ? '\n' + err.stack : ''}`);
+            return response.status(500).json({ message: `An internal server error occurred` });
         }
     };
 };

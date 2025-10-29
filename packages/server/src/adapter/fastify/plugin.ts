@@ -2,6 +2,7 @@ import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
+import { log } from '../../api/utils';
 import type { CommonAdapterOptions } from '../common';
 
 /**
@@ -43,7 +44,8 @@ const pluginHandler: FastifyPluginCallback<PluginOptions<SchemaDef>> = (fastify,
             });
             reply.status(response.status).send(response.body);
         } catch (err) {
-            reply.status(500).send({ message: `An unhandled error occurred: ${err}` });
+            log(options.apiHandler.log, 'error', `An unhandled error occurred while processing the request: ${err}${err instanceof Error ? '\n' + err.stack : ''}`);
+            reply.status(500).send({ message: `An internal server error occurred` });
         }
 
         return reply;

@@ -38,6 +38,10 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
         return this.options.schema;
     }
 
+    get log(): LogConfig | undefined {
+        return this.options.log;
+    }
+
     async handleRequest({ client, method, path, query, requestBody }: RequestContext<Schema>): Promise<Response> {
         const parts = path.split('/').filter((p) => !!p);
         const op = parts.pop();

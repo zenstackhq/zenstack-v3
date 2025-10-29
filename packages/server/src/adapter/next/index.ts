@@ -2,16 +2,9 @@ import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { NextRequest } from 'next/server';
-import type { ApiHandler } from '../../types';
+import type { CommonAdapterOptions } from '../common';
 import { default as AppRouteHandler } from './app-route-handler';
 import { default as PagesRouteHandler } from './pages-route-handler';
-
-interface CommonAdapterOptions<Schema extends SchemaDef> {
-    /**
-     * The API handler to process requests
-     */
-    apiHandler: ApiHandler<Schema>;
-}
 
 /**
  * Options for initializing a Next.js API endpoint request handler.

@@ -6,7 +6,7 @@ import type { CommonAdapterOptions } from '../common';
 /**
  * Express middleware options
  */
-export interface MiddlewareOptions<Schema extends SchemaDef>  extends CommonAdapterOptions<Schema> {
+export interface MiddlewareOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
     /**
      * Callback for getting a ZenStackClient for the given request
      */

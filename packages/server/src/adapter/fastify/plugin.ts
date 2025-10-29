@@ -15,7 +15,7 @@ export interface PluginOptions<Schema extends SchemaDef> extends CommonAdapterOp
     prefix: string;
 
     /**
-     * Callback for getting a PrismaClient for the given request
+     * Callback for getting a ZenStackClient for the given request
      */
     getClient: (request: FastifyRequest, reply: FastifyReply) => ClientContract<Schema> | Promise<ClientContract<Schema>>;
 }
@@ -29,7 +29,7 @@ const pluginHandler: FastifyPluginCallback<PluginOptions<SchemaDef>> = (fastify,
     fastify.all(`${prefix}/*`, async (request, reply) => {
         const client = await options.getClient(request, reply);
         if (!client) {
-            reply.status(500).send({ message: 'unable to get prisma from request context' });
+            reply.status(500).send({ message: 'unable to get ZenStackClient from request context' });
             return reply;
         }
 

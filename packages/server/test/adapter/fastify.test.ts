@@ -6,7 +6,7 @@ import { RestApiHandler, RPCApiHandler } from '../../src/api';
 import { makeUrl, schema } from '../utils';
 
 describe('Fastify adapter tests - rpc handler', () => {
-    it('run plugin regular json', async () => {
+    it('properly handles requests', async () => {
         const client = await createTestClient(schema);
 
         const app = fastify();
@@ -108,7 +108,7 @@ describe('Fastify adapter tests - rpc handler', () => {
         expect(r.json().data.count).toBe(1);
     });
 
-    it('invalid path or args', async () => {
+    it('properly handles invalid path or args', async () => {
         const client = await createTestClient(schema);
 
         const app = fastify();
@@ -139,7 +139,7 @@ describe('Fastify adapter tests - rpc handler', () => {
 });
 
 describe('Fastify adapter tests - rest handler', () => {
-    it('run plugin regular json', async () => {
+    it('properly handles requests', async () => {
         const client = await createTestClient(schema);
 
         const app = fastify();

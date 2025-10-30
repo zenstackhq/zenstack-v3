@@ -10,6 +10,7 @@ export default defineConfig({
         nuxt: 'src/adapter/nuxt/index.ts',
         hono: 'src/adapter/hono/index.ts',
         sveltekit: 'src/adapter/sveltekit/index.ts',
+        'tanstack-start': 'src/adapter/tanstack-start/index.ts',
     },
     outDir: 'dist',
     splitting: false,

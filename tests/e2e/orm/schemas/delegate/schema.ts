@@ -5,461 +5,540 @@
 
 /* eslint-disable */
 
-import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
+import { type SchemaDef, ExpressionUtils } from '@zenstackhq/orm/schema';
 export const schema = {
     provider: {
-        type: "sqlite"
+        type: 'sqlite',
     },
     models: {
         User: {
-            name: "User",
+            name: 'User',
             fields: {
                 id: {
-                    name: "id",
-                    type: "Int",
+                    name: 'id',
+                    type: 'Int',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
-                    default: ExpressionUtils.call("autoincrement")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('autoincrement') }] },
+                    ],
+                    default: ExpressionUtils.call('autoincrement'),
                 },
                 email: {
-                    name: "email",
-                    type: "String",
+                    name: 'email',
+                    type: 'String',
                     unique: true,
                     optional: true,
-                    attributes: [{ name: "@unique" }]
+                    attributes: [{ name: '@unique' }],
                 },
                 level: {
-                    name: "level",
-                    type: "Int",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
-                    default: 0
+                    name: 'level',
+                    type: 'Int',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.literal(0) }] }],
+                    default: 0,
                 },
                 assets: {
-                    name: "assets",
-                    type: "Asset",
+                    name: 'assets',
+                    type: 'Asset',
                     array: true,
-                    relation: { opposite: "owner" }
+                    relation: { opposite: 'owner' },
                 },
                 ratedVideos: {
-                    name: "ratedVideos",
-                    type: "RatedVideo",
+                    name: 'ratedVideos',
+                    type: 'RatedVideo',
                     array: true,
-                    attributes: [{ name: "@relation", args: [{ name: "name", value: ExpressionUtils.literal("direct") }] }],
-                    relation: { opposite: "user", name: "direct" }
-                }
+                    attributes: [
+                        { name: '@relation', args: [{ name: 'name', value: ExpressionUtils.literal('direct') }] },
+                    ],
+                    relation: { opposite: 'user', name: 'direct' },
+                },
             },
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "Int" },
-                email: { type: "String" }
-            }
+                id: { type: 'Int' },
+                email: { type: 'String' },
+            },
         },
         Comment: {
-            name: "Comment",
+            name: 'Comment',
             fields: {
                 id: {
-                    name: "id",
-                    type: "Int",
+                    name: 'id',
+                    type: 'Int',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
-                    default: ExpressionUtils.call("autoincrement")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('autoincrement') }] },
+                    ],
+                    default: ExpressionUtils.call('autoincrement'),
                 },
                 content: {
-                    name: "content",
-                    type: "String"
+                    name: 'content',
+                    type: 'String',
                 },
                 asset: {
-                    name: "asset",
-                    type: "Asset",
+                    name: 'asset',
+                    type: 'Asset',
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("assetId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "comments", fields: ["assetId"], references: ["id"], onDelete: "Cascade" }
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('assetId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'comments', fields: ['assetId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 assetId: {
-                    name: "assetId",
-                    type: "Int",
+                    name: 'assetId',
+                    type: 'Int',
                     optional: true,
-                    foreignKeyFor: [
-                        "asset"
-                    ]
-                }
+                    foreignKeyFor: ['asset'],
+                },
             },
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "Int" }
-            }
+                id: { type: 'Int' },
+            },
         },
         Asset: {
-            name: "Asset",
+            name: 'Asset',
             fields: {
                 id: {
-                    name: "id",
-                    type: "Int",
+                    name: 'id',
+                    type: 'Int',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
-                    default: ExpressionUtils.call("autoincrement")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('autoincrement') }] },
+                    ],
+                    default: ExpressionUtils.call('autoincrement'),
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    attributes: [{ name: '@updatedAt' }],
                 },
                 viewCount: {
-                    name: "viewCount",
-                    type: "Int",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
-                    default: 0
+                    name: 'viewCount',
+                    type: 'Int',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.literal(0) }] }],
+                    default: 0,
                 },
                 owner: {
-                    name: "owner",
-                    type: "User",
+                    name: 'owner',
+                    type: 'User',
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "assets", fields: ["ownerId"], references: ["id"], onDelete: "Cascade" }
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('ownerId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'assets', fields: ['ownerId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 ownerId: {
-                    name: "ownerId",
-                    type: "Int",
+                    name: 'ownerId',
+                    type: 'Int',
                     optional: true,
-                    foreignKeyFor: [
-                        "owner"
-                    ]
+                    foreignKeyFor: ['owner'],
                 },
                 comments: {
-                    name: "comments",
-                    type: "Comment",
+                    name: 'comments',
+                    type: 'Comment',
                     array: true,
-                    relation: { opposite: "asset" }
+                    relation: { opposite: 'asset' },
                 },
                 assetType: {
-                    name: "assetType",
-                    type: "String",
-                    isDiscriminator: true
-                }
+                    name: 'assetType',
+                    type: 'String',
+                    isDiscriminator: true,
+                },
             },
             attributes: [
-                { name: "@@delegate", args: [{ name: "discriminator", value: ExpressionUtils.field("assetType") }] }
+                { name: '@@delegate', args: [{ name: 'discriminator', value: ExpressionUtils.field('assetType') }] },
             ],
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "Int" }
+                id: { type: 'Int' },
             },
             isDelegate: true,
-            subModels: ["Video", "Image"]
+            subModels: ['Video', 'Image'],
         },
         Video: {
-            name: "Video",
-            baseModel: "Asset",
+            name: 'Video',
+            baseModel: 'Asset',
             fields: {
                 id: {
-                    name: "id",
-                    type: "Int",
+                    name: 'id',
+                    type: 'Int',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
-                    default: ExpressionUtils.call("autoincrement")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('autoincrement') }] },
+                    ],
+                    default: ExpressionUtils.call('autoincrement'),
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    originModel: "Asset",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    originModel: 'Asset',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    originModel: "Asset",
-                    attributes: [{ name: "@updatedAt" }]
+                    originModel: 'Asset',
+                    attributes: [{ name: '@updatedAt' }],
                 },
                 viewCount: {
-                    name: "viewCount",
-                    type: "Int",
-                    originModel: "Asset",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
-                    default: 0
+                    name: 'viewCount',
+                    type: 'Int',
+                    originModel: 'Asset',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.literal(0) }] }],
+                    default: 0,
                 },
                 owner: {
-                    name: "owner",
-                    type: "User",
+                    name: 'owner',
+                    type: 'User',
                     optional: true,
-                    originModel: "Asset",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "assets", fields: ["ownerId"], references: ["id"], onDelete: "Cascade" }
+                    originModel: 'Asset',
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('ownerId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'assets', fields: ['ownerId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 ownerId: {
-                    name: "ownerId",
-                    type: "Int",
+                    name: 'ownerId',
+                    type: 'Int',
                     optional: true,
-                    originModel: "Asset",
-                    foreignKeyFor: [
-                        "owner"
-                    ]
+                    originModel: 'Asset',
+                    foreignKeyFor: ['owner'],
                 },
                 comments: {
-                    name: "comments",
-                    type: "Comment",
+                    name: 'comments',
+                    type: 'Comment',
                     array: true,
-                    originModel: "Asset",
-                    relation: { opposite: "asset" }
+                    originModel: 'Asset',
+                    relation: { opposite: 'asset' },
                 },
                 assetType: {
-                    name: "assetType",
-                    type: "String",
-                    originModel: "Asset",
-                    isDiscriminator: true
+                    name: 'assetType',
+                    type: 'String',
+                    originModel: 'Asset',
+                    isDiscriminator: true,
                 },
                 duration: {
-                    name: "duration",
-                    type: "Int"
+                    name: 'duration',
+                    type: 'Int',
                 },
                 url: {
-                    name: "url",
-                    type: "String",
+                    name: 'url',
+                    type: 'String',
                     unique: true,
-                    attributes: [{ name: "@unique" }]
+                    attributes: [{ name: '@unique' }],
                 },
                 videoType: {
-                    name: "videoType",
-                    type: "String",
-                    isDiscriminator: true
-                }
+                    name: 'videoType',
+                    type: 'String',
+                    isDiscriminator: true,
+                },
             },
             attributes: [
-                { name: "@@delegate", args: [{ name: "discriminator", value: ExpressionUtils.field("videoType") }] }
+                { name: '@@delegate', args: [{ name: 'discriminator', value: ExpressionUtils.field('videoType') }] },
             ],
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "Int" },
-                url: { type: "String" }
+                id: { type: 'Int' },
+                url: { type: 'String' },
             },
             isDelegate: true,
-            subModels: ["RatedVideo"]
+            subModels: ['RatedVideo'],
         },
         RatedVideo: {
-            name: "RatedVideo",
-            baseModel: "Video",
+            name: 'RatedVideo',
+            baseModel: 'Video',
             fields: {
                 id: {
-                    name: "id",
-                    type: "Int",
+                    name: 'id',
+                    type: 'Int',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
-                    default: ExpressionUtils.call("autoincrement")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('autoincrement') }] },
+                    ],
+                    default: ExpressionUtils.call('autoincrement'),
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    originModel: "Asset",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    originModel: 'Asset',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    originModel: "Asset",
-                    attributes: [{ name: "@updatedAt" }]
+                    originModel: 'Asset',
+                    attributes: [{ name: '@updatedAt' }],
                 },
                 viewCount: {
-                    name: "viewCount",
-                    type: "Int",
-                    originModel: "Asset",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
-                    default: 0
+                    name: 'viewCount',
+                    type: 'Int',
+                    originModel: 'Asset',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.literal(0) }] }],
+                    default: 0,
                 },
                 owner: {
-                    name: "owner",
-                    type: "User",
+                    name: 'owner',
+                    type: 'User',
                     optional: true,
-                    originModel: "Asset",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "assets", fields: ["ownerId"], references: ["id"], onDelete: "Cascade" }
+                    originModel: 'Asset',
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('ownerId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'assets', fields: ['ownerId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 ownerId: {
-                    name: "ownerId",
-                    type: "Int",
+                    name: 'ownerId',
+                    type: 'Int',
                     optional: true,
-                    originModel: "Asset",
-                    foreignKeyFor: [
-                        "owner"
-                    ]
+                    originModel: 'Asset',
+                    foreignKeyFor: ['owner'],
                 },
                 comments: {
-                    name: "comments",
-                    type: "Comment",
+                    name: 'comments',
+                    type: 'Comment',
                     array: true,
-                    originModel: "Asset",
-                    relation: { opposite: "asset" }
+                    originModel: 'Asset',
+                    relation: { opposite: 'asset' },
                 },
                 assetType: {
-                    name: "assetType",
-                    type: "String",
-                    originModel: "Asset",
-                    isDiscriminator: true
+                    name: 'assetType',
+                    type: 'String',
+                    originModel: 'Asset',
+                    isDiscriminator: true,
                 },
                 duration: {
-                    name: "duration",
-                    type: "Int",
-                    originModel: "Video"
+                    name: 'duration',
+                    type: 'Int',
+                    originModel: 'Video',
                 },
                 url: {
-                    name: "url",
-                    type: "String",
+                    name: 'url',
+                    type: 'String',
                     unique: true,
-                    originModel: "Video",
-                    attributes: [{ name: "@unique" }]
+                    originModel: 'Video',
+                    attributes: [{ name: '@unique' }],
                 },
                 videoType: {
-                    name: "videoType",
-                    type: "String",
-                    originModel: "Video",
-                    isDiscriminator: true
+                    name: 'videoType',
+                    type: 'String',
+                    originModel: 'Video',
+                    isDiscriminator: true,
                 },
                 rating: {
-                    name: "rating",
-                    type: "Int"
+                    name: 'rating',
+                    type: 'Int',
                 },
                 user: {
-                    name: "user",
-                    type: "User",
+                    name: 'user',
+                    type: 'User',
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "name", value: ExpressionUtils.literal("direct") }, { name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "ratedVideos", name: "direct", fields: ["userId"], references: ["id"], onDelete: "Cascade" }
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'name', value: ExpressionUtils.literal('direct') },
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('userId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: {
+                        opposite: 'ratedVideos',
+                        name: 'direct',
+                        fields: ['userId'],
+                        references: ['id'],
+                        onDelete: 'Cascade',
+                    },
                 },
                 userId: {
-                    name: "userId",
-                    type: "Int",
+                    name: 'userId',
+                    type: 'Int',
                     optional: true,
-                    foreignKeyFor: [
-                        "user"
-                    ]
-                }
+                    foreignKeyFor: ['user'],
+                },
             },
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "Int" },
-                url: { type: "String" }
-            }
+                id: { type: 'Int' },
+                url: { type: 'String' },
+            },
         },
         Image: {
-            name: "Image",
-            baseModel: "Asset",
+            name: 'Image',
+            baseModel: 'Asset',
             fields: {
                 id: {
-                    name: "id",
-                    type: "Int",
+                    name: 'id',
+                    type: 'Int',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
-                    default: ExpressionUtils.call("autoincrement")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('autoincrement') }] },
+                    ],
+                    default: ExpressionUtils.call('autoincrement'),
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    originModel: "Asset",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    originModel: 'Asset',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    originModel: "Asset",
-                    attributes: [{ name: "@updatedAt" }]
+                    originModel: 'Asset',
+                    attributes: [{ name: '@updatedAt' }],
                 },
                 viewCount: {
-                    name: "viewCount",
-                    type: "Int",
-                    originModel: "Asset",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
-                    default: 0
+                    name: 'viewCount',
+                    type: 'Int',
+                    originModel: 'Asset',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.literal(0) }] }],
+                    default: 0,
                 },
                 owner: {
-                    name: "owner",
-                    type: "User",
+                    name: 'owner',
+                    type: 'User',
                     optional: true,
-                    originModel: "Asset",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "assets", fields: ["ownerId"], references: ["id"], onDelete: "Cascade" }
+                    originModel: 'Asset',
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('ownerId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'assets', fields: ['ownerId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 ownerId: {
-                    name: "ownerId",
-                    type: "Int",
+                    name: 'ownerId',
+                    type: 'Int',
                     optional: true,
-                    originModel: "Asset",
-                    foreignKeyFor: [
-                        "owner"
-                    ]
+                    originModel: 'Asset',
+                    foreignKeyFor: ['owner'],
                 },
                 comments: {
-                    name: "comments",
-                    type: "Comment",
+                    name: 'comments',
+                    type: 'Comment',
                     array: true,
-                    originModel: "Asset",
-                    relation: { opposite: "asset" }
+                    originModel: 'Asset',
+                    relation: { opposite: 'asset' },
                 },
                 assetType: {
-                    name: "assetType",
-                    type: "String",
-                    originModel: "Asset",
-                    isDiscriminator: true
+                    name: 'assetType',
+                    type: 'String',
+                    originModel: 'Asset',
+                    isDiscriminator: true,
                 },
                 format: {
-                    name: "format",
-                    type: "String"
+                    name: 'format',
+                    type: 'String',
                 },
                 gallery: {
-                    name: "gallery",
-                    type: "Gallery",
+                    name: 'gallery',
+                    type: 'Gallery',
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("galleryId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "images", fields: ["galleryId"], references: ["id"], onDelete: "Cascade" }
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('galleryId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'images', fields: ['galleryId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 galleryId: {
-                    name: "galleryId",
-                    type: "Int",
+                    name: 'galleryId',
+                    type: 'Int',
                     optional: true,
-                    foreignKeyFor: [
-                        "gallery"
-                    ]
-                }
+                    foreignKeyFor: ['gallery'],
+                },
             },
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "Int" }
-            }
+                id: { type: 'Int' },
+            },
         },
         Gallery: {
-            name: "Gallery",
+            name: 'Gallery',
             fields: {
                 id: {
-                    name: "id",
-                    type: "Int",
+                    name: 'id',
+                    type: 'Int',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
-                    default: ExpressionUtils.call("autoincrement")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('autoincrement') }] },
+                    ],
+                    default: ExpressionUtils.call('autoincrement'),
                 },
                 images: {
-                    name: "images",
-                    type: "Image",
+                    name: 'images',
+                    type: 'Image',
                     array: true,
-                    relation: { opposite: "gallery" }
-                }
+                    relation: { opposite: 'gallery' },
+                },
             },
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "Int" }
-            }
-        }
+                id: { type: 'Int' },
+            },
+        },
     },
-    authType: "User",
-    plugins: {}
+    authType: 'User',
+    plugins: {},
 } as const satisfies SchemaDef;
 export type SchemaType = typeof schema;

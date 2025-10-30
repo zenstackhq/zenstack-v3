@@ -108,6 +108,16 @@
                 "types": "./dist/sveltekit.d.cts",
                 "default": "./dist/sveltekit.cjs"
             }
+        },
+        "./tanstack-start": {
+            "import": {
+                "types": "./dist/tanstack-start.d.ts",
+                "default": "./dist/tanstack-start.js"
+            },
+            "require": {
+                "types": "./dist/tanstack-start.d.cts",
+                "default": "./dist/tanstack-start.cjs"
+            }
         }
     },
     "dependencies": {

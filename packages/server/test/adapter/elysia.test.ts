@@ -11,7 +11,11 @@ describe('Elysia adapter tests - rpc handler', () => {
         const client = await createTestClient(schema);
 
         const handler = await createElysiaApp(
-            createElysiaHandler({ getClient: () => client, basePath: '/api', apiHandler: new RPCApiHandler({ schema: client.schema }) })
+            createElysiaHandler({
+                getClient: () => client,
+                basePath: '/api',
+                apiHandler: new RPCApiHandler({ schema: client.schema }),
+            }),
         );
 
         let r = await handler(makeRequest('GET', makeUrl('/api/post/findMany', { where: { id: { equals: '1' } } })));
@@ -31,7 +35,7 @@ describe('Elysia adapter tests - rpc handler', () => {
                         ],
                     },
                 },
-            })
+            }),
         );
         expect(r.status).toBe(201);
         expect((await unmarshal(r)).data).toMatchObject({
@@ -51,7 +55,7 @@ describe('Elysia adapter tests - rpc handler', () => {
         expect((await unmarshal(r)).data).toHaveLength(1);
 
         r = await handler(
-            makeRequest('PUT', '/api/user/update', { where: { id: 'user1' }, data: { email: 'user1@def.com' } })
+            makeRequest('PUT', '/api/user/update', { where: { id: 'user1' }, data: { email: 'user1@def.com' } }),
         );
         expect(r.status).toBe(200);
         expect((await unmarshal(r)).data.email).toBe('user1@def.com');
@@ -65,14 +69,14 @@ describe('Elysia adapter tests - rpc handler', () => {
         expect((await unmarshal(r)).data._sum.viewCount).toBe(3);
 
         r = await handler(
-            makeRequest('GET', makeUrl('/api/post/groupBy', { by: ['published'], _sum: { viewCount: true } }))
+            makeRequest('GET', makeUrl('/api/post/groupBy', { by: ['published'], _sum: { viewCount: true } })),
         );
         expect(r.status).toBe(200);
         expect((await unmarshal(r)).data).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({ published: true, _sum: { viewCount: 1 } }),
                 expect.objectContaining({ published: false, _sum: { viewCount: 2 } }),
-            ])
+            ]),
         );
 
         r = await handler(makeRequest('DELETE', makeUrl('/api/user/deleteMany', { where: { id: 'user1' } })));
@@ -89,8 +93,8 @@ describe('Elysia adapter tests - rest handler', () => {
             createElysiaHandler({
                 getClient: () => client,
                 basePath: '/api',
-                apiHandler: new RestApiHandler({schema: client.$schema, endpoint: 'http://localhost/api' }),
-            })
+                apiHandler: new RestApiHandler({ schema: client.$schema, endpoint: 'http://localhost/api' }),
+            }),
         );
 
         let r = await handler(makeRequest('GET', makeUrl('/api/post/1')));
@@ -102,7 +106,7 @@ describe('Elysia adapter tests - rest handler', () => {
                     type: 'user',
                     attributes: { id: 'user1', email: 'user1@abc.com' },
                 },
-            })
+            }),
         );
         expect(r.status).toBe(201);
         expect(await unmarshal(r)).toMatchObject({
@@ -129,7 +133,7 @@ describe('Elysia adapter tests - rest handler', () => {
         r = await handler(
             makeRequest('PUT', makeUrl('/api/user/user1'), {
                 data: { type: 'user', attributes: { email: 'user1@def.com' } },
-            })
+            }),
         );
         expect(r.status).toBe(200);
         expect((await unmarshal(r)).data.attributes.email).toBe('user1@def.com');

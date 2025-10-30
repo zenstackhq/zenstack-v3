@@ -8,7 +8,7 @@ export default defineConfig({
         fastify: 'src/adapter/fastify/index.ts',
         elysia: 'src/adapter/elysia/index.ts',
         nuxt: 'src/adapter/nuxt/index.ts',
-        hono: 'src/adapter/hono/handler.ts',
+        hono: 'src/adapter/hono/index.ts',
     },
     outDir: 'dist',
     splitting: false,

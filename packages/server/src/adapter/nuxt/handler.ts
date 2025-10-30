@@ -1,14 +1,14 @@
 import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import {
-    type EventHandlerRequest,
     H3Event,
     defineEventHandler,
     getQuery,
     getRouterParams,
-    readBody
+    readBody,
+    type EventHandlerRequest
 } from 'h3';
-import type { CommonAdapterOptions } from '../common';
+import { logInternalError, type CommonAdapterOptions } from '../common';
 
 /**
  * Nuxt request handler options
@@ -49,7 +49,8 @@ export function createEventHandler<Schema extends SchemaDef>(options: HandlerOpt
             return body;
         } catch (err) {
             event.res.status = 500;
-            return { message: `An unhandled error occurred: ${err}` };
+            logInternalError(options.apiHandler.log, err);
+            return { message: 'An internal server error occurred' };
         }
     });
 }

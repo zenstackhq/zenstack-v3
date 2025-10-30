@@ -8,6 +8,7 @@ import {
     readBody,
     type EventHandlerRequest
 } from 'h3';
+import { setResponseStatus } from 'nuxt/app';
 import { logInternalError, type CommonAdapterOptions } from '../common';
 
 /**
@@ -24,7 +25,7 @@ export function createEventHandler<Schema extends SchemaDef>(options: HandlerOpt
     return defineEventHandler(async (event) => {
         const client = await options.getClient(event);
         if (!client) {
-            event.res.status = 500;
+            setResponseStatus(event, 500);
             return { message: 'unable to get ZenStackClient from request context' };
         }
 
@@ -32,7 +33,7 @@ export function createEventHandler<Schema extends SchemaDef>(options: HandlerOpt
         const query = await getQuery(event);
 
         let reqBody: unknown;
-        if (event.req.method === 'POST' || event.req.method === 'PUT' || event.req.method === 'PATCH') {
+        if (event.method === 'POST' || event.method === 'PUT' || event.method === 'PATCH') {
             reqBody = await readBody(event);
         }
 
@@ -45,10 +46,10 @@ export function createEventHandler<Schema extends SchemaDef>(options: HandlerOpt
                 client,
             });
 
-            event.res.status = status;
+            setResponseStatus(event, status);
             return body;
         } catch (err) {
-            event.res.status = 500;
+            setResponseStatus(event, 500);
             logInternalError(options.apiHandler.log, err);
             return { message: 'An internal server error occurred' };
         }

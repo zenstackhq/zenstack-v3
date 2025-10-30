@@ -476,8 +476,8 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0
       h3:
-        specifier: 2.0.1-rc.5
-        version: 2.0.1-rc.5
+        specifier: ^1.15.4
+        version: 1.15.4
       hono:
         specifier: ^4.6.3
         version: 4.10.3
@@ -3734,15 +3734,6 @@ packages:
   h3@1.15.4:
     resolution: {integrity: sha512-z5cFQWDffyOe4vQ9xIqNfCZdV4p//vy6fBnr8Q1AWnVZ0teurKMG66rLj++TKwKPUP3u7iMUvrvKaEUiQw2QWQ==}
 
-  h3@2.0.1-rc.5:
-    resolution: {integrity: sha512-qkohAzCab0nLzXNm78tBjZDvtKMTmtygS8BJLT3VPczAQofdqlFXDPkXdLMJN4r05+xqneG8snZJ0HgkERCZTg==}
-    engines: {node: '>=20.11.1'}
-    peerDependencies:
-      crossws: ^0.4.1
-    peerDependenciesMeta:
-      crossws:
-        optional: true
-
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
@@ -5132,9 +5123,6 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rou3@0.7.9:
-    resolution: {integrity: sha512-+JM7c8swGkoXkWRkIz7qpYN9Bls7Rj/vuSGaxtoKHIe8Ba1ci+mXnqzqtJFrXSbvEazNL9v83P2RiXae9NSbfQ==}
-
   router@2.2.0:
     resolution: {integrity: sha512-nLTrUKm2UyiL7rlhapu/Zl45FwNgkZGaCpZbIHajDYgwlJCOzLSk+cIPAnsEqV955GjILJnKbdQC1nVPz+gAYQ==}
     engines: {node: '>= 18'}
@@ -5317,11 +5305,6 @@ packages:
 
   srvx@0.8.16:
     resolution: {integrity: sha512-hmcGW4CgroeSmzgF1Ihwgl+Ths0JqAJ7HwjP2X7e3JzY7u4IydLMcdnlqGQiQGUswz+PO9oh/KtCpOISIvs9QQ==}
-    engines: {node: '>=20.16.0'}
-    hasBin: true
-
-  srvx@0.9.2:
-    resolution: {integrity: sha512-LfOHFxk16td6UjWh8YKPzA6+UJudLh59gj8F+Cb4N0xvwkoR8+rUnX9ej9rv9CT9tt9A6hHhN3A3G210DUS88g==}
     engines: {node: '>=20.16.0'}
     hasBin: true
 
@@ -9365,11 +9348,6 @@ snapshots:
       ufo: 1.6.1
       uncrypto: 0.1.3
 
-  h3@2.0.1-rc.5:
-    dependencies:
-      rou3: 0.7.9
-      srvx: 0.9.2
-
   has-flag@4.0.0: {}
 
   has-property-descriptors@1.0.2:
@@ -10933,8 +10911,6 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.52.5
       fsevents: 2.3.3
 
-  rou3@0.7.9: {}
-
   router@2.2.0:
     dependencies:
       debug: 4.4.1
@@ -11151,8 +11127,6 @@ snapshots:
   sql.js@1.13.0: {}
 
   srvx@0.8.16: {}
-
-  srvx@0.9.2: {}
 
   stackback@0.0.2: {}
 

@@ -8,7 +8,6 @@ import { logInternalError, type CommonAdapterOptions } from '../common';
  * Fastify plugin options
  */
 export interface FastifyPluginOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
-
     /**
      * Url prefix, e.g.: /api
      */
@@ -17,7 +16,10 @@ export interface FastifyPluginOptions<Schema extends SchemaDef> extends CommonAd
     /**
      * Callback for getting a ZenStackClient for the given request
      */
-    getClient: (request: FastifyRequest, reply: FastifyReply) => ClientContract<Schema> | Promise<ClientContract<Schema>>;
+    getClient: (
+        request: FastifyRequest,
+        reply: FastifyReply,
+    ) => ClientContract<Schema> | Promise<ClientContract<Schema>>;
 }
 
 /**

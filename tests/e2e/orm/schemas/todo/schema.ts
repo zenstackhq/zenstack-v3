@@ -5,392 +5,831 @@
 
 /* eslint-disable */
 
-import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
+import { type SchemaDef, ExpressionUtils } from '@zenstackhq/orm/schema';
 export const schema = {
     provider: {
-        type: "sqlite"
+        type: 'sqlite',
     },
     models: {
         Space: {
-            name: "Space",
+            name: 'Space',
             fields: {
                 id: {
-                    name: "id",
-                    type: "String",
+                    name: 'id',
+                    type: 'String',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("uuid") }] }],
-                    default: ExpressionUtils.call("uuid")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('uuid') }] },
+                    ],
+                    default: ExpressionUtils.call('uuid'),
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    attributes: [{ name: '@updatedAt' }],
                 },
                 name: {
-                    name: "name",
-                    type: "String",
-                    attributes: [{ name: "@length", args: [{ name: "min", value: ExpressionUtils.literal(4) }, { name: "max", value: ExpressionUtils.literal(50) }] }]
+                    name: 'name',
+                    type: 'String',
+                    attributes: [
+                        {
+                            name: '@length',
+                            args: [
+                                { name: 'min', value: ExpressionUtils.literal(4) },
+                                { name: 'max', value: ExpressionUtils.literal(50) },
+                            ],
+                        },
+                    ],
                 },
                 slug: {
-                    name: "slug",
-                    type: "String",
+                    name: 'slug',
+                    type: 'String',
                     unique: true,
-                    attributes: [{ name: "@unique" }, { name: "@length", args: [{ name: "min", value: ExpressionUtils.literal(4) }, { name: "max", value: ExpressionUtils.literal(16) }] }]
+                    attributes: [
+                        { name: '@unique' },
+                        {
+                            name: '@length',
+                            args: [
+                                { name: 'min', value: ExpressionUtils.literal(4) },
+                                { name: 'max', value: ExpressionUtils.literal(16) },
+                            ],
+                        },
+                    ],
                 },
                 owner: {
-                    name: "owner",
-                    type: "User",
+                    name: 'owner',
+                    type: 'User',
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "ownedSpaces", fields: ["ownerId"], references: ["id"], onDelete: "Cascade" }
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('ownerId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'ownedSpaces', fields: ['ownerId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 ownerId: {
-                    name: "ownerId",
-                    type: "String",
+                    name: 'ownerId',
+                    type: 'String',
                     optional: true,
-                    foreignKeyFor: [
-                        "owner"
-                    ]
+                    foreignKeyFor: ['owner'],
                 },
                 members: {
-                    name: "members",
-                    type: "SpaceUser",
+                    name: 'members',
+                    type: 'SpaceUser',
                     array: true,
-                    relation: { opposite: "space" }
+                    relation: { opposite: 'space' },
                 },
                 lists: {
-                    name: "lists",
-                    type: "List",
+                    name: 'lists',
+                    type: 'List',
                     array: true,
-                    relation: { opposite: "space" }
-                }
+                    relation: { opposite: 'space' },
+                },
             },
             attributes: [
-                { name: "@@deny", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.call("auth"), "==", ExpressionUtils._null()) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("create") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("read") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.field("members"), "?", ExpressionUtils.binary(ExpressionUtils.field("userId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"]))) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("update,delete") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.field("members"), "?", ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.field("userId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])), "&&", ExpressionUtils.binary(ExpressionUtils.field("role"), "==", ExpressionUtils.literal("ADMIN")))) }] }
+                {
+                    name: '@@deny',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('all') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(ExpressionUtils.call('auth'), '==', ExpressionUtils._null()),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('create') },
+                        { name: 'condition', value: ExpressionUtils.literal(true) },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('read') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.field('members'),
+                                '?',
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.field('userId'),
+                                    '==',
+                                    ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                ),
+                            ),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('update,delete') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.field('members'),
+                                '?',
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.binary(
+                                        ExpressionUtils.field('userId'),
+                                        '==',
+                                        ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                    ),
+                                    '&&',
+                                    ExpressionUtils.binary(
+                                        ExpressionUtils.field('role'),
+                                        '==',
+                                        ExpressionUtils.literal('ADMIN'),
+                                    ),
+                                ),
+                            ),
+                        },
+                    ],
+                },
             ],
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "String" },
-                slug: { type: "String" }
-            }
+                id: { type: 'String' },
+                slug: { type: 'String' },
+            },
         },
         SpaceUser: {
-            name: "SpaceUser",
+            name: 'SpaceUser',
             fields: {
                 id: {
-                    name: "id",
-                    type: "String",
+                    name: 'id',
+                    type: 'String',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("uuid") }] }],
-                    default: ExpressionUtils.call("uuid")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('uuid') }] },
+                    ],
+                    default: ExpressionUtils.call('uuid'),
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    attributes: [{ name: '@updatedAt' }],
                 },
                 space: {
-                    name: "space",
-                    type: "Space",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("spaceId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "members", fields: ["spaceId"], references: ["id"], onDelete: "Cascade" }
+                    name: 'space',
+                    type: 'Space',
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('spaceId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'members', fields: ['spaceId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 spaceId: {
-                    name: "spaceId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "space"
-                    ]
+                    name: 'spaceId',
+                    type: 'String',
+                    foreignKeyFor: ['space'],
                 },
                 user: {
-                    name: "user",
-                    type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "spaces", fields: ["userId"], references: ["id"], onDelete: "Cascade" }
+                    name: 'user',
+                    type: 'User',
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('userId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'spaces', fields: ['userId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 userId: {
-                    name: "userId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "user"
-                    ]
+                    name: 'userId',
+                    type: 'String',
+                    foreignKeyFor: ['user'],
                 },
                 role: {
-                    name: "role",
-                    type: "String"
-                }
+                    name: 'role',
+                    type: 'String',
+                },
             },
             attributes: [
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId"), ExpressionUtils.field("spaceId")]) }] },
-                { name: "@@deny", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.call("auth"), "==", ExpressionUtils._null()) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("create,update,delete") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("space"), ["ownerId"]), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])), "||", ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("space"), ["members"]), "?", ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.field("userId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])), "&&", ExpressionUtils.binary(ExpressionUtils.field("role"), "==", ExpressionUtils.literal("ADMIN"))))) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("read") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("space"), ["members"]), "?", ExpressionUtils.binary(ExpressionUtils.field("userId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"]))) }] }
+                {
+                    name: '@@unique',
+                    args: [
+                        {
+                            name: 'fields',
+                            value: ExpressionUtils.array([
+                                ExpressionUtils.field('userId'),
+                                ExpressionUtils.field('spaceId'),
+                            ]),
+                        },
+                    ],
+                },
+                {
+                    name: '@@deny',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('all') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(ExpressionUtils.call('auth'), '==', ExpressionUtils._null()),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('create,update,delete') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.member(ExpressionUtils.field('space'), ['ownerId']),
+                                    '==',
+                                    ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                ),
+                                '||',
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.member(ExpressionUtils.field('space'), ['members']),
+                                    '?',
+                                    ExpressionUtils.binary(
+                                        ExpressionUtils.binary(
+                                            ExpressionUtils.field('userId'),
+                                            '==',
+                                            ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                        ),
+                                        '&&',
+                                        ExpressionUtils.binary(
+                                            ExpressionUtils.field('role'),
+                                            '==',
+                                            ExpressionUtils.literal('ADMIN'),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('read') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.member(ExpressionUtils.field('space'), ['members']),
+                                '?',
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.field('userId'),
+                                    '==',
+                                    ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                ),
+                            ),
+                        },
+                    ],
+                },
             ],
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "String" },
-                userId_spaceId: { userId: { type: "String" }, spaceId: { type: "String" } }
-            }
+                id: { type: 'String' },
+                userId_spaceId: { userId: { type: 'String' }, spaceId: { type: 'String' } },
+            },
         },
         User: {
-            name: "User",
+            name: 'User',
             fields: {
                 id: {
-                    name: "id",
-                    type: "String",
+                    name: 'id',
+                    type: 'String',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("uuid") }] }],
-                    default: ExpressionUtils.call("uuid")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('uuid') }] },
+                    ],
+                    default: ExpressionUtils.call('uuid'),
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    attributes: [{ name: '@updatedAt' }],
                 },
                 email: {
-                    name: "email",
-                    type: "String",
+                    name: 'email',
+                    type: 'String',
                     unique: true,
-                    attributes: [{ name: "@unique" }, { name: "@email" }]
+                    attributes: [{ name: '@unique' }, { name: '@email' }],
                 },
                 password: {
-                    name: "password",
-                    type: "String",
-                    optional: true
+                    name: 'password',
+                    type: 'String',
+                    optional: true,
                 },
                 emailVerified: {
-                    name: "emailVerified",
-                    type: "DateTime",
-                    optional: true
+                    name: 'emailVerified',
+                    type: 'DateTime',
+                    optional: true,
                 },
                 name: {
-                    name: "name",
-                    type: "String",
-                    optional: true
+                    name: 'name',
+                    type: 'String',
+                    optional: true,
                 },
                 ownedSpaces: {
-                    name: "ownedSpaces",
-                    type: "Space",
+                    name: 'ownedSpaces',
+                    type: 'Space',
                     array: true,
-                    relation: { opposite: "owner" }
+                    relation: { opposite: 'owner' },
                 },
                 spaces: {
-                    name: "spaces",
-                    type: "SpaceUser",
+                    name: 'spaces',
+                    type: 'SpaceUser',
                     array: true,
-                    relation: { opposite: "user" }
+                    relation: { opposite: 'user' },
                 },
                 image: {
-                    name: "image",
-                    type: "String",
+                    name: 'image',
+                    type: 'String',
                     optional: true,
-                    attributes: [{ name: "@url" }]
+                    attributes: [{ name: '@url' }],
                 },
                 lists: {
-                    name: "lists",
-                    type: "List",
+                    name: 'lists',
+                    type: 'List',
                     array: true,
-                    relation: { opposite: "owner" }
+                    relation: { opposite: 'owner' },
                 },
                 todos: {
-                    name: "todos",
-                    type: "Todo",
+                    name: 'todos',
+                    type: 'Todo',
                     array: true,
-                    relation: { opposite: "owner" }
-                }
+                    relation: { opposite: 'owner' },
+                },
             },
             attributes: [
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("create") }, { name: "condition", value: ExpressionUtils.literal(true) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("read") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.field("spaces"), "?", ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("space"), ["members"]), "?", ExpressionUtils.binary(ExpressionUtils.field("userId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])))) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"]), "==", ExpressionUtils.field("id")) }] }
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('create') },
+                        { name: 'condition', value: ExpressionUtils.literal(true) },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('read') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.field('spaces'),
+                                '?',
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.member(ExpressionUtils.field('space'), ['members']),
+                                    '?',
+                                    ExpressionUtils.binary(
+                                        ExpressionUtils.field('userId'),
+                                        '==',
+                                        ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                    ),
+                                ),
+                            ),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('all') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                '==',
+                                ExpressionUtils.field('id'),
+                            ),
+                        },
+                    ],
+                },
             ],
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "String" },
-                email: { type: "String" }
-            }
+                id: { type: 'String' },
+                email: { type: 'String' },
+            },
         },
         List: {
-            name: "List",
+            name: 'List',
             fields: {
                 id: {
-                    name: "id",
-                    type: "String",
+                    name: 'id',
+                    type: 'String',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("uuid") }] }],
-                    default: ExpressionUtils.call("uuid")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('uuid') }] },
+                    ],
+                    default: ExpressionUtils.call('uuid'),
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    attributes: [{ name: '@updatedAt' }],
                 },
                 space: {
-                    name: "space",
-                    type: "Space",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("spaceId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "lists", fields: ["spaceId"], references: ["id"], onDelete: "Cascade" }
+                    name: 'space',
+                    type: 'Space',
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('spaceId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'lists', fields: ['spaceId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 spaceId: {
-                    name: "spaceId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "space"
-                    ]
+                    name: 'spaceId',
+                    type: 'String',
+                    foreignKeyFor: ['space'],
                 },
                 owner: {
-                    name: "owner",
-                    type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "lists", fields: ["ownerId"], references: ["id"], onDelete: "Cascade" }
+                    name: 'owner',
+                    type: 'User',
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('ownerId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'lists', fields: ['ownerId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 ownerId: {
-                    name: "ownerId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "owner"
-                    ]
+                    name: 'ownerId',
+                    type: 'String',
+                    foreignKeyFor: ['owner'],
                 },
                 title: {
-                    name: "title",
-                    type: "String",
-                    attributes: [{ name: "@length", args: [{ name: "min", value: ExpressionUtils.literal(1) }, { name: "max", value: ExpressionUtils.literal(100) }] }]
+                    name: 'title',
+                    type: 'String',
+                    attributes: [
+                        {
+                            name: '@length',
+                            args: [
+                                { name: 'min', value: ExpressionUtils.literal(1) },
+                                { name: 'max', value: ExpressionUtils.literal(100) },
+                            ],
+                        },
+                    ],
                 },
                 private: {
-                    name: "private",
-                    type: "Boolean",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
-                    default: false
+                    name: 'private',
+                    type: 'Boolean',
+                    attributes: [
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.literal(false) }] },
+                    ],
+                    default: false,
                 },
                 todos: {
-                    name: "todos",
-                    type: "Todo",
+                    name: 'todos',
+                    type: 'Todo',
                     array: true,
-                    relation: { opposite: "list" }
+                    relation: { opposite: 'list' },
                 },
                 revision: {
-                    name: "revision",
-                    type: "Int",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(0) }] }],
-                    default: 0
-                }
+                    name: 'revision',
+                    type: 'Int',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.literal(0) }] }],
+                    default: 0,
+                },
             },
             attributes: [
-                { name: "@@deny", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.call("auth"), "==", ExpressionUtils._null()) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("read") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.field("ownerId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])), "||", ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("space"), ["members"]), "?", ExpressionUtils.binary(ExpressionUtils.field("userId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"]))), "&&", ExpressionUtils.unary("!", ExpressionUtils.field("private")))) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("create") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.field("ownerId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])), "&&", ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("space"), ["members"]), "?", ExpressionUtils.binary(ExpressionUtils.field("userId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])))) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("update") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.field("ownerId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])), "&&", ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("space"), ["members"]), "?", ExpressionUtils.binary(ExpressionUtils.field("userId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])))) }] },
-                { name: "@@deny", args: [{ name: "operation", value: ExpressionUtils.literal("post-update") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.call("before"), ["ownerId"]), "!=", ExpressionUtils.field("ownerId")) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("delete") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.field("ownerId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])) }] }
+                {
+                    name: '@@deny',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('all') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(ExpressionUtils.call('auth'), '==', ExpressionUtils._null()),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('read') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.field('ownerId'),
+                                    '==',
+                                    ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                ),
+                                '||',
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.binary(
+                                        ExpressionUtils.member(ExpressionUtils.field('space'), ['members']),
+                                        '?',
+                                        ExpressionUtils.binary(
+                                            ExpressionUtils.field('userId'),
+                                            '==',
+                                            ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                        ),
+                                    ),
+                                    '&&',
+                                    ExpressionUtils.unary('!', ExpressionUtils.field('private')),
+                                ),
+                            ),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('create') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.field('ownerId'),
+                                    '==',
+                                    ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                ),
+                                '&&',
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.member(ExpressionUtils.field('space'), ['members']),
+                                    '?',
+                                    ExpressionUtils.binary(
+                                        ExpressionUtils.field('userId'),
+                                        '==',
+                                        ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                    ),
+                                ),
+                            ),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('update') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.field('ownerId'),
+                                    '==',
+                                    ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                ),
+                                '&&',
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.member(ExpressionUtils.field('space'), ['members']),
+                                    '?',
+                                    ExpressionUtils.binary(
+                                        ExpressionUtils.field('userId'),
+                                        '==',
+                                        ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                    ),
+                                ),
+                            ),
+                        },
+                    ],
+                },
+                {
+                    name: '@@deny',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('post-update') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.member(ExpressionUtils.call('before'), ['ownerId']),
+                                '!=',
+                                ExpressionUtils.field('ownerId'),
+                            ),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('delete') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.field('ownerId'),
+                                '==',
+                                ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                            ),
+                        },
+                    ],
+                },
             ],
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "String" }
-            }
+                id: { type: 'String' },
+            },
         },
         Todo: {
-            name: "Todo",
+            name: 'Todo',
             fields: {
                 id: {
-                    name: "id",
-                    type: "String",
+                    name: 'id',
+                    type: 'String',
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("uuid") }] }],
-                    default: ExpressionUtils.call("uuid")
+                    attributes: [
+                        { name: '@id' },
+                        { name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('uuid') }] },
+                    ],
+                    default: ExpressionUtils.call('uuid'),
                 },
                 createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
+                    name: 'createdAt',
+                    type: 'DateTime',
+                    attributes: [{ name: '@default', args: [{ name: 'value', value: ExpressionUtils.call('now') }] }],
+                    default: ExpressionUtils.call('now'),
                 },
                 updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
+                    name: 'updatedAt',
+                    type: 'DateTime',
                     updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    attributes: [{ name: '@updatedAt' }],
                 },
                 owner: {
-                    name: "owner",
-                    type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "todos", fields: ["ownerId"], references: ["id"], onDelete: "Cascade" }
+                    name: 'owner',
+                    type: 'User',
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('ownerId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'todos', fields: ['ownerId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 ownerId: {
-                    name: "ownerId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "owner"
-                    ]
+                    name: 'ownerId',
+                    type: 'String',
+                    foreignKeyFor: ['owner'],
                 },
                 list: {
-                    name: "list",
-                    type: "List",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("listId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
-                    relation: { opposite: "todos", fields: ["listId"], references: ["id"], onDelete: "Cascade" }
+                    name: 'list',
+                    type: 'List',
+                    attributes: [
+                        {
+                            name: '@relation',
+                            args: [
+                                { name: 'fields', value: ExpressionUtils.array([ExpressionUtils.field('listId')]) },
+                                { name: 'references', value: ExpressionUtils.array([ExpressionUtils.field('id')]) },
+                                { name: 'onDelete', value: ExpressionUtils.literal('Cascade') },
+                            ],
+                        },
+                    ],
+                    relation: { opposite: 'todos', fields: ['listId'], references: ['id'], onDelete: 'Cascade' },
                 },
                 listId: {
-                    name: "listId",
-                    type: "String",
-                    foreignKeyFor: [
-                        "list"
-                    ]
+                    name: 'listId',
+                    type: 'String',
+                    foreignKeyFor: ['list'],
                 },
                 title: {
-                    name: "title",
-                    type: "String",
-                    attributes: [{ name: "@length", args: [{ name: "min", value: ExpressionUtils.literal(1) }, { name: "max", value: ExpressionUtils.literal(100) }] }]
+                    name: 'title',
+                    type: 'String',
+                    attributes: [
+                        {
+                            name: '@length',
+                            args: [
+                                { name: 'min', value: ExpressionUtils.literal(1) },
+                                { name: 'max', value: ExpressionUtils.literal(100) },
+                            ],
+                        },
+                    ],
                 },
                 completedAt: {
-                    name: "completedAt",
-                    type: "DateTime",
-                    optional: true
-                }
+                    name: 'completedAt',
+                    type: 'DateTime',
+                    optional: true,
+                },
             },
             attributes: [
-                { name: "@@deny", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.call("auth"), "==", ExpressionUtils._null()) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("list"), ["ownerId"]), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"])) }] },
-                { name: "@@allow", args: [{ name: "operation", value: ExpressionUtils.literal("all") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.field("list"), ["space", "members"]), "?", ExpressionUtils.binary(ExpressionUtils.field("userId"), "==", ExpressionUtils.member(ExpressionUtils.call("auth"), ["id"]))), "&&", ExpressionUtils.unary("!", ExpressionUtils.member(ExpressionUtils.field("list"), ["private"]))) }] },
-                { name: "@@deny", args: [{ name: "operation", value: ExpressionUtils.literal("post-update") }, { name: "condition", value: ExpressionUtils.binary(ExpressionUtils.member(ExpressionUtils.call("before"), ["ownerId"]), "!=", ExpressionUtils.field("ownerId")) }] }
+                {
+                    name: '@@deny',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('all') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(ExpressionUtils.call('auth'), '==', ExpressionUtils._null()),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('all') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.member(ExpressionUtils.field('list'), ['ownerId']),
+                                '==',
+                                ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                            ),
+                        },
+                    ],
+                },
+                {
+                    name: '@@allow',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('all') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.binary(
+                                    ExpressionUtils.member(ExpressionUtils.field('list'), ['space', 'members']),
+                                    '?',
+                                    ExpressionUtils.binary(
+                                        ExpressionUtils.field('userId'),
+                                        '==',
+                                        ExpressionUtils.member(ExpressionUtils.call('auth'), ['id']),
+                                    ),
+                                ),
+                                '&&',
+                                ExpressionUtils.unary(
+                                    '!',
+                                    ExpressionUtils.member(ExpressionUtils.field('list'), ['private']),
+                                ),
+                            ),
+                        },
+                    ],
+                },
+                {
+                    name: '@@deny',
+                    args: [
+                        { name: 'operation', value: ExpressionUtils.literal('post-update') },
+                        {
+                            name: 'condition',
+                            value: ExpressionUtils.binary(
+                                ExpressionUtils.member(ExpressionUtils.call('before'), ['ownerId']),
+                                '!=',
+                                ExpressionUtils.field('ownerId'),
+                            ),
+                        },
+                    ],
+                },
             ],
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "String" }
-            }
-        }
+                id: { type: 'String' },
+            },
+        },
     },
-    authType: "User",
-    plugins: {}
+    authType: 'User',
+    plugins: {},
 } as const satisfies SchemaDef;
 export type SchemaType = typeof schema;

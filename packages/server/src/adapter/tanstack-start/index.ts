@@ -10,16 +10,20 @@ export interface TanStackStartOptions<Schema extends SchemaDef> extends CommonAd
     /**
      * Callback method for getting a ZenStackClient instance for the given request and params.
      */
-    getClient: (request: Request, params: Record<string, string>) => ClientContract<Schema> | Promise<ClientContract<Schema>> ;
+    getClient: (
+        request: Request,
+        params: Record<string, string>,
+    ) => ClientContract<Schema> | Promise<ClientContract<Schema>>;
 }
 
 /**
  * Creates a TanStack Start server route handler.
  * @see https://zenstack.dev/docs/reference/server-adapters/tanstack-start
  */
-export function TanStackStartHandler<Schema extends SchemaDef>(options: TanStackStartOptions<Schema>): ReturnType<typeof Handler> {
+export function TanStackStartHandler<Schema extends SchemaDef>(
+    options: TanStackStartOptions<Schema>,
+): ReturnType<typeof Handler> {
     return Handler(options);
 }
 
 export default TanStackStartHandler;
-

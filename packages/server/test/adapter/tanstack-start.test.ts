@@ -21,7 +21,12 @@ interface TestClient {
     del: () => Promise<{ status: number; body: any }>;
 }
 
-function makeTestClient(apiPath: string, options: TanStackStartOptions<SchemaDef>, qArg?: unknown, otherArgs?: any): TestClient {
+function makeTestClient(
+    apiPath: string,
+    options: TanStackStartOptions<SchemaDef>,
+    qArg?: unknown,
+    otherArgs?: any,
+): TestClient {
     const pathParts = apiPath.split('/').filter((p) => p);
     const path = pathParts.join('/');
 
@@ -87,7 +92,9 @@ model M {
             apiHandler: new RPCApiHandler({ schema: db.schema }),
         };
 
-        const client = await makeTestClient('/m/create', options).post().send({ data: { id: '1', value: 1 } });
+        const client = await makeTestClient('/m/create', options)
+            .post()
+            .send({ data: { id: '1', value: 1 } });
         expect(client.status).toBe(201);
         expect(client.body.data.value).toBe(1);
 
@@ -103,19 +110,27 @@ model M {
         expect(findMany.status).toBe(200);
         expect(findMany.body.data).toHaveLength(1);
 
-        const update = await makeTestClient('/m/update', options).put().send({ where: { id: '1' }, data: { value: 2 } });
+        const update = await makeTestClient('/m/update', options)
+            .put()
+            .send({ where: { id: '1' }, data: { value: 2 } });
         expect(update.status).toBe(200);
         expect(update.body.data.value).toBe(2);
 
-        const updateMany = await makeTestClient('/m/updateMany', options).put().send({ data: { value: 4 } });
+        const updateMany = await makeTestClient('/m/updateMany', options)
+            .put()
+            .send({ data: { value: 4 } });
         expect(updateMany.status).toBe(200);
         expect(updateMany.body.data.count).toBe(1);
 
-        const upsert1 = await makeTestClient('/m/upsert', options).post().send({ where: { id: '2' }, create: { id: '2', value: 2 }, update: { value: 3 } });
+        const upsert1 = await makeTestClient('/m/upsert', options)
+            .post()
+            .send({ where: { id: '2' }, create: { id: '2', value: 2 }, update: { value: 3 } });
         expect(upsert1.status).toBe(201);
         expect(upsert1.body.data.value).toBe(2);
 
-        const upsert2 = await makeTestClient('/m/upsert', options).post().send({ where: { id: '2' }, create: { id: '2', value: 2 }, update: { value: 3 } });
+        const upsert2 = await makeTestClient('/m/upsert', options)
+            .post()
+            .send({ where: { id: '2' }, create: { id: '2', value: 2 }, update: { value: 3 } });
         expect(upsert2.status).toBe(201);
         expect(upsert2.body.data.value).toBe(3);
 
@@ -167,27 +182,37 @@ model M {
             apiHandler: new RPCApiHandler({ schema: db.schema }),
         };
 
-        const createForbidden = await makeTestClient('/m/create', options).post().send({ data: { value: 0 } });
+        const createForbidden = await makeTestClient('/m/create', options)
+            .post()
+            .send({ data: { value: 0 } });
         expect(createForbidden.status).toBe(403);
         expect(createForbidden.body.error.rejectReason).toBe('cannot-read-back');
 
-        const create = await makeTestClient('/m/create', options).post().send({ data: { id: '1', value: 1 } });
+        const create = await makeTestClient('/m/create', options)
+            .post()
+            .send({ data: { id: '1', value: 1 } });
         expect(create.status).toBe(201);
 
         const findMany = await makeTestClient('/m/findMany', options).get();
         expect(findMany.status).toBe(200);
         expect(findMany.body.data).toHaveLength(1);
 
-        const updateForbidden1 = await makeTestClient('/m/update', options).put().send({ where: { id: '1' }, data: { value: 0 } });
+        const updateForbidden1 = await makeTestClient('/m/update', options)
+            .put()
+            .send({ where: { id: '1' }, data: { value: 0 } });
         expect(updateForbidden1.status).toBe(403);
 
-        const update1 = await makeTestClient('/m/update', options).put().send({ where: { id: '1' }, data: { value: 2 } });
+        const update1 = await makeTestClient('/m/update', options)
+            .put()
+            .send({ where: { id: '1' }, data: { value: 2 } });
         expect(update1.status).toBe(200);
 
         const deleteForbidden = await makeTestClient('/m/delete', options, { where: { id: '1' } }).del();
         expect(deleteForbidden.status).toBe(404);
 
-        const update2 = await makeTestClient('/m/update', options).put().send({ where: { id: '1' }, data: { value: 3 } });
+        const update2 = await makeTestClient('/m/update', options)
+            .put()
+            .send({ where: { id: '1' }, data: { value: 3 } });
         expect(update2.status).toBe(200);
 
         const deleteOne = await makeTestClient('/m/delete', options, { where: { id: '1' } }).del();
@@ -206,9 +231,14 @@ model M {
 
         const db = await createTestClient(model);
 
-        const options: TanStackStartOptions<SchemaDef> = { getClient: () => db, apiHandler: new RestApiHandler({ endpoint: 'http://localhost/api', schema: db.schema }) };
+        const options: TanStackStartOptions<SchemaDef> = {
+            getClient: () => db,
+            apiHandler: new RestApiHandler({ endpoint: 'http://localhost/api', schema: db.schema }),
+        };
 
-        const create = await makeTestClient('/m', options).post().send({ data: { type: 'm', attributes: { id: '1', value: 1 } } });
+        const create = await makeTestClient('/m', options)
+            .post()
+            .send({ data: { type: 'm', attributes: { id: '1', value: 1 } } });
         expect(create.status).toBe(201);
         expect(create.body.data.attributes.value).toBe(1);
 
@@ -224,7 +254,9 @@ model M {
         expect(findWithFilter2.status).toBe(200);
         expect(findWithFilter2.body.data).toHaveLength(0);
 
-        const update = await makeTestClient('/m/1', options).put().send({ data: { type: 'm', attributes: { value: 2 } } });
+        const update = await makeTestClient('/m/1', options)
+            .put()
+            .send({ data: { type: 'm', attributes: { value: 2 } } });
         expect(update.status).toBe(200);
         expect(update.body.data.attributes.value).toBe(2);
 
@@ -233,4 +265,3 @@ model M {
         expect(await db.m.count()).toBe(0);
     });
 });
-

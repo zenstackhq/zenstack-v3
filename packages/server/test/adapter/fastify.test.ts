@@ -13,7 +13,7 @@ describe('Fastify adapter tests - rpc handler', () => {
         app.register(ZenStackFastifyPlugin, {
             prefix: '/api',
             getClient: () => client,
-            apiHandler: new RPCApiHandler({ schema: client.schema })
+            apiHandler: new RPCApiHandler({ schema: client.schema }),
         });
 
         let r = await app.inject({
@@ -49,7 +49,7 @@ describe('Fastify adapter tests - rpc handler', () => {
                     expect.objectContaining({ title: 'post1' }),
                     expect.objectContaining({ title: 'post2' }),
                 ]),
-            })
+            }),
         );
 
         r = await app.inject({
@@ -97,7 +97,7 @@ describe('Fastify adapter tests - rpc handler', () => {
             expect.arrayContaining([
                 expect.objectContaining({ published: true, _sum: { viewCount: 1 } }),
                 expect.objectContaining({ published: false, _sum: { viewCount: 2 } }),
-            ])
+            ]),
         );
 
         r = await app.inject({

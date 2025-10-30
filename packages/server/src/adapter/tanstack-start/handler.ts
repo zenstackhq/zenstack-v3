@@ -9,7 +9,7 @@ import { logInternalError } from '../common';
  * @returns A TanStack Start server route handler
  */
 export default function factory<Schema extends SchemaDef>(
-    options: TanStackStartOptions<Schema>
+    options: TanStackStartOptions<Schema>,
 ): ({ request, params }: { request: Request; params: Record<string, string> }) => Promise<Response> {
     return async ({ request, params }: { request: Request; params: Record<string, string> }) => {
         const client = await options.getClient(request, params);
@@ -71,4 +71,3 @@ export default function factory<Schema extends SchemaDef>(
         }
     };
 }
-

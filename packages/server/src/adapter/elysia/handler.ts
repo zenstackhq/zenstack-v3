@@ -1,8 +1,7 @@
 import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { Elysia, type Context as ElysiaContext } from 'elysia';
-import { log } from '../../api/utils';
-import type { CommonAdapterOptions } from '../common';
+import { logInternalError, type CommonAdapterOptions } from '../common';
 
 /**
  * Options for initializing an Elysia middleware.
@@ -66,7 +65,7 @@ export function createElysiaHandler<Schema extends SchemaDef>(options: ElysiaOpt
                 return r.body;
             } catch (err) {
                 set.status = 500;
-                log(options.apiHandler.log, 'error', `An unhandled error occurred while processing the request: ${err}${err instanceof Error ? '\n' + err.stack : ''}`);
+                logInternalError(options.apiHandler.log, err);
                 return {
                     message: 'An internal server error occurred',
                 };

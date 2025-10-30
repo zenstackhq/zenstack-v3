@@ -9,7 +9,7 @@ import { RestApiHandler } from '../../src/api/rest';
 import { makeUrl, schema } from '../utils';
 
 describe('Express adapter tests - rpc handler', () => {
-    it('works with simple requests', async () => {
+    it('properly handles requests', async () => {
         const client = await createPolicyTestClient(schema);
         const rawClient = client.$unuseAll();
 
@@ -148,7 +148,7 @@ describe('Express adapter tests - rest handler', () => {
 });
 
 describe('Express adapter tests - rest handler with custom middleware', () => {
-    it('run middleware', async () => {
+    it('properly handles requests', async () => {
         const client = await createPolicyTestClient(schema);
 
         const app = express();

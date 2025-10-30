@@ -9,6 +9,7 @@ export default defineConfig({
         elysia: 'src/adapter/elysia/index.ts',
         nuxt: 'src/adapter/nuxt/index.ts',
         hono: 'src/adapter/hono/index.ts',
+        sveltekit: 'src/adapter/sveltekit/index.ts',
     },
     outDir: 'dist',
     splitting: false,

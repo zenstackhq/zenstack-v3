@@ -1,1 +1,1 @@
-export { ZenStackMiddleware, type MiddlewareOptions } from './middleware';
+export { ZenStackMiddleware, type ExpressMiddlewareOptions } from './middleware';

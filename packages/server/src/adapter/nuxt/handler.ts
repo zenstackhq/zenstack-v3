@@ -14,14 +14,14 @@ import { logInternalError, type CommonAdapterOptions } from '../common';
 /**
  * Nuxt request handler options
  */
-export interface HandlerOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
+export interface NuxtHandlerOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
     /**
      * Callback for getting a ZenStackClient for the given request
      */
     getClient: (event: H3Event<EventHandlerRequest>) => ClientContract<Schema> | Promise<ClientContract<Schema>>;
 }
 
-export function createEventHandler<Schema extends SchemaDef>(options: HandlerOptions<Schema>) {
+export function createEventHandler<Schema extends SchemaDef>(options: NuxtHandlerOptions<Schema>) {
     return defineEventHandler(async (event) => {
         const client = await options.getClient(event);
         if (!client) {

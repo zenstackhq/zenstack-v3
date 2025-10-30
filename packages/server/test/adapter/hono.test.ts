@@ -3,7 +3,7 @@ import { Hono, MiddlewareHandler } from 'hono';
 import superjson from 'superjson';
 import { describe, expect, it } from 'vitest';
 import { createHonoHandler } from '../../src/adapter/hono';
-import { RPCApiHandler } from '../../src/api';
+import { RestApiHandler, RPCApiHandler } from '../../src/api';
 import { makeUrl, schema } from '../utils';
 
 describe('Hono adapter tests - rpc handler', () => {
@@ -86,18 +86,11 @@ describe('Hono adapter tests - rest handler', () => {
         const handler = await createHonoApp(
             createHonoHandler({
                 getClient: () => client,
-                apiHandler: new RPCApiHandler({ schema: client.$schema }),
+                apiHandler: new RestApiHandler({ endpoint: 'http://localhost/api', schema: client.$schema }),
             })
         );
 
         let r = await handler(makeRequest('GET', makeUrl('/api/post/1')));
-        expect(r.status).toBe(404);
-
-        r = await handler(
-            makeRequest('POST', '/api/user')
-        );
-
-        r = await handler(makeRequest('GET', makeUrl('/api/post/1')));
         expect(r.status).toBe(404);
 
         r = await handler(

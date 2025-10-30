@@ -1,7 +1,6 @@
 import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import type { Context, MiddlewareHandler } from 'hono';
-import { routePath } from 'hono/route';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { logInternalError, type CommonAdapterOptions } from '../common';
 
@@ -25,7 +24,7 @@ export function createHonoHandler<Schema extends SchemaDef>(options: HonoOptions
         const url = new URL(ctx.req.url);
         const query = Object.fromEntries(url.searchParams);
 
-        const path = ctx.req.path.substring(routePath(ctx).length - 1);
+        const path = ctx.req.path.substring(ctx.req.routePath.length - 1);
         if (!path) {
             return ctx.json({ message: 'missing path parameter' }, 400);
         }

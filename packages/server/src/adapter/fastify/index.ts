@@ -1,2 +1,2 @@
-export { ZenStackFastifyPlugin, type PluginOptions } from './plugin';
+export { ZenStackFastifyPlugin, type FastifyPluginOptions } from './plugin';
 

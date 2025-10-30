@@ -1,1 +1,1 @@
-export * from './handler'; 
+export { createElysiaHandler, type ElysiaOptions } from './handler';

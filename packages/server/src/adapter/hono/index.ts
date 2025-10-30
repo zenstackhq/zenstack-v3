@@ -1,1 +1,1 @@
-export * from './handler';
+export { createHonoHandler, type HonoOptions } from './handler';

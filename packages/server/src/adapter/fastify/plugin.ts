@@ -7,7 +7,7 @@ import { logInternalError, type CommonAdapterOptions } from '../common';
 /**
  * Fastify plugin options
  */
-export interface PluginOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
+export interface FastifyPluginOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
 
     /**
      * Url prefix, e.g.: /api
@@ -23,7 +23,7 @@ export interface PluginOptions<Schema extends SchemaDef> extends CommonAdapterOp
 /**
  * Fastify plugin for handling CRUD requests.
  */
-const pluginHandler: FastifyPluginCallback<PluginOptions<SchemaDef>> = (fastify, options, done) => {
+const pluginHandler: FastifyPluginCallback<FastifyPluginOptions<SchemaDef>> = (fastify, options, done) => {
     const prefix = options.prefix ?? '';
 
     fastify.all(`${prefix}/*`, async (request, reply) => {

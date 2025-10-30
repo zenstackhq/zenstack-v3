@@ -6,7 +6,7 @@ import { logInternalError, type CommonAdapterOptions } from '../common';
 /**
  * Express middleware options
  */
-export interface MiddlewareOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
+export interface ExpressMiddlewareOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
     /**
      * Callback for getting a ZenStackClient for the given request
      */
@@ -27,7 +27,7 @@ export interface MiddlewareOptions<Schema extends SchemaDef> extends CommonAdapt
 /**
  * Creates an Express middleware for handling CRUD requests.
  */
-const factory = <Schema extends SchemaDef>(options: MiddlewareOptions<Schema>): Handler => {
+const factory = <Schema extends SchemaDef>(options: ExpressMiddlewareOptions<Schema>): Handler => {
     const requestHandler = options.apiHandler;
 
     return async (request, response, next) => {

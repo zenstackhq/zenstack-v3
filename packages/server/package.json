@@ -98,6 +98,16 @@
                 "types": "./dist/nuxt.d.cts",
                 "default": "./dist/nuxt.cjs"
             }
+        },
+        "./sveltekit": {
+            "import": {
+                "types": "./dist/sveltekit.d.ts",
+                "default": "./dist/sveltekit.js"
+            },
+            "require": {
+                "types": "./dist/sveltekit.d.cts",
+                "default": "./dist/sveltekit.cjs"
+            }
         }
     },
     "dependencies": {
@@ -111,6 +121,7 @@
         "zod-validation-error": "catalog:"
     },
     "devDependencies": {
+        "@sveltejs/kit": "^2.48.3",
         "@types/body-parser": "^1.19.6",
         "@types/express": "^5.0.0",
         "@types/supertest": "^6.0.3",
@@ -131,6 +142,7 @@
         "zod": "~3.25.0"
     },
     "peerDependencies": {
+        "@sveltejs/kit": "^2.0.0",
         "elysia": "^1.3.0",
         "express": "^5.0.0",
         "fastify": "^5.0.0",
@@ -160,6 +172,9 @@
             "optional": true
         },
         "nuxt": {
+            "optional": true
+        },
+        "@sveltejs/kit": {
             "optional": true
         }
     }

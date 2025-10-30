@@ -1,1 +1,1 @@
-export * from './handler';
+export { createEventHandler, type NuxtHandlerOptions } from './handler';

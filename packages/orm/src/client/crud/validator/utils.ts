@@ -11,6 +11,7 @@ import type {
 import Decimal from 'decimal.js';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';
+import { ZodIssueCode } from 'zod/v3';
 import { ExpressionUtils } from '../../../schema';
 import { QueryError } from '../../errors';
 
@@ -174,7 +175,7 @@ export function addDecimalValidation(
             error?.issues.forEach((issue) => {
                 if (op === 'gt' || op === 'gte') {
                     ctx.addIssue({
-                        code: 'too_small',
+                        code: ZodIssueCode.too_small,
                         origin: 'number',
                         minimum: value,
                         type: 'decimal',
@@ -183,7 +184,7 @@ export function addDecimalValidation(
                     });
                 } else {
                     ctx.addIssue({
-                        code: 'too_big',
+                        code: ZodIssueCode.too_big,
                         origin: 'number',
                         maximum: value,
                         type: 'decimal',

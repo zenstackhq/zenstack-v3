@@ -118,7 +118,7 @@ export class TsSchemaGenerator {
                         : []),
                 ]),
             ),
-            ts.factory.createStringLiteral('@zenstackhq/runtime/schema'),
+            ts.factory.createStringLiteral('@zenstackhq/orm/schema'),
         );
         statements.push(runtimeImportDecl);
 
@@ -1116,7 +1116,7 @@ export class TsSchemaGenerator {
         // generate: import { schema as $schema, type SchemaType as $Schema } from './schema';
         statements.push(this.generateSchemaImport(model, true, true));
 
-        // generate: import type { ModelResult as $ModelResult } from '@zenstackhq/runtime';
+        // generate: import type { ModelResult as $ModelResult } from '@zenstackhq/orm';
         statements.push(
             ts.factory.createImportDeclaration(
                 undefined,
@@ -1140,7 +1140,7 @@ export class TsSchemaGenerator {
                             : []),
                     ]),
                 ),
-                ts.factory.createStringLiteral('@zenstackhq/runtime'),
+                ts.factory.createStringLiteral('@zenstackhq/orm'),
             ),
         );
 
@@ -1289,7 +1289,7 @@ export class TsSchemaGenerator {
         // generate: import { SchemaType as $Schema } from './schema';
         statements.push(this.generateSchemaImport(model, false, true));
 
-        // generate: import { CreateArgs as $CreateArgs, ... } from '@zenstackhq/runtime';
+        // generate: import { CreateArgs as $CreateArgs, ... } from '@zenstackhq/orm';
         const inputTypes = [
             'FindManyArgs',
             'FindUniqueArgs',
@@ -1318,7 +1318,7 @@ export class TsSchemaGenerator {
             OmitInput: 'Omit',
         };
 
-        // generate: import { CreateArgs as $CreateArgs, ... } from '@zenstackhq/runtime';
+        // generate: import { CreateArgs as $CreateArgs, ... } from '@zenstackhq/orm';
         statements.push(
             ts.factory.createImportDeclaration(
                 undefined,
@@ -1335,11 +1335,11 @@ export class TsSchemaGenerator {
                         ),
                     ),
                 ),
-                ts.factory.createStringLiteral('@zenstackhq/runtime'),
+                ts.factory.createStringLiteral('@zenstackhq/orm'),
             ),
         );
 
-        // generate: import { type SelectIncludeOmit as $SelectIncludeOmit, type SimplifiedModelResult as $SimplifiedModelResult } from '@zenstackhq/runtime';
+        // generate: import { type SelectIncludeOmit as $SelectIncludeOmit, type SimplifiedModelResult as $SimplifiedModelResult } from '@zenstackhq/orm';
         statements.push(
             ts.factory.createImportDeclaration(
                 undefined,
@@ -1359,7 +1359,7 @@ export class TsSchemaGenerator {
                         ),
                     ]),
                 ),
-                ts.factory.createStringLiteral('@zenstackhq/runtime'),
+                ts.factory.createStringLiteral('@zenstackhq/orm'),
             ),
         );
 

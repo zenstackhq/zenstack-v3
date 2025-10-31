@@ -1,7 +1,7 @@
 {
-    "name": "@zenstackhq/runtime",
-    "version": "3.0.0-beta.13",
-    "description": "ZenStack Runtime",
+    "name": "@zenstackhq/orm",
+    "version": "3.0.0-beta.14",
+    "description": "ZenStack ORM",
     "type": "module",
     "scripts": {
         "build": "tsc --noEmit && tsup-node",
@@ -97,6 +97,6 @@
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "tsx": "^4.19.2",
-        "zod": "~3.25.0"
+        "zod": "^4.1.0"
     }
 }

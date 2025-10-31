@@ -1,6 +1,6 @@
 import { isCuid } from '@paralleldrive/cuid2';
-import { ZenStackClient } from '@zenstackhq/runtime';
-import { ExpressionUtils, type SchemaDef } from '@zenstackhq/runtime/schema';
+import { ZenStackClient } from '@zenstackhq/orm';
+import { ExpressionUtils, type SchemaDef } from '@zenstackhq/orm/schema';
 import SQLite from 'better-sqlite3';
 import { SqliteDialect } from 'kysely';
 import { isValid as isValidUlid } from 'ulid';

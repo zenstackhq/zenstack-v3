@@ -1,5 +1,5 @@
 import { createId } from '@paralleldrive/cuid2';
-import { invariant, isPlainObject } from '@zenstackhq/common-helpers';
+import { clone, enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers';
 import {
     DeleteResult,
     expressionBuilder,
@@ -17,8 +17,6 @@ import * as uuid from 'uuid';
 import type { ClientContract } from '../..';
 import type { BuiltinType, Expression, FieldDef } from '../../../schema';
 import { ExpressionUtils, type GetModels, type ModelDef, type SchemaDef } from '../../../schema';
-import { clone } from '../../../utils/clone';
-import { enumerate } from '../../../utils/enumerate';
 import { extractFields, fieldsToSelectObject } from '../../../utils/object-utils';
 import { NUMERIC_FIELD_TYPES } from '../../constants';
 import { TransactionIsolationLevel, type CRUD } from '../../contract';

@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/tanstack-query",
-    "version": "3.0.0-beta.13",
+    "version": "3.0.0-beta.14",
     "description": "",
     "main": "index.js",
     "type": "module",
@@ -25,7 +25,7 @@
         }
     },
     "dependencies": {
-        "@zenstackhq/runtime": "workspace:*"
+        "@zenstackhq/orm": "workspace:*"
     },
     "devDependencies": {
         "@zenstackhq/eslint-config": "workspace:*",

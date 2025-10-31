@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { createPolicyTestClient } from '@zenstackhq/testtools';
+import { describe, expect, it } from 'vitest';
 
 describe('Policy create tests', () => {
     it('works with scalar field check', async () => {

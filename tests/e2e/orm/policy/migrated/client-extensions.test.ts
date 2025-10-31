@@ -1,4 +1,4 @@
-import { definePlugin } from '@zenstackhq/runtime';
+import { definePlugin } from '@zenstackhq/orm';
 import { createPolicyTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
 

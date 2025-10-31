@@ -1,5 +1,5 @@
-import type { ClientContract } from '@zenstackhq/runtime';
-import type { SchemaDef } from '@zenstackhq/runtime/schema';
+import type { ClientContract } from '@zenstackhq/orm';
+import type { SchemaDef } from '@zenstackhq/orm/schema';
 
 /**
  * Log levels
@@ -69,6 +69,11 @@ export interface ApiHandler<Schema extends SchemaDef> {
      * The schema associated with this handler.
      */
     get schema(): Schema;
+
+    /**
+     * Logging configuration.
+     */
+    get log(): LogConfig | undefined;
 
     /**
      * Handle an API request.

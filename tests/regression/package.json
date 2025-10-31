@@ -1,6 +1,6 @@
 {
     "name": "regression",
-    "version": "3.0.0-beta.13",
+    "version": "3.0.0-beta.14",
     "private": true,
     "type": "module",
     "scripts": {
@@ -14,7 +14,7 @@
     "devDependencies": {
         "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/language": "workspace:*",
-        "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*"

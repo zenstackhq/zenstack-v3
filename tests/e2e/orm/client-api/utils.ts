@@ -1,4 +1,4 @@
-import type { ClientContract } from '@zenstackhq/runtime';
+import type { ClientContract } from '@zenstackhq/orm';
 import type { schema } from '../schemas/basic';
 
 type ClientType = ClientContract<typeof schema>;

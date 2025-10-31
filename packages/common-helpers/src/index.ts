@@ -1,3 +1,5 @@
+export * from './clone';
+export * from './enumerable';
 export * from './is-plain-object';
 export * from './lower-case-first';
 export * from './param-case';

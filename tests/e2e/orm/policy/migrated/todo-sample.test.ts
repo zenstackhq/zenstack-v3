@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ClientContract } from '@zenstackhq/runtime';
+import type { ClientContract } from '@zenstackhq/orm';
 import { schema, type SchemaType } from '../../schemas/todo/schema';
 import { createPolicyTestClient } from '@zenstackhq/testtools';
 

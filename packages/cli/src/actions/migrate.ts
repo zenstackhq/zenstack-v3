@@ -86,7 +86,7 @@ async function runReset(prismaSchemaFile: string, options: ResetOptions) {
             'prisma migrate reset',
             ` --schema "${prismaSchemaFile}"`,
             ' --skip-generate',
-            options.force ? ' --force' : ''
+            options.force ? ' --force' : '',
         ].join('');
 
         await execPackage(cmd);

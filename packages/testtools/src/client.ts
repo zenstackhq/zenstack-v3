@@ -1,8 +1,8 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import type { Model } from '@zenstackhq/language/ast';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
-import { ZenStackClient, type ClientContract, type ClientOptions } from '@zenstackhq/runtime';
-import type { SchemaDef } from '@zenstackhq/runtime/schema';
+import { ZenStackClient, type ClientContract, type ClientOptions } from '@zenstackhq/orm';
+import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import SQLite from 'better-sqlite3';
 import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';

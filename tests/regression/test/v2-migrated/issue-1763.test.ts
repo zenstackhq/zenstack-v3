@@ -24,7 +24,7 @@ model ConcretePost extends Post {
             {
                 extraSourceFiles: {
                     main: `
-import { ZenStackClient } from '@zenstackhq/runtime';
+import { ZenStackClient } from '@zenstackhq/orm';
 import { schema } from './schema';
 
 async function test() {

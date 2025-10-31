@@ -1,14 +1,12 @@
-import type { ClientContract } from '@zenstackhq/runtime';
-import type { SchemaDef } from '@zenstackhq/runtime/schema';
+import type { ClientContract } from '@zenstackhq/orm';
+import type { SchemaDef } from '@zenstackhq/orm/schema';
 import type { Handler, Request, Response } from 'express';
-import type { ApiHandler } from '../types';
+import { logInternalError, type CommonAdapterOptions } from '../common';
 
 /**
  * Express middleware options
  */
-export interface MiddlewareOptions<Schema extends SchemaDef> {
-    apiHandler: ApiHandler<Schema>;
-
+export interface ExpressMiddlewareOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
     /**
      * Callback for getting a ZenStackClient for the given request
      */
@@ -29,7 +27,7 @@ export interface MiddlewareOptions<Schema extends SchemaDef> {
 /**
  * Creates an Express middleware for handling CRUD requests.
  */
-const factory = <Schema extends SchemaDef>(options: MiddlewareOptions<Schema>): Handler => {
+const factory = <Schema extends SchemaDef>(options: ExpressMiddlewareOptions<Schema>): Handler => {
     const requestHandler = options.apiHandler;
 
     return async (request, response, next) => {
@@ -72,7 +70,8 @@ const factory = <Schema extends SchemaDef>(options: MiddlewareOptions<Schema>): 
             if (sendResponse === false) {
                 throw err;
             }
-            return response.status(500).json({ message: `An unhandled error occurred: ${err}` });
+            logInternalError(options.apiHandler.log, err);
+            return response.status(500).json({ message: `An internal server error occurred` });
         }
     };
 };

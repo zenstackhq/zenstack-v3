@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/plugin-policy",
-    "version": "3.0.0-beta.13",
+    "version": "3.0.0-beta.14",
     "description": "ZenStack Policy Plugin",
     "type": "module",
     "scripts": {
@@ -38,7 +38,7 @@
     },
     "dependencies": {
         "@zenstackhq/common-helpers": "workspace:*",
-        "@zenstackhq/runtime": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
         "ts-pattern": "catalog:"
     },
     "peerDependencies": {

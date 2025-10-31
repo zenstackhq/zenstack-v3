@@ -5,8 +5,8 @@ import {
     RejectedByPolicyError,
     ZenStackError,
     type ClientContract,
-} from '@zenstackhq/runtime';
-import type { SchemaDef } from '@zenstackhq/runtime/schema';
+} from '@zenstackhq/orm';
+import type { SchemaDef } from '@zenstackhq/orm/schema';
 import SuperJSON from 'superjson';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
 import { log, registerCustomSerializers } from '../utils';
@@ -17,7 +17,14 @@ registerCustomSerializers();
  * Options for {@link RPCApiHandler}
  */
 export type RPCApiHandlerOptions<Schema extends SchemaDef> = {
+    /**
+     * The schema
+     */
     schema: Schema;
+
+    /**
+     * Logging configuration
+     */
     log?: LogConfig;
 };
 
@@ -29,6 +36,10 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
 
     get schema(): Schema {
         return this.options.schema;
+    }
+
+    get log(): LogConfig | undefined {
+        return this.options.log;
     }
 
     async handleRequest({ client, method, path, query, requestBody }: RequestContext<Schema>): Promise<Response> {
@@ -173,9 +184,13 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
     private makeGenericErrorResponse(err: unknown) {
         const resp = {
             status: 500,
-            body: { error: { message: (err as Error).message || 'unknown error' } },
+            body: { error: { message: err instanceof Error ? err.message : 'unknown error' } },
         };
-        log(this.options.log, 'debug', () => `sending error response: ${safeJSONStringify(resp)}`);
+        log(
+            this.options.log,
+            'debug',
+            () => `sending error response: ${safeJSONStringify(resp)}${err instanceof Error ? '\n' + err.stack : ''}`,
+        );
         return resp;
     }
 

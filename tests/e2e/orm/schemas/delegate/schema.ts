@@ -5,7 +5,7 @@
 
 /* eslint-disable */
 
-import { type SchemaDef, ExpressionUtils } from "@zenstackhq/runtime/schema";
+import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
 export const schema = {
     provider: {
         type: "sqlite"

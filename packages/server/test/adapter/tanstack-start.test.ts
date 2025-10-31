@@ -89,7 +89,7 @@ model M {
         const db = await createTestClient(model);
         const options: TanStackStartOptions<SchemaDef> = {
             getClient: () => db,
-            apiHandler: new RPCApiHandler({ schema: db.schema }),
+            apiHandler: new RPCApiHandler({ schema: db.$schema }),
         };
 
         const client = await makeTestClient('/m/create', options)
@@ -179,7 +179,7 @@ model M {
         const db = await createPolicyTestClient(model);
         const options: TanStackStartOptions<SchemaDef> = {
             getClient: () => db,
-            apiHandler: new RPCApiHandler({ schema: db.schema }),
+            apiHandler: new RPCApiHandler({ schema: db.$schema }),
         };
 
         const createForbidden = await makeTestClient('/m/create', options)
@@ -233,7 +233,7 @@ model M {
 
         const options: TanStackStartOptions<SchemaDef> = {
             getClient: () => db,
-            apiHandler: new RestApiHandler({ endpoint: 'http://localhost/api', schema: db.schema }),
+            apiHandler: new RestApiHandler({ endpoint: 'http://localhost/api', schema: db.$schema }),
         };
 
         const create = await makeTestClient('/m', options)

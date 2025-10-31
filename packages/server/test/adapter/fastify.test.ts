@@ -146,7 +146,7 @@ describe('Fastify adapter tests - rest handler', () => {
         app.register(ZenStackFastifyPlugin, {
             prefix: '/api',
             getClient: () => client,
-            apiHandler: new RestApiHandler({ schema: client.schema, endpoint: 'http://localhost/api' }),
+            apiHandler: new RestApiHandler({ schema: client.$schema, endpoint: 'http://localhost/api' }),
         });
 
         let r = await app.inject({

@@ -1,4 +1,4 @@
-import type { Handle, RequestEvent } from '@sveltejs/kit';
+import { type Handle, type RequestEvent } from '@sveltejs/kit';
 import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { logInternalError, type CommonAdapterOptions } from '../common';
@@ -37,9 +37,18 @@ export default function createHandler<Schema extends SchemaDef>(options: SvelteK
             const query = Object.fromEntries(event.url.searchParams);
             let requestBody: unknown;
             if (event.request.body) {
-                const text = await event.request.text();
-                if (text) {
-                    requestBody = JSON.parse(text);
+                try {
+                    const text = await event.request.text();
+                    if (text) {
+                        requestBody = JSON.parse(text);
+                    }
+                } catch {
+                    return new Response(JSON.stringify({ message: 'invalid JSON payload' }), {
+                        status: 400,
+                        headers: {
+                            'content-type': 'application/json',
+                        },
+                    });
                 }
             }
 

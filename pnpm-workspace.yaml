@@ -4,7 +4,7 @@ packages:
     - tests/**
 catalog:
     kysely: ^0.27.6
-    zod: ^3.25.0 || ^4.0.0
+    zod: ^4.0.0
     prisma: ^6.10.0
     langium: 3.5.0
     langium-cli: 3.5.0

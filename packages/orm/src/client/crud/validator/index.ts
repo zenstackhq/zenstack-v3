@@ -2,7 +2,7 @@ import { enumerate, invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
-import { z, ZodSchema, ZodType } from 'zod';
+import { z, ZodType } from 'zod';
 import {
     type AttributeApplication,
     type BuiltinType,
@@ -830,7 +830,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeCreateSchema(model: string) {
         const dataSchema = this.makeCreateDataSchema(model, false);
-        let schema: ZodSchema = z.strictObject({
+        let schema: ZodType = z.strictObject({
             data: dataSchema,
             select: this.makeSelectSchema(model).optional(),
             include: this.makeIncludeSchema(model).optional(),
@@ -1107,7 +1107,7 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Update
 
     private makeUpdateSchema(model: string) {
-        let schema: ZodSchema = z.strictObject({
+        let schema: ZodType = z.strictObject({
             where: this.makeWhereSchema(model, true),
             data: this.makeUpdateDataSchema(model),
             select: this.makeSelectSchema(model).optional(),
@@ -1129,7 +1129,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeUpdateManyAndReturnSchema(model: string) {
         const base = this.makeUpdateManySchema(model);
-        let schema: ZodSchema = base.extend({
+        let schema: ZodType = base.extend({
             select: this.makeSelectSchema(model).optional(),
             omit: this.makeOmitSchema(model).optional(),
         });
@@ -1138,7 +1138,7 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeUpsertSchema(model: string) {
-        let schema: ZodSchema = z.strictObject({
+        let schema: ZodType = z.strictObject({
             where: this.makeWhereSchema(model, true),
             create: this.makeCreateDataSchema(model, false),
             update: this.makeUpdateDataSchema(model),
@@ -1257,7 +1257,7 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Delete
 
     private makeDeleteSchema(model: GetModels<Schema>) {
-        let schema: ZodSchema = z.strictObject({
+        let schema: ZodType = z.strictObject({
             where: this.makeWhereSchema(model, true),
             select: this.makeSelectSchema(model).optional(),
             include: this.makeIncludeSchema(model).optional(),
@@ -1387,7 +1387,7 @@ export class InputValidator<Schema extends SchemaDef> {
         });
 
         // fields used in `having` must be either in the `by` list, or aggregations
-        schema = schema.refine((value) => {
+        schema = schema.refine((value: any) => {
             const bys = typeof value.by === 'string' ? [value.by] : value.by;
             if (value.having && typeof value.having === 'object') {
                 for (const [key, val] of Object.entries(value.having)) {
@@ -1414,7 +1414,7 @@ export class InputValidator<Schema extends SchemaDef> {
         }, 'fields in "having" must be in "by"');
 
         // fields used in `orderBy` must be either in the `by` list, or aggregations
-        schema = schema.refine((value) => {
+        schema = schema.refine((value: any) => {
             const bys = typeof value.by === 'string' ? [value.by] : value.by;
             if (
                 value.orderBy &&

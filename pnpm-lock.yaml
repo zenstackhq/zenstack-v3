@@ -317,7 +317,7 @@ importers:
         version: 11.0.5
       zod-validation-error:
         specifier: 'catalog:'
-        version: 4.0.1(zod@3.25.76)
+        version: 4.0.1(zod@4.1.12)
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -347,8 +347,8 @@ importers:
         specifier: ^4.19.2
         version: 4.20.3
       zod:
-        specifier: ~3.25.0
-        version: 3.25.76
+        specifier: ^4.1.0
+        version: 4.1.12
 
   packages/plugins/policy:
     dependencies:
@@ -437,7 +437,7 @@ importers:
         version: 1.0.3
       zod-validation-error:
         specifier: 'catalog:'
-        version: 4.0.1(zod@3.25.76)
+        version: 4.0.1(zod@4.1.12)
     devDependencies:
       '@sveltejs/kit':
         specifier: ^2.48.3
@@ -494,8 +494,8 @@ importers:
         specifier: ^7.1.4
         version: 7.1.4
       zod:
-        specifier: ~3.25.0
-        version: 3.25.76
+        specifier: ^4.1.0
+        version: 4.1.12
 
   packages/tanstack-query:
     dependencies:
@@ -590,8 +590,8 @@ importers:
         specifier: workspace:*
         version: link:../config/typescript-config
       zod:
-        specifier: ~3.25.0
-        version: 3.25.76
+        specifier: ^4.1.0
+        version: 4.1.12
 
   samples/blog:
     dependencies:
@@ -6250,8 +6250,8 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.1.12:
+    resolution: {integrity: sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ==}
 
 snapshots:
 
@@ -12153,8 +12153,8 @@ snapshots:
       compress-commons: 6.0.2
       readable-stream: 4.7.0
 
-  zod-validation-error@4.0.1(zod@3.25.76):
+  zod-validation-error@4.0.1(zod@4.1.12):
     dependencies:
-      zod: 3.25.76
+      zod: 4.1.12
 
-  zod@3.25.76: {}
+  zod@4.1.12: {}

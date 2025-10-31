@@ -97,6 +97,6 @@
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "tsx": "^4.19.2",
-        "zod": "~3.25.0"
+        "zod": "^4.1.0"
     }
 }

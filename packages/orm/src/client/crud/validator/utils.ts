@@ -11,6 +11,7 @@ import type {
 import Decimal from 'decimal.js';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';
+import { ZodIssueCode } from 'zod/v3';
 import { ExpressionUtils } from '../../../schema';
 import { QueryError } from '../../errors';
 
@@ -171,8 +172,26 @@ export function addDecimalValidation(
         return schema.superRefine((v, ctx) => {
             const base = z.number();
             const { error } = base[op](value).safeParse((v as Decimal).toNumber());
-            error?.errors.forEach((e) => {
-                ctx.addIssue(e);
+            error?.issues.forEach((issue) => {
+                if (op === 'gt' || op === 'gte') {
+                    ctx.addIssue({
+                        code: ZodIssueCode.too_small,
+                        origin: 'number',
+                        minimum: value,
+                        type: 'decimal',
+                        inclusive: op === 'gte',
+                        message: issue.message,
+                    });
+                } else {
+                    ctx.addIssue({
+                        code: ZodIssueCode.too_big,
+                        origin: 'number',
+                        maximum: value,
+                        type: 'decimal',
+                        inclusive: op === 'lte',
+                        message: issue.message,
+                    });
+                }
             });
         });
     }
@@ -258,9 +277,9 @@ function applyValidation(
     message: string | undefined,
     path: string[] | undefined,
 ) {
-    const options: z.CustomErrorParams = {};
+    const options: Parameters<typeof schema.refine>[1] = {};
     if (message) {
-        options.message = message;
+        options.error = message;
     }
     if (path) {
         options.path = path;

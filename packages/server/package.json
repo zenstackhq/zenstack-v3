@@ -149,7 +149,7 @@
         "next": "^15.0.0",
         "nuxt": "^4.2.0",
         "supertest": "^7.1.4",
-        "zod": "~3.25.0"
+        "zod": "^4.1.0"
     },
     "peerDependencies": {
         "@sveltejs/kit": "^2.0.0",

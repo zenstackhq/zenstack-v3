@@ -21,7 +21,7 @@ function expectError(err: any, errorType: any) {
 
 function expectErrorMessages(expectedMessages: string[], message: string) {
     for (const m of expectedMessages) {
-        if (!message.includes(m)) {
+        if (!message.toLowerCase().includes(m.toLowerCase())) {
             return {
                 message: () => `expected message not found in error: ${m}, got message: ${message}`,
                 pass: false,

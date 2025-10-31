@@ -171,8 +171,26 @@ export function addDecimalValidation(
         return schema.superRefine((v, ctx) => {
             const base = z.number();
             const { error } = base[op](value).safeParse((v as Decimal).toNumber());
-            error?.errors.forEach((e) => {
-                ctx.addIssue(e);
+            error?.issues.forEach((issue) => {
+                if (op === 'gt' || op === 'gte') {
+                    ctx.addIssue({
+                        code: 'too_small',
+                        origin: 'number',
+                        minimum: value,
+                        type: 'decimal',
+                        inclusive: op === 'gte',
+                        message: issue.message,
+                    });
+                } else {
+                    ctx.addIssue({
+                        code: 'too_big',
+                        origin: 'number',
+                        maximum: value,
+                        type: 'decimal',
+                        inclusive: op === 'lte',
+                        message: issue.message,
+                    });
+                }
             });
         });
     }
@@ -258,9 +276,9 @@ function applyValidation(
     message: string | undefined,
     path: string[] | undefined,
 ) {
-    const options: z.CustomErrorParams = {};
+    const options: Parameters<typeof schema.refine>[1] = {};
     if (message) {
-        options.message = message;
+        options.error = message;
     }
     if (path) {
         options.path = path;

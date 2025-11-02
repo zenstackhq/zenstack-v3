@@ -96,7 +96,7 @@ jobs:
                   done
 
                   # Finally run generate
-                  npx run generate
+                  npm run generate
 
             - name: Commit and push changes
               if: steps.check-package.outputs.exists == 'true'

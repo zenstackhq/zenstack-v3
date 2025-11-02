@@ -285,6 +285,9 @@ importers:
       '@zenstackhq/common-helpers':
         specifier: workspace:*
         version: link:../common-helpers
+      '@zenstackhq/schema':
+        specifier: workspace:*
+        version: link:../schema
       better-sqlite3:
         specifier: 'catalog:'
         version: 12.2.0
@@ -331,12 +334,6 @@ importers:
       '@zenstackhq/eslint-config':
         specifier: workspace:*
         version: link:../config/eslint-config
-      '@zenstackhq/language':
-        specifier: workspace:*
-        version: link:../language
-      '@zenstackhq/sdk':
-        specifier: workspace:*
-        version: link:../sdk
       '@zenstackhq/typescript-config':
         specifier: workspace:*
         version: link:../config/typescript-config
@@ -380,6 +377,19 @@ importers:
       '@zenstackhq/vitest-config':
         specifier: workspace:*
         version: link:../../config/vitest-config
+
+  packages/schema:
+    dependencies:
+      decimal.js:
+        specifier: 'catalog:'
+        version: 10.4.3
+    devDependencies:
+      '@zenstackhq/eslint-config':
+        specifier: workspace:*
+        version: link:../config/eslint-config
+      '@zenstackhq/typescript-config':
+        specifier: workspace:*
+        version: link:../config/typescript-config
 
   packages/sdk:
     dependencies:
@@ -536,6 +546,9 @@ importers:
       '@zenstackhq/plugin-policy':
         specifier: workspace:*
         version: link:../plugins/policy
+      '@zenstackhq/schema':
+        specifier: workspace:*
+        version: link:../schema
       '@zenstackhq/sdk':
         specifier: workspace:*
         version: link:../sdk
@@ -647,6 +660,9 @@ importers:
       '@zenstackhq/plugin-policy':
         specifier: workspace:*
         version: link:../../packages/plugins/policy
+      '@zenstackhq/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
       '@zenstackhq/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk

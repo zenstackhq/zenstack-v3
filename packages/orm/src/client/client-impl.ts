@@ -11,9 +11,14 @@ import {
     type KyselyProps,
 } from 'kysely';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
-import type { AuthType } from '../schema/auth';
 import type { UnwrapTuplePromises } from '../utils/type-utils';
-import type { ClientConstructor, ClientContract, ModelOperations, TransactionIsolationLevel } from './contract';
+import type {
+    AuthType,
+    ClientConstructor,
+    ClientContract,
+    ModelOperations,
+    TransactionIsolationLevel,
+} from './contract';
 import { AggregateOperationHandler } from './crud/operations/aggregate';
 import type { AllCrudOperation, CoreCrudOperation } from './crud/operations/base';
 import { BaseOperationHandler } from './crud/operations/base';

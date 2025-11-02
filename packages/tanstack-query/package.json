@@ -25,7 +25,10 @@
         }
     },
     "dependencies": {
-        "@zenstackhq/orm": "workspace:*"
+        "@zenstackhq/common-helpers": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
+        "superjson": "^2.2.3",
+        "decimal.js": "catalog:"
     },
     "devDependencies": {
         "@zenstackhq/eslint-config": "workspace:*",

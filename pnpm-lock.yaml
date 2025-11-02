@@ -502,9 +502,18 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.0.0
         version: 5.81.0(react@19.1.0)
+      '@zenstackhq/common-helpers':
+        specifier: workspace:*
+        version: link:../common-helpers
       '@zenstackhq/orm':
         specifier: workspace:*
         version: link:../orm
+      decimal.js:
+        specifier: 'catalog:'
+        version: 10.4.3
+      superjson:
+        specifier: ^2.2.3
+        version: 2.2.3
     devDependencies:
       '@zenstackhq/eslint-config':
         specifier: workspace:*

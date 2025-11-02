@@ -95,8 +95,8 @@ jobs:
                     npm install "$pkg@next"
                   done
 
-                  # Finally run zenstack generate
-                  npx zen generate
+                  # Finally run generate
+                  npx run generate
 
             - name: Commit and push changes
               if: steps.check-package.outputs.exists == 'true'

@@ -1,6 +1,6 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import { TsSchemaGenerator } from '@zenstackhq/sdk';
-import type { SchemaDef } from '@zenstackhq/sdk/schema';
+import type { SchemaDef } from '@zenstackhq/schema';
 import { execSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';

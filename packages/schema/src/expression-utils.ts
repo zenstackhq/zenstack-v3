@@ -11,8 +11,11 @@ import type {
     ThisExpression,
     UnaryExpression,
     UnaryOperator,
-} from '.';
+} from './expression';
 
+/**
+ * Utility functions to create and work with Expression objects
+ */
 export const ExpressionUtils = {
     literal: (value: string | number | boolean): LiteralExpression => {
         return {

@@ -63,6 +63,7 @@
     },
     "dependencies": {
         "@paralleldrive/cuid2": "^2.2.2",
+        "@zenstackhq/schema": "workspace:*",
         "@zenstackhq/common-helpers": "workspace:*",
         "decimal.js": "catalog:",
         "json-stable-stringify": "^1.3.0",
@@ -92,8 +93,6 @@
         "@types/pg": "^8.0.0",
         "@types/toposort": "^2.0.7",
         "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/language": "workspace:*",
-        "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "tsx": "^4.19.2",

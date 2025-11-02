@@ -3,7 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
     entry: {
         index: 'src/index.ts',
-        schema: 'src/schema/index.ts',
+        schema: 'src/schema.ts',
         helpers: 'src/helpers.ts',
     },
     outDir: 'dist',

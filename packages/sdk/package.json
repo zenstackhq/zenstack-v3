@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/sdk",
-    "version": "3.0.0-beta.14",
+    "version": "3.0.0-beta.15",
     "description": "ZenStack SDK",
     "type": "module",
     "scripts": {
@@ -24,16 +24,6 @@
             "require": {
                 "types": "./dist/index.d.cts",
                 "default": "./dist/index.cjs"
-            }
-        },
-        "./schema": {
-            "import": {
-                "types": "./dist/schema.d.ts",
-                "default": "./dist/schema.js"
-            },
-            "require": {
-                "types": "./dist/schema.d.cts",
-                "default": "./dist/schema.cjs"
             }
         }
     },

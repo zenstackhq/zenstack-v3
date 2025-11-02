@@ -1,7 +1,7 @@
 {
-    "name": "@zenstackhq/common-helpers",
+    "name": "@zenstackhq/schema",
     "version": "3.0.0-beta.15",
-    "description": "ZenStack Common Helpers",
+    "description": "ZenStack Runtime Schema",
     "type": "module",
     "scripts": {
         "build": "tsc --noEmit && tsup-node",
@@ -27,8 +27,11 @@
             }
         }
     },
+    "dependencies": {
+        "decimal.js": "catalog:"
+    },
     "devDependencies": {
-        "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/eslint-config": "workspace:*"
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*"
     }
 }

@@ -7,7 +7,7 @@ import type {
     FieldExpression,
     MemberExpression,
     UnaryExpression,
-} from '@zenstackhq/sdk/schema';
+} from '@zenstackhq/schema';
 import Decimal from 'decimal.js';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';

@@ -1,6 +1,5 @@
 import type Decimal from 'decimal.js';
 import { type GetModels, type IsDelegateModel, type ProcedureDef, type SchemaDef } from '../schema';
-import type { AuthType } from '../schema/auth';
 import type { OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
 import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
 import type {
@@ -801,5 +800,16 @@ export type ModelOperations<Schema extends SchemaDef, Model extends GetModels<Sc
     // exclude operations not applicable to delegate models
     IsDelegateModel<Schema, Model> extends true ? 'create' | 'createMany' | 'createManyAndReturn' | 'upsert' : never
 >;
+
+//#endregion
+
+//#region Supporting types
+
+export type AuthType<Schema extends SchemaDef> =
+    string extends GetModels<Schema>
+        ? Record<string, unknown>
+        : Schema['authType'] extends GetModels<Schema>
+          ? Partial<ModelResult<Schema, Schema['authType']>>
+          : never;
 
 //#endregion

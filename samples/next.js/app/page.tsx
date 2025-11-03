@@ -42,7 +42,7 @@ export default function Home() {
     };
 
     if (isUsersFetched && (!users || users.length === 0)) {
-        return <div className="p-4">No users found. Please run "pnpm db:init" to seed the database.</div>;
+        return <div className="p-4">No users found. Please run &quot;pnpm db:init&quot; to seed the database.</div>;
     }
 
     return (

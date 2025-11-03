@@ -4,9 +4,9 @@
     "private": true,
     "scripts": {
         "generate": "zen generate",
-        "db:init": "zen generate && zen db push && npx tsx zenstack/seed.ts",
+        "db:init": "pnpm generate && zen db push && npx tsx zenstack/seed.ts",
         "dev": "next dev",
-        "build": "next build",
+        "build": "pnpm generate && next build",
         "start": "next start",
         "lint": "eslint"
     },

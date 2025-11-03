@@ -177,7 +177,7 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
         options?: ModelMutationOptions<ModelResult<Schema, Model, T>, T>,
     ): ModelMutationResult<ModelResult<Schema, Model, T>, T>;
 
-    useUpdateMany<T extends UpdateManyArgs<Schema, Model>[]>(
+    useUpdateMany<T extends UpdateManyArgs<Schema, Model>>(
         options?: ModelMutationOptions<BatchResult, T>,
     ): ModelMutationResult<BatchResult, T>;
 
@@ -193,7 +193,7 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
         options?: ModelMutationOptions<ModelResult<Schema, Model, T>, T>,
     ): ModelMutationResult<ModelResult<Schema, Model, T>, T>;
 
-    useDeleteMany<T extends DeleteManyArgs<Schema, Model>[]>(
+    useDeleteMany<T extends DeleteManyArgs<Schema, Model>>(
         options?: ModelMutationOptions<BatchResult, T>,
     ): ModelMutationResult<BatchResult, T>;
 

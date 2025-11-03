@@ -1,5 +1,5 @@
 import { enumerate } from '@zenstackhq/common-helpers';
-import type { FieldDef, SchemaDef } from '@zenstackhq/orm/schema';
+import type { FieldDef, SchemaDef } from '@zenstackhq/schema';
 import { ORMWriteActions, type MaybePromise, type ORMWriteActionType } from './types';
 
 type NestingPathItem = { field?: FieldDef; model: string; where: any; unique: boolean };
@@ -35,25 +35,25 @@ export type NestedWriterVisitorCallback = {
     createMany?: (
         model: string,
         args: { data: any; skipDuplicates?: boolean },
-        context: NestedWriteVisitorContext
+        context: NestedWriteVisitorContext,
     ) => MaybePromise<boolean | object | void>;
 
     connectOrCreate?: (
         model: string,
         args: { where: object; create: any },
-        context: NestedWriteVisitorContext
+        context: NestedWriteVisitorContext,
     ) => MaybePromise<boolean | object | void>;
 
     connect?: (
         model: string,
         args: object,
-        context: NestedWriteVisitorContext
+        context: NestedWriteVisitorContext,
     ) => MaybePromise<boolean | object | void>;
 
     disconnect?: (
         model: string,
         args: object,
-        context: NestedWriteVisitorContext
+        context: NestedWriteVisitorContext,
     ) => MaybePromise<boolean | object | void>;
 
     set?: (model: string, args: object, context: NestedWriteVisitorContext) => MaybePromise<boolean | object | void>;
@@ -63,32 +63,32 @@ export type NestedWriterVisitorCallback = {
     updateMany?: (
         model: string,
         args: { where?: object; data: any },
-        context: NestedWriteVisitorContext
+        context: NestedWriteVisitorContext,
     ) => MaybePromise<boolean | object | void>;
 
     upsert?: (
         model: string,
         args: { where: object; create: any; update: any },
-        context: NestedWriteVisitorContext
+        context: NestedWriteVisitorContext,
     ) => MaybePromise<boolean | object | void>;
 
     delete?: (
         model: string,
         args: object | boolean,
-        context: NestedWriteVisitorContext
+        context: NestedWriteVisitorContext,
     ) => MaybePromise<boolean | object | void>;
 
     deleteMany?: (
         model: string,
         args: any | object,
-        context: NestedWriteVisitorContext
+        context: NestedWriteVisitorContext,
     ) => MaybePromise<boolean | object | void>;
 
     field?: (
         field: FieldDef,
         action: ORMWriteActionType,
         data: any,
-        context: NestedWriteVisitorContext
+        context: NestedWriteVisitorContext,
     ) => MaybePromise<void>;
 };
 
@@ -96,7 +96,10 @@ export type NestedWriterVisitorCallback = {
  * Recursive visitor for nested write (create/update) payload.
  */
 export class NestedWriteVisitor {
-    constructor(private readonly schema: SchemaDef, private readonly callback: NestedWriterVisitorCallback) {}
+    constructor(
+        private readonly schema: SchemaDef,
+        private readonly callback: NestedWriterVisitorCallback,
+    ) {}
 
     private isWriteAction(value: string): value is ORMWriteActionType {
         return ORMWriteActions.includes(value as ORMWriteActionType);
@@ -135,7 +138,7 @@ export class NestedWriteVisitor {
         data: any,
         parent: any,
         field: FieldDef | undefined,
-        nestingPath: NestingPathItem[]
+        nestingPath: NestingPathItem[],
     ): Promise<void> {
         if (!data) {
             return;
@@ -235,8 +238,8 @@ export class NestedWriteVisitor {
                             typeof callbackResult === 'object'
                                 ? callbackResult
                                 : typeof item.data === 'object'
-                                ? item.data
-                                : item;
+                                  ? item.data
+                                  : item;
                         await this.visitSubPayload(model, action, subPayload, newContext.nestingPath);
                     }
                 }
@@ -305,7 +308,7 @@ export class NestedWriteVisitor {
         model: string,
         action: ORMWriteActionType,
         payload: any,
-        nestingPath: NestingPathItem[]
+        nestingPath: NestingPathItem[],
     ) {
         for (const item of enumerate(payload)) {
             if (!item || typeof item !== 'object') {

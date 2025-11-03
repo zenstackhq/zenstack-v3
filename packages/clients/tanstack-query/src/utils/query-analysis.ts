@@ -1,4 +1,4 @@
-import type { SchemaDef } from '@zenstackhq/orm/schema';
+import type { SchemaDef } from '@zenstackhq/schema';
 import { NestedReadVisitor } from './nested-read-visitor';
 import { NestedWriteVisitor } from './nested-write-visitor';
 import type { ORMWriteActionType } from './types';

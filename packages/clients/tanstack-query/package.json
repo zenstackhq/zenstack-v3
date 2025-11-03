@@ -1,16 +1,25 @@
 {
     "name": "@zenstackhq/tanstack-query",
     "version": "3.0.0-beta.15",
-    "description": "",
+    "description": "TanStack Query Client for consuming ZenStack v3's CRUD service",
     "main": "index.js",
     "type": "module",
     "private": true,
     "scripts": {
         "build": "tsc --noEmit && tsup-node",
-        "lint": "eslint src --ext ts"
+        "watch": "tsup-node --watch",
+        "lint": "eslint src --ext ts",
+        "test": "vitest run",
+        "pack": "pnpm pack"
     },
-    "keywords": [],
-    "author": "",
+    "keywords": [
+        "tanstack-query",
+        "react-query",
+        "zenstack",
+        "orm",
+        "fullstack"
+    ],
+    "author": "ZenStack Team",
     "license": "MIT",
     "exports": {
         "./react": {
@@ -26,19 +35,27 @@
     },
     "dependencies": {
         "@zenstackhq/common-helpers": "workspace:*",
+        "@zenstackhq/schema": "workspace:*",
         "@zenstackhq/orm": "workspace:*",
         "superjson": "^2.2.3",
         "decimal.js": "catalog:"
     },
     "devDependencies": {
         "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*"
+        "@zenstackhq/typescript-config": "workspace:*",
+        "react": "catalog:",
+        "@types/react": "catalog:",
+        "@tanstack/react-query": "catalog:"
     },
     "peerDependencies": {
-        "@tanstack/react-query": "^5.0.0"
+        "@tanstack/react-query": "^5.0.0",
+        "react": "^18 || ^19"
     },
     "peerDependenciesMeta": {
         "@tanstack/react-query": {
+            "optional": true
+        },
+        "react": {
             "optional": true
         }
     }

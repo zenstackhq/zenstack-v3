@@ -1,8 +1,8 @@
-import type { SchemaDef } from '@zenstackhq/orm/schema';
-import { deserialize, serialize } from './serialization';
-import type { ORMWriteActionType } from './types';
+import type { SchemaDef } from '@zenstackhq/schema';
 import { applyMutation } from './mutator';
 import { getMutatedModels, getReadModels } from './query-analysis';
+import { deserialize, serialize } from './serialization';
+import type { ORMWriteActionType } from './types';
 
 /**
  * The default query endpoint.
@@ -136,9 +136,8 @@ export async function fetcher<R, C extends boolean>(
         const errData = unmarshal(await res.text());
         if (
             checkReadBack !== false &&
-            errData.error?.prisma &&
-            errData.error?.code === 'P2004' &&
-            errData.error?.reason === 'RESULT_NOT_READABLE'
+            errData.error?.rejectedByPolicy &&
+            errData.error?.rejectReason === 'cannot-read-back'
         ) {
             // policy doesn't allow mutation result to be read back, just return undefined
             return undefined as any;
@@ -172,26 +171,20 @@ type QueryKey = [
 /**
  * Computes query key for the given model, operation and query args.
  * @param model Model name.
- * @param urlOrOperation Prisma operation (e.g, `findMany`) or request URL. If it's a URL, the last path segment will be used as the operation name.
- * @param args Prisma query arguments.
+ * @param operation Query operation (e.g, `findMany`) or request URL. If it's a URL, the last path segment will be used as the operation name.
+ * @param args Query arguments.
  * @param options Query options, including `infinite` indicating if it's an infinite query (defaults to false), and `optimisticUpdate` indicating if optimistic updates are enabled (defaults to true).
  * @returns Query key
  */
 export function getQueryKey(
     model: string,
-    urlOrOperation: string,
+    operation: string,
     args: unknown,
     options: { infinite: boolean; optimisticUpdate: boolean } = { infinite: false, optimisticUpdate: true },
 ): QueryKey {
-    if (!urlOrOperation) {
-        throw new Error('Invalid urlOrOperation');
-    }
-    const operation = urlOrOperation.split('/').pop();
-
     const infinite = options.infinite;
     // infinite query doesn't support optimistic updates
     const optimisticUpdate = options.infinite ? false : options.optimisticUpdate;
-
     return [QUERY_KEY_PREFIX, model, operation!, args, { infinite, optimisticUpdate }];
 }
 
@@ -214,13 +207,13 @@ export function unmarshal(value: string) {
     }
 }
 
-export function makeUrl(url: string, args: unknown) {
+export function makeUrl(url: string, model: string, operation: string, args?: unknown) {
     if (!args) {
-        return url;
+        return `${url}/${model}/${operation}`;
     }
 
     const { data, meta } = serialize(args);
-    let result = `${url}?q=${encodeURIComponent(JSON.stringify(data))}`;
+    let result = `${url}/${model}/${operation}?q=${encodeURIComponent(JSON.stringify(data))}`;
     if (meta) {
         result += `&meta=${encodeURIComponent(JSON.stringify({ serialization: meta }))}`;
     }

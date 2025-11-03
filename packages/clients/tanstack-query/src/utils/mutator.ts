@@ -1,5 +1,5 @@
-import { clone, enumerate, invariant } from '@zenstackhq/common-helpers';
-import type { FieldDef, SchemaDef } from '@zenstackhq/orm/schema';
+import { clone, enumerate, invariant, zip } from '@zenstackhq/common-helpers';
+import type { FieldDef, SchemaDef } from '@zenstackhq/schema';
 import { NestedWriteVisitor } from './nested-write-visitor';
 import type { ORMWriteActionType } from './types';
 
@@ -213,7 +213,7 @@ function createMutate(queryModel: string, currentData: any, newData: any, schema
     });
 
     // add temp id value
-    const idFields = getIdFields(schema, queryModel, false);
+    const idFields = getIdFields(schema, queryModel);
     idFields.forEach((f) => {
         if (insert[f.name] === undefined) {
             if (f.type === 'Int' || f.type === 'BigInt') {
@@ -407,7 +407,7 @@ function idFieldsMatch(model: string, x: any, y: any, schema: SchemaDef) {
     if (!x || !y || typeof x !== 'object' || typeof y !== 'object') {
         return false;
     }
-    const idFields = getIdFields(schema, model, false);
+    const idFields = getIdFields(schema, model);
     if (idFields.length === 0) {
         return false;
     }
@@ -421,13 +421,17 @@ function assignForeignKeyFields(field: FieldDef, resultData: any, mutationData: 
         return;
     }
 
-    if (!field.foreignKeyMapping) {
+    if (!field.relation?.fields || !field.relation.references) {
         return;
     }
 
-    for (const [idField, fkField] of Object.entries(field.foreignKeyMapping)) {
+    for (const [idField, fkField] of zip(field.relation.fields, field.relation.references)) {
         if (idField in mutationData.connect) {
             resultData[fkField] = mutationData.connect[idField];
         }
     }
+}
+
+function getIdFields(schema: SchemaDef, model: string) {
+    return (schema.models[model]?.idFields ?? []).map((f) => schema.models[model]!.fields[f]!);
 }

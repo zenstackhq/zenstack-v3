@@ -27,7 +27,7 @@ export function isIdField(field: DataField, contextModel: DataModel) {
     }
 
     // NOTE: we have to use name to match fields because the fields
-    // may be inherited from an abstract base and have cloned identities
+    // may be inherited from a base and have different identities
 
     // model-level @@id attribute with a list of fields
     const modelLevelIds = getModelIdFields(contextModel);
@@ -37,7 +37,7 @@ export function isIdField(field: DataField, contextModel: DataModel) {
 
     const allFields = getAllFields(contextModel);
     if (allFields.some((f) => hasAttribute(f, '@id')) || modelLevelIds.length > 0) {
-        // the model already has id field, don't check @unique and @@unique
+        // the model already has `@id` or `@@id` field, don't further check unique fields
         return false;
     }
 

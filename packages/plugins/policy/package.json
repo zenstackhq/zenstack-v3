@@ -45,7 +45,7 @@
         "kysely": "catalog:"
     },
     "devDependencies": {
-        "@types/better-sqlite3": "^7.6.13",
+        "@types/better-sqlite3": "catalog:",
         "@types/pg": "^8.0.0",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",

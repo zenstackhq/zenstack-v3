@@ -1,11 +1,11 @@
-import type { FieldDef, SchemaDef } from "@zenstackhq/orm/schema";
+import type { FieldDef, SchemaDef } from '@zenstackhq/schema';
 
 export type NestedReadVisitorCallback = {
     field?: (
         model: string,
         field: FieldDef | undefined,
         kind: 'include' | 'select' | undefined,
-        args: unknown
+        args: unknown,
     ) => void | boolean;
 };
 
@@ -13,7 +13,10 @@ export type NestedReadVisitorCallback = {
  * Visitor for nested read payload.
  */
 export class NestedReadVisitor {
-    constructor(private readonly schema: SchemaDef, private readonly callback: NestedReadVisitorCallback) {}
+    constructor(
+        private readonly schema: SchemaDef,
+        private readonly callback: NestedReadVisitorCallback,
+    ) {}
 
     doVisit(model: string, field: FieldDef | undefined, kind: 'include' | 'select' | undefined, args: unknown) {
         if (this.callback.field) {

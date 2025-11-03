@@ -48,7 +48,7 @@
         "pg": "catalog:"
     },
     "devDependencies": {
-        "@types/better-sqlite3": "^7.6.13",
+        "@types/better-sqlite3": "catalog:",
         "@types/node": "catalog:",
         "@types/tmp": "catalog:",
         "@types/pg": "^8.11.11",

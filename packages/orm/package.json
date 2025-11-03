@@ -89,7 +89,7 @@
         }
     },
     "devDependencies": {
-        "@types/better-sqlite3": "^7.6.13",
+        "@types/better-sqlite3": "catalog:",
         "@types/pg": "^8.0.0",
         "@types/toposort": "^2.0.7",
         "@zenstackhq/eslint-config": "workspace:*",

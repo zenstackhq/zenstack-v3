@@ -3,6 +3,7 @@
     "version": "3.0.0-beta.15",
     "description": "",
     "main": "index.js",
+    "private": true,
     "scripts": {
         "generate": "zen generate",
         "db:push": "zen db push",
@@ -16,11 +17,11 @@
     "dependencies": {
         "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/plugin-policy": "workspace:*",
-        "better-sqlite3": "^12.2.0",
+        "better-sqlite3": "catalog:",
         "kysely": "catalog:"
     },
     "devDependencies": {
-        "@types/better-sqlite3": "^7.6.13",
+        "@types/better-sqlite3": "catalog:",
         "prisma": "catalog:",
         "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*"

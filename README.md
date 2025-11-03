@@ -51,7 +51,8 @@ Even without using advanced features, ZenStack offers the following benefits as 
 
 # Quick start
 
-> You can also check the [blog sample](./samples/blog) for a complete example.
+- [ORM](./samples/orm): A simple example demonstrating ZenStack ORM usage.
+- [Next.js + TanStack Query](./samples/next.js): A full-stack sample demonstrating using TanStack Query to consume ZenStack's automatic CRUD services in a Next.js app.
 
 ## Installation
 

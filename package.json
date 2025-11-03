@@ -31,7 +31,8 @@
         "typescript": "catalog:",
         "typescript-eslint": "^8.34.1",
         "vitest": "^3.2.4",
-        "yaml": "^2.8.0"
+        "yaml": "^2.8.0",
+        "prisma": "catalog:"
     },
     "pnpm": {
         "onlyBuiltDependencies": [

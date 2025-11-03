@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
-    const zmodelFiles = glob.sync(path.resolve(dir, './test/**/*.zmodel'));
+    const zmodelFiles = glob.sync(path.resolve(dir, '../test/**/*.zmodel'));
     for (const file of zmodelFiles) {
         console.log(`Generating TS schema for: ${file}`);
         await generate(file);

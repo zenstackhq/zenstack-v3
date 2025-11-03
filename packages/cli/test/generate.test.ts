@@ -44,4 +44,18 @@ describe('CLI generate command test', () => {
         runCli('generate', workDir);
         expect(fs.existsSync(path.join(workDir, 'bar/schema.ts'))).toBe(true);
     });
+
+    it('should respect lite option', () => {
+        const workDir = createProject(model);
+        runCli('generate --lite', workDir);
+        expect(fs.existsSync(path.join(workDir, 'zenstack/schema.ts'))).toBe(true);
+        expect(fs.existsSync(path.join(workDir, 'zenstack/schema-lite.ts'))).toBe(true);
+    });
+
+    it('should respect liteOnly option', () => {
+        const workDir = createProject(model);
+        runCli('generate --lite-only', workDir);
+        expect(fs.existsSync(path.join(workDir, 'zenstack/schema.ts'))).toBe(false);
+        expect(fs.existsSync(path.join(workDir, 'zenstack/schema-lite.ts'))).toBe(true);
+    });
 });

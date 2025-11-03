@@ -1,6 +1,6 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import type { SchemaDef } from '@zenstackhq/schema';
+import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import { execSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -37,6 +37,7 @@ export async function generateTsSchema(
     provider: 'sqlite' | 'postgresql' = 'sqlite',
     dbUrl?: string,
     extraSourceFiles?: Record<string, string>,
+    withLiteSchema?: boolean,
 ) {
     const workDir = createTestProject();
 
@@ -50,7 +51,7 @@ export async function generateTsSchema(
     }
 
     const generator = new TsSchemaGenerator();
-    await generator.generate(result.model, { outDir: workDir });
+    await generator.generate(result.model, { outDir: workDir, lite: withLiteSchema });
 
     if (extraSourceFiles) {
         for (const [fileName, content] of Object.entries(extraSourceFiles)) {
@@ -72,7 +73,14 @@ async function compileAndLoad(workDir: string) {
 
     // load the schema module
     const module = await import(path.join(workDir, 'schema.js'));
-    return { workDir, schema: module.schema as SchemaDef };
+
+    let moduleLite: any;
+    try {
+        moduleLite = await import(path.join(workDir, 'schema-lite.js'));
+    } catch {
+        // ignore
+    }
+    return { workDir, schema: module.schema as SchemaDef, schemaLite: moduleLite?.schema as SchemaDef | undefined };
 }
 
 export function generateTsSchemaFromFile(filePath: string) {

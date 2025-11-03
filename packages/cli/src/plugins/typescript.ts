@@ -19,7 +19,10 @@ const plugin: CliPlugin = {
         // lite mode
         const lite = pluginOptions['lite'] === true;
 
-        await new TsSchemaGenerator().generate(model, { outDir, lite });
+        // liteOnly mode
+        const liteOnly = pluginOptions['liteOnly'] === true;
+
+        await new TsSchemaGenerator().generate(model, { outDir, lite, liteOnly });
     },
 };
 

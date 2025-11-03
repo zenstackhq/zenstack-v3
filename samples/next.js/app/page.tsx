@@ -1,6 +1,6 @@
 'use client';
 
-import { schema } from '@/zenstack/schema';
+import { schema } from '@/zenstack/schema-lite';
 import { useClientQueries } from '@zenstackhq/tanstack-query/react';
 import { LoremIpsum } from 'lorem-ipsum';
 import Image from 'next/image';

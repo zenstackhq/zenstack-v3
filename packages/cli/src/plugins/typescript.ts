@@ -7,6 +7,7 @@ const plugin: CliPlugin = {
     name: 'TypeScript Schema Generator',
     statusText: 'Generating TypeScript schema',
     async generate({ model, defaultOutputPath, pluginOptions }) {
+        // output path
         let outDir = defaultOutputPath;
         if (typeof pluginOptions['output'] === 'string') {
             outDir = path.resolve(defaultOutputPath, pluginOptions['output']);
@@ -14,7 +15,11 @@ const plugin: CliPlugin = {
                 fs.mkdirSync(outDir, { recursive: true });
             }
         }
-        await new TsSchemaGenerator().generate(model, outDir);
+
+        // lite mode
+        const lite = pluginOptions['lite'] === true;
+
+        await new TsSchemaGenerator().generate(model, { outDir, lite });
     },
 };
 

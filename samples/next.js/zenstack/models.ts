@@ -5,7 +5,7 @@
 
 /* eslint-disable */
 
-import { type SchemaType as $Schema } from "./schema";
+import { type SchemaType as $Schema } from "./schema-lite";
 import { type ModelResult as $ModelResult } from "@zenstackhq/orm";
 /**
  * User model

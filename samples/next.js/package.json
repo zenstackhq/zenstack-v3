@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "generate": "zen generate",
+        "generate": "zen generate --lite",
         "db:init": "pnpm generate && zen db push && npx tsx zenstack/seed.ts",
         "dev": "next dev",
         "build": "pnpm generate && next build",

@@ -17,7 +17,7 @@ async function main() {
 
 async function generate(schemaPath: string) {
     const generator = new TsSchemaGenerator();
-    const outputDir = path.dirname(schemaPath);
+    const outDir = path.dirname(schemaPath);
 
     // isomorphic __dirname
     const _dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
@@ -29,7 +29,7 @@ async function generate(schemaPath: string) {
     if (!result.success) {
         throw new Error(`Failed to load schema from ${schemaPath}: ${result.errors}`);
     }
-    await generator.generate(result.model as Model, outputDir);
+    await generator.generate(result.model as Model, { outDir });
 }
 
 main();

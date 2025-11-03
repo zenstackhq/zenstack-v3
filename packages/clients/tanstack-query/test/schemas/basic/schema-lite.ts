@@ -18,14 +18,12 @@ export const schema = {
                     name: "id",
                     type: "String",
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
                 email: {
                     name: "email",
                     type: "String",
-                    unique: true,
-                    attributes: [{ name: "@unique" }]
+                    unique: true
                 },
                 name: {
                     name: "name",
@@ -52,7 +50,6 @@ export const schema = {
                     name: "id",
                     type: "String",
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
                 title: {
@@ -63,7 +60,6 @@ export const schema = {
                     name: "owner",
                     type: "User",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "posts", fields: ["ownerId"], references: ["id"] }
                 },
                 ownerId: {
@@ -78,7 +74,6 @@ export const schema = {
                     name: "category",
                     type: "Category",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("categoryId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "posts", fields: ["categoryId"], references: ["id"] }
                 },
                 categoryId: {
@@ -102,14 +97,12 @@ export const schema = {
                     name: "id",
                     type: "String",
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
                 name: {
                     name: "name",
                     type: "String",
-                    unique: true,
-                    attributes: [{ name: "@unique" }]
+                    unique: true
                 },
                 posts: {
                     name: "posts",

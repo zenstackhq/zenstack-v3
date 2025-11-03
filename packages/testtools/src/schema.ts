@@ -50,7 +50,7 @@ export async function generateTsSchema(
     }
 
     const generator = new TsSchemaGenerator();
-    await generator.generate(result.model, workDir);
+    await generator.generate(result.model, { outDir: workDir });
 
     if (extraSourceFiles) {
         for (const [fileName, content] of Object.entries(extraSourceFiles)) {
@@ -87,7 +87,7 @@ export async function generateTsSchemaInPlace(schemaPath: string) {
         throw new Error(`Failed to load schema from ${schemaPath}: ${result.errors}`);
     }
     const generator = new TsSchemaGenerator();
-    await generator.generate(result.model, workDir);
+    await generator.generate(result.model, { outDir: workDir });
     return compileAndLoad(workDir);
 }
 

@@ -13,6 +13,8 @@ type Options = {
     schema?: string;
     output?: string;
     silent: boolean;
+    lite: boolean;
+    liteOnly: boolean;
 };
 
 /**
@@ -88,10 +90,15 @@ async function runPlugins(schemaFile: string, model: Model, outputPath: string, 
         }
     }
 
-    const defaultPlugins = [corePlugins['typescript']].reverse();
-    defaultPlugins.forEach((d) => {
-        if (!processedPlugins.some((p) => p.cliPlugin === d)) {
-            processedPlugins.push({ cliPlugin: d, pluginOptions: {} });
+    const defaultPlugins = [
+        {
+            plugin: corePlugins['typescript'],
+            options: { lite: options.lite, liteOnly: options.liteOnly },
+        },
+    ];
+    defaultPlugins.forEach(({ plugin, options }) => {
+        if (!processedPlugins.some((p) => p.cliPlugin === plugin)) {
+            processedPlugins.push({ cliPlugin: plugin, pluginOptions: options });
         }
     });
 

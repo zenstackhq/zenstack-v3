@@ -1,5 +1,5 @@
 /**
- * @vitest-environment jsdom
+ * @vitest-environment happy-dom
  */
 
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';

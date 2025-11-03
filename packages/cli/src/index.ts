@@ -59,6 +59,8 @@ function createProgram() {
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
         .addOption(new Option('-o, --output <path>', 'default output directory for code generation'))
+        .addOption(new Option('--lite', 'also generate a lite version of schema without attributes').default(false))
+        .addOption(new Option('--lite-only', 'only generate lite version of schema without attributes').default(false))
         .addOption(new Option('--silent', 'suppress all output except errors').default(false))
         .action(generateAction);
 

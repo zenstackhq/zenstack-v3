@@ -9,7 +9,7 @@ import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { QuerySettingsProvider, useClientQueries } from '../src/react';
 import { getQueryKey } from '../src/utils/common';
-import { schema } from './schemas/basic/schema';
+import { schema } from './schemas/basic/schema-lite';
 
 const BASE_URL = 'http://localhost';
 
@@ -18,7 +18,7 @@ describe('React Query Test', () => {
         const queryClient = new QueryClient({
             defaultOptions: {
                 queries: {
-                    experimental_prefetchInRender: true,
+                    retry: false,
                 },
             },
         });
@@ -66,9 +66,45 @@ describe('React Query Test', () => {
             const cacheData = queryClient.getQueryData(getQueryKey('User', 'findUnique', queryArgs));
             expect(cacheData).toMatchObject(data);
         });
+
+        nock(makeUrl('User', 'findFirst', queryArgs))
+            .get(/.*/)
+            .reply(404, () => {
+                return { error: 'Not Found' };
+            });
+        const { result: errorResult } = renderHook(() => useClientQueries(schema).user.useFindFirst(queryArgs), {
+            wrapper,
+        });
+        await waitFor(() => {
+            expect(errorResult.current.isError).toBe(true);
+        });
     });
 
-    it('infinite query', async () => {
+    it('works with suspense query', async () => {
+        const { queryClient, wrapper } = createWrapper();
+
+        const queryArgs = { where: { id: '1' } };
+        const data = { id: '1', name: 'foo' };
+
+        nock(makeUrl('User', 'findUnique', queryArgs))
+            .get(/.*/)
+            .reply(200, {
+                data,
+            });
+
+        const { result } = renderHook(() => useClientQueries(schema).user.useSuspenseFindUnique(queryArgs), {
+            wrapper,
+        });
+
+        await waitFor(() => {
+            expect(result.current.isSuccess).toBe(true);
+            expect(result.current.data).toMatchObject(data);
+            const cacheData = queryClient.getQueryData(getQueryKey('User', 'findUnique', queryArgs));
+            expect(cacheData).toMatchObject(data);
+        });
+    });
+
+    it('works with infinite query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const queryArgs = { where: { id: '1' } };
@@ -104,7 +140,43 @@ describe('React Query Test', () => {
         });
     });
 
-    it('independent mutation and query', async () => {
+    it('works with suspense infinite query', async () => {
+        const { queryClient, wrapper } = createWrapper();
+
+        const queryArgs = { where: { id: '1' } };
+        const data = [{ id: '1', name: 'foo' }];
+
+        nock(makeUrl('User', 'findMany', queryArgs))
+            .get(/.*/)
+            .reply(200, () => ({
+                data,
+            }));
+
+        const { result } = renderHook(
+            () =>
+                useClientQueries(schema).user.useSuspenseInfiniteFindMany(queryArgs, {
+                    getNextPageParam: () => null,
+                }),
+            {
+                wrapper,
+            },
+        );
+        await waitFor(() => {
+            expect(result.current.isSuccess).toBe(true);
+            const resultData = result.current.data!;
+            expect(resultData.pages).toHaveLength(1);
+            expect(resultData.pages[0]).toMatchObject(data);
+            expect(resultData?.pageParams).toHaveLength(1);
+            expect(resultData?.pageParams[0]).toMatchObject(queryArgs);
+            expect(result.current.hasNextPage).toBe(false);
+            const cacheData: any = queryClient.getQueryData(
+                getQueryKey('User', 'findMany', queryArgs, { infinite: true, optimisticUpdate: false }),
+            );
+            expect(cacheData.pages[0]).toMatchObject(data);
+        });
+    });
+
+    it('works with independent mutation and query', async () => {
         const { wrapper } = createWrapper();
 
         const queryArgs = { where: { id: '1' } };
@@ -144,7 +216,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('create and invalidation', async () => {
+    it('works with create and invalidation', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any[] = [];
@@ -180,7 +252,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('create and no invalidation', async () => {
+    it('works with create and no invalidation', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any[] = [];
@@ -216,7 +288,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic create single', async () => {
+    it('works with optimistic create single', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any[] = [];
@@ -266,7 +338,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic create updating nested query', async () => {
+    it('works with optimistic create updating nested query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any[] = [{ id: '1', name: 'user1', posts: [] }];
@@ -326,7 +398,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic create updating deeply nested query', async () => {
+    it('works with optimistic create updating deeply nested query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         // populate the cache with a user
@@ -468,7 +540,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic update with optional one-to-many relationship', async () => {
+    it('works with optimistic update with optional one-to-many relationship', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         // populate the cache with a post, with an optional category relationship
@@ -556,7 +628,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic update with nested optional one-to-many relationship', async () => {
+    it('works with optimistic update with nested optional one-to-many relationship', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         // populate the cache with a user and a post, with an optional category
@@ -652,7 +724,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic nested create updating query', async () => {
+    it('works with optimistic nested create updating query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any[] = [];
@@ -704,7 +776,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic create many', async () => {
+    it('works with optimistic create many', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any[] = [];
@@ -753,7 +825,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('update and invalidation', async () => {
+    it('works with update and invalidation', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const queryArgs = { where: { id: '1' } };
@@ -792,7 +864,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('update and no invalidation', async () => {
+    it('works with update and no invalidation', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const queryArgs = { where: { id: '1' } };
@@ -829,7 +901,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic update simple', async () => {
+    it('works with optimistic update simple', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const queryArgs = { where: { id: '1' } };
@@ -877,7 +949,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic update updating nested query', async () => {
+    it('works with optimistic update updating nested query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const queryArgs = { where: { id: '1' }, include: { posts: true } };
@@ -928,7 +1000,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic nested update updating query', async () => {
+    it('works with optimistic nested update updating query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const queryArgs = { where: { id: 'p1' } };
@@ -979,7 +1051,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic upsert - create simple', async () => {
+    it('works with optimistic upsert - create simple', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any[] = [];
@@ -1031,7 +1103,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic upsert - create updating nested query', async () => {
+    it('works with optimistic upsert - create updating nested query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any = { id: '1', name: 'user1', posts: [{ id: 'p1', title: 'post1' }] };
@@ -1084,7 +1156,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic upsert - nested create updating query', async () => {
+    it('works with optimistic upsert - nested create updating query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any = [{ id: 'p1', title: 'post1' }];
@@ -1143,7 +1215,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic upsert - update simple', async () => {
+    it('works with optimistic upsert - update simple', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const queryArgs = { where: { id: '1' } };
@@ -1189,7 +1261,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic upsert - update updating nested query', async () => {
+    it('works with optimistic upsert - update updating nested query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any = { id: '1', name: 'user1', posts: [{ id: 'p1', title: 'post1' }] };
@@ -1242,7 +1314,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic upsert - nested update updating query', async () => {
+    it('works with optimistic upsert - nested update updating query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any = [{ id: 'p1', title: 'post1' }];
@@ -1301,7 +1373,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('delete and invalidation', async () => {
+    it('works with delete and invalidation', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any[] = [{ id: '1', name: 'foo' }];
@@ -1337,7 +1409,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic delete simple', async () => {
+    it('works with optimistic delete simple', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any[] = [{ id: '1', name: 'foo' }];
@@ -1382,7 +1454,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic delete nested query', async () => {
+    it('works with optimistic delete nested query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any = { id: '1', name: 'foo', posts: [{ id: 'p1', title: 'post1' }] };
@@ -1438,7 +1510,7 @@ describe('React Query Test', () => {
         });
     });
 
-    it('optimistic nested delete update query', async () => {
+    it('works with optimistic nested delete update query', async () => {
         const { queryClient, wrapper } = createWrapper();
 
         const data: any = [
@@ -1507,7 +1579,7 @@ describe('React Query Test', () => {
         nock(makeUrl('Post', 'update'))
             .put(/.*/)
             .reply(200, () => {
-                data.posts[0].title = 'post2';
+                data.posts[0]!.title = 'post2';
                 return data;
             });
 

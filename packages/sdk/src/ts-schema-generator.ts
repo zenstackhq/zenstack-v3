@@ -51,44 +51,70 @@ import {
     isUniqueField,
 } from './model-utils';
 
+export type TsSchemaGeneratorOptions = {
+    outDir: string;
+    lite?: boolean;
+    liteOnly?: boolean;
+};
+
 export class TsSchemaGenerator {
     private usedExpressionUtils = false;
 
-    async generate(model: Model, outputDir: string) {
-        fs.mkdirSync(outputDir, { recursive: true });
+    async generate(model: Model, options: TsSchemaGeneratorOptions) {
+        fs.mkdirSync(options.outDir, { recursive: true });
 
         // Reset the flag for each generation
         this.usedExpressionUtils = false;
 
         // the schema itself
-        this.generateSchema(model, outputDir);
+        this.generateSchema(model, options);
 
         // the model types
-        this.generateModelsAndTypeDefs(model, outputDir);
+        this.generateModelsAndTypeDefs(model, options);
 
         // the input types
-        this.generateInputTypes(model, outputDir);
+        this.generateInputTypes(model, options);
     }
 
-    private generateSchema(model: Model, outputDir: string) {
-        const statements: ts.Statement[] = [];
-        this.generateSchemaStatements(model, statements);
-        this.generateBannerComments(statements);
+    private generateSchema(model: Model, options: TsSchemaGeneratorOptions) {
+        const targets: { lite: boolean; file: string }[] = [];
+        if (!options.liteOnly) {
+            targets.push({ lite: false, file: 'schema.ts' });
+        }
+        if (options.lite || options.liteOnly) {
+            targets.push({ lite: true, file: 'schema-lite.ts' });
+        }
 
-        const schemaOutputFile = path.join(outputDir, 'schema.ts');
-        const sourceFile = ts.createSourceFile(schemaOutputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
-        const printer = ts.createPrinter();
-        const result = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(statements), sourceFile);
-        fs.writeFileSync(schemaOutputFile, result);
+        for (const { lite, file } of targets) {
+            const statements: ts.Statement[] = [];
+            this.generateSchemaStatements(model, statements, lite);
+            this.generateBannerComments(statements);
+
+            const schemaOutputFile = path.join(options.outDir, file);
+            const sourceFile = ts.createSourceFile(
+                schemaOutputFile,
+                '',
+                ts.ScriptTarget.ESNext,
+                false,
+                ts.ScriptKind.TS,
+            );
+            const printer = ts.createPrinter();
+            const result = printer.printList(
+                ts.ListFormat.MultiLine,
+                ts.factory.createNodeArray(statements),
+                sourceFile,
+            );
+            fs.writeFileSync(schemaOutputFile, result);
+        }
     }
 
-    private generateSchemaStatements(model: Model, statements: ts.Statement[]) {
+    private generateSchemaStatements(model: Model, statements: ts.Statement[], lite: boolean) {
         const hasComputedFields = model.declarations.some(
             (d) => isDataModel(d) && d.fields.some((f) => hasAttribute(f, '@computed')),
         );
 
         // Generate schema content first to determine if ExpressionUtils is needed
-        const schemaObject = this.createSchemaObject(model);
+        const schemaObject = this.createSchemaObject(model, lite);
 
         // Now generate the import declaration with the correct imports
         const runtimeImportDecl = ts.factory.createImportDeclaration(
@@ -160,17 +186,17 @@ export class TsSchemaGenerator {
         );
     }
 
-    private createSchemaObject(model: Model) {
+    private createSchemaObject(model: Model, lite: boolean): ts.Expression {
         const properties: ts.PropertyAssignment[] = [
             // provider
             ts.factory.createPropertyAssignment('provider', this.createProviderObject(model)),
 
             // models
-            ts.factory.createPropertyAssignment('models', this.createModelsObject(model)),
+            ts.factory.createPropertyAssignment('models', this.createModelsObject(model, lite)),
 
             // typeDefs
             ...(model.declarations.some(isTypeDef)
-                ? [ts.factory.createPropertyAssignment('typeDefs', this.createTypeDefsObject(model))]
+                ? [ts.factory.createPropertyAssignment('typeDefs', this.createTypeDefsObject(model, lite))]
                 : []),
         ];
 
@@ -216,33 +242,35 @@ export class TsSchemaGenerator {
         );
     }
 
-    private createModelsObject(model: Model) {
+    private createModelsObject(model: Model, lite: boolean): ts.Expression {
         return ts.factory.createObjectLiteralExpression(
             model.declarations
                 .filter((d): d is DataModel => isDataModel(d) && !hasAttribute(d, '@@ignore'))
-                .map((dm) => ts.factory.createPropertyAssignment(dm.name, this.createDataModelObject(dm))),
+                .map((dm) => ts.factory.createPropertyAssignment(dm.name, this.createDataModelObject(dm, lite))),
             true,
         );
     }
 
-    private createTypeDefsObject(model: Model): ts.Expression {
+    private createTypeDefsObject(model: Model, lite: boolean): ts.Expression {
         return ts.factory.createObjectLiteralExpression(
             model.declarations
                 .filter((d): d is TypeDef => isTypeDef(d))
-                .map((td) => ts.factory.createPropertyAssignment(td.name, this.createTypeDefObject(td))),
+                .map((td) => ts.factory.createPropertyAssignment(td.name, this.createTypeDefObject(td, lite))),
             true,
         );
     }
 
-    private createDataModelObject(dm: DataModel) {
+    private createDataModelObject(dm: DataModel, lite: boolean) {
         const allFields = getAllFields(dm);
-        const allAttributes = getAllAttributes(dm).filter((attr) => {
-            // exclude `@@delegate` attribute from base model
-            if (attr.decl.$refText === '@@delegate' && attr.$container !== dm) {
-                return false;
-            }
-            return true;
-        });
+        const allAttributes = lite
+            ? [] // in lite mode, skip all model-level attributes
+            : getAllAttributes(dm).filter((attr) => {
+                  // exclude `@@delegate` attribute from base model
+                  if (attr.decl.$refText === '@@delegate' && attr.$container !== dm) {
+                      return false;
+                  }
+                  return true;
+              });
         const subModels = this.getSubModels(dm);
 
         const fields: ts.PropertyAssignment[] = [
@@ -264,7 +292,7 @@ export class TsSchemaGenerator {
                 'fields',
                 ts.factory.createObjectLiteralExpression(
                     allFields.map((field) =>
-                        ts.factory.createPropertyAssignment(field.name, this.createDataFieldObject(field, dm)),
+                        ts.factory.createPropertyAssignment(field.name, this.createDataFieldObject(field, dm, lite)),
                     ),
                     true,
                 ),
@@ -332,7 +360,7 @@ export class TsSchemaGenerator {
             .map((d) => d.name);
     }
 
-    private createTypeDefObject(td: TypeDef): ts.Expression {
+    private createTypeDefObject(td: TypeDef, lite: boolean): ts.Expression {
         const allFields = getAllFields(td);
         const allAttributes = getAllAttributes(td);
 
@@ -345,7 +373,10 @@ export class TsSchemaGenerator {
                 'fields',
                 ts.factory.createObjectLiteralExpression(
                     allFields.map((field) =>
-                        ts.factory.createPropertyAssignment(field.name, this.createDataFieldObject(field, undefined)),
+                        ts.factory.createPropertyAssignment(
+                            field.name,
+                            this.createDataFieldObject(field, undefined, lite),
+                        ),
                     ),
                     true,
                 ),
@@ -432,7 +463,7 @@ export class TsSchemaGenerator {
         return result;
     }
 
-    private createDataFieldObject(field: DataField, contextModel: DataModel | undefined) {
+    private createDataFieldObject(field: DataField, contextModel: DataModel | undefined, lite: boolean) {
         const objectFields = [
             // name
             ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(field.name)),
@@ -482,8 +513,8 @@ export class TsSchemaGenerator {
             objectFields.push(ts.factory.createPropertyAssignment('isDiscriminator', ts.factory.createTrue()));
         }
 
-        // attributes
-        if (field.attributes.length > 0) {
+        // attributes, only when not in lite mode
+        if (!lite && field.attributes.length > 0) {
             objectFields.push(
                 ts.factory.createPropertyAssignment(
                     'attributes',
@@ -1110,11 +1141,11 @@ export class TsSchemaGenerator {
             });
     }
 
-    private generateModelsAndTypeDefs(model: Model, outputDir: string) {
+    private generateModelsAndTypeDefs(model: Model, options: TsSchemaGeneratorOptions) {
         const statements: ts.Statement[] = [];
 
         // generate: import { schema as $schema, type SchemaType as $Schema } from './schema';
-        statements.push(this.generateSchemaImport(model, true, true));
+        statements.push(this.generateSchemaImport(model, true, true, !!(options.lite || options.liteOnly)));
 
         // generate: import type { ModelResult as $ModelResult } from '@zenstackhq/orm';
         statements.push(
@@ -1230,14 +1261,14 @@ export class TsSchemaGenerator {
         this.generateBannerComments(statements);
 
         // write to file
-        const outputFile = path.join(outputDir, 'models.ts');
+        const outputFile = path.join(options.outDir, 'models.ts');
         const sourceFile = ts.createSourceFile(outputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
         const printer = ts.createPrinter();
         const result = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(statements), sourceFile);
         fs.writeFileSync(outputFile, result);
     }
 
-    private generateSchemaImport(model: Model, schemaObject: boolean, schemaType: boolean) {
+    private generateSchemaImport(model: Model, schemaObject: boolean, schemaType: boolean, useLite: boolean) {
         const importSpecifiers = [];
 
         if (schemaObject) {
@@ -1266,7 +1297,7 @@ export class TsSchemaGenerator {
         return ts.factory.createImportDeclaration(
             undefined,
             ts.factory.createImportClause(false, undefined, ts.factory.createNamedImports(importSpecifiers)),
-            ts.factory.createStringLiteral('./schema'),
+            ts.factory.createStringLiteral(useLite ? './schema-lite' : './schema'),
         );
     }
 
@@ -1282,12 +1313,12 @@ export class TsSchemaGenerator {
         );
     }
 
-    private generateInputTypes(model: Model, outputDir: string) {
+    private generateInputTypes(model: Model, options: TsSchemaGeneratorOptions) {
         const dataModels = model.declarations.filter(isDataModel);
         const statements: ts.Statement[] = [];
 
         // generate: import { SchemaType as $Schema } from './schema';
-        statements.push(this.generateSchemaImport(model, false, true));
+        statements.push(this.generateSchemaImport(model, false, true, !!(options.lite || options.liteOnly)));
 
         // generate: import { CreateArgs as $CreateArgs, ... } from '@zenstackhq/orm';
         const inputTypes = [
@@ -1410,7 +1441,7 @@ export class TsSchemaGenerator {
         this.generateBannerComments(statements);
 
         // write to file
-        const outputFile = path.join(outputDir, 'input.ts');
+        const outputFile = path.join(options.outDir, 'input.ts');
         const sourceFile = ts.createSourceFile(outputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
         const printer = ts.createPrinter();
         const result = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(statements), sourceFile);

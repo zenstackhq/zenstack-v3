@@ -7,6 +7,7 @@ import {
     useSuspenseQuery,
     type DefaultError,
     type InfiniteData,
+    type QueryKey,
     type UseInfiniteQueryOptions,
     type UseInfiniteQueryResult,
     type UseMutationOptions,
@@ -87,18 +88,28 @@ function useHooksContext() {
 
 export type ModelQueryOptions<T> = Omit<UseQueryOptions<T, DefaultError>, 'queryKey'> & ExtraQueryOptions;
 
+export type ModelQueryResult<T> = UseQueryResult<T, DefaultError> & { queryKey: QueryKey };
+
 export type ModelSuspenseQueryOptions<T> = Omit<UseSuspenseQueryOptions<T, DefaultError>, 'queryKey'> &
     ExtraQueryOptions;
+
+export type ModelSuspenseQueryResult<T> = UseSuspenseQueryResult<T, DefaultError> & { queryKey: QueryKey };
 
 export type ModelInfiniteQueryOptions<T> = Omit<
     UseInfiniteQueryOptions<T, DefaultError, InfiniteData<T>>,
     'queryKey' | 'initialPageParam'
 >;
 
+export type ModelInfiniteQueryResult<T> = UseInfiniteQueryResult<T, DefaultError> & { queryKey: QueryKey };
+
 export type ModelSuspenseInfiniteQueryOptions<T> = Omit<
     UseSuspenseInfiniteQueryOptions<T, DefaultError, InfiniteData<T>>,
     'queryKey' | 'initialPageParam'
 >;
+
+export type ModelSuspenseInfiniteQueryResult<T> = UseSuspenseInfiniteQueryResult<T, DefaultError> & {
+    queryKey: QueryKey;
+};
 
 export type ModelMutationOptions<T, TArgs> = Omit<UseMutationOptions<T, DefaultError, TArgs>, 'mutationFn'> &
     ExtraMutationOptions;
@@ -113,48 +124,48 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
     useFindUnique<T extends FindUniqueArgs<Schema, Model>>(
         args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
         options?: ModelQueryOptions<ModelResult<Schema, Model, T> | null>,
-    ): UseQueryResult<ModelResult<Schema, Model, T> | null>;
+    ): ModelQueryResult<ModelResult<Schema, Model, T> | null>;
 
     useSuspenseFindUnique<T extends FindUniqueArgs<Schema, Model>>(
         args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
         options?: ModelSuspenseQueryOptions<ModelResult<Schema, Model, T> | null>,
-    ): UseSuspenseQueryResult<ModelResult<Schema, Model, T> | null>;
+    ): ModelSuspenseQueryResult<ModelResult<Schema, Model, T> | null>;
 
     useFindFirst<T extends FindArgs<Schema, Model, false>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, false>>,
         options?: ModelQueryOptions<ModelResult<Schema, Model, T> | null>,
-    ): UseQueryResult<ModelResult<Schema, Model, T> | null>;
+    ): ModelQueryResult<ModelResult<Schema, Model, T> | null>;
 
     useSuspenseFindFirst<T extends FindArgs<Schema, Model, false>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, false>>,
         options?: ModelSuspenseQueryOptions<ModelResult<Schema, Model, T> | null>,
-    ): UseSuspenseQueryResult<ModelResult<Schema, Model, T> | null>;
+    ): ModelSuspenseQueryResult<ModelResult<Schema, Model, T> | null>;
 
     useFindMany<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
         options?: ModelQueryOptions<ModelResult<Schema, Model, T>[]>,
-    ): UseQueryResult<ModelResult<Schema, Model, T>[]>;
+    ): ModelQueryResult<ModelResult<Schema, Model, T>[]>;
 
     useSuspenseFindMany<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
         options?: ModelSuspenseQueryOptions<ModelResult<Schema, Model, T>[]>,
-    ): UseSuspenseQueryResult<ModelResult<Schema, Model, T>[]>;
-
-    useSuspenseInfiniteFindMany<T extends FindArgs<Schema, Model, true>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
-        options?: ModelSuspenseInfiniteQueryOptions<ModelResult<Schema, Model, T>[]>,
-    ): UseSuspenseInfiniteQueryResult<InfiniteData<ModelResult<Schema, Model, T>[]>>;
+    ): ModelSuspenseQueryResult<ModelResult<Schema, Model, T>[]>;
 
     useInfiniteFindMany<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
         options?: ModelInfiniteQueryOptions<ModelResult<Schema, Model, T>[]>,
-    ): UseInfiniteQueryResult<InfiniteData<ModelResult<Schema, Model, T>[]>>;
+    ): ModelInfiniteQueryResult<InfiniteData<ModelResult<Schema, Model, T>[]>>;
+
+    useSuspenseInfiniteFindMany<T extends FindArgs<Schema, Model, true>>(
+        args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
+        options?: ModelSuspenseInfiniteQueryOptions<ModelResult<Schema, Model, T>[]>,
+    ): ModelSuspenseInfiniteQueryResult<InfiniteData<ModelResult<Schema, Model, T>[]>>;
 
     useCreate<T extends CreateArgs<Schema, Model>>(
-        options?: UseMutationOptions<ModelResult<Schema, Model, T>, DefaultError, T>,
+        options?: ModelMutationOptions<ModelResult<Schema, Model, T>, T>,
     ): ModelMutationResult<ModelResult<Schema, Model, T>, T>;
 
-    useCreateMany<T extends CreateManyArgs<Schema, Model>[]>(
+    useCreateMany<T extends CreateManyArgs<Schema, Model>>(
         options?: ModelMutationOptions<BatchResult, T>,
     ): ModelMutationResult<BatchResult, T>;
 
@@ -188,27 +199,27 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
 
     useCount<T extends CountArgs<Schema, Model>>(
         options?: ModelQueryOptions<CountResult<Schema, Model, T>>,
-    ): UseQueryResult<CountResult<Schema, Model, T>>;
+    ): ModelQueryResult<CountResult<Schema, Model, T>>;
 
     useSuspenseCount<T extends CountArgs<Schema, Model>>(
         options?: ModelSuspenseQueryOptions<CountResult<Schema, Model, T>>,
-    ): UseSuspenseQueryResult<CountResult<Schema, Model, T>>;
+    ): ModelSuspenseQueryResult<CountResult<Schema, Model, T>>;
 
     useAggregate<T extends AggregateArgs<Schema, Model>>(
         options?: ModelQueryOptions<AggregateResult<Schema, Model, T>>,
-    ): UseQueryResult<AggregateResult<Schema, Model, T>>;
+    ): ModelQueryResult<AggregateResult<Schema, Model, T>>;
 
     useSuspenseAggregate<T extends AggregateArgs<Schema, Model>>(
         options?: ModelSuspenseQueryOptions<AggregateResult<Schema, Model, T>>,
-    ): UseSuspenseQueryResult<AggregateResult<Schema, Model, T>>;
+    ): ModelSuspenseQueryResult<AggregateResult<Schema, Model, T>>;
 
     useGroupBy<T extends GroupByArgs<Schema, Model>>(
         options?: ModelQueryOptions<GroupByResult<Schema, Model, T>>,
-    ): UseQueryResult<GroupByResult<Schema, Model, T>>;
+    ): ModelQueryResult<GroupByResult<Schema, Model, T>>;
 
     useSuspenseGroupBy<T extends GroupByArgs<Schema, Model>>(
         options?: ModelSuspenseQueryOptions<GroupByResult<Schema, Model, T>>,
-    ): UseSuspenseQueryResult<GroupByResult<Schema, Model, T>>;
+    ): ModelSuspenseQueryResult<GroupByResult<Schema, Model, T>>;
 };
 
 /**
@@ -233,7 +244,7 @@ export function useModelQueries<Schema extends SchemaDef, Model extends GetModel
         throw new Error(`Model "${model}" not found in schema`);
     }
 
-    const modelName = lowerCaseFirst(modelDef.name);
+    const modelName = modelDef.name;
 
     return {
         useFindUnique: (args: any, options?: any) => {

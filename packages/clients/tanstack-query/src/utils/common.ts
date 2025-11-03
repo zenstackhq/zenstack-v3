@@ -1,3 +1,4 @@
+import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import type { SchemaDef } from '@zenstackhq/schema';
 import { applyMutation } from './mutator';
 import { getMutatedModels, getReadModels } from './query-analysis';
@@ -208,12 +209,13 @@ export function unmarshal(value: string) {
 }
 
 export function makeUrl(url: string, model: string, operation: string, args?: unknown) {
+    const baseUrl = `${url}/${lowerCaseFirst(model)}/${operation}`;
     if (!args) {
-        return `${url}/${model}/${operation}`;
+        return baseUrl;
     }
 
     const { data, meta } = serialize(args);
-    let result = `${url}/${model}/${operation}?q=${encodeURIComponent(JSON.stringify(data))}`;
+    let result = `${baseUrl}?q=${encodeURIComponent(JSON.stringify(data))}`;
     if (meta) {
         result += `&meta=${encodeURIComponent(JSON.stringify({ serialization: meta }))}`;
     }

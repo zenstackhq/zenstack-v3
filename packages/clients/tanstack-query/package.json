@@ -10,7 +10,8 @@
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
         "test": "vitest run",
-        "pack": "pnpm pack"
+        "pack": "pnpm pack",
+        "test:generate": "tsx scripts/generate.ts"
     },
     "keywords": [
         "tanstack-query",
@@ -35,17 +36,24 @@
     },
     "dependencies": {
         "@zenstackhq/common-helpers": "workspace:*",
-        "@zenstackhq/schema": "workspace:*",
         "@zenstackhq/orm": "workspace:*",
-        "superjson": "^2.2.3",
-        "decimal.js": "catalog:"
+        "@zenstackhq/schema": "workspace:*",
+        "decimal.js": "catalog:",
+        "superjson": "^2.2.3"
     },
     "devDependencies": {
-        "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*",
-        "react": "catalog:",
+        "@tanstack/react-query": "catalog:",
+        "@testing-library/dom": "^10.4.1",
+        "@testing-library/react": "^16.3.0",
         "@types/react": "catalog:",
-        "@tanstack/react-query": "catalog:"
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/sdk": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*",
+        "jsdom": "^27.1.0",
+        "nock": "^14.0.10",
+        "react": "catalog:"
     },
     "peerDependencies": {
         "@tanstack/react-query": "^5.0.0",

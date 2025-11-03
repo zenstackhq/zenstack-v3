@@ -89,12 +89,19 @@ function collectDeleteCascades(model: string, schema: SchemaDef, result: Set<str
         return;
     }
 
-    Object.values(modelDef.fields).forEach((fieldDef) => {
-        if (fieldDef.relation && fieldDef.relation.onDelete === 'Cascade') {
-            result.add(fieldDef.type);
-            collectDeleteCascades(fieldDef.type, schema, result, visited);
+    for (const [modelName, modelDef] of Object.entries(schema.models)) {
+        if (!modelDef) {
+            continue;
         }
-    });
+        for (const fieldDef of Object.values(modelDef.fields)) {
+            if (fieldDef.relation?.onDelete === 'Cascade' && fieldDef.type === model) {
+                if (!result.has(modelName)) {
+                    result.add(modelName);
+                }
+                collectDeleteCascades(modelName, schema, result, visited);
+            }
+        }
+    }
 }
 
 function getBaseRecursively(model: string, schema: SchemaDef, result: Set<string>) {

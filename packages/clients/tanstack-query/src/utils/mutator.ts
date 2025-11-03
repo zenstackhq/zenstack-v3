@@ -204,10 +204,14 @@ function createMutate(queryModel: string, currentData: any, newData: any, schema
                 // default value for DateTime field
                 if (defaultAttr || field.attributes?.some((attr) => attr.name === '@updatedAt')) {
                     insert[name] = new Date();
+                    return;
                 }
-            } else if (defaultAttr?.args?.[0]?.value !== undefined) {
+            }
+
+            const defaultArg = defaultAttr?.args?.[0]?.value;
+            if (defaultArg?.kind === 'literal') {
                 // other default value
-                insert[name] = defaultAttr.args[0].value;
+                insert[name] = defaultArg.value;
             }
         }
     });
@@ -425,7 +429,7 @@ function assignForeignKeyFields(field: FieldDef, resultData: any, mutationData: 
         return;
     }
 
-    for (const [idField, fkField] of zip(field.relation.fields, field.relation.references)) {
+    for (const [idField, fkField] of zip(field.relation.references, field.relation.fields)) {
         if (idField in mutationData.connect) {
             resultData[fkField] = mutationData.connect[idField];
         }

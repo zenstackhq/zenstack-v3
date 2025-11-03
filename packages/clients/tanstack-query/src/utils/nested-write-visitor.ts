@@ -169,7 +169,7 @@ export class NestedWriteVisitor {
 
             case 'createMany':
             case 'createManyAndReturn':
-                if (data) {
+                {
                     const newContext = pushNewContext(field, model, {});
                     let callbackResult: any;
                     if (this.callback.createMany) {

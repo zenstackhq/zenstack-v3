@@ -1,19 +1,21 @@
 'use client';
 
 import { schema } from '@/zenstack/schema';
-import { useModelQueries } from '@zenstackhq/tanstack-query/react';
+import { useClientQueries } from '@zenstackhq/tanstack-query/react';
 import { LoremIpsum } from 'lorem-ipsum';
 import Image from 'next/image';
 
 const lorem = new LoremIpsum({ wordsPerSentence: { max: 6, min: 4 } });
 
 export default function Home() {
-    const userQueries = useModelQueries(schema, 'User');
-    const postQueries = useModelQueries(schema, 'Post');
-    const { data: users, isFetched: isUsersFetched } = userQueries.useFindMany();
-    const { data: posts } = postQueries.useFindMany({ orderBy: { createdAt: 'desc' }, include: { author: true } });
-    const createPost = postQueries.useCreate();
-    const deletePost = postQueries.useDelete();
+    const clientQueries = useClientQueries(schema);
+    const { data: users, isFetched: isUsersFetched } = clientQueries.user.useFindMany();
+    const { data: posts } = clientQueries.post.useFindMany({
+        orderBy: { createdAt: 'desc' },
+        include: { author: true },
+    });
+    const createPost = clientQueries.post.useCreate();
+    const deletePost = clientQueries.post.useDelete();
 
     const onCreatePost = () => {
         if (!users) {

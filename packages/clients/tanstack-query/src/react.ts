@@ -18,6 +18,7 @@ import {
     type UseSuspenseQueryOptions,
     type UseSuspenseQueryResult,
 } from '@tanstack/react-query';
+import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import type {
     AggregateArgs,
     AggregateResult,
@@ -103,6 +104,10 @@ export type ModelMutationOptions<T, TArgs> = Omit<UseMutationOptions<T, DefaultE
     ExtraMutationOptions;
 
 export type ModelMutationResult<T, TArgs> = UseMutationResult<T, DefaultError, TArgs>;
+
+export type SchemaHooks<Schema extends SchemaDef> = {
+    [Model in GetModels<Schema> as `${Uncapitalize<Model>}`]: ModelQueryHooks<Schema, Model>;
+};
 
 export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     useFindUnique<T extends FindUniqueArgs<Schema, Model>>(
@@ -206,106 +211,121 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
     ): UseSuspenseQueryResult<GroupByResult<Schema, Model, T>>;
 };
 
+/**
+ * Gets data query hooks for all models in the schema.
+ */
+export function useClientQueries<Schema extends SchemaDef>(schema: Schema): SchemaHooks<Schema> {
+    return Object.keys(schema.models).reduce((acc, model) => {
+        (acc as any)[lowerCaseFirst(model)] = useModelQueries(schema, model as GetModels<Schema>);
+        return acc;
+    }, {} as SchemaHooks<Schema>);
+}
+
+/**
+ * Gets data query hooks for a specific model in the schema.
+ */
 export function useModelQueries<Schema extends SchemaDef, Model extends GetModels<Schema>>(
     schema: Schema,
     model: Model,
 ): ModelQueryHooks<Schema, Model> {
-    const modelDef = schema.models[model];
+    const modelDef = Object.values(schema.models).find((m) => m.name.toLowerCase() === model.toLowerCase());
     if (!modelDef) {
-        throw new Error(`Model ${model} not found in schema`);
+        throw new Error(`Model "${model}" not found in schema`);
     }
+
+    const modelName = lowerCaseFirst(modelDef.name);
 
     return {
         useFindUnique: (args: any, options?: any) => {
-            return useInternalQuery(schema, model, 'findUnique', args, options);
+            return useInternalQuery(schema, modelName, 'findUnique', args, options);
         },
 
         useSuspenseFindUnique: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, model, 'findUnique', args, options);
+            return useInternalSuspenseQuery(schema, modelName, 'findUnique', args, options);
         },
 
         useFindFirst: (args: any, options?: any) => {
-            return useInternalQuery(schema, model, 'findFirst', args, options);
+            return useInternalQuery(schema, modelName, 'findFirst', args, options);
         },
 
         useSuspenseFindFirst: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, model, 'findFirst', args, options);
+            return useInternalSuspenseQuery(schema, modelName, 'findFirst', args, options);
         },
 
         useFindMany: (args: any, options?: any) => {
-            return useInternalQuery(schema, model, 'findMany', args, options);
+            return useInternalQuery(schema, modelName, 'findMany', args, options);
         },
 
         useSuspenseFindMany: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, model, 'findMany', args, options);
+            return useInternalSuspenseQuery(schema, modelName, 'findMany', args, options);
         },
 
         useInfiniteFindMany: (args: any, options?: any) => {
-            return useInternalInfiniteQuery(schema, model, 'findMany', args, options);
+            return useInternalInfiniteQuery(schema, modelName, 'findMany', args, options);
         },
 
         useSuspenseInfiniteFindMany: (args: any, options?: any) => {
-            return useInternalSuspenseInfiniteQuery(schema, model, 'findMany', args, options);
+            return useInternalSuspenseInfiniteQuery(schema, modelName, 'findMany', args, options);
         },
 
         useCreate: (options?: any) => {
-            return useInternalMutation(schema, model, 'POST', 'create', options, true);
+            return useInternalMutation(schema, modelName, 'POST', 'create', options, true);
         },
 
         useCreateMany: (options?: any) => {
-            return useInternalMutation(schema, model, 'POST', 'createMany', options, false);
+            return useInternalMutation(schema, modelName, 'POST', 'createMany', options, false);
         },
 
         useCreateManyAndReturn: (options?: any) => {
-            return useInternalMutation(schema, model, 'POST', 'createManyAndReturn', options, true);
+            return useInternalMutation(schema, modelName, 'POST', 'createManyAndReturn', options, true);
         },
 
         useUpdate: (options?: any) => {
-            return useInternalMutation(schema, model, 'PUT', 'update', options, true);
+            return useInternalMutation(schema, modelName, 'PUT', 'update', options, true);
         },
 
         useUpdateMany: (options?: any) => {
-            return useInternalMutation(schema, model, 'PUT', 'updateMany', options, false);
+            return useInternalMutation(schema, modelName, 'PUT', 'updateMany', options, false);
         },
 
         useUpdateManyAndReturn: (options?: any) => {
-            return useInternalMutation(schema, model, 'PUT', 'updateManyAndReturn', options, true);
+            return useInternalMutation(schema, modelName, 'PUT', 'updateManyAndReturn', options, true);
         },
 
         useUpsert: (options?: any) => {
-            return useInternalMutation(schema, model, 'POST', 'upsert', options, true);
+            return useInternalMutation(schema, modelName, 'POST', 'upsert', options, true);
         },
 
         useDelete: (options?: any) => {
-            return useInternalMutation(schema, model, 'DELETE', 'delete', options, true);
+            return useInternalMutation(schema, modelName, 'DELETE', 'delete', options, true);
         },
 
         useDeleteMany: (options?: any) => {
-            return useInternalMutation(schema, model, 'DELETE', 'deleteMany', options, false);
+            return useInternalMutation(schema, modelName, 'DELETE', 'deleteMany', options, false);
         },
 
         useCount: (options?: any) => {
-            return useInternalQuery(schema, model, 'count', undefined, options);
+            return useInternalQuery(schema, modelName, 'count', undefined, options);
         },
 
         useSuspenseCount: (options?: any) => {
-            return useInternalSuspenseQuery(schema, model, 'count', undefined, options);
+            return useInternalSuspenseQuery(schema, modelName, 'count', undefined, options);
         },
 
         useAggregate: (options?: any) => {
-            return useInternalQuery(schema, model, 'aggregate', undefined, options);
+            return useInternalQuery(schema, modelName, 'aggregate', undefined, options);
         },
 
         useSuspenseAggregate: (options?: any) => {
-            return useInternalSuspenseQuery(schema, model, 'aggregate', undefined, options);
+            return useInternalSuspenseQuery(schema, modelName, 'aggregate', undefined, options);
         },
 
         useGroupBy: (options?: any) => {
-            return useInternalQuery(schema, model, 'groupBy', undefined, options);
+            return useInternalQuery(schema, modelName, 'groupBy', undefined, options);
         },
 
         useSuspenseGroupBy: (options?: any) => {
-            return useInternalSuspenseQuery(schema, model, 'groupBy', undefined, options);
+            return useInternalSuspenseQuery(schema, modelName, 'groupBy', undefined, options);
         },
     } as ModelQueryHooks<Schema, Model>;
 }

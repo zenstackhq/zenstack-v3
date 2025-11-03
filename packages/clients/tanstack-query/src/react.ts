@@ -491,9 +491,9 @@ export function useInternalMutation<
     const finalOptions = { ...options, mutationFn };
     const invalidateQueries = options?.invalidateQueries !== false;
     const optimisticUpdate = !!options?.optimisticUpdate;
+    const { logging } = useContext(QuerySettingsContext);
 
     if (operation) {
-        const { logging } = useContext(QuerySettingsContext);
         if (invalidateQueries) {
             setupInvalidation(
                 model,

@@ -1534,7 +1534,7 @@ describe('React Query Test', () => {
         });
 
         nock(makeUrl('User', 'update'))
-            .delete(/.*/)
+            .put(/.*/)
             .reply(200, () => ({ data }));
 
         const { result: mutationResult } = renderHook(

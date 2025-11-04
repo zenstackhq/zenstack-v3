@@ -56,6 +56,8 @@ import {
     type ExtraQueryOptions,
 } from './utils/common';
 
+export type { FetchFn } from './utils/common';
+
 /**
  * The default query endpoint.
  */

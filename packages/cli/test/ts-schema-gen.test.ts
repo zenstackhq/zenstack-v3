@@ -420,4 +420,26 @@ model User {
             },
         });
     });
+
+    it('supports lite schema generation', async () => {
+        const { schemaLite } = await generateTsSchema(
+            `
+model User {
+    id String @id @default(uuid())
+    name String
+    email String @unique
+
+    @@map('users')
+}
+        `,
+            undefined,
+            undefined,
+            undefined,
+            true,
+        );
+
+        expect(schemaLite!.models.User.attributes).toBeUndefined();
+        expect(schemaLite!.models.User.fields.id.attributes).toBeUndefined();
+        expect(schemaLite!.models.User.fields.email.attributes).toBeUndefined();
+    });
 });

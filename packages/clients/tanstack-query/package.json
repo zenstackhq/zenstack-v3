@@ -1,0 +1,71 @@
+{
+    "name": "@zenstackhq/tanstack-query",
+    "version": "3.0.0-beta.16",
+    "description": "TanStack Query Client for consuming ZenStack v3's CRUD service",
+    "main": "index.js",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "build": "tsc --noEmit && tsup-node && pnpm test:generate && pnpm test:typecheck",
+        "watch": "tsup-node --watch",
+        "lint": "eslint src --ext ts",
+        "test": "vitest run",
+        "pack": "pnpm pack",
+        "test:generate": "tsx scripts/generate.ts",
+        "test:typecheck": "tsc --noEmit --project tsconfig.test.json"
+    },
+    "keywords": [
+        "tanstack-query",
+        "react-query",
+        "zenstack",
+        "orm",
+        "fullstack"
+    ],
+    "author": "ZenStack Team",
+    "license": "MIT",
+    "exports": {
+        "./react": {
+            "import": {
+                "types": "./dist/react.d.ts",
+                "default": "./dist/react.js"
+            },
+            "require": {
+                "types": "./dist/react.d.cts",
+                "default": "./dist/react.cjs"
+            }
+        }
+    },
+    "dependencies": {
+        "@zenstackhq/common-helpers": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
+        "@zenstackhq/schema": "workspace:*",
+        "decimal.js": "catalog:",
+        "superjson": "^2.2.3"
+    },
+    "devDependencies": {
+        "@tanstack/react-query": "catalog:",
+        "@testing-library/dom": "^10.4.1",
+        "@testing-library/react": "^16.3.0",
+        "@types/react": "catalog:",
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/sdk": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*",
+        "happy-dom": "^20.0.10",
+        "nock": "^14.0.10",
+        "react": "catalog:"
+    },
+    "peerDependencies": {
+        "@tanstack/react-query": "^5.0.0",
+        "react": "^18 || ^19"
+    },
+    "peerDependenciesMeta": {
+        "@tanstack/react-query": {
+            "optional": true
+        },
+        "react": {
+            "optional": true
+        }
+    }
+}

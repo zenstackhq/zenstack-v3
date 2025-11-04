@@ -1,7 +1,6 @@
 import { loadDocument } from '@zenstackhq/language';
 import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import { glob } from 'glob';
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,12 +16,12 @@ async function main() {
 
 async function generate(schemaPath: string) {
     const generator = new TsSchemaGenerator();
-    const outputDir = path.dirname(schemaPath);
+    const outDir = path.dirname(schemaPath);
     const result = await loadDocument(schemaPath);
     if (!result.success) {
         throw new Error(`Failed to load schema from ${schemaPath}: ${result.errors}`);
     }
-    await generator.generate(result.model, outputDir);
+    await generator.generate(result.model, { outDir });
 }
 
 main();

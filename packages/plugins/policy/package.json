@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/plugin-policy",
-    "version": "3.0.0-beta.15",
+    "version": "3.0.0-beta.16",
     "description": "ZenStack Policy Plugin",
     "type": "module",
     "scripts": {
@@ -45,7 +45,7 @@
         "kysely": "catalog:"
     },
     "devDependencies": {
-        "@types/better-sqlite3": "^7.6.13",
+        "@types/better-sqlite3": "catalog:",
         "@types/pg": "^8.0.0",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",

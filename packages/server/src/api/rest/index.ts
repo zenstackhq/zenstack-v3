@@ -10,7 +10,7 @@ import {
 import type { FieldDef, ModelDef, SchemaDef } from '@zenstackhq/orm/schema';
 import { Decimal } from 'decimal.js';
 import SuperJSON from 'superjson';
-import { Linker, Paginator, Relator, Serializer, type SerializerOptions } from 'ts-japi';
+import tsjapi, { type Linker, type Paginator, type Relator, type Serializer, type SerializerOptions } from 'ts-japi';
 import UrlPattern from 'url-pattern';
 import z from 'zod';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
@@ -610,7 +610,9 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
                 status: 200,
                 body: await this.serializeItems(relationInfo.type, entity[relationship], {
                     linkers: {
-                        document: new Linker(() => this.makeLinkUrl(`/${mappedType}/${resourceId}/${relationship}`)),
+                        document: new tsjapi.Linker(() =>
+                            this.makeLinkUrl(`/${mappedType}/${resourceId}/${relationship}`),
+                        ),
                         paginator,
                     },
                     include,
@@ -670,7 +672,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         if (entity?.[relationship]) {
             const serialized: any = await this.serializeItems(relationInfo.type, entity[relationship], {
                 linkers: {
-                    document: new Linker(() =>
+                    document: new tsjapi.Linker(() =>
                         this.makeLinkUrl(`/${mappedType}/${resourceId}/relationships/${relationship}`),
                     ),
                     paginator,
@@ -827,7 +829,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
 
         const totalPages = Math.ceil(total / limit);
 
-        return new Paginator(() => ({
+        return new tsjapi.Paginator(() => ({
             first: this.replaceURLSearchParams(baseUrl, { 'page[limit]': limit }),
             last: this.replaceURLSearchParams(baseUrl, {
                 'page[offset]': (totalPages - 1) * limit,
@@ -1110,7 +1112,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
 
         const serialized: any = await this.serializeItems(relationInfo.type, entity[relationship], {
             linkers: {
-                document: new Linker(() =>
+                document: new tsjapi.Linker(() =>
                     this.makeLinkUrl(`/${mappedType}/${resourceId}/relationships/${relationship}`),
                 ),
             },
@@ -1308,7 +1310,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
                 continue;
             }
 
-            const linker = new Linker((items) =>
+            const linker = new tsjapi.Linker((items) =>
                 Array.isArray(items)
                     ? this.makeLinkUrl(`/${mappedModel}`)
                     : this.makeLinkUrl(`/${mappedModel}/${this.getId(model, items)}`),
@@ -1326,7 +1328,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
                 projection = null;
             }
 
-            const serializer = new Serializer(model, {
+            const serializer = new tsjapi.Serializer(model, {
                 version: '1.1',
                 idKey: this.makeIdKey(ids),
                 linkers: {
@@ -1360,7 +1362,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
                 if (fieldIds.length > 0) {
                     const mappedModel = this.mapModelName(modelLower);
 
-                    const relator = new Relator(
+                    const relator = new tsjapi.Relator(
                         async (data) => {
                             return (data as any)[field];
                         },
@@ -1368,10 +1370,10 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
                         {
                             relatedName: field,
                             linkers: {
-                                related: new Linker((primary) =>
+                                related: new tsjapi.Linker((primary) =>
                                     this.makeLinkUrl(`/${mappedModel}/${this.getId(model, primary)}/${field}`),
                                 ),
-                                relationship: new Linker((primary) =>
+                                relationship: new tsjapi.Linker((primary) =>
                                     this.makeLinkUrl(
                                         `/${mappedModel}/${this.getId(model, primary)}/relationships/${field}`,
                                     ),

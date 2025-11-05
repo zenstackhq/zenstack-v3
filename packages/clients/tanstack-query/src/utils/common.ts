@@ -208,8 +208,8 @@ export function unmarshal(value: string) {
     }
 }
 
-export function makeUrl(url: string, model: string, operation: string, args?: unknown) {
-    const baseUrl = `${url}/${lowerCaseFirst(model)}/${operation}`;
+export function makeUrl(endpoint: string, model: string, operation: string, args?: unknown) {
+    const baseUrl = `${endpoint}/${lowerCaseFirst(model)}/${operation}`;
     if (!args) {
         return baseUrl;
     }

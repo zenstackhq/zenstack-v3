@@ -344,28 +344,28 @@ export function useModelQueries<Schema extends SchemaDef, Model extends GetModel
             return useInternalMutation(schema, modelName, 'DELETE', 'deleteMany', options);
         },
 
-        useCount: (options?: any) => {
-            return useInternalQuery(schema, modelName, 'count', undefined, options);
+        useCount: (args: any, options?: any) => {
+            return useInternalQuery(schema, modelName, 'count', args, options);
         },
 
-        useSuspenseCount: (options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'count', undefined, options);
+        useSuspenseCount: (args: any, options?: any) => {
+            return useInternalSuspenseQuery(schema, modelName, 'count', args, options);
         },
 
-        useAggregate: (options?: any) => {
-            return useInternalQuery(schema, modelName, 'aggregate', undefined, options);
+        useAggregate: (args: any, options?: any) => {
+            return useInternalQuery(schema, modelName, 'aggregate', args, options);
         },
 
-        useSuspenseAggregate: (options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'aggregate', undefined, options);
+        useSuspenseAggregate: (args: any, options?: any) => {
+            return useInternalSuspenseQuery(schema, modelName, 'aggregate', args, options);
         },
 
-        useGroupBy: (options?: any) => {
-            return useInternalQuery(schema, modelName, 'groupBy', undefined, options);
+        useGroupBy: (args: any, options?: any) => {
+            return useInternalQuery(schema, modelName, 'groupBy', args, options);
         },
 
-        useSuspenseGroupBy: (options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'groupBy', undefined, options);
+        useSuspenseGroupBy: (args: any, options?: any) => {
+            return useInternalSuspenseQuery(schema, modelName, 'groupBy', args, options);
         },
     } as ModelQueryHooks<Schema, Model>;
 }

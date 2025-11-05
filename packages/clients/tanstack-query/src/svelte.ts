@@ -248,39 +248,39 @@ export function useModelQueries<Schema extends SchemaDef, Model extends GetModel
         },
 
         useCreate: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'POST', 'create', options, true);
+            return useInternalMutation(schema, modelName, 'POST', 'create', options);
         },
 
         useCreateMany: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'POST', 'createMany', options, false);
+            return useInternalMutation(schema, modelName, 'POST', 'createMany', options);
         },
 
         useCreateManyAndReturn: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'POST', 'createManyAndReturn', options, true);
+            return useInternalMutation(schema, modelName, 'POST', 'createManyAndReturn', options);
         },
 
         useUpdate: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'PUT', 'update', options, true);
+            return useInternalMutation(schema, modelName, 'PUT', 'update', options);
         },
 
         useUpdateMany: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'PUT', 'updateMany', options, false);
+            return useInternalMutation(schema, modelName, 'PUT', 'updateMany', options);
         },
 
         useUpdateManyAndReturn: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'PUT', 'updateManyAndReturn', options, true);
+            return useInternalMutation(schema, modelName, 'PUT', 'updateManyAndReturn', options);
         },
 
         useUpsert: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'POST', 'upsert', options, true);
+            return useInternalMutation(schema, modelName, 'POST', 'upsert', options);
         },
 
         useDelete: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'DELETE', 'delete', options, true);
+            return useInternalMutation(schema, modelName, 'DELETE', 'delete', options);
         },
 
         useDeleteMany: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'DELETE', 'deleteMany', options, false);
+            return useInternalMutation(schema, modelName, 'DELETE', 'deleteMany', options);
         },
 
         useCount: (options?: any) => {
@@ -313,7 +313,7 @@ export function useInternalQuery<TQueryFnData, TData>(
         optimisticUpdate: optionsValue?.optimisticUpdate !== false,
     });
     const queryFn: QueryFunction<TQueryFnData, QueryKey, unknown> = ({ signal }) =>
-        fetcher<TQueryFnData, false>(reqUrl, { signal }, fetch, false);
+        fetcher<TQueryFnData>(reqUrl, { signal }, fetch);
 
     let mergedOpt: any;
     if (isStore(options)) {
@@ -360,12 +360,7 @@ export function useInternalInfiniteQuery<TQueryFnData, TData>(
     const argsValue = unwrapStore(args);
     const queryKey = getQueryKey(model, operation, argsValue, { infinite: true, optimisticUpdate: false });
     const queryFn: QueryFunction<TQueryFnData, QueryKey, unknown> = ({ pageParam, signal }) =>
-        fetcher<TQueryFnData, false>(
-            makeUrl(endpoint, model, operation, pageParam ?? argsValue),
-            { signal },
-            fetch,
-            false,
-        );
+        fetcher<TQueryFnData>(makeUrl(endpoint, model, operation, pageParam ?? argsValue), { signal }, fetch);
 
     let mergedOpt: StoreOrVal<CreateInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>>;
     if (isStore(options)) {
@@ -406,18 +401,12 @@ export function useInternalInfiniteQuery<TQueryFnData, TData>(
  * @param options The svelte-query options.
  * @param checkReadBack Whether to check for read back errors and return undefined if found.
  */
-export function useInternalMutation<
-    TArgs,
-    R = any,
-    C extends boolean = boolean,
-    Result = C extends true ? R | undefined : R,
->(
+export function useInternalMutation<TArgs, R = any>(
     schema: SchemaDef,
     model: string,
     method: 'POST' | 'PUT' | 'DELETE',
     operation: string,
-    options?: StoreOrVal<Omit<CreateMutationOptions<Result, DefaultError, TArgs>, 'mutationFn'> & ExtraMutationOptions>,
-    checkReadBack?: C,
+    options?: StoreOrVal<Omit<CreateMutationOptions<R, DefaultError, TArgs>, 'mutationFn'> & ExtraMutationOptions>,
 ) {
     const { endpoint, fetch, logging } = getQuerySettings();
     const queryClient = useQueryClient();
@@ -434,10 +423,10 @@ export function useInternalMutation<
                 body: marshal(data),
             }),
         };
-        return fetcher<R, C>(reqUrl, fetchInit, fetch, checkReadBack) as Promise<Result>;
+        return fetcher<R>(reqUrl, fetchInit, fetch) as Promise<R>;
     };
 
-    let mergedOpt: StoreOrVal<CreateMutationOptions<Result, DefaultError, TArgs>>;
+    let mergedOpt: StoreOrVal<CreateMutationOptions<R, DefaultError, TArgs>>;
 
     if (isStore(options)) {
         mergedOpt = derived([options], ([$opt]) => ({

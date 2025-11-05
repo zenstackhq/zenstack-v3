@@ -116,6 +116,54 @@ export const schema = {
                 id: { type: "String" },
                 name: { type: "String" }
             }
+        },
+        Foo: {
+            name: "Foo",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    default: ExpressionUtils.call("cuid")
+                },
+                type: {
+                    name: "type",
+                    type: "String",
+                    isDiscriminator: true
+                }
+            },
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" }
+            },
+            isDelegate: true,
+            subModels: ["Bar"]
+        },
+        Bar: {
+            name: "Bar",
+            baseModel: "Foo",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    default: ExpressionUtils.call("cuid")
+                },
+                type: {
+                    name: "type",
+                    type: "String",
+                    originModel: "Foo",
+                    isDiscriminator: true
+                },
+                title: {
+                    name: "title",
+                    type: "String"
+                }
+            },
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" }
+            }
         }
     },
     authType: "User",

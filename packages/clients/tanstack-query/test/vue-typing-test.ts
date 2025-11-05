@@ -99,3 +99,9 @@ client.user.useDeleteMany().mutate({ where: { email: 'test@example.com' } });
 function check(_value: unknown) {
     // noop
 }
+
+// @ts-expect-error delegate model
+client.foo.useCreate();
+
+client.foo.useUpdate();
+client.bar.useCreate();

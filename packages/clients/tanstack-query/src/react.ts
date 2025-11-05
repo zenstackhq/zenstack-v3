@@ -37,6 +37,7 @@ import type {
     GroupByResult,
     ModelResult,
     SelectSubset,
+    Subset,
     UpdateArgs,
     UpdateManyAndReturnArgs,
     UpdateManyArgs,
@@ -200,26 +201,32 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
     ): ModelMutationResult<BatchResult, T>;
 
     useCount<T extends CountArgs<Schema, Model>>(
+        args?: Subset<T, CountArgs<Schema, Model>>,
         options?: ModelQueryOptions<CountResult<Schema, Model, T>>,
     ): ModelQueryResult<CountResult<Schema, Model, T>>;
 
     useSuspenseCount<T extends CountArgs<Schema, Model>>(
+        args?: Subset<T, CountArgs<Schema, Model>>,
         options?: ModelSuspenseQueryOptions<CountResult<Schema, Model, T>>,
     ): ModelSuspenseQueryResult<CountResult<Schema, Model, T>>;
 
     useAggregate<T extends AggregateArgs<Schema, Model>>(
+        args: Subset<T, AggregateArgs<Schema, Model>>,
         options?: ModelQueryOptions<AggregateResult<Schema, Model, T>>,
     ): ModelQueryResult<AggregateResult<Schema, Model, T>>;
 
     useSuspenseAggregate<T extends AggregateArgs<Schema, Model>>(
+        args: Subset<T, AggregateArgs<Schema, Model>>,
         options?: ModelSuspenseQueryOptions<AggregateResult<Schema, Model, T>>,
     ): ModelSuspenseQueryResult<AggregateResult<Schema, Model, T>>;
 
     useGroupBy<T extends GroupByArgs<Schema, Model>>(
+        args: Subset<T, GroupByArgs<Schema, Model>>,
         options?: ModelQueryOptions<GroupByResult<Schema, Model, T>>,
     ): ModelQueryResult<GroupByResult<Schema, Model, T>>;
 
     useSuspenseGroupBy<T extends GroupByArgs<Schema, Model>>(
+        args: Subset<T, GroupByArgs<Schema, Model>>,
         options?: ModelSuspenseQueryOptions<GroupByResult<Schema, Model, T>>,
     ): ModelSuspenseQueryResult<GroupByResult<Schema, Model, T>>;
 };

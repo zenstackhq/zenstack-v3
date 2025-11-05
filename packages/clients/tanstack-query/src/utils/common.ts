@@ -125,21 +125,12 @@ export type APIContext = {
     logging?: boolean;
 };
 
-export async function fetcher<R, C extends boolean>(
-    url: string,
-    options?: RequestInit,
-    customFetch?: FetchFn,
-    checkReadBack?: C,
-): Promise<C extends true ? R | undefined : R> {
+export async function fetcher<R>(url: string, options?: RequestInit, customFetch?: FetchFn): Promise<R> {
     const _fetch = customFetch ?? fetch;
     const res = await _fetch(url, options);
     if (!res.ok) {
         const errData = unmarshal(await res.text());
-        if (
-            checkReadBack !== false &&
-            errData.error?.rejectedByPolicy &&
-            errData.error?.rejectReason === 'cannot-read-back'
-        ) {
+        if (errData.error?.rejectedByPolicy && errData.error?.rejectReason === 'cannot-read-back') {
             // policy doesn't allow mutation result to be read back, just return undefined
             return undefined as any;
         }

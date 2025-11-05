@@ -795,10 +795,12 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
     ): ZenStackPromise<Schema, Simplify<GroupByResult<Schema, Model, T>>>;
 };
 
+export type OperationsIneligibleForDelegateModels = 'create' | 'createMany' | 'createManyAndReturn' | 'upsert';
+
 export type ModelOperations<Schema extends SchemaDef, Model extends GetModels<Schema>> = Omit<
     AllModelOperations<Schema, Model>,
     // exclude operations not applicable to delegate models
-    IsDelegateModel<Schema, Model> extends true ? 'create' | 'createMany' | 'createManyAndReturn' | 'upsert' : never
+    IsDelegateModel<Schema, Model> extends true ? OperationsIneligibleForDelegateModels : never
 >;
 
 //#endregion

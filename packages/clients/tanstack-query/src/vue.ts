@@ -3,22 +3,16 @@ import {
     useMutation,
     useQuery,
     useQueryClient,
-    useSuspenseInfiniteQuery,
-    useSuspenseQuery,
     type DefaultError,
     type InfiniteData,
     type QueryKey,
     type UseInfiniteQueryOptions,
-    type UseInfiniteQueryResult,
+    type UseInfiniteQueryReturnType,
     type UseMutationOptions,
-    type UseMutationResult,
+    type UseMutationReturnType,
     type UseQueryOptions,
-    type UseQueryResult,
-    type UseSuspenseInfiniteQueryOptions,
-    type UseSuspenseInfiniteQueryResult,
-    type UseSuspenseQueryOptions,
-    type UseSuspenseQueryResult,
-} from '@tanstack/react-query';
+    type UseQueryReturnType,
+} from '@tanstack/vue-query';
 import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import type {
     AggregateArgs,
@@ -43,8 +37,9 @@ import type {
     UpsertArgs,
 } from '@zenstackhq/orm';
 import type { GetModels, SchemaDef } from '@zenstackhq/schema';
-import { createContext, useContext } from 'react';
+import { inject, provide, toValue, type MaybeRefOrGetter, type UnwrapRef } from 'vue';
 import {
+    DEFAULT_QUERY_ENDPOINT,
     fetcher,
     getQueryKey,
     makeUrl,
@@ -57,66 +52,48 @@ import {
 } from './utils/common';
 
 export type { FetchFn } from './utils/common';
+export const VueQueryContextKey = 'zenstack-vue-query-context';
 
 /**
- * The default query endpoint.
- */
-export const DEFAULT_QUERY_ENDPOINT = '/api/model';
-
-/**
- * React context for query settings.
- */
-export const QuerySettingsContext = createContext<APIContext>({
-    endpoint: DEFAULT_QUERY_ENDPOINT,
-    fetch: undefined,
-});
-
-/**
- * React context provider for configuring query settings.
- */
-export const QuerySettingsProvider = QuerySettingsContext.Provider;
-
-/**
- * React context provider for configuring query settings.
+ * Provide context for query settings.
  *
- * @deprecated Use {@link QuerySettingsProvider} instead.
+ * @deprecated Use {@link provideQuerySettingsContext} instead.
  */
-export const Provider = QuerySettingsProvider;
+export function provideHooksContext(context: APIContext) {
+    provide<APIContext>(VueQueryContextKey, context);
+}
 
-function useHooksContext() {
-    const { endpoint, ...rest } = useContext(QuerySettingsContext);
+/**
+ * Provide context for query settings.
+ */
+export function provideQuerySettingsContext(context: APIContext) {
+    provide<APIContext>(VueQueryContextKey, context);
+}
+
+function getQuerySettings() {
+    const { endpoint, ...rest } = inject<APIContext>(VueQueryContextKey, {
+        endpoint: DEFAULT_QUERY_ENDPOINT,
+        fetch: undefined,
+        logging: false,
+    });
     return { endpoint: endpoint ?? DEFAULT_QUERY_ENDPOINT, ...rest };
 }
 
 export type ModelQueryOptions<T> = Omit<UseQueryOptions<T, DefaultError>, 'queryKey'> & ExtraQueryOptions;
 
-export type ModelQueryResult<T> = UseQueryResult<T, DefaultError> & { queryKey: QueryKey };
-
-export type ModelSuspenseQueryOptions<T> = Omit<UseSuspenseQueryOptions<T, DefaultError>, 'queryKey'> &
-    ExtraQueryOptions;
-
-export type ModelSuspenseQueryResult<T> = UseSuspenseQueryResult<T, DefaultError> & { queryKey: QueryKey };
+export type ModelQueryResult<T> = UseQueryReturnType<T, DefaultError> & { queryKey: QueryKey };
 
 export type ModelInfiniteQueryOptions<T> = Omit<
     UseInfiniteQueryOptions<T, DefaultError, InfiniteData<T>>,
     'queryKey' | 'initialPageParam'
 >;
 
-export type ModelInfiniteQueryResult<T> = UseInfiniteQueryResult<T, DefaultError> & { queryKey: QueryKey };
-
-export type ModelSuspenseInfiniteQueryOptions<T> = Omit<
-    UseSuspenseInfiniteQueryOptions<T, DefaultError, InfiniteData<T>>,
-    'queryKey' | 'initialPageParam'
->;
-
-export type ModelSuspenseInfiniteQueryResult<T> = UseSuspenseInfiniteQueryResult<T, DefaultError> & {
-    queryKey: QueryKey;
-};
+export type ModelInfiniteQueryResult<T> = UseInfiniteQueryReturnType<T, DefaultError> & { queryKey: QueryKey };
 
 export type ModelMutationOptions<T, TArgs> = Omit<UseMutationOptions<T, DefaultError, TArgs>, 'mutationFn'> &
     ExtraMutationOptions;
 
-export type ModelMutationResult<T, TArgs> = UseMutationResult<T, DefaultError, TArgs>;
+export type ModelMutationResult<T, TArgs> = UseMutationReturnType<T, DefaultError, TArgs, unknown>;
 
 export type SchemaHooks<Schema extends SchemaDef> = {
     [Model in GetModels<Schema> as `${Uncapitalize<Model>}`]: ModelQueryHooks<Schema, Model>;
@@ -128,40 +105,20 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
         options?: ModelQueryOptions<ModelResult<Schema, Model, T> | null>,
     ): ModelQueryResult<ModelResult<Schema, Model, T> | null>;
 
-    useSuspenseFindUnique<T extends FindUniqueArgs<Schema, Model>>(
-        args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
-        options?: ModelSuspenseQueryOptions<ModelResult<Schema, Model, T> | null>,
-    ): ModelSuspenseQueryResult<ModelResult<Schema, Model, T> | null>;
-
     useFindFirst<T extends FindArgs<Schema, Model, false>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, false>>,
         options?: ModelQueryOptions<ModelResult<Schema, Model, T> | null>,
     ): ModelQueryResult<ModelResult<Schema, Model, T> | null>;
-
-    useSuspenseFindFirst<T extends FindArgs<Schema, Model, false>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model, false>>,
-        options?: ModelSuspenseQueryOptions<ModelResult<Schema, Model, T> | null>,
-    ): ModelSuspenseQueryResult<ModelResult<Schema, Model, T> | null>;
 
     useFindMany<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
         options?: ModelQueryOptions<ModelResult<Schema, Model, T>[]>,
     ): ModelQueryResult<ModelResult<Schema, Model, T>[]>;
 
-    useSuspenseFindMany<T extends FindArgs<Schema, Model, true>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
-        options?: ModelSuspenseQueryOptions<ModelResult<Schema, Model, T>[]>,
-    ): ModelSuspenseQueryResult<ModelResult<Schema, Model, T>[]>;
-
     useInfiniteFindMany<T extends FindArgs<Schema, Model, true>>(
         args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
         options?: ModelInfiniteQueryOptions<ModelResult<Schema, Model, T>[]>,
     ): ModelInfiniteQueryResult<InfiniteData<ModelResult<Schema, Model, T>[]>>;
-
-    useSuspenseInfiniteFindMany<T extends FindArgs<Schema, Model, true>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
-        options?: ModelSuspenseInfiniteQueryOptions<ModelResult<Schema, Model, T>[]>,
-    ): ModelSuspenseInfiniteQueryResult<InfiniteData<ModelResult<Schema, Model, T>[]>>;
 
     useCreate<T extends CreateArgs<Schema, Model>>(
         options?: ModelMutationOptions<ModelResult<Schema, Model, T>, T>,
@@ -203,25 +160,13 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
         options?: ModelQueryOptions<CountResult<Schema, Model, T>>,
     ): ModelQueryResult<CountResult<Schema, Model, T>>;
 
-    useSuspenseCount<T extends CountArgs<Schema, Model>>(
-        options?: ModelSuspenseQueryOptions<CountResult<Schema, Model, T>>,
-    ): ModelSuspenseQueryResult<CountResult<Schema, Model, T>>;
-
     useAggregate<T extends AggregateArgs<Schema, Model>>(
         options?: ModelQueryOptions<AggregateResult<Schema, Model, T>>,
     ): ModelQueryResult<AggregateResult<Schema, Model, T>>;
 
-    useSuspenseAggregate<T extends AggregateArgs<Schema, Model>>(
-        options?: ModelSuspenseQueryOptions<AggregateResult<Schema, Model, T>>,
-    ): ModelSuspenseQueryResult<AggregateResult<Schema, Model, T>>;
-
     useGroupBy<T extends GroupByArgs<Schema, Model>>(
         options?: ModelQueryOptions<GroupByResult<Schema, Model, T>>,
     ): ModelQueryResult<GroupByResult<Schema, Model, T>>;
-
-    useSuspenseGroupBy<T extends GroupByArgs<Schema, Model>>(
-        options?: ModelSuspenseQueryOptions<GroupByResult<Schema, Model, T>>,
-    ): ModelSuspenseQueryResult<GroupByResult<Schema, Model, T>>;
 };
 
 /**
@@ -253,32 +198,16 @@ export function useModelQueries<Schema extends SchemaDef, Model extends GetModel
             return useInternalQuery(schema, modelName, 'findUnique', args, options);
         },
 
-        useSuspenseFindUnique: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'findUnique', args, options);
-        },
-
         useFindFirst: (args: any, options?: any) => {
             return useInternalQuery(schema, modelName, 'findFirst', args, options);
-        },
-
-        useSuspenseFindFirst: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'findFirst', args, options);
         },
 
         useFindMany: (args: any, options?: any) => {
             return useInternalQuery(schema, modelName, 'findMany', args, options);
         },
 
-        useSuspenseFindMany: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'findMany', args, options);
-        },
-
         useInfiniteFindMany: (args: any, options?: any) => {
             return useInternalInfiniteQuery(schema, modelName, 'findMany', args, options);
-        },
-
-        useSuspenseInfiniteFindMany: (args: any, options?: any) => {
-            return useInternalSuspenseInfiniteQuery(schema, modelName, 'findMany', args, options);
         },
 
         useCreate: (options?: any) => {
@@ -321,24 +250,12 @@ export function useModelQueries<Schema extends SchemaDef, Model extends GetModel
             return useInternalQuery(schema, modelName, 'count', undefined, options);
         },
 
-        useSuspenseCount: (options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'count', undefined, options);
-        },
-
         useAggregate: (options?: any) => {
             return useInternalQuery(schema, modelName, 'aggregate', undefined, options);
         },
 
-        useSuspenseAggregate: (options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'aggregate', undefined, options);
-        },
-
         useGroupBy: (options?: any) => {
             return useInternalQuery(schema, modelName, 'groupBy', undefined, options);
-        },
-
-        useSuspenseGroupBy: (options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'groupBy', undefined, options);
         },
     } as ModelQueryHooks<Schema, Model>;
 }
@@ -347,117 +264,73 @@ export function useInternalQuery<TQueryFnData, TData>(
     _schema: SchemaDef,
     model: string,
     operation: string,
-    args?: unknown,
-    options?: Omit<UseQueryOptions<TQueryFnData, DefaultError, TData>, 'queryKey'> & ExtraQueryOptions,
+    args?: MaybeRefOrGetter<unknown>,
+    options?: MaybeRefOrGetter<
+        Omit<UnwrapRef<UseQueryOptions<TQueryFnData, DefaultError, TData>>, 'queryKey'> & ExtraQueryOptions
+    >,
 ) {
-    const { endpoint, fetch } = useHooksContext();
-    const reqUrl = makeUrl(endpoint, model, operation, args);
-    const queryKey = getQueryKey(model, operation, args, {
+    const argsValue = toValue(args);
+    const { optimisticUpdate, ...restOptions } = toValue(options) ?? {};
+    const queryKey = getQueryKey(model, operation, argsValue, {
         infinite: false,
-        optimisticUpdate: options?.optimisticUpdate !== false,
+        optimisticUpdate: optimisticUpdate !== false,
     });
-    return {
-        queryKey,
-        ...useQuery({
-            queryKey,
-            queryFn: ({ signal }) => fetcher<TQueryFnData, false>(reqUrl, { signal }, fetch, false),
-            ...options,
-        }),
-    };
-}
+    const { endpoint, fetch } = getQuerySettings();
 
-export function useInternalSuspenseQuery<TQueryFnData, TData>(
-    _schema: SchemaDef,
-    model: string,
-    operation: string,
-    args?: unknown,
-    options?: Omit<UseSuspenseQueryOptions<TQueryFnData, DefaultError, TData>, 'queryKey'> & ExtraQueryOptions,
-) {
-    const { endpoint, fetch } = useHooksContext();
-    const reqUrl = makeUrl(endpoint, model, operation, args);
-    const queryKey = getQueryKey(model, operation, args, {
-        infinite: false,
-        optimisticUpdate: options?.optimisticUpdate !== false,
-    });
-    return {
+    const finalOptions: any = {
         queryKey,
-        ...useSuspenseQuery({
-            queryKey,
-            queryFn: ({ signal }) => fetcher<TQueryFnData, false>(reqUrl, { signal }, fetch, false),
-            ...options,
-        }),
+        queryFn: ({ queryKey, signal }: any) => {
+            const [_prefix, _model, _op, args] = queryKey;
+            const reqUrl = makeUrl(endpoint, model, operation, args);
+            return fetcher<TQueryFnData, false>(reqUrl, { signal }, fetch, false);
+        },
+        ...restOptions,
     };
+    return { queryKey, ...useQuery<TQueryFnData, DefaultError, TData>(finalOptions) };
 }
 
 export function useInternalInfiniteQuery<TQueryFnData, TData>(
     _schema: SchemaDef,
     model: string,
     operation: string,
-    args: unknown,
-    options: Omit<
-        UseInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>,
-        'queryKey' | 'initialPageParam'
+    args: MaybeRefOrGetter<unknown>,
+    options: MaybeRefOrGetter<
+        Omit<
+            UnwrapRef<UseInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>>,
+            'queryKey' | 'initialPageParam'
+        >
     >,
 ) {
-    const { endpoint, fetch } = useHooksContext();
-    const queryKey = getQueryKey(model, operation, args, { infinite: true, optimisticUpdate: false });
-    return {
-        queryKey,
-        ...useInfiniteQuery({
-            queryKey,
-            queryFn: ({ pageParam, signal }) => {
-                return fetcher<TQueryFnData, false>(
-                    makeUrl(endpoint, model, operation, pageParam ?? args),
-                    { signal },
-                    fetch,
-                    false,
-                );
-            },
-            initialPageParam: args,
-            ...options,
-        }),
-    };
-}
+    const { endpoint, fetch } = getQuerySettings();
+    const argsValue = toValue(args);
+    const optionsValue = toValue(options);
+    const queryKey = getQueryKey(model, operation, argsValue, { infinite: true, optimisticUpdate: false });
 
-export function useInternalSuspenseInfiniteQuery<TQueryFnData, TData>(
-    _schema: SchemaDef,
-    model: string,
-    operation: string,
-    args: unknown,
-    options: Omit<
-        UseSuspenseInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>,
-        'queryKey' | 'initialPageParam'
-    >,
-) {
-    const { endpoint, fetch } = useHooksContext();
-    const queryKey = getQueryKey(model, operation, args, { infinite: true, optimisticUpdate: false });
+    const finalOptions: any = {
+        queryKey,
+        queryFn: ({ queryKey, signal }: any) => {
+            const [_prefix, _model, _op, args] = queryKey;
+            const reqUrl = makeUrl(endpoint, model, operation, args);
+            return fetcher<TQueryFnData, false>(reqUrl, { signal }, fetch, false);
+        },
+        initialPageParam: argsValue,
+        ...optionsValue,
+    };
     return {
         queryKey,
-        ...useSuspenseInfiniteQuery({
-            queryKey,
-            queryFn: ({ pageParam, signal }) => {
-                return fetcher<TQueryFnData, false>(
-                    makeUrl(endpoint, model, operation, pageParam ?? args),
-                    { signal },
-                    fetch,
-                    false,
-                );
-            },
-            initialPageParam: args,
-            ...options,
-        }),
+        ...useInfiniteQuery(finalOptions),
     };
 }
 
 /**
- * Creates a react-query mutation
+ * Creates a vue-query mutation
  *
  * @private
  *
  * @param model The name of the model under mutation.
  * @param method The HTTP method.
  * @param operation The mutation operation (e.g. `create`).
- * @param options The react-query options.
+ * @param options The vue-query options.
  * @param checkReadBack Whether to check for read back errors and return undefined if found.
  */
 export function useInternalMutation<
@@ -470,10 +343,12 @@ export function useInternalMutation<
     model: string,
     method: 'POST' | 'PUT' | 'DELETE',
     operation: string,
-    options?: Omit<UseMutationOptions<Result, DefaultError, TArgs>, 'mutationFn'> & ExtraMutationOptions,
+    options?: MaybeRefOrGetter<
+        Omit<UnwrapRef<UseMutationOptions<Result, DefaultError, TArgs>>, 'mutationFn'> & ExtraMutationOptions
+    >,
     checkReadBack?: C,
 ) {
-    const { endpoint, fetch, logging } = useHooksContext();
+    const { endpoint, fetch, logging } = getQuerySettings();
     const queryClient = useQueryClient();
     const mutationFn = (data: any) => {
         const reqUrl =
@@ -490,9 +365,10 @@ export function useInternalMutation<
         return fetcher<R, C>(reqUrl, fetchInit, fetch, checkReadBack) as Promise<Result>;
     };
 
-    const finalOptions = { ...options, mutationFn };
-    const invalidateQueries = options?.invalidateQueries !== false;
-    const optimisticUpdate = !!options?.optimisticUpdate;
+    const optionsValue = toValue(options);
+    const finalOptions: any = { ...optionsValue, mutationFn };
+    const invalidateQueries = optionsValue?.invalidateQueries !== false;
+    const optimisticUpdate = !!optionsValue?.optimisticUpdate;
 
     if (operation) {
         if (invalidateQueries) {

@@ -3,6 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
     entry: {
         react: 'src/react.ts',
+        vue: 'src/vue.ts',
         svelte: 'src/svelte.ts',
     },
     outDir: 'dist',

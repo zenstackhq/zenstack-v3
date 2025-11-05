@@ -293,14 +293,18 @@ export function useInternalInfiniteQuery<TQueryFnData, TData>(
     _schema: SchemaDef,
     model: string,
     operation: string,
-    args: unknown,
-    options: Omit<
-        UseInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>,
-        'queryKey' | 'initialPageParam'
+    args: MaybeRefOrGetter<unknown>,
+    options: MaybeRefOrGetter<
+        Omit<
+            UnwrapRef<UseInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>>,
+            'queryKey' | 'initialPageParam'
+        >
     >,
 ) {
     const { endpoint, fetch } = getQuerySettings();
-    const queryKey = getQueryKey(model, operation, args, { infinite: true, optimisticUpdate: false });
+    const argsValue = toValue(args);
+    const optionsValue = toValue(options);
+    const queryKey = getQueryKey(model, operation, argsValue, { infinite: true, optimisticUpdate: false });
 
     const finalOptions: any = {
         queryKey,
@@ -309,7 +313,8 @@ export function useInternalInfiniteQuery<TQueryFnData, TData>(
             const reqUrl = makeUrl(endpoint, model, operation, args);
             return fetcher<TQueryFnData, false>(reqUrl, { signal }, fetch, false);
         },
-        ...options,
+        initialPageParam: argsValue,
+        ...optionsValue,
     };
     return {
         queryKey,

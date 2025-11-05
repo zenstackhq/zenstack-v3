@@ -25,3 +25,4 @@ catalog:
     '@tanstack/react-query': 5.90.6
     'next': 16.0.1
     'vue': 3.5.22
+    'svelte': 5.43.3

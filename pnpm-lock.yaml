@@ -29,7 +29,7 @@ catalogs:
       version: 12.2.0
     decimal.js:
       specifier: ^10.4.3
-      version: 10.4.3
+      version: 10.6.0
     kysely:
       specifier: ^0.27.6
       version: 0.27.6
@@ -54,6 +54,9 @@ catalogs:
     react-dom:
       specifier: 19.2.0
       version: 19.2.0
+    svelte:
+      specifier: 5.43.3
+      version: 5.43.3
     tmp:
       specifier: ^0.2.3
       version: 0.2.3
@@ -197,7 +200,7 @@ importers:
         version: link:../../schema
       decimal.js:
         specifier: 'catalog:'
-        version: 10.4.3
+        version: 10.6.0
       superjson:
         specifier: ^2.2.3
         version: 2.2.3
@@ -205,6 +208,9 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.90.6(react@19.2.0)
+      '@tanstack/svelte-query':
+        specifier: 5.90.2
+        version: 5.90.2(svelte@5.43.3)
       '@tanstack/vue-query':
         specifier: 5.90.6
         version: 5.90.6(vue@3.5.22(typescript@5.8.3))
@@ -241,6 +247,9 @@ importers:
       react:
         specifier: 'catalog:'
         version: 19.2.0
+      svelte:
+        specifier: 'catalog:'
+        version: 5.43.3
       vue:
         specifier: 'catalog:'
         version: 3.5.22(typescript@5.8.3)
@@ -381,7 +390,7 @@ importers:
         version: 12.2.0
       decimal.js:
         specifier: 'catalog:'
-        version: 10.4.3
+        version: 10.6.0
       json-stable-stringify:
         specifier: ^1.3.0
         version: 1.3.0
@@ -470,7 +479,7 @@ importers:
     dependencies:
       decimal.js:
         specifier: 'catalog:'
-        version: 10.4.3
+        version: 10.6.0
     devDependencies:
       '@zenstackhq/eslint-config':
         specifier: workspace:*
@@ -505,7 +514,7 @@ importers:
         version: link:../config/typescript-config
       decimal.js:
         specifier: 'catalog:'
-        version: 10.4.3
+        version: 10.6.0
       kysely:
         specifier: 'catalog:'
         version: 0.27.6
@@ -520,7 +529,7 @@ importers:
         version: link:../orm
       decimal.js:
         specifier: 'catalog:'
-        version: 10.4.3
+        version: 10.6.0
       superjson:
         specifier: ^2.2.3
         version: 2.2.3
@@ -539,7 +548,7 @@ importers:
     devDependencies:
       '@sveltejs/kit':
         specifier: ^2.48.3
-        version: 2.48.3(@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)))(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))
+        version: 2.48.3(@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)))(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))
       '@types/body-parser':
         specifier: ^1.19.6
         version: 1.19.6
@@ -801,7 +810,7 @@ importers:
         version: 12.2.0
       decimal.js:
         specifier: 'catalog:'
-        version: 10.4.3
+        version: 10.6.0
       kysely:
         specifier: 'catalog:'
         version: 0.27.6
@@ -829,7 +838,7 @@ importers:
         version: link:../../packages/testtools
       decimal.js:
         specifier: 'catalog:'
-        version: 10.4.3
+        version: 10.6.0
     devDependencies:
       '@zenstackhq/cli':
         specifier: workspace:*
@@ -2687,6 +2696,9 @@ packages:
     resolution: {integrity: sha512-Wo1iKt2b9OT7d+YGhvEPD3DXvPv2etTusIMhMUoG7fbhmxcXCtIjJDEygy91Y2JFlwGyjqiBPRozme7UD8hoqg==}
     engines: {node: '>=12'}
 
+  '@tanstack/query-core@5.90.2':
+    resolution: {integrity: sha512-k/TcR3YalnzibscALLwxeiLUub6jN5EDLwKDiO7q5f4ICEoptJ+n9+7vcEFy5/x/i6Q+Lb/tXrsKCggf5uQJXQ==}
+
   '@tanstack/query-core@5.90.6':
     resolution: {integrity: sha512-AnZSLF26R8uX+tqb/ivdrwbVdGemdEDm1Q19qM6pry6eOZ6bEYiY7mWhzXT1YDIPTNEVcZ5kYP9nWjoxDLiIVw==}
 
@@ -2694,6 +2706,11 @@ packages:
     resolution: {integrity: sha512-gB1sljYjcobZKxjPbKSa31FUTyr+ROaBdoH+wSSs9Dk+yDCmMs+TkTV3PybRRVLC7ax7q0erJ9LvRWnMktnRAw==}
     peerDependencies:
       react: ^18 || ^19
+
+  '@tanstack/svelte-query@5.90.2':
+    resolution: {integrity: sha512-owjnp0w8sOXlMhLZhucHrsYvCjgjHrVyII/wlqMGefxKFyroZS3xCwTee+IUx7UHbL+QmKr/HQTeTqhgxmxPQw==}
+    peerDependencies:
+      svelte: ^3.54.0 || ^4.0.0 || ^5.0.0
 
   '@tanstack/vue-query@5.90.6':
     resolution: {integrity: sha512-7lKXKuTkX8XPjNd3g71B39JDE5B83Gtrr+yDPs5DiHm5wsM80OcwolLYkXumOM8+7VSm6ZYCrI9HSWszTIx5Gw==}
@@ -3844,9 +3861,6 @@ packages:
     peerDependenciesMeta:
       supports-color:
         optional: true
-
-  decimal.js@10.4.3:
-    resolution: {integrity: sha512-VBBaLc1MgL5XpzgIP7ny5Z6Nx3UrRkIViUkPUdtl9aya5amy3De1gsUUSB1g3+3sExYNjCAsAznmukyxCb1GRA==}
 
   decimal.js@10.6.0:
     resolution: {integrity: sha512-YpgQiITW3JXGntzdUmyUR1V812Hn8T1YVXhCu+wO3OpS4eU9l4YdD3qjyiKdV6mvV29zapkMeD390UVEf2lkUg==}
@@ -6626,8 +6640,8 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
-  svelte@5.43.0:
-    resolution: {integrity: sha512-1sRxVbgJAB+UGzwkc3GUoiBSzEOf0jqzccMaVoI2+pI+kASUe9qubslxace8+Mzhqw19k4syTA5niCIJwfXpOA==}
+  svelte@5.43.3:
+    resolution: {integrity: sha512-kjkAjCk41mJfvJZG56XcJNOdJSke94JxtcX8zFzzz2vrt47E0LnoBzU6azIZ1aBxJgUep8qegAkguSf1GjxLXQ==}
     engines: {node: '>=18'}
 
   svgo@4.0.0:
@@ -8124,8 +8138,8 @@ snapshots:
 
   '@jridgewell/remapping@2.3.5':
     dependencies:
-      '@jridgewell/gen-mapping': 0.3.8
-      '@jridgewell/trace-mapping': 0.3.25
+      '@jridgewell/gen-mapping': 0.3.13
+      '@jridgewell/trace-mapping': 0.3.31
 
   '@jridgewell/resolve-uri@3.1.2': {}
 
@@ -8133,8 +8147,8 @@ snapshots:
 
   '@jridgewell/source-map@0.3.11':
     dependencies:
-      '@jridgewell/gen-mapping': 0.3.8
-      '@jridgewell/trace-mapping': 0.3.25
+      '@jridgewell/gen-mapping': 0.3.13
+      '@jridgewell/trace-mapping': 0.3.31
 
   '@jridgewell/sourcemap-codec@1.5.0': {}
 
@@ -9040,11 +9054,11 @@ snapshots:
     dependencies:
       acorn: 8.15.0
 
-  '@sveltejs/kit@2.48.3(@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)))(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))':
+  '@sveltejs/kit@2.48.3(@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)))(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))':
     dependencies:
       '@standard-schema/spec': 1.0.0
       '@sveltejs/acorn-typescript': 1.0.6(acorn@8.15.0)
-      '@sveltejs/vite-plugin-svelte': 6.2.1(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))
+      '@sveltejs/vite-plugin-svelte': 6.2.1(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))
       '@types/cookie': 0.6.0
       acorn: 8.15.0
       cookie: 0.6.0
@@ -9056,25 +9070,25 @@ snapshots:
       sade: 1.8.1
       set-cookie-parser: 2.7.2
       sirv: 3.0.2
-      svelte: 5.43.0
+      svelte: 5.43.3
       vite: 7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)
 
-  '@sveltejs/vite-plugin-svelte-inspector@5.0.1(@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)))(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))':
+  '@sveltejs/vite-plugin-svelte-inspector@5.0.1(@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)))(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))':
     dependencies:
-      '@sveltejs/vite-plugin-svelte': 6.2.1(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))
+      '@sveltejs/vite-plugin-svelte': 6.2.1(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))
       debug: 4.4.1
-      svelte: 5.43.0
+      svelte: 5.43.3
       vite: 7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)
     transitivePeerDependencies:
       - supports-color
 
-  '@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))':
+  '@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))':
     dependencies:
-      '@sveltejs/vite-plugin-svelte-inspector': 5.0.1(@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)))(svelte@5.43.0)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))
+      '@sveltejs/vite-plugin-svelte-inspector': 5.0.1(@sveltejs/vite-plugin-svelte@6.2.1(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)))(svelte@5.43.3)(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))
       debug: 4.4.1
       deepmerge: 4.3.1
       magic-string: 0.30.21
-      svelte: 5.43.0
+      svelte: 5.43.3
       vite: 7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1)
       vitefu: 1.1.1(vite@7.1.12(@types/node@20.17.24)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(tsx@4.20.3)(yaml@2.8.1))
     transitivePeerDependencies:
@@ -9212,12 +9226,19 @@ snapshots:
     dependencies:
       remove-accents: 0.5.0
 
+  '@tanstack/query-core@5.90.2': {}
+
   '@tanstack/query-core@5.90.6': {}
 
   '@tanstack/react-query@5.90.6(react@19.2.0)':
     dependencies:
       '@tanstack/query-core': 5.90.6
       react: 19.2.0
+
+  '@tanstack/svelte-query@5.90.2(svelte@5.43.3)':
+    dependencies:
+      '@tanstack/query-core': 5.90.2
+      svelte: 5.43.3
 
   '@tanstack/vue-query@5.90.6(vue@3.5.22(typescript@5.8.3))':
     dependencies:
@@ -10549,10 +10570,7 @@ snapshots:
     dependencies:
       ms: 2.1.3
 
-  decimal.js@10.4.3: {}
-
-  decimal.js@10.6.0:
-    optional: true
+  decimal.js@10.6.0: {}
 
   decompress-response@6.0.0:
     dependencies:
@@ -13881,7 +13899,7 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  svelte@5.43.0:
+  svelte@5.43.3:
     dependencies:
       '@jridgewell/remapping': 2.3.5
       '@jridgewell/sourcemap-codec': 1.5.5

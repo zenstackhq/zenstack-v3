@@ -23,3 +23,13 @@ model Category {
     name  String   @unique
     posts Post[]
 }
+
+model Foo {
+    id String @id @default(cuid())
+    type String
+    @@delegate(type)
+}
+
+model Bar extends Foo {
+    title String
+}

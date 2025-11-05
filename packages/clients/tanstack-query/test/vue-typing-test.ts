@@ -102,5 +102,6 @@ function check(_value: unknown) {
 
 // @ts-expect-error delegate model
 client.foo.useCreate();
+
 client.foo.useUpdate();
 client.bar.useCreate();

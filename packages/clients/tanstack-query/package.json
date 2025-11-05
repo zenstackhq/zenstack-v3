@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/tanstack-query",
-    "version": "3.0.0-beta.17",
+    "version": "3.0.0-beta.18",
     "description": "TanStack Query Client for consuming ZenStack v3's CRUD service",
     "main": "index.js",
     "type": "module",
@@ -32,6 +32,30 @@
                 "types": "./dist/react.d.cts",
                 "default": "./dist/react.cjs"
             }
+        },
+        "./vue": {
+            "import": {
+                "types": "./dist/vue.d.ts",
+                "default": "./dist/vue.js"
+            },
+            "require": {
+                "types": "./dist/vue.d.cts",
+                "default": "./dist/vue.cjs"
+            }
+        },
+        "./svelte": {
+            "import": {
+                "types": "./dist/svelte.d.ts",
+                "default": "./dist/svelte.js"
+            },
+            "require": {
+                "types": "./dist/svelte.d.cts",
+                "default": "./dist/svelte.cjs"
+            }
+        },
+        "./package.json": {
+            "import": "./package.json",
+            "require": "./package.json"
         }
     },
     "dependencies": {
@@ -43,6 +67,8 @@
     },
     "devDependencies": {
         "@tanstack/react-query": "catalog:",
+        "@tanstack/vue-query": "5.90.6",
+        "@tanstack/svelte-query": "5.90.2",
         "@testing-library/dom": "^10.4.1",
         "@testing-library/react": "^16.3.0",
         "@types/react": "catalog:",
@@ -53,17 +79,23 @@
         "@zenstackhq/vitest-config": "workspace:*",
         "happy-dom": "^20.0.10",
         "nock": "^14.0.10",
-        "react": "catalog:"
+        "react": "catalog:",
+        "vue": "catalog:",
+        "svelte": "catalog:"
     },
     "peerDependencies": {
         "@tanstack/react-query": "^5.0.0",
-        "react": "^18 || ^19"
+        "@tanstack/vue-query": "^5.0.0",
+        "@tanstack/svelte-query": "^5.0.0"
     },
     "peerDependenciesMeta": {
         "@tanstack/react-query": {
             "optional": true
         },
-        "react": {
+        "@tanstack/vue-query": {
+            "optional": true
+        },
+        "@tanstack/svelte-query": {
             "optional": true
         }
     }

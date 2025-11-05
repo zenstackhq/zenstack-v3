@@ -83,7 +83,7 @@ export function setQuerySettingsContext(context: APIContext) {
 }
 
 function getQuerySettings() {
-    const { endpoint, ...rest } = getContext<APIContext>(SvelteQueryContextKey);
+    const { endpoint, ...rest } = getContext<APIContext>(SvelteQueryContextKey) ?? {};
     return { endpoint: endpoint ?? DEFAULT_QUERY_ENDPOINT, ...rest };
 }
 
@@ -394,7 +394,7 @@ export function useInternalMutation<
     options?: StoreOrVal<Omit<CreateMutationOptions<Result, DefaultError, TArgs>, 'mutationFn'> & ExtraMutationOptions>,
     checkReadBack?: C,
 ) {
-    const { endpoint, fetch } = getQuerySettings();
+    const { endpoint, fetch, logging } = getQuerySettings();
     const queryClient = useQueryClient();
     const optionsValue = unwrapStore(options);
     const mutationFn = (data: any) => {
@@ -430,7 +430,6 @@ export function useInternalMutation<
     const optimisticUpdate = !!optionsValue?.optimisticUpdate;
 
     if (operation) {
-        const { logging } = getContext<APIContext>(SvelteQueryContextKey);
         if (invalidateQueries) {
             setupInvalidation(
                 model,

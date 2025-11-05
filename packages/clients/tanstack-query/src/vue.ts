@@ -318,14 +318,14 @@ export function useInternalInfiniteQuery<TQueryFnData, TData>(
 }
 
 /**
- * Creates a react-query mutation
+ * Creates a vue-query mutation
  *
  * @private
  *
  * @param model The name of the model under mutation.
  * @param method The HTTP method.
  * @param operation The mutation operation (e.g. `create`).
- * @param options The react-query options.
+ * @param options The vue-query options.
  * @param checkReadBack Whether to check for read back errors and return undefined if found.
  */
 export function useInternalMutation<

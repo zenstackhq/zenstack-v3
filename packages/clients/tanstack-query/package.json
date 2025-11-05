@@ -73,17 +73,13 @@
     },
     "peerDependencies": {
         "@tanstack/react-query": "^5.0.0",
-        "@tanstack/vue-query": "^5.0.0",
-        "react": "^18 || ^19"
+        "@tanstack/vue-query": "^5.0.0"
     },
     "peerDependenciesMeta": {
         "@tanstack/react-query": {
             "optional": true
         },
         "@tanstack/vue-query": {
-            "optional": true
-        },
-        "react": {
             "optional": true
         }
     }

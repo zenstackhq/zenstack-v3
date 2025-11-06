@@ -1,5 +1,5 @@
+import { createPolicyTestClient, getTestDbProvider, testLogger } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient, getTestDbProvider } from '@zenstackhq/testtools';
 
 describe('Policy post-update tests', () => {
     it('allows post-update by default', async () => {
@@ -104,6 +104,7 @@ describe('Policy post-update tests', () => {
                 @@allow('post-update', x > before().x)
             }
             `,
+            { log: testLogger },
         );
 
         await db.foo.create({ data: { id: 1, x: 1 } });

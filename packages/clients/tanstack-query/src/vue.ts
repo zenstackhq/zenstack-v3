@@ -52,7 +52,7 @@ import {
     type ExtraMutationOptions,
     type ExtraQueryOptions,
 } from './utils/common';
-import type { TrimDelegateModelOperations } from './utils/types';
+import type { TrimDelegateModelOperations, WithOptimistic } from './utils/types';
 
 export type { FetchFn } from './utils/common';
 export const VueQueryContextKey = 'zenstack-vue-query-context';
@@ -86,7 +86,7 @@ export type ModelQueryOptions<T> = MaybeRefOrGetter<
     Omit<UnwrapRef<UseQueryOptions<T, DefaultError>>, 'queryKey'> & ExtraQueryOptions
 >;
 
-export type ModelQueryResult<T> = UseQueryReturnType<T, DefaultError> & { queryKey: QueryKey };
+export type ModelQueryResult<T> = UseQueryReturnType<WithOptimistic<T>, DefaultError> & { queryKey: QueryKey };
 
 export type ModelInfiniteQueryOptions<T> = MaybeRefOrGetter<
     Omit<UnwrapRef<UseInfiniteQueryOptions<T, DefaultError, InfiniteData<T>>>, 'queryKey' | 'initialPageParam'>

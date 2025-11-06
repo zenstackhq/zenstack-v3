@@ -54,7 +54,7 @@ import {
     type ExtraMutationOptions,
     type ExtraQueryOptions,
 } from './utils/common';
-import type { TrimDelegateModelOperations } from './utils/types';
+import type { TrimDelegateModelOperations, WithOptimistic } from './utils/types';
 
 export type { FetchFn } from './utils/common';
 
@@ -91,7 +91,9 @@ function getQuerySettings() {
 
 export type ModelQueryOptions<T> = Omit<CreateQueryOptions<T, DefaultError>, 'queryKey'> & ExtraQueryOptions;
 
-export type ModelQueryResult<T> = Readable<UnwrapStore<CreateQueryResult<T, DefaultError>> & { queryKey: QueryKey }>;
+export type ModelQueryResult<T> = Readable<
+    UnwrapStore<CreateQueryResult<WithOptimistic<T>, DefaultError>> & { queryKey: QueryKey }
+>;
 
 export type ModelInfiniteQueryOptions<T> = Omit<
     CreateInfiniteQueryOptions<T, DefaultError, InfiniteData<T>>,

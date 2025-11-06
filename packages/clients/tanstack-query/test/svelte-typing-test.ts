@@ -17,8 +17,11 @@ check(get(client.user.useFindUnique({ select: { email: true } })).data.name);
 check(get(client.user.useFindUnique({ where: { id: '1' }, include: { posts: true } })).data?.posts[0]?.title);
 
 check(get(client.user.useFindFirst()).data?.email);
+check(get(client.user.useFindFirst()).data?.$optimistic);
 
 check(get(client.user.useFindMany()).data?.[0]?.email);
+check(get(client.user.useFindMany()).data?.[0]?.$optimistic);
+
 check(get(client.user.useInfiniteFindMany()).data?.pages[0]?.[0]?.email);
 check(
     get(
@@ -30,6 +33,8 @@ check(
         ),
     ).data?.pages[1]?.[0]?.email,
 );
+// @ts-expect-error
+check(get(client.user.useInfiniteFindMany()).data?.pages[0]?.[0]?.$optimistic);
 
 check(get(client.user.useCount()).data?.toFixed(2));
 check(get(client.user.useCount({ select: { email: true } })).data?.email.toFixed(2));

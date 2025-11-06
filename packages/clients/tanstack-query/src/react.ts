@@ -57,7 +57,7 @@ import {
     type ExtraMutationOptions,
     type ExtraQueryOptions,
 } from './utils/common';
-import type { TrimDelegateModelOperations } from './utils/types';
+import type { TrimDelegateModelOperations, WithOptimistic } from './utils/types';
 
 export type { FetchFn } from './utils/common';
 
@@ -93,12 +93,14 @@ function useHooksContext() {
 
 export type ModelQueryOptions<T> = Omit<UseQueryOptions<T, DefaultError>, 'queryKey'> & ExtraQueryOptions;
 
-export type ModelQueryResult<T> = UseQueryResult<T, DefaultError> & { queryKey: QueryKey };
+export type ModelQueryResult<T> = UseQueryResult<WithOptimistic<T>, DefaultError> & { queryKey: QueryKey };
 
 export type ModelSuspenseQueryOptions<T> = Omit<UseSuspenseQueryOptions<T, DefaultError>, 'queryKey'> &
     ExtraQueryOptions;
 
-export type ModelSuspenseQueryResult<T> = UseSuspenseQueryResult<T, DefaultError> & { queryKey: QueryKey };
+export type ModelSuspenseQueryResult<T> = UseSuspenseQueryResult<WithOptimistic<T>, DefaultError> & {
+    queryKey: QueryKey;
+};
 
 export type ModelInfiniteQueryOptions<T> = Omit<
     UseInfiniteQueryOptions<T, DefaultError, InfiniteData<T>>,

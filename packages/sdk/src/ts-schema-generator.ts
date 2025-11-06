@@ -707,12 +707,16 @@ export class TsSchemaGenerator {
         }
 
         const relation = getAttribute(field, '@relation');
+        const fkFields: string[] = [];
         if (relation) {
             for (const arg of relation.args) {
                 const param = arg.$resolvedParam.name;
                 if (param === 'fields' || param === 'references') {
                     const fieldNames = this.getReferenceNames(arg.value);
                     if (fieldNames) {
+                        if (param === 'fields') {
+                            fkFields.push(...fieldNames);
+                        }
                         relationFields.push(
                             ts.factory.createPropertyAssignment(
                                 param,
@@ -730,6 +734,17 @@ export class TsSchemaGenerator {
                         ts.factory.createPropertyAssignment(param, ts.factory.createStringLiteral(action)),
                     );
                 }
+            }
+        }
+
+        // check if all fk fields have default values
+        if (fkFields.length > 0) {
+            const allHaveDefault = fkFields.every((fieldName) => {
+                const fieldDef = field.$container.fields.find((f) => f.name === fieldName);
+                return fieldDef && hasAttribute(fieldDef, '@default');
+            });
+            if (allHaveDefault) {
+                relationFields.push(ts.factory.createPropertyAssignment('hasDefault', ts.factory.createTrue()));
             }
         }
 

@@ -30,3 +30,14 @@ export type TrimDelegateModelOperations<
     Model extends GetModels<Schema>,
     T extends Record<string, unknown>,
 > = IsDelegateModel<Schema, Model> extends true ? Omit<T, HooksOperationsIneligibleForDelegateModels> : T;
+
+type WithOptimisticFlag<T> = T extends object
+    ? T & {
+          /**
+           * Indicates if the item is in an optimistic update state
+           */
+          $optimistic?: boolean;
+      }
+    : T;
+
+export type WithOptimistic<T> = T extends Array<infer U> ? Array<WithOptimisticFlag<U>> : WithOptimisticFlag<T>;

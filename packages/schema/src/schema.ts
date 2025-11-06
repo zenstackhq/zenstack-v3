@@ -52,6 +52,7 @@ export type RelationInfo = {
     name?: string;
     fields?: string[];
     references?: string[];
+    hasDefault?: boolean;
     opposite?: string;
     onDelete?: CascadeAction;
     onUpdate?: CascadeAction;
@@ -253,7 +254,9 @@ export type FieldHasDefault<
     ? true
     : GetModelField<Schema, Model, Field>['updatedAt'] extends true
       ? true
-      : false;
+      : GetModelField<Schema, Model, Field>['relation'] extends { hasDefault: true }
+        ? true
+        : false;
 
 export type FieldIsRelationArray<
     Schema extends SchemaDef,

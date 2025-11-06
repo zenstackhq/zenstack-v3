@@ -77,4 +77,6 @@ jobs:
               run: pnpm run lint
 
             - name: Test
+              env:
+                  TEST_DB_PROVIDER: ${{ matrix.provider }}
               run: TEST_DB_PROVIDER=${{ matrix.provider }} pnpm run test

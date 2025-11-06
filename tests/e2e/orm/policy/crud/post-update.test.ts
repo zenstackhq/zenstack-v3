@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient } from '@zenstackhq/testtools';
+import { createPolicyTestClient, getTestDbProvider } from '@zenstackhq/testtools';
 
 describe('Policy post-update tests', () => {
     it('allows post-update by default', async () => {
@@ -94,6 +94,7 @@ describe('Policy post-update tests', () => {
     });
 
     it('works with before function', async () => {
+        console.log('PROVIDER:', getTestDbProvider());
         const db = await createPolicyTestClient(
             `
             model Foo {

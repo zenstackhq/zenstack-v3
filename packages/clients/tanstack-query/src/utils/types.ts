@@ -33,7 +33,17 @@ export type TrimDelegateModelOperations<
 
 export type WithOptimistic<T> =
     T extends Array<infer U>
-        ? Array<U & { $optimistic?: boolean }>
+        ? Array<
+              U & {
+                  /**
+                   * Indicates if the item is in an optimistic update state
+                   */
+                  $optimistic?: boolean;
+              }
+          >
         : T & {
+              /**
+               * Indicates if the item is in an optimistic update state
+               */
               $optimistic?: boolean;
           };

@@ -345,6 +345,9 @@ importers:
       ts-pattern:
         specifier: 'catalog:'
         version: 5.7.1
+      vscode-languageserver:
+        specifier: ^9.0.1
+        version: 9.0.1
     devDependencies:
       '@types/pluralize':
         specifier: ^0.0.33

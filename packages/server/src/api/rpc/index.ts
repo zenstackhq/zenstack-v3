@@ -191,7 +191,7 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
 
     private makeORMErrorResponse(err: ORMError) {
         let status = 400;
-        const error: any = { message: err.message };
+        const error: any = { message: err.message, reason: err.reason };
 
         match(err.reason)
             .with(ORMErrorReason.NOT_FOUND, () => {

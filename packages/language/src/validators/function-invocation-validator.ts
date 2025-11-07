@@ -180,7 +180,6 @@ export default class FunctionInvocationValidator implements AstValidator<Express
     }
 
     @func('length')
-    // @ts-expect-error
     private _checkLength(expr: InvocationExpr, accept: ValidationAcceptor) {
         const msg = 'argument must be a string or list field';
         const fieldArg = expr.args[0]!.value;
@@ -206,7 +205,6 @@ export default class FunctionInvocationValidator implements AstValidator<Express
     }
 
     @func('regex')
-    // @ts-expect-error
     private _checkRegex(expr: InvocationExpr, accept: ValidationAcceptor) {
         const regex = expr.args[1]?.value;
         if (!isStringLiteral(regex)) {
@@ -228,7 +226,6 @@ export default class FunctionInvocationValidator implements AstValidator<Express
 
     // TODO: move this to policy plugin
     @func('check')
-    // @ts-expect-error
     private _checkCheck(expr: InvocationExpr, accept: ValidationAcceptor) {
         let valid = true;
 

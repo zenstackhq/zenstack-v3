@@ -57,7 +57,8 @@
     "dependencies": {
         "langium": "catalog:",
         "pluralize": "^8.0.0",
-        "ts-pattern": "catalog:"
+        "ts-pattern": "catalog:",
+        "vscode-languageserver": "^9.0.1"
     },
     "devDependencies": {
         "@types/pluralize": "^0.0.33",

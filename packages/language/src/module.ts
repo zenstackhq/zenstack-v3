@@ -14,6 +14,7 @@ import type { Model } from './ast';
 import { ZModelGeneratedModule, ZModelGeneratedSharedModule, ZModelLanguageMetaData } from './generated/module';
 import { getPluginDocuments } from './utils';
 import { registerValidationChecks, ZModelValidator } from './validator';
+import { ZModelCommentProvider } from './zmodel-comment-provider';
 import { ZModelCompletionProvider } from './zmodel-completion-provider';
 import { ZModelDefinitionProvider } from './zmodel-definition';
 import { ZModelDocumentBuilder } from './zmodel-document-builder';
@@ -23,7 +24,6 @@ import { ZModelLinker } from './zmodel-linker';
 import { ZModelScopeComputation, ZModelScopeProvider } from './zmodel-scope';
 import { ZModelSemanticTokenProvider } from './zmodel-semantic';
 import { ZModelWorkspaceManager } from './zmodel-workspace-manager';
-import { ZModelCommentProvider } from './zmodle-comment-provider';
 export { ZModelLanguageMetaData };
 
 /**

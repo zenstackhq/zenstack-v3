@@ -1,19 +1,19 @@
-import { InputValidationError, NotFoundError, RejectedByPolicyError } from '@zenstackhq/orm';
+import { ORMError, ORMErrorReason } from '@zenstackhq/orm';
 import { expect } from 'vitest';
 
 function isPromise(value: any) {
     return typeof value.then === 'function' && typeof value.catch === 'function';
 }
 
-function expectError(err: any, errorType: any) {
-    if (err instanceof errorType) {
+function expectErrorReason(err: any, errorReason: ORMErrorReason) {
+    if (err instanceof ORMError && err.reason === errorReason) {
         return {
             message: () => '',
             pass: true,
         };
     } else {
         return {
-            message: () => `expected ${errorType}, got ${err}`,
+            message: () => `expected ORMError of reason ${errorReason}, got ${err}`,
             pass: false,
         };
     }
@@ -80,7 +80,7 @@ expect.extend({
         try {
             await received;
         } catch (err) {
-            return expectError(err, NotFoundError);
+            return expectErrorReason(err, ORMErrorReason.NOT_FOUND);
         }
         return {
             message: () => `expected NotFoundError, got no error`,
@@ -95,13 +95,13 @@ expect.extend({
         try {
             await received;
         } catch (err) {
-            if (expectedMessages && err instanceof RejectedByPolicyError) {
+            if (expectedMessages && err instanceof ORMError && err.reason === ORMErrorReason.REJECTED_BY_POLICY) {
                 const r = expectErrorMessages(expectedMessages, err.message || '');
                 if (r) {
                     return r;
                 }
             }
-            return expectError(err, RejectedByPolicyError);
+            return expectErrorReason(err, ORMErrorReason.REJECTED_BY_POLICY);
         }
         return {
             message: () => `expected PolicyError, got no error`,
@@ -116,13 +116,13 @@ expect.extend({
         try {
             await received;
         } catch (err) {
-            if (expectedMessages && err instanceof InputValidationError) {
+            if (expectedMessages && err instanceof ORMError && err.reason === ORMErrorReason.INVALID_INPUT) {
                 const r = expectErrorMessages(expectedMessages, err.message || '');
                 if (r) {
                     return r;
                 }
             }
-            return expectError(err, InputValidationError);
+            return expectErrorReason(err, ORMErrorReason.INVALID_INPUT);
         }
         return {
             message: () => `expected InputValidationError, got no error`,

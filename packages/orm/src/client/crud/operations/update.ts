@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { UpdateArgs, UpdateManyAndReturnArgs, UpdateManyArgs, UpsertArgs, WhereInput } from '../../crud-types';
-import { RejectedByPolicyError, RejectedByPolicyReason } from '../../errors';
+import { createRejectedByPolicyError, RejectedByPolicyReason } from '../../errors';
 import { getIdValues } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 
@@ -61,7 +61,7 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             // update succeeded but result cannot be read back
             if (this.hasPolicyEnabled) {
                 // if access policy is enabled, we assume it's due to read violation (not guaranteed though)
-                throw new RejectedByPolicyError(
+                throw createRejectedByPolicyError(
                     this.model,
                     RejectedByPolicyReason.CANNOT_READ_BACK,
                     'result is not allowed to be read back',
@@ -120,7 +120,7 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
 
         if (readBackResult.length < updateResult.length && this.hasPolicyEnabled) {
             // some of the updated entities cannot be read back
-            throw new RejectedByPolicyError(
+            throw createRejectedByPolicyError(
                 this.model,
                 RejectedByPolicyReason.CANNOT_READ_BACK,
                 'result is not allowed to be read back',
@@ -168,7 +168,7 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
         });
 
         if (!result && this.hasPolicyEnabled) {
-            throw new RejectedByPolicyError(
+            throw createRejectedByPolicyError(
                 this.model,
                 RejectedByPolicyReason.CANNOT_READ_BACK,
                 'result is not allowed to be read back',

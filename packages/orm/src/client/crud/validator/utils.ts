@@ -13,7 +13,7 @@ import { match, P } from 'ts-pattern';
 import { z } from 'zod';
 import { ZodIssueCode } from 'zod/v3';
 import { ExpressionUtils } from '../../../schema';
-import { QueryError } from '../../errors';
+import { createNotSupportedError } from '../../errors';
 
 function getArgValue<T extends string | number | boolean>(expr: Expression | undefined): T | undefined {
     if (!expr || !ExpressionUtils.isLiteral(expr)) {
@@ -452,7 +452,7 @@ function evalCall(data: any, expr: CallExpression) {
                 return fieldArg.length === 0;
             })
             .otherwise(() => {
-                throw new QueryError(`Unknown function "${expr.function}"`);
+                throw createNotSupportedError(`Unsupported function "${expr.function}"`);
             })
     );
 }

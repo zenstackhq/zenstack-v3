@@ -14,14 +14,19 @@ import { nanoid } from 'nanoid';
 import { match } from 'ts-pattern';
 import { ulid } from 'ulid';
 import * as uuid from 'uuid';
-import type { ClientContract } from '../..';
 import type { BuiltinType, Expression, FieldDef } from '../../../schema';
 import { ExpressionUtils, type GetModels, type ModelDef, type SchemaDef } from '../../../schema';
 import { extractFields, fieldsToSelectObject } from '../../../utils/object-utils';
 import { NUMERIC_FIELD_TYPES } from '../../constants';
-import { TransactionIsolationLevel, type CRUD } from '../../contract';
+import { TransactionIsolationLevel, type ClientContract, type CRUD } from '../../contract';
 import type { FindArgs, SelectIncludeOmit, WhereInput } from '../../crud-types';
-import { InternalError, NotFoundError, QueryError } from '../../errors';
+import {
+    createDBQueryError,
+    createInternalError,
+    createInvalidInputError,
+    createNotFoundError,
+    createNotSupportedError,
+} from '../../errors';
 import type { ToKysely } from '../../query-builder';
 import {
     ensureArray,
@@ -172,8 +177,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const r = await kysely.getExecutor().executeQuery(compiled, queryId);
             result = r.rows;
         } catch (err) {
-            const message = `Failed to execute query: ${err}, sql: ${compiled.sql}`;
-            throw new QueryError(message, err);
+            throw createDBQueryError('Failed to execute query', err, compiled.sql, compiled.parameters);
         }
 
         return result;
@@ -212,7 +216,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 result = this.dialect.buildSelectField(result, model, parentAlias, field);
             } else {
                 if (!fieldDef.array && !fieldDef.optional && payload.where) {
-                    throw new QueryError(`Field "${field}" doesn't support filtering`);
+                    throw createInternalError(`Field "${field}" does not support filtering`, model);
                 }
                 if (fieldDef.originModel) {
                     result = this.dialect.buildRelationSelection(
@@ -253,7 +257,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         // additional validations
         if (modelDef.isDelegate && !creatingForDelegate) {
-            throw new QueryError(`Model "${this.model}" is a delegate and cannot be created directly.`);
+            throw createNotSupportedError(`Model "${model}" is a delegate and cannot be created directly.`);
         }
 
         let createFields: any = {};
@@ -442,7 +446,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     select: { [pair.pk]: true },
                 } as any);
                 if (!extraRead) {
-                    throw new QueryError(`Field "${pair.pk}" not found in parent created data`);
+                    throw createInternalError(`Field "${pair.pk}" not found in parent created data`, model);
                 } else {
                     // update the parent entity
                     Object.assign(entity, extraRead);
@@ -560,7 +564,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             select: fieldsToSelectObject(referencedPkFields) as any,
                         });
                         if (!relationEntity) {
-                            throw new NotFoundError(
+                            throw createNotFoundError(
                                 relationModel,
                                 `Could not find the entity to connect for the relation "${relationField.name}"`,
                             );
@@ -584,7 +588,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
 
                 default:
-                    throw new QueryError(`Invalid relation action: ${action}`);
+                    throw createInvalidInputError(`Invalid relation action: ${action}`);
             }
         }
 
@@ -650,7 +654,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
 
                 default:
-                    throw new QueryError(`Invalid relation action: ${action}`);
+                    throw createInvalidInputError(`Invalid relation action: ${action}`);
             }
         }
     }
@@ -681,7 +685,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 fromRelation.field,
             );
             if (ownedByModel) {
-                throw new QueryError('incorrect relation hierarchy for createMany');
+                throw createInvalidInputError('incorrect relation hierarchy for createMany', model);
             }
             relationKeyPairs = keyPairs;
         }
@@ -739,7 +743,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (modelDef.baseModel) {
             if (input.skipDuplicates) {
                 // TODO: simulate createMany with create in this case
-                throw new QueryError('"skipDuplicates" options is not supported for polymorphic models');
+                throw createNotSupportedError('"skipDuplicates" options is not supported for polymorphic models');
             }
             // create base hierarchy
             const baseCreateResult = await this.processBaseModelCreateMany(
@@ -906,7 +910,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fieldsToReturn?: string[],
     ): Promise<unknown> {
         if (!data || typeof data !== 'object') {
-            throw new InternalError('data must be an object');
+            throw createInvalidInputError('data must be an object');
         }
 
         const parentWhere: any = {};
@@ -982,7 +986,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 select: this.makeIdSelect(model),
             });
             if (!readResult && throwIfNotFound) {
-                throw new NotFoundError(model);
+                throw createNotFoundError(model);
             }
             combinedWhere = readResult;
         }
@@ -1010,13 +1014,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 updateFields[field] = this.processScalarFieldUpdateData(model, field, finalData);
             } else {
                 if (!allowRelationUpdate) {
-                    throw new QueryError(`Relation update not allowed for field "${field}"`);
+                    throw createNotSupportedError(`Relation update not allowed for field "${field}"`);
                 }
                 if (!thisEntity) {
                     thisEntity = await this.getEntityIds(kysely, model, combinedWhere);
                     if (!thisEntity) {
                         if (throwIfNotFound) {
-                            throw new NotFoundError(model);
+                            throw createNotFoundError(model);
                         } else {
                             return null;
                         }
@@ -1065,7 +1069,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const updatedEntity = await this.executeQueryTakeFirst(kysely, query, 'update');
             if (!updatedEntity) {
                 if (throwIfNotFound) {
-                    throw new NotFoundError(model);
+                    throw createNotFoundError(model);
                 } else {
                     return null;
                 }
@@ -1163,7 +1167,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             .with('multiply', () => eb(fieldRef, '*', value))
             .with('divide', () => eb(fieldRef, '/', value))
             .otherwise(() => {
-                throw new InternalError(`Invalid incremental update operation: ${key}`);
+                throw createInvalidInputError(`Invalid incremental update operation: ${key}`);
             });
     }
 
@@ -1185,7 +1189,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 return eb(fieldRef, '||', eb.val(ensureArray(value)));
             })
             .otherwise(() => {
-                throw new InternalError(`Invalid array update operation: ${key}`);
+                throw createInvalidInputError(`Invalid array update operation: ${key}`);
             });
     }
 
@@ -1212,7 +1216,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fieldsToReturn?: string[],
     ): Promise<Result> {
         if (typeof data !== 'object') {
-            throw new InternalError('data must be an object');
+            throw createInvalidInputError('data must be an object');
         }
 
         if (Object.keys(data).length === 0) {
@@ -1221,7 +1225,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         const modelDef = this.requireModel(model);
         if (modelDef.baseModel && limit !== undefined) {
-            throw new QueryError('Updating with a limit is not supported for polymorphic models');
+            throw createNotSupportedError('Updating with a limit is not supported for polymorphic models');
         }
 
         filterModel ??= model;
@@ -1465,7 +1469,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
 
                 default: {
-                    throw new Error('Not implemented yet');
+                    throw createInvalidInputError(`Invalid relation update operation: ${key}`);
                 }
             }
         }
@@ -1493,7 +1497,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             for (const d of _data) {
                 const ids = await this.getEntityIds(kysely, model, d);
                 if (!ids) {
-                    throw new NotFoundError(model);
+                    throw createNotFoundError(model);
                 }
                 const r = await this.handleManyToManyRelation(
                     kysely,
@@ -1511,7 +1515,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             // validate connect result
             if (_data.length > results.filter((r) => !!r).length) {
-                throw new NotFoundError(model);
+                throw createNotFoundError(model);
             }
         } else {
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
@@ -1527,7 +1531,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     where: _data[0],
                 });
                 if (!target) {
-                    throw new NotFoundError(model);
+                    throw createNotFoundError(model);
                 }
 
                 for (const { fk, pk } of keyPairs) {
@@ -1577,7 +1581,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 // validate connect result
                 if (!updateResult.numAffectedRows || _data.length > updateResult.numAffectedRows) {
                     // some entities were not connected
-                    throw new NotFoundError(model);
+                    throw createNotFoundError(model);
                 }
             }
         }
@@ -1742,7 +1746,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             for (const d of _data) {
                 const ids = await this.getEntityIds(kysely, model, d);
                 if (!ids) {
-                    throw new NotFoundError(model);
+                    throw createNotFoundError(model);
                 }
                 results.push(
                     await this.handleManyToManyRelation(
@@ -1761,7 +1765,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             // validate connect result
             if (_data.length > results.filter((r) => !!r).length) {
-                throw new NotFoundError(model);
+                throw createNotFoundError(model);
             }
         } else {
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
@@ -1771,7 +1775,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
 
             if (ownedByModel) {
-                throw new InternalError('relation can only be set from the non-owning side');
+                throw createInternalError('relation can only be set from the non-owning side', fromRelation.model);
             }
 
             const fkConditions = keyPairs.reduce(
@@ -1827,7 +1831,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 // validate result
                 if (!r.numAffectedRows || _data.length > r.numAffectedRows) {
                     // some entities were not connected
-                    throw new NotFoundError(model);
+                    throw createNotFoundError(model);
                 }
             }
         }
@@ -1894,7 +1898,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     where: fromRelation.ids,
                 });
                 if (!fromEntity) {
-                    throw new NotFoundError(fromRelation.model);
+                    throw createNotFoundError(fromRelation.model);
                 }
 
                 const fieldDef = this.requireField(fromRelation.model, fromRelation.field);
@@ -1924,7 +1928,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // validate result
         if (throwForNotFound && expectedDeleteCount > deleteResult.rows.length) {
             // some entities were not deleted
-            throw new NotFoundError(deleteFromModel);
+            throw createNotFoundError(deleteFromModel);
         }
     }
 
@@ -1948,7 +1952,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         if (modelDef.baseModel) {
             if (limit !== undefined) {
-                throw new QueryError('Deleting with a limit is not supported for polymorphic models');
+                throw createNotSupportedError('Deleting with a limit is not supported for polymorphic models');
             }
             // just delete base and it'll cascade back to this model
             return this.processBaseModelDelete(kysely, modelDef.baseModel, where, limit, filterModel);
@@ -2013,7 +2017,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 const oppositeRelation = this.requireField(fieldDef.type, fieldDef.relation.opposite);
                 if (oppositeModelDef.baseModel && oppositeRelation.relation?.onDelete === 'Cascade') {
                     if (limit !== undefined) {
-                        throw new QueryError('Deleting with a limit is not supported for polymorphic models');
+                        throw createNotSupportedError('Deleting with a limit is not supported for polymorphic models');
                     }
                     // the deletion will propagate upward to the base model chain
                     await this.delete(
@@ -2134,7 +2138,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected async executeQueryTakeFirstOrThrow(kysely: ToKysely<Schema>, query: Compilable, operation: string) {
         const result = await kysely.executeQuery(query.compile(), this.makeQueryId(operation));
         if (result.rows.length === 0) {
-            throw new QueryError('No rows found');
+            throw createNotFoundError('No rows found');
         }
         return result.rows[0];
     }

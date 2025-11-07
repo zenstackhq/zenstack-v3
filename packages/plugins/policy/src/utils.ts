@@ -1,4 +1,4 @@
-import type { BaseCrudDialect } from '@zenstackhq/orm';
+import { ORMError, ORMErrorReason, RejectedByPolicyReason, type BaseCrudDialect } from '@zenstackhq/orm';
 import { ExpressionUtils, type Expression, type SchemaDef } from '@zenstackhq/orm/schema';
 import type { OperationNode } from 'kysely';
 import {
@@ -157,4 +157,19 @@ export function getTableName(node: OperationNode | undefined) {
 
 export function isBeforeInvocation(expr: Expression) {
     return ExpressionUtils.isCall(expr) && expr.function === 'before';
+}
+
+export function createRejectedByPolicyError(
+    model: string | undefined,
+    reason: RejectedByPolicyReason,
+    message?: string,
+) {
+    const err = new ORMError(ORMErrorReason.REJECTED_BY_POLICY, message ?? 'operation is rejected by access policies');
+    err.rejectedByPolicyReason = reason;
+    err.model = model;
+    return err;
+}
+
+export function createUnsupportedError(message: string) {
+    return new ORMError(ORMErrorReason.NOT_SUPPORTED, message);
 }

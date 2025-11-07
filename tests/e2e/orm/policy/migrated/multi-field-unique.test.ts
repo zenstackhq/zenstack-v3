@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { QueryError } from '@zenstackhq/orm';
+import { ORMError, ORMErrorReason } from '@zenstackhq/orm';
 import { createPolicyTestClient } from '@zenstackhq/testtools';
+import { describe, expect, it } from 'vitest';
 
 describe('Policy tests multi-field unique', () => {
     it('toplevel crud test unnamed constraint', async () => {
@@ -20,7 +20,9 @@ describe('Policy tests multi-field unique', () => {
         );
 
         await expect(db.model.create({ data: { a: 'a1', b: 'b1', x: 1 } })).toResolveTruthy();
-        await expect(db.model.create({ data: { a: 'a1', b: 'b1', x: 2 } })).rejects.toThrow(QueryError);
+        await expect(db.model.create({ data: { a: 'a1', b: 'b1', x: 2 } })).rejects.toSatisfy(
+            (e) => e instanceof ORMError && e.reason === ORMErrorReason.DB_QUERY_ERROR,
+        );
         await expect(db.model.create({ data: { a: 'a2', b: 'b2', x: 0 } })).toBeRejectedByPolicy();
 
         await expect(db.model.findUnique({ where: { a_b: { a: 'a1', b: 'b1' } } })).toResolveTruthy();
@@ -83,8 +85,8 @@ describe('Policy tests multi-field unique', () => {
         );
 
         await expect(db.m1.create({ data: { id: '1', m2: { create: { a: 'a1', b: 'b1', x: 1 } } } })).toResolveTruthy();
-        await expect(db.m1.create({ data: { id: '2', m2: { create: { a: 'a1', b: 'b1', x: 2 } } } })).rejects.toThrow(
-            QueryError,
+        await expect(db.m1.create({ data: { id: '2', m2: { create: { a: 'a1', b: 'b1', x: 2 } } } })).rejects.toSatisfy(
+            (e) => e instanceof ORMError && e.reason === ORMErrorReason.DB_QUERY_ERROR,
         );
         await expect(
             db.m1.create({ data: { id: '3', m2: { create: { a: 'a1', b: 'b2', x: 0 } } } }),

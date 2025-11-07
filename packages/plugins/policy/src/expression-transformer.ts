@@ -1,13 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import {
-    getCrudDialect,
-    InternalError,
-    QueryError,
-    QueryUtils,
-    type BaseCrudDialect,
-    type ClientContract,
-    type CRUD_EXT,
-} from '@zenstackhq/orm';
+import { getCrudDialect, QueryUtils, type BaseCrudDialect, type ClientContract, type CRUD_EXT } from '@zenstackhq/orm';
 import type {
     BinaryExpression,
     BinaryOperator,
@@ -48,7 +40,15 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import { ExpressionEvaluator } from './expression-evaluator';
-import { conjunction, disjunction, falseNode, isBeforeInvocation, logicalNot, trueNode } from './utils';
+import {
+    conjunction,
+    createUnsupportedError,
+    disjunction,
+    falseNode,
+    isBeforeInvocation,
+    logicalNot,
+    trueNode,
+} from './utils';
 
 export type ExpressionTransformerContext<Schema extends SchemaDef> = {
     model: GetModels<Schema>;
@@ -92,7 +92,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     get authType() {
         if (!this.schema.authType) {
-            throw new InternalError('Schema does not have an "authType" specified');
+            invariant(false, 'Schema does not have an "authType" specified');
         }
         return this.schema.authType!;
     }
@@ -298,7 +298,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     private transformAuthBinary(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
         if (expr.op !== '==' && expr.op !== '!=') {
-            throw new QueryError(
+            throw createUnsupportedError(
                 `Unsupported operator for \`auth()\` in policy of model "${context.model}": ${expr.op}`,
             );
         }
@@ -318,7 +318,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         } else {
             const authModel = QueryUtils.getModel(this.schema, this.authType);
             if (!authModel) {
-                throw new QueryError(
+                throw createUnsupportedError(
                     `Unsupported use of \`auth()\` in policy of model "${context.model}", comparing with \`auth()\` is only possible when auth type is a model`,
                 );
             }
@@ -387,7 +387,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     private transformCall(expr: CallExpression, context: ExpressionTransformerContext<Schema>) {
         const func = this.getFunctionImpl(expr.function);
         if (!func) {
-            throw new QueryError(`Function not implemented: ${expr.function}`);
+            throw createUnsupportedError(`Function not implemented: ${expr.function}`);
         }
         const eb = expressionBuilder<any, any>();
         return func(
@@ -444,7 +444,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         // if (Expression.isMember(arg)) {
         // }
 
-        throw new InternalError(`Unsupported argument expression: ${arg.kind}`);
+        throw createUnsupportedError(`Unsupported argument expression: ${arg.kind}`);
     }
 
     @expr('member')

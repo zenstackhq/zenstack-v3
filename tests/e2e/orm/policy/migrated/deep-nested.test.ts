@@ -482,7 +482,7 @@ describe('deep nested operations tests', () => {
                     },
                 },
             }),
-        ).rejects.toThrow('constraint');
+        ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
 
         // createMany skip duplicate
         await db.m1.update({

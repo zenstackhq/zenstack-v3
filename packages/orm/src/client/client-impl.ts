@@ -29,7 +29,7 @@ import { FindOperationHandler } from './crud/operations/find';
 import { GroupByOperationHandler } from './crud/operations/group-by';
 import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/validator';
-import { NotFoundError, QueryError } from './errors';
+import { createConfigError, createNotFoundError } from './errors';
 import { ZenStackDriver } from './executor/zenstack-driver';
 import { ZenStackQueryExecutor } from './executor/zenstack-query-executor';
 import * as BuiltinFunctions from './functions';
@@ -223,7 +223,7 @@ export class ClientImpl<Schema extends SchemaDef> {
 
     private async handleProc(name: string, args: unknown[]) {
         if (!('procedures' in this.$options) || !this.$options || typeof this.$options.procedures !== 'object') {
-            throw new QueryError('Procedures are not configured for the client.');
+            throw createConfigError('Procedures are not configured for the client.');
         }
 
         const procOptions = this.$options.procedures as ProceduresOptions<
@@ -389,7 +389,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 const _handler = txClient ? handler.withClient(txClient) : handler;
                 const r = await _handler.handle(operation, _args);
                 if (!r && throwIfNoResult) {
-                    throw new NotFoundError(model);
+                    throw createNotFoundError(model);
                 }
                 let result: unknown;
                 if (r && postProcess) {

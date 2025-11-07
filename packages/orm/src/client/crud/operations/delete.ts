@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
 import type { SchemaDef } from '../../../schema';
 import type { DeleteArgs, DeleteManyArgs } from '../../crud-types';
-import { NotFoundError, RejectedByPolicyError, RejectedByPolicyReason } from '../../errors';
+import { createNotFoundError, createRejectedByPolicyError, RejectedByPolicyReason } from '../../errors';
 import { BaseOperationHandler } from './base';
 
 export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
@@ -34,13 +34,13 @@ export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperat
             }
             const deleteResult = await this.delete(tx, this.model, args.where, undefined, undefined, selectedFields);
             if (deleteResult.rows.length === 0) {
-                throw new NotFoundError(this.model);
+                throw createNotFoundError(this.model);
             }
             return needReadBack ? preDeleteRead : deleteResult.rows[0];
         });
 
         if (!result && this.hasPolicyEnabled) {
-            throw new RejectedByPolicyError(
+            throw createRejectedByPolicyError(
                 this.model,
                 RejectedByPolicyReason.CANNOT_READ_BACK,
                 'result is not allowed to be read back',

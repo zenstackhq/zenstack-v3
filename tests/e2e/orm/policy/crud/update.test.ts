@@ -758,7 +758,7 @@ model Post {
                         },
                     },
                 }),
-            ).rejects.toThrow('constraint');
+            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
             await db.$unuseAll().post.update({ where: { id: 1 }, data: { title: 'Bar Post' } });
             // can update
             await expect(
@@ -1124,7 +1124,7 @@ model Foo {
             // can't update, but create violates unique constraint
             await expect(
                 db.foo.upsert({ where: { id: 1 }, create: { id: 1, x: 1 }, update: { x: 1 } }),
-            ).rejects.toThrow('constraint');
+            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
             await db.$unuseAll().foo.update({ where: { id: 1 }, data: { x: 2 } });
             // can update now
             await expect(

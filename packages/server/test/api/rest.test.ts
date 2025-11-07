@@ -2544,7 +2544,6 @@ describe('REST server tests', () => {
                     expect(r.status).toBe(422);
                     expect(r.body.errors[0].code).toBe('validation-error');
                     expect(r.body.errors[0].detail).toContain('Invalid email');
-                    expect(r.body.errors[0].reason).toContain('Invalid email');
                 });
             });
         });

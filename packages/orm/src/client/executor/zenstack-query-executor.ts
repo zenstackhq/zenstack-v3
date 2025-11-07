@@ -25,7 +25,7 @@ import { match } from 'ts-pattern';
 import type { GetModels, ModelDef, SchemaDef, TypeDefDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
 import { TransactionIsolationLevel, type ClientContract } from '../contract';
-import { InternalError, QueryError, ZenStackError } from '../errors';
+import { createDBQueryError, createInternalError, ORMError } from '../errors';
 import type { AfterEntityMutationCallback, OnKyselyQueryCallback } from '../plugin';
 import { stripAlias } from '../query-utils';
 import { QueryNameMapper } from './name-mapper';
@@ -108,12 +108,16 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 if (startedTx) {
                     await this.driver.rollbackTransaction(connection);
                 }
-                if (err instanceof ZenStackError) {
+                if (err instanceof ORMError) {
                     throw err;
                 } else {
                     // wrap error
-                    const message = `Failed to execute query: ${err}, sql: ${compiledQuery?.sql}`;
-                    throw new QueryError(message, err);
+                    throw createDBQueryError(
+                        'Failed to execute query',
+                        err,
+                        compiledQuery.sql,
+                        compiledQuery.parameters,
+                    );
                 }
             }
         });
@@ -361,7 +365,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 return tableNode.table.identifier.name;
             })
             .otherwise((node) => {
-                throw new InternalError(`Invalid query node: ${node}`);
+                throw createInternalError(`Invalid query node: ${node}`);
             }) as GetModels<Schema>;
     }
 

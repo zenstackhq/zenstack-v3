@@ -2,7 +2,7 @@ import { type AstNode, type ConfigurationProvider, type LangiumDocument, type Ma
 import { AbstractFormatter, Formatting, type LangiumServices } from 'langium/lsp';
 import type { DocumentFormattingParams, FormattingOptions, TextEdit } from 'vscode-languageserver';
 import * as ast from './ast';
-import { ZModelLanguageMetaData } from './module';
+import { ZModelLanguageMetaData } from './generated/module';
 
 export class ZModelFormatter extends AbstractFormatter {
     private formatOptions?: FormattingOptions;

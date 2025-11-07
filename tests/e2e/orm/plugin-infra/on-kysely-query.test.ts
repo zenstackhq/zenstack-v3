@@ -211,7 +211,7 @@ describe('On kysely query tests', () => {
                     data: { email: 'u1@test.com', name: 'Marvin' },
                 }),
             ),
-        ).rejects.toThrow('test error');
+        ).rejects.toSatisfy((e) => (e as any).cause.message === 'test error');
 
         await expect(called1).toBe(true);
         await expect(called2).toBe(true);

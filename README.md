@@ -35,7 +35,7 @@ ZenStack is a TypeScript database toolkit for developing full-stack or backend N
 - Automatic CRUD web APIs with adapters for popular frameworks (coming soon)
 - Automatic [TanStack Query](https://github.com/TanStack/query) hooks for easy CRUD from the frontend (coming soon)
 
-# What's new with V3
+# What's New in V3
 
 ZenStack V3 is a major rewrite of [V2](https://github.com/zenstackhq/zenstack). The biggest change is V3 doesn't have a runtime dependency to Prisma anymore. Instead of working as a big wrapper of Prisma as in V2, V3 made a bold move and implemented the entire ORM engine using [Kysely](https://github.com/kysely-org/kysely), while keeping the query API fully compatible with Prisma.
 
@@ -49,7 +49,7 @@ Even without using advanced features, ZenStack offers the following benefits as 
 
 > Although ZenStack v3's ORM runtime doesn't depend on Prisma anymore (specifically, `@prisma/client`), it still relies on Prisma to handle database migration. See [database migration](https://zenstack.dev/docs/3.x/orm/migration) for more details.
 
-# Quick start
+# Quick Start
 
 - [ORM](./samples/orm): A simple example demonstrating ZenStack ORM usage.
 - [Next.js + TanStack Query](./samples/next.js): A full-stack sample demonstrating using TanStack Query to consume ZenStack's automatic CRUD services in a Next.js app.
@@ -72,7 +72,7 @@ Or, if you have an existing project, use the CLI to initialize it:
 npx @zenstackhq/cli@next init
 ```
 
-### 3. Manual setup
+### 3. Setting up manually
 
 Alternatively, you can set it up manually:
 

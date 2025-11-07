@@ -1050,7 +1050,7 @@ describe('Client update tests', () => {
                         },
                     },
                 }),
-            ).rejects.toThrow('constraint');
+            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
             //  transaction fails as a whole
             await expect(client.comment.findUnique({ where: { id: '3' } })).resolves.toMatchObject({
                 content: 'Comment3',

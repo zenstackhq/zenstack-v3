@@ -13,7 +13,7 @@ import { ExpressionUtils, type FieldDef, type GetModels, type ModelDef, type Sch
 import { extractFields } from '../utils/object-utils';
 import type { AGGREGATE_OPERATORS } from './constants';
 import type { OrderBy } from './crud-types';
-import { InternalError, QueryError } from './errors';
+import { createInternalError } from './errors';
 
 export function hasModel(schema: SchemaDef, model: string) {
     return Object.keys(schema.models)
@@ -32,7 +32,7 @@ export function getTypeDef(schema: SchemaDef, type: string) {
 export function requireModel(schema: SchemaDef, model: string) {
     const modelDef = getModel(schema, model);
     if (!modelDef) {
-        throw new QueryError(`Model "${model}" not found in schema`);
+        throw createInternalError(`Model "${model}" not found in schema`, model);
     }
     return modelDef;
 }
@@ -46,7 +46,7 @@ export function requireField(schema: SchemaDef, modelOrType: string, field: stri
     const modelDef = getModel(schema, modelOrType);
     if (modelDef) {
         if (!modelDef.fields[field]) {
-            throw new QueryError(`Field "${field}" not found in model "${modelOrType}"`);
+            throw createInternalError(`Field "${field}" not found in model "${modelOrType}"`, modelOrType);
         } else {
             return modelDef.fields[field];
         }
@@ -54,12 +54,12 @@ export function requireField(schema: SchemaDef, modelOrType: string, field: stri
     const typeDef = getTypeDef(schema, modelOrType);
     if (typeDef) {
         if (!typeDef.fields[field]) {
-            throw new QueryError(`Field "${field}" not found in type "${modelOrType}"`);
+            throw createInternalError(`Field "${field}" not found in type "${modelOrType}"`, modelOrType);
         } else {
             return typeDef.fields[field];
         }
     }
-    throw new QueryError(`Model or type "${modelOrType}" not found in schema`);
+    throw createInternalError(`Model or type "${modelOrType}" not found in schema`, modelOrType);
 }
 
 export function getIdFields<Schema extends SchemaDef>(schema: SchemaDef, model: GetModels<Schema>) {
@@ -71,7 +71,7 @@ export function requireIdFields(schema: SchemaDef, model: string) {
     const modelDef = requireModel(schema, model);
     const result = modelDef?.idFields;
     if (!result) {
-        throw new InternalError(`Model "${model}" does not have ID field(s)`);
+        throw createInternalError(`Model "${model}" does not have ID field(s)`, model);
     }
     return result;
 }
@@ -80,12 +80,12 @@ export function getRelationForeignKeyFieldPairs(schema: SchemaDef, model: string
     const fieldDef = requireField(schema, model, relationField);
 
     if (!fieldDef?.relation) {
-        throw new InternalError(`Field "${relationField}" is not a relation`);
+        throw createInternalError(`Field "${relationField}" is not a relation`, model);
     }
 
     if (fieldDef.relation.fields) {
         if (!fieldDef.relation.references) {
-            throw new InternalError(`Relation references not defined for field "${relationField}"`);
+            throw createInternalError(`Relation references not defined for field "${relationField}"`, model);
         }
         // this model owns the fk
         return {
@@ -97,19 +97,19 @@ export function getRelationForeignKeyFieldPairs(schema: SchemaDef, model: string
         };
     } else {
         if (!fieldDef.relation.opposite) {
-            throw new InternalError(`Opposite relation not defined for field "${relationField}"`);
+            throw createInternalError(`Opposite relation not defined for field "${relationField}"`, model);
         }
 
         const oppositeField = requireField(schema, fieldDef.type, fieldDef.relation.opposite);
 
         if (!oppositeField.relation) {
-            throw new InternalError(`Field "${fieldDef.relation.opposite}" is not a relation`);
+            throw createInternalError(`Field "${fieldDef.relation.opposite}" is not a relation`, model);
         }
         if (!oppositeField.relation.fields) {
-            throw new InternalError(`Relation fields not defined for field "${relationField}"`);
+            throw createInternalError(`Relation fields not defined for field "${relationField}"`, model);
         }
         if (!oppositeField.relation.references) {
-            throw new InternalError(`Relation references not defined for field "${relationField}"`);
+            throw createInternalError(`Relation references not defined for field "${relationField}"`, model);
         }
 
         // the opposite model owns the fk
@@ -153,7 +153,7 @@ export function getUniqueFields(schema: SchemaDef, model: string) {
     > = [];
     for (const [key, value] of Object.entries(modelDef.uniqueFields)) {
         if (typeof value !== 'object') {
-            throw new InternalError(`Invalid unique field definition for "${key}"`);
+            throw createInternalError(`Invalid unique field definition for "${key}"`, model);
         }
 
         if (typeof value.type === 'string') {
@@ -173,7 +173,7 @@ export function getUniqueFields(schema: SchemaDef, model: string) {
 export function getIdValues(schema: SchemaDef, model: string, data: any): Record<string, any> {
     const idFields = getIdFields(schema, model);
     if (!idFields) {
-        throw new InternalError(`ID fields not defined for model "${model}"`);
+        throw createInternalError(`ID fields not defined for model "${model}"`, model);
     }
     return idFields.reduce((acc, field) => ({ ...acc, [field]: data[field] }), {});
 }
@@ -328,7 +328,7 @@ export function getDiscriminatorField(schema: SchemaDef, model: string) {
     }
     const discriminator = delegateAttr.args?.find((arg) => arg.name === 'discriminator');
     if (!discriminator || !ExpressionUtils.isField(discriminator.value)) {
-        throw new InternalError(`Discriminator field not defined for model "${model}"`);
+        throw createInternalError(`Discriminator field not defined for model "${model}"`, model);
     }
     return discriminator.value.field;
 }

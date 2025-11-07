@@ -1,16 +1,10 @@
 import { clone, enumerate, lowerCaseFirst, paramCase } from '@zenstackhq/common-helpers';
-import {
-    InputValidationError,
-    NotFoundError,
-    QueryError,
-    RejectedByPolicyError,
-    ZenStackError,
-    type ClientContract,
-} from '@zenstackhq/orm';
+import { ORMError, ORMErrorReason, type ClientContract } from '@zenstackhq/orm';
 import type { FieldDef, ModelDef, SchemaDef } from '@zenstackhq/orm/schema';
 import { Decimal } from 'decimal.js';
 import SuperJSON from 'superjson';
 import tsjapi, { type Linker, type Paginator, type Relator, type Serializer, type SerializerOptions } from 'ts-japi';
+import { match } from 'ts-pattern';
 import UrlPattern from 'url-pattern';
 import z from 'zod';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
@@ -467,8 +461,8 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         } catch (err) {
             if (err instanceof InvalidValueError) {
                 return this.makeError('invalidValue', err.message);
-            } else if (err instanceof ZenStackError) {
-                return this.handleZenStackError(err);
+            } else if (err instanceof ORMError) {
+                return this.handleORMError(err);
             } else {
                 return this.handleGenericError(err);
             }
@@ -2021,31 +2015,33 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private handleZenStackError(err: ZenStackError) {
-        if (err instanceof InputValidationError) {
-            return this.makeError(
-                'validationError',
-                err.message,
-                422,
-                err.cause instanceof Error ? err.cause.message : undefined,
-            );
-        } else if (err instanceof RejectedByPolicyError) {
-            return this.makeError('forbidden', err.message, 403, err.reason);
-        } else if (err instanceof NotFoundError) {
-            return this.makeError('notFound', err.message);
-        } else if (err instanceof QueryError) {
-            return this.makeError(
-                'queryError',
-                err.message,
-                400,
-                err.cause instanceof Error ? err.cause.message : undefined,
-            );
-        } else {
-            return this.makeError('unknownError', err.message);
-        }
+    private handleORMError(err: ORMError) {
+        return match(err.reason)
+            .with(ORMErrorReason.INVALID_INPUT, () => {
+                return this.makeError('validationError', err.message, 422);
+            })
+            .with(ORMErrorReason.REJECTED_BY_POLICY, () => {
+                return this.makeError('forbidden', err.message, 403, { reason: err.rejectedByPolicyReason });
+            })
+            .with(ORMErrorReason.NOT_FOUND, () => {
+                return this.makeError('notFound', err.message, 404);
+            })
+            .with(ORMErrorReason.DB_QUERY_ERROR, () => {
+                return this.makeError('queryError', err.message, 400, {
+                    dbErrorCode: err.dbErrorCode,
+                });
+            })
+            .otherwise(() => {
+                return this.makeError('unknownError', err.message);
+            });
     }
 
-    private makeError(code: keyof typeof this.errors, detail?: string, status?: number, reason?: string) {
+    private makeError(
+        code: keyof typeof this.errors,
+        detail?: string,
+        status?: number,
+        otherFields: Record<string, any> = {},
+    ) {
         status = status ?? this.errors[code]?.status ?? 500;
         const error: any = {
             status,
@@ -2057,9 +2053,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             error.detail = detail;
         }
 
-        if (reason) {
-            error.reason = reason;
-        }
+        Object.assign(error, otherFields);
 
         return {
             status,

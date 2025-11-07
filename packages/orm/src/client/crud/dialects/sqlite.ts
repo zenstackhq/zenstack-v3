@@ -12,7 +12,7 @@ import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
-import { QueryError } from '../../errors';
+import { createInternalError } from '../../errors';
 import {
     getDelegateDescendantModels,
     getManyToManyRelation,
@@ -121,7 +121,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             try {
                 return JSON.parse(value);
             } catch (e) {
-                throw new QueryError('Invalid JSON returned', e);
+                throw createInternalError('Invalid JSON returned', undefined, { cause: e });
             }
         }
         return value;
@@ -376,10 +376,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
     override getFieldSqlType(fieldDef: FieldDef) {
         // TODO: respect `@db.x` attributes
         if (fieldDef.relation) {
-            throw new QueryError('Cannot get SQL type of a relation field');
+            throw createInternalError('Cannot get SQL type of a relation field');
         }
         if (fieldDef.array) {
-            throw new QueryError('SQLite does not support scalar list type');
+            throw createInternalError('SQLite does not support scalar list type');
         }
 
         if (this.schema.enums?.[fieldDef.type]) {

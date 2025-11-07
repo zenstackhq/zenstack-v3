@@ -1,15 +1,6 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import type { BaseCrudDialect, ClientContract, ProceedKyselyQueryFunction } from '@zenstackhq/orm';
-import {
-    getCrudDialect,
-    InternalError,
-    QueryError,
-    QueryUtils,
-    RejectedByPolicyError,
-    RejectedByPolicyReason,
-    SchemaUtils,
-    type CRUD_EXT,
-} from '@zenstackhq/orm';
+import { getCrudDialect, QueryUtils, RejectedByPolicyReason, SchemaUtils, type CRUD_EXT } from '@zenstackhq/orm';
 import {
     ExpressionUtils,
     type BuiltinType,
@@ -55,7 +46,17 @@ import { match } from 'ts-pattern';
 import { ColumnCollector } from './column-collector';
 import { ExpressionTransformer } from './expression-transformer';
 import type { Policy, PolicyOperation } from './types';
-import { buildIsFalse, conjunction, disjunction, falseNode, getTableName, isBeforeInvocation, trueNode } from './utils';
+import {
+    buildIsFalse,
+    conjunction,
+    createRejectedByPolicyError,
+    createUnsupportedError,
+    disjunction,
+    falseNode,
+    getTableName,
+    isBeforeInvocation,
+    trueNode,
+} from './utils';
 
 export type CrudQueryNode = SelectQueryNode | InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
 
@@ -76,7 +77,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     async handle(node: RootOperationNode, proceed: ProceedKyselyQueryFunction) {
         if (!this.isCrudQueryNode(node)) {
             // non-CRUD queries are not allowed
-            throw new RejectedByPolicyError(
+            throw createRejectedByPolicyError(
                 undefined,
                 RejectedByPolicyReason.OTHER,
                 'non-CRUD queries are not allowed',
@@ -104,7 +105,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 if (constCondition === true) {
                     needCheckPreCreate = false;
                 } else if (constCondition === false) {
-                    throw new RejectedByPolicyError(mutationModel, RejectedByPolicyReason.NO_ACCESS);
+                    throw createRejectedByPolicyError(mutationModel, RejectedByPolicyReason.NO_ACCESS);
                 }
             }
 
@@ -134,7 +135,9 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 for (const postRow of result.rows) {
                     const beforeRow = beforeUpdateInfo.rows.find((r) => idFields.every((f) => r[f] === postRow[f]));
                     if (!beforeRow) {
-                        throw new QueryError(
+                        throw createRejectedByPolicyError(
+                            mutationModel,
+                            RejectedByPolicyReason.OTHER,
                             'Before-update and after-update rows do not match by id. If you have post-update policies on a model, updating id fields is not supported.',
                         );
                     }
@@ -194,7 +197,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
             const postUpdateResult = await proceed(postUpdateQuery.toOperationNode());
             if (!postUpdateResult.rows[0]?.$condition) {
-                throw new RejectedByPolicyError(
+                throw createRejectedByPolicyError(
                     mutationModel,
                     RejectedByPolicyReason.NO_ACCESS,
                     'some or all updated rows failed to pass post-update policy check',
@@ -210,7 +213,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         } else {
             const readBackResult = await this.processReadBack(node, result, proceed);
             if (readBackResult.rows.length !== result.rows.length) {
-                throw new RejectedByPolicyError(
+                throw createRejectedByPolicyError(
                     mutationModel,
                     RejectedByPolicyReason.CANNOT_READ_BACK,
                     'result is not allowed to be read back',
@@ -543,14 +546,14 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const result = await proceed(queryNode);
         if (!result.rows[0]?.$conditionA) {
-            throw new RejectedByPolicyError(
+            throw createRejectedByPolicyError(
                 m2m.firstModel as GetModels<Schema>,
                 RejectedByPolicyReason.CANNOT_READ_BACK,
                 `many-to-many relation participant model "${m2m.firstModel}" not updatable`,
             );
         }
         if (!result.rows[0]?.$conditionB) {
-            throw new RejectedByPolicyError(
+            throw createRejectedByPolicyError(
                 m2m.secondModel as GetModels<Schema>,
                 RejectedByPolicyReason.NO_ACCESS,
                 `many-to-many relation participant model "${m2m.secondModel}" not updatable`,
@@ -621,7 +624,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const result = await proceed(preCreateCheck);
         if (!result.rows[0]?.$condition) {
-            throw new RejectedByPolicyError(model, RejectedByPolicyReason.NO_ACCESS);
+            throw createRejectedByPolicyError(model, RejectedByPolicyReason.NO_ACCESS);
         }
     }
 
@@ -636,7 +639,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         } else if (PrimitiveValueListNode.is(node)) {
             return [this.unwrapCreateValueRow(node.values, model, fields, isManyToManyJoinTable)];
         } else {
-            throw new InternalError(`Unexpected node kind: ${node.kind} for unwrapping create values`);
+            invariant(false, `Unexpected node kind: ${node.kind} for unwrapping create values`);
         }
     }
 
@@ -762,21 +765,21 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             }))
             .when(UpdateQueryNode.is, (node) => {
                 if (!node.table) {
-                    throw new QueryError('Update query must have a table');
+                    invariant(false, 'Update query must have a table');
                 }
                 const r = this.extractTableName(node.table);
                 return r ? { mutationModel: r.model, alias: r.alias } : undefined;
             })
             .when(DeleteQueryNode.is, (node) => {
                 if (node.from.froms.length !== 1) {
-                    throw new QueryError('Only one from table is supported for delete');
+                    throw createUnsupportedError('Only one from table is supported for delete');
                 }
                 const r = this.extractTableName(node.from.froms[0]!);
                 return r ? { mutationModel: r.model, alias: r.alias } : undefined;
             })
             .exhaustive();
         if (!r) {
-            throw new InternalError(`Unable to get table name for query node: ${node}`);
+            invariant(false, `Unable to get table name for query node: ${node}`);
         }
         return r;
     }

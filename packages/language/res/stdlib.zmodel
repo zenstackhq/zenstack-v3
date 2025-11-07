@@ -382,12 +382,14 @@ attribute @map(_ name: String) @@@prisma
 attribute @@map(_ name: String) @@@prisma
 
 /**
- * Exclude a field from the Prisma Client (for example, a field that you do not want Prisma users to update).
+ * Exclude a field from the ORM Client (for example, a field that you do not want Prisma users to update).
+ * The field is still recognized by database schema migrations.
  */
 attribute @ignore() @@@prisma
 
 /**
- * Exclude a model from the Prisma Client (for example, a model that you do not want Prisma users to update).
+ * Exclude a model from the ORM Client (for example, a model that you do not want Prisma users to update).
+ * The model is still recognized by database schema migrations.
  */
 attribute @@ignore() @@@prisma
 

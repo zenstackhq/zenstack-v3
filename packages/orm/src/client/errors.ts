@@ -1,45 +1,43 @@
-/**
- * Base for all ZenStack runtime errors.
- */
-export class ZenStackError extends Error {}
+import { getDbErrorCode } from './executor/error-processor';
 
 /**
- * Error thrown when input validation fails.
+ * Reason code for ORM errors.
  */
-export class InputValidationError extends ZenStackError {
-    constructor(
-        public readonly model: string,
-        message: string,
-        cause?: unknown,
-    ) {
-        super(message, { cause });
-    }
-}
+export enum ORMErrorReason {
+    /**
+     * ORM client configuration error.
+     */
+    CONFIG_ERROR = 'config-error',
 
-/**
- * Error thrown when a query fails.
- */
-export class QueryError extends ZenStackError {
-    constructor(message: string, cause?: unknown) {
-        super(message, { cause });
-    }
-}
+    /**
+     * Invalid input error.
+     */
+    INVALID_INPUT = 'invalid-input',
 
-/**
- * Error thrown when an internal error occurs.
- */
-export class InternalError extends ZenStackError {}
+    /**
+     * The specified record was not found.
+     */
+    NOT_FOUND = 'not-found',
 
-/**
- * Error thrown when an entity is not found.
- */
-export class NotFoundError extends ZenStackError {
-    constructor(
-        public readonly model: string,
-        details?: string,
-    ) {
-        super(`Entity not found for model "${model}"${details ? `: ${details}` : ''}`);
-    }
+    /**
+     * Operation is rejected by access policy.
+     */
+    REJECTED_BY_POLICY = 'rejected-by-policy',
+
+    /**
+     * Error was thrown by the underlying database driver.
+     */
+    DB_QUERY_ERROR = 'db-query-error',
+
+    /**
+     * The requested operation is not supported.
+     */
+    NOT_SUPPORTED = 'not-supported',
+
+    /**
+     * An internal error occurred.
+     */
+    INTERNAL_ERROR = 'internal-error',
 }
 
 /**
@@ -63,14 +61,91 @@ export enum RejectedByPolicyReason {
 }
 
 /**
- * Error thrown when an operation is rejected by access policy.
+ * ZenStack ORM error.
  */
-export class RejectedByPolicyError extends ZenStackError {
+export class ORMError extends Error {
     constructor(
-        public readonly model: string | undefined,
-        public readonly reason: RejectedByPolicyReason = RejectedByPolicyReason.NO_ACCESS,
+        public reason: ORMErrorReason,
         message?: string,
+        options?: ErrorOptions,
     ) {
-        super(message ?? `Operation rejected by policy${model ? ': ' + model : ''}`);
+        super(message, options);
     }
+
+    /**
+     * The name of the model that the error pertains to.
+     */
+    public model?: string;
+
+    /**
+     * The error code given by the underlying database driver.
+     */
+    public dbErrorCode?: unknown;
+
+    /**
+     * The error message given by the underlying database driver.
+     */
+    public dbErrorMessage?: string;
+
+    /**
+     * The reason code for policy rejection. Only available when `reason` is `REJECTED_BY_POLICY`.
+     */
+    public rejectedByPolicyReason?: RejectedByPolicyReason;
+
+    /**
+     * The SQL query that was executed. Only available when `reason` is `DB_QUERY_ERROR`.
+     */
+    public sql?: string;
+
+    /**
+     * The parameters used in the SQL query. Only available when `reason` is `DB_QUERY_ERROR`.
+     */
+    public sqlParams?: readonly unknown[];
+}
+
+export function createConfigError(message: string, options?: ErrorOptions) {
+    return new ORMError(ORMErrorReason.CONFIG_ERROR, message, options);
+}
+
+export function createNotFoundError(model: string, message?: string, options?: ErrorOptions) {
+    const error = new ORMError(ORMErrorReason.NOT_FOUND, message ?? 'Record not found', options);
+    error.model = model;
+    return error;
+}
+
+export function createInvalidInputError(message: string, model?: string, options?: ErrorOptions) {
+    const error = new ORMError(ORMErrorReason.INVALID_INPUT, message, options);
+    error.model = model;
+    return error;
+}
+
+export function createDBQueryError(message: string, dbError: unknown, sql: string, parameters: readonly unknown[]) {
+    const error = new ORMError(ORMErrorReason.DB_QUERY_ERROR, message, { cause: dbError });
+    error.dbErrorCode = getDbErrorCode(dbError);
+    error.dbErrorMessage = dbError instanceof Error ? dbError.message : undefined;
+    error.sql = sql;
+    error.sqlParams = parameters;
+    return error;
+}
+
+export function createRejectedByPolicyError(
+    model: string,
+    reason: RejectedByPolicyReason,
+    message: string,
+    options?: ErrorOptions,
+) {
+    const error = new ORMError(ORMErrorReason.REJECTED_BY_POLICY, message, options);
+    error.model = model;
+    error.rejectedByPolicyReason = reason;
+    return error;
+}
+
+export function createNotSupportedError(message: string, options?: ErrorOptions) {
+    return new ORMError(ORMErrorReason.NOT_SUPPORTED, message, options);
+}
+
+export function createInternalError(message: string, model?: string, options?: ErrorOptions) {
+    const error = new ORMError(ORMErrorReason.INTERNAL_ERROR, message, options);
+    error.model = model;
+    return error;
 }

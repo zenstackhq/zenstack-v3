@@ -40,8 +40,8 @@ import {
     TypeDef,
     UnaryExpr,
     type AstNode,
-} from '@zenstackhq/language/ast';
-import { resolved } from './model-utils';
+} from './ast';
+import { resolved } from './utils';
 
 /**
  * Options for the generator.

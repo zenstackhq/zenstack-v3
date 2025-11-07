@@ -122,6 +122,7 @@ export function createInvalidInputError(message: string, model?: string, options
 export function createDBQueryError(message: string, dbError: unknown, sql: string, parameters: readonly unknown[]) {
     const error = new ORMError(ORMErrorReason.DB_QUERY_ERROR, message, { cause: dbError });
     error.dbErrorCode = getDbErrorCode(dbError);
+    error.dbErrorMessage = dbError instanceof Error ? dbError.message : undefined;
     error.sql = sql;
     error.sqlParams = parameters;
     return error;

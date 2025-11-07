@@ -43,7 +43,10 @@ model User {
 
         await expect(db.user.create({ data: { email: 'user1@example.com' } })).rejects.toSatisfy(
             (e) =>
-                e instanceof ORMError && e.reason === ORMErrorReason.DB_QUERY_ERROR && e.dbErrorCode === expectedCode,
+                e instanceof ORMError &&
+                e.reason === ORMErrorReason.DB_QUERY_ERROR &&
+                e.dbErrorCode === expectedCode &&
+                !!e.dbErrorMessage?.includes('constraint'),
         );
     });
 });

@@ -26,6 +26,8 @@ import {
     createInvalidInputError,
     createNotFoundError,
     createNotSupportedError,
+    ORMError,
+    ORMErrorReason,
 } from '../../errors';
 import type { ToKysely } from '../../query-builder';
 import {
@@ -2138,7 +2140,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     protected async executeQueryTakeFirstOrThrow(kysely: ToKysely<Schema>, query: Compilable, operation: string) {
         const result = await kysely.executeQuery(query.compile(), this.makeQueryId(operation));
         if (result.rows.length === 0) {
-            throw createNotFoundError('No rows found');
+            throw new ORMError(ORMErrorReason.NOT_FOUND, 'No rows found');
         }
         return result.rows[0];
     }

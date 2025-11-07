@@ -212,7 +212,8 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
             .with(ORMErrorReason.DB_QUERY_ERROR, () => {
                 status = 400;
                 error.dbErrorCode = err.dbErrorCode;
-            });
+            })
+            .otherwise(() => {});
 
         const resp = { status, body: { error } };
         log(this.options.log, 'debug', () => `sending error response: ${safeJSONStringify(resp)}`);

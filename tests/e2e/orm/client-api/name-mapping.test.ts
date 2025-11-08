@@ -121,7 +121,7 @@ describe('Name mapping tests', () => {
                 .selectFrom('User')
                 .select(['email'])
                 .whereRef('email', '=', 'email')
-                .orderBy(['email'])
+                .orderBy('email')
                 .executeTakeFirst(),
         ).resolves.toMatchObject({
             email: 'u1@test.com',

@@ -21,7 +21,6 @@ describe('Toplevel field validation tests', () => {
         await db.foo.create({ data: { id: 100 } });
 
         for (const action of ['create', 'update', 'upsert', 'updateMany']) {
-            console.log(`Testing action: ${action}`);
             const _t =
                 action === 'create'
                     ? (data: any) => db.foo.create({ data })

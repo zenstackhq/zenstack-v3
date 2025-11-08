@@ -123,7 +123,6 @@ model AnotherTest {
                 locale: 'locale3',
             },
         });
-        console.log('test3 created:', test3);
         const updated2 = await db.linkingTable.update({
             where: {
                 test_id_another_test_id: {

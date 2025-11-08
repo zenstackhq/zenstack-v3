@@ -50,8 +50,8 @@ import {
     trueNode,
 } from './utils';
 
-export type ExpressionTransformerContext<Schema extends SchemaDef> = {
-    model: GetModels<Schema>;
+export type ExpressionTransformerContext = {
+    model: string;
     alias?: string;
     operation: CRUD_EXT;
     memberFilter?: OperationNode;
@@ -97,7 +97,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         return this.schema.authType!;
     }
 
-    transform(expression: Expression, context: ExpressionTransformerContext<Schema>): OperationNode {
+    transform(expression: Expression, context: ExpressionTransformerContext): OperationNode {
         const handler = expressionHandlers.get(expression.kind);
         if (!handler) {
             throw new Error(`Unsupported expression kind: ${expression.kind}`);
@@ -116,12 +116,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     @expr('array')
     // @ts-expect-error
-    private _array(expr: ArrayExpression, context: ExpressionTransformerContext<Schema>) {
+    private _array(expr: ArrayExpression, context: ExpressionTransformerContext) {
         return ValueListNode.create(expr.items.map((item) => this.transform(item, context)));
     }
 
     @expr('field')
-    private _field(expr: FieldExpression, context: ExpressionTransformerContext<Schema>) {
+    private _field(expr: FieldExpression, context: ExpressionTransformerContext) {
         const fieldDef = QueryUtils.requireField(this.schema, context.model, expr.field);
         if (!fieldDef.relation) {
             return this.createColumnRef(expr.field, context);
@@ -154,7 +154,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     @expr('binary')
     // @ts-ignore
-    private _binary(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
+    private _binary(expr: BinaryExpression, context: ExpressionTransformerContext) {
         if (expr.op === '&&') {
             return conjunction(this.dialect, [this.transform(expr.left, context), this.transform(expr.right, context)]);
         } else if (expr.op === '||') {
@@ -216,7 +216,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
     }
 
-    private normalizeBinaryOperationOperands(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
+    private normalizeBinaryOperationOperands(expr: BinaryExpression, context: ExpressionTransformerContext) {
         // if relation fields are used directly in comparison, it can only be compared with null,
         // so we normalize the args with the id field (use the first id field if multiple)
         let normalizedLeft: Expression = expr.left;
@@ -238,7 +238,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         return { normalizedLeft, normalizedRight };
     }
 
-    private transformCollectionPredicate(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
+    private transformCollectionPredicate(expr: BinaryExpression, context: ExpressionTransformerContext) {
         invariant(expr.op === '?' || expr.op === '!' || expr.op === '^', 'expected "?" or "!" or "^" operator');
 
         if (this.isAuthCall(expr.left) || this.isAuthMember(expr.left)) {
@@ -273,7 +273,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
         let predicateFilter = this.transform(expr.right, {
             ...context,
-            model: newContextModel as GetModels<Schema>,
+            model: newContextModel,
             alias: undefined,
         });
 
@@ -296,7 +296,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         });
     }
 
-    private transformAuthBinary(expr: BinaryExpression, context: ExpressionTransformerContext<Schema>) {
+    private transformAuthBinary(expr: BinaryExpression, context: ExpressionTransformerContext) {
         if (expr.op !== '==' && expr.op !== '!=') {
             throw createUnsupportedError(
                 `Unsupported operator for \`auth()\` in policy of model "${context.model}": ${expr.op}`,
@@ -364,7 +364,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     @expr('unary')
     // @ts-ignore
-    private _unary(expr: UnaryExpression, context: ExpressionTransformerContext<Schema>) {
+    private _unary(expr: UnaryExpression, context: ExpressionTransformerContext) {
         // only '!' operator for now
         invariant(expr.op === '!', 'only "!" operator is supported');
         return logicalNot(this.dialect, this.transform(expr.operand, context));
@@ -379,12 +379,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     @expr('call')
     // @ts-ignore
-    private _call(expr: CallExpression, context: ExpressionTransformerContext<Schema>) {
+    private _call(expr: CallExpression, context: ExpressionTransformerContext) {
         const result = this.transformCall(expr, context);
         return result.toOperationNode();
     }
 
-    private transformCall(expr: CallExpression, context: ExpressionTransformerContext<Schema>) {
+    private transformCall(expr: CallExpression, context: ExpressionTransformerContext) {
         const func = this.getFunctionImpl(expr.function);
         if (!func) {
             throw createUnsupportedError(`Function not implemented: ${expr.function}`);
@@ -396,7 +396,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             {
                 client: this.client,
                 dialect: this.dialect,
-                model: context.model,
+                model: context.model as GetModels<Schema>,
                 modelAlias: context.alias ?? context.model,
                 operation: context.operation,
             },
@@ -421,7 +421,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     private transformCallArg(
         eb: ExpressionBuilder<any, any>,
         arg: Expression,
-        context: ExpressionTransformerContext<Schema>,
+        context: ExpressionTransformerContext,
     ): OperandExpression<any> {
         if (ExpressionUtils.isLiteral(arg)) {
             return eb.val(arg.value);
@@ -449,7 +449,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     @expr('member')
     // @ts-ignore
-    private _member(expr: MemberExpression, context: ExpressionTransformerContext<Schema>) {
+    private _member(expr: MemberExpression, context: ExpressionTransformerContext) {
         // `auth()` member access
         if (this.isAuthCall(expr.receiver)) {
             return this.valueMemberAccess(this.auth, expr, this.authType);
@@ -516,7 +516,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             if (fieldDef.relation) {
                 const relation = this.transformRelationAccess(member, fieldDef.type, {
                     ...restContext,
-                    model: fromModel as GetModels<Schema>,
+                    model: fromModel,
                     alias: undefined,
                 });
 
@@ -567,7 +567,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     private transformRelationAccess(
         field: string,
         relationModel: string,
-        context: ExpressionTransformerContext<Schema>,
+        context: ExpressionTransformerContext,
     ): SelectQueryNode {
         const m2m = QueryUtils.getManyToManyRelation(this.schema, context.model, field);
         if (m2m) {
@@ -627,7 +627,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     private transformManyToManyRelationAccess(
         m2m: NonNullable<ReturnType<typeof QueryUtils.getManyToManyRelation>>,
-        context: ExpressionTransformerContext<Schema>,
+        context: ExpressionTransformerContext,
     ) {
         const eb = expressionBuilder<any, any>();
         const relationQuery = eb
@@ -647,7 +647,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         return relationQuery.toOperationNode();
     }
 
-    private createColumnRef(column: string, context: ExpressionTransformerContext<Schema>) {
+    private createColumnRef(column: string, context: ExpressionTransformerContext) {
         // if field comes from a delegate base model, we need to use the join alias
         // of that base model
 
@@ -716,12 +716,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
     }
 
-    private isRelationField(expr: Expression, model: GetModels<Schema>) {
+    private isRelationField(expr: Expression, model: string) {
         const fieldDef = this.getFieldDefFromFieldRef(expr, model);
         return !!fieldDef?.relation;
     }
 
-    private getFieldDefFromFieldRef(expr: Expression, model: GetModels<Schema>): FieldDef | undefined {
+    private getFieldDefFromFieldRef(expr: Expression, model: string): FieldDef | undefined {
         if (ExpressionUtils.isField(expr)) {
             return QueryUtils.requireField(this.schema, model, expr.field);
         } else if (

@@ -77,12 +77,12 @@ describe('Entity mutation hooks tests', () => {
                                 email: args.action === 'update' ? 'u1@test.com' : 'u3@test.com',
                             }),
                         ]);
-                        queryIds[args.action].before = args.queryId;
+                        queryIds[args.action].before = args.queryId.queryId;
                     }
                 },
                 async afterEntityMutation(args) {
                     if (args.action === 'update' || args.action === 'delete') {
-                        queryIds[args.action].after = args.queryId;
+                        queryIds[args.action].after = args.queryId.queryId;
                     }
                 },
             },

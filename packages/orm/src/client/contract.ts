@@ -1,5 +1,6 @@
 import type Decimal from 'decimal.js';
 import { type GetModels, type IsDelegateModel, type ProcedureDef, type SchemaDef } from '../schema';
+import type { AnyKysely } from '../utils/kysely-utils';
 import type { OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
 import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
 import type {
@@ -116,7 +117,7 @@ export type ClientContract<Schema extends SchemaDef> = {
     /**
      * The raw Kysely query builder without any ZenStack enhancements.
      */
-    readonly $qbRaw: ToKysely<any>;
+    readonly $qbRaw: AnyKysely;
 
     /**
      * Starts an interactive transaction.

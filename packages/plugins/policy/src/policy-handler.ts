@@ -5,7 +5,6 @@ import {
     ExpressionUtils,
     type BuiltinType,
     type Expression,
-    type GetModels,
     type MemberExpression,
     type SchemaDef,
 } from '@zenstackhq/orm/schema';
@@ -237,13 +236,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
     }
 
-    hasPostUpdatePolicies(model: GetModels<Schema>) {
+    hasPostUpdatePolicies(model: string) {
         const policies = this.getModelPolicies(model, 'post-update');
         return policies.length > 0;
     }
 
     private async loadBeforeUpdateEntities(
-        model: GetModels<Schema>,
+        model: string,
         where: WhereNode | undefined,
         proceed: ProceedKyselyQueryFunction,
     ) {
@@ -266,7 +265,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return { fields: beforeUpdateAccessFields, rows: result.rows };
     }
 
-    private getFieldsAccessForBeforeUpdatePolicies(model: GetModels<Schema>) {
+    private getFieldsAccessForBeforeUpdatePolicies(model: string) {
         const policies = this.getModelPolicies(model, 'post-update');
         if (policies.length === 0) {
             return undefined;
@@ -471,7 +470,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
     private async enforcePreCreatePolicy(
         node: InsertQueryNode,
-        mutationModel: GetModels<Schema>,
+        mutationModel: string,
         isManyToManyJoinTable: boolean,
         proceed: ProceedKyselyQueryFunction,
     ) {
@@ -499,7 +498,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     private async enforcePreCreatePolicyForManyToManyJoinTable(
-        tableName: GetModels<Schema>,
+        tableName: string,
         fields: string[],
         values: OperationNode[],
         proceed: ProceedKyselyQueryFunction,
@@ -523,13 +522,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const eb = expressionBuilder<any, any>();
 
-        const filterA = this.buildPolicyFilter(m2m.firstModel as GetModels<Schema>, undefined, 'update');
+        const filterA = this.buildPolicyFilter(m2m.firstModel, undefined, 'update');
         const queryA = eb
             .selectFrom(m2m.firstModel)
             .where(eb(eb.ref(`${m2m.firstModel}.${m2m.firstIdField}`), '=', aValue))
             .select(() => new ExpressionWrapper(filterA).as('$t'));
 
-        const filterB = this.buildPolicyFilter(m2m.secondModel as GetModels<Schema>, undefined, 'update');
+        const filterB = this.buildPolicyFilter(m2m.secondModel, undefined, 'update');
         const queryB = eb
             .selectFrom(m2m.secondModel)
             .where(eb(eb.ref(`${m2m.secondModel}.${m2m.secondIdField}`), '=', bValue))
@@ -547,14 +546,14 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         const result = await proceed(queryNode);
         if (!result.rows[0]?.$conditionA) {
             throw createRejectedByPolicyError(
-                m2m.firstModel as GetModels<Schema>,
+                m2m.firstModel,
                 RejectedByPolicyReason.CANNOT_READ_BACK,
                 `many-to-many relation participant model "${m2m.firstModel}" not updatable`,
             );
         }
         if (!result.rows[0]?.$conditionB) {
             throw createRejectedByPolicyError(
-                m2m.secondModel as GetModels<Schema>,
+                m2m.secondModel,
                 RejectedByPolicyReason.NO_ACCESS,
                 `many-to-many relation participant model "${m2m.secondModel}" not updatable`,
             );
@@ -562,7 +561,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     private async enforcePreCreatePolicyForOne(
-        model: GetModels<Schema>,
+        model: string,
         fields: string[],
         values: OperationNode[],
         proceed: ProceedKyselyQueryFunction,
@@ -630,7 +629,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
     private unwrapCreateValueRows(
         node: OperationNode,
-        model: GetModels<Schema>,
+        model: string,
         fields: string[],
         isManyToManyJoinTable: boolean,
     ) {
@@ -645,7 +644,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
     private unwrapCreateValueRow(
         data: readonly unknown[],
-        model: GetModels<Schema>,
+        model: string,
         fields: string[],
         isImplicitManyToManyJoinTable: boolean,
     ) {
@@ -689,7 +688,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return result;
     }
 
-    private tryGetConstantPolicy(model: GetModels<Schema>, operation: PolicyOperation) {
+    private tryGetConstantPolicy(model: string, operation: PolicyOperation) {
         const policies = this.getModelPolicies(model, operation);
         if (!policies.some((p) => p.kind === 'allow')) {
             // no allow -> unconditional deny
@@ -760,7 +759,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     private getMutationModel(node: InsertQueryNode | UpdateQueryNode | DeleteQueryNode) {
         const r = match(node)
             .when(InsertQueryNode.is, (node) => ({
-                mutationModel: getTableName(node.into) as GetModels<Schema>,
+                mutationModel: getTableName(node.into)!,
                 alias: undefined,
             }))
             .when(UpdateQueryNode.is, (node) => {
@@ -794,7 +793,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node);
     }
 
-    buildPolicyFilter(model: GetModels<Schema>, alias: string | undefined, operation: CRUD_EXT): OperationNode {
+    buildPolicyFilter(model: string, alias: string | undefined, operation: CRUD_EXT): OperationNode {
         // first check if it's a many-to-many join table, and if so, handle specially
         const m2mFilter = this.getModelPolicyFilterForManyToManyJoinTable(model, alias, operation);
         if (m2mFilter) {
@@ -841,9 +840,9 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return combinedPolicy;
     }
 
-    private extractTableName(node: OperationNode): { model: GetModels<Schema>; alias?: string } | undefined {
+    private extractTableName(node: OperationNode): { model: string; alias?: string } | undefined {
         if (TableNode.is(node)) {
-            return { model: node.table.identifier.name as GetModels<Schema> };
+            return { model: node.table.identifier.name };
         }
         if (AliasNode.is(node)) {
             const inner = this.extractTableName(node.node);
@@ -880,12 +879,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }, undefined);
     }
 
-    private compilePolicyCondition(
-        model: GetModels<Schema>,
-        alias: string | undefined,
-        operation: CRUD_EXT,
-        policy: Policy,
-    ) {
+    private compilePolicyCondition(model: string, alias: string | undefined, operation: CRUD_EXT, policy: Policy) {
         return new ExpressionTransformer(this.client).transform(policy.condition, {
             model,
             alias,
@@ -998,18 +992,18 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             .selectFrom(m2m.firstModel)
             .whereRef(`${m2m.firstModel}.${m2m.firstIdField}`, '=', `${joinTable}.A`)
             .select(() =>
-                new ExpressionWrapper(
-                    this.buildPolicyFilter(m2m.firstModel as GetModels<Schema>, undefined, checkForOperation),
-                ).as('$conditionA'),
+                new ExpressionWrapper(this.buildPolicyFilter(m2m.firstModel, undefined, checkForOperation)).as(
+                    '$conditionA',
+                ),
             );
 
         const bQuery = eb
             .selectFrom(m2m.secondModel)
             .whereRef(`${m2m.secondModel}.${m2m.secondIdField}`, '=', `${joinTable}.B`)
             .select(() =>
-                new ExpressionWrapper(
-                    this.buildPolicyFilter(m2m.secondModel as GetModels<Schema>, undefined, checkForOperation),
-                ).as('$conditionB'),
+                new ExpressionWrapper(this.buildPolicyFilter(m2m.secondModel, undefined, checkForOperation)).as(
+                    '$conditionB',
+                ),
             );
 
         return eb.and([aQuery, bQuery]).toOperationNode();

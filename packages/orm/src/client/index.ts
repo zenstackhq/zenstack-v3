@@ -3,7 +3,7 @@ export * from './contract';
 export type * from './crud-types';
 export { getCrudDialect } from './crud/dialects';
 export { BaseCrudDialect } from './crud/dialects/base-dialect';
-export * from './errors';
+export { ORMError, ORMErrorReason, RejectedByPolicyReason } from './errors';
 export * from './options';
 export * from './plugin';
 export type { ZenStackPromise } from './promise';

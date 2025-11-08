@@ -12,7 +12,6 @@ import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
-import { QueryError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
     buildJoinPairs,
@@ -24,6 +23,7 @@ import {
     requireModel,
 } from '../../query-utils';
 import { BaseCrudDialect } from './base-dialect';
+import { createInternalError } from '../../errors';
 
 export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
     constructor(schema: Schema, options: ClientOptions<Schema>) {
@@ -438,7 +438,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
     override getFieldSqlType(fieldDef: FieldDef) {
         // TODO: respect `@db.x` attributes
         if (fieldDef.relation) {
-            throw new QueryError('Cannot get SQL type of a relation field');
+            throw createInternalError('Cannot get SQL type of a relation field');
         }
 
         let result: string;

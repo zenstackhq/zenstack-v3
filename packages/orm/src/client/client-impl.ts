@@ -11,6 +11,7 @@ import {
     type KyselyProps,
 } from 'kysely';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
+import type { AnyKysely } from '../utils/kysely-utils';
 import type { UnwrapTuplePromises } from '../utils/type-utils';
 import type {
     AuthType,
@@ -29,7 +30,7 @@ import { FindOperationHandler } from './crud/operations/find';
 import { GroupByOperationHandler } from './crud/operations/group-by';
 import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/validator';
-import { NotFoundError, QueryError } from './errors';
+import { createConfigError, createNotFoundError } from './errors';
 import { ZenStackDriver } from './executor/zenstack-driver';
 import { ZenStackQueryExecutor } from './executor/zenstack-query-executor';
 import * as BuiltinFunctions from './functions';
@@ -53,7 +54,7 @@ export const ZenStackClient = function <Schema extends SchemaDef>(
 
 export class ClientImpl<Schema extends SchemaDef> {
     private kysely: ToKysely<Schema>;
-    private kyselyRaw: ToKysely<any>;
+    private kyselyRaw: AnyKysely;
     public readonly $options: ClientOptions<Schema>;
     public readonly $schema: Schema;
     readonly kyselyProps: KyselyProps;
@@ -192,7 +193,7 @@ export class ClientImpl<Schema extends SchemaDef> {
         arg: ZenStackPromise<Schema, any>[],
         options?: { isolationLevel?: TransactionIsolationLevel },
     ) {
-        const execute = async (tx: Kysely<any>) => {
+        const execute = async (tx: AnyKysely) => {
             const txClient = new ClientImpl<Schema>(this.schema, this.$options, this);
             txClient.kysely = tx;
             const result: any[] = [];
@@ -210,7 +211,7 @@ export class ClientImpl<Schema extends SchemaDef> {
             if (options?.isolationLevel) {
                 txBuilder = txBuilder.setIsolationLevel(options.isolationLevel);
             }
-            return txBuilder.execute((tx) => execute(tx as Kysely<any>));
+            return txBuilder.execute((tx) => execute(tx as AnyKysely));
         }
     }
 
@@ -223,7 +224,7 @@ export class ClientImpl<Schema extends SchemaDef> {
 
     private async handleProc(name: string, args: unknown[]) {
         if (!('procedures' in this.$options) || !this.$options || typeof this.$options.procedures !== 'object') {
-            throw new QueryError('Procedures are not configured for the client.');
+            throw createConfigError('Procedures are not configured for the client.');
         }
 
         const procOptions = this.$options.procedures as ProceduresOptions<
@@ -389,7 +390,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 const _handler = txClient ? handler.withClient(txClient) : handler;
                 const r = await _handler.handle(operation, _args);
                 if (!r && throwIfNoResult) {
-                    throw new NotFoundError(model);
+                    throw createNotFoundError(model);
                 }
                 let result: unknown;
                 if (r && postProcess) {

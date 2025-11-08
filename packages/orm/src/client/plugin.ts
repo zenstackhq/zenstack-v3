@@ -1,4 +1,4 @@
-import type { OperationNode, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
+import type { OperationNode, QueryId, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
 import type { ClientContract } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
@@ -138,7 +138,7 @@ type MutationHooksArgs<Schema extends SchemaDef> = {
      * A query ID that uniquely identifies the mutation operation. You can use it to correlate
      * data between the before and after mutation hooks.
      */
-    queryId: string;
+    queryId: QueryId;
 };
 
 export type BeforeEntityMutationCallback<Schema extends SchemaDef> = (

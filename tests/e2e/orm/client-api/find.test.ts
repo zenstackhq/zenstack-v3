@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ClientContract } from '@zenstackhq/orm';
-import { InputValidationError, NotFoundError } from '@zenstackhq/orm';
-import { schema } from '../schemas/basic';
 import { createTestClient } from '@zenstackhq/testtools';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { schema } from '../schemas/basic';
 import { createPosts, createUser } from './utils';
 
 describe('Client find tests ', () => {
@@ -53,7 +52,7 @@ describe('Client find tests ', () => {
         await expect(client.user.findMany({ take: 4 })).resolves.toHaveLength(3);
 
         // findFirst's take must be 1
-        await expect(client.user.findFirst({ take: 2 })).rejects.toThrow(InputValidationError);
+        await expect(client.user.findFirst({ take: 2 })).toBeRejectedByValidation();
         await expect(client.user.findFirst({ take: 1 })).toResolveTruthy();
 
         // skip
@@ -389,7 +388,7 @@ describe('Client find tests ', () => {
 
         r = await client.user.findUnique({ where: { id: 'none' } });
         expect(r).toBeNull();
-        await expect(client.user.findUniqueOrThrow({ where: { id: 'none' } })).rejects.toThrow(NotFoundError);
+        await expect(client.user.findUniqueOrThrow({ where: { id: 'none' } })).toBeRejectedNotFound();
     });
 
     it('works with non-unique finds', async () => {
@@ -403,7 +402,7 @@ describe('Client find tests ', () => {
 
         r = await client.user.findFirst({ where: { name: 'User2' } });
         expect(r).toBeNull();
-        await expect(client.user.findFirstOrThrow({ where: { name: 'User2' } })).rejects.toThrow(NotFoundError);
+        await expect(client.user.findFirstOrThrow({ where: { name: 'User2' } })).toBeRejectedNotFound();
     });
 
     it('works with boolean composition', async () => {

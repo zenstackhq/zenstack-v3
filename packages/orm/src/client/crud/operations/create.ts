@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { CreateArgs, CreateManyAndReturnArgs, CreateManyArgs, WhereInput } from '../../crud-types';
-import { RejectedByPolicyError, RejectedByPolicyReason } from '../../errors';
+import { createRejectedByPolicyError, RejectedByPolicyReason } from '../../errors';
 import { getIdValues } from '../../query-utils';
 import { BaseOperationHandler } from './base';
 
@@ -48,7 +48,7 @@ export class CreateOperationHandler<Schema extends SchemaDef> extends BaseOperat
         });
 
         if (!result && this.hasPolicyEnabled) {
-            throw new RejectedByPolicyError(
+            throw createRejectedByPolicyError(
                 this.model,
                 RejectedByPolicyReason.CANNOT_READ_BACK,
                 `result is not allowed to be read back`,

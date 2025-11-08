@@ -14,7 +14,7 @@ import type {
     SortOrder,
     StringFilter,
 } from '../../crud-types';
-import { InternalError, QueryError } from '../../errors';
+import { createConfigError, createInvalidInputError, createNotSupportedError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
     aggregate,
@@ -64,7 +64,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     buildFilterSortTake(
-        model: GetModels<Schema>,
+        model: string,
         args: FindArgs<Schema, GetModels<Schema>, true>,
         query: SelectQueryBuilder<any, any, {}>,
         modelAlias: string,
@@ -95,7 +95,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             if (this.supportsDistinctOn) {
                 result = result.distinctOn(distinct.map((f) => this.eb.ref(`${modelAlias}.${f}`)));
             } else {
-                throw new QueryError(`"distinct" is not supported by "${this.schema.provider.type}" provider`);
+                throw createNotSupportedError(`"distinct" is not supported by "${this.schema.provider.type}" provider`);
             }
         }
 
@@ -482,7 +482,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 }
 
                 default: {
-                    throw new InternalError(`Invalid array filter key: ${key}`);
+                    throw createInvalidInputError(`Invalid array filter key: ${key}`);
                 }
             }
         }
@@ -510,10 +510,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 .with('Bytes', () => this.buildBytesFilter(fieldRef, payload))
                 // TODO: JSON filters
                 .with('Json', () => {
-                    throw new InternalError('JSON filters are not supported yet');
+                    throw createNotSupportedError('JSON filters are not supported yet');
                 })
                 .with('Unsupported', () => {
-                    throw new QueryError(`Unsupported field cannot be used in filters`);
+                    throw createInvalidInputError(`Unsupported field cannot be used in filters`);
                 })
                 .exhaustive()
         );
@@ -589,7 +589,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 })
                 .otherwise(() => {
                     if (throwIfInvalid) {
-                        throw new QueryError(`Invalid filter key: ${op}`);
+                        throw createInvalidInputError(`Invalid filter key: ${op}`);
                     } else {
                         return undefined;
                     }
@@ -642,7 +642,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                             : this.eb(fieldRef, 'like', sql.val(`%${value}`)),
                     )
                     .otherwise(() => {
-                        throw new QueryError(`Invalid string filter key: ${key}`);
+                        throw createInvalidInputError(`Invalid string filter key: ${key}`);
                     });
 
                 if (condition) {
@@ -767,7 +767,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                         result = result.orderBy(
                             (eb) => aggregate(eb, buildFieldRef(model, k, modelAlias), field as AGGREGATE_OPERATORS),
-                            sql.raw(this.negateSort(v, negated)),
+                            this.negateSort(v, negated),
                         );
                     }
                     continue;
@@ -780,7 +780,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                             invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                             result = result.orderBy(
                                 (eb) => eb.fn.count(buildFieldRef(model, k, modelAlias)),
-                                sql.raw(this.negateSort(v, negated)),
+                                this.negateSort(v, negated),
                             );
                         }
                         continue;
@@ -803,10 +803,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         (value.sort === 'asc' || value.sort === 'desc') &&
                         (value.nulls === 'first' || value.nulls === 'last')
                     ) {
-                        result = result.orderBy(
-                            fieldRef,
-                            sql.raw(`${this.negateSort(value.sort, negated)} nulls ${value.nulls}`),
-                        );
+                        result = result.orderBy(fieldRef, (ob) => {
+                            const dir = this.negateSort(value.sort, negated);
+                            ob = dir === 'asc' ? ob.asc() : ob.desc();
+                            ob = value.nulls === 'first' ? ob.nullsFirst() : ob.nullsLast();
+                            return ob;
+                        });
                     }
                 } else {
                     // order by relation
@@ -815,7 +817,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     if (fieldDef.array) {
                         // order by to-many relation
                         if (typeof value !== 'object') {
-                            throw new QueryError(`invalid orderBy value for field "${field}"`);
+                            throw createInvalidInputError(`invalid orderBy value for field "${field}"`);
                         }
                         if ('_count' in value) {
                             invariant(
@@ -1084,7 +1086,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 computer = computedFields?.[fieldDef.originModel ?? model]?.[field];
             }
             if (!computer) {
-                throw new QueryError(`Computed field "${field}" implementation not provided for model "${model}"`);
+                throw createConfigError(`Computed field "${field}" implementation not provided for model "${model}"`);
             }
             return computer(this.eb, { modelAlias });
         }

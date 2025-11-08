@@ -158,7 +158,6 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     // TODO: design a way to let plugin register validation
     @check('@@allow')
     @check('@@deny')
-    // @ts-expect-error
     private _checkModelLevelPolicy(attr: AttributeApplication, accept: ValidationAcceptor) {
         const kind = getStringLiteral(attr.args[0]?.value);
         if (!kind) {
@@ -247,7 +246,6 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     // TODO: design a way to let plugin register validation
     @check('@allow')
     @check('@deny')
-    // @ts-expect-error
     private _checkFieldLevelPolicy(attr: AttributeApplication, accept: ValidationAcceptor) {
         const kind = getStringLiteral(attr.args[0]?.value);
         if (!kind) {
@@ -277,7 +275,6 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     }
 
     @check('@@validate')
-    // @ts-expect-error
     private _checkValidate(attr: AttributeApplication, accept: ValidationAcceptor) {
         const condition = attr.args[0]?.value;
         if (
@@ -293,7 +290,6 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     @check('@@id')
     @check('@@index')
     @check('@@unique')
-    // @ts-expect-error
     private _checkConstraint(attr: AttributeApplication, accept: ValidationAcceptor) {
         const fields = attr.args[0]?.value;
         const attrName = attr.decl.ref?.name;

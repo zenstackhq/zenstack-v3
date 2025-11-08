@@ -1,7 +1,9 @@
 import { invariant } from '@zenstackhq/common-helpers';
+import type { QueryId } from 'kysely';
 import {
     AndNode,
     CompiledQuery,
+    createQueryId,
     DefaultQueryExecutor,
     DeleteQueryNode,
     InsertQueryNode,
@@ -25,13 +27,11 @@ import { match } from 'ts-pattern';
 import type { GetModels, ModelDef, SchemaDef, TypeDefDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
 import { TransactionIsolationLevel, type ClientContract } from '../contract';
-import { InternalError, QueryError, ZenStackError } from '../errors';
+import { createDBQueryError, createInternalError, ORMError } from '../errors';
 import type { AfterEntityMutationCallback, OnKyselyQueryCallback } from '../plugin';
 import { stripAlias } from '../query-utils';
 import { QueryNameMapper } from './name-mapper';
 import type { ZenStackDriver } from './zenstack-driver';
-
-type QueryId = { queryId: string };
 
 type MutationQueryNode = InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
 
@@ -79,7 +79,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         return this.client.$options;
     }
 
-    override executeQuery(compiledQuery: CompiledQuery, queryId: QueryId) {
+    override executeQuery(compiledQuery: CompiledQuery) {
         // proceed with the query with kysely interceptors
         // if the query is a raw query, we need to carry over the parameters
         const queryParams = (compiledQuery as any).$raw ? compiledQuery.parameters : undefined;
@@ -98,7 +98,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                     connection,
                     compiledQuery.query,
                     queryParams,
-                    queryId.queryId,
+                    compiledQuery.queryId,
                 );
                 if (startedTx) {
                     await this.driver.commitTransaction(connection);
@@ -108,12 +108,16 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 if (startedTx) {
                     await this.driver.rollbackTransaction(connection);
                 }
-                if (err instanceof ZenStackError) {
+                if (err instanceof ORMError) {
                     throw err;
                 } else {
                     // wrap error
-                    const message = `Failed to execute query: ${err}, sql: ${compiledQuery?.sql}`;
-                    throw new QueryError(message, err);
+                    throw createDBQueryError(
+                        'Failed to execute query',
+                        err,
+                        compiledQuery.sql,
+                        compiledQuery.parameters,
+                    );
                 }
             }
         });
@@ -123,7 +127,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         connection: DatabaseConnection,
         queryNode: RootOperationNode,
         parameters: readonly unknown[] | undefined,
-        queryId: string,
+        queryId: QueryId,
     ) {
         let proceed = (q: RootOperationNode) => this.proceedQuery(connection, q, parameters, queryId);
 
@@ -178,14 +182,16 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         connection: DatabaseConnection,
         query: RootOperationNode,
         parameters: readonly unknown[] | undefined,
-        queryId: string,
+        queryId: QueryId,
     ) {
         let compiled: CompiledQuery | undefined;
 
         if (this.suppressMutationHooks || !this.isMutationNode(query) || !this.hasEntityMutationPlugins) {
             // no need to handle mutation hooks, just proceed
             const finalQuery = this.processNameMapping(query);
-            compiled = this.compileQuery(finalQuery);
+
+            // inherit the original queryId
+            compiled = this.compileQuery(finalQuery, queryId);
             if (parameters) {
                 compiled = { ...compiled, parameters };
             }
@@ -204,7 +210,9 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
             };
         }
         const finalQuery = this.processNameMapping(query);
-        compiled = this.compileQuery(finalQuery);
+
+        // inherit the original queryId
+        compiled = this.compileQuery(finalQuery, queryId);
         if (parameters) {
             compiled = { ...compiled, parameters };
         }
@@ -361,7 +369,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
                 return tableNode.table.identifier.name;
             })
             .otherwise((node) => {
-                throw new InternalError(`Invalid query node: ${node}`);
+                throw createInternalError(`Invalid query node: ${node}`);
             }) as GetModels<Schema>;
     }
 
@@ -370,7 +378,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         mutationInfo: MutationInfo<Schema>,
         loadBeforeMutationEntities: () => Promise<Record<string, unknown>[] | undefined>,
         client: ClientContract<Schema>,
-        queryId: string,
+        queryId: QueryId,
     ) {
         if (this.options.plugins) {
             for (const plugin of this.options.plugins) {
@@ -397,7 +405,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         mutationInfo: MutationInfo<Schema>,
         client: ClientContract<Schema>,
         filterFor: 'inTx' | 'outTx' | 'all',
-        queryId: string,
+        queryId: QueryId,
     ) {
         const hooks: AfterEntityMutationCallback<Schema>[] = [];
 
@@ -456,7 +464,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
             ...selectQueryNode,
             where: this.andNodes(selectQueryNode.where, where),
         };
-        const compiled = this.compileQuery(selectQueryNode);
+        const compiled = this.compileQuery(selectQueryNode, createQueryId());
         // execute the query directly with the given connection to avoid triggering
         // any other side effects
         const result = await connection.executeQuery(compiled);

@@ -14,9 +14,15 @@ import type { Model } from './ast';
 import { ZModelGeneratedModule, ZModelGeneratedSharedModule, ZModelLanguageMetaData } from './generated/module';
 import { getPluginDocuments } from './utils';
 import { registerValidationChecks, ZModelValidator } from './validator';
+import { ZModelCommentProvider } from './zmodel-comment-provider';
+import { ZModelCompletionProvider } from './zmodel-completion-provider';
+import { ZModelDefinitionProvider } from './zmodel-definition';
 import { ZModelDocumentBuilder } from './zmodel-document-builder';
+import { ZModelDocumentationProvider } from './zmodel-documentation-provider';
+import { ZModelFormatter } from './zmodel-formatter';
 import { ZModelLinker } from './zmodel-linker';
 import { ZModelScopeComputation, ZModelScopeProvider } from './zmodel-scope';
+import { ZModelSemanticTokenProvider } from './zmodel-semantic';
 import { ZModelWorkspaceManager } from './zmodel-workspace-manager';
 export { ZModelLanguageMetaData };
 
@@ -48,6 +54,16 @@ export const ZModelLanguageModule: Module<ZModelServices, PartialLangiumServices
     },
     validation: {
         ZModelValidator: (services) => new ZModelValidator(services),
+    },
+    lsp: {
+        Formatter: (services) => new ZModelFormatter(services),
+        DefinitionProvider: (services) => new ZModelDefinitionProvider(services),
+        CompletionProvider: (services) => new ZModelCompletionProvider(services),
+        SemanticTokenProvider: (services) => new ZModelSemanticTokenProvider(services),
+    },
+    documentation: {
+        CommentProvider: (services) => new ZModelCommentProvider(services),
+        DocumentationProvider: (services) => new ZModelDocumentationProvider(services),
     },
 };
 
@@ -109,15 +125,20 @@ export function createZModelLanguageServices(
 
             const schemaPath = fileURLToPath(doc.uri.toString());
             const pluginSchemas = getPluginDocuments(doc.parseResult.value as Model, schemaPath);
+
+            // ensure plugin docs are loaded
             for (const plugin of pluginSchemas) {
-                // load the plugin model document
-                const pluginDoc = await shared.workspace.LangiumDocuments.getOrCreateDocument(
-                    URI.file(path.resolve(plugin)),
-                );
-                // add to indexer so the plugin model's definitions are globally visible
-                shared.workspace.IndexManager.updateContent(pluginDoc);
-                if (logToConsole) {
-                    console.log(`Loaded plugin model: ${plugin}`);
+                const pluginDocUri = URI.file(path.resolve(plugin));
+                let pluginDoc = shared.workspace.LangiumDocuments.getDocument(pluginDocUri);
+                if (!pluginDoc) {
+                    pluginDoc = await shared.workspace.LangiumDocuments.getOrCreateDocument(pluginDocUri);
+                    if (pluginDoc) {
+                        // add to indexer so the plugin model's definitions are globally visible
+                        shared.workspace.IndexManager.updateContent(pluginDoc);
+                        if (logToConsole) {
+                            console.log(`Loaded plugin model: ${plugin}`);
+                        }
+                    }
                 }
             }
         }

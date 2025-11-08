@@ -1,4 +1,5 @@
 import { lowerCaseFirst } from '@zenstackhq/common-helpers';
+import { ZModelCodeGenerator } from '@zenstackhq/language';
 import {
     AttributeArg,
     BooleanLiteral,
@@ -33,7 +34,7 @@ import {
 import { getAllAttributes, getAllFields, isAuthInvocation, isDelegateModel } from '@zenstackhq/language/utils';
 import { AstUtils } from 'langium';
 import { match } from 'ts-pattern';
-import { ModelUtils, ZModelCodeGenerator } from '..';
+import { ModelUtils } from '..';
 import { DELEGATE_AUX_RELATION_PREFIX, getIdFields } from '../model-utils';
 import {
     AttributeArgValue,

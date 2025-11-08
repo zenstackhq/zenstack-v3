@@ -1,13 +1,8 @@
 import { lowerCaseFirst, safeJSONStringify } from '@zenstackhq/common-helpers';
-import {
-    InputValidationError,
-    NotFoundError,
-    RejectedByPolicyError,
-    ZenStackError,
-    type ClientContract,
-} from '@zenstackhq/orm';
+import { ORMError, ORMErrorReason, type ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import SuperJSON from 'superjson';
+import { match } from 'ts-pattern';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
 import { log, registerCustomSerializers } from '../utils';
 
@@ -160,8 +155,8 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
             return response;
         } catch (err) {
             log(this.options.log, 'error', `error occurred when handling "${model}.${op}" request`, err);
-            if (err instanceof ZenStackError) {
-                return this.makeZenStackErrorResponse(err);
+            if (err instanceof ORMError) {
+                return this.makeORMErrorResponse(err);
             } else {
                 return this.makeGenericErrorResponse(err);
             }
@@ -194,26 +189,31 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
         return resp;
     }
 
-    private makeZenStackErrorResponse(err: ZenStackError) {
+    private makeORMErrorResponse(err: ORMError) {
         let status = 400;
-        const error: any = { message: err.message };
-        if (err.cause && err.cause instanceof Error) {
-            error.cause = err.cause.message;
-        }
+        const error: any = { message: err.message, reason: err.reason };
 
-        if (err instanceof NotFoundError) {
-            status = 404;
-            error.model = err.model;
-        } else if (err instanceof InputValidationError) {
-            status = 422;
-            error.rejectedByValidation = true;
-            error.model = err.model;
-        } else if (err instanceof RejectedByPolicyError) {
-            status = 403;
-            error.rejectedByPolicy = true;
-            error.rejectReason = err.reason;
-            error.model = err.model;
-        }
+        match(err.reason)
+            .with(ORMErrorReason.NOT_FOUND, () => {
+                status = 404;
+                error.model = err.model;
+            })
+            .with(ORMErrorReason.INVALID_INPUT, () => {
+                status = 422;
+                error.rejectedByValidation = true;
+                error.model = err.model;
+            })
+            .with(ORMErrorReason.REJECTED_BY_POLICY, () => {
+                status = 403;
+                error.rejectedByPolicy = true;
+                error.rejectReason = err.rejectedByPolicyReason;
+                error.model = err.model;
+            })
+            .with(ORMErrorReason.DB_QUERY_ERROR, () => {
+                status = 400;
+                error.dbErrorCode = err.dbErrorCode;
+            })
+            .otherwise(() => {});
 
         const resp = { status, body: { error } };
         log(this.options.log, 'debug', () => `sending error response: ${safeJSONStringify(resp)}`);

@@ -182,7 +182,7 @@ describe('Delegate model tests ', () => {
                         rating: 3,
                     },
                 }),
-            ).rejects.toThrow('constraint');
+            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
 
             await expect(client.ratedVideo.findMany()).toResolveWithLength(1);
             await expect(client.video.findMany()).toResolveWithLength(1);

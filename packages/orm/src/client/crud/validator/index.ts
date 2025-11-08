@@ -31,7 +31,6 @@ import {
     type UpdateManyArgs,
     type UpsertArgs,
 } from '../../crud-types';
-import { InputValidationError, InternalError } from '../../errors';
 import {
     fieldHasDefaultValue,
     getDiscriminatorField,
@@ -48,6 +47,7 @@ import {
     addNumberValidation,
     addStringValidation,
 } from './utils';
+import { createInternalError, createInvalidInputError } from '../../errors';
 
 const schemaCache = new WeakMap<SchemaDef, Map<string, ZodType>>();
 
@@ -230,10 +230,12 @@ export class InputValidator<Schema extends SchemaDef> {
         }
         const { error, data } = schema.safeParse(args);
         if (error) {
-            throw new InputValidationError(
-                model,
+            throw createInvalidInputError(
                 `Invalid ${operation} args for model "${model}": ${formatError(error)}`,
-                error,
+                model,
+                {
+                    cause: error,
+                },
             );
         }
         return data as T;
@@ -471,7 +473,7 @@ export class InputValidator<Schema extends SchemaDef> {
             // requires at least one unique field (field set) is required
             const uniqueFields = getUniqueFields(this.schema, model);
             if (uniqueFields.length === 0) {
-                throw new InternalError(`Model "${model}" has no unique fields`);
+                throw createInternalError(`Model "${model}" has no unique fields`);
             }
 
             if (uniqueFields.length === 1) {

@@ -767,7 +767,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                         result = result.orderBy(
                             (eb) => aggregate(eb, buildFieldRef(model, k, modelAlias), field as AGGREGATE_OPERATORS),
-                            sql.raw(this.negateSort(v, negated)),
+                            this.negateSort(v, negated),
                         );
                     }
                     continue;
@@ -780,7 +780,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                             invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                             result = result.orderBy(
                                 (eb) => eb.fn.count(buildFieldRef(model, k, modelAlias)),
-                                sql.raw(this.negateSort(v, negated)),
+                                this.negateSort(v, negated),
                             );
                         }
                         continue;
@@ -803,10 +803,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         (value.sort === 'asc' || value.sort === 'desc') &&
                         (value.nulls === 'first' || value.nulls === 'last')
                     ) {
-                        result = result.orderBy(
-                            fieldRef,
-                            sql.raw(`${this.negateSort(value.sort, negated)} nulls ${value.nulls}`),
-                        );
+                        result = result.orderBy(fieldRef, (ob) => {
+                            const dir = this.negateSort(value.sort, negated);
+                            ob = dir === 'asc' ? ob.asc() : ob.desc();
+                            ob = value.nulls === 'first' ? ob.nullsFirst() : ob.nullsLast();
+                            return ob;
+                        });
                     }
                 } else {
                     // order by relation

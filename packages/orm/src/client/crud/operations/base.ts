@@ -2099,16 +2099,16 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     protected executeQuery(kysely: ToKysely<Schema>, query: Compilable, _operation: string) {
-        return kysely.executeQuery(query.compile(), createQueryId());
+        return kysely.executeQuery(query.compile());
     }
 
     protected async executeQueryTakeFirst(kysely: ToKysely<Schema>, query: Compilable, _operation: string) {
-        const result = await kysely.executeQuery(query.compile(), createQueryId());
+        const result = await kysely.executeQuery(query.compile());
         return result.rows[0];
     }
 
     protected async executeQueryTakeFirstOrThrow(kysely: ToKysely<Schema>, query: Compilable, _operation: string) {
-        const result = await kysely.executeQuery(query.compile(), createQueryId());
+        const result = await kysely.executeQuery(query.compile());
         if (result.rows.length === 0) {
             throw new ORMError(ORMErrorReason.NOT_FOUND, 'No rows found');
         }

@@ -1,6 +1,7 @@
 import { createId } from '@paralleldrive/cuid2';
 import { clone, enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers';
 import {
+    createQueryId,
     DeleteResult,
     expressionBuilder,
     sql,
@@ -16,6 +17,7 @@ import { ulid } from 'ulid';
 import * as uuid from 'uuid';
 import type { BuiltinType, Expression, FieldDef } from '../../../schema';
 import { ExpressionUtils, type GetModels, type ModelDef, type SchemaDef } from '../../../schema';
+import type { AnyKysely } from '../../../utils/kysely-utils';
 import { extractFields, fieldsToSelectObject } from '../../../utils/object-utils';
 import { NUMERIC_FIELD_TYPES } from '../../constants';
 import { TransactionIsolationLevel, type ClientContract, type CRUD } from '../../contract';
@@ -71,9 +73,9 @@ export type CoreCrudOperation =
 export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
 
 // context for nested relation operations
-export type FromRelationContext<Schema extends SchemaDef> = {
+export type FromRelationContext = {
     // the model where the relation field is defined
-    model: GetModels<Schema>;
+    model: string;
     // the relation field name
     field: string;
     // the parent entity's id fields and values
@@ -101,7 +103,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return this.client.$options;
     }
 
-    protected get kysely() {
+    protected get kysely(): AnyKysely {
         return this.client.$qb;
     }
 
@@ -144,8 +146,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     protected async read(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
+        kysely: AnyKysely,
+        model: string,
         args: FindArgs<Schema, GetModels<Schema>, true> | undefined,
     ): Promise<any[]> {
         // table
@@ -173,10 +175,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         query = query.modifyEnd(this.makeContextComment({ model, operation: 'read' }));
 
         let result: any[] = [];
-        const queryId = { queryId: `zenstack-${createId()}` };
-        const compiled = kysely.getExecutor().compileQuery(query.toOperationNode(), queryId);
+        const compiled = kysely.getExecutor().compileQuery(query.toOperationNode(), createQueryId());
         try {
-            const r = await kysely.getExecutor().executeQuery(compiled, queryId);
+            const r = await kysely.getExecutor().executeQuery(compiled);
             result = r.rows;
         } catch (err) {
             throw createDBQueryError('Failed to execute query', err, compiled.sql, compiled.parameters);
@@ -185,11 +186,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return result;
     }
 
-    protected async readUnique(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        args: FindArgs<Schema, GetModels<Schema>, true>,
-    ) {
+    protected async readUnique(kysely: AnyKysely, model: string, args: FindArgs<Schema, GetModels<Schema>, true>) {
         const result = await this.read(kysely, model, { ...args, take: 1 });
         return result[0] ?? null;
     }
@@ -248,10 +245,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     protected async create(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
+        kysely: AnyKysely,
+        model: string,
         data: any,
-        fromRelation?: FromRelationContext<Schema>,
+        fromRelation?: FromRelationContext,
         creatingForDelegate = false,
         returnFields?: string[],
     ): Promise<unknown> {
@@ -426,12 +423,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return { baseEntity, remainingFields };
     }
 
-    private async buildFkAssignments(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        relationField: string,
-        entity: any,
-    ) {
+    private async buildFkAssignments(kysely: AnyKysely, model: string, relationField: string, entity: any) {
         const parentFkFields: any = {};
 
         invariant(relationField, 'parentField must be defined if parentModel is defined');
@@ -462,7 +454,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private async handleManyToManyRelation<Action extends 'connect' | 'disconnect'>(
-        kysely: ToKysely<Schema>,
+        kysely: AnyKysely,
         action: Action,
         leftModel: string,
         leftField: string,
@@ -517,7 +509,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    private resetManyToManyRelation(kysely: ToKysely<Schema>, model: GetModels<Schema>, field: string, parentIds: any) {
+    private resetManyToManyRelation(kysely: AnyKysely, model: string, field: string, parentIds: any) {
         invariant(Object.keys(parentIds).length === 1, 'parentIds must have exactly one field');
         const parentId = Object.values(parentIds)[0]!;
 
@@ -598,15 +590,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private async processNoneOwnedRelationForCreate(
-        kysely: ToKysely<Schema>,
-        contextModel: GetModels<Schema>,
+        kysely: AnyKysely,
+        contextModel: string,
         relationFieldName: string,
         payload: any,
         parentEntity: any,
     ) {
         const relationFieldDef = this.requireField(contextModel, relationFieldName);
         const relationModel = relationFieldDef.type as GetModels<Schema>;
-        const fromRelationContext: FromRelationContext<Schema> = {
+        const fromRelationContext: FromRelationContext = {
             model: contextModel,
             field: relationFieldName,
             ids: parentEntity,
@@ -669,7 +661,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         model: GetModels<Schema>,
         input: { data: any; skipDuplicates?: boolean },
         returnData: ReturnData,
-        fromRelation?: FromRelationContext<Schema>,
+        fromRelation?: FromRelationContext,
         fieldsToReturn?: string[],
     ): Promise<Result> {
         if (!input.data || (Array.isArray(input.data) && input.data.length === 0)) {
@@ -902,11 +894,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     protected async update(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
+        kysely: AnyKysely,
+        model: string,
         where: any,
         data: any,
-        fromRelation?: FromRelationContext<Schema>,
+        fromRelation?: FromRelationContext,
         allowRelationUpdate = true,
         throwIfNotFound = true,
         fieldsToReturn?: string[],
@@ -1081,7 +1073,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    private processScalarFieldUpdateData(model: GetModels<Schema>, field: string, data: any): any {
+    private processScalarFieldUpdateData(model: string, field: string, data: any): any {
         const fieldDef = this.requireField(model, field);
         if (this.isNumericIncrementalUpdate(fieldDef, data[field])) {
             // numeric fields incremental updates
@@ -1106,7 +1098,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return ['increment', 'decrement', 'multiply', 'divide', 'set'].some((key) => key in value);
     }
 
-    private isIdFilter(model: GetModels<Schema>, filter: any) {
+    private isIdFilter(model: string, filter: any) {
         if (!filter || typeof filter !== 'object') {
             return false;
         }
@@ -1147,7 +1139,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private transformIncrementalUpdate(
-        model: GetModels<Schema>,
+        model: string,
         field: string,
         fieldDef: FieldDef,
         payload: Record<string, number | null>,
@@ -1174,7 +1166,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private transformScalarListUpdate(
-        model: GetModels<Schema>,
+        model: string,
         field: string,
         fieldDef: FieldDef,
         payload: Record<string, unknown>,
@@ -1199,7 +1191,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return NUMERIC_FIELD_TYPES.includes(fieldDef.type) && !fieldDef.array;
     }
 
-    private makeContextComment(_context: { model: GetModels<Schema>; operation: CRUD }) {
+    private makeContextComment(_context: { model: string; operation: CRUD }) {
         return sql``;
         // return sql.raw(`${CONTEXT_COMMENT_PREFIX}${JSON.stringify(context)}`);
     }
@@ -1208,13 +1200,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         ReturnData extends boolean,
         Result = ReturnData extends true ? unknown[] : { count: number },
     >(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
+        kysely: AnyKysely,
+        model: string,
         where: any,
         data: any,
         limit: number | undefined,
         returnData: ReturnData,
-        filterModel?: GetModels<Schema>,
+        filterModel?: string,
         fieldsToReturn?: string[],
     ): Promise<Result> {
         if (typeof data !== 'object') {
@@ -1312,11 +1304,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private async processBaseModelUpdateMany(
-        kysely: ToKysely<Schema>,
+        kysely: AnyKysely,
         model: string,
         where: any,
         updateFields: any,
-        filterModel: GetModels<Schema>,
+        filterModel: string,
     ) {
         const thisUpdateFields: any = {};
         const remainingFields: any = {};
@@ -1343,14 +1335,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return { baseResult, remainingFields };
     }
 
-    private buildIdFieldRefs(kysely: ToKysely<Schema>, model: GetModels<Schema>) {
+    private buildIdFieldRefs(kysely: AnyKysely, model: string) {
         const idFields = requireIdFields(this.schema, model);
         return idFields.map((f) => kysely.dynamic.ref(`${model}.${f}`));
     }
 
     private async processRelationUpdates(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
+        kysely: AnyKysely,
+        model: string,
         field: string,
         fieldDef: FieldDef,
         parentIds: any,
@@ -1358,7 +1350,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         throwIfNotFound: boolean,
     ) {
         const fieldModel = fieldDef.type as GetModels<Schema>;
-        const fromRelationContext: FromRelationContext<Schema> = {
+        const fromRelationContext: FromRelationContext = {
             model,
             field,
             ids: parentIds,
@@ -1481,12 +1473,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     // #region relation manipulation
 
-    protected async connectRelation(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        data: any,
-        fromRelation: FromRelationContext<Schema>,
-    ) {
+    protected async connectRelation(kysely: AnyKysely, model: string, data: any, fromRelation: FromRelationContext) {
         const _data = this.normalizeRelationManipulationInput(model, data);
         if (_data.length === 0) {
             return;
@@ -1593,7 +1580,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         data: any,
-        fromRelation: FromRelationContext<Schema>,
+        fromRelation: FromRelationContext,
     ) {
         const _data = enumerate(data);
         if (_data.length === 0) {
@@ -1610,12 +1597,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    protected async disconnectRelation(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        data: any,
-        fromRelation: FromRelationContext<Schema>,
-    ) {
+    protected async disconnectRelation(kysely: AnyKysely, model: string, data: any, fromRelation: FromRelationContext) {
         let disconnectConditions: any[] = [];
         if (typeof data === 'boolean') {
             if (data === false) {
@@ -1727,12 +1709,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    protected async setRelation(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
-        data: any,
-        fromRelation: FromRelationContext<Schema>,
-    ) {
+    protected async setRelation(kysely: AnyKysely, model: string, data: any, fromRelation: FromRelationContext) {
         const _data = this.normalizeRelationManipulationInput(model, data);
 
         const m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
@@ -1843,7 +1820,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         data: any,
-        fromRelation: FromRelationContext<Schema>,
+        fromRelation: FromRelationContext,
         throwForNotFound: boolean,
     ) {
         let deleteConditions: any[] = [];
@@ -1864,7 +1841,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         let deleteResult: QueryResult<unknown>;
-        let deleteFromModel: GetModels<Schema>;
+        let deleteFromModel: string;
         const m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
 
         if (m2m) {
@@ -1934,18 +1911,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    private normalizeRelationManipulationInput(model: GetModels<Schema>, data: any) {
+    private normalizeRelationManipulationInput(model: string, data: any) {
         return enumerate(data).map((item) => flattenCompoundUniqueFilters(this.schema, model, item));
     }
 
     // #endregion
 
     protected async delete(
-        kysely: ToKysely<Schema>,
-        model: GetModels<Schema>,
+        kysely: AnyKysely,
+        model: string,
         where: any,
         limit?: number,
-        filterModel?: GetModels<Schema>,
+        filterModel?: string,
         fieldsToReturn?: string[],
     ): Promise<QueryResult<unknown>> {
         filterModel ??= model;
@@ -2036,13 +2013,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     private async processBaseModelDelete(
-        kysely: ToKysely<Schema>,
+        kysely: AnyKysely,
         model: string,
         where: any,
         limit: number | undefined,
-        filterModel: GetModels<Schema>,
+        filterModel: string,
     ) {
-        return this.delete(kysely, model as GetModels<Schema>, where, limit, filterModel);
+        return this.delete(kysely, model, where, limit, filterModel);
     }
 
     protected makeIdSelect(model: string) {
@@ -2077,10 +2054,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return returnRelation;
     }
 
-    protected async safeTransaction<T>(
-        callback: (tx: ToKysely<Schema>) => Promise<T>,
-        isolationLevel?: IsolationLevel,
-    ) {
+    protected async safeTransaction<T>(callback: (tx: AnyKysely) => Promise<T>, isolationLevel?: IsolationLevel) {
         if (this.kysely.isTransaction) {
             // proceed directly if already in a transaction
             return callback(this.kysely);
@@ -2093,7 +2067,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     }
 
     // Given a unique filter of a model, load the entity and return its id fields
-    private getEntityIds(kysely: ToKysely<Schema>, model: GetModels<Schema>, uniqueFilter: any) {
+    private getEntityIds(kysely: AnyKysely, model: string, uniqueFilter: any) {
         return this.readUnique(kysely, model, {
             where: uniqueFilter,
             select: this.makeIdSelect(model),
@@ -2124,21 +2098,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    protected makeQueryId(operation: string) {
-        return { queryId: `${operation}-${createId()}` };
+    protected executeQuery(kysely: ToKysely<Schema>, query: Compilable, _operation: string) {
+        return kysely.executeQuery(query.compile(), createQueryId());
     }
 
-    protected executeQuery(kysely: ToKysely<Schema>, query: Compilable, operation: string) {
-        return kysely.executeQuery(query.compile(), this.makeQueryId(operation));
-    }
-
-    protected async executeQueryTakeFirst(kysely: ToKysely<Schema>, query: Compilable, operation: string) {
-        const result = await kysely.executeQuery(query.compile(), this.makeQueryId(operation));
+    protected async executeQueryTakeFirst(kysely: ToKysely<Schema>, query: Compilable, _operation: string) {
+        const result = await kysely.executeQuery(query.compile(), createQueryId());
         return result.rows[0];
     }
 
-    protected async executeQueryTakeFirstOrThrow(kysely: ToKysely<Schema>, query: Compilable, operation: string) {
-        const result = await kysely.executeQuery(query.compile(), this.makeQueryId(operation));
+    protected async executeQueryTakeFirstOrThrow(kysely: ToKysely<Schema>, query: Compilable, _operation: string) {
+        const result = await kysely.executeQuery(query.compile(), createQueryId());
         if (result.rows.length === 0) {
             throw new ORMError(ORMErrorReason.NOT_FOUND, 'No rows found');
         }

@@ -12,7 +12,7 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
         const parsedArgs = this.inputValidator.validateGroupByArgs(this.model, normalizedArgs);
 
         let query = this.kysely
-            .selectFrom(this.model)
+            .selectFrom(this.model as string)
             .where(() => this.dialect.buildFilter(this.model, this.model, parsedArgs?.where));
 
         const fieldRef = (field: string) => this.dialect.fieldRef(this.model, field);

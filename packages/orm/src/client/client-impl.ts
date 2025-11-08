@@ -11,6 +11,7 @@ import {
     type KyselyProps,
 } from 'kysely';
 import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
+import type { AnyKysely } from '../utils/kysely-utils';
 import type { UnwrapTuplePromises } from '../utils/type-utils';
 import type {
     AuthType,
@@ -53,7 +54,7 @@ export const ZenStackClient = function <Schema extends SchemaDef>(
 
 export class ClientImpl<Schema extends SchemaDef> {
     private kysely: ToKysely<Schema>;
-    private kyselyRaw: ToKysely<any>;
+    private kyselyRaw: AnyKysely;
     public readonly $options: ClientOptions<Schema>;
     public readonly $schema: Schema;
     readonly kyselyProps: KyselyProps;
@@ -192,7 +193,7 @@ export class ClientImpl<Schema extends SchemaDef> {
         arg: ZenStackPromise<Schema, any>[],
         options?: { isolationLevel?: TransactionIsolationLevel },
     ) {
-        const execute = async (tx: Kysely<any>) => {
+        const execute = async (tx: AnyKysely) => {
             const txClient = new ClientImpl<Schema>(this.schema, this.$options, this);
             txClient.kysely = tx;
             const result: any[] = [];
@@ -210,7 +211,7 @@ export class ClientImpl<Schema extends SchemaDef> {
             if (options?.isolationLevel) {
                 txBuilder = txBuilder.setIsolationLevel(options.isolationLevel);
             }
-            return txBuilder.execute((tx) => execute(tx as Kysely<any>));
+            return txBuilder.execute((tx) => execute(tx as AnyKysely));
         }
     }
 

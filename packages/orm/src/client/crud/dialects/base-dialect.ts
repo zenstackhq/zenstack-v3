@@ -64,7 +64,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     buildFilterSortTake(
-        model: GetModels<Schema>,
+        model: string,
         args: FindArgs<Schema, GetModels<Schema>, true>,
         query: SelectQueryBuilder<any, any, {}>,
         modelAlias: string,

@@ -11,6 +11,7 @@ import {
     CaseNode,
     CastNode,
     CheckConstraintNode,
+    CollateNode,
     ColumnDefinitionNode,
     ColumnNode,
     ColumnUpdateNode,
@@ -48,6 +49,7 @@ import {
     JSONPathLegNode,
     JSONPathNode,
     JSONReferenceNode,
+    Kysely,
     LimitNode,
     ListNode,
     MatchedNode,
@@ -59,6 +61,7 @@ import {
     OnNode,
     OperationNodeVisitor,
     OperatorNode,
+    OrActionNode,
     OrderByItemNode,
     OrderByNode,
     OrNode,
@@ -71,7 +74,9 @@ import {
     RawNode,
     ReferenceNode,
     ReferencesNode,
+    RefreshMaterializedViewNode,
     RenameColumnNode,
+    RenameConstraintNode,
     ReturningNode,
     SchemableIdentifierNode,
     SelectAllNode,
@@ -390,4 +395,18 @@ export class DefaultOperationNodeVisitor extends OperationNodeVisitor {
     protected override visitOutput(node: OutputNode): void {
         this.defaultVisit(node);
     }
+    protected override visitRenameConstraint(node: RenameConstraintNode): void {
+        this.defaultVisit(node);
+    }
+    protected override visitRefreshMaterializedView(node: RefreshMaterializedViewNode): void {
+        this.defaultVisit(node);
+    }
+    protected override visitOrAction(node: OrActionNode): void {
+        this.defaultVisit(node);
+    }
+    protected override visitCollate(node: CollateNode): void {
+        this.defaultVisit(node);
+    }
 }
+
+export type AnyKysely = Kysely<any>;

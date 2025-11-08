@@ -25,7 +25,7 @@
     "devDependencies": {
         "@tailwindcss/postcss": "^4",
         "@types/better-sqlite3": "catalog:",
-        "@types/node": "^20",
+        "@types/node": "catalog:",
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",
         "@zenstackhq/cli": "workspace:*",

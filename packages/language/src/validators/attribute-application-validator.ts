@@ -293,8 +293,6 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     @check('@@unique')
     private _checkConstraint(attr: AttributeApplication, accept: ValidationAcceptor) {
         const fields = getAttributeArg(attr, 'fields');
-
-        // const fields = attr.args[0]?.value;
         const attrName = attr.decl.ref?.name;
         if (!fields) {
             accept('error', `expects an array of field references`, {

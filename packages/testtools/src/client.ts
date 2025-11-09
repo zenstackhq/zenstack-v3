@@ -60,12 +60,6 @@ export async function createTestClient<Schema extends SchemaDef>(
     const provider = options?.provider ?? getTestDbProvider() ?? 'sqlite';
     const dbName = options?.dbName ?? getTestDbName(provider);
 
-    if (options?.dbFile) {
-        if (provider !== 'sqlite') {
-            throw new Error('dbFile option is only supported for sqlite provider');
-        }
-    }
-
     const dbUrl =
         provider === 'sqlite'
             ? `file:${dbName}`

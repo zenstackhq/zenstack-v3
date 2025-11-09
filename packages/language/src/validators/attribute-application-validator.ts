@@ -21,6 +21,7 @@ import {
 } from '../generated/ast';
 import {
     getAllAttributes,
+    getAttributeArg,
     getStringLiteral,
     hasAttribute,
     isAuthOrAuthMemberAccess,
@@ -291,7 +292,7 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     @check('@@index')
     @check('@@unique')
     private _checkConstraint(attr: AttributeApplication, accept: ValidationAcceptor) {
-        const fields = attr.args[0]?.value;
+        const fields = getAttributeArg(attr, 'fields');
         const attrName = attr.decl.ref?.name;
         if (!fields) {
             accept('error', `expects an array of field references`, {

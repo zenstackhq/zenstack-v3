@@ -35,7 +35,7 @@ import {
     UnaryExpr,
     type Model,
 } from '@zenstackhq/language/ast';
-import { getAllAttributes, getAllFields, isDataFieldReference } from '@zenstackhq/language/utils';
+import { getAllAttributes, getAllFields, getAttributeArg, isDataFieldReference } from '@zenstackhq/language/utils';
 import fs from 'node:fs';
 import path from 'node:path';
 import { match } from 'ts-pattern';
@@ -840,7 +840,11 @@ export class TsSchemaGenerator {
         const seenKeys = new Set<string>();
         for (const attr of allAttributes) {
             if (attr.decl.$refText === '@@id' || attr.decl.$refText === '@@unique') {
-                const fieldNames = this.getReferenceNames(attr.args[0]!.value);
+                const fieldsArg = getAttributeArg(attr, 'fields');
+                if (!fieldsArg) {
+                    continue;
+                }
+                const fieldNames = this.getReferenceNames(fieldsArg);
                 if (!fieldNames) {
                     continue;
                 }

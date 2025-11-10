@@ -5,6 +5,7 @@ export type DataSourceProviderType = 'sqlite' | 'postgresql';
 
 export type DataSourceProvider = {
     type: DataSourceProviderType;
+    defaultSchema?: string;
 };
 
 export type SchemaDef = {

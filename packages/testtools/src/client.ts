@@ -1,8 +1,8 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import type { Model } from '@zenstackhq/language/ast';
-import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { ZenStackClient, type ClientContract, type ClientOptions } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
+import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import SQLite from 'better-sqlite3';
 import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
@@ -59,7 +59,6 @@ export async function createTestClient<Schema extends SchemaDef>(
     let _schema: Schema;
     const provider = options?.provider ?? getTestDbProvider() ?? 'sqlite';
     const dbName = options?.dbName ?? getTestDbName(provider);
-
     const dbUrl =
         provider === 'sqlite'
             ? `file:${dbName}`
@@ -68,13 +67,14 @@ export async function createTestClient<Schema extends SchemaDef>(
     let model: Model | undefined;
 
     if (typeof schema === 'string') {
-        const generated = await generateTsSchema(schema, provider, dbUrl, options?.extraSourceFiles);
+        const generated = await generateTsSchema(schema, provider, dbUrl, options?.extraSourceFiles, undefined);
         workDir = generated.workDir;
         model = generated.model;
         // replace schema's provider
         _schema = {
             ...generated.schema,
             provider: {
+                ...generated.schema.provider,
                 type: provider,
             },
         } as Schema;

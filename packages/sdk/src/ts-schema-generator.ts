@@ -236,8 +236,20 @@ export class TsSchemaGenerator {
 
     private createProviderObject(model: Model): ts.Expression {
         const dsProvider = this.getDataSourceProvider(model);
+        const defaultSchema = this.getDataSourceDefaultSchema(model);
+
         return ts.factory.createObjectLiteralExpression(
-            [ts.factory.createPropertyAssignment('type', ts.factory.createStringLiteral(dsProvider.type))],
+            [
+                ts.factory.createPropertyAssignment('type', ts.factory.createStringLiteral(dsProvider)),
+                ...(defaultSchema
+                    ? [
+                          ts.factory.createPropertyAssignment(
+                              'defaultSchema',
+                              ts.factory.createStringLiteral(defaultSchema),
+                          ),
+                      ]
+                    : []),
+            ],
             true,
         );
     }
@@ -621,9 +633,26 @@ export class TsSchemaGenerator {
         invariant(dataSource, 'No data source found in the model');
 
         const providerExpr = dataSource.fields.find((f) => f.name === 'provider')?.value;
-        invariant(isLiteralExpr(providerExpr), 'Provider must be a literal');
-        const type = providerExpr.value as string;
-        return { type };
+        invariant(
+            isLiteralExpr(providerExpr) && typeof providerExpr.value === 'string',
+            'Provider must be a string literal',
+        );
+        return providerExpr.value as string;
+    }
+
+    private getDataSourceDefaultSchema(model: Model) {
+        const dataSource = model.declarations.find(isDataSource);
+        invariant(dataSource, 'No data source found in the model');
+
+        const defaultSchemaExpr = dataSource.fields.find((f) => f.name === 'defaultSchema')?.value;
+        if (!defaultSchemaExpr) {
+            return undefined;
+        }
+        invariant(
+            isLiteralExpr(defaultSchemaExpr) && typeof defaultSchemaExpr.value === 'string',
+            'Default schema must be a string literal',
+        );
+        return defaultSchemaExpr.value as string;
     }
 
     private getFieldMappedDefault(

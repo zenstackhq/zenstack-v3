@@ -129,10 +129,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
                     mappedTableName = this.mapTableName(scope.model);
                 }
             }
-
             return ReferenceNode.create(
                 ColumnNode.create(mappedFieldName),
-                mappedTableName ? TableNode.create(mappedTableName) : undefined,
+                mappedTableName ? this.createTableNode(mappedTableName, undefined) : undefined,
             );
         } else {
             // no name mapping needed
@@ -316,7 +315,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
         if (!TableNode.is(node)) {
             return super.transformNode(node);
         }
-        return TableNode.create(this.mapTableName(node.table.identifier.name));
+        const mappedName = this.mapTableName(node.table.identifier.name);
+        const tableSchema = this.getTableSchema(node.table.identifier.name);
+        return this.createTableNode(mappedName, tableSchema);
     }
 
     private getMappedName(def: ModelDef | FieldDef) {
@@ -362,8 +363,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
             const modelName = innerNode.table.identifier.name;
             const mappedName = this.mapTableName(modelName);
             const finalAlias = alias ?? (mappedName !== modelName ? IdentifierNode.create(modelName) : undefined);
+            const tableSchema = this.getTableSchema(modelName);
             return {
-                node: this.wrapAlias(TableNode.create(mappedName), finalAlias),
+                node: this.wrapAlias(this.createTableNode(mappedName, tableSchema), finalAlias),
                 scope: {
                     alias: alias ?? IdentifierNode.create(modelName),
                     model: modelName,
@@ -382,6 +384,21 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 },
             };
         }
+    }
+
+    private getTableSchema(model: string) {
+        if (this.schema.provider.type !== 'postgresql') {
+            return undefined;
+        }
+        let schema = this.schema.provider.defaultSchema ?? 'public';
+        const schemaAttr = this.schema.models[model]?.attributes?.find((attr) => attr.name === '@@schema');
+        if (schemaAttr) {
+            const nameArg = schemaAttr.args?.find((arg) => arg.name === 'name');
+            if (nameArg && nameArg.value.kind === 'literal') {
+                schema = nameArg.value.value as string;
+            }
+        }
+        return schema;
     }
 
     private createSelectAllFields(model: string, alias: OperationNode | undefined) {
@@ -452,6 +469,10 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 ? this.wrapAlias(columnRef, IdentifierNode.create(fieldDef.name))
                 : columnRef;
         });
+    }
+
+    private createTableNode(tableName: string, schemaName: string | undefined) {
+        return schemaName ? TableNode.createWithSchema(schemaName, tableName) : TableNode.create(tableName);
     }
 
     // #endregion

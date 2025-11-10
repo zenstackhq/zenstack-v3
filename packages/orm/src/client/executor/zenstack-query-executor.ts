@@ -55,9 +55,16 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     ) {
         super(compiler, adapter, connectionProvider, plugins);
 
-        if (this.schemaHasMappedNames(client.$schema)) {
+        if (this.schemaHasCustomPostgresSchema(client.$schema) || this.schemaHasMappedNames(client.$schema)) {
             this.nameMapper = new QueryNameMapper(client.$schema);
         }
+    }
+
+    private schemaHasCustomPostgresSchema(schema: SchemaDef) {
+        if (schema.provider.type !== 'postgresql') {
+            return false;
+        }
+        return Object.values(schema.models).some((model) => model.attributes?.some((attr) => attr.name === '@@schema'));
     }
 
     private schemaHasMappedNames(schema: Schema) {

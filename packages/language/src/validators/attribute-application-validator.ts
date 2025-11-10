@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import { AstUtils, type ValidationAcceptor } from 'langium';
 import pluralize from 'pluralize';
 import type { BinaryExpr, DataModel, Expression } from '../ast';
@@ -13,9 +14,13 @@ import {
     ReferenceExpr,
     isArrayExpr,
     isAttribute,
+    isConfigArrayExpr,
     isDataField,
     isDataModel,
+    isDataSource,
     isEnum,
+    isLiteralExpr,
+    isModel,
     isReferenceExpr,
     isTypeDef,
 } from '../generated/ast';
@@ -329,6 +334,28 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
             accept('error', `Expected an array of field references`, {
                 node: fields,
             });
+        }
+    }
+
+    @check('@@schema')
+    private _checkSchema(attr: AttributeApplication, accept: ValidationAcceptor) {
+        const schemaName = getStringLiteral(attr.args[0]?.value);
+        invariant(schemaName, `@@schema expects a string literal`);
+
+        // verify the schema name is defined in the datasource
+        const zmodel = AstUtils.getContainerOfType(attr, isModel)!;
+        const datasource = zmodel.declarations.find(isDataSource);
+        if (datasource) {
+            let found = false;
+            const schemas = datasource.fields.find((f) => f.name === 'schemas');
+            if (schemas && isConfigArrayExpr(schemas.value)) {
+                found = schemas.value.items.some((item) => isLiteralExpr(item) && item.value === schemaName);
+            }
+            if (!found) {
+                accept('error', `Schema "${schemaName}" is not defined in the datasource`, {
+                    node: attr,
+                });
+            }
         }
     }
 

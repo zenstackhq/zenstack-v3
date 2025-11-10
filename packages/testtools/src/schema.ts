@@ -32,6 +32,11 @@ datasource db {
         .exhaustive();
 }
 
+function replacePlaceholders(schemaText: string, provider: 'sqlite' | 'postgresql', dbUrl: string | undefined) {
+    const url = dbUrl ?? (provider === 'sqlite' ? 'file:./test.db' : 'postgres://postgres:postgres@localhost:5432/db');
+    return schemaText.replace(/\$DB_URL/g, url).replace(/\$PROVIDER/g, provider);
+}
+
 export async function generateTsSchema(
     schemaText: string,
     provider: 'sqlite' | 'postgresql' = 'sqlite',
@@ -43,7 +48,10 @@ export async function generateTsSchema(
 
     const zmodelPath = path.join(workDir, 'schema.zmodel');
     const noPrelude = schemaText.includes('datasource ');
-    fs.writeFileSync(zmodelPath, `${noPrelude ? '' : makePrelude(provider, dbUrl)}\n\n${schemaText}`);
+    fs.writeFileSync(
+        zmodelPath,
+        `${noPrelude ? '' : makePrelude(provider, dbUrl)}\n\n${replacePlaceholders(schemaText, provider, dbUrl)}`,
+    );
 
     const result = await loadDocumentWithPlugins(zmodelPath);
     if (!result.success) {

@@ -39,10 +39,20 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
         }
 
         const defaultSchemaField = ds.fields.find((f) => f.name === 'defaultSchema');
-        if (defaultSchemaField && providerValue !== 'postgresql') {
-            accept('error', '"defaultSchema" is only supported for "postgresql" provider', {
-                node: defaultSchemaField,
-            });
+        let defaultSchemaValue: string | undefined;
+        if (defaultSchemaField) {
+            if (providerValue !== 'postgresql') {
+                accept('error', '"defaultSchema" is only supported for "postgresql" provider', {
+                    node: defaultSchemaField,
+                });
+            }
+
+            defaultSchemaValue = getStringLiteral(defaultSchemaField.value);
+            if (!defaultSchemaValue) {
+                accept('error', '"defaultSchema" must be a string literal', {
+                    node: defaultSchemaField.value,
+                });
+            }
         }
 
         const schemasField = ds.fields.find((f) => f.name === 'schemas');
@@ -58,6 +68,14 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
                 !schemasValue.items.every((e) => isLiteralExpr(e) && typeof getStringLiteral(e) === 'string')
             ) {
                 accept('error', '"schemas" must be an array of string literals', {
+                    node: schemasField,
+                });
+            } else if (
+                // validate `defaultSchema` is included in `schemas`
+                defaultSchemaValue &&
+                !schemasValue.items.some((e) => getStringLiteral(e) === defaultSchemaValue)
+            ) {
+                accept('error', `"${defaultSchemaValue}" must be included in the "schemas" array`, {
                     node: schemasField,
                 });
             }

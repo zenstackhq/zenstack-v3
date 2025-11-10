@@ -193,4 +193,69 @@ model Foo {
             ),
         ).rejects.toThrow('Schema "mySchema" is not defined in the datasource');
     });
+
+    it('requires defaultSchema to be included in schemas', async () => {
+        await expect(
+            createTestClient(
+                `
+datasource db {
+    provider = 'postgresql'
+    defaultSchema = 'mySchema'
+    schemas = ['public']
+}
+
+model Foo {
+    id Int @id
+    name String
+}
+`,
+            ),
+        ).rejects.toThrow('"mySchema" must be included in the "schemas" array');
+    });
+
+    it('allows specifying schema only on a few models', async () => {
+        let fooQueriesVerified = false;
+        let barQueriesVerified = false;
+
+        const db = await createTestClient(
+            `
+datasource db {
+    provider = 'postgresql'
+    defaultSchema = 'somedefault'
+    schemas = ['mySchema', 'somedefault']
+    url = '$DB_URL'
+}
+
+model Foo {
+    id Int @id
+    name String
+    @@schema('mySchema')
+}
+
+model Bar {
+    id Int @id
+    name String
+}
+`,
+            {
+                provider: 'postgresql',
+                usePrismaPush: true,
+                log: (event) => {
+                    const sql = event.query.sql.toLowerCase();
+                    if (sql.includes('"myschema"."foo"')) {
+                        fooQueriesVerified = true;
+                    }
+                    if (sql.includes('"somedefault"."bar"')) {
+                        barQueriesVerified = true;
+                    }
+                },
+            },
+        );
+
+        await expect(db.foo.create({ data: { id: 1, name: 'test' } })).toResolveTruthy();
+        await expect(db.bar.create({ data: { id: 1, name: 'test' } })).toResolveTruthy();
+
+        expect(fooQueriesVerified).toBe(true);
+        expect(barQueriesVerified).toBe(true);
+    });
 });

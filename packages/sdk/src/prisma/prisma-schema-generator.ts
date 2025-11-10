@@ -19,6 +19,7 @@ import {
     InvocationExpr,
     isArrayExpr,
     isDataModel,
+    isDataSource,
     isInvocationExpr,
     isLiteralExpr,
     isNullExpr,
@@ -29,9 +30,14 @@ import {
     Model,
     NumberLiteral,
     StringLiteral,
-    type AstNode,
 } from '@zenstackhq/language/ast';
-import { getAllAttributes, getAllFields, isAuthInvocation, isDelegateModel } from '@zenstackhq/language/utils';
+import {
+    getAllAttributes,
+    getAllFields,
+    getStringLiteral,
+    isAuthInvocation,
+    isDelegateModel,
+} from '@zenstackhq/language/utils';
 import { AstUtils } from 'langium';
 import { match } from 'ts-pattern';
 import { ModelUtils } from '..';
@@ -57,6 +63,9 @@ import {
 // Some database providers like postgres and mysql have default limit to the length of identifiers
 // Here we use a conservative value that should work for most cases, and truncate names if needed
 const IDENTIFIER_NAME_MAX_LENGTH = 50 - DELEGATE_AUX_RELATION_PREFIX.length;
+
+// Datasource fields that only exist in ZModel but not in Prisma schema
+const NON_PRISMA_DATASOURCE_FIELDS = ['defaultSchema'];
 
 /**
  * Generates Prisma schema file
@@ -101,10 +110,12 @@ export class PrismaSchemaGenerator {
     }
 
     private generateDataSource(prisma: PrismaModel, dataSource: DataSource) {
-        const fields: SimpleField[] = dataSource.fields.map((f) => ({
-            name: f.name,
-            text: this.configExprToText(f.value),
-        }));
+        const fields: SimpleField[] = dataSource.fields
+            .filter((f) => !NON_PRISMA_DATASOURCE_FIELDS.includes(f.name))
+            .map((f) => ({
+                name: f.name,
+                text: this.configExprToText(f.value),
+            }));
         prisma.addDataSource(dataSource.name, fields);
     }
 
@@ -171,11 +182,25 @@ export class PrismaSchemaGenerator {
             }
         }
 
-        const allAttributes = getAllAttributes(decl);
-        for (const attr of allAttributes.filter(
+        const allAttributes = getAllAttributes(decl).filter(
             (attr) => this.isPrismaAttribute(attr) && !this.isInheritedMapAttribute(attr, decl),
-        )) {
+        );
+
+        for (const attr of allAttributes) {
             this.generateContainerAttribute(model, attr);
+        }
+
+        if (
+            this.datasourceHasSchemasSetting(decl.$container) &&
+            !allAttributes.some((attr) => attr.decl.ref?.name === '@@schema')
+        ) {
+            // if the datasource declared `schemas` and no @@schema attribute is defined, add a default one
+            model.addAttribute('@@schema', [
+                new PrismaAttributeArg(
+                    undefined,
+                    new PrismaAttributeArgValue('String', this.getDefaultPostgresSchemaName(decl.$container)),
+                ),
+            ]);
         }
 
         // user defined comments pass-through
@@ -186,6 +211,20 @@ export class PrismaSchemaGenerator {
 
         // generate reverse relation fields on concrete models
         this.generateDelegateRelationForConcrete(model, decl);
+    }
+
+    private getDatasourceField(zmodel: Model, fieldName: string) {
+        const dataSource = zmodel.declarations.find(isDataSource);
+        return dataSource?.fields.find((f) => f.name === fieldName);
+    }
+
+    private datasourceHasSchemasSetting(zmodel: Model) {
+        return !!this.getDatasourceField(zmodel, 'schemas');
+    }
+
+    private getDefaultPostgresSchemaName(zmodel: Model) {
+        const defaultSchemaField = this.getDatasourceField(zmodel, 'defaultSchema');
+        return getStringLiteral(defaultSchemaField?.value) ?? 'public';
     }
 
     private isInheritedMapAttribute(attr: DataModelAttribute, contextModel: DataModel) {
@@ -206,7 +245,7 @@ export class PrismaSchemaGenerator {
 
     private getUnsupportedFieldType(fieldType: DataFieldType) {
         if (fieldType.unsupported) {
-            const value = this.getStringLiteral(fieldType.unsupported.value);
+            const value = getStringLiteral(fieldType.unsupported.value);
             if (value) {
                 return `Unsupported("${value}")`;
             } else {
@@ -215,10 +254,6 @@ export class PrismaSchemaGenerator {
         } else {
             return undefined;
         }
-    }
-
-    private getStringLiteral(node: AstNode | undefined): string | undefined {
-        return isStringLiteral(node) ? node.value : undefined;
     }
 
     private generateModelField(model: PrismaDataModel, field: DataField, contextModel: DataModel, addToFront = false) {

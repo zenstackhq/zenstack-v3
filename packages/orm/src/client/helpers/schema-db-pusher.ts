@@ -23,7 +23,26 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         await this.kysely.transaction().execute(async (tx) => {
             if (this.schema.enums && this.schema.provider.type === 'postgresql') {
                 for (const [name, enumDef] of Object.entries(this.schema.enums)) {
-                    const createEnum = tx.schema.createType(name).asEnum(Object.values(enumDef));
+                    let enumValues: string[];
+                    if (enumDef.fields) {
+                        enumValues = Object.values(enumDef.fields).map((f) => {
+                            const mapAttr = f.attributes?.find((a) => a.name === '@map');
+                            if (!mapAttr || !mapAttr.args?.[0]) {
+                                return f.name;
+                            } else {
+                                const mappedName = ExpressionUtils.getLiteralValue(mapAttr.args[0].value);
+                                invariant(
+                                    mappedName && typeof mappedName === 'string',
+                                    `Invalid @map attribute for enum field ${f.name}`,
+                                );
+                                return mappedName;
+                            }
+                        });
+                    } else {
+                        enumValues = Object.values(enumDef.values);
+                    }
+
+                    const createEnum = tx.schema.createType(name).asEnum(enumValues);
                     await createEnum.execute();
                 }
             }

@@ -1,7 +1,7 @@
 import { createId } from '@paralleldrive/cuid2';
+import { createTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
 import { getSchema } from '../schemas/basic';
-import { createTestClient } from '@zenstackhq/testtools';
 
 describe('Client API tests', () => {
     const schema = getSchema('sqlite');

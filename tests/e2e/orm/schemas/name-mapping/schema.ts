@@ -27,6 +27,12 @@ export const schema = {
                     unique: true,
                     attributes: [{ name: "@map", args: [{ name: "name", value: ExpressionUtils.literal("user_email") }] }, { name: "@unique" }]
                 },
+                role: {
+                    name: "role",
+                    type: "Role",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("USER") }] }, { name: "@map", args: [{ name: "name", value: ExpressionUtils.literal("user_role") }] }],
+                    default: "USER"
+                },
                 posts: {
                     name: "posts",
                     type: "Post",
@@ -80,6 +86,35 @@ export const schema = {
             uniqueFields: {
                 id: { type: "Int" }
             }
+        }
+    },
+    enums: {
+        Role: {
+            values: {
+                USER: "USER",
+                ADMIN: "ADMIN",
+                MODERATOR: "MODERATOR"
+            },
+            fields: {
+                USER: {
+                    name: "USER",
+                    attributes: [
+                        { name: "@map", args: [{ name: "name", value: ExpressionUtils.literal("role_user") }] }
+                    ]
+                },
+                ADMIN: {
+                    name: "ADMIN",
+                    attributes: [
+                        { name: "@map", args: [{ name: "name", value: ExpressionUtils.literal("role_admin") }] }
+                    ]
+                },
+                MODERATOR: {
+                    name: "MODERATOR"
+                }
+            },
+            attributes: [
+                { name: "@@map", args: [{ name: "name", value: ExpressionUtils.literal("user_role") }] }
+            ]
         }
     },
     authType: "User",

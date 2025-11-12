@@ -33,6 +33,7 @@ const TEST_PG_CONFIG = {
 
 export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptions<Schema>, 'dialect'> & {
     provider?: 'sqlite' | 'postgresql';
+    schemaFile?: string;
     dbName?: string;
     usePrismaPush?: boolean;
     extraSourceFiles?: Record<string, string>;
@@ -44,7 +45,6 @@ export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptio
 export async function createTestClient<Schema extends SchemaDef>(
     schema: Schema,
     options?: CreateTestClientOptions<Schema>,
-    schemaFile?: string,
 ): Promise<ClientContract<Schema>>;
 export async function createTestClient<Schema extends SchemaDef>(
     schema: string,
@@ -53,7 +53,6 @@ export async function createTestClient<Schema extends SchemaDef>(
 export async function createTestClient<Schema extends SchemaDef>(
     schema: Schema | string,
     options?: CreateTestClientOptions<Schema>,
-    schemaFile?: string,
 ): Promise<any> {
     let workDir = options?.workDir;
     let _schema: Schema;
@@ -87,8 +86,8 @@ export async function createTestClient<Schema extends SchemaDef>(
             },
         };
         workDir ??= createTestProject();
-        if (schemaFile) {
-            let schemaContent = fs.readFileSync(schemaFile, 'utf-8');
+        if (options?.schemaFile) {
+            let schemaContent = fs.readFileSync(options.schemaFile, 'utf-8');
             if (dbUrl) {
                 // replace `datasource db { }` section
                 schemaContent = schemaContent.replace(
@@ -124,7 +123,7 @@ export async function createTestClient<Schema extends SchemaDef>(
     if (!options?.dbFile) {
         if (options?.usePrismaPush) {
             invariant(
-                typeof schema === 'string' || schemaFile,
+                typeof schema === 'string' || options?.schemaFile,
                 'a schema file must be provided when using prisma db push',
             );
             if (!model) {

@@ -947,9 +947,68 @@ export class TsSchemaGenerator {
 
     private createEnumObject(e: Enum) {
         return ts.factory.createObjectLiteralExpression(
-            e.fields.map((field) =>
-                ts.factory.createPropertyAssignment(field.name, ts.factory.createStringLiteral(field.name)),
-            ),
+            [
+                ts.factory.createPropertyAssignment(
+                    'values',
+                    ts.factory.createObjectLiteralExpression(
+                        e.fields.map((f) =>
+                            ts.factory.createPropertyAssignment(f.name, ts.factory.createStringLiteral(f.name)),
+                        ),
+                        true,
+                    ),
+                ),
+
+                // only generate `fields` if there are attributes on the fields
+                ...(e.fields.some((f) => f.attributes.length > 0)
+                    ? [
+                          ts.factory.createPropertyAssignment(
+                              'fields',
+                              ts.factory.createObjectLiteralExpression(
+                                  e.fields.map((field) =>
+                                      ts.factory.createPropertyAssignment(
+                                          field.name,
+                                          ts.factory.createObjectLiteralExpression(
+                                              [
+                                                  ts.factory.createPropertyAssignment(
+                                                      'name',
+                                                      ts.factory.createStringLiteral(field.name),
+                                                  ),
+                                                  ...(field.attributes.length > 0
+                                                      ? [
+                                                            ts.factory.createPropertyAssignment(
+                                                                'attributes',
+                                                                ts.factory.createArrayLiteralExpression(
+                                                                    field.attributes?.map((attr) =>
+                                                                        this.createAttributeObject(attr),
+                                                                    ) ?? [],
+                                                                    true,
+                                                                ),
+                                                            ),
+                                                        ]
+                                                      : []),
+                                              ],
+                                              true,
+                                          ),
+                                      ),
+                                  ),
+                                  true,
+                              ),
+                          ),
+                      ]
+                    : []),
+
+                ...(e.attributes.length > 0
+                    ? [
+                          ts.factory.createPropertyAssignment(
+                              'attributes',
+                              ts.factory.createArrayLiteralExpression(
+                                  e.attributes.map((attr) => this.createAttributeObject(attr)),
+                                  true,
+                              ),
+                          ),
+                      ]
+                    : []),
+            ],
             true,
         );
     }
@@ -1259,7 +1318,7 @@ export class TsSchemaGenerator {
             statements.push(typeDef);
         }
 
-        // generate: export const Enum = $schema.enums.Enum;
+        // generate: export const Enum = $schema.enums.Enum['values'];
         const enums = model.declarations.filter(isEnum);
         for (const e of enums) {
             let enumDecl = ts.factory.createVariableStatement(
@@ -1272,10 +1331,13 @@ export class TsSchemaGenerator {
                             undefined,
                             ts.factory.createPropertyAccessExpression(
                                 ts.factory.createPropertyAccessExpression(
-                                    ts.factory.createIdentifier('$schema'),
-                                    ts.factory.createIdentifier('enums'),
+                                    ts.factory.createPropertyAccessExpression(
+                                        ts.factory.createIdentifier('$schema'),
+                                        ts.factory.createIdentifier('enums'),
+                                    ),
+                                    ts.factory.createIdentifier(e.name),
                                 ),
-                                ts.factory.createIdentifier(e.name),
+                                ts.factory.createIdentifier('values'),
                             ),
                         ),
                     ],

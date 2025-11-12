@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PLUGIN_MODULE_NAME, STD_LIB_MODULE_NAME, type ExpressionContext } from './constants';
 import {
+    InternalAttribute,
     isArrayExpr,
     isBinaryExpr,
     isConfigArrayExpr,
@@ -173,7 +174,7 @@ export function getRecursiveBases(
     bases.forEach((base) => {
         // avoid using .ref since this function can be called before linking
         const baseDecl = decl.$container.declarations.find(
-            (d): d is TypeDef | DataModel => isTypeDef(d) || (isDataModel(d) && d.name === base.$refText),
+            (d): d is TypeDef | DataModel => (isTypeDef(d) || isDataModel(d)) && d.name === base.$refText,
         );
         if (baseDecl) {
             if (!includeDelegate && isDelegateModel(baseDecl)) {
@@ -321,8 +322,15 @@ function getArray(expr: Expression | ConfigExpr | undefined) {
     return isArrayExpr(expr) || isConfigArrayExpr(expr) ? expr.items : undefined;
 }
 
+export function getAttributeArg(
+    attr: DataModelAttribute | DataFieldAttribute | InternalAttribute,
+    name: string,
+): Expression | undefined {
+    return attr.args.find((arg) => arg.$resolvedParam?.name === name)?.value;
+}
+
 export function getAttributeArgLiteral<T extends string | number | boolean>(
-    attr: DataModelAttribute | DataFieldAttribute,
+    attr: DataModelAttribute | DataFieldAttribute | InternalAttribute,
     name: string,
 ): T | undefined {
     for (const arg of attr.args) {

@@ -5,6 +5,7 @@ export type DataSourceProviderType = 'sqlite' | 'postgresql';
 
 export type DataSourceProvider = {
     type: DataSourceProviderType;
+    defaultSchema?: string;
 };
 
 export type SchemaDef = {
@@ -97,7 +98,16 @@ export type BuiltinType =
 
 export type MappedBuiltinType = string | boolean | number | bigint | Decimal | Date;
 
-export type EnumDef = Record<string, string>;
+export type EnumField = {
+    name: string;
+    attributes?: AttributeApplication[];
+};
+
+export type EnumDef = {
+    fields?: Record<string, EnumField>;
+    values: Record<string, string>;
+    attributes?: AttributeApplication[];
+};
 
 export type TypeDefDef = {
     name: string;
@@ -124,7 +134,9 @@ export type GetModel<Schema extends SchemaDef, Model extends GetModels<Schema>> 
 
 export type GetEnums<Schema extends SchemaDef> = keyof Schema['enums'];
 
-export type GetEnum<Schema extends SchemaDef, Enum extends GetEnums<Schema>> = Schema['enums'][Enum];
+export type GetEnum<Schema extends SchemaDef, Enum extends GetEnums<Schema>> = Schema['enums'][Enum] extends EnumDef
+    ? Schema['enums'][Enum]['values']
+    : never;
 
 export type GetTypeDefs<Schema extends SchemaDef> = Extract<keyof Schema['typeDefs'], string>;
 

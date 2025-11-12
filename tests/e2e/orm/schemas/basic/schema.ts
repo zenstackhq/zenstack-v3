@@ -275,8 +275,10 @@ export const schema = {
     },
     enums: {
         Role: {
-            ADMIN: "ADMIN",
-            USER: "USER"
+            values: {
+                ADMIN: "ADMIN",
+                USER: "USER"
+            }
         }
     },
     authType: "User",

@@ -35,7 +35,7 @@ import {
     UnaryExpr,
     type Model,
 } from '@zenstackhq/language/ast';
-import { getAllAttributes, getAllFields, isDataFieldReference } from '@zenstackhq/language/utils';
+import { getAllAttributes, getAllFields, getAttributeArg, isDataFieldReference } from '@zenstackhq/language/utils';
 import fs from 'node:fs';
 import path from 'node:path';
 import { match } from 'ts-pattern';
@@ -236,8 +236,20 @@ export class TsSchemaGenerator {
 
     private createProviderObject(model: Model): ts.Expression {
         const dsProvider = this.getDataSourceProvider(model);
+        const defaultSchema = this.getDataSourceDefaultSchema(model);
+
         return ts.factory.createObjectLiteralExpression(
-            [ts.factory.createPropertyAssignment('type', ts.factory.createStringLiteral(dsProvider.type))],
+            [
+                ts.factory.createPropertyAssignment('type', ts.factory.createStringLiteral(dsProvider)),
+                ...(defaultSchema
+                    ? [
+                          ts.factory.createPropertyAssignment(
+                              'defaultSchema',
+                              ts.factory.createStringLiteral(defaultSchema),
+                          ),
+                      ]
+                    : []),
+            ],
             true,
         );
     }
@@ -621,9 +633,26 @@ export class TsSchemaGenerator {
         invariant(dataSource, 'No data source found in the model');
 
         const providerExpr = dataSource.fields.find((f) => f.name === 'provider')?.value;
-        invariant(isLiteralExpr(providerExpr), 'Provider must be a literal');
-        const type = providerExpr.value as string;
-        return { type };
+        invariant(
+            isLiteralExpr(providerExpr) && typeof providerExpr.value === 'string',
+            'Provider must be a string literal',
+        );
+        return providerExpr.value as string;
+    }
+
+    private getDataSourceDefaultSchema(model: Model) {
+        const dataSource = model.declarations.find(isDataSource);
+        invariant(dataSource, 'No data source found in the model');
+
+        const defaultSchemaExpr = dataSource.fields.find((f) => f.name === 'defaultSchema')?.value;
+        if (!defaultSchemaExpr) {
+            return undefined;
+        }
+        invariant(
+            isLiteralExpr(defaultSchemaExpr) && typeof defaultSchemaExpr.value === 'string',
+            'Default schema must be a string literal',
+        );
+        return defaultSchemaExpr.value as string;
     }
 
     private getFieldMappedDefault(
@@ -840,7 +869,11 @@ export class TsSchemaGenerator {
         const seenKeys = new Set<string>();
         for (const attr of allAttributes) {
             if (attr.decl.$refText === '@@id' || attr.decl.$refText === '@@unique') {
-                const fieldNames = this.getReferenceNames(attr.args[0]!.value);
+                const fieldsArg = getAttributeArg(attr, 'fields');
+                if (!fieldsArg) {
+                    continue;
+                }
+                const fieldNames = this.getReferenceNames(fieldsArg);
                 if (!fieldNames) {
                     continue;
                 }
@@ -914,9 +947,68 @@ export class TsSchemaGenerator {
 
     private createEnumObject(e: Enum) {
         return ts.factory.createObjectLiteralExpression(
-            e.fields.map((field) =>
-                ts.factory.createPropertyAssignment(field.name, ts.factory.createStringLiteral(field.name)),
-            ),
+            [
+                ts.factory.createPropertyAssignment(
+                    'values',
+                    ts.factory.createObjectLiteralExpression(
+                        e.fields.map((f) =>
+                            ts.factory.createPropertyAssignment(f.name, ts.factory.createStringLiteral(f.name)),
+                        ),
+                        true,
+                    ),
+                ),
+
+                // only generate `fields` if there are attributes on the fields
+                ...(e.fields.some((f) => f.attributes.length > 0)
+                    ? [
+                          ts.factory.createPropertyAssignment(
+                              'fields',
+                              ts.factory.createObjectLiteralExpression(
+                                  e.fields.map((field) =>
+                                      ts.factory.createPropertyAssignment(
+                                          field.name,
+                                          ts.factory.createObjectLiteralExpression(
+                                              [
+                                                  ts.factory.createPropertyAssignment(
+                                                      'name',
+                                                      ts.factory.createStringLiteral(field.name),
+                                                  ),
+                                                  ...(field.attributes.length > 0
+                                                      ? [
+                                                            ts.factory.createPropertyAssignment(
+                                                                'attributes',
+                                                                ts.factory.createArrayLiteralExpression(
+                                                                    field.attributes?.map((attr) =>
+                                                                        this.createAttributeObject(attr),
+                                                                    ) ?? [],
+                                                                    true,
+                                                                ),
+                                                            ),
+                                                        ]
+                                                      : []),
+                                              ],
+                                              true,
+                                          ),
+                                      ),
+                                  ),
+                                  true,
+                              ),
+                          ),
+                      ]
+                    : []),
+
+                ...(e.attributes.length > 0
+                    ? [
+                          ts.factory.createPropertyAssignment(
+                              'attributes',
+                              ts.factory.createArrayLiteralExpression(
+                                  e.attributes.map((attr) => this.createAttributeObject(attr)),
+                                  true,
+                              ),
+                          ),
+                      ]
+                    : []),
+            ],
             true,
         );
     }
@@ -1226,7 +1318,7 @@ export class TsSchemaGenerator {
             statements.push(typeDef);
         }
 
-        // generate: export const Enum = $schema.enums.Enum;
+        // generate: export const Enum = $schema.enums.Enum['values'];
         const enums = model.declarations.filter(isEnum);
         for (const e of enums) {
             let enumDecl = ts.factory.createVariableStatement(
@@ -1239,10 +1331,13 @@ export class TsSchemaGenerator {
                             undefined,
                             ts.factory.createPropertyAccessExpression(
                                 ts.factory.createPropertyAccessExpression(
-                                    ts.factory.createIdentifier('$schema'),
-                                    ts.factory.createIdentifier('enums'),
+                                    ts.factory.createPropertyAccessExpression(
+                                        ts.factory.createIdentifier('$schema'),
+                                        ts.factory.createIdentifier('enums'),
+                                    ),
+                                    ts.factory.createIdentifier(e.name),
                                 ),
-                                ts.factory.createIdentifier(e.name),
+                                ts.factory.createIdentifier('values'),
                             ),
                         ),
                     ],

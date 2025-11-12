@@ -1,6 +1,6 @@
 import type { ValidationAcceptor } from 'langium';
 import { SUPPORTED_PROVIDERS } from '../constants';
-import { DataSource, isInvocationExpr } from '../generated/ast';
+import { DataSource, isConfigArrayExpr, isInvocationExpr, isLiteralExpr } from '../generated/ast';
 import { getStringLiteral } from '../utils';
 import { validateDuplicatedDeclarations, type AstValidator } from './common';
 
@@ -12,7 +12,6 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
         validateDuplicatedDeclarations(ds, ds.fields, accept);
         this.validateProvider(ds, accept);
         this.validateUrl(ds, accept);
-        this.validateRelationMode(ds, accept);
     }
 
     private validateProvider(ds: DataSource, accept: ValidationAcceptor) {
@@ -24,19 +23,62 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
             return;
         }
 
-        const value = getStringLiteral(provider.value);
-        if (!value) {
+        const providerValue = getStringLiteral(provider.value);
+        if (!providerValue) {
             accept('error', '"provider" must be set to a string literal', {
                 node: provider.value,
             });
-        } else if (!SUPPORTED_PROVIDERS.includes(value)) {
+        } else if (!SUPPORTED_PROVIDERS.includes(providerValue)) {
             accept(
                 'error',
-                `Provider "${value}" is not supported. Choose from ${SUPPORTED_PROVIDERS.map((p) => '"' + p + '"').join(
-                    ' | ',
-                )}.`,
+                `Provider "${providerValue}" is not supported. Choose from ${SUPPORTED_PROVIDERS.map(
+                    (p) => '"' + p + '"',
+                ).join(' | ')}.`,
                 { node: provider.value },
             );
+        }
+
+        const defaultSchemaField = ds.fields.find((f) => f.name === 'defaultSchema');
+        let defaultSchemaValue: string | undefined;
+        if (defaultSchemaField) {
+            if (providerValue !== 'postgresql') {
+                accept('error', '"defaultSchema" is only supported for "postgresql" provider', {
+                    node: defaultSchemaField,
+                });
+            }
+
+            defaultSchemaValue = getStringLiteral(defaultSchemaField.value);
+            if (!defaultSchemaValue) {
+                accept('error', '"defaultSchema" must be a string literal', {
+                    node: defaultSchemaField.value,
+                });
+            }
+        }
+
+        const schemasField = ds.fields.find((f) => f.name === 'schemas');
+        if (schemasField) {
+            if (providerValue !== 'postgresql') {
+                accept('error', '"schemas" is only supported for "postgresql" provider', {
+                    node: schemasField,
+                });
+            }
+            const schemasValue = schemasField.value;
+            if (
+                !isConfigArrayExpr(schemasValue) ||
+                !schemasValue.items.every((e) => isLiteralExpr(e) && typeof getStringLiteral(e) === 'string')
+            ) {
+                accept('error', '"schemas" must be an array of string literals', {
+                    node: schemasField,
+                });
+            } else if (
+                // validate `defaultSchema` is included in `schemas`
+                defaultSchemaValue &&
+                !schemasValue.items.some((e) => getStringLiteral(e) === defaultSchemaValue)
+            ) {
+                accept('error', `"${defaultSchemaValue}" must be included in the "schemas" array`, {
+                    node: schemasField,
+                });
+            }
         }
     }
 
@@ -51,16 +93,6 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
             accept('error', `"${urlField.name}" must be set to a string literal or an invocation of "env" function`, {
                 node: urlField.value,
             });
-        }
-    }
-
-    private validateRelationMode(ds: DataSource, accept: ValidationAcceptor) {
-        const field = ds.fields.find((f) => f.name === 'relationMode');
-        if (field) {
-            const val = getStringLiteral(field.value);
-            if (!val || !['foreignKeys', 'prisma'].includes(val)) {
-                accept('error', '"relationMode" must be set to "foreignKeys" or "prisma"', { node: field.value });
-            }
         }
     }
 }

@@ -23,7 +23,7 @@ export type CommonFields = $TypeDefResult<$Schema, "CommonFields">;
 /**
  * User roles
  */
-export const Role = $schema.enums.Role;
+export const Role = $schema.enums.Role.values;
 /**
  * User roles
  */

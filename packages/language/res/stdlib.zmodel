@@ -454,12 +454,12 @@ attribute @db.JsonB() @@@targetField([JsonField]) @@@prisma
 
 attribute @db.ByteA() @@@targetField([BytesField]) @@@prisma
 
-// /**
-//  * Specifies the schema to use in a multi-schema database. https://www.prisma.io/docs/guides/database/multi-schema.
-//  *
-//  * @param: The name of the database schema.
-//  */
-// attribute @@schema(_ name: String) @@@prisma
+/**
+ * Specifies the schema to use in a multi-schema PostgreSQL database.
+ *
+ * @param map: The name of the database schema.
+ */
+attribute @@schema(_ map: String) @@@prisma
 
 //////////////////////////////////////////////
 // Begin validation attributes and functions

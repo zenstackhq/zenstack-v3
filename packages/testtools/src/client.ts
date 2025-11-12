@@ -1,8 +1,8 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import type { Model } from '@zenstackhq/language/ast';
-import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { ZenStackClient, type ClientContract, type ClientOptions } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
+import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import SQLite from 'better-sqlite3';
 import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
@@ -33,17 +33,18 @@ const TEST_PG_CONFIG = {
 
 export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptions<Schema>, 'dialect'> & {
     provider?: 'sqlite' | 'postgresql';
+    schemaFile?: string;
     dbName?: string;
     usePrismaPush?: boolean;
     extraSourceFiles?: Record<string, string>;
     workDir?: string;
     debug?: boolean;
+    dbFile?: string;
 };
 
 export async function createTestClient<Schema extends SchemaDef>(
     schema: Schema,
     options?: CreateTestClientOptions<Schema>,
-    schemaFile?: string,
 ): Promise<ClientContract<Schema>>;
 export async function createTestClient<Schema extends SchemaDef>(
     schema: string,
@@ -52,14 +53,11 @@ export async function createTestClient<Schema extends SchemaDef>(
 export async function createTestClient<Schema extends SchemaDef>(
     schema: Schema | string,
     options?: CreateTestClientOptions<Schema>,
-    schemaFile?: string,
 ): Promise<any> {
     let workDir = options?.workDir;
     let _schema: Schema;
     const provider = options?.provider ?? getTestDbProvider() ?? 'sqlite';
-
     const dbName = options?.dbName ?? getTestDbName(provider);
-
     const dbUrl =
         provider === 'sqlite'
             ? `file:${dbName}`
@@ -68,13 +66,14 @@ export async function createTestClient<Schema extends SchemaDef>(
     let model: Model | undefined;
 
     if (typeof schema === 'string') {
-        const generated = await generateTsSchema(schema, provider, dbUrl, options?.extraSourceFiles);
+        const generated = await generateTsSchema(schema, provider, dbUrl, options?.extraSourceFiles, undefined);
         workDir = generated.workDir;
         model = generated.model;
         // replace schema's provider
         _schema = {
             ...generated.schema,
             provider: {
+                ...generated.schema.provider,
                 type: provider,
             },
         } as Schema;
@@ -87,8 +86,8 @@ export async function createTestClient<Schema extends SchemaDef>(
             },
         };
         workDir ??= createTestProject();
-        if (schemaFile) {
-            let schemaContent = fs.readFileSync(schemaFile, 'utf-8');
+        if (options?.schemaFile) {
+            let schemaContent = fs.readFileSync(options.schemaFile, 'utf-8');
             if (dbUrl) {
                 // replace `datasource db { }` section
                 schemaContent = schemaContent.replace(
@@ -108,35 +107,48 @@ export async function createTestClient<Schema extends SchemaDef>(
         console.log(`Work directory: ${workDir}`);
     }
 
+    // copy db file to workDir if specified
+    if (options?.dbFile) {
+        if (provider !== 'sqlite') {
+            throw new Error('dbFile option is only supported for sqlite provider');
+        }
+        fs.copyFileSync(options.dbFile, path.join(workDir, dbName));
+    }
+
     const { plugins, ...rest } = options ?? {};
     const _options: ClientOptions<Schema> = {
         ...rest,
     } as ClientOptions<Schema>;
 
-    if (options?.usePrismaPush) {
-        invariant(typeof schema === 'string' || schemaFile, 'a schema file must be provided when using prisma db push');
-        if (!model) {
-            const r = await loadDocumentWithPlugins(path.join(workDir, 'schema.zmodel'));
-            if (!r.success) {
-                throw new Error(r.errors.join('\n'));
+    if (!options?.dbFile) {
+        if (options?.usePrismaPush) {
+            invariant(
+                typeof schema === 'string' || options?.schemaFile,
+                'a schema file must be provided when using prisma db push',
+            );
+            if (!model) {
+                const r = await loadDocumentWithPlugins(path.join(workDir, 'schema.zmodel'));
+                if (!r.success) {
+                    throw new Error(r.errors.join('\n'));
+                }
+                model = r.model;
             }
-            model = r.model;
-        }
-        const prismaSchema = new PrismaSchemaGenerator(model);
-        const prismaSchemaText = await prismaSchema.generate();
-        fs.writeFileSync(path.resolve(workDir!, 'schema.prisma'), prismaSchemaText);
-        execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {
-            cwd: workDir,
-            stdio: 'ignore',
-        });
-    } else {
-        if (provider === 'postgresql') {
-            invariant(dbName, 'dbName is required');
-            const pgClient = new PGClient(TEST_PG_CONFIG);
-            await pgClient.connect();
-            await pgClient.query(`DROP DATABASE IF EXISTS "${dbName}"`);
-            await pgClient.query(`CREATE DATABASE "${dbName}"`);
-            await pgClient.end();
+            const prismaSchema = new PrismaSchemaGenerator(model);
+            const prismaSchemaText = await prismaSchema.generate();
+            fs.writeFileSync(path.resolve(workDir!, 'schema.prisma'), prismaSchemaText);
+            execSync('npx prisma db push --schema ./schema.prisma --skip-generate --force-reset', {
+                cwd: workDir,
+                stdio: 'ignore',
+            });
+        } else {
+            if (provider === 'postgresql') {
+                invariant(dbName, 'dbName is required');
+                const pgClient = new PGClient(TEST_PG_CONFIG);
+                await pgClient.connect();
+                await pgClient.query(`DROP DATABASE IF EXISTS "${dbName}"`);
+                await pgClient.query(`CREATE DATABASE "${dbName}"`);
+                await pgClient.end();
+            }
         }
     }
 
@@ -155,7 +167,7 @@ export async function createTestClient<Schema extends SchemaDef>(
 
     let client = new ZenStackClient(_schema, _options);
 
-    if (!options?.usePrismaPush) {
+    if (!options?.usePrismaPush && !options?.dbFile) {
         await client.$pushSchema();
     }
 

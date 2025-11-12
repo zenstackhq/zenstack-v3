@@ -457,9 +457,9 @@ attribute @db.ByteA() @@@targetField([BytesField]) @@@prisma
 /**
  * Specifies the schema to use in a multi-schema PostgreSQL database.
  *
- * @param name: The name of the database schema.
+ * @param map: The name of the database schema.
  */
-attribute @@schema(_ name: String) @@@prisma
+attribute @@schema(_ map: String) @@@prisma
 
 //////////////////////////////////////////////
 // Begin validation attributes and functions

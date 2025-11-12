@@ -3,9 +3,17 @@ datasource db {
     url      = "file:./dev.db"
 }
 
+enum Role {
+    USER @map('role_user')
+    ADMIN @map('role_admin')
+    MODERATOR
+    @@map("user_role")
+}
+
 model User {
     id    Int    @id @default(autoincrement())
     email String @map('user_email') @unique
+    role  Role   @default(USER) @map('user_role')
     posts Post[]
     @@map('users')
 }

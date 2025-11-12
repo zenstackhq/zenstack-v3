@@ -1,12 +1,17 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import {
     AliasNode,
+    CaseWhenBuilder,
     ColumnNode,
+    ColumnUpdateNode,
     DeleteQueryNode,
+    expressionBuilder,
+    ExpressionWrapper,
     FromNode,
     IdentifierNode,
     InsertQueryNode,
     OperationNodeTransformer,
+    PrimitiveValueListNode,
     ReferenceNode,
     ReturningNode,
     SelectAllNode,
@@ -14,16 +19,31 @@ import {
     SelectQueryNode,
     TableNode,
     UpdateQueryNode,
+    ValueListNode,
+    ValueNode,
+    ValuesNode,
     type OperationNode,
+    type SimpleReferenceExpressionNode,
 } from 'kysely';
-import type { FieldDef, ModelDef, SchemaDef } from '../../schema';
-import { extractFieldName, extractModelName, getModel, requireModel, stripAlias } from '../query-utils';
+import type { EnumDef, EnumField, FieldDef, ModelDef, SchemaDef } from '../../schema';
+import {
+    extractFieldName,
+    extractModelName,
+    getEnum,
+    getField,
+    getModel,
+    isEnum,
+    requireModel,
+    stripAlias,
+} from '../query-utils';
 
 type Scope = {
     model?: string;
     alias?: OperationNode;
     namesMapped?: boolean; // true means fields referring to this scope have their names already mapped
 };
+
+type SelectionNodeChild = SimpleReferenceExpressionNode | AliasNode | SelectAllNode;
 
 export class QueryNameMapper extends OperationNodeTransformer {
     private readonly modelToTableMap = new Map<string, string>();
@@ -89,15 +109,27 @@ export class QueryNameMapper extends OperationNodeTransformer {
             return super.transformInsertQuery(node);
         }
 
-        return this.withScope(
-            { model: node.into.table.identifier.name },
-            () =>
-                ({
-                    ...super.transformInsertQuery(node),
-                    // map table name
-                    into: this.processTableRef(node.into!),
-                }) satisfies InsertQueryNode,
-        );
+        const model = extractModelName(node.into);
+        invariant(model, 'InsertQueryNode must have a model name in the "into" clause');
+
+        return this.withScope({ model }, () => {
+            const baseResult = super.transformInsertQuery(node);
+            let values = baseResult.values;
+            if (node.columns && values) {
+                // process enum values with name mapping
+                values = this.processEnumMappingForColumns(model, node.columns, values);
+            }
+            return {
+                ...baseResult,
+                // map table name
+                into: this.processTableRef(node.into!),
+                values,
+            } satisfies InsertQueryNode;
+        });
+    }
+
+    private isOperationNode(value: unknown): value is OperationNode {
+        return !!value && typeof value === 'object' && 'kind' in value;
     }
 
     protected override transformReturning(node: ReturningNode) {
@@ -158,9 +190,29 @@ export class QueryNameMapper extends OperationNodeTransformer {
             return super.transformUpdateQuery(node);
         }
 
-        return this.withScope({ model: innerTable.table.identifier.name, alias }, () => {
+        const model = extractModelName(innerTable);
+        invariant(model, 'UpdateQueryNode must have a model name in the "table" clause');
+
+        return this.withScope({ model, alias }, () => {
+            const baseResult = super.transformUpdateQuery(node);
+
+            // process enum value mappings in update set values
+            const updates = baseResult.updates?.map((update, i) => {
+                if (ColumnNode.is(update.column)) {
+                    // fetch original column that doesn't have name mapping applied
+                    const origColumn = node.updates![i]!.column as ColumnNode;
+                    return ColumnUpdateNode.create(
+                        update.column,
+                        this.processEnumMappingForValue(model, origColumn, update.value) as OperationNode,
+                    );
+                } else {
+                    return update;
+                }
+            });
+
             return {
-                ...super.transformUpdateQuery(node),
+                ...baseResult,
+                updates,
                 // map table name
                 table: this.wrapAlias(this.processTableRef(innerTable), alias),
             };
@@ -204,42 +256,70 @@ export class QueryNameMapper extends OperationNodeTransformer {
     private processSelectQuerySelections(node: SelectQueryNode) {
         const selections: SelectionNode[] = [];
         for (const selection of node.selections ?? []) {
+            const processedSelections: { originalField?: string; selection: SelectionNode }[] = [];
             if (SelectAllNode.is(selection.selection)) {
                 // expand `selectAll` to all fields with name mapping if the
                 // inner-most scope is not already mapped
-                const scope = this.scopes[this.scopes.length - 1];
+                const scope = this.requireCurrentScope();
                 if (scope?.model && !scope.namesMapped) {
-                    selections.push(...this.createSelectAllFields(scope.model, scope.alias));
+                    // expand
+                    processedSelections.push(...this.createSelectAllFields(scope.model, scope.alias));
                 } else {
-                    selections.push(super.transformSelection(selection));
+                    // preserve
+                    processedSelections.push({
+                        originalField: undefined,
+                        selection: super.transformSelection(selection),
+                    });
                 }
             } else if (ReferenceNode.is(selection.selection) || ColumnNode.is(selection.selection)) {
                 // map column name and add/preserve alias
                 const transformed = this.transformNode(selection.selection);
+
+                // field name without applying name mapping
+                const originalField = extractFieldName(selection.selection);
+
                 if (AliasNode.is(transformed)) {
                     // keep the alias if there's one
-                    selections.push(SelectionNode.create(transformed));
+                    processedSelections.push({ originalField, selection: SelectionNode.create(transformed) });
                 } else {
                     // otherwise use an alias to preserve the original field name
-                    const origFieldName = extractFieldName(selection.selection);
                     const fieldName = extractFieldName(transformed);
-                    if (fieldName !== origFieldName) {
-                        selections.push(
-                            SelectionNode.create(
+                    if (fieldName !== originalField) {
+                        processedSelections.push({
+                            originalField,
+                            selection: SelectionNode.create(
                                 this.wrapAlias(
                                     transformed,
-                                    origFieldName ? IdentifierNode.create(origFieldName) : undefined,
+                                    originalField ? IdentifierNode.create(originalField) : undefined,
                                 ),
                             ),
-                        );
+                        });
                     } else {
-                        selections.push(SelectionNode.create(transformed));
+                        processedSelections.push({
+                            originalField,
+                            selection: SelectionNode.create(transformed),
+                        });
                     }
                 }
             } else {
-                selections.push(super.transformSelection(selection));
+                const { node: innerNode } = stripAlias(selection.selection);
+                processedSelections.push({
+                    originalField: extractFieldName(innerNode),
+                    selection: super.transformSelection(selection),
+                });
             }
+
+            // process enum value mapping
+            const enumProcessedSelections = processedSelections.map(({ originalField, selection }) => {
+                if (!originalField) {
+                    return selection;
+                } else {
+                    return SelectionNode.create(this.processEnumSelection(selection.selection, originalField));
+                }
+            });
+            selections.push(...enumProcessedSelections);
         }
+
         return selections;
     }
 
@@ -320,7 +400,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return this.createTableNode(mappedName, tableSchema);
     }
 
-    private getMappedName(def: ModelDef | FieldDef) {
+    private getMappedName(def: ModelDef | FieldDef | EnumField) {
         const mapAttr = def.attributes?.find((attr) => attr.name === '@@map' || attr.name === '@map');
         if (mapAttr) {
             const nameArg = mapAttr.args?.find((arg) => arg.name === 'name');
@@ -393,7 +473,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         let schema = this.schema.provider.defaultSchema ?? 'public';
         const schemaAttr = this.schema.models[model]?.attributes?.find((attr) => attr.name === '@@schema');
         if (schemaAttr) {
-            const nameArg = schemaAttr.args?.find((arg) => arg.name === 'name');
+            const nameArg = schemaAttr.args?.find((arg) => arg.name === 'map');
             if (nameArg && nameArg.value.kind === 'literal') {
                 schema = nameArg.value.value as string;
             }
@@ -411,9 +491,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
             );
             if (columnName !== fieldDef.name) {
                 const aliased = AliasNode.create(columnRef, IdentifierNode.create(fieldDef.name));
-                return SelectionNode.create(aliased);
+                return { originalField: fieldDef.name, selection: SelectionNode.create(aliased) };
             } else {
-                return SelectionNode.create(columnRef);
+                return { originalField: fieldDef.name, selection: SelectionNode.create(columnRef) };
             }
         });
     }
@@ -442,20 +522,28 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return result;
     }
 
-    private processSelection(node: AliasNode | ColumnNode | ReferenceNode) {
-        let alias: string | undefined;
-        if (!AliasNode.is(node)) {
-            alias = extractFieldName(node);
+    private processSelection(node: SelectionNodeChild) {
+        const { alias, node: innerNode } = stripAlias(node);
+        const originalField = extractFieldName(innerNode);
+        let result = super.transformNode(node);
+
+        if (originalField) {
+            // process enum value mapping
+            result = this.processEnumSelection(result, originalField);
         }
-        const result = super.transformNode(node);
-        return this.wrapAlias(result, alias ? IdentifierNode.create(alias) : undefined);
+
+        if (!AliasNode.is(result)) {
+            const addAlias = alias ?? (originalField ? IdentifierNode.create(originalField) : undefined);
+            if (addAlias) {
+                result = this.wrapAlias(result, addAlias);
+            }
+        }
+        return result;
     }
 
     private processSelectAll(node: SelectAllNode) {
-        const scope = this.scopes[this.scopes.length - 1];
-        invariant(scope);
-
-        if (!scope.model || !this.hasMappedColumns(scope.model)) {
+        const scope = this.requireCurrentScope();
+        if (!scope.model || !(this.hasMappedColumns(scope.model) || this.modelUsesEnumWithMappedValues(scope.model))) {
             // no name mapping needed, preserve the select all
             return super.transformSelectAll(node);
         }
@@ -465,14 +553,163 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return this.getModelFields(modelDef).map((fieldDef) => {
             const columnName = this.mapFieldName(modelDef.name, fieldDef.name);
             const columnRef = ReferenceNode.create(ColumnNode.create(columnName));
-            return columnName !== fieldDef.name
-                ? this.wrapAlias(columnRef, IdentifierNode.create(fieldDef.name))
-                : columnRef;
+
+            // process enum value mapping
+            const enumProcessed = this.processEnumSelection(columnRef, fieldDef.name);
+
+            return columnName !== fieldDef.name && !AliasNode.is(enumProcessed)
+                ? this.wrapAlias(enumProcessed, IdentifierNode.create(fieldDef.name))
+                : enumProcessed;
         });
     }
 
     private createTableNode(tableName: string, schemaName: string | undefined) {
         return schemaName ? TableNode.createWithSchema(schemaName, tableName) : TableNode.create(tableName);
+    }
+
+    private requireCurrentScope() {
+        const scope = this.scopes[this.scopes.length - 1];
+        invariant(scope, 'No scope available');
+        return scope;
+    }
+
+    // #endregion
+
+    // #region enum value mapping
+
+    private modelUsesEnumWithMappedValues(model: string) {
+        const modelDef = getModel(this.schema, model);
+        if (!modelDef) {
+            return false;
+        }
+        return this.getModelFields(modelDef).some((fieldDef) => {
+            const enumDef = getEnum(this.schema, fieldDef.type);
+            if (!enumDef) {
+                return false;
+            }
+            return Object.values(enumDef.fields ?? {}).some((f) => f.attributes?.some((attr) => attr.name === '@map'));
+        });
+    }
+
+    private getEnumValueMapping(enumDef: EnumDef) {
+        const mapping: Record<string, string> = {};
+        for (const [key, field] of Object.entries(enumDef.fields ?? {})) {
+            const mappedName = this.getMappedName(field);
+            if (mappedName) {
+                mapping[key] = mappedName;
+            }
+        }
+        return mapping;
+    }
+
+    private processEnumMappingForColumns(
+        model: string,
+        columns: readonly ColumnNode[],
+        values: OperationNode,
+    ): OperationNode {
+        if (ValuesNode.is(values)) {
+            return ValuesNode.create(
+                values.values.map((valueItems) => {
+                    if (PrimitiveValueListNode.is(valueItems)) {
+                        return PrimitiveValueListNode.create(
+                            this.processEnumMappingForValues(model, columns, valueItems.values),
+                        );
+                    } else {
+                        return ValueListNode.create(
+                            this.processEnumMappingForValues(model, columns, valueItems.values) as OperationNode[],
+                        );
+                    }
+                }),
+            );
+        } else if (PrimitiveValueListNode.is(values)) {
+            return PrimitiveValueListNode.create(this.processEnumMappingForValues(model, columns, values.values));
+        } else {
+            return values;
+        }
+    }
+
+    private processEnumMappingForValues(model: string, columns: readonly ColumnNode[], values: readonly unknown[]) {
+        const result: unknown[] = [];
+        for (let i = 0; i < columns.length; i++) {
+            const value = values[i];
+            if (value === null || value === undefined) {
+                result.push(value);
+                continue;
+            }
+            result.push(this.processEnumMappingForValue(model, columns[i]!, value));
+        }
+        return result;
+    }
+
+    private processEnumMappingForValue(model: string, column: ColumnNode, value: unknown) {
+        const fieldDef = getField(this.schema, model, column.column.name);
+        if (!fieldDef) {
+            return value;
+        }
+        if (!isEnum(this.schema, fieldDef.type)) {
+            return value;
+        }
+
+        const enumDef = getEnum(this.schema, fieldDef.type);
+        if (!enumDef) {
+            return value;
+        }
+
+        const enumValueMapping = this.getEnumValueMapping(enumDef);
+        if (this.isOperationNode(value) && ValueNode.is(value) && typeof value.value === 'string') {
+            const mappedValue = enumValueMapping[value.value];
+            if (mappedValue) {
+                return ValueNode.create(mappedValue);
+            }
+        } else if (typeof value === 'string') {
+            const mappedValue = enumValueMapping[value];
+            if (mappedValue) {
+                return mappedValue;
+            }
+        }
+
+        return value;
+    }
+
+    private processEnumSelection(selection: SelectionNodeChild, fieldName: string) {
+        const { alias, node } = stripAlias(selection);
+        const fieldScope = this.resolveFieldFromScopes(fieldName);
+        if (!fieldScope || !fieldScope.model) {
+            return selection;
+        }
+        const aliasName = alias && IdentifierNode.is(alias) ? alias.name : fieldName;
+
+        const fieldDef = getField(this.schema, fieldScope.model, fieldName);
+        if (!fieldDef) {
+            return selection;
+        }
+        const enumDef = getEnum(this.schema, fieldDef.type);
+        if (!enumDef) {
+            return selection;
+        }
+        const enumValueMapping = this.getEnumValueMapping(enumDef);
+        if (Object.keys(enumValueMapping).length === 0) {
+            return selection;
+        }
+
+        const eb = expressionBuilder();
+        const caseBuilder = eb.case();
+        let caseWhen: CaseWhenBuilder<any, any, any, any> | undefined;
+        for (const [key, value] of Object.entries(enumValueMapping)) {
+            if (!caseWhen) {
+                caseWhen = caseBuilder.when(new ExpressionWrapper(node), '=', value).then(key);
+            } else {
+                caseWhen = caseWhen.when(new ExpressionWrapper(node), '=', value).then(key);
+            }
+        }
+
+        // the explicit cast to "text" is needed to address postgres's case-when type inference issue
+        const finalExpr = caseWhen!.else(eb.cast(new ExpressionWrapper(node), 'text')).end();
+        if (aliasName) {
+            return finalExpr.as(aliasName).toOperationNode() as SelectionNodeChild;
+        } else {
+            return finalExpr.toOperationNode() as SelectionNodeChild;
+        }
     }
 
     // #endregion

@@ -328,13 +328,17 @@ export const schema = {
     },
     enums: {
         Role: {
-            ADMIN: "ADMIN",
-            USER: "USER"
+            values: {
+                ADMIN: "ADMIN",
+                USER: "USER"
+            }
         },
         Status: {
-            ACTIVE: "ACTIVE",
-            INACTIVE: "INACTIVE",
-            BANNED: "BANNED"
+            values: {
+                ACTIVE: "ACTIVE",
+                INACTIVE: "INACTIVE",
+                BANNED: "BANNED"
+            }
         }
     },
     authType: "User",

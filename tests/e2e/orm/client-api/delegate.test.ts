@@ -8,13 +8,10 @@ describe('Delegate model tests ', () => {
     let client: ClientContract<SchemaType>;
 
     beforeEach(async () => {
-        client = await createTestClient(
-            schema,
-            {
-                usePrismaPush: true,
-            },
-            path.join(__dirname, '../schemas/delegate/schema.zmodel'),
-        );
+        client = await createTestClient(schema, {
+            usePrismaPush: true,
+            schemaFile: path.join(__dirname, '../schemas/delegate/schema.zmodel'),
+        });
     });
 
     afterEach(async () => {

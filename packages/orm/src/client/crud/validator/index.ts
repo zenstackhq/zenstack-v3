@@ -31,10 +31,12 @@ import {
     type UpdateManyArgs,
     type UpsertArgs,
 } from '../../crud-types';
+import { createInternalError, createInvalidInputError } from '../../errors';
 import {
     fieldHasDefaultValue,
     getDiscriminatorField,
     getEnum,
+    getTypeDef,
     getUniqueFields,
     requireField,
     requireModel,
@@ -47,7 +49,6 @@ import {
     addNumberValidation,
     addStringValidation,
 } from './utils';
-import { createInternalError, createInvalidInputError } from '../../errors';
 
 const schemaCache = new WeakMap<SchemaDef, Map<string, ZodType>>();
 
@@ -281,6 +282,8 @@ export class InputValidator<Schema extends SchemaDef> {
     private makePrimitiveSchema(type: string, attributes?: AttributeApplication[]) {
         if (this.schema.typeDefs && type in this.schema.typeDefs) {
             return this.makeTypeDefSchema(type);
+        } else if (this.schema.enums && type in this.schema.enums) {
+            return this.makeEnumSchema(type);
         } else {
             return match(type)
                 .with('String', () =>
@@ -314,6 +317,22 @@ export class InputValidator<Schema extends SchemaDef> {
         }
     }
 
+    private makeEnumSchema(type: string) {
+        const key = stableStringify({
+            type: 'enum',
+            name: type,
+        });
+        let schema = this.getSchemaCache(key!);
+        if (schema) {
+            return schema;
+        }
+        const enumDef = getEnum(this.schema, type);
+        invariant(enumDef, `Enum "${type}" not found in schema`);
+        schema = z.enum(Object.keys(enumDef.values) as [string, ...string[]]);
+        this.setSchemaCache(key!, schema);
+        return schema;
+    }
+
     private makeTypeDefSchema(type: string): z.ZodType {
         const key = stableStringify({
             type: 'typedef',
@@ -324,24 +343,22 @@ export class InputValidator<Schema extends SchemaDef> {
         if (schema) {
             return schema;
         }
-        const typeDef = this.schema.typeDefs?.[type];
+        const typeDef = getTypeDef(this.schema, type);
         invariant(typeDef, `Type definition "${type}" not found in schema`);
-        schema = z
-            .object(
-                Object.fromEntries(
-                    Object.entries(typeDef.fields).map(([field, def]) => {
-                        let fieldSchema = this.makePrimitiveSchema(def.type);
-                        if (def.array) {
-                            fieldSchema = fieldSchema.array();
-                        }
-                        if (def.optional) {
-                            fieldSchema = fieldSchema.optional();
-                        }
-                        return [field, fieldSchema];
-                    }),
-                ),
-            )
-            .passthrough();
+        schema = z.looseObject(
+            Object.fromEntries(
+                Object.entries(typeDef.fields).map(([field, def]) => {
+                    let fieldSchema = this.makePrimitiveSchema(def.type);
+                    if (def.array) {
+                        fieldSchema = fieldSchema.array();
+                    }
+                    if (def.optional) {
+                        fieldSchema = fieldSchema.optional();
+                    }
+                    return [field, fieldSchema];
+                }),
+            ),
+        );
         this.setSchemaCache(key!, schema);
         return schema;
     }
@@ -392,7 +409,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 const enumDef = getEnum(this.schema, fieldDef.type);
                 if (enumDef) {
                     // enum
-                    if (Object.keys(enumDef).length > 0) {
+                    if (Object.keys(enumDef.values).length > 0) {
                         fieldSchema = this.makeEnumFilterSchema(enumDef, !!fieldDef.optional, withAggregations);
                     }
                 } else if (fieldDef.array) {
@@ -427,7 +444,7 @@ export class InputValidator<Schema extends SchemaDef> {
                                     const enumDef = getEnum(this.schema, def.type);
                                     if (enumDef) {
                                         // enum
-                                        if (Object.keys(enumDef).length > 0) {
+                                        if (Object.keys(enumDef.values).length > 0) {
                                             fieldSchema = this.makeEnumFilterSchema(enumDef, !!def.optional, false);
                                         } else {
                                             fieldSchema = z.never();
@@ -493,7 +510,7 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeEnumFilterSchema(enumDef: EnumDef, optional: boolean, withAggregations: boolean) {
-        const baseSchema = z.enum(Object.keys(enumDef) as [string, ...string[]]);
+        const baseSchema = z.enum(Object.keys(enumDef.values) as [string, ...string[]]);
         const components = this.makeCommonPrimitiveFilterComponents(
             baseSchema,
             optional,

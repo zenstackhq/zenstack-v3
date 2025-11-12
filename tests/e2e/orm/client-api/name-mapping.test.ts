@@ -1,18 +1,17 @@
+import type { ClientContract } from '@zenstackhq/orm';
+import { createTestClient } from '@zenstackhq/testtools';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ClientContract } from '@zenstackhq/orm';
 import { schema, type SchemaType } from '../schemas/name-mapping/schema';
-import { createTestClient } from '@zenstackhq/testtools';
 
 describe('Name mapping tests', () => {
     let db: ClientContract<SchemaType>;
 
     beforeEach(async () => {
-        db = await createTestClient(
-            schema,
-            { usePrismaPush: true },
-            path.join(__dirname, '../schemas/name-mapping/schema.zmodel'),
-        );
+        db = await createTestClient(schema, {
+            usePrismaPush: true,
+            schemaFile: path.join(__dirname, '../schemas/name-mapping/schema.zmodel'),
+        });
     });
 
     afterEach(async () => {
@@ -34,6 +33,37 @@ describe('Name mapping tests', () => {
         ).resolves.toMatchObject({
             id: expect.any(Number),
             email: 'u1@test.com',
+            role: 'USER', // mapped enum value
+        });
+
+        let rawRead = await db.$qbRaw
+            .selectFrom('users')
+            .where('user_email', '=', 'u1@test.com')
+            .selectAll()
+            .executeTakeFirst();
+        await expect(rawRead).toMatchObject({
+            user_email: 'u1@test.com',
+            user_role: 'role_user',
+        });
+
+        await expect(
+            db.user.create({
+                data: {
+                    email: 'u1_1@test.com',
+                    role: 'MODERATOR', // unmapped enum value
+                },
+            }),
+        ).resolves.toMatchObject({
+            role: 'MODERATOR',
+        });
+
+        rawRead = await db.$qbRaw
+            .selectFrom('users')
+            .where('user_email', '=', 'u1_1@test.com')
+            .selectAll()
+            .executeTakeFirst();
+        await expect(rawRead).toMatchObject({
+            user_role: 'MODERATOR',
         });
 
         await expect(
@@ -41,12 +71,22 @@ describe('Name mapping tests', () => {
                 .insertInto('User')
                 .values({
                     email: 'u2@test.com',
+                    role: 'ADMIN',
                 })
-                .returning(['id', 'email'])
+                .returning(['id', 'email', 'role'])
                 .executeTakeFirst(),
         ).resolves.toMatchObject({
             id: expect.any(Number),
             email: 'u2@test.com',
+            role: 'ADMIN',
+        });
+        rawRead = await db.$qbRaw
+            .selectFrom('users')
+            .where('user_email', '=', 'u2@test.com')
+            .selectAll()
+            .executeTakeFirst();
+        await expect(rawRead).toMatchObject({
+            user_role: 'role_admin',
         });
 
         await expect(
@@ -73,6 +113,7 @@ describe('Name mapping tests', () => {
         ).resolves.toMatchObject({
             id: expect.any(Number),
             email: 'u4@test.com',
+            role: 'USER',
         });
     });
 
@@ -94,13 +135,26 @@ describe('Name mapping tests', () => {
                 select: {
                     id: true,
                     email: true,
+                    role: true,
                     posts: { where: { title: { contains: 'Post1' } }, select: { title: true } },
                 },
             }),
         ).resolves.toMatchObject({
             id: expect.any(Number),
             email: 'u1@test.com',
+            role: 'USER',
             posts: [{ title: 'Post1' }],
+        });
+
+        // select all
+        await expect(
+            db.user.findFirst({
+                where: { email: 'u1@test.com' },
+            }),
+        ).resolves.toMatchObject({
+            id: expect.any(Number),
+            email: 'u1@test.com',
+            role: 'USER',
         });
 
         await expect(
@@ -108,12 +162,18 @@ describe('Name mapping tests', () => {
         ).resolves.toMatchObject({
             id: expect.any(Number),
             email: 'u1@test.com',
+            role: 'USER',
         });
 
         await expect(
-            db.$qb.selectFrom('User').select(['User.email']).where('email', '=', 'u1@test.com').executeTakeFirst(),
+            db.$qb
+                .selectFrom('User')
+                .select(['User.email', 'User.role'])
+                .where('email', '=', 'u1@test.com')
+                .executeTakeFirst(),
         ).resolves.toMatchObject({
             email: 'u1@test.com',
+            role: 'USER',
         });
 
         await expect(
@@ -172,6 +232,7 @@ describe('Name mapping tests', () => {
                 where: { id: user.id },
                 data: {
                     email: 'u2@test.com',
+                    role: 'ADMIN',
                     posts: {
                         update: {
                             where: { id: 1 },
@@ -184,21 +245,22 @@ describe('Name mapping tests', () => {
         ).resolves.toMatchObject({
             id: user.id,
             email: 'u2@test.com',
+            role: 'ADMIN',
             posts: [expect.objectContaining({ title: 'Post2' })],
         });
 
         await expect(
             db.$qb
                 .updateTable('User')
-                .set({ email: (eb) => eb.fn('upper', [eb.ref('email')]) })
+                .set({ email: (eb) => eb.fn('upper', [eb.ref('email')]), role: 'USER' })
                 .where('email', '=', 'u2@test.com')
-                .returning(['email'])
+                .returning(['email', 'role'])
                 .executeTakeFirst(),
-        ).resolves.toMatchObject({ email: 'U2@TEST.COM' });
+        ).resolves.toMatchObject({ email: 'U2@TEST.COM', role: 'USER' });
 
         await expect(
             db.$qb.updateTable('User as u').set({ email: 'u3@test.com' }).returningAll().executeTakeFirst(),
-        ).resolves.toMatchObject({ id: expect.any(Number), email: 'u3@test.com' });
+        ).resolves.toMatchObject({ id: expect.any(Number), email: 'u3@test.com', role: 'USER' });
     });
 
     it('works with delete', async () => {
@@ -229,6 +291,7 @@ describe('Name mapping tests', () => {
         ).resolves.toMatchObject({
             email: 'u1@test.com',
             posts: [],
+            role: 'USER',
         });
     });
 
@@ -236,6 +299,7 @@ describe('Name mapping tests', () => {
         await db.user.create({
             data: {
                 email: 'u1@test.com',
+                role: 'USER',
                 posts: {
                     create: [{ title: 'Post1' }, { title: 'Post2' }],
                 },
@@ -245,6 +309,7 @@ describe('Name mapping tests', () => {
         await db.user.create({
             data: {
                 email: 'u2@test.com',
+                role: 'MODERATOR',
                 posts: {
                     create: [{ title: 'Post3' }],
                 },
@@ -254,8 +319,9 @@ describe('Name mapping tests', () => {
         // Test ORM count operations
         await expect(db.user.count()).resolves.toBe(2);
         await expect(db.post.count()).resolves.toBe(3);
-        await expect(db.user.count({ select: { email: true } })).resolves.toMatchObject({
+        await expect(db.user.count({ select: { email: true, role: true } })).resolves.toMatchObject({
             email: 2,
+            role: 2,
         });
 
         await expect(db.user.count({ where: { email: 'u1@test.com' } })).resolves.toBe(1);
@@ -266,9 +332,11 @@ describe('Name mapping tests', () => {
         // Test Kysely count operations
         const r = await db.$qb
             .selectFrom('User')
-            .select((eb) => eb.fn.count('email').as('count'))
+            .select((eb) => eb.fn.count('email').as('email_count'))
+            .select((eb) => eb.fn.count('role').as('role_count'))
             .executeTakeFirst();
-        await expect(Number(r?.count)).toBe(2);
+        await expect(Number(r?.email_count)).toBe(2);
+        await expect(Number(r?.role_count)).toBe(2);
     });
 
     it('works with aggregate', async () => {
@@ -276,6 +344,7 @@ describe('Name mapping tests', () => {
             data: {
                 id: 1,
                 email: 'u1@test.com',
+                role: 'USER',
                 posts: {
                     create: [
                         { id: 1, title: 'Post1' },
@@ -289,6 +358,7 @@ describe('Name mapping tests', () => {
             data: {
                 id: 2,
                 email: 'u2@test.com',
+                role: 'MODERATOR',
                 posts: {
                     create: [{ id: 3, title: 'Post3' }],
                 },
@@ -296,8 +366,12 @@ describe('Name mapping tests', () => {
         });
 
         // Test ORM aggregate operations
-        await expect(db.user.aggregate({ _count: { id: true, email: true } })).resolves.toMatchObject({
+        await expect(
+            db.user.aggregate({ _count: { id: true, email: true }, _max: { role: true }, _min: { role: true } }),
+        ).resolves.toMatchObject({
             _count: { id: 2, email: 2 },
+            _max: { role: 'USER' },
+            _min: { role: 'MODERATOR' },
         });
 
         await expect(
@@ -342,6 +416,7 @@ describe('Name mapping tests', () => {
             data: {
                 id: 1,
                 email: 'u1@test.com',
+                role: 'USER',
                 posts: {
                     create: [
                         { id: 1, title: 'Post1' },
@@ -356,6 +431,7 @@ describe('Name mapping tests', () => {
             data: {
                 id: 2,
                 email: 'u2@test.com',
+                role: 'MODERATOR',
                 posts: {
                     create: [
                         { id: 4, title: 'Post4' },
@@ -386,6 +462,18 @@ describe('Name mapping tests', () => {
                 { email: 'u1@test.com', _count: { id: 1 } },
                 { email: 'u2@test.com', _count: { id: 1 } },
                 { email: 'u3@test.com', _count: { id: 1 } },
+            ]),
+        );
+
+        const userGroupBy1 = await db.user.groupBy({
+            by: ['role'],
+            _count: { id: true },
+        });
+        expect(userGroupBy1).toHaveLength(2);
+        expect(userGroupBy1).toEqual(
+            expect.arrayContaining([
+                { role: 'USER', _count: { id: 2 } },
+                { role: 'MODERATOR', _count: { id: 1 } },
             ]),
         );
 

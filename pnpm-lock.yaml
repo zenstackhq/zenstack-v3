@@ -183,6 +183,9 @@ importers:
       '@zenstackhq/language':
         specifier: workspace:*
         version: link:../language
+      '@zenstackhq/schema':
+        specifier: workspace:*
+        version: link:../schema
       '@zenstackhq/sdk':
         specifier: workspace:*
         version: link:../sdk

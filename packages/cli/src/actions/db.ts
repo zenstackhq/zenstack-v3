@@ -1,5 +1,6 @@
-import { Model, Enum, DataModel, DataField } from '@zenstackhq/language/ast';
-import { ZModelCodeGenerator } from '@zenstackhq/sdk';
+import { config } from '@dotenvx/dotenvx';
+import { ZModelCodeGenerator } from '@zenstackhq/language';
+import { type DataField, DataModel, Enum, type Model } from '@zenstackhq/language/ast';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execPrisma } from '../utils/exec-utils';
@@ -7,7 +8,6 @@ import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError, require
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers } from './pull/provider';
 import { getDatasource, getDbName, getRelationFkName } from './pull/utils';
-import { config } from '@dotenvx/dotenvx';
 
 type PushOptions = {
     schema?: string;
@@ -17,7 +17,6 @@ type PushOptions = {
 
 export type PullOptions = {
     schema?: string;
-    excludeSchemas?: string[];
     out?: string;
     modelCasing: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none';
     fieldCasing: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none';
@@ -74,7 +73,7 @@ async function runPush(options: PushOptions) {
 async function runPull(options: PullOptions) {
     try {
         const schemaFile = getSchemaFile(options.schema);
-        const { model, services } = await loadSchemaDocumentWithServices(schemaFile);
+        const { model, services } = await loadSchemaDocument(schemaFile, { returnServices: true });
         config();
         const SUPPORTED_PROVIDERS = ['sqlite', 'postgresql'];
         const datasource = getDatasource(model);
@@ -94,8 +93,8 @@ async function runPull(options: PullOptions) {
         }
 
         const { enums: allEnums, tables: allTables } = await provider.introspect(datasource.url);
-        const enums = allEnums.filter((e) => !options.excludeSchemas?.includes(e.schema_name));
-        const tables = allTables.filter((t) => !options.excludeSchemas?.includes(t.schema));
+        const enums = allEnums.filter((e) => datasource.schemas.includes(e.schema_name));
+        const tables = allTables.filter((t) => datasource.schemas.includes(t.schema));
 
         const newModel: Model = {
             $type: 'Model',
@@ -106,11 +105,18 @@ async function runPull(options: PullOptions) {
             imports: [],
         };
 
-        syncEnums({ dbEnums: enums, model: newModel, services, options });
+        syncEnums({ dbEnums: enums, model: newModel, services, options, defaultSchema: datasource.defaultSchema });
 
         const resolvedRelations: Relation[] = [];
         for (const table of tables) {
-            const relations = syncTable({ table, model: newModel, provider, services, options });
+            const relations = syncTable({
+                table,
+                model: newModel,
+                provider,
+                services,
+                options,
+                defaultSchema: datasource.defaultSchema,
+            });
             resolvedRelations.push(...relations);
         }
 

@@ -1,7 +1,7 @@
 import type { ZModelServices } from '@zenstackhq/language';
 import {
-    Attribute,
     isEnum,
+    type Attribute,
     type DataField,
     type DataModel,
     type Enum,
@@ -23,11 +23,13 @@ export function syncEnums({
     model,
     options,
     services,
+    defaultSchema,
 }: {
     dbEnums: IntrospectedEnum[];
     model: Model;
     services: ZModelServices;
     options: PullOptions;
+    defaultSchema: string;
 }) {
     for (const dbEnum of dbEnums) {
         const { modified, name } = resolveNameCasing(options.modelCasing, dbEnum.enum_type);
@@ -55,18 +57,12 @@ export function syncEnums({
             });
         });
 
-        try {
-            if (dbEnum.schema_name && dbEnum.schema_name !== '' && dbEnum.schema_name !== 'public') {
-                factory.addAttribute((b) =>
-                    b
-                        .setDecl(getAttributeRef('@@schema', services))
-                        .addArg((a) => a.StringLiteral.setValue(dbEnum.schema_name)),
-                );
-            }
-        } catch (error: any) {
-            if (error?.message !== `Declaration not found: @@schema`) throw error;
-            //Waiting to support multi-schema
-            //TODO: remove catch after multi-schema support is implemented
+        if (dbEnum.schema_name && dbEnum.schema_name !== '' && dbEnum.schema_name !== defaultSchema) {
+            factory.addAttribute((b) =>
+                b
+                    .setDecl(getAttributeRef('@@schema', services))
+                    .addArg((a) => a.StringLiteral.setValue(dbEnum.schema_name)),
+            );
         }
 
         model.declarations.push(factory.get({ $container: model }));
@@ -143,12 +139,14 @@ export function syncTable({
     table,
     services,
     options,
+    defaultSchema,
 }: {
     table: IntrospectedTable;
     model: Model;
     provider: IntrospectionProvider;
     services: ZModelServices;
     options: PullOptions;
+    defaultSchema: string;
 }) {
     const idAttribute = getAttributeRef('@id', services);
     const modelIdAttribute = getAttributeRef('@@id', services);
@@ -372,16 +370,10 @@ export function syncTable({
         );
     });
 
-    try {
-        if (table.schema && table.schema !== '' && table.schema !== 'public') {
-            modelFactory.addAttribute((b) =>
-                b.setDecl(getAttributeRef('@@schema', services)).addArg((a) => a.StringLiteral.setValue(table.schema)),
-            );
-        }
-    } catch (error: any) {
-        if (error?.message !== `Declaration not found: @@schema`) throw error;
-        //Waiting to support multi-schema
-        //TODO: remove catch after multi-schema support is implemented
+    if (table.schema && table.schema !== '' && table.schema !== defaultSchema) {
+        modelFactory.addAttribute((b) =>
+            b.setDecl(getAttributeRef('@@schema', services)).addArg((a) => a.StringLiteral.setValue(table.schema)),
+        );
     }
 
     model.declarations.push(modelFactory.node);

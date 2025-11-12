@@ -148,7 +148,6 @@ function createProgram() {
         .description('Introspect your database.')
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
-        .addOption(new Option('-e, --exclude-schemas <schemas...>', 'exclude specific schemas from introspection'))
         .addOption(new Option('-o, --out <path>', 'add custom output path for the introspected schema'))
         .addOption(
             new Option('--model-casing <pascal|camel|snake|kebab>', 'set the casing of generated models').default(

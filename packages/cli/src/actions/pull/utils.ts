@@ -11,8 +11,8 @@ import {
     type Model,
     type StringLiteral,
 } from '@zenstackhq/language/ast';
-import { getStringLiteral } from '@zenstackhq/language/utils';
-import type { DataSourceProviderType } from '@zenstackhq/sdk/schema';
+import { getLiteralArray, getStringLiteral } from '@zenstackhq/language/utils';
+import type { DataSourceProviderType } from '@zenstackhq/schema';
 import type { Reference } from 'langium';
 
 export function getAttribute(model: Model, attrName: string) {
@@ -53,12 +53,26 @@ export function getDatasource(model: Model) {
         throw new Error('The url field must be a string literal or an env().');
     }
 
+    const defaultSchemaField = datasource.fields.find((f) => f.name === 'defaultSchema');
+    const defaultSchema = (defaultSchemaField && getStringLiteral(defaultSchemaField.value)) || 'public';
+
+    const schemasField = datasource.fields.find((f) => f.name === 'schemas');
+    const schemas =
+        (schemasField &&
+            getLiteralArray(schemasField.value)
+                ?.map(getStringLiteral)
+                .filter((s) => s !== undefined)) ||
+        [];
+
     return {
         name: datasource.name,
         provider: getStringLiteral(
             datasource.fields.find((f) => f.name === 'provider')?.value,
         ) as DataSourceProviderType,
         url,
+        defaultSchema,
+        schemas,
+        allSchemas: [defaultSchema, ...schemas],
     };
 }
 

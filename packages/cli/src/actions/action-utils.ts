@@ -1,5 +1,5 @@
-import { loadDocument } from '@zenstackhq/language';
-import { isDataSource } from '@zenstackhq/language/ast';
+import { type ZModelServices, loadDocument } from '@zenstackhq/language';
+import { type Model, isDataSource } from '@zenstackhq/language/ast';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
 import fs from 'node:fs';
@@ -41,22 +41,22 @@ export function getSchemaFile(file?: string) {
     }
 }
 
-export async function loadSchemaDocument(schemaFile: string) {
-    const loadResult = await loadDocument(schemaFile);
-    if (!loadResult.success) {
-        loadResult.errors.forEach((err) => {
-            console.error(colors.red(err));
-        });
-        throw new CliError('Schema contains errors. See above for details.');
-    }
-    loadResult.warnings.forEach((warn) => {
-        console.warn(colors.yellow(warn));
-    });
-    return loadResult.model;
-}
+export async function loadSchemaDocument(
+    schemaFile: string,
+    opts?: { keepImports?: boolean; returnServices?: false },
+): Promise<Model>;
+export async function loadSchemaDocument(
+    schemaFile: string,
+    opts: { returnServices: true; keepImports?: boolean },
+): Promise<{ model: Model; services: ZModelServices }>;
+export async function loadSchemaDocument(
+    schemaFile: string,
+    opts: { returnServices?: boolean; keepImports?: boolean } = {},
+) {
+    const returnServices = opts.returnServices || false;
+    const keepImports = opts.keepImports || false;
 
-export async function loadSchemaDocumentWithServices(schemaFile: string) {
-    const loadResult = await loadDocument(schemaFile, [], true);
+    const loadResult = await loadDocument(schemaFile, [], keepImports);
     if (!loadResult.success) {
         loadResult.errors.forEach((err) => {
             console.error(colors.red(err));
@@ -66,7 +66,10 @@ export async function loadSchemaDocumentWithServices(schemaFile: string) {
     loadResult.warnings.forEach((warn) => {
         console.warn(colors.yellow(warn));
     });
-    return { services: loadResult.services, model: loadResult.model };
+
+    if (returnServices) return { model: loadResult.model, services: loadResult.services };
+
+    return loadResult.model;
 }
 
 export function handleSubProcessError(err: unknown) {

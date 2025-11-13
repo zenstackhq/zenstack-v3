@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/server",
-    "version": "3.0.0-beta.21",
+    "version": "3.0.0-beta.22",
     "description": "ZenStack automatic CRUD API handlers and server adapters",
     "type": "module",
     "scripts": {
@@ -125,7 +125,7 @@
         "@zenstackhq/orm": "workspace:*",
         "decimal.js": "catalog:",
         "superjson": "^2.2.3",
-        "ts-japi": "^1.12.0",
+        "ts-japi": "^1.12.1",
         "ts-pattern": "catalog:",
         "url-pattern": "^1.0.3",
         "zod-validation-error": "catalog:"

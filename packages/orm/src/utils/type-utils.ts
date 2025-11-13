@@ -16,6 +16,8 @@ export type Simplify<T, D extends number = 6> = D extends 0
           : { [K in keyof T]: Simplify<T[K], _Depth[D]> } & {}
       : T;
 
+export type SimplifyIf<T, Condition extends boolean> = Condition extends true ? Simplify<T> : T;
+
 export type WrapType<T, Optional = false, Array = false> = Array extends true
     ? Optional extends true
         ? T[] | null

@@ -25,7 +25,7 @@ describe('React Query Test', () => {
         const Provider = QuerySettingsProvider;
         const wrapper = ({ children }: { children: React.ReactNode }) => (
             <QueryClientProvider client={queryClient}>
-                <Provider value={{ endpoint: `${BASE_URL}/api/model`, logging: true }}>{children}</Provider>
+                <Provider value={{ endpoint: `${BASE_URL}/api/model` }}>{children}</Provider>
             </QueryClientProvider>
         );
         return { queryClient, wrapper };

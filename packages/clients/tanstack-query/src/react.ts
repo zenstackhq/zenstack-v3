@@ -205,7 +205,7 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
             options?: ModelMutationOptions<BatchResult, T>,
         ): ModelMutationResult<BatchResult, T>;
 
-        useUpdateManyAndReturn<T extends UpdateManyAndReturnArgs<Schema, Model>>(
+        useUpdateManyAndReturn<T extends UpdateManyAndReturnArgs<Schema, Model, true>>(
             options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, T>[], T>,
         ): ModelMutationModelResult<Schema, Model, T, true>;
 

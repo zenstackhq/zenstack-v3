@@ -1,5 +1,5 @@
 import type { SchemaDef } from '@zenstackhq/orm/schema';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server.js';
 import type { AppRouteRequestHandlerOptions } from '.';
 import { logInternalError } from '../common';
 

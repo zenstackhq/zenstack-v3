@@ -14,7 +14,6 @@ import type {
     CreateManyArgs,
     DeleteArgs,
     DeleteManyArgs,
-    FindArgs,
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,

@@ -327,7 +327,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * ```
      */
     findMany<T extends FindManyArgs<Schema, Model, true>>(
-        args?: SelectSubset<T, FindArgs<Schema, Model, true>>,
+        args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>[]>;
 
     /**
@@ -668,8 +668,8 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * });
      * ```
      */
-    upsert<T extends UpsertArgs<Schema, Model>>(
-        args: SelectSubset<T, UpsertArgs<Schema, Model, true>>,
+    upsert<T extends UpsertArgs<Schema, Model, true>>(
+        args: SelectSubset<T, UpsertArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>>;
 
     /**
@@ -691,8 +691,8 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * }); // result: `{ id: string; email: string }`
      * ```
      */
-    delete<T extends DeleteArgs<Schema, Model>>(
-        args: SelectSubset<T, DeleteArgs<Schema, Model, true>>,
+    delete<T extends DeleteArgs<Schema, Model, true>>(
+        args: SelectSubset<T, DeleteArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>>;
 
     /**

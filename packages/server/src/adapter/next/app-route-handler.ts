@@ -1,5 +1,5 @@
 import type { SchemaDef } from '@zenstackhq/orm/schema';
-import { NextRequest, NextResponse } from 'next/server.js';
+import type { NextRequest } from 'next/server';
 import type { AppRouteRequestHandlerOptions } from '.';
 import { logInternalError } from '../common';
 
@@ -13,11 +13,11 @@ type Context = { params: Promise<{ path: string[] }> };
  */
 export default function factory<Schema extends SchemaDef>(
     options: AppRouteRequestHandlerOptions<Schema>,
-): (req: NextRequest, context: Context) => Promise<NextResponse> {
+): (req: NextRequest, context: Context) => Promise<Response> {
     return async (req: NextRequest, context: Context) => {
         const client = await options.getClient(req);
         if (!client) {
-            return NextResponse.json({ message: 'unable to get ZenStackClient from request context' }, { status: 500 });
+            return Response.json({ message: 'unable to get ZenStackClient from request context' }, { status: 500 });
         }
 
         let params: Awaited<Context['params']>;
@@ -27,11 +27,11 @@ export default function factory<Schema extends SchemaDef>(
         try {
             params = await context.params;
         } catch {
-            return NextResponse.json({ message: 'Failed to resolve request parameters' }, { status: 500 });
+            return Response.json({ message: 'Failed to resolve request parameters' }, { status: 500 });
         }
 
         if (!params.path) {
-            return NextResponse.json(
+            return Response.json(
                 { message: 'missing path parameter' },
                 {
                     status: 400,
@@ -57,10 +57,10 @@ export default function factory<Schema extends SchemaDef>(
                 requestBody,
                 client,
             });
-            return NextResponse.json(r.body, { status: r.status });
+            return Response.json(r.body, { status: r.status });
         } catch (err) {
             logInternalError(options.apiHandler.log, err);
-            return NextResponse.json({ message: 'An internal server error occurred' }, { status: 500 });
+            return Response.json({ message: 'An internal server error occurred' }, { status: 500 });
         }
     };
 }

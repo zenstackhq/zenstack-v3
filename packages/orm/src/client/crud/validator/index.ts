@@ -65,14 +65,18 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.client.$options.validateInput !== false;
     }
 
-    validateFindArgs(model: GetModels<Schema>, args: unknown, options: { unique: boolean; findOne: boolean }) {
+    validateFindArgs(
+        model: GetModels<Schema>,
+        args: unknown,
+        options: { unique: boolean; findOne: boolean },
+    ): FindArgs<Schema, GetModels<Schema>, true> | undefined {
         return this.validate<
             FindArgs<Schema, GetModels<Schema>, true> | undefined,
             Parameters<typeof this.makeFindSchema>[1]
         >(model, 'find', options, (model, options) => this.makeFindSchema(model, options), args);
     }
 
-    validateCreateArgs(model: GetModels<Schema>, args: unknown) {
+    validateCreateArgs(model: GetModels<Schema>, args: unknown): CreateArgs<Schema, GetModels<Schema>> {
         return this.validate<CreateArgs<Schema, GetModels<Schema>>>(
             model,
             'create',
@@ -82,8 +86,8 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateCreateManyArgs(model: GetModels<Schema>, args: unknown) {
-        return this.validate<CreateManyArgs<Schema, GetModels<Schema>>, undefined>(
+    validateCreateManyArgs(model: GetModels<Schema>, args: unknown): CreateManyArgs<Schema, GetModels<Schema>> {
+        return this.validate<CreateManyArgs<Schema, GetModels<Schema>>>(
             model,
             'createMany',
             undefined,
@@ -92,7 +96,10 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateCreateManyAndReturnArgs(model: GetModels<Schema>, args: unknown) {
+    validateCreateManyAndReturnArgs(
+        model: GetModels<Schema>,
+        args: unknown,
+    ): CreateManyAndReturnArgs<Schema, GetModels<Schema>> | undefined {
         return this.validate<CreateManyAndReturnArgs<Schema, GetModels<Schema>> | undefined>(
             model,
             'createManyAndReturn',
@@ -102,7 +109,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateUpdateArgs(model: GetModels<Schema>, args: unknown) {
+    validateUpdateArgs(model: GetModels<Schema>, args: unknown): UpdateArgs<Schema, GetModels<Schema>> {
         return this.validate<UpdateArgs<Schema, GetModels<Schema>>>(
             model,
             'update',
@@ -112,7 +119,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateUpdateManyArgs(model: GetModels<Schema>, args: unknown) {
+    validateUpdateManyArgs(model: GetModels<Schema>, args: unknown): UpdateManyArgs<Schema, GetModels<Schema>> {
         return this.validate<UpdateManyArgs<Schema, GetModels<Schema>>>(
             model,
             'updateMany',
@@ -122,8 +129,11 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateUpdateManyAndReturnArgs(model: GetModels<Schema>, args: unknown) {
-        return this.validate<UpdateManyAndReturnArgs<Schema, GetModels<Schema>> | undefined>(
+    validateUpdateManyAndReturnArgs(
+        model: GetModels<Schema>,
+        args: unknown,
+    ): UpdateManyAndReturnArgs<Schema, GetModels<Schema>> {
+        return this.validate<UpdateManyAndReturnArgs<Schema, GetModels<Schema>>>(
             model,
             'updateManyAndReturn',
             undefined,
@@ -132,7 +142,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateUpsertArgs(model: GetModels<Schema>, args: unknown) {
+    validateUpsertArgs(model: GetModels<Schema>, args: unknown): UpsertArgs<Schema, GetModels<Schema>> {
         return this.validate<UpsertArgs<Schema, GetModels<Schema>>>(
             model,
             'upsert',
@@ -142,7 +152,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateDeleteArgs(model: GetModels<Schema>, args: unknown) {
+    validateDeleteArgs(model: GetModels<Schema>, args: unknown): DeleteArgs<Schema, GetModels<Schema>> {
         return this.validate<DeleteArgs<Schema, GetModels<Schema>>>(
             model,
             'delete',
@@ -152,7 +162,10 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateDeleteManyArgs(model: GetModels<Schema>, args: unknown) {
+    validateDeleteManyArgs(
+        model: GetModels<Schema>,
+        args: unknown,
+    ): DeleteManyArgs<Schema, GetModels<Schema>> | undefined {
         return this.validate<DeleteManyArgs<Schema, GetModels<Schema>> | undefined>(
             model,
             'deleteMany',
@@ -162,8 +175,8 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateCountArgs(model: GetModels<Schema>, args: unknown) {
-        return this.validate<CountArgs<Schema, GetModels<Schema>> | undefined, undefined>(
+    validateCountArgs(model: GetModels<Schema>, args: unknown): CountArgs<Schema, GetModels<Schema>> | undefined {
+        return this.validate<CountArgs<Schema, GetModels<Schema>> | undefined>(
             model,
             'count',
             undefined,
@@ -172,8 +185,8 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateAggregateArgs(model: GetModels<Schema>, args: unknown) {
-        return this.validate<AggregateArgs<Schema, GetModels<Schema>>, undefined>(
+    validateAggregateArgs(model: GetModels<Schema>, args: unknown): AggregateArgs<Schema, GetModels<Schema>> {
+        return this.validate<AggregateArgs<Schema, GetModels<Schema>>>(
             model,
             'aggregate',
             undefined,
@@ -182,8 +195,8 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    validateGroupByArgs(model: GetModels<Schema>, args: unknown) {
-        return this.validate<GroupByArgs<Schema, GetModels<Schema>>, undefined>(
+    validateGroupByArgs(model: GetModels<Schema>, args: unknown): GroupByArgs<Schema, GetModels<Schema>> {
+        return this.validate<GroupByArgs<Schema, GetModels<Schema>>>(
             model,
             'groupBy',
             undefined,

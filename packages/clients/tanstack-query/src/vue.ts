@@ -105,13 +105,11 @@ export type ModelMutationModelResult<
     Model extends GetModels<Schema>,
     TArgs,
     Array extends boolean = false,
-> = Omit<ModelMutationResult<SimplifiedModelResult<Schema, Model, TArgs>, TArgs>, 'mutateAsync'> & {
+> = Omit<ModelMutationResult<SimplifiedModelResult<Schema, Model, TArgs, false, Array>, TArgs>, 'mutateAsync'> & {
     mutateAsync<T extends TArgs>(
         args: T,
-        options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, T>, T>,
-    ): Promise<
-        Array extends true ? SimplifiedModelResult<Schema, Model, T>[] : SimplifiedModelResult<Schema, Model, T>
-    >;
+        options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, T, false, Array>, T>,
+    ): Promise<SimplifiedModelResult<Schema, Model, T, false, Array>>;
 };
 
 export type ClientHooks<Schema extends SchemaDef> = {

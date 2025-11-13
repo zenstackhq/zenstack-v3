@@ -117,13 +117,14 @@ export type ModelMutationModelResult<
     TArgs,
     Array extends boolean = false,
 > = Readable<
-    Omit<UnwrapStore<ModelMutationResult<SimplifiedModelResult<Schema, Model, TArgs>, TArgs>>, 'mutateAsync'> & {
+    Omit<
+        UnwrapStore<ModelMutationResult<SimplifiedModelResult<Schema, Model, TArgs, false, Array>, TArgs>>,
+        'mutateAsync'
+    > & {
         mutateAsync<T extends TArgs>(
             args: T,
-            options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, T>, T>,
-        ): Promise<
-            Array extends true ? SimplifiedModelResult<Schema, Model, T>[] : SimplifiedModelResult<Schema, Model, T>
-        >;
+            options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, T, false, Array>, T>,
+        ): Promise<SimplifiedModelResult<Schema, Model, T, false, Array>>;
     }
 >;
 

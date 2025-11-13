@@ -3,6 +3,9 @@
 - [ ] CLI
     - [x] generate
     - [x] migrate
+    - [ ] db
+        - [x] push
+        - [ ] seed
     - [x] info
     - [x] init
     - [x] validate
@@ -106,5 +109,5 @@
 - [ ] Databases
     - [x] SQLite
     - [x] PostgreSQL
-        - [ ] Multi-schema
+        - [x] Multi-schema
     - [ ] MySQL

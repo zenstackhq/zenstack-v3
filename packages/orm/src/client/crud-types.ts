@@ -452,9 +452,9 @@ export type OmitInput<Schema extends SchemaDef, Model extends GetModels<Schema>>
 };
 
 export type SelectIncludeOmit<Schema extends SchemaDef, Model extends GetModels<Schema>, AllowCount extends boolean> = {
-    select?: SelectInput<Schema, Model, AllowCount, boolean>;
-    include?: IncludeInput<Schema, Model, AllowCount>;
-    omit?: OmitInput<Schema, Model>;
+    select?: SelectInput<Schema, Model, AllowCount, boolean> | null;
+    include?: IncludeInput<Schema, Model, AllowCount> | null;
+    omit?: OmitInput<Schema, Model> | null;
 };
 
 export type SelectInput<

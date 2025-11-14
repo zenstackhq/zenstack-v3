@@ -266,9 +266,9 @@ export class InputValidator<Schema extends SchemaDef> {
             fields['where'] = where.optional();
         }
 
-        fields['select'] = this.makeSelectSchema(model).optional();
-        fields['include'] = this.makeIncludeSchema(model).optional();
-        fields['omit'] = this.makeOmitSchema(model).optional();
+        fields['select'] = this.makeSelectSchema(model).optional().nullable();
+        fields['include'] = this.makeIncludeSchema(model).optional().nullable();
+        fields['omit'] = this.makeOmitSchema(model).optional().nullable();
 
         if (!options.unique) {
             fields['skip'] = this.makeSkipSchema().optional();

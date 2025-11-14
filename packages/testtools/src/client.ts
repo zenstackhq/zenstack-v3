@@ -5,6 +5,7 @@ import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import SQLite from 'better-sqlite3';
+import { glob } from 'glob';
 import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -32,14 +33,55 @@ const TEST_PG_CONFIG = {
 };
 
 export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptions<Schema>, 'dialect'> & {
+    /**
+     * Database provider
+     */
     provider?: 'sqlite' | 'postgresql';
+
+    /**
+     * The main ZModel file. Only used when `usePrismaPush` is true and `schema` is an object.
+     */
     schemaFile?: string;
+
+    /**
+     * Database name. If not provided, a name will be generated based on the test name.
+     */
     dbName?: string;
+
+    /**
+     * Use `prisma db push` instead of ZenStack's `$pushSchema` for database initialization.
+     */
     usePrismaPush?: boolean;
+
+    /**
+     * Extra source files to create and compile.
+     */
     extraSourceFiles?: Record<string, string>;
+
+    /**
+     * Working directory for the test client. If not provided, a temporary directory will be created.
+     */
     workDir?: string;
+
+    /**
+     * Debug mode.
+     */
     debug?: boolean;
+
+    /**
+     * A sqlite database file to be used for the test. Only supported for sqlite provider.
+     */
     dbFile?: string;
+
+    /**
+     * PostgreSQL extensions to be added to the datasource. Only supported for postgresql provider.
+     */
+    dataSourceExtensions?: string[];
+
+    /**
+     * Additional files to be copied to the working directory. The glob pattern is relative to the test file.
+     */
+    copyFiles?: { globPattern: string; destination: string }[];
 };
 
 export async function createTestClient<Schema extends SchemaDef>(
@@ -95,16 +137,24 @@ export async function createTestClient<Schema extends SchemaDef>(
                     `datasource db {
     provider = '${provider}'
     url = '${dbUrl}'
+    ${options.dataSourceExtensions ? `extensions = [${options.dataSourceExtensions.join(', ')}]` : ''}
 }`,
                 );
             }
-            fs.writeFileSync(path.join(workDir, 'schema.zmodel'), schemaContent);
+            fs.writeFileSync(path.join(workDir!, 'schema.zmodel'), schemaContent);
         }
     }
 
     invariant(workDir);
+
+    const { plugins, ...rest } = options ?? {};
+    const _options: ClientOptions<Schema> = {
+        ...rest,
+    } as ClientOptions<Schema>;
+
     if (options?.debug) {
         console.log(`Work directory: ${workDir}`);
+        _options.log = testLogger;
     }
 
     // copy db file to workDir if specified
@@ -115,10 +165,23 @@ export async function createTestClient<Schema extends SchemaDef>(
         fs.copyFileSync(options.dbFile, path.join(workDir, dbName));
     }
 
-    const { plugins, ...rest } = options ?? {};
-    const _options: ClientOptions<Schema> = {
-        ...rest,
-    } as ClientOptions<Schema>;
+    // copy additional files if specified
+    if (options?.copyFiles) {
+        const state = expect.getState();
+        const currentTestPath = state.testPath;
+        if (!currentTestPath) {
+            throw new Error('Unable to determine current test file path');
+        }
+        for (const { globPattern, destination } of options.copyFiles) {
+            const files = glob.sync(globPattern, { cwd: path.dirname(currentTestPath) });
+            for (const file of files) {
+                const src = path.resolve(path.dirname(currentTestPath), file);
+                const dest = path.resolve(workDir, destination, path.basename(file));
+                fs.mkdirSync(path.dirname(dest), { recursive: true });
+                fs.copyFileSync(src, dest);
+            }
+        }
+    }
 
     if (!options?.dbFile) {
         if (options?.usePrismaPush) {

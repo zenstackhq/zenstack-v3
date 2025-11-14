@@ -402,8 +402,22 @@ export class PrismaSchemaGenerator {
             this.generateEnumField(_enum, field);
         }
 
-        for (const attr of decl.attributes.filter((attr) => this.isPrismaAttribute(attr))) {
+        const allAttributes = decl.attributes.filter((attr) => this.isPrismaAttribute(attr));
+        for (const attr of allAttributes) {
             this.generateContainerAttribute(_enum, attr);
+        }
+
+        if (
+            this.datasourceHasSchemasSetting(decl.$container) &&
+            !allAttributes.some((attr) => attr.decl.ref?.name === '@@schema')
+        ) {
+            // if the datasource declared `schemas` and no @@schema attribute is defined, add a default one
+            _enum.addAttribute('@@schema', [
+                new PrismaAttributeArg(
+                    undefined,
+                    new PrismaAttributeArgValue('String', this.getDefaultPostgresSchemaName(decl.$container)),
+                ),
+            ]);
         }
 
         // user defined comments pass-through

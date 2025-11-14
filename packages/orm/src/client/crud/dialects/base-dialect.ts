@@ -863,7 +863,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     buildSelectAllFields(
         model: string,
         query: SelectQueryBuilder<any, any, any>,
-        omit: Record<string, boolean | undefined> | undefined,
+        omit: Record<string, boolean | undefined> | undefined | null,
         modelAlias: string,
     ) {
         const modelDef = requireModel(this.schema, model);

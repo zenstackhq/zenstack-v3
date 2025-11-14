@@ -77,8 +77,11 @@ export class QueryNameMapper extends OperationNodeTransformer {
         // process "from" clauses
         const processedFroms = node.from.froms.map((from) => this.processSelectTable(from));
 
-        // process "join" clauses
-        const processedJoins = (node.joins ?? []).map((join) => this.processSelectTable(join.table));
+        // process "join" clauses, note that "from" needs to be added as scopes since join conditions
+        // can refer to "from" tables
+        const processedJoins = this.withScopes([...processedFroms.map(({ scope }) => scope)], () =>
+            (node.joins ?? []).map((join) => this.processSelectTable(join.table)),
+        );
 
         // merge the scopes of froms and joins since they're all visible in the query body
         const scopes = [...processedFroms.map(({ scope }) => scope), ...processedJoins.map(({ scope }) => scope)];

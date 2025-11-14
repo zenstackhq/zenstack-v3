@@ -20,6 +20,7 @@ import {
     isArrayExpr,
     isDataModel,
     isDataSource,
+    isGeneratorDecl,
     isInvocationExpr,
     isLiteralExpr,
     isNullExpr,
@@ -106,6 +107,10 @@ export class PrismaSchemaGenerator {
             }
         }
 
+        if (!this.zmodel.declarations.some(isGeneratorDecl)) {
+            this.generateDefaultGenerator(prisma);
+        }
+
         return this.PRELUDE + prisma.toString();
     }
 
@@ -167,6 +172,15 @@ export class PrismaSchemaGenerator {
                 text: this.configExprToText(f.value),
             })),
         );
+    }
+
+    private generateDefaultGenerator(prisma: PrismaModel) {
+        const gen = prisma.addGenerator('client', [{ name: 'provider', text: '"prisma-client-js"' }]);
+        const dataSource = this.zmodel.declarations.find(isDataSource);
+        if (dataSource?.fields.some((f) => f.name === 'extensions')) {
+            // enable "postgresqlExtensions" preview feature
+            gen.fields.push({ name: 'previewFeatures', text: '["postgresqlExtensions"]' });
+        }
     }
 
     private generateModel(prisma: PrismaModel, decl: DataModel) {

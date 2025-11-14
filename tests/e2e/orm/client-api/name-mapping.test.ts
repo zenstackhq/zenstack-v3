@@ -157,6 +157,15 @@ describe('Name mapping tests', () => {
             role: 'USER',
         });
 
+        // nested select
+        await expect(
+            db.user.findFirst({
+                include: { posts: { where: { title: 'Post1' } } },
+            }),
+        ).resolves.toMatchObject({
+            posts: expect.arrayContaining([expect.objectContaining({ title: 'Post1', authorId: user.id })]),
+        });
+
         await expect(
             db.$qb.selectFrom('User').selectAll().where('email', '=', 'u1@test.com').executeTakeFirst(),
         ).resolves.toMatchObject({
@@ -191,6 +200,18 @@ describe('Name mapping tests', () => {
             db.$qb
                 .selectFrom('Post')
                 .innerJoin('User', 'User.id', 'Post.authorId')
+                .select(['User.email', 'Post.authorId', 'Post.title'])
+                .whereRef('Post.authorId', '=', 'User.id')
+                .executeTakeFirst(),
+        ).resolves.toMatchObject({
+            authorId: user.id,
+            title: 'Post1',
+        });
+
+        await expect(
+            db.$qb
+                .selectFrom('Post')
+                .innerJoin('User', (join) => join.onRef('User.id', '=', 'Post.authorId'))
                 .select(['User.email', 'Post.authorId', 'Post.title'])
                 .whereRef('Post.authorId', '=', 'User.id')
                 .executeTakeFirst(),

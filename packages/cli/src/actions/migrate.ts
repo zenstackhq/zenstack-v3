@@ -70,7 +70,7 @@ function runDev(prismaSchemaFile: string, options: DevOptions) {
             'migrate dev',
             ` --schema "${prismaSchemaFile}"`,
             ' --skip-generate',
-            options.name ? ` --name ${options.name}` : '',
+            options.name ? ` --name "${options.name}"` : '',
             options.createOnly ? ' --create-only' : '',
         ].join('');
         execPrisma(cmd);
@@ -119,8 +119,8 @@ function runResolve(prismaSchemaFile: string, options: ResolveOptions) {
         const cmd = [
             'migrate resolve',
             ` --schema "${prismaSchemaFile}"`,
-            options.applied ? ` --applied ${options.applied}` : '',
-            options.rolledBack ? ` --rolled-back ${options.rolledBack}` : '',
+            options.applied ? ` --applied "${options.applied}"` : '',
+            options.rolledBack ? ` --rolled-back "${options.rolledBack}"` : '',
         ].join('');
         execPrisma(cmd);
     } catch (err) {

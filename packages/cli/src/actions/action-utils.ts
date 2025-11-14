@@ -19,7 +19,15 @@ export function getSchemaFile(file?: string) {
         if (!fs.existsSync(pkgJsonConfig.schema)) {
             throw new CliError(`Schema file not found: ${pkgJsonConfig.schema}`);
         }
-        return pkgJsonConfig.schema;
+        if (fs.statSync(pkgJsonConfig.schema).isDirectory()) {
+            const schemaPath = path.join(pkgJsonConfig.schema, 'schema.zmodel');
+            if (!fs.existsSync(schemaPath)) {
+                throw new CliError(`Schema file not found: ${schemaPath}`);
+            }
+            return schemaPath;
+        } else {
+            return pkgJsonConfig.schema;
+        }
     }
 
     if (fs.existsSync('./zenstack/schema.zmodel')) {

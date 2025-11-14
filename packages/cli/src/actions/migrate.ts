@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { CliError } from '../cli-error';
-import { execPackage } from '../utils/exec-utils';
+import { execPrisma } from '../utils/exec-utils';
 import { generateTempPrismaSchema, getSchemaFile } from './action-utils';
 
 type CommonOptions = {
@@ -64,69 +64,65 @@ export async function run(command: string, options: CommonOptions) {
     }
 }
 
-async function runDev(prismaSchemaFile: string, options: DevOptions) {
+function runDev(prismaSchemaFile: string, options: DevOptions) {
     try {
         const cmd = [
-            'prisma migrate dev',
+            'migrate dev',
             ` --schema "${prismaSchemaFile}"`,
             ' --skip-generate',
             options.name ? ` --name ${options.name}` : '',
             options.createOnly ? ' --create-only' : '',
         ].join('');
-
-        await execPackage(cmd);
+        execPrisma(cmd);
     } catch (err) {
         handleSubProcessError(err);
     }
 }
 
-async function runReset(prismaSchemaFile: string, options: ResetOptions) {
+function runReset(prismaSchemaFile: string, options: ResetOptions) {
     try {
         const cmd = [
-            'prisma migrate reset',
+            'migrate reset',
             ` --schema "${prismaSchemaFile}"`,
             ' --skip-generate',
             options.force ? ' --force' : '',
         ].join('');
-
-        await execPackage(cmd);
+        execPrisma(cmd);
     } catch (err) {
         handleSubProcessError(err);
     }
 }
 
-async function runDeploy(prismaSchemaFile: string, _options: DeployOptions) {
+function runDeploy(prismaSchemaFile: string, _options: DeployOptions) {
     try {
-        const cmd = ['prisma migrate deploy', ` --schema "${prismaSchemaFile}"`].join('');
-
-        await execPackage(cmd);
+        const cmd = ['migrate deploy', ` --schema "${prismaSchemaFile}"`].join('');
+        execPrisma(cmd);
     } catch (err) {
         handleSubProcessError(err);
     }
 }
 
-async function runStatus(prismaSchemaFile: string, _options: StatusOptions) {
+function runStatus(prismaSchemaFile: string, _options: StatusOptions) {
     try {
-        await execPackage(`prisma migrate status --schema "${prismaSchemaFile}"`);
+        execPrisma(`migrate status --schema "${prismaSchemaFile}"`);
     } catch (err) {
         handleSubProcessError(err);
     }
 }
 
-async function runResolve(prismaSchemaFile: string, options: ResolveOptions) {
+function runResolve(prismaSchemaFile: string, options: ResolveOptions) {
     if (!options.applied && !options.rolledBack) {
         throw new CliError('Either --applied or --rolled-back option must be provided');
     }
 
     try {
         const cmd = [
-            'prisma migrate resolve',
+            'migrate resolve',
             ` --schema "${prismaSchemaFile}"`,
             options.applied ? ` --applied ${options.applied}` : '',
             options.rolledBack ? ` --rolled-back ${options.rolledBack}` : '',
         ].join('');
-
-        await execPackage(cmd);
+        execPrisma(cmd);
     } catch (err) {
         handleSubProcessError(err);
     }

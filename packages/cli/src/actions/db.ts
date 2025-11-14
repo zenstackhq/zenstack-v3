@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { execPackage } from '../utils/exec-utils';
+import { execPrisma } from '../utils/exec-utils';
 import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError } from './action-utils';
 
 type Options = {
@@ -27,7 +27,7 @@ async function runPush(options: Options) {
     try {
         // run prisma db push
         const cmd = [
-            'prisma db push',
+            'db push',
             ` --schema "${prismaSchemaFile}"`,
             options.acceptDataLoss ? ' --accept-data-loss' : '',
             options.forceReset ? ' --force-reset' : '',
@@ -35,7 +35,7 @@ async function runPush(options: Options) {
         ].join('');
 
         try {
-            await execPackage(cmd);
+            execPrisma(cmd);
         } catch (err) {
             handleSubProcessError(err);
         }

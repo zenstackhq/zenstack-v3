@@ -38,9 +38,15 @@ model Foo {
         const foundSchema = { create: false, read: false, update: false, delete: false };
         const db = await createTestClient(
             `
+enum Role {
+    ADMIN
+    USER
+}
+
 model Foo {
     id Int @id
     name String
+    role Role
 }
 `,
             {
@@ -57,7 +63,9 @@ model Foo {
             },
         );
 
-        await expect(db.$qb.insertInto('Foo').values({ id: 1, name: 'test' }).execute()).toResolveTruthy();
+        await expect(
+            db.$qb.insertInto('Foo').values({ id: 1, name: 'test', role: 'ADMIN' }).execute(),
+        ).toResolveTruthy();
         await expect(db.$qb.selectFrom('Foo').selectAll().executeTakeFirst()).toResolveTruthy();
         await expect(
             db.$qb.updateTable('Foo').set({ name: 'updated' }).where('id', '=', 1).execute(),
@@ -75,9 +83,15 @@ datasource db {
     defaultSchema = 'mySchema'
 }
 
+enum Role {
+    ADMIN
+    USER
+}
+
 model Foo {
     id Int @id
     name String
+    role Role
 }
 `,
             {
@@ -85,7 +99,7 @@ model Foo {
             },
         );
 
-        await expect(db.foo.create({ data: { id: 1, name: 'test' } })).rejects.toSatisfy(
+        await expect(db.foo.create({ data: { id: 1, name: 'test', role: 'ADMIN' } })).rejects.toSatisfy(
             (e) => e instanceof ORMError && !!e.dbErrorMessage?.includes('relation "mySchema.Foo" does not exist'),
         );
 
@@ -98,9 +112,15 @@ datasource db {
     defaultSchema = 'public'
 }
 
+enum Role {
+    ADMIN
+    USER
+}
+
 model Foo {
     id Int @id
     name String
+    role Role
 }
 `,
             {
@@ -108,7 +128,7 @@ model Foo {
             },
         );
 
-        await expect(db1.foo.create({ data: { id: 1, name: 'test' } })).toResolveTruthy();
+        await expect(db1.foo.create({ data: { id: 1, name: 'test', role: 'ADMIN' } })).toResolveTruthy();
     });
 
     it('supports custom schemas', async () => {
@@ -123,15 +143,29 @@ datasource db {
     url = '$DB_URL'
 }
 
+enum FooRole {
+    ADMIN
+    USER
+    @@schema('mySchema')
+}
+
 model Foo {
     id Int @id
     name String
+    role FooRole
     @@schema('mySchema')
+}
+
+enum BarRole {
+    ADMIN
+    USER
+    @@schema('public')
 }
 
 model Bar {
     id Int @id
     name String
+    role BarRole
     @@schema('public')
 }
 `,
@@ -150,8 +184,8 @@ model Bar {
             },
         );
 
-        await expect(db.foo.create({ data: { id: 1, name: 'test' } })).toResolveTruthy();
-        await expect(db.bar.create({ data: { id: 1, name: 'test' } })).toResolveTruthy();
+        await expect(db.foo.create({ data: { id: 1, name: 'test', role: 'ADMIN' } })).toResolveTruthy();
+        await expect(db.bar.create({ data: { id: 1, name: 'test', role: 'USER' } })).toResolveTruthy();
 
         expect(fooQueriesVerified).toBe(true);
         expect(barQueriesVerified).toBe(true);
@@ -226,9 +260,15 @@ datasource db {
     url = '$DB_URL'
 }
 
+enum Role {
+    ADMIN
+    USER
+}
+
 model Foo {
     id Int @id
     name String
+    role Role
     @@schema('mySchema')
 }
 
@@ -252,7 +292,7 @@ model Bar {
             },
         );
 
-        await expect(db.foo.create({ data: { id: 1, name: 'test' } })).toResolveTruthy();
+        await expect(db.foo.create({ data: { id: 1, name: 'test', role: 'ADMIN' } })).toResolveTruthy();
         await expect(db.bar.create({ data: { id: 1, name: 'test' } })).toResolveTruthy();
 
         expect(fooQueriesVerified).toBe(true);

@@ -148,12 +148,13 @@ export class TsSchemaGenerator {
         );
         statements.push(runtimeImportDecl);
 
-        const declaration = ts.factory.createVariableStatement(
-            [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+        // const _schema = { ... } as const satisfies SchemaDef;
+        const _schemaDecl = ts.factory.createVariableStatement(
+            [],
             ts.factory.createVariableDeclarationList(
                 [
                     ts.factory.createVariableDeclaration(
-                        'schema',
+                        '_schema',
                         undefined,
                         undefined,
                         ts.factory.createSatisfiesExpression(
@@ -165,16 +166,53 @@ export class TsSchemaGenerator {
                 ts.NodeFlags.Const,
             ),
         );
-        statements.push(declaration);
+        statements.push(_schemaDecl);
 
-        // create statement "export type SchemaType = typeof schema;"
-        const typeDeclaration = ts.factory.createTypeAliasDeclaration(
+        // type Schema = typeof _schema & { __brand?: 'schema' };
+        // use a branded type to prevent typescript compiler from expanding the schema type
+        const brandedSchemaType = ts.factory.createTypeAliasDeclaration(
+            undefined,
+            'Schema',
+            undefined,
+            ts.factory.createIntersectionTypeNode([
+                ts.factory.createTypeQueryNode(ts.factory.createIdentifier('_schema')),
+                ts.factory.createTypeLiteralNode([
+                    ts.factory.createPropertySignature(
+                        undefined,
+                        '__brand',
+                        ts.factory.createToken(ts.SyntaxKind.QuestionToken),
+                        ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral('schema')),
+                    ),
+                ]),
+            ]),
+        );
+        statements.push(brandedSchemaType);
+
+        // export const schema: Schema = _schema;
+        const schemaExportDecl = ts.factory.createVariableStatement(
+            [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+            ts.factory.createVariableDeclarationList(
+                [
+                    ts.factory.createVariableDeclaration(
+                        'schema',
+                        undefined,
+                        ts.factory.createTypeReferenceNode('Schema'),
+                        ts.factory.createIdentifier('_schema'),
+                    ),
+                ],
+                ts.NodeFlags.Const,
+            ),
+        );
+        statements.push(schemaExportDecl);
+
+        // export type SchemaType = Schema;
+        const schemaTypeDeclaration = ts.factory.createTypeAliasDeclaration(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             'SchemaType',
             undefined,
-            ts.factory.createTypeReferenceNode('typeof schema'),
+            ts.factory.createTypeReferenceNode('Schema'),
         );
-        statements.push(typeDeclaration);
+        statements.push(schemaTypeDeclaration);
     }
 
     private createExpressionUtilsCall(method: string, args?: ts.Expression[]): ts.CallExpression {

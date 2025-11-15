@@ -39,7 +39,6 @@ import type {
     Optional,
     OrArray,
     Simplify,
-    SimplifyIf,
     ValueOfPotentialTuple,
     WrapType,
     XOR,
@@ -230,7 +229,6 @@ export type WhereInput<
               >
             : // primitive
               PrimitiveFilter<
-                  Schema,
                   GetModelFieldType<Schema, Model, Key>,
                   ModelFieldIsOptional<Schema, Model, Key>,
                   WithAggregations
@@ -257,7 +255,7 @@ type EnumFilter<
           not?: EnumFilter<Schema, T, Nullable, WithAggregations>;
       } & (WithAggregations extends true
           ? {
-                _count?: NumberFilter<Schema, 'Int', false, false>;
+                _count?: NumberFilter<'Int', false, false>;
                 _min?: EnumFilter<Schema, T, false, false>;
                 _max?: EnumFilter<Schema, T, false, false>;
             }
@@ -275,27 +273,21 @@ type ArrayFilter<Schema extends SchemaDef, T extends string> = {
 type MapScalarType<Schema extends SchemaDef, T extends string> =
     T extends GetEnums<Schema> ? keyof GetEnum<Schema, T> : MapBaseType<T>;
 
-type PrimitiveFilter<
-    Schema extends SchemaDef,
-    T extends string,
-    Nullable extends boolean,
-    WithAggregations extends boolean,
-> = T extends 'String'
-    ? StringFilter<Schema, Nullable, WithAggregations>
+type PrimitiveFilter<T extends string, Nullable extends boolean, WithAggregations extends boolean> = T extends 'String'
+    ? StringFilter<Nullable, WithAggregations>
     : T extends 'Int' | 'Float' | 'Decimal' | 'BigInt'
-      ? NumberFilter<Schema, T, Nullable, WithAggregations>
+      ? NumberFilter<T, Nullable, WithAggregations>
       : T extends 'Boolean'
-        ? BooleanFilter<Schema, Nullable, WithAggregations>
+        ? BooleanFilter<Nullable, WithAggregations>
         : T extends 'DateTime'
-          ? DateTimeFilter<Schema, Nullable, WithAggregations>
+          ? DateTimeFilter<Nullable, WithAggregations>
           : T extends 'Bytes'
-            ? BytesFilter<Schema, Nullable, WithAggregations>
+            ? BytesFilter<Nullable, WithAggregations>
             : T extends 'Json'
               ? 'Not implemented yet' // TODO: Json filter
               : never;
 
 type CommonPrimitiveFilter<
-    Schema extends SchemaDef,
     DataType,
     T extends BuiltinType,
     Nullable extends boolean,
@@ -308,82 +300,80 @@ type CommonPrimitiveFilter<
     lte?: DataType;
     gt?: DataType;
     gte?: DataType;
-    not?: PrimitiveFilter<Schema, T, Nullable, WithAggregations>;
+    not?: PrimitiveFilter<T, Nullable, WithAggregations>;
 };
 
-export type StringFilter<Schema extends SchemaDef, Nullable extends boolean, WithAggregations extends boolean> =
+export type StringFilter<Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<string, Nullable>
-    | (CommonPrimitiveFilter<Schema, string, 'String', Nullable, WithAggregations> & {
+    | (CommonPrimitiveFilter<string, 'String', Nullable, WithAggregations> & {
           contains?: string;
           startsWith?: string;
           endsWith?: string;
+          /**
+           * Not effective for "sqlite" provider
+           */
+          mode?: 'default' | 'insensitive';
       } & (WithAggregations extends true
               ? {
-                    _count?: NumberFilter<Schema, 'Int', false, false>;
-                    _min?: StringFilter<Schema, false, false>;
-                    _max?: StringFilter<Schema, false, false>;
-                }
-              : {}) &
-          (ProviderSupportsCaseSensitivity<Schema> extends true
-              ? {
-                    mode?: 'default' | 'insensitive';
+                    _count?: NumberFilter<'Int', false, false>;
+                    _min?: StringFilter<false, false>;
+                    _max?: StringFilter<false, false>;
                 }
               : {}));
 
 export type NumberFilter<
-    Schema extends SchemaDef,
     T extends 'Int' | 'Float' | 'Decimal' | 'BigInt',
     Nullable extends boolean,
     WithAggregations extends boolean,
 > =
     | NullableIf<number | bigint, Nullable>
-    | (CommonPrimitiveFilter<Schema, number, T, Nullable, WithAggregations> &
+    | (CommonPrimitiveFilter<number, T, Nullable, WithAggregations> &
           (WithAggregations extends true
               ? {
-                    _count?: NumberFilter<Schema, 'Int', false, false>;
-                    _avg?: NumberFilter<Schema, T, false, false>;
-                    _sum?: NumberFilter<Schema, T, false, false>;
-                    _min?: NumberFilter<Schema, T, false, false>;
-                    _max?: NumberFilter<Schema, T, false, false>;
+                    _count?: NumberFilter<'Int', false, false>;
+                    _avg?: NumberFilter<T, false, false>;
+                    _sum?: NumberFilter<T, false, false>;
+                    _min?: NumberFilter<T, false, false>;
+                    _max?: NumberFilter<T, false, false>;
                 }
               : {}));
 
-export type DateTimeFilter<Schema extends SchemaDef, Nullable extends boolean, WithAggregations extends boolean> =
+export type DateTimeFilter<Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<Date | string, Nullable>
-    | (CommonPrimitiveFilter<Schema, Date | string, 'DateTime', Nullable, WithAggregations> &
+    | (CommonPrimitiveFilter<Date | string, 'DateTime', Nullable, WithAggregations> &
           (WithAggregations extends true
               ? {
-                    _count?: NumberFilter<Schema, 'Int', false, false>;
-                    _min?: DateTimeFilter<Schema, false, false>;
-                    _max?: DateTimeFilter<Schema, false, false>;
+                    _count?: NumberFilter<'Int', false, false>;
+                    _min?: DateTimeFilter<false, false>;
+                    _max?: DateTimeFilter<false, false>;
                 }
               : {}));
 
-export type BytesFilter<Schema extends SchemaDef, Nullable extends boolean, WithAggregations extends boolean> =
+export type BytesFilter<Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<Uint8Array | Buffer, Nullable>
     | ({
           equals?: NullableIf<Uint8Array, Nullable>;
           in?: Uint8Array[];
           notIn?: Uint8Array[];
-          not?: BytesFilter<Schema, Nullable, WithAggregations>;
+          not?: BytesFilter<Nullable, WithAggregations>;
       } & (WithAggregations extends true
           ? {
-                _count?: NumberFilter<Schema, 'Int', false, false>;
-                _min?: BytesFilter<Schema, false, false>;
-                _max?: BytesFilter<Schema, false, false>;
+                _count?: NumberFilter<'Int', false, false>;
+                _min?: BytesFilter<false, false>;
+                _max?: BytesFilter<false, false>;
             }
           : {}));
 
-export type BooleanFilter<Schema extends SchemaDef, Nullable extends boolean, WithAggregations extends boolean> =
+export type BooleanFilter<Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<boolean, Nullable>
     | ({
           equals?: NullableIf<boolean, Nullable>;
-          not?: BooleanFilter<Schema, Nullable, WithAggregations>;
+          not?: BooleanFilter<Nullable, WithAggregations>;
       } & (WithAggregations extends true
           ? {
-                _count?: NumberFilter<Schema, 'Int', false, false>;
-                _min?: BooleanFilter<Schema, false, false>;
-                _max?: BooleanFilter<Schema, false, false>;
+                _count?: NumberFilter<'Int', false, false>;
+                _min?: BooleanFilter<false, false>;
+                _max?: BooleanFilter<false, false>;
             }
           : {}));
 
@@ -451,10 +441,15 @@ export type OmitInput<Schema extends SchemaDef, Model extends GetModels<Schema>>
     [Key in NonRelationFields<Schema, Model>]?: boolean;
 };
 
-export type SelectIncludeOmit<Schema extends SchemaDef, Model extends GetModels<Schema>, AllowCount extends boolean> = {
-    select?: SelectInput<Schema, Model, AllowCount, boolean>;
-    include?: IncludeInput<Schema, Model, AllowCount>;
-    omit?: OmitInput<Schema, Model>;
+export type SelectIncludeOmit<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    AllowCount extends boolean,
+    AllowRelation extends boolean = true,
+> = {
+    select?: SelectInput<Schema, Model, AllowCount, AllowRelation> | null;
+    include?: IncludeInput<Schema, Model, AllowCount> | null;
+    omit?: OmitInput<Schema, Model> | null;
 };
 
 export type SelectInput<
@@ -664,64 +659,29 @@ export type FindArgs<
               (AllowFilter extends true ? FilterArgs<Schema, Model> : {}) &
               SelectIncludeOmit<Schema, Model, Collection>;
 
-export type FindManyArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<FindArgs<Schema, Model, true>, Simplify>;
+export type FindManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, true>;
 
-export type FindFirstArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<FindArgs<Schema, Model, true>, Simplify>;
+export type FindFirstArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, true>;
 
-export type FindUniqueArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    {
-        where?: WhereUniqueInput<Schema, Model>;
-    } & SelectIncludeOmit<Schema, Model, true>,
-    Simplify
->;
+export type FindUniqueArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    where: WhereUniqueInput<Schema, Model>;
+} & SelectIncludeOmit<Schema, Model, true>;
 
 //#endregion
 
 //#region Create args
 
-export type CreateArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    {
-        data: CreateInput<Schema, Model>;
-        select?: SelectInput<Schema, Model>;
-        include?: IncludeInput<Schema, Model>;
-        omit?: OmitInput<Schema, Model>;
-    },
-    Simplify
->;
+export type CreateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    data: CreateInput<Schema, Model>;
+} & SelectIncludeOmit<Schema, Model, true>;
 
-export type CreateManyArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<CreateManyInput<Schema, Model>, Simplify>;
+export type CreateManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = CreateManyInput<Schema, Model>;
 
-export type CreateManyAndReturnArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    CreateManyInput<Schema, Model> & {
-        select?: SelectInput<Schema, Model, false, false>;
-        omit?: OmitInput<Schema, Model>;
-    },
-    Simplify
->;
+export type CreateManyAndReturnArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = CreateManyInput<
+    Schema,
+    Model
+> &
+    Omit<SelectIncludeOmit<Schema, Model, false, false>, 'include'>;
 
 type OptionalWrap<Schema extends SchemaDef, Model extends GetModels<Schema>, T extends object> = Optional<
     T,
@@ -847,38 +807,21 @@ type NestedCreateManyInput<
 
 // #region Update args
 
-export type UpdateArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    {
-        data: UpdateInput<Schema, Model>;
-        where: WhereUniqueInput<Schema, Model>;
-        select?: SelectInput<Schema, Model>;
-        include?: IncludeInput<Schema, Model>;
-        omit?: OmitInput<Schema, Model>;
-    },
-    Simplify
+export type UpdateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    data: UpdateInput<Schema, Model>;
+    where: WhereUniqueInput<Schema, Model>;
+} & SelectIncludeOmit<Schema, Model, true>;
+
+export type UpdateManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = UpdateManyPayload<
+    Schema,
+    Model
 >;
 
-export type UpdateManyArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<UpdateManyPayload<Schema, Model>, Simplify>;
-
-export type UpdateManyAndReturnArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    UpdateManyPayload<Schema, Model> & {
-        select?: SelectInput<Schema, Model, false, false>;
-        omit?: OmitInput<Schema, Model>;
-    },
-    Simplify
->;
+export type UpdateManyAndReturnArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = UpdateManyPayload<
+    Schema,
+    Model
+> &
+    Omit<SelectIncludeOmit<Schema, Model, false, false>, 'include'>;
 
 type UpdateManyPayload<Schema extends SchemaDef, Model extends GetModels<Schema>, Without extends string = never> = {
     data: OrArray<UpdateScalarInput<Schema, Model, Without>>;
@@ -886,21 +829,11 @@ type UpdateManyPayload<Schema extends SchemaDef, Model extends GetModels<Schema>
     limit?: number;
 };
 
-export type UpsertArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    {
-        create: CreateInput<Schema, Model>;
-        update: UpdateInput<Schema, Model>;
-        where: WhereUniqueInput<Schema, Model>;
-        select?: SelectInput<Schema, Model>;
-        include?: IncludeInput<Schema, Model>;
-        omit?: OmitInput<Schema, Model>;
-    },
-    Simplify
->;
+export type UpsertArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    create: CreateInput<Schema, Model>;
+    update: UpdateInput<Schema, Model>;
+    where: WhereUniqueInput<Schema, Model>;
+} & SelectIncludeOmit<Schema, Model, true>;
 
 type UpdateScalarInput<
     Schema extends SchemaDef,
@@ -1012,46 +945,25 @@ type ToOneRelationUpdateInput<
 
 // #region Delete args
 
-export type DeleteArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    {
-        where: WhereUniqueInput<Schema, Model>;
-        select?: SelectInput<Schema, Model>;
-        include?: IncludeInput<Schema, Model>;
-        omit?: OmitInput<Schema, Model>;
-    },
-    Simplify
->;
+export type DeleteArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    where: WhereUniqueInput<Schema, Model>;
+} & SelectIncludeOmit<Schema, Model, true>;
 
-export type DeleteManyArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    {
-        where?: WhereInput<Schema, Model>;
-        limit?: number;
-    },
-    Simplify
->;
+export type DeleteManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    where?: WhereInput<Schema, Model>;
+    limit?: number;
+};
 
 // #endregion
 
 // #region Count args
 
-export type CountArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    Omit<FindArgs<Schema, Model, true>, 'select' | 'include' | 'distinct' | 'omit'> & {
-        select?: CountAggregateInput<Schema, Model> | true;
-    },
-    Simplify
->;
+export type CountArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = Omit<
+    FindArgs<Schema, Model, true>,
+    'select' | 'include' | 'distinct' | 'omit'
+> & {
+    select?: CountAggregateInput<Schema, Model> | true;
+};
 
 type CountAggregateInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
     [Key in NonRelationFields<Schema, Model>]?: true;
@@ -1071,28 +983,21 @@ export type CountResult<Schema extends SchemaDef, _Model extends GetModels<Schem
 
 // #region Aggregate
 
-export type AggregateArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    {
-        where?: WhereInput<Schema, Model>;
-        skip?: number;
-        take?: number;
-        orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
-    } & {
-        _count?: true | CountAggregateInput<Schema, Model>;
-        _min?: MinMaxInput<Schema, Model, true>;
-        _max?: MinMaxInput<Schema, Model, true>;
-    } & (NumericFields<Schema, Model> extends never
-            ? {}
-            : {
-                  _avg?: SumAvgInput<Schema, Model, true>;
-                  _sum?: SumAvgInput<Schema, Model, true>;
-              }),
-    Simplify
->;
+export type AggregateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    where?: WhereInput<Schema, Model>;
+    skip?: number;
+    take?: number;
+    orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
+} & {
+    _count?: true | CountAggregateInput<Schema, Model>;
+    _min?: MinMaxInput<Schema, Model, true>;
+    _max?: MinMaxInput<Schema, Model, true>;
+} & (NumericFields<Schema, Model> extends never
+        ? {}
+        : {
+              _avg?: SumAvgInput<Schema, Model, true>;
+              _sum?: SumAvgInput<Schema, Model, true>;
+          });
 
 type NumericFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
     [Key in GetModelFields<Schema, Model> as GetModelFieldType<Schema, Model, Key> extends
@@ -1163,31 +1068,24 @@ type GroupByHaving<Schema extends SchemaDef, Model extends GetModels<Schema>> = 
     '$expr'
 >;
 
-export type GroupByArgs<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Simplify extends boolean = false,
-> = SimplifyIf<
-    {
-        where?: WhereInput<Schema, Model>;
-        orderBy?: OrArray<OrderBy<Schema, Model, false, true>>;
-        by: NonRelationFields<Schema, Model> | NonEmptyArray<NonRelationFields<Schema, Model>>;
-        having?: GroupByHaving<Schema, Model>;
-        take?: number;
-        skip?: number;
-        // aggregations
-        _count?: true | CountAggregateInput<Schema, Model>;
-        _min?: MinMaxInput<Schema, Model, true>;
-        _max?: MinMaxInput<Schema, Model, true>;
-    } & (NumericFields<Schema, Model> extends never
-        ? {}
-        : {
-              // aggregations specific to numeric fields
-              _avg?: SumAvgInput<Schema, Model, true>;
-              _sum?: SumAvgInput<Schema, Model, true>;
-          }),
-    Simplify
->;
+export type GroupByArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    where?: WhereInput<Schema, Model>;
+    orderBy?: OrArray<OrderBy<Schema, Model, false, true>>;
+    by: NonRelationFields<Schema, Model> | NonEmptyArray<NonRelationFields<Schema, Model>>;
+    having?: GroupByHaving<Schema, Model>;
+    take?: number;
+    skip?: number;
+    // aggregations
+    _count?: true | CountAggregateInput<Schema, Model>;
+    _min?: MinMaxInput<Schema, Model, true>;
+    _max?: MinMaxInput<Schema, Model, true>;
+} & (NumericFields<Schema, Model> extends never
+    ? {}
+    : {
+          // aggregations specific to numeric fields
+          _avg?: SumAvgInput<Schema, Model, true>;
+          _sum?: SumAvgInput<Schema, Model, true>;
+      });
 
 export type GroupByResult<
     Schema extends SchemaDef,
@@ -1362,10 +1260,6 @@ type HasToManyRelations<Schema extends SchemaDef, Model extends GetModels<Schema
 } extends never
     ? false
     : true;
-
-type ProviderSupportsCaseSensitivity<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
-    ? true
-    : false;
 
 type ProviderSupportsDistinct<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
     ? true

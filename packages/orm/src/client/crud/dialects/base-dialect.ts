@@ -604,7 +604,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return { conditions, consumedKeys };
     }
 
-    private buildStringFilter(fieldRef: Expression<any>, payload: StringFilter<Schema, true, boolean>) {
+    private buildStringFilter(fieldRef: Expression<any>, payload: StringFilter<true, boolean>) {
         let mode: 'default' | 'insensitive' | undefined;
         if (payload && typeof payload === 'object' && 'mode' in payload) {
             mode = payload.mode;
@@ -615,7 +615,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             payload,
             mode === 'insensitive' ? this.eb.fn('lower', [fieldRef]) : fieldRef,
             (value) => this.prepStringCasing(this.eb, value, mode),
-            (value) => this.buildStringFilter(fieldRef, value as StringFilter<Schema, true, boolean>),
+            (value) => this.buildStringFilter(fieldRef, value as StringFilter<true, boolean>),
         );
 
         if (payload && typeof payload === 'object') {
@@ -683,38 +683,38 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return this.and(...conditions);
     }
 
-    private buildBooleanFilter(fieldRef: Expression<any>, payload: BooleanFilter<Schema, boolean, boolean>) {
+    private buildBooleanFilter(fieldRef: Expression<any>, payload: BooleanFilter<boolean, boolean>) {
         const { conditions } = this.buildStandardFilter(
             'Boolean',
             payload,
             fieldRef,
             (value) => this.transformPrimitive(value, 'Boolean', false),
-            (value) => this.buildBooleanFilter(fieldRef, value as BooleanFilter<Schema, boolean, boolean>),
+            (value) => this.buildBooleanFilter(fieldRef, value as BooleanFilter<boolean, boolean>),
             true,
             ['equals', 'not'],
         );
         return this.and(...conditions);
     }
 
-    private buildDateTimeFilter(fieldRef: Expression<any>, payload: DateTimeFilter<Schema, boolean, boolean>) {
+    private buildDateTimeFilter(fieldRef: Expression<any>, payload: DateTimeFilter<boolean, boolean>) {
         const { conditions } = this.buildStandardFilter(
             'DateTime',
             payload,
             fieldRef,
             (value) => this.transformPrimitive(value, 'DateTime', false),
-            (value) => this.buildDateTimeFilter(fieldRef, value as DateTimeFilter<Schema, boolean, boolean>),
+            (value) => this.buildDateTimeFilter(fieldRef, value as DateTimeFilter<boolean, boolean>),
             true,
         );
         return this.and(...conditions);
     }
 
-    private buildBytesFilter(fieldRef: Expression<any>, payload: BytesFilter<Schema, boolean, boolean>) {
+    private buildBytesFilter(fieldRef: Expression<any>, payload: BytesFilter<boolean, boolean>) {
         const conditions = this.buildStandardFilter(
             'Bytes',
             payload,
             fieldRef,
             (value) => this.transformPrimitive(value, 'Bytes', false),
-            (value) => this.buildBytesFilter(fieldRef, value as BytesFilter<Schema, boolean, boolean>),
+            (value) => this.buildBytesFilter(fieldRef, value as BytesFilter<boolean, boolean>),
             true,
             ['equals', 'in', 'notIn', 'not'],
         );
@@ -863,7 +863,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     buildSelectAllFields(
         model: string,
         query: SelectQueryBuilder<any, any, any>,
-        omit: Record<string, boolean | undefined> | undefined,
+        omit: Record<string, boolean | undefined> | undefined | null,
         modelAlias: string,
     ) {
         const modelDef = requireModel(this.schema, model);

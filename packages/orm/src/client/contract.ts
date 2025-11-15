@@ -325,7 +325,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * }); // result: `{ _count: { posts: number } }`
      * ```
      */
-    findMany<T extends FindManyArgs<Schema, Model, true>>(
+    findMany<T extends FindManyArgs<Schema, Model>>(
         args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>[]>;
 
@@ -335,7 +335,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * @returns a single entity or null if not found
      * @see {@link findMany}
      */
-    findUnique<T extends FindUniqueArgs<Schema, Model, true>>(
+    findUnique<T extends FindUniqueArgs<Schema, Model>>(
         args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T> | null>;
 
@@ -345,7 +345,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * @returns a single entity
      * @see {@link findMany}
      */
-    findUniqueOrThrow<T extends FindUniqueArgs<Schema, Model, true>>(
+    findUniqueOrThrow<T extends FindUniqueArgs<Schema, Model>>(
         args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>>;
 
@@ -355,7 +355,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * @returns a single entity or null if not found
      * @see {@link findMany}
      */
-    findFirst<T extends FindFirstArgs<Schema, Model, true>>(
+    findFirst<T extends FindFirstArgs<Schema, Model>>(
         args?: SelectSubset<T, FindFirstArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T> | null>;
 
@@ -365,7 +365,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * @returns a single entity
      * @see {@link findMany}
      */
-    findFirstOrThrow<T extends FindFirstArgs<Schema, Model, true>>(
+    findFirstOrThrow<T extends FindFirstArgs<Schema, Model>>(
         args?: SelectSubset<T, FindFirstArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>>;
 
@@ -421,7 +421,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * });
      * ```
      */
-    create<T extends CreateArgs<Schema, Model, true>>(
+    create<T extends CreateArgs<Schema, Model>>(
         args: SelectSubset<T, CreateArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>>;
 
@@ -450,7 +450,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * });
      * ```
      */
-    createMany<T extends CreateManyArgs<Schema, Model, true>>(
+    createMany<T extends CreateManyArgs<Schema, Model>>(
         args?: SelectSubset<T, CreateManyArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, BatchResult>;
 
@@ -472,7 +472,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * });
      * ```
      */
-    createManyAndReturn<T extends CreateManyAndReturnArgs<Schema, Model, true>>(
+    createManyAndReturn<T extends CreateManyAndReturnArgs<Schema, Model>>(
         args?: SelectSubset<T, CreateManyAndReturnArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>[]>;
 
@@ -593,7 +593,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * });
      * ```
      */
-    update<T extends UpdateArgs<Schema, Model, true>>(
+    update<T extends UpdateArgs<Schema, Model>>(
         args: SelectSubset<T, UpdateArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>>;
 
@@ -617,7 +617,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      *     limit: 10
      * });
      */
-    updateMany<T extends UpdateManyArgs<Schema, Model, true>>(
+    updateMany<T extends UpdateManyArgs<Schema, Model>>(
         args: Subset<T, UpdateManyArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, BatchResult>;
 
@@ -643,7 +643,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * });
      * ```
      */
-    updateManyAndReturn<T extends UpdateManyAndReturnArgs<Schema, Model, true>>(
+    updateManyAndReturn<T extends UpdateManyAndReturnArgs<Schema, Model>>(
         args: Subset<T, UpdateManyAndReturnArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>[]>;
 
@@ -667,7 +667,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * });
      * ```
      */
-    upsert<T extends UpsertArgs<Schema, Model, true>>(
+    upsert<T extends UpsertArgs<Schema, Model>>(
         args: SelectSubset<T, UpsertArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>>;
 
@@ -690,7 +690,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * }); // result: `{ id: string; email: string }`
      * ```
      */
-    delete<T extends DeleteArgs<Schema, Model, true>>(
+    delete<T extends DeleteArgs<Schema, Model>>(
         args: SelectSubset<T, DeleteArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, T>>;
 
@@ -713,7 +713,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      * });
      * ```
      */
-    deleteMany<T extends DeleteManyArgs<Schema, Model, true>>(
+    deleteMany<T extends DeleteManyArgs<Schema, Model>>(
         args?: Subset<T, DeleteManyArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, BatchResult>;
 
@@ -735,7 +735,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      *     select: { _all: true, email: true }
      * }); // result: `{ _all: number, email: number }`
      */
-    count<T extends CountArgs<Schema, Model, true>>(
+    count<T extends CountArgs<Schema, Model>>(
         args?: Subset<T, CountArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, Simplify<CountResult<Schema, Model, T>>>;
 
@@ -756,7 +756,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      *     _max: { age: true }
      * }); // result: `{ _count: number, _avg: { age: number }, ... }`
      */
-    aggregate<T extends AggregateArgs<Schema, Model, true>>(
+    aggregate<T extends AggregateArgs<Schema, Model>>(
         args: Subset<T, AggregateArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, Simplify<AggregateResult<Schema, Model, T>>>;
 
@@ -793,7 +793,7 @@ export type AllModelOperations<Schema extends SchemaDef, Model extends GetModels
      *     having: { country: 'US', age: { _avg: { gte: 18 } } }
      * });
      */
-    groupBy<T extends GroupByArgs<Schema, Model, true>>(
+    groupBy<T extends GroupByArgs<Schema, Model>>(
         args: Subset<T, GroupByArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, Simplify<GroupByResult<Schema, Model, T>>>;
 };

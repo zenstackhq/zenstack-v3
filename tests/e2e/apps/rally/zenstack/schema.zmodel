@@ -1,0 +1,12 @@
+import './models/user'
+import './models/space'
+import './models/poll'
+import './models/instance-settings'
+import './models/licensing'
+import './models/integrations'
+import './models/event'
+import './models/billing'
+
+datasource db {
+  provider  = "postgresql"
+}

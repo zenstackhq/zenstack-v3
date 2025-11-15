@@ -266,9 +266,9 @@ export class InputValidator<Schema extends SchemaDef> {
             fields['where'] = where.optional();
         }
 
-        fields['select'] = this.makeSelectSchema(model).optional();
-        fields['include'] = this.makeIncludeSchema(model).optional();
-        fields['omit'] = this.makeOmitSchema(model).optional();
+        fields['select'] = this.makeSelectSchema(model).optional().nullable();
+        fields['include'] = this.makeIncludeSchema(model).optional().nullable();
+        fields['omit'] = this.makeOmitSchema(model).optional().nullable();
 
         if (!options.unique) {
             fields['skip'] = this.makeSkipSchema().optional();
@@ -745,9 +745,18 @@ export class InputValidator<Schema extends SchemaDef> {
                       where: z.lazy(() => this.makeWhereSchema(fieldDef.type, false)).optional(),
                   }
                 : {}),
-            select: z.lazy(() => this.makeSelectSchema(fieldDef.type)).optional(),
-            include: z.lazy(() => this.makeIncludeSchema(fieldDef.type)).optional(),
-            omit: z.lazy(() => this.makeOmitSchema(fieldDef.type)).optional(),
+            select: z
+                .lazy(() => this.makeSelectSchema(fieldDef.type))
+                .optional()
+                .nullable(),
+            include: z
+                .lazy(() => this.makeIncludeSchema(fieldDef.type))
+                .optional()
+                .nullable(),
+            omit: z
+                .lazy(() => this.makeOmitSchema(fieldDef.type))
+                .optional()
+                .nullable(),
             ...(fieldDef.array
                 ? {
                       // to-many relations can be ordered, skipped, taken, and cursor-located
@@ -864,9 +873,9 @@ export class InputValidator<Schema extends SchemaDef> {
         const dataSchema = this.makeCreateDataSchema(model, false);
         let schema: ZodType = z.strictObject({
             data: dataSchema,
-            select: this.makeSelectSchema(model).optional(),
-            include: this.makeIncludeSchema(model).optional(),
-            omit: this.makeOmitSchema(model).optional(),
+            select: this.makeSelectSchema(model).optional().nullable(),
+            include: this.makeIncludeSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
         });
         schema = this.refineForSelectIncludeMutuallyExclusive(schema);
         schema = this.refineForSelectOmitMutuallyExclusive(schema);
@@ -880,8 +889,8 @@ export class InputValidator<Schema extends SchemaDef> {
     private makeCreateManyAndReturnSchema(model: string) {
         const base = this.makeCreateManyDataSchema(model, []);
         const result = base.extend({
-            select: this.makeSelectSchema(model).optional(),
-            omit: this.makeOmitSchema(model).optional(),
+            select: this.makeSelectSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
         });
         return this.refineForSelectOmitMutuallyExclusive(result).optional();
     }
@@ -1142,9 +1151,9 @@ export class InputValidator<Schema extends SchemaDef> {
         let schema: ZodType = z.strictObject({
             where: this.makeWhereSchema(model, true),
             data: this.makeUpdateDataSchema(model),
-            select: this.makeSelectSchema(model).optional(),
-            include: this.makeIncludeSchema(model).optional(),
-            omit: this.makeOmitSchema(model).optional(),
+            select: this.makeSelectSchema(model).optional().nullable(),
+            include: this.makeIncludeSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
         });
         schema = this.refineForSelectIncludeMutuallyExclusive(schema);
         schema = this.refineForSelectOmitMutuallyExclusive(schema);
@@ -1162,8 +1171,8 @@ export class InputValidator<Schema extends SchemaDef> {
     private makeUpdateManyAndReturnSchema(model: string) {
         const base = this.makeUpdateManySchema(model);
         let schema: ZodType = base.extend({
-            select: this.makeSelectSchema(model).optional(),
-            omit: this.makeOmitSchema(model).optional(),
+            select: this.makeSelectSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
         });
         schema = this.refineForSelectOmitMutuallyExclusive(schema);
         return schema;
@@ -1174,9 +1183,9 @@ export class InputValidator<Schema extends SchemaDef> {
             where: this.makeWhereSchema(model, true),
             create: this.makeCreateDataSchema(model, false),
             update: this.makeUpdateDataSchema(model),
-            select: this.makeSelectSchema(model).optional(),
-            include: this.makeIncludeSchema(model).optional(),
-            omit: this.makeOmitSchema(model).optional(),
+            select: this.makeSelectSchema(model).optional().nullable(),
+            include: this.makeIncludeSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
         });
         schema = this.refineForSelectIncludeMutuallyExclusive(schema);
         schema = this.refineForSelectOmitMutuallyExclusive(schema);
@@ -1291,8 +1300,8 @@ export class InputValidator<Schema extends SchemaDef> {
     private makeDeleteSchema(model: GetModels<Schema>) {
         let schema: ZodType = z.strictObject({
             where: this.makeWhereSchema(model, true),
-            select: this.makeSelectSchema(model).optional(),
-            include: this.makeIncludeSchema(model).optional(),
+            select: this.makeSelectSchema(model).optional().nullable(),
+            include: this.makeIncludeSchema(model).optional().nullable(),
         });
         schema = this.refineForSelectIncludeMutuallyExclusive(schema);
         schema = this.refineForSelectOmitMutuallyExclusive(schema);

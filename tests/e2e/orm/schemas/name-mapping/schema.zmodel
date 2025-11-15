@@ -11,7 +11,7 @@ enum Role {
 }
 
 model User {
-    id    Int    @id @default(autoincrement())
+    id    Int    @id @default(autoincrement()) @map('user_id')
     email String @map('user_email') @unique
     role  Role   @default(USER) @map('user_role')
     posts Post[]
@@ -19,7 +19,7 @@ model User {
 }
 
 model Post {
-    id       Int    @id @default(autoincrement())
+    id       Int    @id @default(autoincrement()) @map('post_id')
     title    String @map('post_title')
     author   User   @relation(fields: [authorId], references: [id])
     authorId Int    @map('author_id')

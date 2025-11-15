@@ -6,7 +6,7 @@
 /* eslint-disable */
 
 import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
-export const schema = {
+const _schema = {
     provider: {
         type: "sqlite"
     },
@@ -18,7 +18,7 @@ export const schema = {
                     name: "id",
                     type: "Int",
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }, { name: "@map", args: [{ name: "name", value: ExpressionUtils.literal("user_id") }] }],
                     default: ExpressionUtils.call("autoincrement")
                 },
                 email: {
@@ -56,7 +56,7 @@ export const schema = {
                     name: "id",
                     type: "Int",
                     id: true,
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }, { name: "@map", args: [{ name: "name", value: ExpressionUtils.literal("post_id") }] }],
                     default: ExpressionUtils.call("autoincrement")
                 },
                 title: {
@@ -120,4 +120,8 @@ export const schema = {
     authType: "User",
     plugins: {}
 } as const satisfies SchemaDef;
-export type SchemaType = typeof schema;
+type Schema = typeof _schema & {
+    __brand?: "schema";
+};
+export const schema: Schema = _schema;
+export type SchemaType = Schema;

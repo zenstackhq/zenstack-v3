@@ -8,7 +8,10 @@ import { fileURLToPath } from 'node:url';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
-    const zmodelFiles = glob.sync(path.resolve(dir, '../schemas/**/*.zmodel'));
+    const zmodelFiles = [
+        ...glob.sync(path.resolve(dir, '../orm/schemas/**/*.zmodel')),
+        ...glob.sync(path.resolve(dir, '../apps/**/schema.zmodel')),
+    ];
     for (const file of zmodelFiles) {
         console.log(`Generating TS schema for: ${file}`);
         await generate(file);
@@ -23,7 +26,7 @@ async function generate(schemaPath: string) {
     const _dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
     // plugin models
-    const pluginDocs = [path.resolve(_dirname, '../../node_modules/@zenstackhq/plugin-policy/plugin.zmodel')];
+    const pluginDocs = [path.resolve(_dirname, '../node_modules/@zenstackhq/plugin-policy/plugin.zmodel')];
 
     const result = await loadDocument(schemaPath, pluginDocs);
     if (!result.success) {

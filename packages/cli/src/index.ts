@@ -34,7 +34,7 @@ function createProgram() {
     const program = new Command('zen')
         .alias('zenstack')
         .helpOption('-h, --help', 'Show this help message')
-        .version(getVersion()!, '-v --version', 'Display CLI version');
+        .version(getVersion()!, '-v --version', 'Show CLI version');
 
     const schemaExtensions = ZModelLanguageMetaData.fileExtensions.join(', ');
 

@@ -78,13 +78,17 @@ export class CreateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             const createResult = await this.createMany(tx, this.model, args, true, undefined, selectedFields);
 
             if (needReadBack) {
-                return this.read(tx, this.model, {
-                    select: args.select,
-                    omit: args.omit,
-                    where: {
-                        OR: createResult.map((item) => getIdValues(this.schema, this.model, item) as any),
+                return this.read(
+                    tx,
+                    this.model,
+                    {
+                        select: args.select,
+                        omit: args.omit,
+                        where: {
+                            OR: createResult.map((item) => getIdValues(this.schema, this.model, item) as any),
+                        },
                     } as any, // TODO: fix type
-                });
+                );
             } else {
                 return createResult;
             }

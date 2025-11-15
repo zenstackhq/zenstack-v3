@@ -104,13 +104,17 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             );
 
             if (needReadBack) {
-                const readBackResult = await this.read(tx, this.model, {
-                    select: args.select,
-                    omit: args.omit,
-                    where: {
-                        OR: updateResult.map((item) => getIdValues(this.schema, this.model, item) as any),
+                const readBackResult = await this.read(
+                    tx,
+                    this.model,
+                    {
+                        select: args.select,
+                        omit: args.omit,
+                        where: {
+                            OR: updateResult.map((item) => getIdValues(this.schema, this.model, item) as any),
+                        },
                     } as any, // TODO: fix type
-                });
+                );
 
                 return { readBackResult, updateResult };
             } else {

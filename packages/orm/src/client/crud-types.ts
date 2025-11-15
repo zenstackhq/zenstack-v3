@@ -451,8 +451,13 @@ export type OmitInput<Schema extends SchemaDef, Model extends GetModels<Schema>>
     [Key in NonRelationFields<Schema, Model>]?: boolean;
 };
 
-export type SelectIncludeOmit<Schema extends SchemaDef, Model extends GetModels<Schema>, AllowCount extends boolean> = {
-    select?: SelectInput<Schema, Model, AllowCount, boolean> | null;
+export type SelectIncludeOmit<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    AllowCount extends boolean,
+    AllowRelation extends boolean = true,
+> = {
+    select?: SelectInput<Schema, Model, AllowCount, AllowRelation> | null;
     include?: IncludeInput<Schema, Model, AllowCount> | null;
     omit?: OmitInput<Schema, Model> | null;
 };
@@ -698,10 +703,7 @@ export type CreateArgs<
 > = SimplifyIf<
     {
         data: CreateInput<Schema, Model>;
-        select?: SelectInput<Schema, Model>;
-        include?: IncludeInput<Schema, Model>;
-        omit?: OmitInput<Schema, Model>;
-    },
+    } & SelectIncludeOmit<Schema, Model, true>,
     Simplify
 >;
 
@@ -716,10 +718,7 @@ export type CreateManyAndReturnArgs<
     Model extends GetModels<Schema>,
     Simplify extends boolean = false,
 > = SimplifyIf<
-    CreateManyInput<Schema, Model> & {
-        select?: SelectInput<Schema, Model, false, false>;
-        omit?: OmitInput<Schema, Model>;
-    },
+    CreateManyInput<Schema, Model> & Omit<SelectIncludeOmit<Schema, Model, false, false>, 'include'>,
     Simplify
 >;
 
@@ -855,10 +854,7 @@ export type UpdateArgs<
     {
         data: UpdateInput<Schema, Model>;
         where: WhereUniqueInput<Schema, Model>;
-        select?: SelectInput<Schema, Model>;
-        include?: IncludeInput<Schema, Model>;
-        omit?: OmitInput<Schema, Model>;
-    },
+    } & SelectIncludeOmit<Schema, Model, true>,
     Simplify
 >;
 
@@ -873,10 +869,7 @@ export type UpdateManyAndReturnArgs<
     Model extends GetModels<Schema>,
     Simplify extends boolean = false,
 > = SimplifyIf<
-    UpdateManyPayload<Schema, Model> & {
-        select?: SelectInput<Schema, Model, false, false>;
-        omit?: OmitInput<Schema, Model>;
-    },
+    UpdateManyPayload<Schema, Model> & Omit<SelectIncludeOmit<Schema, Model, false, false>, 'include'>,
     Simplify
 >;
 
@@ -895,10 +888,7 @@ export type UpsertArgs<
         create: CreateInput<Schema, Model>;
         update: UpdateInput<Schema, Model>;
         where: WhereUniqueInput<Schema, Model>;
-        select?: SelectInput<Schema, Model>;
-        include?: IncludeInput<Schema, Model>;
-        omit?: OmitInput<Schema, Model>;
-    },
+    } & SelectIncludeOmit<Schema, Model, true>,
     Simplify
 >;
 
@@ -1019,10 +1009,7 @@ export type DeleteArgs<
 > = SimplifyIf<
     {
         where: WhereUniqueInput<Schema, Model>;
-        select?: SelectInput<Schema, Model>;
-        include?: IncludeInput<Schema, Model>;
-        omit?: OmitInput<Schema, Model>;
-    },
+    } & SelectIncludeOmit<Schema, Model, true>,
     Simplify
 >;
 

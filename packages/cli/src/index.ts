@@ -31,9 +31,10 @@ const checkAction = async (options: Parameters<typeof actions.check>[0]): Promis
 };
 
 function createProgram() {
-    const program = new Command('zen');
-
-    program.version(getVersion()!, '-v --version', 'display CLI version');
+    const program = new Command('zen')
+        .alias('zenstack')
+        .helpOption('-h, --help', 'Show this help message')
+        .version(getVersion()!, '-v --version', 'Show CLI version');
 
     const schemaExtensions = ZModelLanguageMetaData.fileExtensions.join(', ');
 
@@ -55,7 +56,7 @@ function createProgram() {
 
     program
         .command('generate')
-        .description('Run code generation plugins.')
+        .description('Run code generation plugins')
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
         .addOption(new Option('-o, --output <path>', 'default output directory for code generation'))
@@ -74,7 +75,7 @@ function createProgram() {
         .addOption(new Option('-n, --name <name>', 'migration name'))
         .addOption(new Option('--create-only', 'only create migration, do not apply'))
         .addOption(migrationsOption)
-        .description('Create a migration from changes in schema and apply it to the database.')
+        .description('Create a migration from changes in schema and apply it to the database')
         .action((options) => migrateAction('dev', options));
 
     migrateCommand
@@ -83,7 +84,7 @@ function createProgram() {
         .addOption(new Option('--force', 'skip the confirmation prompt'))
         .addOption(migrationsOption)
         .addOption(noVersionCheckOption)
-        .description('Reset your database and apply all migrations, all data will be lost.')
+        .description('Reset your database and apply all migrations, all data will be lost')
         .action((options) => migrateAction('reset', options));
 
     migrateCommand
@@ -91,7 +92,7 @@ function createProgram() {
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
         .addOption(migrationsOption)
-        .description('Deploy your pending migrations to your production/staging database.')
+        .description('Deploy your pending migrations to your production/staging database')
         .action((options) => migrateAction('deploy', options));
 
     migrateCommand
@@ -99,7 +100,7 @@ function createProgram() {
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
         .addOption(migrationsOption)
-        .description('Check the status of your database migrations.')
+        .description('Check the status of your database migrations')
         .action((options) => migrateAction('status', options));
 
     migrateCommand
@@ -109,14 +110,14 @@ function createProgram() {
         .addOption(migrationsOption)
         .addOption(new Option('--applied <migration>', 'record a specific migration as applied'))
         .addOption(new Option('--rolled-back <migration>', 'record a specific migration as rolled back'))
-        .description('Resolve issues with database migrations in deployment databases.')
+        .description('Resolve issues with database migrations in deployment databases')
         .action((options) => migrateAction('resolve', options));
 
-    const dbCommand = program.command('db').description('Manage your database schema during development.');
+    const dbCommand = program.command('db').description('Manage your database schema during development');
 
     dbCommand
         .command('push')
-        .description('Push the state from your schema to your database.')
+        .description('Push the state from your schema to your database')
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
         .addOption(new Option('--accept-data-loss', 'ignore data loss warnings'))
@@ -125,24 +126,26 @@ function createProgram() {
 
     program
         .command('info')
-        .description('Get information of installed ZenStack packages.')
+        .description('Get information of installed ZenStack packages')
         .argument('[path]', 'project path', '.')
         .addOption(noVersionCheckOption)
         .action(infoAction);
 
     program
         .command('init')
-        .description('Initialize an existing project for ZenStack.')
+        .description('Initialize an existing project for ZenStack')
         .argument('[path]', 'project path', '.')
         .addOption(noVersionCheckOption)
         .action(initAction);
 
     program
         .command('check')
-        .description('Check a ZModel schema for syntax or semantic errors.')
+        .description('Check a ZModel schema for syntax or semantic errors')
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
         .action(checkAction);
+
+    program.addHelpCommand('help [command]', 'Display help for a command');
 
     program.hook('preAction', async (_thisCommand, actionCommand) => {
         if (actionCommand.getOptionValue('versionCheck') !== false) {

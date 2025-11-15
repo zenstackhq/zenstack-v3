@@ -36,6 +36,36 @@
                 "default": "./dist/schema.cjs"
             }
         },
+        "./dialects/sqlite": {
+            "import": {
+                "types": "./dist/dialects/sqlite.d.ts",
+                "default": "./dist/dialects/sqlite.js"
+            },
+            "require": {
+                "types": "./dist/dialects/sqlite.d.cts",
+                "default": "./dist/dialects/sqlite.cjs"
+            }
+        },
+        "./dialects/postgres": {
+            "import": {
+                "types": "./dist/dialects/postgres.d.ts",
+                "default": "./dist/dialects/postgres.js"
+            },
+            "require": {
+                "types": "./dist/dialects/postgres.d.cts",
+                "default": "./dist/dialects/postgres.cjs"
+            }
+        },
+        "./dialects/sql.js": {
+            "import": {
+                "types": "./dist/dialects/sql.js.d.ts",
+                "default": "./dist/dialects/sql.js.js"
+            },
+            "require": {
+                "types": "./dist/dialects/sql.js.d.cts",
+                "default": "./dist/dialects/sql.js.cjs"
+            }
+        },
         "./helpers": {
             "import": {
                 "types": "./dist/helpers.d.ts",
@@ -44,16 +74,6 @@
             "require": {
                 "types": "./dist/helpers.d.cts",
                 "default": "./dist/helpers.cjs"
-            }
-        },
-        "./plugins/policy": {
-            "import": {
-                "types": "./dist/plugins/policy/index.d.ts",
-                "default": "./dist/plugins/policy/index.js"
-            },
-            "require": {
-                "types": "./dist/plugins/policy/index.d.cts",
-                "default": "./dist/plugins/policy/index.cjs"
             }
         },
         "./package.json": {
@@ -78,13 +98,17 @@
     "peerDependencies": {
         "better-sqlite3": "catalog:",
         "pg": "catalog:",
-        "zod": "catalog:"
+        "zod": "catalog:",
+        "sql.js": "catalog:"
     },
     "peerDependenciesMeta": {
         "better-sqlite3": {
             "optional": true
         },
         "pg": {
+            "optional": true
+        },
+        "sql.js": {
             "optional": true
         }
     },
@@ -96,6 +120,7 @@
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "tsx": "^4.19.2",
-        "zod": "^4.1.0"
+        "zod": "^4.1.0",
+        "@types/sql.js": "^1.4.9"
     }
 }

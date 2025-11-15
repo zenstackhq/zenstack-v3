@@ -22,7 +22,18 @@ const plugin: CliPlugin = {
         // liteOnly mode
         const liteOnly = pluginOptions['liteOnly'] === true;
 
-        await new TsSchemaGenerator().generate(model, { outDir, lite, liteOnly });
+        // add .js extension when importing
+        const importWithFileExtension = pluginOptions['importWithFileExtension'];
+        if (importWithFileExtension && typeof importWithFileExtension !== 'string') {
+            throw new Error('The "importWithFileExtension" option must be a string if specified.');
+        }
+
+        await new TsSchemaGenerator().generate(model, {
+            outDir,
+            lite,
+            liteOnly,
+            importWithFileExtension: importWithFileExtension as string | undefined,
+        });
     },
 };
 

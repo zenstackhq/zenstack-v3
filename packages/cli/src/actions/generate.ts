@@ -86,7 +86,19 @@ async function runPlugins(schemaFile: string, model: Model, outputPath: string, 
         }
 
         if (cliPlugin) {
-            processedPlugins.push({ cliPlugin, pluginOptions: getPluginOptions(plugin) });
+            const pluginOptions = getPluginOptions(plugin);
+
+            // merge CLI options
+            if (provider === '@core/typescript') {
+                if (pluginOptions['lite'] === undefined) {
+                    pluginOptions['lite'] = options.lite;
+                }
+                if (pluginOptions['liteOnly'] === undefined) {
+                    pluginOptions['liteOnly'] = options.liteOnly;
+                }
+            }
+
+            processedPlugins.push({ cliPlugin, pluginOptions });
         }
     }
 

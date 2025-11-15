@@ -30,13 +30,24 @@ export function execPackage(
  * Utility for running prisma commands
  */
 export function execPrisma(args: string, options?: Omit<ExecSyncOptions, 'env'> & { env?: Record<string, string> }) {
-    let prismaPath: string;
-    if (typeof import.meta.resolve === 'function') {
-        // esm
-        prismaPath = fileURLToPath(import.meta.resolve('prisma/build/index.js'));
-    } else {
-        // cjs
-        prismaPath = require.resolve('prisma/build/index.js');
+    let prismaPath: string | undefined;
+    try {
+        if (typeof import.meta.resolve === 'function') {
+            // esm
+            prismaPath = fileURLToPath(import.meta.resolve('prisma/build/index.js'));
+        } else {
+            // cjs
+            prismaPath = require.resolve('prisma/build/index.js');
+        }
+    } catch {
+        // ignore and fallback
     }
+
+    if (!prismaPath) {
+        // fallback to npx/bunx execute
+        execPackage(`prisma ${args}`, options);
+        return;
+    }
+
     execSync(`node ${prismaPath} ${args}`, options);
 }

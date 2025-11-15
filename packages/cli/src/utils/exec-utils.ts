@@ -16,7 +16,10 @@ export function execSync(cmd: string, options?: Omit<ExecSyncOptions, 'env'> & {
 }
 
 /**
- * Utility for running package commands through npx/bunx
+ * Run a package-manager command using `bunx` when running on Bun, otherwise `npx`.
+ *
+ * @param cmd - The package command and its arguments (e.g. `"install foo"` or `"run build"`).
+ * @param options - Additional child_process.execSync options; `env` may be provided to override or extend the environment. 
  */
 export function execPackage(
     cmd: string,
@@ -27,7 +30,12 @@ export function execPackage(
 }
 
 /**
- * Utility for running prisma commands
+ * Execute the Prisma CLI with the provided command-line arguments.
+ *
+ * Resolves the installed Prisma binary and runs it via `node` with the given `args`.
+ *
+ * @param args - Command-line arguments to pass to the Prisma CLI (e.g., `"migrate deploy"`).
+ * @param options - Options forwarded to the underlying `execSync`. If `options.env` is provided, its entries are merged with `process.env`.
  */
 export function execPrisma(args: string, options?: Omit<ExecSyncOptions, 'env'> & { env?: Record<string, string> }) {
     let prismaPath: string;

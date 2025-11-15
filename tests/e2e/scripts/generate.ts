@@ -7,6 +7,11 @@ import { fileURLToPath } from 'node:url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Discovers project .zmodel schema files and generates TypeScript schemas for each.
+ *
+ * Searches the repository's ORM and app schema locations for `.zmodel` files, logs each file being processed, and invokes `generate` for every discovered file.
+ */
 async function main() {
     const zmodelFiles = [
         ...glob.sync(path.resolve(dir, '../orm/schemas/**/*.zmodel')),
@@ -18,6 +23,12 @@ async function main() {
     }
 }
 
+/**
+ * Generates TypeScript schema files from a .zmodel file and writes them to the schema's directory.
+ *
+ * @param schemaPath - Filesystem path to the source `.zmodel` schema file
+ * @throws Error if the schema document fails to load; the error message includes the schema path and load errors
+ */
 async function generate(schemaPath: string) {
     const generator = new TsSchemaGenerator();
     const outDir = path.dirname(schemaPath);

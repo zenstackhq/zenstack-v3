@@ -28,7 +28,10 @@ type ResolveOptions = CommonOptions & {
 };
 
 /**
- * CLI action for migration-related commands
+ * Run a migration-related CLI command using a temporary Prisma schema and ensure the temporary schema file is removed.
+ *
+ * @param command - The migration command to run: 'dev', 'reset', 'deploy', 'status', or 'resolve'
+ * @param options - Common options that may include `schema` (path to a Prisma schema) and `migrations` (path to the migrations directory); additional command-specific options are accepted for certain commands
  */
 export async function run(command: string, options: CommonOptions) {
     const schemaFile = getSchemaFile(options.schema);
@@ -64,6 +67,14 @@ export async function run(command: string, options: CommonOptions) {
     }
 }
 
+/**
+ * Run Prisma Migrate in development mode using the given schema and options.
+ *
+ * Invokes the CLI command equivalent to `migrate dev` with `--schema` and `--skip-generate`, and adds `--name` and/or `--create-only` when provided in `options`.
+ *
+ * @param prismaSchemaFile - Path to the Prisma schema file to use for the migrate command.
+ * @param options - Options controlling migrate behavior (may include `name` and `createOnly`).
+ */
 function runDev(prismaSchemaFile: string, options: DevOptions) {
     try {
         const cmd = [
@@ -79,6 +90,12 @@ function runDev(prismaSchemaFile: string, options: DevOptions) {
     }
 }
 
+/**
+ * Runs `prisma migrate reset` against the provided Prisma schema file.
+ *
+ * @param prismaSchemaFile - Path to the Prisma schema file to target
+ * @param options - Reset options; if `options.force` is `true`, the reset proceeds without interactive confirmation
+ */
 function runReset(prismaSchemaFile: string, options: ResetOptions) {
     try {
         const cmd = [
@@ -93,6 +110,11 @@ function runReset(prismaSchemaFile: string, options: ResetOptions) {
     }
 }
 
+/**
+ * Executes a Prisma Migrate deploy using the specified Prisma schema file.
+ *
+ * @param prismaSchemaFile - Path to the Prisma schema file to use for the deploy command
+ */
 function runDeploy(prismaSchemaFile: string, _options: DeployOptions) {
     try {
         const cmd = ['migrate deploy', ` --schema "${prismaSchemaFile}"`].join('');
@@ -102,6 +124,13 @@ function runDeploy(prismaSchemaFile: string, _options: DeployOptions) {
     }
 }
 
+/**
+ * Show the current status of database migrations for the given Prisma schema.
+ *
+ * Runs the `migrate status` command against the provided schema file. Subprocess failures are handled by the module's subprocess error handler.
+ *
+ * @param prismaSchemaFile - Path to the Prisma schema file to use for the status check
+ */
 function runStatus(prismaSchemaFile: string, _options: StatusOptions) {
     try {
         execPrisma(`migrate status --schema "${prismaSchemaFile}"`);
@@ -110,6 +139,13 @@ function runStatus(prismaSchemaFile: string, _options: StatusOptions) {
     }
 }
 
+/**
+ * Resolve migration status for specified migration names against a Prisma schema.
+ *
+ * @param prismaSchemaFile - Path to the Prisma schema file to use for the migrate command
+ * @param options - Resolve options; include `applied` to mark a migration as applied and/or `rolledBack` to mark a migration as rolled back
+ * @throws CliError - If neither `applied` nor `rolledBack` is provided on `options`
+ */
 function runResolve(prismaSchemaFile: string, options: ResolveOptions) {
     if (!options.applied && !options.rolledBack) {
         throw new CliError('Either --applied or --rolled-back option must be provided');

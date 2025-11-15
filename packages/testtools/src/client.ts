@@ -92,6 +92,30 @@ export async function createTestClient<Schema extends SchemaDef>(
     schema: string,
     options?: CreateTestClientOptions<Schema>,
 ): Promise<any>;
+/**
+ * Creates and configures a test ZenStackClient using the provided schema and options.
+ *
+ * This function prepares a working directory and datasource, optionally creates or resets
+ * the test database (SQLite file or PostgreSQL database), may write schema files, copy
+ * additional files into the work directory, and applies any provided client plugins.
+ *
+ * @param schema - A schema definition object or a ZModel schema string. When a string is provided,
+ *                 a TypeScript schema is generated into a temporary work directory.
+ * @param options - Configuration for test client creation. Important options:
+ *                  - provider: 'sqlite' | 'postgresql' (selects the database provider)
+ *                  - schemaFile: path to an existing .zmodel file to copy/adjust into the workDir
+ *                  - dbName: explicit database name (auto-generated when omitted)
+ *                  - usePrismaPush: when true, runs `prisma db push` using a generated Prisma schema
+ *                  - extraSourceFiles: additional source files to include when generating a TS schema
+ *                  - workDir: directory to use for generated files and database (created if omitted)
+ *                  - debug: when true, enables test logging and prints the work directory
+ *                  - dbFile: path to an existing SQLite database file to copy into the workDir (sqlite only)
+ *                  - dataSourceExtensions: list of datasource extensions to include in generated schema
+ *                  - copyFiles: array of { globPattern, destination } entries whose matched files are copied
+ *                               (matched relative to the current test file) into the workDir
+ *                  - plugins: array of PolicyPlugin or other client plugins to apply to the returned client
+ * @returns The configured ZenStackClient instance for the prepared test schema and datasource.
+ */
 export async function createTestClient<Schema extends SchemaDef>(
     schema: Schema | string,
     options?: CreateTestClientOptions<Schema>,

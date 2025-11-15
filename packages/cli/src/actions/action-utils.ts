@@ -6,6 +6,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CliError } from '../cli-error';
 
+/**
+ * Resolve and return the filesystem path to the ZenStack schema file to use.
+ *
+ * If `file` is provided, it is validated and returned. Otherwise the function looks for a schema configured in the nearest package.json `zenstack.schema`; if that path is a directory, it looks for `schema.zmodel` inside it. If no package.json configuration is found, the function checks the default locations `./zenstack/schema.zmodel` and `./schema.zmodel`.
+ *
+ * @param file - Optional explicit path to a schema file or directory to use
+ * @returns The resolved path to the schema file to load
+ * @throws {CliError} If the resolved schema file (or expected schema inside a configured directory) does not exist
+ */
 export function getSchemaFile(file?: string) {
     if (file) {
         if (!fs.existsSync(file)) {

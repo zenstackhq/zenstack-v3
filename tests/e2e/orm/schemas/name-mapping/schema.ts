@@ -6,7 +6,7 @@
 /* eslint-disable */
 
 import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
-export const schema = {
+const _schema = {
     provider: {
         type: "sqlite"
     },
@@ -120,4 +120,8 @@ export const schema = {
     authType: "User",
     plugins: {}
 } as const satisfies SchemaDef;
-export type SchemaType = typeof schema;
+type Schema = typeof _schema & {
+    __brand?: "schema";
+};
+export const schema: Schema = _schema;
+export type SchemaType = Schema;

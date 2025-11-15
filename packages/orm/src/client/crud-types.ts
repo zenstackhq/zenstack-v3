@@ -309,6 +309,9 @@ export type StringFilter<Nullable extends boolean, WithAggregations extends bool
           contains?: string;
           startsWith?: string;
           endsWith?: string;
+          /**
+           * Not effective for "sqlite" provider
+           */
           mode?: 'default' | 'insensitive';
       } & (WithAggregations extends true
               ? {

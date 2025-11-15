@@ -93,8 +93,7 @@
         "ts-pattern": "catalog:",
         "ulid": "^3.0.0",
         "uuid": "^11.0.5",
-        "zod-validation-error": "catalog:",
-        "@types/sql.js": "^1.4.9"
+        "zod-validation-error": "catalog:"
     },
     "peerDependencies": {
         "better-sqlite3": "catalog:",
@@ -121,6 +120,7 @@
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "tsx": "^4.19.2",
-        "zod": "^4.1.0"
+        "zod": "^4.1.0",
+        "@types/sql.js": "^1.4.9"
     }
 }

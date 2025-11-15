@@ -291,27 +291,6 @@ importers:
         specifier: workspace:*
         version: link:../config/typescript-config
 
-  packages/dialects/sql.js:
-    devDependencies:
-      '@types/sql.js':
-        specifier: ^1.4.9
-        version: 1.4.9
-      '@zenstackhq/eslint-config':
-        specifier: workspace:*
-        version: link:../../config/eslint-config
-      '@zenstackhq/typescript-config':
-        specifier: workspace:*
-        version: link:../../config/typescript-config
-      '@zenstackhq/vitest-config':
-        specifier: workspace:*
-        version: link:../../config/vitest-config
-      kysely:
-        specifier: 'catalog:'
-        version: 0.28.8
-      sql.js:
-        specifier: ^1.13.0
-        version: 1.13.0
-
   packages/ide/vscode:
     dependencies:
       '@zenstackhq/language':
@@ -385,9 +364,6 @@ importers:
       '@paralleldrive/cuid2':
         specifier: ^2.2.2
         version: 2.2.2
-      '@types/sql.js':
-        specifier: ^1.4.9
-        version: 1.4.9
       '@zenstackhq/common-helpers':
         specifier: workspace:*
         version: link:../common-helpers
@@ -437,6 +413,9 @@ importers:
       '@types/pg':
         specifier: ^8.0.0
         version: 8.11.11
+      '@types/sql.js':
+        specifier: ^1.4.9
+        version: 1.4.9
       '@types/toposort':
         specifier: ^2.0.7
         version: 2.0.7

@@ -664,7 +664,7 @@ export type FindManyArgs<Schema extends SchemaDef, Model extends GetModels<Schem
 export type FindFirstArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, true>;
 
 export type FindUniqueArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    where?: WhereUniqueInput<Schema, Model>;
+    where: WhereUniqueInput<Schema, Model>;
 } & SelectIncludeOmit<Schema, Model, true>;
 
 //#endregion

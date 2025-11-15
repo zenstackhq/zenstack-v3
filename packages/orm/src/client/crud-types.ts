@@ -451,8 +451,13 @@ export type OmitInput<Schema extends SchemaDef, Model extends GetModels<Schema>>
     [Key in NonRelationFields<Schema, Model>]?: boolean;
 };
 
-export type SelectIncludeOmit<Schema extends SchemaDef, Model extends GetModels<Schema>, AllowCount extends boolean> = {
-    select?: SelectInput<Schema, Model, AllowCount, boolean> | null;
+export type SelectIncludeOmit<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    AllowCount extends boolean,
+    AllowRelation extends boolean = true,
+> = {
+    select?: SelectInput<Schema, Model, AllowCount, AllowRelation> | null;
     include?: IncludeInput<Schema, Model, AllowCount> | null;
     omit?: OmitInput<Schema, Model> | null;
 };
@@ -712,7 +717,10 @@ export type CreateManyAndReturnArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Simplify extends boolean = false,
-> = SimplifyIf<CreateManyInput<Schema, Model> & Omit<SelectIncludeOmit<Schema, Model, false>, 'include'>, Simplify>;
+> = SimplifyIf<
+    CreateManyInput<Schema, Model> & Omit<SelectIncludeOmit<Schema, Model, false, false>, 'include'>,
+    Simplify
+>;
 
 type OptionalWrap<Schema extends SchemaDef, Model extends GetModels<Schema>, T extends object> = Optional<
     T,
@@ -860,7 +868,10 @@ export type UpdateManyAndReturnArgs<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Simplify extends boolean = false,
-> = SimplifyIf<UpdateManyPayload<Schema, Model> & Omit<SelectIncludeOmit<Schema, Model, false>, 'include'>, Simplify>;
+> = SimplifyIf<
+    UpdateManyPayload<Schema, Model> & Omit<SelectIncludeOmit<Schema, Model, false, false>, 'include'>,
+    Simplify
+>;
 
 type UpdateManyPayload<Schema extends SchemaDef, Model extends GetModels<Schema>, Without extends string = never> = {
     data: OrArray<UpdateScalarInput<Schema, Model, Without>>;

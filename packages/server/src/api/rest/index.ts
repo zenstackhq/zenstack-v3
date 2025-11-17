@@ -118,10 +118,10 @@ registerCustomSerializers();
  */
 export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Schema> {
     // resource serializers
-    private serializers = new Map<string, Serializer>();
+    protected serializers = new Map<string, Serializer>();
 
     // error responses
-    private readonly errors: Record<string, { status: number; title: string; detail?: string }> = {
+    protected readonly errors: Record<string, { status: number; title: string; detail?: string }> = {
         unsupportedModel: {
             status: 404,
             title: 'Unsupported model type',
@@ -200,10 +200,10 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         },
     };
 
-    private filterParamPattern = new RegExp(/^filter(?<match>(\[[^[\]]+\])+)$/);
+    protected filterParamPattern = new RegExp(/^filter(?<match>(\[[^[\]]+\])+)$/);
 
     // zod schema for payload of creating and updating a resource
-    private createUpdatePayloadSchema = z
+    protected createUpdatePayloadSchema = z
         .object({
             data: z.object({
                 type: z.string(),
@@ -225,16 +225,16 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         .strict();
 
     // zod schema for updating a single relationship
-    private updateSingleRelationSchema = z.object({
+    protected updateSingleRelationSchema = z.object({
         data: z.object({ type: z.string(), id: z.union([z.string(), z.number()]) }).nullable(),
     });
 
     // zod schema for updating collection relationship
-    private updateCollectionRelationSchema = z.object({
+    protected updateCollectionRelationSchema = z.object({
         data: z.array(z.object({ type: z.string(), id: z.union([z.string(), z.number()]) })),
     });
 
-    private upsertMetaSchema = z.object({
+    protected upsertMetaSchema = z.object({
         meta: z.object({
             operation: z.literal('upsert'),
             matchFields: z.array(z.string()).min(1),
@@ -242,17 +242,17 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
     });
 
     // all known types and their metadata
-    private typeMap: Record<string, ModelInfo> = {};
+    protected typeMap: Record<string, ModelInfo> = {};
 
     // divider used to separate compound ID fields
-    private idDivider;
+    protected idDivider;
 
-    private urlPatternMap: Record<UrlPatterns, UrlPattern>;
-    private modelNameMapping: Record<string, string>;
-    private reverseModelNameMapping: Record<string, string>;
-    private externalIdMapping: Record<string, string>;
+    protected urlPatternMap: Record<UrlPatterns, UrlPattern>;
+    protected modelNameMapping: Record<string, string>;
+    protected reverseModelNameMapping: Record<string, string>;
+    protected externalIdMapping: Record<string, string>;
 
-    constructor(private readonly options: RestApiHandlerOptions<Schema>) {
+    constructor(protected readonly options: RestApiHandlerOptions<Schema>) {
         this.idDivider = options.idDivider ?? DEFAULT_ID_DIVIDER;
         const segmentCharset = options.urlSegmentCharset ?? 'a-zA-Z0-9-_~ %';
 
@@ -283,7 +283,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return this.options.log;
     }
 
-    private buildUrlPatternMap(urlSegmentNameCharset: string): Record<UrlPatterns, UrlPattern> {
+    protected buildUrlPatternMap(urlSegmentNameCharset: string): Record<UrlPatterns, UrlPattern> {
         const options = { segmentValueCharset: urlSegmentNameCharset };
 
         const buildPath = (segments: string[]) => {
@@ -301,11 +301,11 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         };
     }
 
-    private mapModelName(modelName: string): string {
+    protected mapModelName(modelName: string): string {
         return this.modelNameMapping[modelName] ?? modelName;
     }
 
-    private matchUrlPattern(path: string, routeType: UrlPatterns): Match | undefined {
+    protected matchUrlPattern(path: string, routeType: UrlPatterns): Match | undefined {
         const pattern = this.urlPatternMap[routeType];
         if (!pattern) {
             throw new InvalidValueError(`Unknown route type: ${routeType}`);
@@ -469,11 +469,11 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private handleGenericError(err: unknown): Response | PromiseLike<Response> {
+    protected handleGenericError(err: unknown): Response | PromiseLike<Response> {
         return this.makeError('unknownError', err instanceof Error ? `${err.message}\n${err.stack}` : 'Unknown error');
     }
 
-    private async processSingleRead(
+    protected async processSingleRead(
         client: ClientContract<Schema>,
         type: string,
         resourceId: string,
@@ -528,7 +528,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private async processFetchRelated(
+    protected async processFetchRelated(
         client: ClientContract<Schema>,
         type: string,
         resourceId: string,
@@ -617,7 +617,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private async processReadRelationship(
+    protected async processReadRelationship(
         client: ClientContract<Schema>,
         type: string,
         resourceId: string,
@@ -683,7 +683,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private async processCollectionRead(
+    protected async processCollectionRead(
         client: ClientContract<Schema>,
         type: string,
         query: Record<string, string | string[]> | undefined,
@@ -785,7 +785,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private buildPartialSelect(type: string, query: Record<string, string | string[]> | undefined) {
+    protected buildPartialSelect(type: string, query: Record<string, string | string[]> | undefined) {
         const selectFieldsQuery = query?.[`fields[${type}]`];
         if (!selectFieldsQuery) {
             return { select: undefined, error: undefined };
@@ -812,11 +812,11 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         };
     }
 
-    private addTotalCountToMeta(meta: any, total: any) {
+    protected addTotalCountToMeta(meta: any, total: any) {
         return meta ? Object.assign(meta, { total }) : Object.assign({}, { total });
     }
 
-    private makePaginator(baseUrl: string, offset: number, limit: number, total: number) {
+    protected makePaginator(baseUrl: string, offset: number, limit: number, total: number) {
         if (limit === Infinity) {
             return undefined;
         }
@@ -845,7 +845,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }));
     }
 
-    private processRequestBody(requestBody: unknown) {
+    protected processRequestBody(requestBody: unknown) {
         let body: any = requestBody;
         if (body.meta?.serialization) {
             // superjson deserialize body if a serialization meta is provided
@@ -868,7 +868,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         };
     }
 
-    private async processCreate(
+    protected async processCreate(
         client: ClientContract<Schema>,
         type: string,
         _query: Record<string, string | string[]> | undefined,
@@ -931,7 +931,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         };
     }
 
-    private async processUpsert(
+    protected async processUpsert(
         client: ClientContract<Schema>,
         type: string,
         _query: Record<string, string | string[]> | undefined,
@@ -1014,7 +1014,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         };
     }
 
-    private getUniqueFieldSets(type: string) {
+    protected getUniqueFieldSets(type: string) {
         const modelDef = this.requireModel(type);
         return Object.entries(modelDef.uniqueFields).map(
             ([k, v]) =>
@@ -1024,7 +1024,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         );
     }
 
-    private async processRelationshipCRUD(
+    protected async processRelationshipCRUD(
         client: ClientContract<Schema>,
         mode: 'create' | 'update' | 'delete',
         type: string,
@@ -1119,7 +1119,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         };
     }
 
-    private async processUpdate(
+    protected async processUpdate(
         client: ClientContract<Schema>,
         type: any,
         resourceId: string,
@@ -1186,7 +1186,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         };
     }
 
-    private async processDelete(client: ClientContract<Schema>, type: any, resourceId: string): Promise<Response> {
+    protected async processDelete(client: ClientContract<Schema>, type: any, resourceId: string): Promise<Response> {
         const typeInfo = this.getModelInfo(type);
         if (!typeInfo) {
             return this.makeUnsupportedModelError(type);
@@ -1203,7 +1203,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
 
     //#region utilities
 
-    private requireModel(model: string): ModelDef {
+    protected requireModel(model: string): ModelDef {
         const modelDef = this.schema.models[model];
         if (!modelDef) {
             throw new Error(`Model ${model} is not defined in the schema`);
@@ -1211,7 +1211,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return modelDef;
     }
 
-    private getIdFields(model: string): FieldDef[] {
+    protected getIdFields(model: string): FieldDef[] {
         const modelDef = this.requireModel(model);
         const modelLower = lowerCaseFirst(model);
         if (!(modelLower in this.externalIdMapping)) {
@@ -1235,7 +1235,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         throw new Error(`Model ${model} does not have unique key ${externalIdName}`);
     }
 
-    private requireField(model: string, field: string): FieldDef {
+    protected requireField(model: string, field: string): FieldDef {
         const modelDef = this.requireModel(model);
         const fieldDef = modelDef.fields[field];
         if (!fieldDef) {
@@ -1244,7 +1244,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return fieldDef;
     }
 
-    private buildTypeMap() {
+    protected buildTypeMap() {
         this.typeMap = {};
         for (const [model, { fields }] of Object.entries(this.schema.models)) {
             const idFields = this.getIdFields(model);
@@ -1284,15 +1284,15 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private getModelInfo(model: string): ModelInfo | undefined {
+    protected getModelInfo(model: string): ModelInfo | undefined {
         return this.typeMap[lowerCaseFirst(model)];
     }
 
-    private makeLinkUrl(path: string) {
+    protected makeLinkUrl(path: string) {
         return `${this.options.endpoint}${path}`;
     }
 
-    private buildSerializers() {
+    protected buildSerializers() {
         const linkers: Record<string, Linker<any>> = {};
 
         for (const model of Object.keys(this.schema.models)) {
@@ -1382,7 +1382,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private getId(model: string, data: any) {
+    protected getId(model: string, data: any) {
         if (!data) {
             return undefined;
         }
@@ -1394,7 +1394,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private async serializeItems(model: string, items: unknown, options?: Partial<SerializerOptions<any>>) {
+    protected async serializeItems(model: string, items: unknown, options?: Partial<SerializerOptions<any>>) {
         model = lowerCaseFirst(model);
         const serializer = this.serializers.get(model);
         if (!serializer) {
@@ -1421,7 +1421,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return result;
     }
 
-    private injectCompoundId(model: string, items: unknown) {
+    protected injectCompoundId(model: string, items: unknown) {
         const typeInfo = this.getModelInfo(model);
         if (!typeInfo) {
             return;
@@ -1446,7 +1446,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         });
     }
 
-    private toPlainObject(data: any): any {
+    protected toPlainObject(data: any): any {
         if (data === undefined || data === null) {
             return data;
         }
@@ -1478,7 +1478,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return data;
     }
 
-    private replaceURLSearchParams(url: string, params: Record<string, string | number>) {
+    protected replaceURLSearchParams(url: string, params: Record<string, string | number>) {
         const r = new URL(url);
         for (const [key, value] of Object.entries(params)) {
             r.searchParams.set(key, value.toString());
@@ -1486,7 +1486,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return r.toString();
     }
 
-    private makeIdFilter(idFields: FieldDef[], resourceId: string, nested: boolean = true) {
+    protected makeIdFilter(idFields: FieldDef[], resourceId: string, nested: boolean = true) {
         const decodedId = decodeURIComponent(resourceId);
         if (idFields.length === 1) {
             return { [idFields[0]!.name]: this.coerce(idFields[0]!, decodedId) };
@@ -1512,14 +1512,14 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private makeIdSelect(idFields: FieldDef[]) {
+    protected makeIdSelect(idFields: FieldDef[]) {
         if (idFields.length === 0) {
             throw this.errors['noId'];
         }
         return idFields.reduce((acc, curr) => ({ ...acc, [curr.name]: true }), {});
     }
 
-    private makeIdConnect(idFields: FieldDef[], id: string | number) {
+    protected makeIdConnect(idFields: FieldDef[], id: string | number) {
         if (idFields.length === 1) {
             return { [idFields[0]!.name]: this.coerce(idFields[0]!, id) };
         } else {
@@ -1535,20 +1535,20 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private makeIdKey(idFields: FieldDef[]) {
+    protected makeIdKey(idFields: FieldDef[]) {
         return idFields.map((idf) => idf.name).join(this.idDivider);
     }
 
-    private makeDefaultIdKey(idFields: FieldDef[]) {
+    protected makeDefaultIdKey(idFields: FieldDef[]) {
         // TODO: support `@@id` with custom name
         return idFields.map((idf) => idf.name).join(DEFAULT_ID_DIVIDER);
     }
 
-    private makeCompoundId(idFields: FieldDef[], item: any) {
+    protected makeCompoundId(idFields: FieldDef[], item: any) {
         return idFields.map((idf) => item[idf.name]).join(this.idDivider);
     }
 
-    private makeUpsertWhere(matchFields: any[], attributes: any, typeInfo: ModelInfo) {
+    protected makeUpsertWhere(matchFields: any[], attributes: any, typeInfo: ModelInfo) {
         const where = matchFields.reduce((acc: any, field: string) => {
             acc[field] = attributes[field] ?? null;
             return acc;
@@ -1566,7 +1566,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return where;
     }
 
-    private includeRelationshipIds(model: string, args: any, mode: 'select' | 'include') {
+    protected includeRelationshipIds(model: string, args: any, mode: 'select' | 'include') {
         const typeInfo = this.getModelInfo(model);
         if (!typeInfo) {
             return;
@@ -1576,7 +1576,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private coerce(fieldDef: FieldDef, value: any) {
+    protected coerce(fieldDef: FieldDef, value: any) {
         if (typeof value === 'string') {
             if (fieldDef.attributes?.some((attr) => attr.name === '@json')) {
                 try {
@@ -1624,7 +1624,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return value;
     }
 
-    private makeNormalizedUrl(path: string, query: Record<string, string | string[]> | undefined) {
+    protected makeNormalizedUrl(path: string, query: Record<string, string | string[]> | undefined) {
         const url = new URL(this.makeLinkUrl(path));
         for (const [key, value] of Object.entries(query ?? {})) {
             if (
@@ -1642,7 +1642,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return url.toString();
     }
 
-    private getPagination(query: Record<string, string | string[]> | undefined) {
+    protected getPagination(query: Record<string, string | string[]> | undefined) {
         if (!query) {
             return { offset: 0, limit: this.options.pageSize ?? DEFAULT_PAGE_SIZE };
         }
@@ -1676,7 +1676,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return { offset, limit };
     }
 
-    private buildFilter(
+    protected buildFilter(
         type: string,
         query: Record<string, string | string[]> | undefined,
     ): { filter: any; error: any } {
@@ -1780,7 +1780,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private buildSort(type: string, query: Record<string, string | string[]> | undefined) {
+    protected buildSort(type: string, query: Record<string, string | string[]> | undefined) {
         if (!query?.['sort']) {
             return { sort: undefined, error: undefined };
         }
@@ -1857,7 +1857,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return { sort: result, error: undefined };
     }
 
-    private buildRelationSelect(
+    protected buildRelationSelect(
         type: string,
         include: string | string[],
         query: Record<string, string | string[]> | undefined,
@@ -1917,7 +1917,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         return { select: result, error: undefined, allIncludes };
     }
 
-    private makeFilterValue(fieldDef: FieldDef, value: string, op: FilterOperationType): any {
+    protected makeFilterValue(fieldDef: FieldDef, value: string, op: FilterOperationType): any {
         // TODO: inequality filters?
         if (fieldDef.relation) {
             // relation filter is converted to an ID filter
@@ -1976,7 +1976,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private injectRelationQuery(
+    protected injectRelationQuery(
         type: string,
         injectTarget: any,
         injectKey: string,
@@ -2015,7 +2015,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         }
     }
 
-    private handleORMError(err: ORMError) {
+    protected handleORMError(err: ORMError) {
         return match(err.reason)
             .with(ORMErrorReason.INVALID_INPUT, () => {
                 return this.makeError('validationError', err.message, 422);
@@ -2036,7 +2036,7 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
             });
     }
 
-    private makeError(
+    protected makeError(
         code: keyof typeof this.errors,
         detail?: string,
         status?: number,
@@ -2063,11 +2063,11 @@ export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Sche
         };
     }
 
-    private makeUnsupportedModelError(model: string) {
+    protected makeUnsupportedModelError(model: string) {
         return this.makeError('unsupportedModel', `Model ${model} doesn't exist`);
     }
 
-    private makeUnsupportedRelationshipError(model: string, relationship: string, status: number) {
+    protected makeUnsupportedRelationshipError(model: string, relationship: string, status: number) {
         return this.makeError('unsupportedRelationship', `Relationship ${model}.${relationship} doesn't exist`, status);
     }
 

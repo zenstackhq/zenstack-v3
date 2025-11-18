@@ -36,7 +36,7 @@ export function getSchemaFile(file?: string) {
         return './zenstack/schema.zmodel';
     } else {
         throw new CliError(
-            'Schema file not found in default locations ("./zenstack/schema.zmodel" or "./schema.zmodel").',
+            'Schema file not found in default locations ("./schema.zmodel" or "./zenstack/schema.zmodel").',
         );
     }
 }

@@ -44,7 +44,7 @@ export async function generateSchema(
         }
     }
 
-    const schemaExists = !!(filePath && fs.existsSync(filePath));
+    const schemaExists = fs.existsSync(filePath);
 
     const schema = await updateSchema(filePath, tables, config, options);
 
@@ -161,22 +161,22 @@ function createDataModel(modelName: string, zmodel: Model, numericId: boolean) {
 }
 
 function addModelField(dataModel: DataModel, fieldName: string, fieldType: string, array: boolean, optional: boolean) {
-    const idField: DataField = {
+    const field: DataField = {
         $type: 'DataField',
         name: fieldName,
         attributes: [],
         comments: [],
         $container: dataModel,
     } as any;
-    idField.type = {
+    field.type = {
         $type: 'DataFieldType',
         type: fieldType as any,
         array,
         optional,
-        $container: idField,
+        $container: field,
     };
-    dataModel.fields.push(idField);
-    return idField;
+    dataModel.fields.push(field);
+    return field;
 }
 
 function initializeZmodel(config: AdapterConfig) {
@@ -340,7 +340,7 @@ function addOrUpdateModel(
                         addDefaultNow(df);
                     } else {
                         console.warn(
-                            `Warning: Unsupported default function for field ${fieldName} in model ${fName}. Please adjust manually.`,
+                            `Warning: Unsupported default function for field ${fieldName} in model ${table.modelName}. Please adjust manually.`,
                         );
                     }
                 }

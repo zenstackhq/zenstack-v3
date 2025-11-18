@@ -1074,12 +1074,18 @@ export class TsSchemaGenerator {
             : typeof arg === 'string'
               ? ts.factory.createStringLiteral(arg)
               : typeof arg === 'number'
-                ? ts.factory.createNumericLiteral(arg)
+                ? this.createNumberLiteral(arg)
                 : arg === true
                   ? ts.factory.createTrue()
                   : arg === false
                     ? ts.factory.createFalse()
                     : undefined;
+    }
+
+    private createNumberLiteral(arg: number): any {
+        return arg < 0
+            ? ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, ts.factory.createNumericLiteral(-arg))
+            : ts.factory.createNumericLiteral(arg);
     }
 
     private createProceduresObject(procedures: Procedure[]) {

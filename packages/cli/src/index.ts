@@ -30,6 +30,10 @@ const checkAction = async (options: Parameters<typeof actions.check>[0]): Promis
     await telemetry.trackCommand('check', () => actions.check(options));
 };
 
+const formatAction = async (options: Parameters<typeof actions.format>[0]): Promise<void> => {
+    await telemetry.trackCommand('format', () => actions.format(options));
+};
+
 function createProgram() {
     const program = new Command('zen')
         .alias('zenstack')
@@ -144,6 +148,13 @@ function createProgram() {
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
         .action(checkAction);
+
+    program
+        .command('format')
+        .description('Format a ZModel schema file')
+        .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
+        .action(formatAction);
 
     program.addHelpCommand('help [command]', 'Display help for a command');
 

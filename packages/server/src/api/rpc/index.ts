@@ -27,7 +27,7 @@ export type RPCApiHandlerOptions<Schema extends SchemaDef> = {
  * RPC style API request handler that mirrors the ZenStackClient API
  */
 export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schema> {
-    constructor(private readonly options: RPCApiHandlerOptions<Schema>) {}
+    constructor(protected readonly options: RPCApiHandlerOptions<Schema>) {}
 
     get schema(): Schema {
         return this.options.schema;
@@ -163,11 +163,11 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
         }
     }
 
-    private isValidModel(client: ClientContract<Schema>, model: string) {
+    protected isValidModel(client: ClientContract<Schema>, model: string) {
         return Object.keys(client.$schema.models).some((m) => lowerCaseFirst(m) === lowerCaseFirst(model));
     }
 
-    private makeBadInputErrorResponse(message: string) {
+    protected makeBadInputErrorResponse(message: string) {
         const resp = {
             status: 400,
             body: { error: { message } },
@@ -176,7 +176,7 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
         return resp;
     }
 
-    private makeGenericErrorResponse(err: unknown) {
+    protected makeGenericErrorResponse(err: unknown) {
         const resp = {
             status: 500,
             body: { error: { message: err instanceof Error ? err.message : 'unknown error' } },
@@ -189,7 +189,7 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
         return resp;
     }
 
-    private makeORMErrorResponse(err: ORMError) {
+    protected makeORMErrorResponse(err: ORMError) {
         let status = 400;
         const error: any = { message: err.message, reason: err.reason };
 
@@ -220,7 +220,7 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
         return resp;
     }
 
-    private async processRequestPayload(args: any) {
+    protected async processRequestPayload(args: any) {
         const { meta, ...rest } = args;
         if (meta?.serialization) {
             try {
@@ -233,7 +233,7 @@ export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schem
         return { result: args, error: undefined };
     }
 
-    private unmarshalQ(value: string, meta: string | undefined) {
+    protected unmarshalQ(value: string, meta: string | undefined) {
         let parsedValue: any;
         try {
             parsedValue = JSON.parse(value);

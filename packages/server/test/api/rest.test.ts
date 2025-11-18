@@ -3163,4 +3163,79 @@ describe('REST server tests', () => {
             });
         });
     });
+
+    describe('REST server tests - handler extension', () => {
+        const schema = `
+            model Post {
+                id String @id
+                title String
+            }
+        `;
+
+        class CustomRestApiHandler extends RestApiHandler<SchemaDef> {
+            public readonly buildFilterCalls: Array<{
+                type: string;
+                query: Record<string, string | string[]> | undefined;
+                filter: unknown;
+            }> = [];
+
+            protected override buildFilter(
+                type: string,
+                query: Record<string, string | string[]> | undefined,
+            ) {
+                const result = super.buildFilter(type, query);
+                if (type !== 'post') {
+                    this.buildFilterCalls.push({ type, query, filter: result.filter });
+                    return result;
+                }
+
+                const baseFilter =
+                    result.filter && typeof result.filter === 'object' && !Array.isArray(result.filter)
+                        ? { ...(result.filter as Record<string, unknown>) }
+                        : {};
+
+                const modified = {
+                    ...result,
+                    filter: {
+                        ...baseFilter,
+                        title: 'second',
+                    },
+                };
+
+                this.buildFilterCalls.push({ type, query, filter: modified.filter });
+                return modified;
+            }
+        }
+
+        beforeEach(async () => {
+            client = await createTestClient(schema);
+            await client.post.create({ data: { id: 'post-first', title: 'first' } });
+            await client.post.create({ data: { id: 'post-second', title: 'second' } });
+        });
+
+        it('allows extending RestApiHandler to customize filtering', async () => {
+            const customHandler = new CustomRestApiHandler({
+                schema: client.$schema,
+                endpoint: 'http://localhost/api',
+            });
+
+            const response = await customHandler.handleRequest({
+                method: 'get',
+                path: '/post',
+                query: {},
+                client,
+            });
+
+            expect(customHandler.buildFilterCalls).toHaveLength(1);
+            expect(customHandler.buildFilterCalls[0].type).toBe('post');
+            expect(customHandler.buildFilterCalls[0].filter).toMatchObject({ title: 'second' });
+
+            expect(response.status).toBe(200);
+            const body = response.body as {
+                data: Array<{ attributes: { title: string } }>;
+            };
+            expect(body.data).toHaveLength(1);
+            expect(body.data[0].attributes.title).toBe('second');
+        });
+    });
 });

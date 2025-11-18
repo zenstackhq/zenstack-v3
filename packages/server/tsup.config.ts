@@ -2,7 +2,9 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
     entry: {
+        types: 'src/types.ts',
         api: 'src/api/index.ts',
+        common: 'src/adapter/common.ts',
         express: 'src/adapter/express/index.ts',
         next: 'src/adapter/next/index.ts',
         fastify: 'src/adapter/fastify/index.ts',

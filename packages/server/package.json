@@ -39,6 +39,16 @@
                 "default": "./dist/api.cjs"
             }
         },
+        "./common": {
+            "import": {
+                "types": "./dist/common.d.ts",
+                "default": "./dist/common.js"
+            },
+            "require": {
+                "types": "./dist/common.d.cts",
+                "default": "./dist/common.cjs"
+            }
+        },
         "./express": {
             "import": {
                 "types": "./dist/express.d.ts",
@@ -117,6 +127,16 @@
             "require": {
                 "types": "./dist/tanstack-start.d.cts",
                 "default": "./dist/tanstack-start.cjs"
+            }
+        },
+        "./types": {
+            "import": {
+                "types": "./dist/types.d.ts",
+                "default": "./dist/types.js"
+            },
+            "require": {
+                "types": "./dist/types.d.cts",
+                "default": "./dist/types.cjs"
             }
         }
     },

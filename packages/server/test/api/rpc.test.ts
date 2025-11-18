@@ -508,6 +508,64 @@ describe('RPC API Handler Tests', () => {
         expect(r.data).toBeNull();
     });
 
+    it('allows extending RPCApiHandler to customize query unmarshalling', async () => {
+        await rawClient.post.deleteMany();
+        await rawClient.user.deleteMany();
+
+        await rawClient.user.create({
+            data: {
+                id: 'ext-user',
+                email: 'ext@example.com',
+                posts: {
+                    create: [
+                        { id: 'ext-post-1', title: 'first', published: true },
+                        { id: 'ext-post-2', title: 'second', published: true },
+                    ],
+                },
+            },
+        });
+
+        class CustomHandler extends RPCApiHandler<SchemaDef> {
+            public readonly unmarshalCalls: Array<{ value: string; meta: string | undefined; result: unknown }> = [];
+            protected override unmarshalQ(value: string, meta: string | undefined) {
+                const result = super.unmarshalQ(value, meta);
+                this.unmarshalCalls.push({ value, meta, result });
+                const asRecord = (result ?? {}) as Record<string, unknown>;
+                const baseWhere = (asRecord.where ?? {}) as Record<string, unknown>;
+                return {
+                    ...asRecord,
+                    where: {
+                        ...baseWhere,
+                        title: 'second',
+                    },
+                };
+            }
+        }
+
+        const handler = new CustomHandler({ schema: client.$schema });
+        const callHandler = (args: Parameters<typeof handler.handleRequest>[0]) => handler.handleRequest(args);
+
+        const response = await callHandler({
+            method: 'get',
+            path: '/post/findMany',
+            client: rawClient,
+            query: {
+                q: JSON.stringify({ where: {} }),
+            },
+        });
+
+        expect(handler.unmarshalCalls).toHaveLength(1);
+        expect(handler.unmarshalCalls[0].value).toBeDefined();
+        expect(handler.unmarshalCalls[0].result).toEqual({ where: {} });
+        expect(response.status).toBe(200);
+        const responseBody = response.body as { data: Array<{ title: string }> };
+        expect(responseBody.data).toHaveLength(1);
+        expect(responseBody.data[0].title).toBe('second');
+
+        await rawClient.post.deleteMany();
+        await rawClient.user.deleteMany();
+    });
+
     function makeHandler() {
         const handler = new RPCApiHandler({ schema: client.$schema });
         return async (args: any) => {

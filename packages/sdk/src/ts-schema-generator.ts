@@ -1082,7 +1082,7 @@ export class TsSchemaGenerator {
                     : undefined;
     }
 
-    private createNumberLiteral(arg: number): any {
+    private createNumberLiteral(arg: number) {
         return arg < 0
             ? ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, ts.factory.createNumericLiteral(-arg))
             : ts.factory.createNumericLiteral(arg);

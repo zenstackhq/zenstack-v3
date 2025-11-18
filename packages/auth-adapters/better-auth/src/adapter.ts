@@ -214,8 +214,7 @@ export const zenstackAdapter = <Schema extends SchemaDef>(db: ClientContract<Sch
             };
         };
 
-    let adapterOptions: AdapterFactoryOptions | null = null;
-    adapterOptions = {
+    const adapterOptions: AdapterFactoryOptions = {
         config: {
             adapterId: 'zenstack',
             adapterName: 'ZenStack Adapter',

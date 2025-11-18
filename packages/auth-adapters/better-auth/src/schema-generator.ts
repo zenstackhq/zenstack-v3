@@ -24,7 +24,6 @@ import { type BetterAuthOptions } from 'better-auth';
 import type { DBAdapterSchemaCreation } from 'better-auth/adapters';
 import type { BetterAuthDBSchema, DBFieldAttribute, DBFieldType } from 'better-auth/db';
 import fs from 'node:fs';
-import path from 'node:path';
 import { match } from 'ts-pattern';
 import type { AdapterConfig } from './adapter';
 
@@ -45,7 +44,7 @@ export async function generateSchema(
         }
     }
 
-    const schemaExists = !!(filePath && fs.existsSync(path.join(process.cwd(), filePath)));
+    const schemaExists = !!(filePath && fs.existsSync(filePath));
 
     const schema = await updateSchema(filePath, tables, config, options);
 
@@ -234,7 +233,7 @@ function initializeZmodel(config: AdapterConfig) {
         config.provider === 'sqlite'
             ? {
                   $type: 'StringLiteral',
-                  value: 'file:./test.db',
+                  value: 'file:./dev.db',
                   $container: urlField,
               }
             : envCall;
@@ -283,11 +282,11 @@ function addOrUpdateModel(
     }
 
     for (const [fName, field] of Object.entries(table.fields)) {
-        if (dataModel.fields.some((f) => f.name === fName)) {
+        const fieldName = field.fieldName ?? fName;
+        if (dataModel.fields.some((f) => f.name === fieldName)) {
             continue;
         }
 
-        const fieldName = field.fieldName ?? fName;
         changed = true;
 
         if (!field.references) {

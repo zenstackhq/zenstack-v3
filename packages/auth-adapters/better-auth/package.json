@@ -41,8 +41,8 @@
         "ts-pattern": "catalog:"
     },
     "peerDependencies": {
-        "@better-auth/core": "^1.0.0",
-        "better-auth": "^1.0.0"
+        "@better-auth/core": "^1.3.0",
+        "better-auth": "^1.3.0"
     },
     "devDependencies": {
         "@better-auth/core": "^1.3.0",

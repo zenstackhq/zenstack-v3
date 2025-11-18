@@ -64,7 +64,7 @@ export type Response = {
 /**
  * Framework-agnostic API handler.
  */
-export interface ApiHandler<Schema extends SchemaDef> {
+export interface ApiHandler<Schema extends SchemaDef = SchemaDef> {
     /**
      * The schema associated with this handler.
      */

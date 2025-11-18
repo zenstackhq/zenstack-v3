@@ -115,7 +115,7 @@ async function updateSchema(
 
     try {
         content = await formatDocument(content);
-    } catch (err) {
+    } catch {
         // ignore formatting errors
     }
 

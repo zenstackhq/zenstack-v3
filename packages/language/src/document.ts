@@ -1,4 +1,12 @@
-import { isAstNode, URI, type AstNode, type LangiumDocument, type LangiumDocuments, type Mutable } from 'langium';
+import {
+    isAstNode,
+    TextDocument,
+    URI,
+    type AstNode,
+    type LangiumDocument,
+    type LangiumDocuments,
+    type Mutable,
+} from 'langium';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +14,7 @@ import { isDataSource, type Model } from './ast';
 import { STD_LIB_MODULE_NAME } from './constants';
 import { createZModelServices } from './module';
 import { getDataModelAndTypeDefs, getDocument, hasAttribute, resolveImport, resolveTransitiveImports } from './utils';
+import type { ZModelFormatter } from './zmodel-formatter';
 
 /**
  * Loads ZModel document from the given file name. Include the additional document
@@ -199,4 +208,21 @@ function validationAfterImportMerge(model: Model) {
         errors.push('Validation error: Multiple `@@auth` declarations are not allowed');
     }
     return errors;
+}
+
+/**
+ * Formats the given ZModel content.
+ */
+export async function formatDocument(content: string) {
+    const services = createZModelServices().ZModelLanguage;
+    const langiumDocuments = services.shared.workspace.LangiumDocuments;
+    const document = langiumDocuments.createDocument(URI.parse('memory://schema.zmodel'), content);
+    const formatter = services.lsp.Formatter as ZModelFormatter;
+    const identifier = { uri: document.uri.toString() };
+    const options = formatter.getFormatOptions() ?? {
+        insertSpaces: true,
+        tabSize: 4,
+    };
+    const edits = await formatter.formatDocument(document, { options, textDocument: identifier });
+    return TextDocument.applyEdits(document.textDocument, edits);
 }

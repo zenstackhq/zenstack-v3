@@ -41,7 +41,6 @@ import {
     UnaryExpr,
     type AstNode,
 } from './ast';
-import { resolved } from './utils';
 
 /**
  * Options for the generator.
@@ -161,7 +160,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
     @gen(DataModel)
     private _generateDataModel(ast: DataModel) {
         return `${ast.isView ? 'view' : 'model'} ${ast.name}${
-            ast.mixins.length > 0 ? ' mixes ' + ast.mixins.map((x) => x.ref?.name).join(', ') : ''
+            ast.mixins.length > 0 ? ' mixes ' + ast.mixins.map((x) => x.$refText).join(', ') : ''
         } {
 ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
             ast.attributes.length > 0
@@ -199,7 +198,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     private attribute(ast: DataModelAttribute | DataFieldAttribute) {
         const args = ast.args.length ? `(${ast.args.map((x) => this.generate(x)).join(', ')})` : '';
-        return `${resolved(ast.decl).name}${args}`;
+        return `${ast.decl.$refText}${args}`;
     }
 
     @gen(AttributeArg)
@@ -265,7 +264,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
     @gen(ReferenceExpr)
     private _generateReferenceExpr(ast: ReferenceExpr) {
         const args = ast.args.length ? `(${ast.args.map((x) => this.generate(x)).join(', ')})` : '';
-        return `${ast.target.ref?.name}${args}`;
+        return `${ast.target.$refText}${args}`;
     }
 
     @gen(ReferenceArg)
@@ -275,12 +274,12 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(MemberAccessExpr)
     private _generateMemberExpr(ast: MemberAccessExpr) {
-        return `${this.generate(ast.operand)}.${ast.member.ref?.name}`;
+        return `${this.generate(ast.operand)}.${ast.member.$refText}`;
     }
 
     @gen(InvocationExpr)
     private _generateInvocationExpr(ast: InvocationExpr) {
-        return `${ast.function.ref?.name}(${ast.args.map((x) => this.argument(x)).join(', ')})`;
+        return `${ast.function.$refText}(${ast.args.map((x) => this.argument(x)).join(', ')})`;
     }
 
     @gen(NullExpr)

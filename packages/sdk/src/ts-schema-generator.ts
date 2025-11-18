@@ -55,6 +55,7 @@ export type TsSchemaGeneratorOptions = {
     outDir: string;
     lite?: boolean;
     liteOnly?: boolean;
+    importWithFileExtension?: string;
 };
 
 export class TsSchemaGenerator {
@@ -117,6 +118,7 @@ export class TsSchemaGenerator {
         const schemaObject = this.createSchemaObject(model, lite);
 
         // Now generate the import declaration with the correct imports
+        // import { type SchemaDef, type OperandExpression, ExpressionUtils } from '@zenstackhq/orm/schema';
         const runtimeImportDecl = ts.factory.createImportDeclaration(
             undefined,
             ts.factory.createImportClause(
@@ -1072,12 +1074,18 @@ export class TsSchemaGenerator {
             : typeof arg === 'string'
               ? ts.factory.createStringLiteral(arg)
               : typeof arg === 'number'
-                ? ts.factory.createNumericLiteral(arg)
+                ? this.createNumberLiteral(arg)
                 : arg === true
                   ? ts.factory.createTrue()
                   : arg === false
                     ? ts.factory.createFalse()
                     : undefined;
+    }
+
+    private createNumberLiteral(arg: number) {
+        return arg < 0
+            ? ts.factory.createPrefixUnaryExpression(ts.SyntaxKind.MinusToken, ts.factory.createNumericLiteral(-arg))
+            : ts.factory.createNumericLiteral(arg);
     }
 
     private createProceduresObject(procedures: Procedure[]) {
@@ -1290,7 +1298,15 @@ export class TsSchemaGenerator {
         const statements: ts.Statement[] = [];
 
         // generate: import { schema as $schema, type SchemaType as $Schema } from './schema';
-        statements.push(this.generateSchemaImport(model, true, true, !!(options.lite || options.liteOnly)));
+        statements.push(
+            this.generateSchemaImport(
+                model,
+                true,
+                true,
+                !!(options.lite || options.liteOnly),
+                options.importWithFileExtension,
+            ),
+        );
 
         // generate: import type { ModelResult as $ModelResult } from '@zenstackhq/orm';
         statements.push(
@@ -1416,7 +1432,13 @@ export class TsSchemaGenerator {
         fs.writeFileSync(outputFile, result);
     }
 
-    private generateSchemaImport(model: Model, schemaObject: boolean, schemaType: boolean, useLite: boolean) {
+    private generateSchemaImport(
+        model: Model,
+        schemaObject: boolean,
+        schemaType: boolean,
+        useLite: boolean,
+        importWithFileExtension: string | undefined,
+    ) {
         const importSpecifiers = [];
 
         if (schemaObject) {
@@ -1442,10 +1464,18 @@ export class TsSchemaGenerator {
             );
         }
 
+        let importFrom = useLite ? './schema-lite' : './schema';
+        if (importWithFileExtension) {
+            importFrom += importWithFileExtension.startsWith('.')
+                ? importWithFileExtension
+                : `.${importWithFileExtension}`;
+        }
+
+        // import { schema as $schema, type SchemaType as $Schema } from './schema';
         return ts.factory.createImportDeclaration(
             undefined,
             ts.factory.createImportClause(false, undefined, ts.factory.createNamedImports(importSpecifiers)),
-            ts.factory.createStringLiteral(useLite ? './schema-lite' : './schema'),
+            ts.factory.createStringLiteral(importFrom),
         );
     }
 
@@ -1466,7 +1496,15 @@ export class TsSchemaGenerator {
         const statements: ts.Statement[] = [];
 
         // generate: import { SchemaType as $Schema } from './schema';
-        statements.push(this.generateSchemaImport(model, false, true, !!(options.lite || options.liteOnly)));
+        statements.push(
+            this.generateSchemaImport(
+                model,
+                false,
+                true,
+                !!(options.lite || options.liteOnly),
+                options.importWithFileExtension,
+            ),
+        );
 
         // generate: import { CreateArgs as $CreateArgs, ... } from '@zenstackhq/orm';
         const inputTypes = [

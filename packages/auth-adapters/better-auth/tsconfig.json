@@ -1,0 +1,8 @@
+{
+    "extends": "@zenstackhq/typescript-config/base.json",
+    "compilerOptions": {
+        "rootDir": ".",
+        "noPropertyAccessFromIndexSignature": false
+    },
+    "include": ["src/**/*"]
+}

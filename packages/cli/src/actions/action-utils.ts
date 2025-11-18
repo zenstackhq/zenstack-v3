@@ -30,13 +30,13 @@ export function getSchemaFile(file?: string) {
         }
     }
 
-    if (fs.existsSync('./zenstack/schema.zmodel')) {
-        return './zenstack/schema.zmodel';
-    } else if (fs.existsSync('./schema.zmodel')) {
+    if (fs.existsSync('./schema.zmodel')) {
         return './schema.zmodel';
+    } else if (fs.existsSync('./zenstack/schema.zmodel')) {
+        return './zenstack/schema.zmodel';
     } else {
         throw new CliError(
-            'Schema file not found in default locations ("./zenstack/schema.zmodel" or "./schema.zmodel").',
+            'Schema file not found in default locations ("./schema.zmodel" or "./zenstack/schema.zmodel").',
         );
     }
 }

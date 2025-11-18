@@ -1,5 +1,5 @@
 import { lowerCaseFirst, upperCaseFirst } from '@zenstackhq/common-helpers';
-import { loadDocument, ZModelCodeGenerator } from '@zenstackhq/language';
+import { formatDocument, loadDocument, ZModelCodeGenerator } from '@zenstackhq/language';
 import {
     Argument,
     ArrayExpr,
@@ -111,7 +111,13 @@ async function updateSchema(
     }
 
     const generator = new ZModelCodeGenerator();
-    const content = generator.generate(zmodel);
+    let content = generator.generate(zmodel);
+
+    try {
+        content = await formatDocument(content);
+    } catch {
+        // ignore formatting errors
+    }
 
     return content;
 }

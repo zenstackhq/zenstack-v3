@@ -778,15 +778,20 @@ type ConnectOrCreatePayload<
     create: CreateInput<Schema, Model, Without>;
 };
 
-type CreateManyInput<Schema extends SchemaDef, Model extends GetModels<Schema>, Without extends string = never> = {
+export type CreateManyInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Without extends string = never,
+> = {
     data: OrArray<Omit<CreateScalarPayload<Schema, Model>, Without> & Omit<CreateFKPayload<Schema, Model>, Without>>;
     skipDuplicates?: boolean;
 };
 
-type CreateInput<Schema extends SchemaDef, Model extends GetModels<Schema>, Without extends string = never> = XOR<
-    Omit<CreateWithFKInput<Schema, Model>, Without>,
-    Omit<CreateWithRelationInput<Schema, Model>, Without>
->;
+export type CreateInput<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Without extends string = never,
+> = XOR<Omit<CreateWithFKInput<Schema, Model>, Without>, Omit<CreateWithRelationInput<Schema, Model>, Without>>;
 
 type NestedCreateInput<
     Schema extends SchemaDef,
@@ -882,7 +887,7 @@ type UpdateRelationInput<
     Without
 >;
 
-type UpdateInput<
+export type UpdateInput<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Without extends string = never,

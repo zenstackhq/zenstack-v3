@@ -34,6 +34,7 @@
         "@zenstackhq/sdk": "workspace:*",
         "colors": "1.4.0",
         "commander": "^8.3.0",
+        "execa": "^9.6.0",
         "langium": "catalog:",
         "mixpanel": "^0.18.1",
         "ora": "^5.4.1",

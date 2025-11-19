@@ -3,10 +3,12 @@ import path from 'node:path';
 import { CliError } from '../cli-error';
 import { execPrisma } from '../utils/exec-utils';
 import { generateTempPrismaSchema, getSchemaFile } from './action-utils';
+import { run as runSeed } from './seed';
 
 type CommonOptions = {
     schema?: string;
     migrations?: string;
+    skipSeed?: boolean;
 };
 
 type DevOptions = CommonOptions & {
@@ -70,6 +72,7 @@ function runDev(prismaSchemaFile: string, options: DevOptions) {
             'migrate dev',
             ` --schema "${prismaSchemaFile}"`,
             ' --skip-generate',
+            ' --skip-seed',
             options.name ? ` --name "${options.name}"` : '',
             options.createOnly ? ' --create-only' : '',
         ].join('');
@@ -79,17 +82,22 @@ function runDev(prismaSchemaFile: string, options: DevOptions) {
     }
 }
 
-function runReset(prismaSchemaFile: string, options: ResetOptions) {
+async function runReset(prismaSchemaFile: string, options: ResetOptions) {
     try {
         const cmd = [
             'migrate reset',
             ` --schema "${prismaSchemaFile}"`,
             ' --skip-generate',
+            ' --skip-seed',
             options.force ? ' --force' : '',
         ].join('');
         execPrisma(cmd);
     } catch (err) {
         handleSubProcessError(err);
+    }
+
+    if (!options.skipSeed) {
+        await runSeed({ noWarnings: true, printStatus: true }, []);
     }
 }
 

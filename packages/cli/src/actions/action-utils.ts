@@ -78,7 +78,11 @@ export async function generateTempPrismaSchema(zmodelPath: string, folder?: stri
 }
 
 export function getPkgJsonConfig(startPath: string) {
-    const result: { schema: string | undefined; output: string | undefined } = { schema: undefined, output: undefined };
+    const result: { schema: string | undefined; output: string | undefined; seed: string | undefined } = {
+        schema: undefined,
+        output: undefined,
+        seed: undefined,
+    };
     const pkgJsonFile = findUp(['package.json'], startPath, false);
 
     if (!pkgJsonFile) {
@@ -93,8 +97,15 @@ export function getPkgJsonConfig(startPath: string) {
     }
 
     if (pkgJson.zenstack && typeof pkgJson.zenstack === 'object') {
-        result.schema = pkgJson.zenstack.schema && path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.schema);
-        result.output = pkgJson.zenstack.output && path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.output);
+        result.schema =
+            pkgJson.zenstack.schema &&
+            typeof pkgJson.zenstack.schema === 'string' &&
+            path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.schema);
+        result.output =
+            pkgJson.zenstack.output &&
+            typeof pkgJson.zenstack.output === 'string' &&
+            path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.output);
+        result.seed = typeof pkgJson.zenstack.seed === 'string' && pkgJson.zenstack.seed;
     }
 
     return result;

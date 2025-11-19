@@ -19,9 +19,6 @@
     "keywords": [],
     "author": "",
     "license": "MIT",
-    "dependencies": {
-        "@zenstackhq/common-helpers": "workspace:*"
-    },
     "devDependencies": {
         "@eslint/js": "^9.29.0",
         "@types/node": "catalog:",

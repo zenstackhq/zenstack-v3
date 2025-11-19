@@ -79,10 +79,6 @@ catalogs:
 importers:
 
   .:
-    dependencies:
-      '@zenstackhq/common-helpers':
-        specifier: workspace:*
-        version: link:packages/common-helpers
     devDependencies:
       '@eslint/js':
         specifier: ^9.29.0
@@ -356,6 +352,9 @@ importers:
 
   packages/language:
     dependencies:
+      '@zenstackhq/common-helpers':
+        specifier: workspace:*
+        version: link:../common-helpers
       langium:
         specifier: 'catalog:'
         version: 3.5.0
@@ -375,9 +374,6 @@ importers:
       '@types/tmp':
         specifier: 'catalog:'
         version: 0.2.6
-      '@zenstackhq/common-helpers':
-        specifier: workspace:*
-        version: link:../common-helpers
       '@zenstackhq/eslint-config':
         specifier: workspace:*
         version: link:../config/eslint-config

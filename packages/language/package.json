@@ -55,6 +55,7 @@
         }
     },
     "dependencies": {
+        "@zenstackhq/common-helpers": "workspace:*",
         "langium": "catalog:",
         "pluralize": "^8.0.0",
         "ts-pattern": "catalog:",

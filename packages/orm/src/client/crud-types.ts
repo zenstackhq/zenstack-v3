@@ -551,7 +551,7 @@ type RelationFilter<
 
 //#region Field utils
 
-type MapModelFieldType<
+export type MapModelFieldType<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,

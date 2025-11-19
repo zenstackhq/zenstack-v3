@@ -125,19 +125,19 @@ export function addBigIntValidation(schema: z.ZodBigInt, attributes: AttributeAp
         if (val === undefined) {
             continue;
         }
-        const bigIntVal = BigInt(val);
+
         match(attr.name)
             .with('@gt', () => {
-                result = result.gt(bigIntVal);
+                result = result.gt(BigInt(val));
             })
             .with('@gte', () => {
-                result = result.gte(bigIntVal);
+                result = result.gte(BigInt(val));
             })
             .with('@lt', () => {
-                result = result.lt(bigIntVal);
+                result = result.lt(BigInt(val));
             })
             .with('@lte', () => {
-                result = result.lte(bigIntVal);
+                result = result.lte(BigInt(val));
             });
     }
     return result;

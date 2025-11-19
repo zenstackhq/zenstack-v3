@@ -135,8 +135,20 @@ function createProgram() {
 
     dbCommand
         .command('seed')
-        .description(
-            'Seed the database. Arguments following -- are passed to the seed script.\nE.g.: `zen db seed -- --users 10`',
+        .description('Seed the database')
+        .allowExcessArguments(true)
+        .addHelpText(
+            'after',
+            `
+Seed script is configured under the "zenstack.seed" field in package.json.
+E.g.:
+{
+    "zenstack": {
+        "seed": "ts-node ./zenstack/seed.ts"
+    }
+}            
+
+Arguments following -- are passed to the seed script. E.g.: "zen db seed -- --users 10"`,
         )
         .addOption(noVersionCheckOption)
         .action((options, command) => seedAction(options, command.args));

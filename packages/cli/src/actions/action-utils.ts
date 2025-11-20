@@ -135,3 +135,11 @@ function findUp<Multiple extends boolean = false>(
     }
     return findUp(names, up, multiple, result);
 }
+
+export async function requireDataSourceUrl(schemaFile: string) {
+    const zmodel = await loadSchemaDocument(schemaFile);
+    const dataSource = zmodel.declarations.find(isDataSource);
+    if (!dataSource?.fields.some((f) => f.name === 'url')) {
+        throw new CliError('The schema\'s "datasource" must have a "url" field to use this command.');
+    }
+}

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CliError } from '../cli-error';
 import { execPrisma } from '../utils/exec-utils';
-import { generateTempPrismaSchema, getSchemaFile } from './action-utils';
+import { generateTempPrismaSchema, getSchemaFile, requireDataSourceUrl } from './action-utils';
 import { run as runSeed } from './seed';
 
 type CommonOptions = {
@@ -34,6 +34,10 @@ type ResolveOptions = CommonOptions & {
  */
 export async function run(command: string, options: CommonOptions) {
     const schemaFile = getSchemaFile(options.schema);
+
+    // validate datasource url exists
+    await requireDataSourceUrl(schemaFile);
+
     const prismaSchemaDir = options.migrations ? path.dirname(options.migrations) : undefined;
     const prismaSchemaFile = await generateTempPrismaSchema(schemaFile, prismaSchemaDir);
 

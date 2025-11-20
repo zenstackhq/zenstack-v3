@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { execPrisma } from '../utils/exec-utils';
-import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError } from './action-utils';
+import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError, requireDataSourceUrl } from './action-utils';
 
 type Options = {
     schema?: string;
@@ -20,8 +20,12 @@ export async function run(command: string, options: Options) {
 }
 
 async function runPush(options: Options) {
-    // generate a temp prisma schema file
     const schemaFile = getSchemaFile(options.schema);
+
+    // validate datasource url exists
+    await requireDataSourceUrl(schemaFile);
+
+    // generate a temp prisma schema file
     const prismaSchemaFile = await generateTempPrismaSchema(schemaFile);
 
     try {

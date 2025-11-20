@@ -32,6 +32,7 @@
         "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
+        "prisma": "catalog:",
         "colors": "1.4.0",
         "commander": "^8.3.0",
         "execa": "^9.6.0",
@@ -41,9 +42,6 @@
         "package-manager-detector": "^1.3.0",
         "semver": "^7.7.2",
         "ts-pattern": "catalog:"
-    },
-    "peerDependencies": {
-        "prisma": "catalog:"
     },
     "devDependencies": {
         "@types/better-sqlite3": "catalog:",
@@ -55,6 +53,7 @@
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "better-sqlite3": "catalog:",
-        "tmp": "catalog:"
+        "tmp": "catalog:",
+        "prisma": "catalog:"
     }
 }

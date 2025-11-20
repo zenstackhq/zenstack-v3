@@ -1,5 +1,13 @@
 import type Decimal from 'decimal.js';
-import { type GetModels, type IsDelegateModel, type ProcedureDef, type SchemaDef } from '../schema';
+import {
+    type FieldIsArray,
+    type GetModels,
+    type IsDelegateModel,
+    type ProcedureDef,
+    type RelationFields,
+    type RelationFieldType,
+    type SchemaDef,
+} from '../schema';
 import type { AnyKysely } from '../utils/kysely-utils';
 import type { OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
 import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
@@ -12,6 +20,7 @@ import type {
     CreateArgs,
     CreateManyAndReturnArgs,
     CreateManyArgs,
+    DefaultModelResult,
     DeleteArgs,
     DeleteManyArgs,
     FindFirstArgs,
@@ -810,11 +819,23 @@ export type ModelOperations<Schema extends SchemaDef, Model extends GetModels<Sc
 
 //#region Supporting types
 
+/**
+ * Type for auth context that includes both scalar and relation fields.
+ * Relations are recursively included to allow nested auth data like { user: { profile: { ... } } }
+ */
+type AuthModelType<Schema extends SchemaDef, Model extends GetModels<Schema>> = Partial<
+    DefaultModelResult<Schema, Model>
+> & {
+    [Key in RelationFields<Schema, Model>]?: FieldIsArray<Schema, Model, Key> extends true
+        ? AuthModelType<Schema, RelationFieldType<Schema, Model, Key>>[]
+        : AuthModelType<Schema, RelationFieldType<Schema, Model, Key>>;
+};
+
 export type AuthType<Schema extends SchemaDef> =
     string extends GetModels<Schema>
         ? Record<string, unknown>
         : Schema['authType'] extends GetModels<Schema>
-          ? Partial<ModelResult<Schema, Schema['authType']>>
+          ? AuthModelType<Schema, Schema['authType']>
           : never;
 
 //#endregion

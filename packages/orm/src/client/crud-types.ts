@@ -47,7 +47,7 @@ import type { ToKyselySchema } from './query-builder';
 
 //#region Query results
 
-type DefaultModelResult<
+export type DefaultModelResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Omit = undefined,

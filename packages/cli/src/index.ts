@@ -150,7 +150,7 @@ E.g.:
     "zenstack": {
         "seed": "ts-node ./zenstack/seed.ts"
     }
-}            
+}
 
 Arguments following -- are passed to the seed script. E.g.: "zen db seed -- --users 10"`,
         )

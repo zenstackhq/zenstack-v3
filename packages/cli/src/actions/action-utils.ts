@@ -98,14 +98,15 @@ export function getPkgJsonConfig(startPath: string) {
 
     if (pkgJson.zenstack && typeof pkgJson.zenstack === 'object') {
         result.schema =
-            pkgJson.zenstack.schema &&
-            typeof pkgJson.zenstack.schema === 'string' &&
-            path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.schema);
+            pkgJson.zenstack.schema && typeof pkgJson.zenstack.schema === 'string'
+                ? path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.schema)
+                : undefined;
         result.output =
-            pkgJson.zenstack.output &&
-            typeof pkgJson.zenstack.output === 'string' &&
-            path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.output);
-        result.seed = typeof pkgJson.zenstack.seed === 'string' && pkgJson.zenstack.seed;
+            pkgJson.zenstack.output && typeof pkgJson.zenstack.output === 'string'
+                ? path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.output)
+                : undefined;
+        result.seed =
+            typeof pkgJson.zenstack.seed === 'string' && pkgJson.zenstack.seed ? pkgJson.zenstack.seed : undefined;
     }
 
     return result;

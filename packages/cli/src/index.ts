@@ -94,6 +94,10 @@ function createProgram() {
         .addOption(new Option('--skip-seed', 'skip seeding the database after reset'))
         .addOption(noVersionCheckOption)
         .description('Reset your database and apply all migrations, all data will be lost')
+        .addHelpText(
+            'after',
+            '\nIf there is a seed script defined in package.json, it will be run after the reset. Use --skip-seed to skip it.',
+        )
         .action((options) => migrateAction('reset', options));
 
     migrateCommand

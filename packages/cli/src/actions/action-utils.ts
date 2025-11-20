@@ -105,7 +105,8 @@ export function getPkgJsonConfig(startPath: string) {
             pkgJson.zenstack.output && typeof pkgJson.zenstack.output === 'string'
                 ? path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.output)
                 : undefined;
-        result.seed = typeof pkgJson.zenstack.seed === 'string' && pkgJson.zenstack.seed ? pkgJson.seed : undefined;
+        result.seed =
+            typeof pkgJson.zenstack.seed === 'string' && pkgJson.zenstack.seed ? pkgJson.zenstack.seed : undefined;
     }
 
     return result;

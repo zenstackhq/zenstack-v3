@@ -34,6 +34,10 @@ const formatAction = async (options: Parameters<typeof actions.format>[0]): Prom
     await telemetry.trackCommand('format', () => actions.format(options));
 };
 
+const seedAction = async (options: Parameters<typeof actions.seed>[0], args: string[]): Promise<void> => {
+    await telemetry.trackCommand('db seed', () => actions.seed(options, args));
+};
+
 function createProgram() {
     const program = new Command('zen')
         .alias('zenstack')
@@ -87,8 +91,13 @@ function createProgram() {
         .addOption(schemaOption)
         .addOption(new Option('--force', 'skip the confirmation prompt'))
         .addOption(migrationsOption)
+        .addOption(new Option('--skip-seed', 'skip seeding the database after reset'))
         .addOption(noVersionCheckOption)
         .description('Reset your database and apply all migrations, all data will be lost')
+        .addHelpText(
+            'after',
+            '\nIf there is a seed script defined in package.json, it will be run after the reset. Use --skip-seed to skip it.',
+        )
         .action((options) => migrateAction('reset', options));
 
     migrateCommand
@@ -127,6 +136,26 @@ function createProgram() {
         .addOption(new Option('--accept-data-loss', 'ignore data loss warnings'))
         .addOption(new Option('--force-reset', 'force a reset of the database before push'))
         .action((options) => dbAction('push', options));
+
+    dbCommand
+        .command('seed')
+        .description('Seed the database')
+        .allowExcessArguments(true)
+        .addHelpText(
+            'after',
+            `
+Seed script is configured under the "zenstack.seed" field in package.json.
+E.g.:
+{
+    "zenstack": {
+        "seed": "ts-node ./zenstack/seed.ts"
+    }
+}
+
+Arguments following -- are passed to the seed script. E.g.: "zen db seed -- --users 10"`,
+        )
+        .addOption(noVersionCheckOption)
+        .action((options, command) => seedAction(options, command.args));
 
     program
         .command('info')

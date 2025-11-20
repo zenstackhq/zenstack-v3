@@ -6,7 +6,7 @@
 /* eslint-disable */
 
 import { type SchemaDef } from "@zenstackhq/orm/schema";
-export const schema = {
+const _schema = {
     provider: {
         type: "sqlite"
     },
@@ -47,13 +47,19 @@ export const schema = {
     },
     enums: {
         ShirtColor: {
-            Black: "Black",
-            White: "White",
-            Red: "Red",
-            Green: "Green",
-            Blue: "Blue"
+            values: {
+                Black: "Black",
+                White: "White",
+                Red: "Red",
+                Green: "Green",
+                Blue: "Blue"
+            }
         }
     },
     plugins: {}
 } as const satisfies SchemaDef;
-export type SchemaType = typeof schema;
+type Schema = typeof _schema & {
+    __brand?: "schema";
+};
+export const schema: Schema = _schema;
+export type SchemaType = Schema;

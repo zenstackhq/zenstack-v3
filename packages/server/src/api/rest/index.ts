@@ -116,7 +116,7 @@ registerCustomSerializers();
 /**
  * RESTful-style API request handler (compliant with JSON:API)
  */
-export class RestApiHandler<Schema extends SchemaDef> implements ApiHandler<Schema> {
+export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiHandler<Schema> {
     // resource serializers
     private serializers = new Map<string, Serializer>();
 

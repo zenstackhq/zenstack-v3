@@ -1,7 +1,7 @@
 {
     "name": "@zenstackhq/language",
     "description": "ZenStack ZModel language specification",
-    "version": "3.0.0-beta.24",
+    "version": "3.0.0-beta.25",
     "license": "MIT",
     "author": "ZenStack Team",
     "files": [
@@ -55,6 +55,7 @@
         }
     },
     "dependencies": {
+        "@zenstackhq/common-helpers": "workspace:*",
         "langium": "catalog:",
         "pluralize": "^8.0.0",
         "ts-pattern": "catalog:",
@@ -63,7 +64,6 @@
     "devDependencies": {
         "@types/pluralize": "^0.0.33",
         "@types/tmp": "catalog:",
-        "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",

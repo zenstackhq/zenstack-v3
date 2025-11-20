@@ -78,7 +78,11 @@ export async function generateTempPrismaSchema(zmodelPath: string, folder?: stri
 }
 
 export function getPkgJsonConfig(startPath: string) {
-    const result: { schema: string | undefined; output: string | undefined } = { schema: undefined, output: undefined };
+    const result: { schema: string | undefined; output: string | undefined; seed: string | undefined } = {
+        schema: undefined,
+        output: undefined,
+        seed: undefined,
+    };
     const pkgJsonFile = findUp(['package.json'], startPath, false);
 
     if (!pkgJsonFile) {
@@ -93,8 +97,16 @@ export function getPkgJsonConfig(startPath: string) {
     }
 
     if (pkgJson.zenstack && typeof pkgJson.zenstack === 'object') {
-        result.schema = pkgJson.zenstack.schema && path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.schema);
-        result.output = pkgJson.zenstack.output && path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.output);
+        result.schema =
+            pkgJson.zenstack.schema && typeof pkgJson.zenstack.schema === 'string'
+                ? path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.schema)
+                : undefined;
+        result.output =
+            pkgJson.zenstack.output && typeof pkgJson.zenstack.output === 'string'
+                ? path.resolve(path.dirname(pkgJsonFile), pkgJson.zenstack.output)
+                : undefined;
+        result.seed =
+            typeof pkgJson.zenstack.seed === 'string' && pkgJson.zenstack.seed ? pkgJson.zenstack.seed : undefined;
     }
 
     return result;
@@ -123,4 +135,12 @@ function findUp<Multiple extends boolean = false>(
         return (multiple && result.length > 0 ? result : undefined) as FindUpResult<Multiple>;
     }
     return findUp(names, up, multiple, result);
+}
+
+export async function requireDataSourceUrl(schemaFile: string) {
+    const zmodel = await loadSchemaDocument(schemaFile);
+    const dataSource = zmodel.declarations.find(isDataSource);
+    if (!dataSource?.fields.some((f) => f.name === 'url')) {
+        throw new CliError('The schema\'s "datasource" must have a "url" field to use this command.');
+    }
 }

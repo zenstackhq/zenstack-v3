@@ -9,5 +9,5 @@ import { schema as $schema, type SchemaType as $Schema } from "./schema";
 import { type ModelResult as $ModelResult, type TypeDefResult as $TypeDefResult } from "@zenstackhq/orm";
 export type Foo = $ModelResult<$Schema, "Foo">;
 export type Configuration = $TypeDefResult<$Schema, "Configuration">;
-export const ShirtColor = $schema.enums.ShirtColor;
+export const ShirtColor = $schema.enums.ShirtColor.values;
 export type ShirtColor = (typeof ShirtColor)[keyof typeof ShirtColor];

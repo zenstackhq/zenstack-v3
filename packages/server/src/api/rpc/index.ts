@@ -11,7 +11,7 @@ registerCustomSerializers();
 /**
  * Options for {@link RPCApiHandler}
  */
-export type RPCApiHandlerOptions<Schema extends SchemaDef> = {
+export type RPCApiHandlerOptions<Schema extends SchemaDef = SchemaDef> = {
     /**
      * The schema
      */
@@ -26,7 +26,7 @@ export type RPCApiHandlerOptions<Schema extends SchemaDef> = {
 /**
  * RPC style API request handler that mirrors the ZenStackClient API
  */
-export class RPCApiHandler<Schema extends SchemaDef> implements ApiHandler<Schema> {
+export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiHandler<Schema> {
     constructor(private readonly options: RPCApiHandlerOptions<Schema>) {}
 
     get schema(): Schema {

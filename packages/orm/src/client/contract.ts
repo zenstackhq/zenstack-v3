@@ -3,7 +3,6 @@ import {
     type FieldIsArray,
     type GetModels,
     type IsDelegateModel,
-    type NonRelationFields,
     type ProcedureDef,
     type RelationFields,
     type RelationFieldType,
@@ -21,6 +20,7 @@ import type {
     CreateArgs,
     CreateManyAndReturnArgs,
     CreateManyArgs,
+    DefaultModelResult,
     DeleteArgs,
     DeleteManyArgs,
     FindFirstArgs,
@@ -28,7 +28,6 @@ import type {
     FindUniqueArgs,
     GroupByArgs,
     GroupByResult,
-    MapModelFieldType,
     ModelResult,
     SelectSubset,
     SimplifiedModelResult,
@@ -824,9 +823,9 @@ export type ModelOperations<Schema extends SchemaDef, Model extends GetModels<Sc
  * Type for auth context that includes both scalar and relation fields.
  * Relations are recursively included to allow nested auth data like { user: { profile: { ... } } }
  */
-type AuthModelType<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in NonRelationFields<Schema, Model>]?: MapModelFieldType<Schema, Model, Key>;
-} & {
+type AuthModelType<Schema extends SchemaDef, Model extends GetModels<Schema>> = Partial<
+    DefaultModelResult<Schema, Model>
+> & {
     [Key in RelationFields<Schema, Model>]?: FieldIsArray<Schema, Model, Key> extends true
         ? AuthModelType<Schema, RelationFieldType<Schema, Model, Key>>[]
         : AuthModelType<Schema, RelationFieldType<Schema, Model, Key>>;

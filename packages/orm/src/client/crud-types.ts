@@ -47,7 +47,7 @@ import type { ToKyselySchema } from './query-builder';
 
 //#region Query results
 
-type DefaultModelResult<
+export type DefaultModelResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Omit = undefined,
@@ -551,7 +551,7 @@ type RelationFilter<
 
 //#region Field utils
 
-export type MapModelFieldType<
+type MapModelFieldType<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,

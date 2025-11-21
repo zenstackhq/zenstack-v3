@@ -1,10 +1,16 @@
 import { config } from '@dotenvx/dotenvx';
 import { ZModelCodeGenerator } from '@zenstackhq/language';
-import { type DataField, DataModel, Enum, type Model } from '@zenstackhq/language/ast';
+import { DataModel, Enum, type Model } from '@zenstackhq/language/ast';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execPrisma } from '../utils/exec-utils';
-import { generateTempPrismaSchema, getSchemaFile, handleSubProcessError, requireDataSourceUrl, loadSchemaDocumentWithServices } from './action-utils';
+import {
+    generateTempPrismaSchema,
+    getSchemaFile,
+    handleSubProcessError,
+    requireDataSourceUrl,
+    loadSchemaDocument,
+} from './action-utils';
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers } from './pull/provider';
 import { getDatasource, getDbName, getRelationFkName } from './pull/utils';

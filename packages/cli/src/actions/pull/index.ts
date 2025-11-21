@@ -15,57 +15,73 @@ import {
     EnumFactory,
 } from '@zenstackhq/language/factory';
 import type { PullOptions } from '../db';
-import type { Cascade, IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider';
+import { type Cascade, type IntrospectedEnum, type IntrospectedTable, type IntrospectionProvider } from './provider';
 import { getAttributeRef, getDbName, getEnumRef } from './utils';
 
 export function syncEnums({
     dbEnums,
     model,
+    oldModel,
+    provider,
     options,
     services,
     defaultSchema,
 }: {
     dbEnums: IntrospectedEnum[];
     model: Model;
+    oldModel: Model;
+    provider: IntrospectionProvider;
     services: ZModelServices;
     options: PullOptions;
     defaultSchema: string;
 }) {
-    for (const dbEnum of dbEnums) {
-        const { modified, name } = resolveNameCasing(options.modelCasing, dbEnum.enum_type);
-        if (modified) console.log(`Mapping enum ${dbEnum.enum_type} to ${name}`);
-        const factory = new EnumFactory().setName(name);
-        if (modified || options.alwaysMap)
-            factory.addAttribute((builder) =>
-                builder
-                    .setDecl(getAttributeRef('@@map', services))
-                    .addArg((argBuilder) => argBuilder.StringLiteral.setValue(dbEnum.enum_type)),
-            );
+    if (provider.isSupportedFeature('NativeEnum')) {
+        for (const dbEnum of dbEnums) {
+            const { modified, name } = resolveNameCasing(options.modelCasing, dbEnum.enum_type);
+            if (modified) console.log(`Mapping enum ${dbEnum.enum_type} to ${name}`);
+            const factory = new EnumFactory().setName(name);
+            if (modified || options.alwaysMap)
+                factory.addAttribute((builder) =>
+                    builder
+                        .setDecl(getAttributeRef('@@map', services))
+                        .addArg((argBuilder) => argBuilder.StringLiteral.setValue(dbEnum.enum_type)),
+                );
 
-        dbEnum.values.forEach((v) => {
-            const { name, modified } = resolveNameCasing(options.fieldCasing, v);
-            factory.addField((builder) => {
-                builder.setName(name);
-                if (modified || options.alwaysMap)
-                    builder.addAttribute((builder) =>
-                        builder
-                            .setDecl(getAttributeRef('@map', services))
-                            .addArg((argBuilder) => argBuilder.StringLiteral.setValue(v)),
-                    );
+            dbEnum.values.forEach((v) => {
+                const { name, modified } = resolveNameCasing(options.fieldCasing, v);
+                factory.addField((builder) => {
+                    builder.setName(name);
+                    if (modified || options.alwaysMap)
+                        builder.addAttribute((builder) =>
+                            builder
+                                .setDecl(getAttributeRef('@map', services))
+                                .addArg((argBuilder) => argBuilder.StringLiteral.setValue(v)),
+                        );
 
-                return builder;
+                    return builder;
+                });
             });
-        });
 
-        if (dbEnum.schema_name && dbEnum.schema_name !== '' && dbEnum.schema_name !== defaultSchema) {
-            factory.addAttribute((b) =>
-                b
-                    .setDecl(getAttributeRef('@@schema', services))
-                    .addArg((a) => a.StringLiteral.setValue(dbEnum.schema_name)),
-            );
+            if (dbEnum.schema_name && dbEnum.schema_name !== '' && dbEnum.schema_name !== defaultSchema) {
+                factory.addAttribute((b) =>
+                    b
+                        .setDecl(getAttributeRef('@@schema', services))
+                        .addArg((a) => a.StringLiteral.setValue(dbEnum.schema_name)),
+                );
+            }
+
+            model.declarations.push(factory.get({ $container: model }));
         }
-
-        model.declarations.push(factory.get({ $container: model }));
+    } else {
+        oldModel.declarations
+            .filter((d) => isEnum(d))
+            .forEach((d) => {
+                const factory = new EnumFactory().setName(d.name);
+                d.fields.forEach((v) => {
+                    factory.addField((builder) => builder.setName(v.name));
+                });
+                model.declarations.push(factory.get({ $container: model }));
+            });
     }
 }
 
@@ -140,9 +156,11 @@ export function syncTable({
     services,
     options,
     defaultSchema,
+    oldModel,
 }: {
     table: IntrospectedTable;
     model: Model;
+    oldModel: Model;
     provider: IntrospectionProvider;
     services: ZModelServices;
     options: PullOptions;
@@ -182,7 +200,6 @@ export function syncTable({
             builder.setDecl(tableMapAttribute).addArg((argBuilder) => argBuilder.StringLiteral.setValue(table.name)),
         );
     }
-
     table.columns.forEach((column) => {
         if (column.foreign_key_table) {
             relations.push({
@@ -369,7 +386,6 @@ export function syncTable({
                 .addArg((argBuilder) => argBuilder.StringLiteral.setValue(index.name), 'map'),
         );
     });
-
     if (table.schema && table.schema !== '' && table.schema !== defaultSchema) {
         modelFactory.addAttribute((b) =>
             b.setDecl(getAttributeRef('@@schema', services)).addArg((a) => a.StringLiteral.setValue(table.schema)),
@@ -377,7 +393,6 @@ export function syncTable({
     }
 
     model.declarations.push(modelFactory.node);
-
     return relations;
 }
 
@@ -427,7 +442,10 @@ export function syncRelation({
     const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : '';
 
     const relationName = `${relation.table}${simmilarRelations > 1 ? `_${relation.column}` : ''}To${relation.references.table}`;
-    let sourceFieldName = `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`;
+    let sourceFieldName =
+        simmilarRelations > 0
+            ? `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
+            : targetModel.name;
 
     if (sourceModel.fields.find((f) => f.name === sourceFieldName)) {
         sourceFieldName = `${sourceFieldName}To${targetModel.name.charAt(0).toLowerCase()}${targetModel.name.slice(1)}_${relation.references.column}`;
@@ -441,47 +459,47 @@ export function syncRelation({
                 .setOptional(relation.nullable)
                 .setArray(relation.type === 'many')
                 .setReference(targetModel),
-        )
-        .addAttribute((ab) => {
-            ab.setDecl(relationAttribute);
-            if (includeRelationName) ab.addArg((ab) => ab.StringLiteral.setValue(relationName));
-            ab.addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(sourceField)), 'fields').addArg(
-                (ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(targetField)),
-                'references',
+        );
+    sourceFieldFactory.addAttribute((ab) => {
+        ab.setDecl(relationAttribute);
+        if (includeRelationName) ab.addArg((ab) => ab.StringLiteral.setValue(relationName));
+        ab.addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(sourceField)), 'fields').addArg(
+            (ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(targetField)),
+            'references',
+        );
+
+        if (relation.foreign_key_on_delete && relation.foreign_key_on_delete !== 'SET NULL') {
+            const enumRef = getEnumRef('ReferentialAction', services);
+            if (!enumRef) throw new Error('ReferentialAction enum not found');
+            const enumFieldRef = enumRef.fields.find(
+                (f) => f.name.toLowerCase() === relation.foreign_key_on_delete!.replace(/ /g, '').toLowerCase(),
             );
+            if (!enumFieldRef) throw new Error(`ReferentialAction ${relation.foreign_key_on_delete} not found`);
+            ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onDelete');
+        }
 
-            if (relation.foreign_key_on_delete && relation.foreign_key_on_delete !== 'SET NULL') {
-                const enumRef = getEnumRef('ReferentialAction', services);
-                if (!enumRef) throw new Error('ReferentialAction enum not found');
-                const enumFieldRef = enumRef.fields.find(
-                    (f) => f.name.toLowerCase() === relation.foreign_key_on_delete!.replace(/ /g, '').toLowerCase(),
-                );
-                if (!enumFieldRef) throw new Error(`ReferentialAction ${relation.foreign_key_on_delete} not found`);
-                ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onDelete');
-            }
+        if (relation.foreign_key_on_update && relation.foreign_key_on_update !== 'SET NULL') {
+            const enumRef = getEnumRef('ReferentialAction', services);
+            if (!enumRef) throw new Error('ReferentialAction enum not found');
+            const enumFieldRef = enumRef.fields.find(
+                (f) => f.name.toLowerCase() === relation.foreign_key_on_update!.replace(/ /g, '').toLowerCase(),
+            );
+            if (!enumFieldRef) throw new Error(`ReferentialAction ${relation.foreign_key_on_update} not found`);
+            ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onUpdate');
+        }
 
-            if (relation.foreign_key_on_update && relation.foreign_key_on_update !== 'SET NULL') {
-                const enumRef = getEnumRef('ReferentialAction', services);
-                if (!enumRef) throw new Error('ReferentialAction enum not found');
-                const enumFieldRef = enumRef.fields.find(
-                    (f) => f.name.toLowerCase() === relation.foreign_key_on_update!.replace(/ /g, '').toLowerCase(),
-                );
-                if (!enumFieldRef) throw new Error(`ReferentialAction ${relation.foreign_key_on_update} not found`);
-                ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onUpdate');
-            }
+        if (relation.fk_name) ab.addArg((ab) => ab.StringLiteral.setValue(relation.fk_name), 'map');
 
-            ab.addArg((ab) => ab.StringLiteral.setValue(relation.fk_name), 'map');
-
-            return ab;
-        });
+        return ab;
+    });
 
     sourceModel.fields.push(sourceFieldFactory.node);
 
     const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : '';
     const oppositeFieldName =
-        relation.type === 'one'
-            ? `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}s`
-            : `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`;
+        simmilarRelations > 0
+            ? `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
+            : sourceModel.name;
 
     const targetFieldFactory = new DataFieldFactory()
         .setContainer(targetModel)
@@ -498,4 +516,9 @@ export function syncRelation({
         );
 
     targetModel.fields.push(targetFieldFactory.node);
+
+    targetModel.fields.sort((a, b) => {
+        if (a.type.reference && b.type.reference) return 0;
+        return a.name.localeCompare(b.name);
+    });
 }

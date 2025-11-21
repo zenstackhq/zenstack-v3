@@ -2,11 +2,11 @@ import type { ZModelServices } from '@zenstackhq/language';
 import {
     isEnum,
     type Attribute,
+    type BuiltinType,
     type DataField,
     type DataModel,
     type Enum,
     type Model,
-    type BuiltinType,
 } from '@zenstackhq/language/ast';
 import {
     DataFieldAttributeFactory,
@@ -15,7 +15,7 @@ import {
     EnumFactory,
 } from '@zenstackhq/language/factory';
 import type { PullOptions } from '../db';
-import { type Cascade, type IntrospectedEnum, type IntrospectedTable, type IntrospectionProvider } from './provider';
+import type { Cascade, IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider';
 import { getAttributeRef, getDbName, getEnumRef } from './utils';
 
 export function syncEnums({
@@ -156,7 +156,6 @@ export function syncTable({
     services,
     options,
     defaultSchema,
-    oldModel,
 }: {
     table: IntrospectedTable;
     model: Model;

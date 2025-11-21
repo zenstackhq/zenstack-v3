@@ -6,9 +6,9 @@ import { createProject, runCli } from '../utils';
 const getSchema = (workDir: string) => fs.readFileSync(path.join(workDir, 'zenstack/schema.zmodel')).toString();
 
 describe('DB pull', () => {
-    it('sqlite schema', () => {
-        const workDir = createProject(`
-model User {
+    it('simple schema', () => {
+        const workDir = createProject(
+`model User {
     id             String   @id @default(cuid())
     email          String   @unique @map("email_address")
     name           String?  @default("Anonymous")

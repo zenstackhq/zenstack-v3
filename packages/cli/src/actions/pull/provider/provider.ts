@@ -58,6 +58,8 @@ export type IntrospectedSchema = {
     enums: IntrospectedEnum[];
 };
 
+export type DatabaseFeature = 'Schema' | 'NativeEnum';
+
 export interface IntrospectionProvider {
     introspect(connectionString: string): Promise<IntrospectedSchema>;
     getBuiltinType(type: string): {
@@ -71,4 +73,5 @@ export interface IntrospectionProvider {
         services: ZModelServices;
         enums: Enum[];
     }): DataFieldAttributeFactory[];
+    isSupportedFeature(feature: DatabaseFeature): boolean;
 }

@@ -1,7 +1,6 @@
-import type { BuiltinType } from '@zenstackhq/language/ast';
-import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
+import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
 
 // Note: We dynamically import better-sqlite3 inside the async function to avoid
 // requiring it at module load time for environments that don't use SQLite.

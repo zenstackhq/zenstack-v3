@@ -53,6 +53,11 @@ export function getDatasource(model: Model) {
         throw new Error('The url field must be a string literal or an env().');
     }
 
+    if (url.startsWith('file:')) {
+        url = new URL(url, `file:${model.$document!.uri.path}`).pathname;
+        if (process.platform === 'win32' && url[0] === '/') url = url.slice(1);
+    }
+
     const defaultSchemaField = datasource.fields.find((f) => f.name === 'defaultSchema');
     const defaultSchema = (defaultSchemaField && getStringLiteral(defaultSchemaField.value)) || 'public';
 

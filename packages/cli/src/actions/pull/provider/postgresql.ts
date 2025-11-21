@@ -1,10 +1,18 @@
+import type { BuiltinType } from '@zenstackhq/language/ast';
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { Client } from 'pg';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
-import type { BuiltinType } from '@zenstackhq/language/ast';
 
 export const postgresql: IntrospectionProvider = {
+    isSupportedFeature(feature) {
+        switch (feature) {
+            case 'Schema':
+                return true;
+            default:
+                return false;
+        }
+    },
     getBuiltinType(type) {
         const t = (type || '').toLowerCase();
 

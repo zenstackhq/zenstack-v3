@@ -1,98 +1,52 @@
 import type { BuiltinType } from '@zenstackhq/language/ast';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
+import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
+import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 
 // Note: We dynamically import better-sqlite3 inside the async function to avoid
 // requiring it at module load time for environments that don't use SQLite.
 
 export const sqlite: IntrospectionProvider = {
+    isSupportedFeature(feature) {
+        switch (feature) {
+            case 'Schema':
+            case 'NativeEnum':
+            default:
+                return false;
+        }
+    },
     getBuiltinType(type) {
         const t = (type || '').toLowerCase().trim();
-
         // SQLite has no array types
         const isArray = false;
-
         switch (t) {
-            // integers
-            case 'int':
             case 'integer':
-            case 'tinyint':
-            case 'smallint':
-            case 'mediumint':
                 return { type: 'Int', isArray };
+            case 'text':
+                return { type: 'String', isArray };
             case 'bigint':
                 return { type: 'BigInt', isArray };
-
-            // decimals and floats
+            case 'blob':
+                return { type: 'Bytes', isArray };
+            case 'real':
+                return { type: 'Float', isArray };
             case 'numeric':
             case 'decimal':
                 return { type: 'Decimal', isArray };
-            case 'real':
-            case 'double':
-            case 'double precision':
-            case 'float':
-                return { type: 'Float', isArray };
-
-            // boolean (SQLite stores as integer 0/1, but commonly typed as BOOLEAN)
-            case 'bool':
-            case 'boolean':
-                return { type: 'Boolean', isArray };
-
-            // strings
-            case 'text':
-            case 'varchar':
-            case 'character varying':
-            case 'char':
-            case 'character':
-            case 'clob':
-            case 'uuid': // often stored as TEXT
-                return { type: 'String', isArray };
-
-            // dates/times (stored as TEXT/REAL/INTEGER, but commonly typed as DATE/DATETIME)
-            case 'date':
             case 'datetime':
                 return { type: 'DateTime', isArray };
-
-            // binary
-            case 'blob':
-                return { type: 'Bytes', isArray };
-
-            // json (not a native type, but commonly used)
-            case 'json':
+            case 'jsonb':
                 return { type: 'Json', isArray };
-
+            case 'boolean':
+                return { type: 'Boolean', isArray };
             default: {
-                // Fallbacks based on SQLite type affinity rules
-                if (t.includes('int')) return { type: 'Int', isArray };
-                if (t.includes('char') || t.includes('clob') || t.includes('text')) return { type: 'String', isArray };
-                if (t.includes('blob')) return { type: 'Bytes', isArray };
-                if (t.includes('real') || t.includes('floa') || t.includes('doub')) return { type: 'Float', isArray };
-                if (t.includes('dec') || t.includes('num')) return { type: 'Decimal', isArray };
                 return { type: 'Unsupported' as const, isArray };
             }
         }
     },
 
-    getDefaultDatabaseType(type: BuiltinType) {
-        switch (type) {
-            case 'String':
-                return { type: 'TEXT' };
-            case 'Boolean':
-                return { type: 'INTEGER' };
-            case 'Int':
-                return { type: 'INTEGER' };
-            case 'BigInt':
-                return { type: 'INTEGER' };
-            case 'Float':
-                return { type: 'REAL' };
-            case 'Decimal':
-                return { type: 'DECIMAL' };
-            case 'DateTime':
-                return { type: 'NUMERIC' };
-            case 'Json':
-                return { type: 'JSONB' };
-            case 'Bytes':
-                return { type: 'BLOB' };
-        }
+    getDefaultDatabaseType() {
+        return undefined;
     },
 
     async introspect(connectionString: string): Promise<IntrospectedSchema> {
@@ -114,7 +68,7 @@ export const sqlite: IntrospectionProvider = {
 
             for (const t of tablesRaw) {
                 const tableName = t.name;
-                const schema = 'main';
+                const schema = '';
 
                 // Columns with extended info; filter out hidden=1 (internal/rowid), mark computed if hidden=2 (generated)
                 const columnsInfo = all<{
@@ -193,7 +147,7 @@ export const sqlite: IntrospectionProvider = {
 
                 for (const fk of fkRows) {
                     fkByColumn.set(fk.from, {
-                        foreign_key_schema: 'main',
+                        foreign_key_schema: '',
                         foreign_key_table: fk.table || null,
                         foreign_key_column: fk.to || null,
                         foreign_key_name: null,
@@ -228,7 +182,7 @@ export const sqlite: IntrospectionProvider = {
                         default: c.dflt_value,
                         options: [],
                         unique: uniqueSingleColumn.has(c.name),
-                        unique_name: uniqueSingleColumn.has(c.name) ? `${tableName}_${c.name}_unique` : null,
+                        unique_name: null,
                     });
                 }
 
@@ -243,7 +197,46 @@ export const sqlite: IntrospectionProvider = {
         }
     },
 
-    getDefaultValue(_args) {
-        throw new Error('Not implemented yet for SQLite');
+    getDefaultValue({ defaultValue, fieldName, services, enums }) {
+        const val = defaultValue.trim();
+        const factories: DataFieldAttributeFactory[] = [];
+
+        const defaultAttr = new DataFieldAttributeFactory().setDecl(getAttributeRef('@default', services));
+
+        if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
+            factories.push(defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services))));
+
+            if (fieldName.toLowerCase() === 'updatedat' || fieldName.toLowerCase() === 'updated_at') {
+                factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)));
+            }
+            return factories;
+        }
+
+        if (val === 'true' || val === 'false') {
+            factories.push(defaultAttr.addArg((a) => a.BooleanLiteral.setValue(val === 'true')));
+            return factories;
+        }
+
+        if (!Number.isNaN(parseFloat(val)) || !Number.isNaN(parseInt(val))) {
+            factories.push(defaultAttr.addArg((a) => a.NumberLiteral.setValue(val)));
+            return factories;
+        }
+
+        if (val.startsWith("'") && val.endsWith("'")) {
+            const strippedName = val.slice(1, -1);
+            const enumDef = enums.find((e) => e.fields.find((v) => getDbName(v) === strippedName));
+            if (enumDef) {
+                const enumField = enumDef.fields.find((v) => getDbName(v) === strippedName);
+                if (enumField) factories.push(defaultAttr.addArg((ab) => ab.ReferenceExpr.setTarget(enumField)));
+            } else {
+                factories.push(defaultAttr.addArg((a) => a.StringLiteral.setValue(strippedName)));
+            }
+            return factories;
+        }
+
+        //TODO: add more default value factories if exists
+        throw new Error(
+            `This default value type currently is not supported. Plesase open an issue on github. Values: "${defaultValue}"`,
+        );
     },
 };

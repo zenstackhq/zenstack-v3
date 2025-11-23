@@ -34,8 +34,11 @@ function getTestDbName(provider: string) {
     );
 }
 
-export function createProject(zmodel: string, addPrelude = true) {
-    const provider = getTestDbProvider() ?? 'sqlite';
+export function createProject(
+    zmodel: string,
+    options?: { customPrelude?: boolean; provider?: 'sqlite' | 'postgresql' },
+) {
+    const provider = (options?.provider || getTestDbProvider()) ?? 'sqlite';
     const dbName = getTestDbName(provider);
     const dbUrl =
         provider === 'sqlite'
@@ -50,7 +53,7 @@ export function createProject(zmodel: string, addPrelude = true) {
     const workDir = createTestProject();
     fs.mkdirSync(path.join(workDir, 'zenstack'), { recursive: true });
     const schemaPath = path.join(workDir, 'zenstack/schema.zmodel');
-    fs.writeFileSync(schemaPath, addPrelude ? `${ZMODEL_PRELUDE}\n${zmodel}` : zmodel);
+    fs.writeFileSync(schemaPath, !options?.customPrelude ? `${ZMODEL_PRELUDE}\n${zmodel}` : zmodel);
     return workDir;
 }
 

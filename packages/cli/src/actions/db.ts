@@ -101,10 +101,10 @@ async function runPull(options: PullOptions) {
         console.log('Starging introspect the database...');
         const { enums: allEnums, tables: allTables } = await provider.introspect(datasource.url);
         const enums = provider.isSupportedFeature('Schema')
-            ? allEnums.filter((e) => datasource.schemas.includes(e.schema_name))
+            ? allEnums.filter((e) => datasource.allSchemas.includes(e.schema_name))
             : allEnums;
         const tables = provider.isSupportedFeature('Schema')
-            ? allTables.filter((t) => datasource.schemas.includes(t.schema))
+            ? allTables.filter((t) => datasource.allSchemas.includes(t.schema))
             : allTables;
 
         const newModel: Model = {

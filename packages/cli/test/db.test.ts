@@ -11,13 +11,13 @@ model User {
 
 describe('CLI db commands test', () => {
     it('should generate a database with db push', () => {
-        const workDir = createProject(model);
+        const workDir = createProject(model, { provider: 'sqlite' });
         runCli('db push', workDir);
-        expect(fs.existsSync(path.join(workDir, 'zenstack/dev.db'))).toBe(true);
+        expect(fs.existsSync(path.join(workDir, 'zenstack/test.db'))).toBe(true);
     });
 
     it('should seed the database with db seed with seed script', () => {
-        const workDir = createProject(model);
+        const workDir = createProject(model, { provider: 'sqlite' });
         const pkgJson = JSON.parse(fs.readFileSync(path.join(workDir, 'package.json'), 'utf8'));
         pkgJson.zenstack = {
             seed: 'node seed.js',
@@ -36,7 +36,7 @@ fs.writeFileSync('seed.txt', 'success');
     });
 
     it('should seed the database after migrate reset', () => {
-        const workDir = createProject(model);
+        const workDir = createProject(model, { provider: 'sqlite' });
         const pkgJson = JSON.parse(fs.readFileSync(path.join(workDir, 'package.json'), 'utf8'));
         pkgJson.zenstack = {
             seed: 'node seed.js',
@@ -55,7 +55,7 @@ fs.writeFileSync('seed.txt', 'success');
     });
 
     it('should skip seeding the database without seed script', () => {
-        const workDir = createProject(model);
+        const workDir = createProject(model, { provider: 'sqlite' });
         runCli('db seed', workDir);
     });
 });

@@ -12,9 +12,11 @@ import type {
     UnaryExpression,
 } from '../schema';
 
+export type VisitResult = void | { abort: true };
+
 export class ExpressionVisitor {
-    visit(expr: Expression): void {
-        match(expr)
+    visit(expr: Expression): VisitResult {
+        return match(expr)
             .with({ kind: 'literal' }, (e) => this.visitLiteral(e))
             .with({ kind: 'array' }, (e) => this.visitArray(e))
             .with({ kind: 'field' }, (e) => this.visitField(e))
@@ -27,32 +29,68 @@ export class ExpressionVisitor {
             .exhaustive();
     }
 
-    protected visitLiteral(_e: LiteralExpression) {}
+    protected visitLiteral(_e: LiteralExpression): VisitResult {}
 
-    protected visitArray(e: ArrayExpression) {
-        e.items.forEach((item) => this.visit(item));
+    protected visitArray(e: ArrayExpression): VisitResult {
+        for (const item of e.items) {
+            const result = this.visit(item);
+            if (result?.abort) {
+                return result;
+            }
+        }
     }
 
-    protected visitField(_e: FieldExpression) {}
+    protected visitField(_e: FieldExpression): VisitResult {}
 
-    protected visitMember(e: MemberExpression) {
-        this.visit(e.receiver);
+    protected visitMember(e: MemberExpression): VisitResult {
+        return this.visit(e.receiver);
     }
 
-    protected visitBinary(e: BinaryExpression) {
-        this.visit(e.left);
-        this.visit(e.right);
+    protected visitBinary(e: BinaryExpression): VisitResult {
+        const l = this.visit(e.left);
+        if (l?.abort) {
+            return l;
+        } else {
+            return this.visit(e.right);
+        }
     }
 
-    protected visitUnary(e: UnaryExpression) {
-        this.visit(e.operand);
+    protected visitUnary(e: UnaryExpression): VisitResult {
+        return this.visit(e.operand);
     }
 
-    protected visitCall(e: CallExpression) {
-        e.args?.forEach((arg) => this.visit(arg));
+    protected visitCall(e: CallExpression): VisitResult {
+        for (const arg of e.args ?? []) {
+            const r = this.visit(arg);
+            if (r?.abort) {
+                return r;
+            }
+        }
     }
 
-    protected visitThis(_e: ThisExpression) {}
+    protected visitThis(_e: ThisExpression): VisitResult {}
 
-    protected visitNull(_e: NullExpression) {}
+    protected visitNull(_e: NullExpression): VisitResult {}
+}
+
+export class MatchingExpressionVisitor extends ExpressionVisitor {
+    private found = false;
+
+    constructor(private predicate: (expr: Expression) => boolean) {
+        super();
+    }
+
+    find(expr: Expression) {
+        this.visit(expr);
+        return this.found;
+    }
+
+    override visit(expr: Expression) {
+        if (this.predicate(expr)) {
+            this.found = true;
+            return { abort: true } as const;
+        } else {
+            return super.visit(expr);
+        }
+    }
 }

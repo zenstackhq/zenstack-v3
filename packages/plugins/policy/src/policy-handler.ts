@@ -881,7 +881,9 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
     private compilePolicyCondition(model: string, alias: string | undefined, operation: CRUD_EXT, policy: Policy) {
         return new ExpressionTransformer(this.client).transform(policy.condition, {
-            model,
+            modelOrType: model,
+            thisType: model, // type name for `this`, never changed during the entire transformation
+            thisAlias: alias, // alias for `this`, never changed during the entire transformation
             alias,
             operation,
         });

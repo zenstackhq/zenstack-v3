@@ -3,13 +3,13 @@
 - [ ] CLI
     - [x] generate
     - [x] migrate
-    - [ ] db
+    - [x] db
         - [x] push
-        - [ ] seed
+        - [x] seed
     - [x] info
     - [x] init
     - [x] validate
-    - [ ] format
+    - [x] format
     - [ ] repl
     - [x] plugin mechanism
     - [x] built-in plugins

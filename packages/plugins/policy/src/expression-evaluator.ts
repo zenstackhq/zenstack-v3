@@ -79,6 +79,11 @@ export class ExpressionEvaluator {
         const left = this.evaluate(expr.left, context);
         const right = this.evaluate(expr.right, context);
 
+        if (!['==', '!='].includes(expr.op) && (left === null || right === null)) {
+            // non-equality comparison with null always yields null (follow SQL logic)
+            return null;
+        }
+
         return match(expr.op)
             .with('==', () => left === right)
             .with('!=', () => left !== right)

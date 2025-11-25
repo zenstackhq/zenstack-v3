@@ -19,3 +19,13 @@ export type Policy = {
     operations: readonly PolicyOperation[];
     condition: Expression;
 };
+
+/**
+ * Operators allowed for collection predicate expressions.
+ */
+export const CollectionPredicateOperator = ['?', '!', '^'] as const;
+
+/**
+ * Operators allowed for collection predicate expressions.
+ */
+export type CollectionPredicateOperator = (typeof CollectionPredicateOperator)[number];

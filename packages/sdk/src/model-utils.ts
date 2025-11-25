@@ -106,7 +106,7 @@ export function getAuthDecl(model: Model) {
         (d) => (isDataModel(d) || isTypeDef(d)) && d.attributes.some((attr) => attr.decl.$refText === '@@auth'),
     );
     if (!found) {
-        found = model.declarations.find((d) => isDataModel(d) && d.name === 'User');
+        found = model.declarations.find((d) => (isDataModel(d) || isTypeDef(d)) && d.name === 'User');
     }
     return found;
 }

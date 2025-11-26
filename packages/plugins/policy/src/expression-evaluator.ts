@@ -107,7 +107,7 @@ export class ExpressionEvaluator {
 
         const left = this.evaluate(expr.left, context);
         if (!left) {
-            return false;
+            return null;
         }
 
         invariant(Array.isArray(left), 'expected array');

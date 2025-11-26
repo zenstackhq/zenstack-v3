@@ -406,6 +406,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 this.transform(expr.right, {
                     operation: context.operation,
                     thisType: context.thisType,
+                    thisAlias: context.thisAlias,
                     modelOrType: context.modelOrType,
                     contextValue: item,
                 }),
@@ -634,7 +635,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 });
             } else {
                 // transform the first segment into a relation access, then continue with the rest of the members
-                const firstMemberFieldDef = QueryUtils.requireField(this.schema, context.modelOrType, expr.members[0]!);
+                const firstMemberFieldDef = QueryUtils.requireField(this.schema, context.thisType, expr.members[0]!);
                 receiver = this.transformRelationAccess(expr.members[0]!, firstMemberFieldDef.type, restContext);
                 members = expr.members.slice(1);
             }
@@ -649,8 +650,8 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             const receiverField = QueryUtils.requireField(this.schema, context.modelOrType, expr.receiver.field);
             startType = receiverField.type;
         } else {
-            // "this." case, start type is the model of the context
-            startType = context.modelOrType;
+            // "this." case
+            startType = context.thisType;
         }
 
         // traverse forward to collect member types

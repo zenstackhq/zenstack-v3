@@ -10,7 +10,7 @@ import {
     Transaction,
     type KyselyProps,
 } from 'kysely';
-import type { GetModels, ProcedureDef, SchemaDef } from '../schema';
+import type { ProcedureDef, SchemaDef } from '../schema';
 import type { AnyKysely } from '../utils/kysely-utils';
 import type { UnwrapTuplePromises } from '../utils/type-utils';
 import type {
@@ -38,7 +38,6 @@ import { SchemaDbPusher } from './helpers/schema-db-pusher';
 import type { ClientOptions, ProceduresOptions } from './options';
 import type { RuntimePlugin } from './plugin';
 import { createZenStackPromise, type ZenStackPromise } from './promise';
-import type { ToKysely } from './query-builder';
 import { ResultProcessor } from './result-processor';
 
 /**
@@ -49,21 +48,21 @@ export const ZenStackClient = function <Schema extends SchemaDef>(
     schema: Schema,
     options: ClientOptions<Schema>,
 ) {
-    return new ClientImpl<Schema>(schema, options);
+    return new ClientImpl(schema, options as ClientOptions<SchemaDef>);
 } as unknown as ClientConstructor;
 
-export class ClientImpl<Schema extends SchemaDef> {
-    private kysely: ToKysely<Schema>;
+export class ClientImpl {
+    private kysely: AnyKysely;
     private kyselyRaw: AnyKysely;
-    public readonly $options: ClientOptions<Schema>;
-    public readonly $schema: Schema;
+    public readonly $options: ClientOptions<SchemaDef>;
+    public readonly $schema: SchemaDef;
     readonly kyselyProps: KyselyProps;
-    private auth: AuthType<Schema> | undefined;
+    private auth: AuthType<SchemaDef> | undefined;
 
     constructor(
-        private readonly schema: Schema,
-        private options: ClientOptions<Schema>,
-        baseClient?: ClientImpl<Schema>,
+        private readonly schema: SchemaDef,
+        private options: ClientOptions<SchemaDef>,
+        baseClient?: ClientImpl,
         executor?: QueryExecutor,
     ) {
         this.$schema = schema;
@@ -139,12 +138,12 @@ export class ClientImpl<Schema extends SchemaDef> {
 
     // overload for interactive transaction
     $transaction<T>(
-        callback: (tx: ClientContract<Schema>) => Promise<T>,
+        callback: (tx: ClientContract<SchemaDef>) => Promise<T>,
         options?: { isolationLevel?: TransactionIsolationLevel },
     ): Promise<T>;
 
     // overload for sequential transaction
-    $transaction<P extends ZenStackPromise<Schema, any>[]>(
+    $transaction<P extends ZenStackPromise<SchemaDef, any>[]>(
         arg: [...P],
         options?: { isolationLevel?: TransactionIsolationLevel },
     ): Promise<UnwrapTuplePromises<P>>;
@@ -169,12 +168,12 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 
     private async interactiveTransaction(
-        callback: (tx: ClientContract<Schema>) => Promise<any>,
+        callback: (tx: ClientContract<SchemaDef>) => Promise<any>,
         options?: { isolationLevel?: TransactionIsolationLevel },
     ): Promise<any> {
         if (this.kysely.isTransaction) {
             // proceed directly if already in a transaction
-            return callback(this as unknown as ClientContract<Schema>);
+            return callback(this as unknown as ClientContract<SchemaDef>);
         } else {
             // otherwise, create a new transaction, clone the client, and execute the callback
             let txBuilder = this.kysely.transaction();
@@ -182,23 +181,23 @@ export class ClientImpl<Schema extends SchemaDef> {
                 txBuilder = txBuilder.setIsolationLevel(options.isolationLevel);
             }
             return txBuilder.execute((tx) => {
-                const txClient = new ClientImpl<Schema>(this.schema, this.$options, this);
+                const txClient = new ClientImpl(this.schema, this.$options, this);
                 txClient.kysely = tx;
-                return callback(txClient as unknown as ClientContract<Schema>);
+                return callback(txClient as unknown as ClientContract<SchemaDef>);
             });
         }
     }
 
     private async sequentialTransaction(
-        arg: ZenStackPromise<Schema, any>[],
+        arg: ZenStackPromise<SchemaDef, any>[],
         options?: { isolationLevel?: TransactionIsolationLevel },
     ) {
         const execute = async (tx: AnyKysely) => {
-            const txClient = new ClientImpl<Schema>(this.schema, this.$options, this);
+            const txClient = new ClientImpl(this.schema, this.$options, this);
             txClient.kysely = tx;
             const result: any[] = [];
             for (const promise of arg) {
-                result.push(await promise.cb(txClient as unknown as ClientContract<Schema>));
+                result.push(await promise.cb(txClient as unknown as ClientContract<SchemaDef>));
             }
             return result;
         };
@@ -228,7 +227,7 @@ export class ClientImpl<Schema extends SchemaDef> {
         }
 
         const procOptions = this.$options.procedures as ProceduresOptions<
-            Schema & {
+            SchemaDef & {
                 procedures: Record<string, ProcedureDef>;
             }
         >;
@@ -253,45 +252,45 @@ export class ClientImpl<Schema extends SchemaDef> {
         await new SchemaDbPusher(this.schema, this.kysely).push();
     }
 
-    $use(plugin: RuntimePlugin<Schema>) {
+    $use(plugin: RuntimePlugin<SchemaDef>) {
         // tsc perf
-        const newPlugins: RuntimePlugin<Schema>[] = [...(this.$options.plugins ?? []), plugin];
-        const newOptions: ClientOptions<Schema> = {
+        const newPlugins: RuntimePlugin<SchemaDef>[] = [...(this.$options.plugins ?? []), plugin];
+        const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
             plugins: newPlugins,
         };
-        return new ClientImpl<Schema>(this.schema, newOptions, this);
+        return new ClientImpl(this.schema, newOptions, this);
     }
 
     $unuse(pluginId: string) {
         // tsc perf
-        const newPlugins: RuntimePlugin<Schema>[] = [];
+        const newPlugins: RuntimePlugin<SchemaDef>[] = [];
         for (const plugin of this.options.plugins ?? []) {
             if (plugin.id !== pluginId) {
                 newPlugins.push(plugin);
             }
         }
-        const newOptions: ClientOptions<Schema> = {
+        const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
             plugins: newPlugins,
         };
-        return new ClientImpl<Schema>(this.schema, newOptions, this);
+        return new ClientImpl(this.schema, newOptions, this);
     }
 
     $unuseAll() {
         // tsc perf
-        const newOptions: ClientOptions<Schema> = {
+        const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
-            plugins: [] as RuntimePlugin<Schema>[],
+            plugins: [] as RuntimePlugin<SchemaDef>[],
         };
-        return new ClientImpl<Schema>(this.schema, newOptions, this);
+        return new ClientImpl(this.schema, newOptions, this);
     }
 
-    $setAuth(auth: AuthType<Schema> | undefined) {
+    $setAuth(auth: AuthType<SchemaDef> | undefined) {
         if (auth !== undefined && typeof auth !== 'object') {
             throw new Error('Invalid auth object');
         }
-        const newClient = new ClientImpl<Schema>(this.schema, this.$options, this);
+        const newClient = new ClientImpl(this.schema, this.$options, this);
         newClient.auth = auth;
         return newClient;
     }
@@ -301,11 +300,11 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 
     $setInputValidation(enable: boolean) {
-        const newOptions: ClientOptions<Schema> = {
+        const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
             validateInput: enable,
         };
-        return new ClientImpl<Schema>(this.schema, newOptions, this);
+        return new ClientImpl(this.schema, newOptions, this);
     }
 
     $executeRaw(query: TemplateStringsArray, ...values: any[]) {
@@ -344,8 +343,8 @@ export class ClientImpl<Schema extends SchemaDef> {
     }
 }
 
-function createClientProxy<Schema extends SchemaDef>(client: ClientImpl<Schema>): ClientImpl<Schema> {
-    const inputValidator = new InputValidator(client as unknown as ClientContract<Schema>);
+function createClientProxy(client: ClientImpl): ClientImpl {
+    const inputValidator = new InputValidator(client as any);
     const resultProcessor = new ResultProcessor(client.$schema, client.$options);
 
     return new Proxy(client, {
@@ -357,35 +356,30 @@ function createClientProxy<Schema extends SchemaDef>(client: ClientImpl<Schema>)
             if (typeof prop === 'string') {
                 const model = Object.keys(client.$schema.models).find((m) => m.toLowerCase() === prop.toLowerCase());
                 if (model) {
-                    return createModelCrudHandler(
-                        client as unknown as ClientContract<Schema>,
-                        model as GetModels<Schema>,
-                        inputValidator,
-                        resultProcessor,
-                    );
+                    return createModelCrudHandler(client as any, model, inputValidator, resultProcessor);
                 }
             }
 
             return Reflect.get(target, prop, receiver);
         },
-    }) as unknown as ClientImpl<Schema>;
+    }) as unknown as ClientImpl;
 }
 
-function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModels<Schema>>(
-    client: ClientContract<Schema>,
-    model: Model,
-    inputValidator: InputValidator<Schema>,
-    resultProcessor: ResultProcessor<Schema>,
-): ModelOperations<Schema, Model> {
+function createModelCrudHandler(
+    client: ClientContract<any>,
+    model: string,
+    inputValidator: InputValidator<any>,
+    resultProcessor: ResultProcessor<any>,
+): ModelOperations<any, any> {
     const createPromise = (
         operation: CoreCrudOperation,
         nominalOperation: AllCrudOperation,
         args: unknown,
-        handler: BaseOperationHandler<Schema>,
+        handler: BaseOperationHandler<any>,
         postProcess = false,
         throwIfNoResult = false,
     ) => {
-        return createZenStackPromise(async (txClient?: ClientContract<Schema>) => {
+        return createZenStackPromise(async (txClient?: ClientContract<any>) => {
             let proceed = async (_args: unknown) => {
                 const _handler = txClient ? handler.withClient(txClient) : handler;
                 const r = await _handler.handle(operation, _args);
@@ -431,7 +425,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'findUnique',
                 'findUnique',
                 args,
-                new FindOperationHandler<Schema>(client, model, inputValidator),
+                new FindOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
@@ -441,7 +435,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'findUnique',
                 'findUniqueOrThrow',
                 args,
-                new FindOperationHandler<Schema>(client, model, inputValidator),
+                new FindOperationHandler<any>(client, model, inputValidator),
                 true,
                 true,
             );
@@ -452,7 +446,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'findFirst',
                 'findFirst',
                 args,
-                new FindOperationHandler<Schema>(client, model, inputValidator),
+                new FindOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
@@ -462,7 +456,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'findFirst',
                 'findFirstOrThrow',
                 args,
-                new FindOperationHandler<Schema>(client, model, inputValidator),
+                new FindOperationHandler<any>(client, model, inputValidator),
                 true,
                 true,
             );
@@ -473,7 +467,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'findMany',
                 'findMany',
                 args,
-                new FindOperationHandler<Schema>(client, model, inputValidator),
+                new FindOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
@@ -483,7 +477,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'create',
                 'create',
                 args,
-                new CreateOperationHandler<Schema>(client, model, inputValidator),
+                new CreateOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
@@ -493,7 +487,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'createMany',
                 'createMany',
                 args,
-                new CreateOperationHandler<Schema>(client, model, inputValidator),
+                new CreateOperationHandler<any>(client, model, inputValidator),
                 false,
             );
         },
@@ -503,7 +497,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'createManyAndReturn',
                 'createManyAndReturn',
                 args,
-                new CreateOperationHandler<Schema>(client, model, inputValidator),
+                new CreateOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
@@ -513,7 +507,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'update',
                 'update',
                 args,
-                new UpdateOperationHandler<Schema>(client, model, inputValidator),
+                new UpdateOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
@@ -523,7 +517,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'updateMany',
                 'updateMany',
                 args,
-                new UpdateOperationHandler<Schema>(client, model, inputValidator),
+                new UpdateOperationHandler<any>(client, model, inputValidator),
                 false,
             );
         },
@@ -533,7 +527,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'updateManyAndReturn',
                 'updateManyAndReturn',
                 args,
-                new UpdateOperationHandler<Schema>(client, model, inputValidator),
+                new UpdateOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
@@ -543,7 +537,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'upsert',
                 'upsert',
                 args,
-                new UpdateOperationHandler<Schema>(client, model, inputValidator),
+                new UpdateOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
@@ -553,7 +547,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'delete',
                 'delete',
                 args,
-                new DeleteOperationHandler<Schema>(client, model, inputValidator),
+                new DeleteOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
@@ -563,7 +557,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'deleteMany',
                 'deleteMany',
                 args,
-                new DeleteOperationHandler<Schema>(client, model, inputValidator),
+                new DeleteOperationHandler<any>(client, model, inputValidator),
                 false,
             );
         },
@@ -573,7 +567,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'count',
                 'count',
                 args,
-                new CountOperationHandler<Schema>(client, model, inputValidator),
+                new CountOperationHandler<any>(client, model, inputValidator),
                 false,
             );
         },
@@ -583,7 +577,7 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'aggregate',
                 'aggregate',
                 args,
-                new AggregateOperationHandler<Schema>(client, model, inputValidator),
+                new AggregateOperationHandler<any>(client, model, inputValidator),
                 false,
             );
         },
@@ -593,9 +587,9 @@ function createModelCrudHandler<Schema extends SchemaDef, Model extends GetModel
                 'groupBy',
                 'groupBy',
                 args,
-                new GroupByOperationHandler<Schema>(client, model, inputValidator),
+                new GroupByOperationHandler<any>(client, model, inputValidator),
                 true,
             );
         },
-    } as ModelOperations<Schema, Model>;
+    } as ModelOperations<any, any>;
 }

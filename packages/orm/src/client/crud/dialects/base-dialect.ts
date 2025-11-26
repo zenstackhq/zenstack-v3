@@ -873,7 +873,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             if (isRelationField(this.schema, model, field)) {
                 continue;
             }
-            if (omit?.[field] === true) {
+            if (this.shouldOmitField(omit, model, field)) {
                 continue;
             }
             result = this.buildSelectField(result, model, modelAlias, field);
@@ -899,6 +899,26 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         return result;
+    }
+
+    shouldOmitField(omit: unknown, model: string, field: string) {
+        // query-level
+        if (omit && typeof omit === 'object' && typeof (omit as any)[field] === 'boolean') {
+            return (omit as any)[field];
+        }
+
+        // options-level
+        if (
+            this.options.omit?.[model] &&
+            typeof this.options.omit[model] === 'object' &&
+            typeof (this.options.omit[model] as any)[field] === 'boolean'
+        ) {
+            return (this.options.omit[model] as any)[field];
+        }
+
+        // schema-level
+        const fieldDef = requireField(this.schema, model, field);
+        return !!fieldDef.omit;
     }
 
     protected buildModelSelect(

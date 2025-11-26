@@ -19,12 +19,13 @@ type CommonFields {
 }
 
 model User with CommonFields {
-    email     String   @unique
-    name      String?
-    role      Role     @default(USER)
-    posts     Post[]
-    profile   Profile?
-    meta      Json?
+    email    String   @unique
+    name     String?
+    password String   @ignore
+    role     Role     @default(USER)
+    posts    Post[]
+    profile  Profile?
+    meta     Json?
 
     // Access policies
     @@allow('all', auth().id == id)
@@ -46,9 +47,9 @@ model Post with CommonFields {
 }
 
 model Comment with CommonFields {
-    content   String
-    post      Post?    @relation(fields: [postId], references: [id], onUpdate: Cascade, onDelete: Cascade)
-    postId    String?
+    content String
+    post    Post?   @relation(fields: [postId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+    postId  String?
 }
 
 model Profile with CommonFields {
@@ -57,3 +58,9 @@ model Profile with CommonFields {
     user   User?   @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
     userId String? @unique
 }
+
+model Foo {
+    id String @id
+    @@ignore
+}
+

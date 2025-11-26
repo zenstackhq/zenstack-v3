@@ -17,7 +17,7 @@ describe('Ignored models and fields test', () => {
     });
 
     it('correctly ignore models', async () => {
-        const db = createTestClient(schema);
+        const db = await createTestClient(schema);
         // @ts-expect-error
         db.foo.findFirst();
     });

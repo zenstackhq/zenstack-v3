@@ -51,7 +51,7 @@ describe('Field omission tests', () => {
 
         // inherited omit from schema
         // @ts-expect-error
-        expect(user.password).toBeUndefined;
+        expect(user.password).toBeUndefined();
 
         // options-level omit
         // @ts-expect-error

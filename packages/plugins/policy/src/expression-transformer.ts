@@ -1,5 +1,12 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { getCrudDialect, QueryUtils, type BaseCrudDialect, type ClientContract, type CRUD_EXT } from '@zenstackhq/orm';
+import {
+    getCrudDialect,
+    QueryUtils,
+    SchemaUtils,
+    type BaseCrudDialect,
+    type ClientContract,
+    type CRUD_EXT,
+} from '@zenstackhq/orm';
 import type {
     BinaryExpression,
     BinaryOperator,
@@ -40,6 +47,7 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import { ExpressionEvaluator } from './expression-evaluator';
+import { CollectionPredicateOperator } from './types';
 import {
     conjunction,
     createUnsupportedError,
@@ -50,12 +58,49 @@ import {
     trueNode,
 } from './utils';
 
+/**
+ * Context for transforming a policy expression
+ */
 export type ExpressionTransformerContext = {
-    model: string;
+    /**
+     * The current model or type name fields should be resolved against
+     */
+    modelOrType: string;
+
+    /**
+     * The alias name that should be used to address a model
+     */
     alias?: string;
+
+    /**
+     * The CRUD operation
+     */
     operation: CRUD_EXT;
+
+    /**
+     * In case of transforming a collection predicate's LHS, the compiled RHS filter expression
+     */
     memberFilter?: OperationNode;
+
+    /**
+     * In case of transforming a collection predicate's LHS, the field name to select as the predicate result
+     */
     memberSelect?: SelectionNode;
+
+    /**
+     * The value object that fields should be evaluated against
+     */
+    contextValue?: Record<string, any>;
+
+    /**
+     * The model or type name that `this` keyword refers to
+     */
+    thisType: string;
+
+    /**
+     * The table alias name used to compile `this` keyword
+     */
+    thisAlias?: string;
 };
 
 // a registry of expression handlers marked with @expr
@@ -122,7 +167,13 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     @expr('field')
     private _field(expr: FieldExpression, context: ExpressionTransformerContext) {
-        const fieldDef = QueryUtils.requireField(this.schema, context.model, expr.field);
+        if (context.contextValue) {
+            // if we're transforming against a value object, fields should be evaluated directly
+            const fieldDef = QueryUtils.requireField(this.schema, context.modelOrType, expr.field);
+            return this.transformValue(context.contextValue[expr.field], fieldDef.type as BuiltinType);
+        }
+
+        const fieldDef = QueryUtils.requireField(this.schema, context.modelOrType, expr.field);
         if (!fieldDef.relation) {
             return this.createColumnRef(expr.field, context);
         } else {
@@ -202,35 +253,45 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private transformNullCheck(expr: OperationNode, operator: BinaryOperator) {
-        invariant(operator === '==' || operator === '!=', 'operator must be "==" or "!=" for null comparison');
-        if (ValueNode.is(expr)) {
-            if (expr.value === null) {
-                return operator === '==' ? trueNode(this.dialect) : falseNode(this.dialect);
+        if (operator === '==' || operator === '!=') {
+            // equality checks against null
+            if (ValueNode.is(expr)) {
+                if (expr.value === null) {
+                    return operator === '==' ? trueNode(this.dialect) : falseNode(this.dialect);
+                } else {
+                    return operator === '==' ? falseNode(this.dialect) : trueNode(this.dialect);
+                }
             } else {
-                return operator === '==' ? falseNode(this.dialect) : trueNode(this.dialect);
+                return operator === '=='
+                    ? BinaryOperationNode.create(expr, OperatorNode.create('is'), ValueNode.createImmediate(null))
+                    : BinaryOperationNode.create(expr, OperatorNode.create('is not'), ValueNode.createImmediate(null));
             }
         } else {
-            return operator === '=='
-                ? BinaryOperationNode.create(expr, OperatorNode.create('is'), ValueNode.createImmediate(null))
-                : BinaryOperationNode.create(expr, OperatorNode.create('is not'), ValueNode.createImmediate(null));
+            // otherwise any comparison with null is null
+            return ValueNode.createImmediate(null);
         }
     }
 
     private normalizeBinaryOperationOperands(expr: BinaryExpression, context: ExpressionTransformerContext) {
+        if (context.contextValue) {
+            // no normalization needed if evaluating against a value object
+            return { normalizedLeft: expr.left, normalizedRight: expr.right };
+        }
+
         // if relation fields are used directly in comparison, it can only be compared with null,
         // so we normalize the args with the id field (use the first id field if multiple)
         let normalizedLeft: Expression = expr.left;
-        if (this.isRelationField(expr.left, context.model)) {
+        if (this.isRelationField(expr.left, context.modelOrType)) {
             invariant(ExpressionUtils.isNull(expr.right), 'only null comparison is supported for relation field');
-            const leftRelDef = this.getFieldDefFromFieldRef(expr.left, context.model);
+            const leftRelDef = this.getFieldDefFromFieldRef(expr.left, context.modelOrType);
             invariant(leftRelDef, 'failed to get relation field definition');
             const idFields = QueryUtils.requireIdFields(this.schema, leftRelDef.type);
             normalizedLeft = this.makeOrAppendMember(normalizedLeft, idFields[0]!);
         }
         let normalizedRight: Expression = expr.right;
-        if (this.isRelationField(expr.right, context.model)) {
+        if (this.isRelationField(expr.right, context.modelOrType)) {
             invariant(ExpressionUtils.isNull(expr.left), 'only null comparison is supported for relation field');
-            const rightRelDef = this.getFieldDefFromFieldRef(expr.right, context.model);
+            const rightRelDef = this.getFieldDefFromFieldRef(expr.right, context.modelOrType);
             invariant(rightRelDef, 'failed to get relation field definition');
             const idFields = QueryUtils.requireIdFields(this.schema, rightRelDef.type);
             normalizedRight = this.makeOrAppendMember(normalizedRight, idFields[0]!);
@@ -239,14 +300,27 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private transformCollectionPredicate(expr: BinaryExpression, context: ExpressionTransformerContext) {
-        invariant(expr.op === '?' || expr.op === '!' || expr.op === '^', 'expected "?" or "!" or "^" operator');
+        this.ensureCollectionPredicateOperator(expr.op);
 
-        if (this.isAuthCall(expr.left) || this.isAuthMember(expr.left)) {
-            const value = new ExpressionEvaluator().evaluate(expr, {
-                auth: this.auth,
-            });
-            return this.transformValue(value, 'Boolean');
+        if (this.isAuthMember(expr.left) || context.contextValue) {
+            invariant(
+                ExpressionUtils.isMember(expr.left) || ExpressionUtils.isField(expr.left),
+                'expected member or field expression',
+            );
+
+            // LHS of the expression is evaluated as a value
+            const evaluator = new ExpressionEvaluator();
+            const receiver = evaluator.evaluate(expr.left, { thisValue: context.contextValue, auth: this.auth });
+
+            // get LHS's type
+            const baseType = this.isAuthMember(expr.left) ? this.authType : context.modelOrType;
+            const memberType = this.getMemberType(baseType, expr.left);
+
+            // transform the entire expression with a value LHS and the correct context type
+            return this.transformValueCollectionPredicate(receiver, expr, { ...context, modelOrType: memberType });
         }
+
+        // otherwise, transform the expression with relation joins
 
         invariant(
             ExpressionUtils.isField(expr.left) || ExpressionUtils.isMember(expr.left),
@@ -254,7 +328,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         );
 
         let newContextModel: string;
-        const fieldDef = this.getFieldDefFromFieldRef(expr.left, context.model);
+        const fieldDef = this.getFieldDefFromFieldRef(expr.left, context.modelOrType);
         if (fieldDef) {
             invariant(fieldDef.relation, `field is not a relation: ${JSON.stringify(expr.left)}`);
             newContextModel = fieldDef.type;
@@ -263,7 +337,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 ExpressionUtils.isMember(expr.left) && ExpressionUtils.isField(expr.left.receiver),
                 'left operand must be member access with field receiver',
             );
-            const fieldDef = QueryUtils.requireField(this.schema, context.model, expr.left.receiver.field);
+            const fieldDef = QueryUtils.requireField(this.schema, context.modelOrType, expr.left.receiver.field);
             newContextModel = fieldDef.type;
             for (const member of expr.left.members) {
                 const memberDef = QueryUtils.requireField(this.schema, newContextModel, member);
@@ -273,7 +347,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
         let predicateFilter = this.transform(expr.right, {
             ...context,
-            model: newContextModel,
+            modelOrType: newContextModel,
             alias: undefined,
         });
 
@@ -296,10 +370,80 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         });
     }
 
+    private ensureCollectionPredicateOperator(op: BinaryOperator): asserts op is CollectionPredicateOperator {
+        invariant(CollectionPredicateOperator.includes(op as any), 'expected "?" or "!" or "^" operator');
+    }
+
+    private transformValueCollectionPredicate(
+        receiver: any,
+        expr: BinaryExpression,
+        context: ExpressionTransformerContext,
+    ) {
+        if (!receiver) {
+            return ValueNode.createImmediate(null);
+        }
+
+        this.ensureCollectionPredicateOperator(expr.op);
+
+        const visitor = new SchemaUtils.MatchingExpressionVisitor((e) => ExpressionUtils.isThis(e));
+        if (!visitor.find(expr.right)) {
+            // right side only refers to the value tree, evaluate directly as an optimization
+            const value = new ExpressionEvaluator().evaluate(expr, {
+                auth: this.auth,
+                thisValue: context.contextValue,
+            });
+            return this.transformValue(value, 'Boolean');
+        } else {
+            // right side refers to `this`, need expand into a real filter
+            // e.g.: `auth().profiles?[age == this.age], where `this` refer to the containing model
+            invariant(Array.isArray(receiver), 'array value is expected');
+
+            // for each LHS element, transform RHS
+            // e.g.: `auth().profiles[age == this.age]`, each `auth().profiles` element (which is a value)
+            // is used to build an expression for the RHS `age == this.age`
+            // the transformation happens recursively for nested collection predicates
+            const components = receiver.map((item) =>
+                this.transform(expr.right, {
+                    operation: context.operation,
+                    thisType: context.thisType,
+                    thisAlias: context.thisAlias,
+                    modelOrType: context.modelOrType,
+                    contextValue: item,
+                }),
+            );
+
+            // compose the components based on the operator
+            return (
+                match(expr.op)
+                    // some
+                    .with('?', () => disjunction(this.dialect, components))
+                    // every
+                    .with('!', () => conjunction(this.dialect, components))
+                    // none
+                    .with('^', () => logicalNot(this.dialect, disjunction(this.dialect, components)))
+                    .exhaustive()
+            );
+        }
+    }
+
+    private getMemberType(receiverType: string, expr: MemberExpression | FieldExpression) {
+        if (ExpressionUtils.isField(expr)) {
+            const fieldDef = QueryUtils.requireField(this.schema, receiverType, expr.field);
+            return fieldDef.type;
+        } else {
+            let currType = receiverType;
+            for (const member of expr.members) {
+                const fieldDef = QueryUtils.requireField(this.schema, currType, member);
+                currType = fieldDef.type;
+            }
+            return currType;
+        }
+    }
+
     private transformAuthBinary(expr: BinaryExpression, context: ExpressionTransformerContext) {
         if (expr.op !== '==' && expr.op !== '!=') {
             throw createUnsupportedError(
-                `Unsupported operator for \`auth()\` in policy of model "${context.model}": ${expr.op}`,
+                `Unsupported operator for \`auth()\` in policy of model "${context.modelOrType}": ${expr.op}`,
             );
         }
 
@@ -319,7 +463,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             const authModel = QueryUtils.getModel(this.schema, this.authType);
             if (!authModel) {
                 throw createUnsupportedError(
-                    `Unsupported use of \`auth()\` in policy of model "${context.model}", comparing with \`auth()\` is only possible when auth type is a model`,
+                    `Unsupported use of \`auth()\` in policy of model "${context.modelOrType}", comparing with \`auth()\` is only possible when auth type is a model`,
                 );
             }
 
@@ -358,7 +502,13 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         } else if (value === false) {
             return falseNode(this.dialect);
         } else {
-            return ValueNode.create(this.dialect.transformPrimitive(value, type, false) ?? null);
+            const transformed = this.dialect.transformPrimitive(value, type, false) ?? null;
+            if (!Array.isArray(transformed)) {
+                // simple primitives can be immediate values
+                return ValueNode.createImmediate(transformed);
+            } else {
+                return ValueNode.create(transformed);
+            }
         }
     }
 
@@ -396,8 +546,8 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             {
                 client: this.client,
                 dialect: this.dialect,
-                model: context.model as GetModels<Schema>,
-                modelAlias: context.alias ?? context.model,
+                model: context.modelOrType as GetModels<Schema>,
+                modelAlias: context.alias ?? context.modelOrType,
                 operation: context.operation,
             },
         );
@@ -476,10 +626,16 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         if (ExpressionUtils.isThis(expr.receiver)) {
             if (expr.members.length === 1) {
                 // `this.relation` case, equivalent to field access
-                return this._field(ExpressionUtils.field(expr.members[0]!), context);
+                return this._field(ExpressionUtils.field(expr.members[0]!), {
+                    ...context,
+                    alias: context.thisAlias,
+                    modelOrType: context.thisType,
+                    thisType: context.thisType,
+                    contextValue: undefined,
+                });
             } else {
                 // transform the first segment into a relation access, then continue with the rest of the members
-                const firstMemberFieldDef = QueryUtils.requireField(this.schema, context.model, expr.members[0]!);
+                const firstMemberFieldDef = QueryUtils.requireField(this.schema, context.thisType, expr.members[0]!);
                 receiver = this.transformRelationAccess(expr.members[0]!, firstMemberFieldDef.type, restContext);
                 members = expr.members.slice(1);
             }
@@ -491,11 +647,11 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
         let startType: string;
         if (ExpressionUtils.isField(expr.receiver)) {
-            const receiverField = QueryUtils.requireField(this.schema, context.model, expr.receiver.field);
+            const receiverField = QueryUtils.requireField(this.schema, context.modelOrType, expr.receiver.field);
             startType = receiverField.type;
         } else {
-            // "this." case, start type is the model of the context
-            startType = context.model;
+            // "this." case
+            startType = context.thisType;
         }
 
         // traverse forward to collect member types
@@ -516,7 +672,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             if (fieldDef.relation) {
                 const relation = this.transformRelationAccess(member, fieldDef.type, {
                     ...restContext,
-                    model: fromModel,
+                    modelOrType: fromModel,
                     alias: undefined,
                 });
 
@@ -554,14 +710,24 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             return ValueNode.createImmediate(null);
         }
 
-        if (expr.members.length !== 1) {
-            throw new Error(`Only single member access is supported`);
-        }
+        invariant(expr.members.length > 0, 'member expression must have at least one member');
 
-        const field = expr.members[0]!;
-        const fieldDef = QueryUtils.requireField(this.schema, receiverType, field);
-        const fieldValue = receiver[field] ?? null;
-        return this.transformValue(fieldValue, fieldDef.type as BuiltinType);
+        let curr: any = receiver;
+        let currType = receiverType;
+        for (let i = 0; i < expr.members.length; i++) {
+            const field = expr.members[i]!;
+            curr = curr?.[field];
+            if (curr === undefined) {
+                curr = ValueNode.createImmediate(null);
+                break;
+            }
+            currType = QueryUtils.requireField(this.schema, currType, field).type;
+            if (i === expr.members.length - 1) {
+                // last segment (which is the value), make sure it's transformed
+                curr = this.transformValue(curr, currType as BuiltinType);
+            }
+        }
+        return curr;
     }
 
     private transformRelationAccess(
@@ -569,12 +735,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         relationModel: string,
         context: ExpressionTransformerContext,
     ): SelectQueryNode {
-        const m2m = QueryUtils.getManyToManyRelation(this.schema, context.model, field);
+        const m2m = QueryUtils.getManyToManyRelation(this.schema, context.modelOrType, field);
         if (m2m) {
             return this.transformManyToManyRelationAccess(m2m, context);
         }
 
-        const fromModel = context.model;
+        const fromModel = context.modelOrType;
         const relationFieldDef = QueryUtils.requireField(this.schema, fromModel, field);
         const { keyPairs, ownedByModel } = QueryUtils.getRelationForeignKeyFieldPairs(this.schema, fromModel, field);
 
@@ -641,7 +807,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                     .onRef(
                         `${m2m.joinTable}.${m2m.parentFkName}`,
                         '=',
-                        `${context.alias ?? context.model}.${m2m.parentPKName}`,
+                        `${context.alias ?? context.modelOrType}.${m2m.parentPKName}`,
                     ),
             );
         return relationQuery.toOperationNode();
@@ -651,7 +817,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         // if field comes from a delegate base model, we need to use the join alias
         // of that base model
 
-        const tableName = context.alias ?? context.model;
+        const tableName = context.alias ?? context.modelOrType;
 
         // "create" policies evaluate table from "VALUES" node so no join from delegate bases are
         // created and thus we should directly use the model table name
@@ -659,12 +825,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             return ReferenceNode.create(ColumnNode.create(column), TableNode.create(tableName));
         }
 
-        const fieldDef = QueryUtils.requireField(this.schema, context.model, column);
-        if (!fieldDef.originModel || fieldDef.originModel === context.model) {
+        const fieldDef = QueryUtils.requireField(this.schema, context.modelOrType, column);
+        if (!fieldDef.originModel || fieldDef.originModel === context.modelOrType) {
             return ReferenceNode.create(ColumnNode.create(column), TableNode.create(tableName));
         }
 
-        return this.buildDelegateBaseFieldSelect(context.model, tableName, column, fieldDef.originModel);
+        return this.buildDelegateBaseFieldSelect(context.modelOrType, tableName, column, fieldDef.originModel);
     }
 
     private buildDelegateBaseFieldSelect(model: string, modelAlias: string, field: string, baseModel: string) {
@@ -723,13 +889,13 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     private getFieldDefFromFieldRef(expr: Expression, model: string): FieldDef | undefined {
         if (ExpressionUtils.isField(expr)) {
-            return QueryUtils.requireField(this.schema, model, expr.field);
+            return QueryUtils.getField(this.schema, model, expr.field);
         } else if (
             ExpressionUtils.isMember(expr) &&
             expr.members.length === 1 &&
             ExpressionUtils.isThis(expr.receiver)
         ) {
-            return QueryUtils.requireField(this.schema, model, expr.members[0]!);
+            return QueryUtils.getField(this.schema, model, expr.members[0]!);
         } else {
             return undefined;
         }

@@ -17,7 +17,6 @@ describe('Rally app tests', () => {
                     destination: 'models',
                 },
             ],
-            debug: true,
             dataSourceExtensions: ['citext'],
             usePrismaPush: true,
         });

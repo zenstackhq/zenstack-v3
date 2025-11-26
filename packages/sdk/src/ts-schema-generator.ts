@@ -296,18 +296,26 @@ export class TsSchemaGenerator {
 
     private createModelsObject(model: Model, lite: boolean): ts.Expression {
         return ts.factory.createObjectLiteralExpression(
-            model.declarations
-                .filter((d): d is DataModel => isDataModel(d) && !hasAttribute(d, '@@ignore'))
-                .map((dm) => ts.factory.createPropertyAssignment(dm.name, this.createDataModelObject(dm, lite))),
+            this.getAllDataModels(model).map((dm) =>
+                ts.factory.createPropertyAssignment(dm.name, this.createDataModelObject(dm, lite)),
+            ),
             true,
         );
     }
 
+    private getAllDataModels(model: Model) {
+        return model.declarations.filter((d): d is DataModel => isDataModel(d) && !hasAttribute(d, '@@ignore'));
+    }
+
+    private getAllTypeDefs(model: Model) {
+        return model.declarations.filter((d): d is TypeDef => isTypeDef(d) && !hasAttribute(d, '@@ignore'));
+    }
+
     private createTypeDefsObject(model: Model, lite: boolean): ts.Expression {
         return ts.factory.createObjectLiteralExpression(
-            model.declarations
-                .filter((d): d is TypeDef => isTypeDef(d))
-                .map((td) => ts.factory.createPropertyAssignment(td.name, this.createTypeDefObject(td, lite))),
+            this.getAllTypeDefs(model).map((td) =>
+                ts.factory.createPropertyAssignment(td.name, this.createTypeDefObject(td, lite)),
+            ),
             true,
         );
     }
@@ -1337,7 +1345,7 @@ export class TsSchemaGenerator {
         );
 
         // generate: export type Model = $ModelResult<Schema, 'Model'>;
-        const dataModels = model.declarations.filter(isDataModel);
+        const dataModels = this.getAllDataModels(model);
         for (const dm of dataModels) {
             let modelType = ts.factory.createTypeAliasDeclaration(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -1355,7 +1363,7 @@ export class TsSchemaGenerator {
         }
 
         // generate: export type TypeDef = $TypeDefResult<Schema, 'TypeDef'>;
-        const typeDefs = model.declarations.filter(isTypeDef);
+        const typeDefs = this.getAllTypeDefs(model);
         for (const td of typeDefs) {
             let typeDef = ts.factory.createTypeAliasDeclaration(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -1492,7 +1500,7 @@ export class TsSchemaGenerator {
     }
 
     private generateInputTypes(model: Model, options: TsSchemaGeneratorOptions) {
-        const dataModels = model.declarations.filter(isDataModel);
+        const dataModels = this.getAllDataModels(model);
         const statements: ts.Statement[] = [];
 
         // generate: import { SchemaType as $Schema } from './schema';

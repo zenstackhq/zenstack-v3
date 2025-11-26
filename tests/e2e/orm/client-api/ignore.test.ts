@@ -20,8 +20,8 @@ describe('Ignored models and fields test', () => {
         noop(u.password);
     });
 
-    it('correctly ignore models', async () => {
-        const db = createTestClient(schema);
+    it('correctly ignores models', async () => {
+        const db = await createTestClient(schema);
         // @ts-expect-error
         expect(db.foo).toBeUndefined();
     });

@@ -1,1 +1,3 @@
-{}
+{
+    "vitest.maximumConfigs": 20
+}

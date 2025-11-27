@@ -31,7 +31,7 @@
         "turbo": "^2.5.4",
         "typescript": "catalog:",
         "typescript-eslint": "^8.34.1",
-        "vitest": "^3.2.4",
+        "vitest": "^4.0.14",
         "yaml": "^2.8.0"
     },
     "pnpm": {

@@ -29,11 +29,9 @@ import type {
     RelationInfo,
     ScalarFields,
     SchemaDef,
-    TypeDefFieldIsArray,
     TypeDefFieldIsOptional,
 } from '../schema';
 import type {
-    ArrayIf,
     AtLeast,
     MapBaseType,
     NonEmptyArray,
@@ -256,16 +254,11 @@ export type TypeDefResult<
 > = PartialIf<
     Optional<
         {
-            [Key in GetTypeDefFields<Schema, TypeDef>]: GetTypeDefField<
+            [Key in GetTypeDefFields<Schema, TypeDef>]: MapFieldDefType<
                 Schema,
-                TypeDef,
-                Key
-            >['type'] extends GetTypeDefs<Schema>
-                ? ArrayIf<
-                      TypeDefResult<Schema, GetTypeDefField<Schema, TypeDef, Key>['type'], Partial>,
-                      TypeDefFieldIsArray<Schema, TypeDef, Key>
-                  >
-                : MapTypeDefFieldType<Schema, TypeDef, Key>;
+                GetTypeDefField<Schema, TypeDef, Key>,
+                Partial
+            >;
         },
         // optionality
         Partial extends true
@@ -277,7 +270,8 @@ export type TypeDefResult<
               }
     >,
     Partial
->;
+> &
+    Record<string, unknown>;
 
 export type BatchResult = { count: number };
 
@@ -638,17 +632,15 @@ type MapModelFieldType<
     Field extends GetModelFields<Schema, Model>,
 > = MapFieldDefType<Schema, GetModelField<Schema, Model, Field>>;
 
-type MapTypeDefFieldType<
+type MapFieldDefType<
     Schema extends SchemaDef,
-    TypeDef extends GetTypeDefs<Schema>,
-    Field extends GetTypeDefFields<Schema, TypeDef>,
-> = MapFieldDefType<Schema, GetTypeDefField<Schema, TypeDef, Field>>;
-
-type MapFieldDefType<Schema extends SchemaDef, T extends Pick<FieldDef, 'type' | 'optional' | 'array'>> = WrapType<
+    T extends Pick<FieldDef, 'type' | 'optional' | 'array'>,
+    Partial extends boolean = false,
+> = WrapType<
     T['type'] extends GetEnums<Schema>
         ? keyof GetEnum<Schema, T['type']>
         : T['type'] extends GetTypeDefs<Schema>
-          ? TypeDefResult<Schema, T['type']> & Record<string, unknown>
+          ? TypeDefResult<Schema, T['type'], Partial> & Record<string, unknown>
           : MapBaseType<T['type']>,
     T['optional'],
     T['array']

@@ -15,7 +15,7 @@ export type SchemaDef = {
     typeDefs?: Record<string, TypeDefDef>;
     plugins: Record<string, unknown>;
     procedures?: Record<string, ProcedureDef>;
-    authType?: GetModels<SchemaDef>;
+    authType?: GetModels<SchemaDef> | GetTypeDefs<SchemaDef>;
 };
 
 export type ModelDef = {

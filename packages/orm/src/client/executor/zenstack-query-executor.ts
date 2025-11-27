@@ -24,7 +24,7 @@ import {
     type RootOperationNode,
 } from 'kysely';
 import { match } from 'ts-pattern';
-import type { GetModels, ModelDef, SchemaDef, TypeDefDef } from '../../schema';
+import type { ModelDef, SchemaDef, TypeDefDef } from '../../schema';
 import { type ClientImpl } from '../client-impl';
 import { TransactionIsolationLevel, type ClientContract } from '../contract';
 import { createDBQueryError, createInternalError, ORMError } from '../errors';
@@ -35,17 +35,17 @@ import type { ZenStackDriver } from './zenstack-driver';
 
 type MutationQueryNode = InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
 
-type MutationInfo<Schema extends SchemaDef> = {
-    model: GetModels<Schema>;
+type MutationInfo = {
+    model: string;
     action: 'create' | 'update' | 'delete';
     where: WhereNode | undefined;
 };
 
-export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQueryExecutor {
+export class ZenStackQueryExecutor extends DefaultQueryExecutor {
     private readonly nameMapper: QueryNameMapper | undefined;
 
     constructor(
-        private client: ClientImpl<Schema>,
+        private client: ClientImpl,
         private readonly driver: ZenStackDriver,
         private readonly compiler: QueryCompiler,
         adapter: DialectAdapter,
@@ -63,7 +63,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         }
     }
 
-    private schemaHasMappedNames(schema: Schema) {
+    private schemaHasMappedNames(schema: SchemaDef) {
         const hasMapAttr = (decl: ModelDef | TypeDefDef) => {
             if (decl.attributes?.some((attr) => attr.name === '@@map')) {
                 return true;
@@ -134,7 +134,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     ) {
         let proceed = (q: RootOperationNode) => this.proceedQuery(connection, q, parameters, queryId);
 
-        const hooks: OnKyselyQueryCallback<Schema>[] = [];
+        const hooks: OnKyselyQueryCallback<SchemaDef>[] = [];
         // tsc perf
         for (const plugin of this.client.$options.plugins ?? []) {
             if (plugin.onKyselyQuery) {
@@ -147,7 +147,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
             proceed = async (query: RootOperationNode) => {
                 const _p = (q: RootOperationNode) => _proceed(q);
                 const hookResult = await hook!({
-                    client: this.client as ClientContract<Schema>,
+                    client: this.client as unknown as ClientContract<SchemaDef>,
                     schema: this.client.$schema,
                     query,
                     proceed: _p,
@@ -161,7 +161,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         return result;
     }
 
-    private getMutationInfo(queryNode: MutationQueryNode): MutationInfo<Schema> {
+    private getMutationInfo(queryNode: MutationQueryNode): MutationInfo {
         const model = this.getMutationModel(queryNode);
         const { action, where } = match(queryNode)
             .when(InsertQueryNode.is, () => ({
@@ -275,7 +275,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         if (inTx) {
             innerClient.forceTransaction();
         }
-        return innerClient as ClientContract<Schema>;
+        return innerClient as unknown as ClientContract<SchemaDef>;
     }
 
     private get hasEntityMutationPlugins() {
@@ -353,7 +353,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
         return newExecutor;
     }
 
-    private getMutationModel(queryNode: OperationNode): GetModels<Schema> {
+    private getMutationModel(queryNode: OperationNode): string {
         return match(queryNode)
             .when(InsertQueryNode.is, (node) => {
                 invariant(node.into, 'InsertQueryNode must have an into clause');
@@ -373,14 +373,14 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
             })
             .otherwise((node) => {
                 throw createInternalError(`Invalid query node: ${node}`);
-            }) as GetModels<Schema>;
+            }) as string;
     }
 
     private async callBeforeMutationHooks(
         queryNode: OperationNode,
-        mutationInfo: MutationInfo<Schema>,
+        mutationInfo: MutationInfo,
         loadBeforeMutationEntities: () => Promise<Record<string, unknown>[] | undefined>,
-        client: ClientContract<Schema>,
+        client: ClientContract<SchemaDef>,
         queryId: QueryId,
     ) {
         if (this.options.plugins) {
@@ -405,12 +405,12 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     private async callAfterMutationHooks(
         queryResult: QueryResult<unknown>,
         queryNode: OperationNode,
-        mutationInfo: MutationInfo<Schema>,
-        client: ClientContract<Schema>,
+        mutationInfo: MutationInfo,
+        client: ClientContract<SchemaDef>,
         filterFor: 'inTx' | 'outTx' | 'all',
         queryId: QueryId,
     ) {
-        const hooks: AfterEntityMutationCallback<Schema>[] = [];
+        const hooks: AfterEntityMutationCallback<SchemaDef>[] = [];
 
         // tsc perf
         for (const plugin of this.options.plugins ?? []) {
@@ -457,7 +457,7 @@ export class ZenStackQueryExecutor<Schema extends SchemaDef> extends DefaultQuer
     }
 
     private async loadEntities(
-        model: GetModels<Schema>,
+        model: string,
         where: WhereNode | undefined,
         connection: DatabaseConnection,
     ): Promise<Record<string, unknown>[]> {

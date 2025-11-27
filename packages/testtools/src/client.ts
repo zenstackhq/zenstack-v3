@@ -32,7 +32,7 @@ const TEST_PG_CONFIG = {
     password: process.env['TEST_PG_PASSWORD'] ?? 'postgres',
 };
 
-export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptions<Schema>, 'dialect'> & {
+type ExtraTestClientOptions = {
     /**
      * Database provider
      */
@@ -81,23 +81,27 @@ export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptio
     /**
      * Additional files to be copied to the working directory. The glob pattern is relative to the test file.
      */
-    copyFiles?: { globPattern: string; destination: string }[];
+    copyFiles?: {
+        globPattern: string;
+        destination: string;
+    }[];
 };
 
-export async function createTestClient<Schema extends SchemaDef>(
-    schema: Schema,
-    options?: CreateTestClientOptions<Schema>,
-): Promise<ClientContract<Schema>>;
-export async function createTestClient<Schema extends SchemaDef>(
-    schema: string,
-    options?: CreateTestClientOptions<Schema>,
-): Promise<any>;
-export async function createTestClient<Schema extends SchemaDef>(
-    schema: Schema | string,
-    options?: CreateTestClientOptions<Schema>,
+export type CreateTestClientOptions<Schema extends SchemaDef> = Omit<ClientOptions<Schema>, 'dialect'> &
+    ExtraTestClientOptions;
+
+export async function createTestClient<
+    Schema extends SchemaDef,
+    Options extends ClientOptions<Schema>,
+    CreateOptions = Omit<Options, 'dialect'>,
+>(schema: Schema, options?: CreateOptions): Promise<ClientContract<Schema, Options>>;
+export async function createTestClient(schema: string, options?: CreateTestClientOptions<SchemaDef>): Promise<any>;
+export async function createTestClient(
+    schema: SchemaDef | string,
+    options?: CreateTestClientOptions<SchemaDef>,
 ): Promise<any> {
     let workDir = options?.workDir;
-    let _schema: Schema;
+    let _schema: SchemaDef;
     const provider = options?.provider ?? getTestDbProvider() ?? 'sqlite';
     const dbName = options?.dbName ?? getTestDbName(provider);
     const dbUrl =
@@ -118,7 +122,7 @@ export async function createTestClient<Schema extends SchemaDef>(
                 ...generated.schema.provider,
                 type: provider,
             },
-        } as Schema;
+        } as SchemaDef;
     } else {
         // replace schema's provider
         _schema = {
@@ -148,9 +152,9 @@ export async function createTestClient<Schema extends SchemaDef>(
     invariant(workDir);
 
     const { plugins, ...rest } = options ?? {};
-    const _options: ClientOptions<Schema> = {
+    const _options = {
         ...rest,
-    } as ClientOptions<Schema>;
+    } as ClientOptions<SchemaDef>;
 
     if (options?.debug) {
         console.log(`Work directory: ${workDir}`);

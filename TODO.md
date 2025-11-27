@@ -85,7 +85,7 @@
         - [x] Error system
         - [x] Custom table name
         - [x] Custom field name
-        - [ ] Global omit
+        - [x] Global omit
         - [ ] DbNull vs JsonNull
         - [ ] Migrate to tsdown
         - [x] @default validation

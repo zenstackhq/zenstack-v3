@@ -2141,20 +2141,21 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const computedFields = Object.values(modelDef.fields)
             .filter((f) => f.computed)
             .map((f) => f.name);
-        const omit = Object.entries(args.omit ?? {})
-            .filter(([, v]) => v)
-            .map(([k]) => k);
 
         const allFieldsSelected: string[] = [];
 
         if (!args.select || typeof args.select !== 'object') {
             // all non-relation fields selected
-            allFieldsSelected.push(...allFields.filter((f) => !relationFields.includes(f) && !omit.includes(f)));
+            allFieldsSelected.push(
+                ...allFields.filter(
+                    (f) => !relationFields.includes(f) && !this.dialect.shouldOmitField(args.omit, model, f),
+                ),
+            );
         } else {
             // explicit select
             allFieldsSelected.push(
                 ...Object.entries(args.select)
-                    .filter(([k, v]) => v && !omit.includes(k))
+                    .filter(([k, v]) => v && !this.dialect.shouldOmitField(args.omit, model, k))
                     .map(([k]) => k),
             );
         }

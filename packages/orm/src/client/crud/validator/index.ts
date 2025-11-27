@@ -1302,6 +1302,7 @@ export class InputValidator<Schema extends SchemaDef> {
             where: this.makeWhereSchema(model, true),
             select: this.makeSelectSchema(model).optional().nullable(),
             include: this.makeIncludeSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
         });
         schema = this.refineForSelectIncludeMutuallyExclusive(schema);
         schema = this.refineForSelectOmitMutuallyExclusive(schema);

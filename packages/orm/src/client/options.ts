@@ -1,5 +1,5 @@
 import type { Dialect, Expression, ExpressionBuilder, KyselyConfig } from 'kysely';
-import type { GetModel, GetModels, ProcedureDef, SchemaDef } from '../schema';
+import type { GetModel, GetModelFields, GetModels, ProcedureDef, ScalarFields, SchemaDef } from '../schema';
 import type { PrependParameter } from '../utils/type-utils';
 import type { ClientContract, CRUD_EXT, ProcedureFunc } from './contract';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
@@ -78,14 +78,19 @@ export type ClientOptions<Schema extends SchemaDef> = {
      * `@@validate`, etc. Defaults to `true`.
      */
     validateInput?: boolean;
+} & {
+    /**
+     * Options for omitting fields in ORM query results.
+     */
+    omit?: OmitOptions<Schema>;
 } & (HasComputedFields<Schema> extends true
-    ? {
-          /**
-           * Computed field definitions.
-           */
-          computedFields: ComputedFieldsOptions<Schema>;
-      }
-    : {}) &
+        ? {
+              /**
+               * Computed field definitions.
+               */
+              computedFields: ComputedFieldsOptions<Schema>;
+          }
+        : {}) &
     (HasProcedures<Schema> extends true
         ? {
               /**
@@ -94,6 +99,15 @@ export type ClientOptions<Schema extends SchemaDef> = {
               procedures: ProceduresOptions<Schema>;
           }
         : {});
+
+/**
+ * Options for omitting fields in ORM query results.
+ */
+export type OmitOptions<Schema extends SchemaDef> = {
+    [Model in GetModels<Schema>]?: {
+        [Field in GetModelFields<Schema, Model> as Field extends ScalarFields<Schema, Model> ? Field : never]?: boolean;
+    };
+};
 
 export type ComputedFieldsOptions<Schema extends SchemaDef> = {
     [Model in GetModels<Schema> as 'computedFields' extends keyof GetModel<Schema, Model> ? Model : never]: {

@@ -12,6 +12,7 @@ import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
+import { createInternalError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
     buildJoinPairs,
@@ -23,7 +24,6 @@ import {
     requireModel,
 } from '../../query-utils';
 import { BaseCrudDialect } from './base-dialect';
-import { createInternalError } from '../../errors';
 
 export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
     constructor(schema: Schema, options: ClientOptions<Schema>) {
@@ -305,11 +305,12 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
 
         if (payload === true || !payload.select) {
-            // select all scalar fields
+            // select all scalar fields except for omitted
+            const omit = typeof payload === 'object' ? payload.omit : undefined;
             objArgs.push(
                 ...Object.entries(relationModelDef.fields)
                     .filter(([, value]) => !value.relation)
-                    .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
+                    .filter(([name]) => !this.shouldOmitField(omit, relationModel, name))
                     .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, relationModelAlias, false)])
                     .flatMap((v) => v),
             );

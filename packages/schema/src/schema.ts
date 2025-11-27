@@ -241,6 +241,12 @@ export type TypeDefFieldIsOptional<
     Field extends GetTypeDefFields<Schema, TypeDef>,
 > = GetTypeDefField<Schema, TypeDef, Field>['optional'] extends true ? true : false;
 
+export type TypeDefFieldIsArray<
+    Schema extends SchemaDef,
+    TypeDef extends GetTypeDefs<Schema>,
+    Field extends GetTypeDefFields<Schema, TypeDef>,
+> = GetTypeDefField<Schema, TypeDef, Field>['array'] extends true ? true : false;
+
 export type FieldIsRelation<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,

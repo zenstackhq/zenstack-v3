@@ -29,15 +29,18 @@ import type {
     RelationInfo,
     ScalarFields,
     SchemaDef,
+    TypeDefFieldIsArray,
     TypeDefFieldIsOptional,
 } from '../schema';
 import type {
+    ArrayIf,
     AtLeast,
     MapBaseType,
     NonEmptyArray,
     NullableIf,
     Optional,
     OrArray,
+    PartialIf,
     Simplify,
     ValueOfPotentialTuple,
     WrapType,
@@ -246,16 +249,34 @@ export type SimplifiedModelResult<
     Array = false,
 > = Simplify<ModelResult<Schema, Model, Options, Args, Optional, Array>>;
 
-export type TypeDefResult<Schema extends SchemaDef, TypeDef extends GetTypeDefs<Schema>> = Optional<
-    {
-        [Key in GetTypeDefFields<Schema, TypeDef>]: MapTypeDefFieldType<Schema, TypeDef, Key>;
-    },
-    // optionality
-    keyof {
-        [Key in GetTypeDefFields<Schema, TypeDef> as TypeDefFieldIsOptional<Schema, TypeDef, Key> extends true
-            ? Key
-            : never]: true;
-    }
+export type TypeDefResult<
+    Schema extends SchemaDef,
+    TypeDef extends GetTypeDefs<Schema>,
+    Partial extends boolean = false,
+> = PartialIf<
+    Optional<
+        {
+            [Key in GetTypeDefFields<Schema, TypeDef>]: GetTypeDefField<
+                Schema,
+                TypeDef,
+                Key
+            >['type'] extends GetTypeDefs<Schema>
+                ? ArrayIf<
+                      TypeDefResult<Schema, GetTypeDefField<Schema, TypeDef, Key>['type'], Partial>,
+                      TypeDefFieldIsArray<Schema, TypeDef, Key>
+                  >
+                : MapTypeDefFieldType<Schema, TypeDef, Key>;
+        },
+        // optionality
+        Partial extends true
+            ? never
+            : keyof {
+                  [Key in GetTypeDefFields<Schema, TypeDef> as TypeDefFieldIsOptional<Schema, TypeDef, Key> extends true
+                      ? Key
+                      : never]: true;
+              }
+    >,
+    Partial
 >;
 
 export type BatchResult = { count: number };

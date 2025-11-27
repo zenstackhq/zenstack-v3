@@ -86,7 +86,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
 
     /**
      * Whether to allow overriding omit settings at query time. Defaults to `true`. When set to
-     * `false`, an `omit` clause that set field to `false` (not omitting) will trigger a validation
+     * `false`, an `omit` clause that sets field to `false` (not omitting) will trigger a validation
      * error.
      */
     allowQueryTimeOmitOverride?: boolean;

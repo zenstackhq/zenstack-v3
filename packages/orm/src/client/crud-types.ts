@@ -38,6 +38,7 @@ import type {
     NullableIf,
     Optional,
     OrArray,
+    PartialIf,
     Simplify,
     ValueOfPotentialTuple,
     WrapType,
@@ -246,17 +247,31 @@ export type SimplifiedModelResult<
     Array = false,
 > = Simplify<ModelResult<Schema, Model, Options, Args, Optional, Array>>;
 
-export type TypeDefResult<Schema extends SchemaDef, TypeDef extends GetTypeDefs<Schema>> = Optional<
-    {
-        [Key in GetTypeDefFields<Schema, TypeDef>]: MapTypeDefFieldType<Schema, TypeDef, Key>;
-    },
-    // optionality
-    keyof {
-        [Key in GetTypeDefFields<Schema, TypeDef> as TypeDefFieldIsOptional<Schema, TypeDef, Key> extends true
-            ? Key
-            : never]: true;
-    }
->;
+export type TypeDefResult<
+    Schema extends SchemaDef,
+    TypeDef extends GetTypeDefs<Schema>,
+    Partial extends boolean = false,
+> = PartialIf<
+    Optional<
+        {
+            [Key in GetTypeDefFields<Schema, TypeDef>]: MapFieldDefType<
+                Schema,
+                GetTypeDefField<Schema, TypeDef, Key>,
+                Partial
+            >;
+        },
+        // optionality
+        Partial extends true
+            ? never
+            : keyof {
+                  [Key in GetTypeDefFields<Schema, TypeDef> as TypeDefFieldIsOptional<Schema, TypeDef, Key> extends true
+                      ? Key
+                      : never]: true;
+              }
+    >,
+    Partial
+> &
+    Record<string, unknown>;
 
 export type BatchResult = { count: number };
 
@@ -617,17 +632,15 @@ type MapModelFieldType<
     Field extends GetModelFields<Schema, Model>,
 > = MapFieldDefType<Schema, GetModelField<Schema, Model, Field>>;
 
-type MapTypeDefFieldType<
+type MapFieldDefType<
     Schema extends SchemaDef,
-    TypeDef extends GetTypeDefs<Schema>,
-    Field extends GetTypeDefFields<Schema, TypeDef>,
-> = MapFieldDefType<Schema, GetTypeDefField<Schema, TypeDef, Field>>;
-
-type MapFieldDefType<Schema extends SchemaDef, T extends Pick<FieldDef, 'type' | 'optional' | 'array'>> = WrapType<
+    T extends Pick<FieldDef, 'type' | 'optional' | 'array'>,
+    Partial extends boolean = false,
+> = WrapType<
     T['type'] extends GetEnums<Schema>
         ? keyof GetEnum<Schema, T['type']>
         : T['type'] extends GetTypeDefs<Schema>
-          ? TypeDefResult<Schema, T['type']> & Record<string, unknown>
+          ? TypeDefResult<Schema, T['type'], Partial> & Record<string, unknown>
           : MapBaseType<T['type']>,
     T['optional'],
     T['array']

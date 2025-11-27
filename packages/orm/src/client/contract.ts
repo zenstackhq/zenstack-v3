@@ -2,6 +2,7 @@ import type Decimal from 'decimal.js';
 import {
     type FieldIsArray,
     type GetModels,
+    type GetTypeDefs,
     type IsDelegateModel,
     type ProcedureDef,
     type RelationFields,
@@ -32,6 +33,7 @@ import type {
     SelectSubset,
     SimplifiedModelResult,
     Subset,
+    TypeDefResult,
     UpdateArgs,
     UpdateManyAndReturnArgs,
     UpdateManyArgs,
@@ -854,10 +856,10 @@ type AuthModelType<Schema extends SchemaDef, Model extends GetModels<Schema>> = 
 };
 
 export type AuthType<Schema extends SchemaDef> =
-    string extends GetModels<Schema>
-        ? Record<string, unknown>
-        : Schema['authType'] extends GetModels<Schema>
-          ? AuthModelType<Schema, Schema['authType']>
-          : never;
+    Schema['authType'] extends GetModels<Schema>
+        ? AuthModelType<Schema, Schema['authType']>
+        : Schema['authType'] extends GetTypeDefs<Schema>
+          ? TypeDefResult<Schema, Schema['authType'], true>
+          : Record<string, unknown>;
 
 //#endregion

@@ -61,6 +61,10 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.client.$schema;
     }
 
+    private get options() {
+        return this.client.$options;
+    }
+
     private get extraValidationsEnabled() {
         return this.client.$options.validateInput !== false;
     }
@@ -783,7 +787,13 @@ export class InputValidator<Schema extends SchemaDef> {
         for (const field of Object.keys(modelDef.fields)) {
             const fieldDef = requireField(this.schema, model, field);
             if (!fieldDef.relation) {
-                fields[field] = z.boolean().optional();
+                if (this.options.allowQueryTimeOmitOverride !== false) {
+                    // if override is allowed, use boolean
+                    fields[field] = z.boolean().optional();
+                } else {
+                    // otherwise only allow true
+                    fields[field] = z.literal(true).optional();
+                }
             }
         }
         return z.strictObject(fields);

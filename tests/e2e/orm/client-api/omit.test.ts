@@ -140,4 +140,23 @@ describe('Field omission tests', () => {
         const read1 = await db.sub.findFirstOrThrow({ omit: { content: false } });
         expect(read1.content).toBe('Foo');
     });
+
+    it('respects query-level omit override settings', async () => {
+        const base = await createTestClient(schema);
+        const db = base.$setOptions({ ...base.$options, allowQueryTimeOmitOverride: false });
+        await expect(
+            db.user.create({
+                data: { id: 1, name: 'User1', password: 'abc' },
+                omit: { password: false },
+            }),
+        ).toBeRejectedByValidation();
+
+        await db.user.create({ data: { id: 1, name: 'User1', password: 'abc' } });
+        await expect(db.user.findFirstOrThrow({ omit: { password: false } })).toBeRejectedByValidation();
+
+        // allow set omit as true
+        const user = await db.user.findFirstOrThrow({ omit: { name: true } });
+        // @ts-expect-error
+        expect(user.name).toBeUndefined();
+    });
 });

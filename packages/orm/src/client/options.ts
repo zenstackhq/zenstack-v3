@@ -78,19 +78,26 @@ export type ClientOptions<Schema extends SchemaDef> = {
      * `@@validate`, etc. Defaults to `true`.
      */
     validateInput?: boolean;
-} & {
+
     /**
      * Options for omitting fields in ORM query results.
      */
     omit?: OmitOptions<Schema>;
+
+    /**
+     * Whether to allow overriding omit settings at query time. Defaults to `true`. When set to
+     * `false`, an `omit` clause that sets field to `false` (not omitting) will trigger a validation
+     * error.
+     */
+    allowQueryTimeOmitOverride?: boolean;
 } & (HasComputedFields<Schema> extends true
-        ? {
-              /**
-               * Computed field definitions.
-               */
-              computedFields: ComputedFieldsOptions<Schema>;
-          }
-        : {}) &
+    ? {
+          /**
+           * Computed field definitions.
+           */
+          computedFields: ComputedFieldsOptions<Schema>;
+      }
+    : {}) &
     (HasProcedures<Schema> extends true
         ? {
               /**

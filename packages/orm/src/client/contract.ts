@@ -115,8 +115,19 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
     $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema, Options>;
 
     /**
+     * Returns a new client with new options applied.
+     * @example
+     * ```
+     * const dbNoValidation = db.$setOptions({ ...db.$options, validateInput: false });
+     * ```
+     */
+    $setOptions<Options extends ClientOptions<Schema>>(options: Options): ClientContract<Schema, Options>;
+
+    /**
      * Returns a new client enabling/disabling input validations expressed with attributes like
      * `@email`, `@regex`, `@@validate`, etc.
+     *
+     * @deprecated Use `$setOptions` instead.
      */
     $setInputValidation(enable: boolean): ClientContract<Schema, Options>;
 

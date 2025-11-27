@@ -143,8 +143,10 @@ describe('Custom validation tests', () => {
             }),
         ).toBeRejectedByValidation();
 
+        const dbNoValidation = db.$setOptions({ ...db.$options, validateInput: false });
+
         await expect(
-            db.$setInputValidation(false).user.create({
+            dbNoValidation.user.create({
                 data: {
                     id: 1,
                     email: 'xyz',
@@ -153,7 +155,7 @@ describe('Custom validation tests', () => {
         ).toResolveTruthy();
 
         await expect(
-            db.$setInputValidation(false).user.update({
+            dbNoValidation.user.update({
                 where: { id: 1 },
                 data: {
                     email: 'a@b.com',

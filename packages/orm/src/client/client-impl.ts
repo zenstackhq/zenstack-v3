@@ -299,6 +299,13 @@ export class ClientImpl {
         return this.auth;
     }
 
+    $setOptions<Options extends ClientOptions<SchemaDef>>(options: Options): ClientContract<SchemaDef, Options> {
+        return new ClientImpl(this.schema, options as ClientOptions<SchemaDef>, this) as unknown as ClientContract<
+            SchemaDef,
+            Options
+        >;
+    }
+
     $setInputValidation(enable: boolean) {
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,

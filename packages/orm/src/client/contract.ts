@@ -61,6 +61,9 @@ export enum TransactionIsolationLevel {
  * ZenStack client interface.
  */
 export type ClientContract<Schema extends SchemaDef, Options extends ClientOptions<Schema> = ClientOptions<Schema>> = {
+    /**
+     * The schema definition.
+     */
     readonly $schema: Schema;
 
     /**

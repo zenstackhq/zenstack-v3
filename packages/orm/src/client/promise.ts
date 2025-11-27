@@ -16,16 +16,16 @@ export type ZenStackPromise<Schema extends SchemaDef, T> = Promise<T> & {
  * Creates a promise that only executes when it's awaited or .then() is called.
  * @see https://github.com/prisma/prisma/blob/main/packages/client/src/runtime/core/request/createPrismaPromise.ts
  */
-export function createZenStackPromise<Schema extends SchemaDef, T>(
-    callback: (txClient?: ClientContract<Schema>) => Promise<T>,
-): ZenStackPromise<Schema, T> {
-    let promise: Promise<T> | undefined;
-    const cb = (txClient?: ClientContract<Schema>) => {
+export function createZenStackPromise(
+    callback: (txClient?: ClientContract<any>) => Promise<unknown>,
+): ZenStackPromise<any, unknown> {
+    let promise: Promise<unknown> | undefined;
+    const cb = (txClient?: ClientContract<any>) => {
         try {
             return (promise ??= valueToPromise(callback(txClient)));
         } catch (err) {
             // deal with synchronous errors
-            return Promise.reject<T>(err);
+            return Promise.reject<unknown>(err);
         }
     };
 

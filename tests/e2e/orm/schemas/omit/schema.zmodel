@@ -1,0 +1,29 @@
+datasource db {
+    provider = "sqlite"
+    url      = "file:./dev.db"
+}
+
+model User {
+    id       Int    @id
+    name     String
+    password String @omit
+    posts    Post[]
+}
+
+model Post {
+    id       Int    @id
+    title    String
+    author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+    authorId Int
+}
+
+model Base {
+    id   Int    @id
+    type String
+    @@delegate(type)
+}
+
+model Sub extends Base {
+    title   String
+    content String @omit
+}

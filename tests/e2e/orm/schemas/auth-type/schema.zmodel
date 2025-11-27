@@ -1,0 +1,21 @@
+datasource db {
+    provider = "sqlite"
+    url      = "file:./dev.db"
+}
+
+type Permission {
+    actionCode String
+}
+
+type Auth {
+    id          Int          @id
+    name        String
+    permissions Permission[]
+    role        String
+
+    @@auth
+}
+
+model Foo {
+    id Int @id
+}

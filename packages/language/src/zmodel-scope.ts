@@ -36,6 +36,7 @@ import {
     getAuthDecl,
     getRecursiveBases,
     isAuthInvocation,
+    isAuthOrAuthMemberAccess,
     isBeforeInvocation,
     isCollectionPredicate,
     resolveImportUri,
@@ -138,8 +139,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         // typedef's fields are only added to the scope if the access starts with `auth().`
         // or the member access resides inside a typedef
         const allowTypeDefScope =
-            // isAuthOrAuthMemberAccess(node.operand) ||
-            !!AstUtils.getContainerOfType(node, isTypeDef);
+            isAuthOrAuthMemberAccess(node.operand) || !!AstUtils.getContainerOfType(node, isTypeDef);
 
         return match(node.operand)
             .when(isReferenceExpr, (operand) => {
@@ -184,10 +184,9 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         const globalScope = this.getGlobalScope(referenceType, context);
         const collection = collectionPredicate.left;
 
-        // TODO: generalize it
+        // TODO: full support of typedef member access
         // // typedef's fields are only added to the scope if the access starts with `auth().`
-        // const allowTypeDefScope = isAuthOrAuthMemberAccess(collection);
-        const allowTypeDefScope = false;
+        const allowTypeDefScope = isAuthOrAuthMemberAccess(collection);
 
         return match(collection)
             .when(isReferenceExpr, (expr) => {

@@ -296,18 +296,26 @@ export class TsSchemaGenerator {
 
     private createModelsObject(model: Model, lite: boolean): ts.Expression {
         return ts.factory.createObjectLiteralExpression(
-            model.declarations
-                .filter((d): d is DataModel => isDataModel(d) && !hasAttribute(d, '@@ignore'))
-                .map((dm) => ts.factory.createPropertyAssignment(dm.name, this.createDataModelObject(dm, lite))),
+            this.getAllDataModels(model).map((dm) =>
+                ts.factory.createPropertyAssignment(dm.name, this.createDataModelObject(dm, lite)),
+            ),
             true,
         );
     }
 
+    private getAllDataModels(model: Model) {
+        return model.declarations.filter((d): d is DataModel => isDataModel(d) && !hasAttribute(d, '@@ignore'));
+    }
+
+    private getAllTypeDefs(model: Model) {
+        return model.declarations.filter((d): d is TypeDef => isTypeDef(d) && !hasAttribute(d, '@@ignore'));
+    }
+
     private createTypeDefsObject(model: Model, lite: boolean): ts.Expression {
         return ts.factory.createObjectLiteralExpression(
-            model.declarations
-                .filter((d): d is TypeDef => isTypeDef(d))
-                .map((td) => ts.factory.createPropertyAssignment(td.name, this.createTypeDefObject(td, lite))),
+            this.getAllTypeDefs(model).map((td) =>
+                ts.factory.createPropertyAssignment(td.name, this.createTypeDefObject(td, lite)),
+            ),
             true,
         );
     }
@@ -541,6 +549,10 @@ export class TsSchemaGenerator {
 
         if (hasAttribute(field, '@updatedAt')) {
             objectFields.push(ts.factory.createPropertyAssignment('updatedAt', ts.factory.createTrue()));
+        }
+
+        if (hasAttribute(field, '@omit')) {
+            objectFields.push(ts.factory.createPropertyAssignment('omit', ts.factory.createTrue()));
         }
 
         // originModel
@@ -1337,7 +1349,7 @@ export class TsSchemaGenerator {
         );
 
         // generate: export type Model = $ModelResult<Schema, 'Model'>;
-        const dataModels = model.declarations.filter(isDataModel);
+        const dataModels = this.getAllDataModels(model);
         for (const dm of dataModels) {
             let modelType = ts.factory.createTypeAliasDeclaration(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -1355,7 +1367,7 @@ export class TsSchemaGenerator {
         }
 
         // generate: export type TypeDef = $TypeDefResult<Schema, 'TypeDef'>;
-        const typeDefs = model.declarations.filter(isTypeDef);
+        const typeDefs = this.getAllTypeDefs(model);
         for (const td of typeDefs) {
             let typeDef = ts.factory.createTypeAliasDeclaration(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -1492,7 +1504,7 @@ export class TsSchemaGenerator {
     }
 
     private generateInputTypes(model: Model, options: TsSchemaGeneratorOptions) {
-        const dataModels = model.declarations.filter(isDataModel);
+        const dataModels = this.getAllDataModels(model);
         const statements: ts.Statement[] = [];
 
         // generate: import { SchemaType as $Schema } from './schema';
@@ -1542,15 +1554,20 @@ export class TsSchemaGenerator {
                 ts.factory.createImportClause(
                     true,
                     undefined,
-                    ts.factory.createNamedImports(
-                        inputTypes.map((inputType) =>
+                    ts.factory.createNamedImports([
+                        ...inputTypes.map((inputType) =>
                             ts.factory.createImportSpecifier(
                                 false,
                                 undefined,
                                 ts.factory.createIdentifier(`${inputType} as $${inputType}`),
                             ),
                         ),
-                    ),
+                        ts.factory.createImportSpecifier(
+                            false,
+                            undefined,
+                            ts.factory.createIdentifier('ClientOptions as $ClientOptions'),
+                        ),
+                    ]),
                 ),
                 ts.factory.createStringLiteral('@zenstackhq/orm'),
             ),
@@ -1599,7 +1616,7 @@ export class TsSchemaGenerator {
                 );
             }
 
-            // generate: export type ModelGetPayload<Args extends $SelectIncludeOmit<Schema, Model, true>> = $SimplifiedModelResult<Schema, Model, Args>;
+            // generate: export type ModelGetPayload<Args extends $SelectIncludeOmit<Schema, Model, true>, Options extends ClientOptions<Schema>> = $SimplifiedModelResult<Schema, Model, Options, Args>;
             statements.push(
                 ts.factory.createTypeAliasDeclaration(
                     [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -1614,10 +1631,21 @@ export class TsSchemaGenerator {
                                 ts.factory.createLiteralTypeNode(ts.factory.createTrue()),
                             ]),
                         ),
+                        ts.factory.createTypeParameterDeclaration(
+                            undefined,
+                            'Options',
+                            ts.factory.createTypeReferenceNode('$ClientOptions', [
+                                ts.factory.createTypeReferenceNode('$Schema'),
+                            ]),
+                            ts.factory.createTypeReferenceNode('$ClientOptions', [
+                                ts.factory.createTypeReferenceNode('$Schema'),
+                            ]),
+                        ),
                     ],
                     ts.factory.createTypeReferenceNode('$SimplifiedModelResult', [
                         ts.factory.createTypeReferenceNode('$Schema'),
                         ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(dm.name)),
+                        ts.factory.createTypeReferenceNode('Options'),
                         ts.factory.createTypeReferenceNode('Args'),
                     ]),
                 ),

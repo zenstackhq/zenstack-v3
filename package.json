@@ -1,8 +1,8 @@
 {
     "name": "zenstack-v3",
-    "version": "3.0.0-beta.25",
+    "version": "3.0.0-beta.26",
     "description": "ZenStack",
-    "packageManager": "pnpm@10.20.0",
+    "packageManager": "pnpm@10.23.0",
     "scripts": {
         "build": "turbo run build",
         "watch": "turbo run watch build",
@@ -25,14 +25,14 @@
         "eslint": "~9.29.0",
         "glob": "^11.0.2",
         "prettier": "^3.5.3",
+        "prisma": "catalog:",
         "tsup": "^8.5.0",
         "tsx": "^4.20.3",
         "turbo": "^2.5.4",
         "typescript": "catalog:",
         "typescript-eslint": "^8.34.1",
         "vitest": "^3.2.4",
-        "yaml": "^2.8.0",
-        "prisma": "catalog:"
+        "yaml": "^2.8.0"
     },
     "pnpm": {
         "onlyBuiltDependencies": [

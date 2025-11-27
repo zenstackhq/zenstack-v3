@@ -2,7 +2,11 @@ import type Decimal from 'decimal.js';
 
 export type Optional<T extends object, K extends keyof T = keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
+export type PartialIf<T, Condition extends boolean> = Condition extends true ? Partial<T> : T;
+
 export type NullableIf<T, Condition extends boolean> = Condition extends true ? T | null : T;
+
+export type ArrayIf<T, Condition extends boolean> = Condition extends true ? T[] : T;
 
 export type PartialRecord<K extends string | number | symbol, T> = Partial<Record<K, T>>;
 

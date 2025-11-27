@@ -9,7 +9,7 @@ catalog:
     langium: 3.5.0
     langium-cli: 3.5.0
     ts-pattern: ^5.7.1
-    typescript: ^5.8.0
+    typescript: ^5.9.3
     '@types/node': ^20.19.0
     tmp: ^0.2.3
     '@types/tmp': ^0.2.6

@@ -179,6 +179,17 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         return true;
     }
 
+    @func('auth')
+    private _checkAuth(expr: InvocationExpr, accept: ValidationAcceptor) {
+        if (!expr.$resolvedType) {
+            accept(
+                'error',
+                'cannot resolve `auth()` - make sure you have a model or type with `@auth` attribute or named "User"',
+                { node: expr },
+            );
+        }
+    }
+
     @func('length')
     private _checkLength(expr: InvocationExpr, accept: ValidationAcceptor) {
         const msg = 'argument must be a string or list field';

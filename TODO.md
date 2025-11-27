@@ -3,13 +3,13 @@
 - [ ] CLI
     - [x] generate
     - [x] migrate
-    - [ ] db
+    - [x] db
         - [x] push
-        - [ ] seed
+        - [x] seed
     - [x] info
     - [x] init
     - [x] validate
-    - [ ] format
+    - [x] format
     - [ ] repl
     - [x] plugin mechanism
     - [x] built-in plugins
@@ -85,7 +85,7 @@
         - [x] Error system
         - [x] Custom table name
         - [x] Custom field name
-        - [ ] Global omit
+        - [x] Global omit
         - [ ] DbNull vs JsonNull
         - [ ] Migrate to tsdown
         - [x] @default validation

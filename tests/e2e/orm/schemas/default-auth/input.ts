@@ -6,7 +6,7 @@
 /* eslint-disable */
 
 import { type SchemaType as $Schema } from "./schema";
-import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput } from "@zenstackhq/orm";
+import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, ClientOptions as $ClientOptions } from "@zenstackhq/orm";
 import type { SimplifiedModelResult as $SimplifiedModelResult, SelectIncludeOmit as $SelectIncludeOmit } from "@zenstackhq/orm";
 export type UserFindManyArgs = $FindManyArgs<$Schema, "User">;
 export type UserFindUniqueArgs = $FindUniqueArgs<$Schema, "User">;
@@ -27,7 +27,7 @@ export type UserWhereInput = $WhereInput<$Schema, "User">;
 export type UserSelect = $SelectInput<$Schema, "User">;
 export type UserInclude = $IncludeInput<$Schema, "User">;
 export type UserOmit = $OmitInput<$Schema, "User">;
-export type UserGetPayload<Args extends $SelectIncludeOmit<$Schema, "User", true>> = $SimplifiedModelResult<$Schema, "User", Args>;
+export type UserGetPayload<Args extends $SelectIncludeOmit<$Schema, "User", true>, Options extends $ClientOptions<$Schema> = $ClientOptions<$Schema>> = $SimplifiedModelResult<$Schema, "User", Options, Args>;
 export type ProfileFindManyArgs = $FindManyArgs<$Schema, "Profile">;
 export type ProfileFindUniqueArgs = $FindUniqueArgs<$Schema, "Profile">;
 export type ProfileFindFirstArgs = $FindFirstArgs<$Schema, "Profile">;
@@ -47,7 +47,7 @@ export type ProfileWhereInput = $WhereInput<$Schema, "Profile">;
 export type ProfileSelect = $SelectInput<$Schema, "Profile">;
 export type ProfileInclude = $IncludeInput<$Schema, "Profile">;
 export type ProfileOmit = $OmitInput<$Schema, "Profile">;
-export type ProfileGetPayload<Args extends $SelectIncludeOmit<$Schema, "Profile", true>> = $SimplifiedModelResult<$Schema, "Profile", Args>;
+export type ProfileGetPayload<Args extends $SelectIncludeOmit<$Schema, "Profile", true>, Options extends $ClientOptions<$Schema> = $ClientOptions<$Schema>> = $SimplifiedModelResult<$Schema, "Profile", Options, Args>;
 export type AddressFindManyArgs = $FindManyArgs<$Schema, "Address">;
 export type AddressFindUniqueArgs = $FindUniqueArgs<$Schema, "Address">;
 export type AddressFindFirstArgs = $FindFirstArgs<$Schema, "Address">;
@@ -67,4 +67,4 @@ export type AddressWhereInput = $WhereInput<$Schema, "Address">;
 export type AddressSelect = $SelectInput<$Schema, "Address">;
 export type AddressInclude = $IncludeInput<$Schema, "Address">;
 export type AddressOmit = $OmitInput<$Schema, "Address">;
-export type AddressGetPayload<Args extends $SelectIncludeOmit<$Schema, "Address", true>> = $SimplifiedModelResult<$Schema, "Address", Args>;
+export type AddressGetPayload<Args extends $SelectIncludeOmit<$Schema, "Address", true>, Options extends $ClientOptions<$Schema> = $ClientOptions<$Schema>> = $SimplifiedModelResult<$Schema, "Address", Options, Args>;

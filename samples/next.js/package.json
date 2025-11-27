@@ -1,6 +1,6 @@
 {
     "name": "next.js",
-    "version": "3.0.0-beta.25",
+    "version": "3.0.0-beta.26",
     "private": true,
     "scripts": {
         "generate": "zen generate --lite",
@@ -32,6 +32,6 @@
         "eslint": "^9",
         "eslint-config-next": "16.0.1",
         "tailwindcss": "^4",
-        "typescript": "^5"
+        "typescript": "catalog:"
     }
 }

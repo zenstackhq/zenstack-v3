@@ -15,7 +15,7 @@ export type SchemaDef = {
     typeDefs?: Record<string, TypeDefDef>;
     plugins: Record<string, unknown>;
     procedures?: Record<string, ProcedureDef>;
-    authType?: GetModels<SchemaDef>;
+    authType?: GetModels<SchemaDef> | GetTypeDefs<SchemaDef>;
 };
 
 export type ModelDef = {
@@ -69,6 +69,7 @@ export type FieldDef = {
     updatedAt?: boolean;
     attributes?: AttributeApplication[];
     default?: MappedBuiltinType | Expression | unknown[];
+    omit?: boolean;
     relation?: RelationInfo;
     foreignKeyFor?: string[];
     computed?: boolean;
@@ -239,6 +240,12 @@ export type TypeDefFieldIsOptional<
     TypeDef extends GetTypeDefs<Schema>,
     Field extends GetTypeDefFields<Schema, TypeDef>,
 > = GetTypeDefField<Schema, TypeDef, Field>['optional'] extends true ? true : false;
+
+export type TypeDefFieldIsArray<
+    Schema extends SchemaDef,
+    TypeDef extends GetTypeDefs<Schema>,
+    Field extends GetTypeDefFields<Schema, TypeDef>,
+> = GetTypeDefField<Schema, TypeDef, Field>['array'] extends true ? true : false;
 
 export type FieldIsRelation<
     Schema extends SchemaDef,

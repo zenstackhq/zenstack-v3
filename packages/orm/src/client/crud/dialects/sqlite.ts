@@ -198,11 +198,12 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             }
 
             if (payload === true || !payload.select) {
-                // select all scalar fields
+                // select all scalar fields except for omitted
+                const omit = typeof payload === 'object' ? payload.omit : undefined;
                 objArgs.push(
                     ...Object.entries(relationModelDef.fields)
                         .filter(([, value]) => !value.relation)
-                        .filter(([name]) => !(typeof payload === 'object' && (payload.omit as any)?.[name] === true))
+                        .filter(([name]) => !this.shouldOmitField(omit, relationModel, name))
                         .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, subQueryName, false)])
                         .flatMap((v) => v),
                 );

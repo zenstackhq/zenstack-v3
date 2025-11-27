@@ -79,6 +79,11 @@ export class ExpressionEvaluator {
         const left = this.evaluate(expr.left, context);
         const right = this.evaluate(expr.right, context);
 
+        if (!['==', '!='].includes(expr.op) && (left === null || right === null)) {
+            // non-equality comparison with null always yields null (follow SQL logic)
+            return null;
+        }
+
         return match(expr.op)
             .with('==', () => left === right)
             .with('!=', () => left !== right)
@@ -101,8 +106,8 @@ export class ExpressionEvaluator {
         invariant(op === '?' || op === '!' || op === '^', 'expected "?" or "!" or "^" operator');
 
         const left = this.evaluate(expr.left, context);
-        if (!left) {
-            return false;
+        if (left === null || left === undefined) {
+            return null;
         }
 
         invariant(Array.isArray(left), 'expected array');

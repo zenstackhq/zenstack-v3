@@ -106,7 +106,7 @@ export class ExpressionEvaluator {
         invariant(op === '?' || op === '!' || op === '^', 'expected "?" or "!" or "^" operator');
 
         const left = this.evaluate(expr.left, context);
-        if (!left) {
+        if (left === null || left === undefined) {
             return null;
         }
 

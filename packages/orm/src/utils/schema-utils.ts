@@ -81,6 +81,7 @@ export class MatchingExpressionVisitor extends ExpressionVisitor {
     }
 
     find(expr: Expression) {
+        this.found = false;
         this.visit(expr);
         return this.found;
     }

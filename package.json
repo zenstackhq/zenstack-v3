@@ -3,6 +3,7 @@
     "version": "3.0.0-beta.26",
     "description": "ZenStack",
     "packageManager": "pnpm@10.23.0",
+    "type": "module",
     "scripts": {
         "build": "turbo run build",
         "watch": "turbo run watch build",

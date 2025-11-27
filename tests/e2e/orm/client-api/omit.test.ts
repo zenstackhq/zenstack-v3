@@ -62,11 +62,13 @@ describe('Field omission tests', () => {
         expect(post.author.password).toBeUndefined();
         // @ts-expect-error
         expect(post.author.name).toBeUndefined();
+    });
 
+    it('allows override at query options level', async () => {
         // override schema-level omit
-        const options1 = { omit: { User: { password: false } }, dialect: {} as any } as const;
-        const db1 = await createTestClient<typeof schema, typeof options1>(schema, options1);
-        const user1 = await db1.user.create({
+        const options = { omit: { User: { password: false } }, dialect: {} as any } as const;
+        const db = await createTestClient<typeof schema, typeof options>(schema, options);
+        const user1 = await db.user.create({
             data: {
                 id: 1,
                 name: 'User1',
@@ -108,16 +110,18 @@ describe('Field omission tests', () => {
 
         const user4 = await db.user.delete({ where: { id: 1 }, omit: { password: false } });
         expect(user4.password).toBeTruthy();
+    });
 
+    it('allows override at query level', async () => {
         // override options-level omit
         const options = { omit: { User: { name: true } }, dialect: {} as any } as const;
-        const db1 = await createTestClient<typeof schema, typeof options>(schema, options);
-        const user5 = await db1.user.create({
+        const db = await createTestClient<typeof schema, typeof options>(schema, options);
+        const user5 = await db.user.create({
             data: { id: 2, name: 'User2', password: 'abc' },
         });
         // @ts-expect-error
         expect(user5.name).toBeUndefined();
-        const user6 = await db1.user.findFirstOrThrow({ omit: { name: false } });
+        const user6 = await db.user.findFirstOrThrow({ omit: { name: false } });
         expect(user6.name).toBeTruthy();
     });
 

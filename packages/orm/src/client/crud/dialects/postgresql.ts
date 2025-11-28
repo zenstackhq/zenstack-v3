@@ -106,7 +106,8 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
     private transformOutputDate(value: unknown) {
         if (typeof value === 'string') {
-            return new Date(value);
+            // force interpret as UTC
+            return new Date(value.endsWith('Z') ? value : `${value}Z`);
         } else if (value instanceof Date && this.options.fixPostgresTimezone !== false) {
             // SPECIAL NOTES:
             // node-pg has a terrible quirk that it returns the date value in local timezone

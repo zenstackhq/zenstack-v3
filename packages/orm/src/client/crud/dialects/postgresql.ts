@@ -106,7 +106,9 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
     private transformOutputDate(value: unknown) {
         if (typeof value === 'string') {
-            // force interpret as UTC
+            // PostgreSQL's jsonb_build_object serializes timestamptz as ISO 8601 strings
+            // in UTC but without the 'Z' suffix (e.g., "2023-01-01T12:00:00.123456").
+            // We add 'Z' to explicitly mark them as UTC for correct Date object creation.
             return new Date(value.endsWith('Z') ? value : `${value}Z`);
         } else if (value instanceof Date && this.options.fixPostgresTimezone !== false) {
             // SPECIAL NOTES:

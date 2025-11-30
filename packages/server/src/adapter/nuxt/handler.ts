@@ -1,12 +1,12 @@
 import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import {
-    H3Event,
     defineEventHandler,
     getQuery,
     getRouterParams,
     readBody,
     setResponseStatus,
+    type H3Event,
     type EventHandlerRequest,
 } from 'h3';
 import { logInternalError, type CommonAdapterOptions } from '../common';

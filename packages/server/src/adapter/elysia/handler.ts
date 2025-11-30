@@ -25,7 +25,7 @@ export interface ElysiaOptions<Schema extends SchemaDef> extends CommonAdapterOp
 export function createElysiaHandler<Schema extends SchemaDef>(options: ElysiaOptions<Schema>) {
     return async (app: Elysia) => {
         app.all('/*', async (ctx: ElysiaContext) => {
-            const { request, body, set } = ctx;
+            const { query, body, set, request } = ctx;
             const client = await options.getClient(ctx);
             if (!client) {
                 set.status = 500;
@@ -35,7 +35,6 @@ export function createElysiaHandler<Schema extends SchemaDef>(options: ElysiaOpt
             }
 
             const url = new URL(request.url);
-            const query = Object.fromEntries(url.searchParams);
             let path = url.pathname;
 
             if (options.basePath && path.startsWith(options.basePath)) {

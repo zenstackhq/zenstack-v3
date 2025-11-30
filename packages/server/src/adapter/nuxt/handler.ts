@@ -1,7 +1,14 @@
 import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
-import { H3Event, defineEventHandler, getQuery, getRouterParams, readBody, type EventHandlerRequest } from 'h3';
-import { setResponseStatus } from 'nuxt/app';
+import {
+    H3Event,
+    defineEventHandler,
+    getQuery,
+    getRouterParams,
+    readBody,
+    setResponseStatus,
+    type EventHandlerRequest,
+} from 'h3';
 import { logInternalError, type CommonAdapterOptions } from '../common';
 
 /**

@@ -17,6 +17,7 @@
         "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/vitest-config": "workspace:*"
+        "@zenstackhq/vitest-config": "workspace:*",
+        "@types/node": "catalog:"
     }
 }

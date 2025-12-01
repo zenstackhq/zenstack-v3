@@ -837,9 +837,6 @@ importers:
       '@zenstackhq/typescript-config':
         specifier: workspace:*
         version: link:../../packages/config/typescript-config
-      '@zenstackhq/vitest-config':
-        specifier: workspace:*
-        version: link:../../packages/config/vitest-config
       bun-types:
         specifier: ^1.3.3
         version: 1.3.3

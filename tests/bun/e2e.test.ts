@@ -83,7 +83,7 @@ describe('Bun e2e tests', () => {
     });
 });
 
-async function createClient(provider: 'sqlite' | 'postgresql', dbName?: string) {
+async function createClient(provider: 'sqlite' | 'postgresql', dbName: string) {
     const _schema = clone(schema);
     let dialect: Dialect;
     if (provider === 'sqlite') {

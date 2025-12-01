@@ -1,8 +1,6 @@
 {
     "extends": "@zenstackhq/typescript-config/base.json",
     "compilerOptions": {
-        "noEmit": true,
-        "noImplicitAny": false,
-        "types": ["bun-types"]
+        "noEmit": true
     }
 }

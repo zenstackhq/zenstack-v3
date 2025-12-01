@@ -47,7 +47,7 @@ export function execPrisma(args: string, options?: Omit<ExecSyncOptions, 'env'> 
         ...options,
         env: {
             ...options?.env,
-            PRISMA_HIDE_UPDATE_MESSAGE: '0',
+            PRISMA_HIDE_UPDATE_MESSAGE: '1',
         },
     };
 

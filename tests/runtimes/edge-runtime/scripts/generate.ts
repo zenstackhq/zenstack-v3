@@ -14,7 +14,7 @@ async function main() {
 }
 
 async function generate(schemaPath: string) {
-    execSync('bunx --bun zen generate', { cwd: path.dirname(schemaPath) });
+    execSync('npx zen generate', { cwd: path.dirname(schemaPath) });
 }
 
 main();

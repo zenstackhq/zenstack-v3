@@ -1,20 +1,14 @@
-import { clone } from '@zenstackhq/common-helpers';
 import { ZenStackClient } from '@zenstackhq/orm';
 import { PostgresDialect } from '@zenstackhq/orm/dialects/postgres';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { TEST_PG_URL } from '@zenstackhq/testtools';
-import { Database } from 'bun:sqlite';
-import { describe, expect, it } from 'bun:test';
-import type { Dialect } from 'kysely';
-import { BunSqliteDialect } from 'kysely-bun-sqlite';
 import { Client, Pool } from 'pg';
+import { describe, expect, it } from 'vitest';
 import { schema } from './schemas/schema';
 
-describe('Bun e2e tests', () => {
-    const provider = (process.env['TEST_DB_PROVIDER'] ?? 'sqlite') as 'sqlite' | 'postgresql';
-
+describe('Edge-runtime e2e tests', () => {
     it('works with simple CRUD', async () => {
-        const db = await createClient(provider, 'bun-e2e-crud');
+        const db = await createClient('edge-runtime-e2e-crud');
 
         const user = await db.user.create({
             data: {
@@ -44,7 +38,7 @@ describe('Bun e2e tests', () => {
     });
 
     it('enforces policies', async () => {
-        const db = await createClient(provider, 'bun-e2e-policies');
+        const db = await createClient('edge-runtime-e2e-policies');
         const authDb = db.$use(new PolicyPlugin());
 
         // create a user
@@ -58,13 +52,11 @@ describe('Bun e2e tests', () => {
                         {
                             id: 'p1',
                             title: 'First Post',
-                            content: 'Hello World',
                             published: true,
                         },
                         {
                             id: 'p2',
                             title: 'Second Post',
-                            content: 'Draft Post',
                             published: false,
                         },
                     ],
@@ -83,31 +75,21 @@ describe('Bun e2e tests', () => {
     });
 });
 
-async function createClient(provider: 'sqlite' | 'postgresql', dbName: string) {
-    const _schema = clone(schema);
-    let dialect: Dialect;
-    if (provider === 'sqlite') {
-        (_schema as any).provider.type = 'sqlite';
-        dialect = new BunSqliteDialect({
-            database: new Database(':memory:'),
-        });
-    } else {
-        (_schema as any).provider.type = 'postgresql';
-        const pgClient = new Client({
-            connectionString: TEST_PG_URL,
-        });
-        await pgClient.connect();
-        await pgClient.query(`DROP DATABASE IF EXISTS "${dbName}"`);
-        await pgClient.query(`CREATE DATABASE "${dbName}"`);
-        await pgClient.end();
-        dialect = new PostgresDialect({
-            pool: new Pool({
-                connectionString: `${TEST_PG_URL}/${dbName}`,
-            }),
-        });
-    }
+async function createClient(dbName: string) {
+    const pgClient = new Client({
+        connectionString: TEST_PG_URL,
+    });
+    await pgClient.connect();
+    await pgClient.query(`DROP DATABASE IF EXISTS "${dbName}"`);
+    await pgClient.query(`CREATE DATABASE "${dbName}"`);
+    await pgClient.end();
+    const dialect = new PostgresDialect({
+        pool: new Pool({
+            connectionString: `${TEST_PG_URL}/${dbName}`,
+        }),
+    });
 
-    const db = new ZenStackClient(_schema, { dialect });
+    const db = new ZenStackClient(schema, { dialect });
     await db.$pushSchema();
     return db;
 }

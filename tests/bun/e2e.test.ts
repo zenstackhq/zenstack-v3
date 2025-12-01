@@ -10,7 +10,9 @@ import { BunSqliteDialect } from 'kysely-bun-sqlite';
 import { Client, Pool } from 'pg';
 import { schema } from './schemas/schema';
 
-describe.each([{ provider: 'sqlite' }, { provider: 'postgres' }])('Bun e2e tests $provider', ({ provider }) => {
+describe('Bun e2e tests', () => {
+    const provider = (process.env['TEST_DB_PROVIDER'] ?? 'sqlite') as 'sqlite' | 'postgresql';
+
     it('works with simple CRUD', async () => {
         const db = await createClient(provider, 'bun-e2e-crud');
 
@@ -81,7 +83,7 @@ describe.each([{ provider: 'sqlite' }, { provider: 'postgres' }])('Bun e2e tests
     });
 });
 
-async function createClient(provider: 'sqlite' | 'postgres', dbName?: string) {
+async function createClient(provider: 'sqlite' | 'postgresql', dbName?: string) {
     const _schema = clone(schema);
     let dialect: Dialect;
     if (provider === 'sqlite') {

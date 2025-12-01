@@ -1,14 +1,20 @@
-import { ZenStackClient } from '@zenstackhq/orm';
+import { ZenStackClient, type ClientContract } from '@zenstackhq/orm';
 import { PostgresDialect } from '@zenstackhq/orm/dialects/postgres';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { TEST_PG_URL } from '@zenstackhq/testtools';
 import { Client, Pool } from 'pg';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { schema } from './schemas/schema';
 
 describe('Edge-runtime e2e tests', () => {
+    let db: ClientContract<typeof schema> | undefined;
+
+    afterEach(async () => {
+        await db?.$disconnect();
+    });
+
     it('works with simple CRUD', async () => {
-        const db = await createClient('edge-runtime-e2e-crud');
+        db = await createClient('edge-runtime-e2e-crud');
 
         const user = await db.user.create({
             data: {
@@ -38,7 +44,7 @@ describe('Edge-runtime e2e tests', () => {
     });
 
     it('enforces policies', async () => {
-        const db = await createClient('edge-runtime-e2e-policies');
+        db = await createClient('edge-runtime-e2e-policies');
         const authDb = db.$use(new PolicyPlugin());
 
         // create a user

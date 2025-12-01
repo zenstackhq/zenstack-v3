@@ -43,7 +43,7 @@ catalogs:
       specifier: 16.0.1
       version: 16.0.1
     pg:
-      specifier: 8.16.3
+      specifier: ^8.13.1
       version: 8.16.3
     prisma:
       specifier: ^6.19.0

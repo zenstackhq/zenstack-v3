@@ -3,7 +3,7 @@ import { ZenStackClient } from '@zenstackhq/orm';
 import { PostgresDialect } from '@zenstackhq/orm/dialects/postgres';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { TEST_PG_URL } from '@zenstackhq/testtools';
-import Database from 'bun:sqlite';
+import { Database } from 'bun:sqlite';
 import { describe, expect, it } from 'bun:test';
 import type { Dialect } from 'kysely';
 import { BunSqliteDialect } from 'kysely-bun-sqlite';

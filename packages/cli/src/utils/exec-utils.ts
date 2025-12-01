@@ -43,11 +43,19 @@ export function execPrisma(args: string, options?: Omit<ExecSyncOptions, 'env'> 
         // ignore and fallback
     }
 
+    const _options = {
+        ...options,
+        env: {
+            ...options?.env,
+            PRISMA_HIDE_UPDATE_MESSAGE: '0',
+        },
+    };
+
     if (!prismaPath) {
         // fallback to npx/bunx execute
-        execPackage(`prisma ${args}`, options);
+        execPackage(`prisma ${args}`, _options);
         return;
     }
 
-    execSync(`node ${prismaPath} ${args}`, options);
+    execSync(`node ${prismaPath} ${args}`, _options);
 }

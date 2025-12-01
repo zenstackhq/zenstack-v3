@@ -43,7 +43,7 @@ catalogs:
       specifier: 16.0.1
       version: 16.0.1
     pg:
-      specifier: ^8.13.1
+      specifier: 8.16.3
       version: 8.16.3
     prisma:
       specifier: ^6.19.0
@@ -804,6 +804,46 @@ importers:
         specifier: 'catalog:'
         version: 6.19.0(magicast@0.3.5)(typescript@5.9.3)
 
+  tests/bun:
+    dependencies:
+      '@zenstackhq/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@zenstackhq/common-helpers':
+        specifier: workspace:*
+        version: link:../../packages/common-helpers
+      '@zenstackhq/orm':
+        specifier: workspace:*
+        version: link:../../packages/orm
+      '@zenstackhq/plugin-policy':
+        specifier: workspace:*
+        version: link:../../packages/plugins/policy
+      '@zenstackhq/testtools':
+        specifier: workspace:*
+        version: link:../../packages/testtools
+      kysely:
+        specifier: 'catalog:'
+        version: 0.28.8
+      kysely-bun-sqlite:
+        specifier: ^0.4.0
+        version: 0.4.0(kysely@0.28.8)
+      pg:
+        specifier: 'catalog:'
+        version: 8.16.3
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.15.6
+        version: 8.15.6
+      '@zenstackhq/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/config/typescript-config
+      '@zenstackhq/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/config/vitest-config
+      bun-types:
+        specifier: ^1.3.3
+        version: 1.3.3
+
   tests/e2e:
     dependencies:
       '@paralleldrive/cuid2':
@@ -846,9 +886,6 @@ importers:
         specifier: ^11.0.5
         version: 11.0.5
     devDependencies:
-      '@types/uuid':
-        specifier: ^11.0.0
-        version: 11.0.0
       '@zenstackhq/typescript-config':
         specifier: workspace:*
         version: link:../../packages/config/typescript-config
@@ -865,6 +902,9 @@ importers:
         specifier: 'catalog:'
         version: 10.6.0
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 20.19.24
       '@zenstackhq/cli':
         specifier: workspace:*
         version: link:../../packages/cli
@@ -2916,6 +2956,9 @@ packages:
   '@types/pg@8.11.11':
     resolution: {integrity: sha512-kGT1qKM8wJQ5qlawUrEkXgvMSXoV213KfMGXcwfDwUIfUHXqXYXOfS1nE1LINRJVVVx5wCm70XnFlMHaIcQAfw==}
 
+  '@types/pg@8.15.6':
+    resolution: {integrity: sha512-NoaMtzhxOrubeL/7UZuNTrejB4MPAJ0RpxZqXQf2qXuVlTPuG6Y8p4u9dKRaue4yjmC7ZhzVO2/Yyyn25znrPQ==}
+
   '@types/pluralize@0.0.33':
     resolution: {integrity: sha512-JOqsl+ZoCpP4e8TDke9W79FDcSgPAR0l6pixx2JHkhnRjvShyYiAYw2LVsnA7K08Y6DeOnaU6ujmENO4os/cYg==}
 
@@ -2962,10 +3005,6 @@ packages:
 
   '@types/toposort@2.0.7':
     resolution: {integrity: sha512-sQNk65vbC36+UixCkcky+dCr7MlflHcVILg1FVGqlUntsLFv9xd9ToWIVko/gTuin+cVe16t+2YubEFkhnSuPQ==}
-
-  '@types/uuid@11.0.0':
-    resolution: {integrity: sha512-HVyk8nj2m+jcFRNazzqyVKiZezyhDKrGUA3jlEcg/nZ6Ms+qHwocba1Y/AaVaznJTAM9xpdFSh+ptbNrhOGvZA==}
-    deprecated: This is a stub types definition. uuid provides its own type definitions, so you do not need this installed.
 
   '@types/vscode@1.101.0':
     resolution: {integrity: sha512-ZWf0IWa+NGegdW3iU42AcDTFHWW7fApLdkdnBqwYEtHVIBGbTu0ZNQKP/kX3Ds/uMJXIMQNAojHR4vexCEEz5Q==}
@@ -3625,6 +3664,9 @@ packages:
 
   buffer@6.0.3:
     resolution: {integrity: sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==}
+
+  bun-types@1.3.3:
+    resolution: {integrity: sha512-z3Xwlg7j2l9JY27x5Qn3Wlyos8YAp0kKRlrePAOjgjMGS5IG6E7Jnlx736vH9UVI4wUICwwhC9anYL++XeOgTQ==}
 
   bundle-name@4.1.0:
     resolution: {integrity: sha512-tjwM5exMg6BGRI+kNmTntNsvdZS1X8BFYS6tnJ2hdH0kVxM6/eVZ2xy+FqStSWvYmtfFMDLIxurorHwDKfDz5Q==}
@@ -5159,6 +5201,12 @@ packages:
 
   knitwork@1.2.0:
     resolution: {integrity: sha512-xYSH7AvuQ6nXkq42x0v5S8/Iry+cfulBz/DJQzhIyESdLD7425jXsPy4vn5cCXU+HhRN2kVw51Vd1K6/By4BQg==}
+
+  kysely-bun-sqlite@0.4.0:
+    resolution: {integrity: sha512-2EkQE5sT4ewiw7IWfJsAkpxJ/QPVKXKO5sRYI/xjjJIJlECuOdtG+ssYM0twZJySrdrmuildNPFYVreyu1EdZg==}
+    engines: {bun: '>=1.1.31'}
+    peerDependencies:
+      kysely: ^0.28.2
 
   kysely@0.28.8:
     resolution: {integrity: sha512-QUOgl5ZrS9IRuhq5FvOKFSsD/3+IA6MLE81/bOOTRA/YQpKDza2sFdN5g6JCB9BOpqMJDGefLCQ9F12hRS13TA==}
@@ -9551,7 +9599,7 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 20.17.24
+      '@types/node': 20.19.24
 
   '@types/cookie@0.6.0': {}
 
@@ -9565,7 +9613,7 @@ snapshots:
 
   '@types/express-serve-static-core@5.1.0':
     dependencies:
-      '@types/node': 20.17.24
+      '@types/node': 20.19.24
       '@types/qs': 6.14.0
       '@types/range-parser': 1.2.7
       '@types/send': 1.2.0
@@ -9604,6 +9652,12 @@ snapshots:
       pg-protocol: 1.10.3
       pg-types: 4.0.2
 
+  '@types/pg@8.15.6':
+    dependencies:
+      '@types/node': 20.19.24
+      pg-protocol: 1.10.3
+      pg-types: 2.2.0
+
   '@types/pluralize@0.0.33': {}
 
   '@types/qs@6.14.0': {}
@@ -9625,16 +9679,16 @@ snapshots:
   '@types/send@0.17.5':
     dependencies:
       '@types/mime': 1.3.5
-      '@types/node': 20.17.24
+      '@types/node': 20.19.24
 
   '@types/send@1.2.0':
     dependencies:
-      '@types/node': 20.17.24
+      '@types/node': 20.19.24
 
   '@types/serve-static@1.15.9':
     dependencies:
       '@types/http-errors': 2.0.5
-      '@types/node': 20.17.24
+      '@types/node': 20.19.24
       '@types/send': 0.17.5
 
   '@types/sql.js@1.4.9':
@@ -9646,7 +9700,7 @@ snapshots:
     dependencies:
       '@types/cookiejar': 2.1.5
       '@types/methods': 1.1.4
-      '@types/node': 20.17.24
+      '@types/node': 20.19.24
       form-data: 4.0.4
 
   '@types/supertest@6.0.3':
@@ -9657,10 +9711,6 @@ snapshots:
   '@types/tmp@0.2.6': {}
 
   '@types/toposort@2.0.7': {}
-
-  '@types/uuid@11.0.0':
-    dependencies:
-      uuid: 11.0.5
 
   '@types/vscode@1.101.0': {}
 
@@ -10466,6 +10516,10 @@ snapshots:
       base64-js: 1.5.1
       ieee754: 1.2.1
 
+  bun-types@1.3.3:
+    dependencies:
+      '@types/node': 20.19.24
+
   bundle-name@4.1.0:
     dependencies:
       run-applescript: 7.1.0
@@ -11175,7 +11229,7 @@ snapshots:
       eslint: 9.29.0(jiti@2.6.1)
       eslint-import-resolver-node: 0.3.9
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint@9.29.0(jiti@2.6.1)))(eslint@9.29.0(jiti@2.6.1))
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.29.0(jiti@2.6.1))
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint@9.29.0(jiti@2.6.1)))(eslint@9.29.0(jiti@2.6.1)))(eslint@9.29.0(jiti@2.6.1))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.29.0(jiti@2.6.1))
       eslint-plugin-react: 7.37.5(eslint@9.29.0(jiti@2.6.1))
       eslint-plugin-react-hooks: 7.0.1(eslint@9.29.0(jiti@2.6.1))
@@ -11208,7 +11262,7 @@ snapshots:
       tinyglobby: 0.2.15
       unrs-resolver: 1.11.1
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.29.0(jiti@2.6.1))
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint@9.29.0(jiti@2.6.1)))(eslint@9.29.0(jiti@2.6.1)))(eslint@9.29.0(jiti@2.6.1))
     transitivePeerDependencies:
       - supports-color
 
@@ -11223,7 +11277,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.29.0(jiti@2.6.1)):
+  eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.46.2(eslint@9.29.0(jiti@2.6.1))(typescript@5.9.3))(eslint@9.29.0(jiti@2.6.1)))(eslint@9.29.0(jiti@2.6.1)))(eslint@9.29.0(jiti@2.6.1)):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
@@ -12246,6 +12300,11 @@ snapshots:
   klona@2.0.6: {}
 
   knitwork@1.2.0: {}
+
+  kysely-bun-sqlite@0.4.0(kysely@0.28.8):
+    dependencies:
+      bun-types: 1.3.3
+      kysely: 0.28.8
 
   kysely@0.28.8: {}
 

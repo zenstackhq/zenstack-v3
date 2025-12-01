@@ -25,12 +25,14 @@ export function getTestDbProvider() {
     return val as 'sqlite' | 'postgresql';
 }
 
-const TEST_PG_CONFIG = {
+export const TEST_PG_CONFIG = {
     host: process.env['TEST_PG_HOST'] ?? 'localhost',
     port: process.env['TEST_PG_PORT'] ? parseInt(process.env['TEST_PG_PORT']) : 5432,
     user: process.env['TEST_PG_USER'] ?? 'postgres',
     password: process.env['TEST_PG_PASSWORD'] ?? 'postgres',
 };
+
+export const TEST_PG_URL = `postgres://${TEST_PG_CONFIG.user}:${TEST_PG_CONFIG.password}@${TEST_PG_CONFIG.host}:${TEST_PG_CONFIG.port}`;
 
 type ExtraTestClientOptions = {
     /**
@@ -104,10 +106,7 @@ export async function createTestClient(
     let _schema: SchemaDef;
     const provider = options?.provider ?? getTestDbProvider() ?? 'sqlite';
     const dbName = options?.dbName ?? getTestDbName(provider);
-    const dbUrl =
-        provider === 'sqlite'
-            ? `file:${dbName}`
-            : `postgres://${TEST_PG_CONFIG.user}:${TEST_PG_CONFIG.password}@${TEST_PG_CONFIG.host}:${TEST_PG_CONFIG.port}/${dbName}`;
+    const dbUrl = provider === 'sqlite' ? `file:${dbName}` : `${TEST_PG_URL}/${dbName}`;
 
     let model: Model | undefined;
 

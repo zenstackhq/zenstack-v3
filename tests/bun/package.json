@@ -1,0 +1,28 @@
+{
+    "name": "bun-e2e",
+    "version": "3.0.0-beta.27",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "pnpm test:generate && pnpm test:typecheck",
+        "test:generate": "tsx scripts/generate.ts",
+        "test:typecheck": "tsc --noEmit",
+        "test": "bun test"
+    },
+    "dependencies": {
+        "@zenstackhq/cli": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
+        "@zenstackhq/plugin-policy": "workspace:*",
+        "@zenstackhq/common-helpers": "workspace:*",
+        "@zenstackhq/testtools": "workspace:*",
+        "kysely-bun-sqlite": "^0.4.0",
+        "pg": "catalog:",
+        "kysely": "catalog:"
+    },
+    "devDependencies": {
+        "@types/pg": "^8.15.6",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*",
+        "bun-types": "^1.3.3"
+    }
+}

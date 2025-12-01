@@ -27,7 +27,6 @@
         "uuid": "^11.0.5"
     },
     "devDependencies": {
-        "@types/uuid": "^11.0.0",
         "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*"

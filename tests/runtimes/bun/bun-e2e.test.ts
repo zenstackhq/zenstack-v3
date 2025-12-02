@@ -1,5 +1,5 @@
 import { clone } from '@zenstackhq/common-helpers';
-import { ZenStackClient, type ClientContract } from '@zenstackhq/orm';
+import { ZenStackClient } from '@zenstackhq/orm';
 import { PostgresDialect } from '@zenstackhq/orm/dialects/postgres';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { TEST_PG_URL } from '@zenstackhq/testtools';
@@ -13,14 +13,14 @@ import { schema } from './schemas/schema';
 describe('Bun e2e tests', () => {
     const provider = (process.env['TEST_DB_PROVIDER'] ?? 'sqlite') as 'sqlite' | 'postgresql';
 
-    let db: ClientContract<typeof schema> | undefined;
+    let _db: any;
 
     afterEach(async () => {
-        await db?.$disconnect();
+        await _db?.$disconnect();
     });
 
     it('works with simple CRUD', async () => {
-        db = await createClient(provider, 'bun-e2e-crud');
+        const db = (_db = await createClient(provider, 'bun-e2e-crud'));
 
         const user = await db.user.create({
             data: {
@@ -50,7 +50,7 @@ describe('Bun e2e tests', () => {
     });
 
     it('enforces policies', async () => {
-        db = await createClient(provider, 'bun-e2e-policies');
+        const db = (_db = await createClient(provider, 'bun-e2e-policies'));
         const authDb = db.$use(new PolicyPlugin());
 
         // create a user

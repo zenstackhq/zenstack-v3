@@ -9,6 +9,7 @@ import {
     type SelectQueryBuilder,
 } from 'kysely';
 import { match } from 'ts-pattern';
+import z from 'zod';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
@@ -26,6 +27,8 @@ import {
 import { BaseCrudDialect } from './base-dialect';
 
 export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
+    private isoDateSchema = z.iso.datetime({ local: true, offset: true });
+
     constructor(schema: Schema, options: ClientOptions<Schema>) {
         super(schema, options);
     }
@@ -106,10 +109,16 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
     private transformOutputDate(value: unknown) {
         if (typeof value === 'string') {
-            // PostgreSQL's jsonb_build_object serializes timestamptz as ISO 8601 strings
-            // in UTC but without the 'Z' suffix (e.g., "2023-01-01T12:00:00.123456").
-            // We add 'Z' to explicitly mark them as UTC for correct Date object creation.
-            return new Date(value.endsWith('Z') ? value : `${value}Z`);
+            // PostgreSQL's jsonb_build_object serializes timestampt as ISO 8601 strings
+            // without timezone, (e.g., "2023-01-01T12:00:00.123456"). Since Date is always
+            // stored as UTC `timestamp` type, we add 'Z' to explicitly mark them as UTC for
+            // correct Date object creation.
+            if (this.isoDateSchema.safeParse(value).success) {
+                const hasOffset = value.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(value);
+                return new Date(hasOffset ? value : `${value}Z`);
+            } else {
+                return value;
+            }
         } else if (value instanceof Date && this.options.fixPostgresTimezone !== false) {
             // SPECIAL NOTES:
             // node-pg has a terrible quirk that it returns the date value in local timezone

@@ -6,6 +6,7 @@ import type {
     Enum,
     Expression,
     FunctionDecl,
+    GeneratorDecl,
     InvocationExpr,
     Model,
     TypeDef,
@@ -31,6 +32,7 @@ export function registerValidationChecks(services: ZModelServices) {
     const checks: ValidationChecks<ZModelAstType> = {
         Model: validator.checkModel,
         DataSource: validator.checkDataSource,
+        GeneratorDecl: validator.checkGenerator,
         DataModel: validator.checkDataModel,
         TypeDef: validator.checkTypeDef,
         Enum: validator.checkEnum,
@@ -54,6 +56,10 @@ export class ZModelValidator {
 
     checkDataSource(node: DataSource, accept: ValidationAcceptor): void {
         new DataSourceValidator().validate(node, accept);
+    }
+
+    checkGenerator(node: GeneratorDecl, accept: ValidationAcceptor): void {
+        accept('warning', '"generator" is not used by ZenStack and should be removed.', { node });
     }
 
     checkDataModel(node: DataModel, accept: ValidationAcceptor): void {

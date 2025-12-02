@@ -2,8 +2,11 @@ import * as fs from 'node:fs';
 import { glob } from 'glob';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
+import { fileURLToPath } from 'node:url';
 
 const excludes = ['packages/ide/vscode/package.json'];
+
+const _dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
 function getWorkspacePackageJsonFiles(workspaceFile: string): string[] {
     const workspaceYaml = fs.readFileSync(workspaceFile, 'utf8');
@@ -23,7 +26,7 @@ function getWorkspacePackageJsonFiles(workspaceFile: string): string[] {
     }
 
     // include root package.json
-    files.add(path.resolve(__dirname, '../package.json'));
+    files.add(path.resolve(_dirname, '../package.json'));
 
     const result = Array.from(files).filter((f) => !excludes.some((e) => f.endsWith(e)));
     return result;
@@ -39,11 +42,11 @@ function incrementVersion(version: string): string {
 }
 
 // find all package.json files in the workspace
-const workspaceFile = path.resolve(__dirname, '../pnpm-workspace.yaml');
+const workspaceFile = path.resolve(_dirname, '../pnpm-workspace.yaml');
 const packageFiles = getWorkspacePackageJsonFiles(workspaceFile);
 
 // get version from root package.json
-const rootPackageJson = path.resolve(__dirname, '../package.json');
+const rootPackageJson = path.resolve(_dirname, '../package.json');
 const rootPkg = JSON.parse(fs.readFileSync(rootPackageJson, 'utf8')) as { version?: string };
 if (!rootPkg.version) throw new Error('No "version" key found in package.json');
 const rootVersion = rootPkg.version;

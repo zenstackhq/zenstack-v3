@@ -15,7 +15,9 @@
             "dependsOn": ["^lint"]
         },
         "test": {
-            "dependsOn": ["build"]
+            "dependsOn": ["build"],
+            "cache": false
         }
-    }
+    },
+    "globalPassThroughEnv": ["TEST_DB_PROVIDER"]
 }

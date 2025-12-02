@@ -6,7 +6,7 @@
 /* eslint-disable */
 
 import { type SchemaType as $Schema } from "./schema";
-import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput } from "@zenstackhq/orm";
+import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, ClientOptions as $ClientOptions } from "@zenstackhq/orm";
 import type { SimplifiedModelResult as $SimplifiedModelResult, SelectIncludeOmit as $SelectIncludeOmit } from "@zenstackhq/orm";
 export type FooFindManyArgs = $FindManyArgs<$Schema, "Foo">;
 export type FooFindUniqueArgs = $FindUniqueArgs<$Schema, "Foo">;
@@ -27,4 +27,4 @@ export type FooWhereInput = $WhereInput<$Schema, "Foo">;
 export type FooSelect = $SelectInput<$Schema, "Foo">;
 export type FooInclude = $IncludeInput<$Schema, "Foo">;
 export type FooOmit = $OmitInput<$Schema, "Foo">;
-export type FooGetPayload<Args extends $SelectIncludeOmit<$Schema, "Foo", true>> = $SimplifiedModelResult<$Schema, "Foo", Args>;
+export type FooGetPayload<Args extends $SelectIncludeOmit<$Schema, "Foo", true>, Options extends $ClientOptions<$Schema> = $ClientOptions<$Schema>> = $SimplifiedModelResult<$Schema, "Foo", Options, Args>;

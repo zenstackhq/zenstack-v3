@@ -8,7 +8,7 @@
 import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
 const _schema = {
     provider: {
-        type: "sqlite"
+        type: "postgresql"
     },
     models: {
         User: {
@@ -21,18 +21,6 @@ const _schema = {
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
-                createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
-                },
-                updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
-                    updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
-                },
                 email: {
                     name: "email",
                     type: "String",
@@ -44,22 +32,11 @@ const _schema = {
                     type: "String",
                     optional: true
                 },
-                role: {
-                    name: "role",
-                    type: "Role",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("USER") }] }],
-                    default: "USER"
-                },
                 posts: {
                     name: "posts",
                     type: "Post",
                     array: true,
                     relation: { opposite: "author" }
-                },
-                meta: {
-                    name: "meta",
-                    type: "Json",
-                    optional: true
                 }
             },
             attributes: [
@@ -82,26 +59,9 @@ const _schema = {
                     attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
                     default: ExpressionUtils.call("cuid")
                 },
-                createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
-                },
-                updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
-                    updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
-                },
                 title: {
                     name: "title",
                     type: "String"
-                },
-                content: {
-                    name: "content",
-                    type: "String",
-                    optional: true
                 },
                 published: {
                     name: "published",
@@ -131,39 +91,6 @@ const _schema = {
             idFields: ["id"],
             uniqueFields: {
                 id: { type: "String" }
-            }
-        }
-    },
-    typeDefs: {
-        CommonFields: {
-            name: "CommonFields",
-            fields: {
-                id: {
-                    name: "id",
-                    type: "String",
-                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
-                    default: ExpressionUtils.call("cuid")
-                },
-                createdAt: {
-                    name: "createdAt",
-                    type: "DateTime",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
-                    default: ExpressionUtils.call("now")
-                },
-                updatedAt: {
-                    name: "updatedAt",
-                    type: "DateTime",
-                    updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
-                }
-            }
-        }
-    },
-    enums: {
-        Role: {
-            values: {
-                ADMIN: "ADMIN",
-                USER: "USER"
             }
         }
     },

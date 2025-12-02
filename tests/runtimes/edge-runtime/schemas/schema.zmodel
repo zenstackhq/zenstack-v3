@@ -1,39 +1,25 @@
 datasource db {
-    provider = "sqlite"
-    url      = "file:./dev.db"
+    provider = "postgresql"
 }
 
 plugin policy {
     provider = "../../../packages/plugins/policy"
 }
 
-enum Role {
-    ADMIN
-    USER
-}
-
-type CommonFields {
-    id        String   @id @default(cuid())
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-}
-
-model User with CommonFields {
-    email    String  @unique
-    name     String?
-    password String  @ignore
-    role     Role    @default(USER)
-    posts    Post[]
-    meta     Json?
+model User {
+    id    String  @id @default(cuid())
+    email String  @unique
+    name  String?
+    posts Post[]
 
     // Access policies
     @@allow('all', auth().id == id)
     @@allow('read', auth() != null)
 }
 
-model Post with CommonFields {
+model Post {
+    id        String  @id @default(cuid())
     title     String
-    content   String?
     published Boolean @default(false)
     author    User    @relation(fields: [authorId], references: [id], onUpdate: Cascade, onDelete: Cascade)
     authorId  String
@@ -43,4 +29,3 @@ model Post with CommonFields {
     @@allow('all', auth().id == authorId)
     @@allow('read', published)
 }
-

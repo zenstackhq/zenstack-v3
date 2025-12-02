@@ -1,0 +1,26 @@
+{
+    "name": "edge-runtime-e2e",
+    "version": "3.0.0-beta.27",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "pnpm test:generate && pnpm test:typecheck",
+        "test:generate": "tsx scripts/generate.ts",
+        "test:typecheck": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@edge-runtime/vm": "^5.0.0",
+        "@zenstackhq/cli": "workspace:*",
+        "@zenstackhq/common-helpers": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
+        "@zenstackhq/plugin-policy": "workspace:*",
+        "@zenstackhq/testtools": "workspace:*",
+        "pg": "catalog:"
+    },
+    "devDependencies": {
+        "@types/pg": "^8.15.6",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*"
+    }
+}

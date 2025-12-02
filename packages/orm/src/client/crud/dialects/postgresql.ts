@@ -109,7 +109,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
     private transformOutputDate(value: unknown) {
         if (typeof value === 'string') {
-            // PostgreSQL's jsonb_build_object serializes timestampt as ISO 8601 strings
+            // PostgreSQL's jsonb_build_object serializes timestamp as ISO 8601 strings
             // without timezone, (e.g., "2023-01-01T12:00:00.123456"). Since Date is always
             // stored as UTC `timestamp` type, we add 'Z' to explicitly mark them as UTC for
             // correct Date object creation.

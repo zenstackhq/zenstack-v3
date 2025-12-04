@@ -13,6 +13,7 @@ import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schem
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
 import { createInternalError } from '../../errors';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../null-values';
 import {
     getDelegateDescendantModels,
     getManyToManyRelation,
@@ -31,6 +32,15 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
     override transformPrimitive(value: unknown, type: BuiltinType, _forArrayField: boolean): unknown {
         if (value === undefined) {
             return value;
+        }
+
+        // Handle special null classes for JSON fields
+        if (value instanceof JsonNullClass) {
+            return 'null';
+        } else if (value instanceof DbNullClass) {
+            return null;
+        } else if (value instanceof AnyNullClass) {
+            invariant(false, 'should not reach here: AnyNull is not a valid input value');
         }
 
         if (Array.isArray(value)) {

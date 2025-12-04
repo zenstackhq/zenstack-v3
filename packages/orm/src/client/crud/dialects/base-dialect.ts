@@ -15,6 +15,7 @@ import type {
     StringFilter,
 } from '../../crud-types';
 import { createConfigError, createInvalidInputError, createNotSupportedError } from '../../errors';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../null-values';
 import type { ClientOptions } from '../../options';
 import {
     aggregate,
@@ -499,24 +500,50 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             return this.buildEnumFilter(fieldRef, fieldDef, payload);
         }
 
-        return (
-            match(fieldDef.type as BuiltinType)
-                .with('String', () => this.buildStringFilter(fieldRef, payload))
-                .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                    this.buildNumberFilter(fieldRef, type, payload),
-                )
-                .with('Boolean', () => this.buildBooleanFilter(fieldRef, payload))
-                .with('DateTime', () => this.buildDateTimeFilter(fieldRef, payload))
-                .with('Bytes', () => this.buildBytesFilter(fieldRef, payload))
-                // TODO: JSON filters
-                .with('Json', () => {
-                    throw createNotSupportedError('JSON filters are not supported yet');
-                })
-                .with('Unsupported', () => {
-                    throw createInvalidInputError(`Unsupported field cannot be used in filters`);
-                })
-                .exhaustive()
-        );
+        return match(fieldDef.type as BuiltinType)
+            .with('String', () => this.buildStringFilter(fieldRef, payload))
+            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
+                this.buildNumberFilter(fieldRef, type, payload),
+            )
+            .with('Boolean', () => this.buildBooleanFilter(fieldRef, payload))
+            .with('DateTime', () => this.buildDateTimeFilter(fieldRef, payload))
+            .with('Bytes', () => this.buildBytesFilter(fieldRef, payload))
+            .with('Json', () => this.buildJsonFilter(fieldRef, payload))
+            .with('Unsupported', () => {
+                throw createInvalidInputError(`Unsupported field cannot be used in filters`);
+            })
+            .exhaustive();
+    }
+
+    private buildJsonFilter(lhs: Expression<any>, payload: any): any {
+        const clauses: Expression<SqlBool>[] = [];
+        invariant(payload && typeof payload === 'object', 'Json filter payload must be an object');
+        for (const [key, value] of Object.entries(payload)) {
+            switch (key) {
+                case 'equals': {
+                    clauses.push(this.buildJsonValueFilterClause(lhs, value));
+                    break;
+                }
+                case 'not': {
+                    clauses.push(this.eb.not(this.buildJsonValueFilterClause(lhs, value)));
+                    break;
+                }
+            }
+        }
+        return this.and(...clauses);
+    }
+
+    private buildJsonValueFilterClause(lhs: Expression<any>, value: unknown) {
+        if (value instanceof DbNullClass) {
+            return this.eb(lhs, 'is', null);
+        } else if (value instanceof JsonNullClass) {
+            return this.eb.and([this.eb(lhs, '=', 'null'), this.eb(lhs, 'is not', null)]);
+        } else if (value instanceof AnyNullClass) {
+            // AnyNull matches both DB NULL and JSON null
+            return this.eb.or([this.eb(lhs, 'is', null), this.eb(lhs, '=', 'null')]);
+        } else {
+            return this.buildLiteralFilter(lhs, 'Json', value);
+        }
     }
 
     private buildLiteralFilter(lhs: Expression<any>, type: BuiltinType, rhs: unknown) {

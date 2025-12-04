@@ -25,6 +25,8 @@
 
 # What's ZenStack
 
+> Read full documentation at 👉🏻 https://zenstack.dev/v3.
+
 ZenStack is a TypeScript database toolkit for developing full-stack or backend Node.js/Bun applications. It provides a unified data modeling and access solution with the following features:
 
 - A modern schema-first ORM that's compatible with [Prisma](https://github.com/prisma/prisma)'s schema and API

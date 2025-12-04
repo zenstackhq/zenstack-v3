@@ -4,6 +4,7 @@ export type * from './crud-types';
 export { getCrudDialect } from './crud/dialects';
 export { BaseCrudDialect } from './crud/dialects/base-dialect';
 export { ORMError, ORMErrorReason, RejectedByPolicyReason } from './errors';
+export { AnyNull, DbNull, JsonNull } from './null-values';
 export * from './options';
 export * from './plugin';
 export type { ZenStackPromise } from './promise';

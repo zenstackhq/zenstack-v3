@@ -33,6 +33,8 @@ import type {
 } from '../schema';
 import type {
     AtLeast,
+    JsonNullValues,
+    JsonValue,
     MapBaseType,
     NonEmptyArray,
     NullableIf,
@@ -44,6 +46,7 @@ import type {
     WrapType,
     XOR,
 } from '../utils/type-utils';
+import type { DbNull, JsonNull } from './null-values';
 import type { ClientOptions } from './options';
 import type { ToKyselySchema } from './query-builder';
 
@@ -359,7 +362,7 @@ type PrimitiveFilter<T extends string, Nullable extends boolean, WithAggregation
           : T extends 'Bytes'
             ? BytesFilter<Nullable, WithAggregations>
             : T extends 'Json'
-              ? 'Not implemented yet' // TODO: Json filter
+              ? JsonFilter
               : never;
 
 type CommonPrimitiveFilter<
@@ -451,6 +454,11 @@ export type BooleanFilter<Nullable extends boolean, WithAggregations extends boo
                 _max?: BooleanFilter<false, false>;
             }
           : {}));
+
+export type JsonFilter = {
+    equals?: JsonValue | JsonNullValues;
+    not?: JsonValue | JsonNullValues;
+};
 
 export type SortOrder = 'asc' | 'desc';
 export type NullsOrder = 'first' | 'last';
@@ -772,20 +780,34 @@ type CreateScalarPayload<Schema extends SchemaDef, Model extends GetModels<Schem
     }
 >;
 
-// For unknown reason toplevel `Simplify` can't simplify this type, so we added an extra layer
-// to make it work
 type ScalarCreatePayload<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends ScalarFields<Schema, Model, false>,
-> = Simplify<
-    | MapModelFieldType<Schema, Model, Field>
+> =
+    | ScalarFieldMutationPayload<Schema, Model, Field>
     | (FieldIsArray<Schema, Model, Field> extends true
           ? {
                 set?: MapModelFieldType<Schema, Model, Field>;
             }
-          : never)
->;
+          : never);
+
+type ScalarFieldMutationPayload<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends GetModelFields<Schema, Model>,
+> =
+    IsJsonField<Schema, Model, Field> extends true
+        ? ModelFieldIsOptional<Schema, Model, Field> extends true
+            ? JsonValue | JsonNull | DbNull
+            : JsonValue | JsonNull
+        : MapModelFieldType<Schema, Model, Field>;
+
+type IsJsonField<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends GetModelFields<Schema, Model>,
+> = GetModelFieldType<Schema, Model, Field> extends 'Json' ? true : false;
 
 type CreateFKPayload<Schema extends SchemaDef, Model extends GetModels<Schema>> = OptionalWrap<
     Schema,
@@ -932,7 +954,7 @@ type ScalarUpdatePayload<
     Model extends GetModels<Schema>,
     Field extends NonRelationFields<Schema, Model>,
 > =
-    | MapModelFieldType<Schema, Model, Field>
+    | ScalarFieldMutationPayload<Schema, Model, Field>
     | (Field extends NumericFields<Schema, Model>
           ? {
                 set?: NullableIf<number, ModelFieldIsOptional<Schema, Model, Field>>;

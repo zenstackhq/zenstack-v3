@@ -1,0 +1,9 @@
+datasource db {
+    provider = "sqlite"
+}
+
+model PlainJson {
+    id    Int   @id @default(autoincrement())
+    data  Json
+    data1 Json?
+}

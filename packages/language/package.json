@@ -67,7 +67,7 @@
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
-        "glob": "^11.0.2",
+        "glob": "^11.1.0",
         "langium-cli": "catalog:",
         "tmp": "catalog:"
     },

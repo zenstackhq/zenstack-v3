@@ -581,7 +581,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
         const schema = z.union([
             ...options,
-            z.lazy(() => this.makeJsonValueSchema(false, false).array()),
+            z.lazy(() => z.union([this.makeJsonValueSchema(false, false), z.null()]).array()),
             z.record(
                 z.string(),
                 z.lazy(() => z.union([this.makeJsonValueSchema(false, false), z.null()])),

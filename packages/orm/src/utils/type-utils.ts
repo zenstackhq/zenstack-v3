@@ -48,7 +48,7 @@ export type MapBaseType<T extends string> = T extends keyof TypeMap ? TypeMap[T]
 export type JsonValue = string | number | boolean | JsonObject | JsonArray;
 
 export type JsonObject = { [key: string]: JsonValue | null };
-export type JsonArray = ReadonlyArray<JsonValue>;
+export type JsonArray = ReadonlyArray<JsonValue | null>;
 
 export type JsonNullValues = DbNull | JsonNull | AnyNull;
 

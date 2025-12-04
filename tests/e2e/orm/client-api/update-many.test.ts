@@ -7,7 +7,7 @@ describe('Client updateMany tests', () => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        client = await createTestClient(schema);
+        client = (await createTestClient(schema)) as any;
     });
 
     afterEach(async () => {

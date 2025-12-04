@@ -4,5 +4,5 @@
         "noEmit": true,
         "types": ["@zenstackhq/testtools/types", "node"]
     },
-    "include": ["src/**/*.ts", "test/**/*.ts"]
+    "include": ["test/**/*.ts"]
 }

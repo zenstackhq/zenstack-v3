@@ -3,6 +3,6 @@
     "compilerOptions": {
         "noEmit": true,
         "noImplicitAny": false,
-        "types": ["@zenstackhq/testtools/types"]
+        "types": ["@zenstackhq/testtools/types", "node"]
     }
 }

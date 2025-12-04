@@ -1,4 +1,5 @@
 import type Decimal from 'decimal.js';
+import type { AnyNull, DbNull, JsonNull } from '../client/null-values';
 
 export type Optional<T extends object, K extends keyof T = keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
@@ -44,10 +45,12 @@ type TypeMap = {
 
 export type MapBaseType<T extends string> = T extends keyof TypeMap ? TypeMap[T] : unknown;
 
-export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
+export type JsonValue = string | number | boolean | JsonObject | JsonArray;
 
-export type JsonObject = { [key: string]: JsonValue };
-export type JsonArray = Array<JsonValue>;
+export type JsonObject = { [key: string]: JsonValue | null };
+export type JsonArray = ReadonlyArray<JsonValue | null>;
+
+export type JsonNullValues = DbNull | JsonNull | AnyNull;
 
 export function call(code: string) {
     return { code };

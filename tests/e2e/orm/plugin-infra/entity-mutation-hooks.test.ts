@@ -8,7 +8,7 @@ describe('Entity mutation hooks tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = await createTestClient(schema, {});
+        _client = (await createTestClient(schema, {})) as any;
     });
 
     afterEach(async () => {

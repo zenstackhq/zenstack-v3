@@ -13,6 +13,7 @@ import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schem
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
 import { createInternalError } from '../../errors';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../null-values';
 import {
     getDelegateDescendantModels,
     getManyToManyRelation,
@@ -33,27 +34,35 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             return value;
         }
 
+        // Handle special null classes for JSON fields
+        if (value instanceof JsonNullClass) {
+            return 'null';
+        } else if (value instanceof DbNullClass) {
+            return null;
+        } else if (value instanceof AnyNullClass) {
+            invariant(false, 'should not reach here: AnyNull is not a valid input value');
+        }
+
+        if (type === 'Json' || (this.schema.typeDefs && type in this.schema.typeDefs)) {
+            // JSON data should be stringified
+            return JSON.stringify(value);
+        }
+
         if (Array.isArray(value)) {
             return value.map((v) => this.transformPrimitive(v, type, false));
         } else {
-            if (this.schema.typeDefs && type in this.schema.typeDefs) {
-                // typed JSON field
-                return JSON.stringify(value);
-            } else {
-                return match(type)
-                    .with('Boolean', () => (value ? 1 : 0))
-                    .with('DateTime', () =>
-                        value instanceof Date
-                            ? value.toISOString()
-                            : typeof value === 'string'
-                              ? new Date(value).toISOString()
-                              : value,
-                    )
-                    .with('Decimal', () => (value as Decimal).toString())
-                    .with('Bytes', () => Buffer.from(value as Uint8Array))
-                    .with('Json', () => JSON.stringify(value))
-                    .otherwise(() => value);
-            }
+            return match(type)
+                .with('Boolean', () => (value ? 1 : 0))
+                .with('DateTime', () =>
+                    value instanceof Date
+                        ? value.toISOString()
+                        : typeof value === 'string'
+                          ? new Date(value).toISOString()
+                          : value,
+                )
+                .with('Decimal', () => (value as Decimal).toString())
+                .with('Bytes', () => Buffer.from(value as Uint8Array))
+                .otherwise(() => value);
         }
     }
 

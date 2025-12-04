@@ -32,6 +32,7 @@ import {
     type UpsertArgs,
 } from '../../crud-types';
 import { createInternalError, createInvalidInputError } from '../../errors';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../null-values';
 import {
     fieldHasDefaultValue,
     getDiscriminatorField,
@@ -328,8 +329,9 @@ export class InputValidator<Schema extends SchemaDef> {
                         addDecimalValidation(z.string(), attributes, this.extraValidationsEnabled),
                     ]);
                 })
-                .with('DateTime', () => z.union([z.date(), z.string().datetime()]))
+                .with('DateTime', () => z.union([z.date(), z.iso.datetime()]))
                 .with('Bytes', () => z.instanceof(Uint8Array))
+                .with('Json', () => this.makeJsonValueSchema(false, false))
                 .otherwise(() => z.unknown());
         }
     }
@@ -553,20 +555,47 @@ export class InputValidator<Schema extends SchemaDef> {
             // typed JSON field
             return this.makeTypeDefFilterSchema(type, optional);
         }
-        return (
-            match(type)
-                .with('String', () => this.makeStringFilterSchema(optional, withAggregations))
-                .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                    this.makeNumberFilterSchema(this.makePrimitiveSchema(type), optional, withAggregations),
-                )
-                .with('Boolean', () => this.makeBooleanFilterSchema(optional, withAggregations))
-                .with('DateTime', () => this.makeDateTimeFilterSchema(optional, withAggregations))
-                .with('Bytes', () => this.makeBytesFilterSchema(optional, withAggregations))
-                // TODO: JSON filters
-                .with('Json', () => z.any())
-                .with('Unsupported', () => z.never())
-                .exhaustive()
-        );
+        return match(type)
+            .with('String', () => this.makeStringFilterSchema(optional, withAggregations))
+            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
+                this.makeNumberFilterSchema(this.makePrimitiveSchema(type), optional, withAggregations),
+            )
+            .with('Boolean', () => this.makeBooleanFilterSchema(optional, withAggregations))
+            .with('DateTime', () => this.makeDateTimeFilterSchema(optional, withAggregations))
+            .with('Bytes', () => this.makeBytesFilterSchema(optional, withAggregations))
+            .with('Json', () => this.makeJsonFilterSchema(optional))
+            .with('Unsupported', () => z.never())
+            .exhaustive();
+    }
+
+    private makeJsonValueSchema(nullable: boolean, forFilter: boolean): z.ZodType {
+        const options: z.ZodType[] = [z.string(), z.number(), z.boolean(), z.instanceof(JsonNullClass)];
+
+        if (nullable) {
+            options.push(z.instanceof(DbNullClass));
+        }
+
+        if (forFilter) {
+            options.push(z.instanceof(AnyNullClass));
+        }
+
+        const schema = z.union([
+            ...options,
+            z.lazy(() => z.union([this.makeJsonValueSchema(false, false), z.null()]).array()),
+            z.record(
+                z.string(),
+                z.lazy(() => z.union([this.makeJsonValueSchema(false, false), z.null()])),
+            ),
+        ]);
+        return this.nullableIf(schema, nullable);
+    }
+
+    private makeJsonFilterSchema(optional: boolean) {
+        const valueSchema = this.makeJsonValueSchema(optional, true);
+        return z.object({
+            equals: valueSchema.optional(),
+            not: valueSchema.optional(),
+        });
     }
 
     private makeTypeDefFilterSchema(_type: string, _optional: boolean) {
@@ -576,7 +605,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeDateTimeFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
         return this.makeCommonPrimitiveFilterSchema(
-            z.union([z.string().datetime(), z.date()]),
+            z.union([z.iso.datetime(), z.date()]),
             optional,
             () => z.lazy(() => this.makeDateTimeFilterSchema(optional, withAggregations)),
             withAggregations ? ['_count', '_min', '_max'] : undefined,
@@ -977,7 +1006,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     uncheckedVariantFields[field] = fieldSchema;
                 }
             } else {
-                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
+                let fieldSchema = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
 
                 if (fieldDef.array) {
                     fieldSchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
@@ -996,7 +1025,12 @@ export class InputValidator<Schema extends SchemaDef> {
                 }
 
                 if (fieldDef.optional) {
-                    fieldSchema = fieldSchema.nullable();
+                    if (fieldDef.type === 'Json') {
+                        // DbNull for Json fields
+                        fieldSchema = z.union([fieldSchema, z.instanceof(DbNullClass)]);
+                    } else {
+                        fieldSchema = fieldSchema.nullable();
+                    }
                 }
 
                 uncheckedVariantFields[field] = fieldSchema;
@@ -1242,7 +1276,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     uncheckedVariantFields[field] = fieldSchema;
                 }
             } else {
-                let fieldSchema: ZodType = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
+                let fieldSchema = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
 
                 if (this.isNumericField(fieldDef)) {
                     fieldSchema = z.union([
@@ -1276,7 +1310,12 @@ export class InputValidator<Schema extends SchemaDef> {
                 }
 
                 if (fieldDef.optional) {
-                    fieldSchema = fieldSchema.nullable();
+                    if (fieldDef.type === 'Json') {
+                        // DbNull for Json fields
+                        fieldSchema = z.union([fieldSchema, z.instanceof(DbNullClass)]);
+                    } else {
+                        fieldSchema = fieldSchema.nullable();
+                    }
                 }
 
                 // all fields are optional in update

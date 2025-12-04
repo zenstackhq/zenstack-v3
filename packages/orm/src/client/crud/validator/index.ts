@@ -584,7 +584,7 @@ export class InputValidator<Schema extends SchemaDef> {
             z.lazy(() => this.makeJsonValueSchema(false, false).array()),
             z.record(
                 z.string(),
-                z.lazy(() => this.makeJsonValueSchema(false, false)),
+                z.lazy(() => z.union([this.makeJsonValueSchema(false, false), z.null()])),
             ),
         ]);
         return this.nullableIf(schema, nullable);

@@ -37,7 +37,7 @@
         "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
         "@zenstackhq/plugin-policy": "workspace:*",
-        "glob": "^11.0.2",
+        "glob": "^11.1.0",
         "kysely": "catalog:",
         "prisma": "catalog:",
         "tmp": "catalog:",

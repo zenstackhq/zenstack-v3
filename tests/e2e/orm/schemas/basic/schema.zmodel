@@ -4,7 +4,7 @@ datasource db {
 }
 
 plugin policy {
-    provider = "../../dist/plugins/policy"
+    provider = '../../../../../packages/plugins/policy/plugin.zmodel'
 }
 
 enum Role {

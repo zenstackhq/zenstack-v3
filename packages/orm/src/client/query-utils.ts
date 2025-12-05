@@ -190,6 +190,10 @@ export function getEnum(schema: SchemaDef, type: string) {
     return schema.enums?.[type];
 }
 
+export function isTypeDef(schema: SchemaDef, type: string) {
+    return !!schema.typeDefs?.[type];
+}
+
 export function buildJoinPairs(
     schema: SchemaDef,
     model: string,

@@ -1,6 +1,7 @@
 import { createTestClient } from '@zenstackhq/testtools';
 import { describe, it, expect } from 'vitest';
 import { schema } from '../schemas/json/schema';
+import { schema as typedJsonSchema } from '../schemas/typed-json/schema';
 import { JsonNull, DbNull, AnyNull } from '@zenstackhq/orm';
 
 describe('Json filter tests', () => {
@@ -230,5 +231,22 @@ model PlainJson {
         expect(notResults.find((r) => r.id === rec1.id)).toBeUndefined();
         expect(notResults.find((r) => r.id === rec2.id)).toBeDefined();
         expect(notResults.find((r) => r.id === rec3.id)).toBeDefined();
+    });
+
+    it('works with filtering typed JSON fields', async () => {
+        const db = await createTestClient(typedJsonSchema, { debug: true });
+
+        const alice = await db.user.create({
+            data: { profile: { name: 'Alice', age: 25, jobs: [] } },
+        });
+
+        await expect(
+            db.user.findFirst({ where: { profile: { equals: { name: 'Alice', age: 25, jobs: [] } } } }),
+        ).resolves.toMatchObject(alice);
+
+        await expect(db.user.findFirst({ where: { profile: { equals: { name: 'Alice', age: 20 } } } })).toResolveNull();
+        await expect(
+            db.user.findFirst({ where: { profile: { not: { name: 'Alice', age: 20 } } } }),
+        ).resolves.toMatchObject(alice);
     });
 });

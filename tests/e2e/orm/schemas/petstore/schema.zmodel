@@ -3,12 +3,8 @@ datasource db {
     url = 'file:./petstore.db'
 }
 
-generator js {
-    provider = 'prisma-client-js'
-}
-
-plugin zod {
-    provider = '@core/zod'
+plugin policy {
+    provider = '../../../../../packages/plugins/policy/plugin.zmodel'
 }
 
 model User {

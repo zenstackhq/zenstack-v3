@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "build": "pnpm test:generate && pnpm test:typecheck",
-        "test:generate": "tsx scripts/generate.ts",
+        "test:generate": "RUNTIME=bun tsx ../../../scripts/test-generate.ts",
         "test:typecheck": "tsc --noEmit",
         "test": "bun test"
     },

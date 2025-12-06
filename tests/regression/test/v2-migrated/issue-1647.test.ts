@@ -29,11 +29,6 @@ describe.skip('Regression for issue 1647', () => {
                 schemas = ['public', 'post']
             }
 
-            generator client {
-                provider = 'prisma-client-js'
-                previewFeatures = ['multiSchema']
-            }
-
             model Asset {
                 id Int @id
                 type String

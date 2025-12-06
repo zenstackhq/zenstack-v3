@@ -378,8 +378,13 @@ export class InputValidator<Schema extends SchemaDef> {
                 }),
             ),
         );
-        this.setSchemaCache(key!, schema);
-        return schema;
+
+        // zod doesn't preserve object field order after parsing, here we use a
+        // validation-only custom schema and use the original data if parsing
+        // is successful
+        const finalSchema = z.custom((v) => schema!.safeParse(v).success);
+        this.setSchemaCache(key!, finalSchema);
+        return finalSchema;
     }
 
     private makeWhereSchema(
@@ -434,6 +439,8 @@ export class InputValidator<Schema extends SchemaDef> {
                 } else if (fieldDef.array) {
                     // array field
                     fieldSchema = this.makeArrayFilterSchema(fieldDef.type as BuiltinType);
+                } else if (this.isTypeDefType(fieldDef.type)) {
+                    fieldSchema = this.makeTypedJsonFilterSchema(fieldDef.type, !!fieldDef.optional);
                 } else {
                     // primitive field
                     fieldSchema = this.makePrimitiveFilterSchema(
@@ -526,6 +533,15 @@ export class InputValidator<Schema extends SchemaDef> {
         }
 
         return result;
+    }
+
+    private makeTypedJsonFilterSchema(_type: string, optional: boolean) {
+        // TODO: direct typed JSON filtering
+        return this.makeJsonFilterSchema(optional);
+    }
+
+    private isTypeDefType(type: string) {
+        return this.schema.typeDefs && type in this.schema.typeDefs;
     }
 
     private makeEnumFilterSchema(enumDef: EnumDef, optional: boolean, withAggregations: boolean) {

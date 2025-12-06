@@ -28,6 +28,7 @@ import {
     isEnum,
     isInheritedField,
     isRelationField,
+    isTypeDef,
     makeDefaultOrderBy,
     requireField,
     requireIdFields,
@@ -498,6 +499,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
         if (isEnum(this.schema, fieldDef.type)) {
             return this.buildEnumFilter(fieldRef, fieldDef, payload);
+        }
+
+        if (isTypeDef(this.schema, fieldDef.type)) {
+            // TODO: type-def field filtering
+            return this.buildJsonFilter(fieldRef, payload);
         }
 
         return match(fieldDef.type as BuiltinType)

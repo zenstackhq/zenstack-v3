@@ -305,12 +305,14 @@ export type WhereInput<
                   ModelFieldIsOptional<Schema, Model, Key>,
                   WithAggregations
               >
-            : // primitive
-              PrimitiveFilter<
-                  GetModelFieldType<Schema, Model, Key>,
-                  ModelFieldIsOptional<Schema, Model, Key>,
-                  WithAggregations
-              >;
+            : GetModelFieldType<Schema, Model, Key> extends GetTypeDefs<Schema>
+              ? TypedJsonFilter
+              : // primitive
+                PrimitiveFilter<
+                    GetModelFieldType<Schema, Model, Key>,
+                    ModelFieldIsOptional<Schema, Model, Key>,
+                    WithAggregations
+                >;
 } & {
     $expr?: (eb: ExpressionBuilder<ToKyselySchema<Schema>, Model>) => OperandExpression<SqlBool>;
 } & {
@@ -459,6 +461,9 @@ export type JsonFilter = {
     equals?: JsonValue | JsonNullValues;
     not?: JsonValue | JsonNullValues;
 };
+
+// TODO: extra typedef filtering
+export type TypedJsonFilter = JsonFilter;
 
 export type SortOrder = 'asc' | 'desc';
 export type NullsOrder = 'first' | 'last';

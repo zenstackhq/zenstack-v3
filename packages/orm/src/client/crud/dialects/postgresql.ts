@@ -454,7 +454,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
     }
 
-    protected override buildJsonPathSelection(receiver: Expression<any>, path: [], asType: 'string' | 'json') {
+    protected override buildJsonPathSelection(receiver: Expression<any>, path: string[], asType: 'string' | 'json') {
         if (path.length > 0) {
             const pathValues = path.map((p: string) => this.eb.val(p));
             if (asType === 'string') {

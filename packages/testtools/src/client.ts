@@ -157,6 +157,7 @@ export async function createTestClient(
 
     if (options?.debug) {
         console.log(`Work directory: ${workDir}`);
+        console.log(`Database name: ${dbName}`);
         _options.log = testLogger;
     }
 

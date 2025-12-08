@@ -7,4 +7,4 @@
 
 import { type SchemaType as $Schema } from "./schema";
 import { type ModelResult as $ModelResult } from "@zenstackhq/orm";
-export type PlainJson = $ModelResult<$Schema, "PlainJson">;
+export type Foo = $ModelResult<$Schema, "Foo">;

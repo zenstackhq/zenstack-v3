@@ -11,8 +11,8 @@ const _schema = {
         type: "sqlite"
     },
     models: {
-        PlainJson: {
-            name: "PlainJson",
+        Foo: {
+            name: "Foo",
             fields: {
                 id: {
                     name: "id",

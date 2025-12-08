@@ -359,6 +359,47 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         );
     }
 
+    protected override buildJsonPathSelection(
+        receiver: Expression<any>,
+        path: string[],
+        _asType: 'string' | 'json',
+    ): Expression<any> {
+        if (path.length === 0) {
+            return receiver;
+        }
+
+        // build a JSON path from the path segments
+        // array indices should use bracket notation: $.a[0].b instead of $.a.0.b
+        const jsonPath =
+            '$' +
+            path
+                .map((p) => {
+                    // check if the segment is a numeric array index
+                    if (/^\d+$/.test(p)) {
+                        return `[${p}]`;
+                    }
+                    return `.${p}`;
+                })
+                .join('');
+        return this.eb.fn('json_extract', [receiver, this.eb.val(jsonPath)]);
+    }
+
+    protected override buildJsonArrayFilter(
+        lhs: Expression<any>,
+        operation: 'array_contains' | 'array_starts_with' | 'array_ends_with',
+        value: unknown,
+    ) {
+        return match(operation)
+            .with('array_contains', () => sql<any>`EXISTS (SELECT 1 FROM json_each(${lhs}) WHERE value = ${value})`)
+            .with('array_starts_with', () =>
+                this.eb(this.eb.fn('json_extract', [lhs, this.eb.val('$[0]')]), '=', value),
+            )
+            .with('array_ends_with', () =>
+                this.eb(sql`json_extract(${lhs}, '$[' || (json_array_length(${lhs}) - 1) || ']')`, '=', value),
+            )
+            .exhaustive();
+    }
+
     override get supportsUpdateWithLimit() {
         return false;
     }

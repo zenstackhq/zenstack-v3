@@ -458,8 +458,16 @@ export type BooleanFilter<Nullable extends boolean, WithAggregations extends boo
           : {}));
 
 export type JsonFilter = {
+    path?: string[];
     equals?: JsonValue | JsonNullValues;
     not?: JsonValue | JsonNullValues;
+    string_contains?: string;
+    string_starts_with?: string;
+    string_ends_with?: string;
+    mode?: 'default' | 'insensitive';
+    array_contains?: JsonValue;
+    array_starts_with?: JsonValue;
+    array_ends_with?: JsonValue;
 };
 
 // TODO: extra typedef filtering

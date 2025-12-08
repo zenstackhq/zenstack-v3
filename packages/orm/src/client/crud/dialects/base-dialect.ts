@@ -569,6 +569,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     clauses.push(this.buildJsonArrayFilter(receiver, key, value));
                     break;
                 }
+                case 'path':
+                case 'mode':
+                    // already handled
+                    break;
+                default:
+                    invariant(false, `Invalid JSON filter key: ${key}`);
             }
         }
         return this.and(...clauses);

@@ -86,7 +86,7 @@
         - [x] Custom table name
         - [x] Custom field name
         - [x] Global omit
-        - [ ] DbNull vs JsonNull
+        - [x] DbNull vs JsonNull
         - [ ] Migrate to tsdown
         - [x] @default validation
     - [x] Benchmark

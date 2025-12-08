@@ -480,7 +480,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         value: unknown,
     ) {
         return match(operation)
-            .with('array_contains', () => sql<SqlBool>`${lhs} @> ${sql.lit(JSON.stringify([value]))}::jsonb`)
+            .with('array_contains', () => sql<SqlBool>`${lhs} @> ${sql.val(JSON.stringify([value]))}::jsonb`)
             .with('array_starts_with', () =>
                 this.eb(
                     this.eb.fn('jsonb_extract_path', [lhs, this.eb.val('0')]),

@@ -608,9 +608,17 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeJsonFilterSchema(optional: boolean) {
         const valueSchema = this.makeJsonValueSchema(optional, true);
-        return z.object({
+        return z.strictObject({
+            path: z.string().array().optional(),
             equals: valueSchema.optional(),
             not: valueSchema.optional(),
+            string_contains: z.string().optional(),
+            string_starts_with: z.string().optional(),
+            string_ends_with: z.string().optional(),
+            mode: this.makeStringModeSchema().optional(),
+            array_contains: valueSchema.optional(),
+            array_starts_with: valueSchema.optional(),
+            array_ends_with: valueSchema.optional(),
         });
     }
 

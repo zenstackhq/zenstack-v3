@@ -524,14 +524,49 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildJsonFilter(lhs: Expression<any>, payload: any): any {
         const clauses: Expression<SqlBool>[] = [];
         invariant(payload && typeof payload === 'object', 'Json filter payload must be an object');
+
+        const path = payload.path && Array.isArray(payload.path) ? payload.path : [];
+        const receiver = this.buildJsonPathSelection(lhs, path, 'json');
+        const stringReceiver = this.buildJsonPathSelection(lhs, path, 'string');
+
+        const mode = payload.mode ?? 'default';
+        invariant(mode === 'default' || mode === 'insensitive', 'Invalid JSON filter mode');
+
         for (const [key, value] of Object.entries(payload)) {
             switch (key) {
                 case 'equals': {
-                    clauses.push(this.buildJsonValueFilterClause(lhs, value));
+                    clauses.push(this.buildJsonValueFilterClause(receiver, value));
                     break;
                 }
                 case 'not': {
-                    clauses.push(this.eb.not(this.buildJsonValueFilterClause(lhs, value)));
+                    clauses.push(this.eb.not(this.buildJsonValueFilterClause(receiver, value)));
+                    break;
+                }
+                case 'string_contains': {
+                    invariant(typeof value === 'string', 'string_contains value must be a string');
+                    clauses.push(this.buildJsonStringFilter(stringReceiver, key, value, mode));
+                    break;
+                }
+                case 'string_starts_with': {
+                    invariant(typeof value === 'string', 'string_starts_with value must be a string');
+                    clauses.push(this.buildJsonStringFilter(stringReceiver, key, value, mode));
+                    break;
+                }
+                case 'string_ends_with': {
+                    invariant(typeof value === 'string', 'string_ends_with value must be a string');
+                    clauses.push(this.buildJsonStringFilter(stringReceiver, key, value, mode));
+                    break;
+                }
+                case 'array_contains': {
+                    clauses.push(this.buildJsonArrayFilter(receiver, key, value));
+                    break;
+                }
+                case 'array_starts_with': {
+                    clauses.push(this.buildJsonArrayFilter(receiver, key, value));
+                    break;
+                }
+                case 'array_ends_with': {
+                    clauses.push(this.buildJsonArrayFilter(receiver, key, value));
                     break;
                 }
             }
@@ -550,6 +585,24 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         } else {
             return this.buildLiteralFilter(lhs, 'Json', value);
         }
+    }
+
+    private buildJsonStringFilter(
+        lhs: Expression<any>,
+        operation: 'string_contains' | 'string_starts_with' | 'string_ends_with',
+        value: string,
+        mode: 'default' | 'insensitive',
+    ) {
+        // build LIKE pattern based on operation
+        const pattern = match(operation)
+            .with('string_contains', () => `%${value}%`)
+            .with('string_starts_with', () => `${value}%`)
+            .with('string_ends_with', () => `%${value}`)
+            .exhaustive();
+
+        // use appropriate operator based on database capabilities
+        const { supportsILike } = this.getStringCasingBehavior();
+        return this.eb(lhs, mode === 'insensitive' && supportsILike ? 'ilike' : 'like', sql.val(pattern));
     }
 
     private buildLiteralFilter(lhs: Expression<any>, type: BuiltinType, rhs: unknown) {
@@ -1244,6 +1297,25 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Gets the string casing behavior for the dialect.
      */
     abstract getStringCasingBehavior(): { supportsILike: boolean; likeCaseSensitive: boolean };
+
+    /**
+     * Builds a JSON path selection expression.
+     * @param asType 'string' | 'json', when 'string', the result is stripped with text quotes if it's a string
+     */
+    protected abstract buildJsonPathSelection(
+        receiver: Expression<any>,
+        path: string[],
+        asType: 'string' | 'json',
+    ): Expression<any>;
+
+    /**
+     * Builds a JSON array filter expression.
+     */
+    protected abstract buildJsonArrayFilter(
+        lhs: Expression<any>,
+        operation: 'array_contains' | 'array_starts_with' | 'array_ends_with',
+        value: unknown,
+    ): Expression<SqlBool>;
 
     // #endregion
 }

@@ -7,6 +7,7 @@ import {
     type ExpressionWrapper,
     type RawBuilder,
     type SelectQueryBuilder,
+    type SqlBool,
 } from 'kysely';
 import { match } from 'ts-pattern';
 import z from 'zod';
@@ -451,6 +452,50 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         } else {
             return `ARRAY[${values.map((v) => (typeof v === 'string' ? `'${v}'` : v))}]`;
         }
+    }
+
+    protected override buildJsonPathSelection(receiver: Expression<any>, path: [], asType: 'string' | 'json') {
+        if (path.length > 0) {
+            const pathValues = path.map((p: string) => this.eb.val(p));
+            if (asType === 'string') {
+                // use `jsonb_extract_path_text` to get string values without quotes
+                return this.eb.fn('jsonb_extract_path_text', [receiver, ...pathValues]);
+            } else {
+                return this.eb.fn('jsonb_extract_path', [receiver, ...pathValues]);
+            }
+        } else {
+            // if we're selecting the JSON root, we'll have to resort to `trim` when selecting as string
+            // to remove the quotes
+            if (asType === 'string') {
+                return sql`trim(both '"' from ${receiver}::text)`;
+            } else {
+                return receiver;
+            }
+        }
+    }
+
+    protected override buildJsonArrayFilter(
+        lhs: Expression<any>,
+        operation: 'array_contains' | 'array_starts_with' | 'array_ends_with',
+        value: unknown,
+    ) {
+        return match(operation)
+            .with('array_contains', () => sql<SqlBool>`${lhs} @> ${sql.lit(JSON.stringify([value]))}::jsonb`)
+            .with('array_starts_with', () =>
+                this.eb(
+                    this.eb.fn('jsonb_extract_path', [lhs, this.eb.val('0')]),
+                    '=',
+                    this.transformPrimitive(value, 'Json', false),
+                ),
+            )
+            .with('array_ends_with', () =>
+                this.eb(
+                    this.eb.fn('jsonb_extract_path', [lhs, sql`(jsonb_array_length(${lhs}) - 1)::text`]),
+                    '=',
+                    this.transformPrimitive(value, 'Json', false),
+                ),
+            )
+            .exhaustive();
     }
 
     override get supportInsertWithDefault() {

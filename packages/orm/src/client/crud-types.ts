@@ -20,6 +20,7 @@ import type {
     GetSubModels,
     GetTypeDefField,
     GetTypeDefFields,
+    GetTypeDefFieldType,
     GetTypeDefs,
     IsDelegateModel,
     ModelFieldIsOptional,
@@ -29,6 +30,7 @@ import type {
     RelationInfo,
     ScalarFields,
     SchemaDef,
+    TypeDefFieldIsArray,
     TypeDefFieldIsOptional,
 } from '../schema';
 import type {
@@ -306,7 +308,12 @@ export type WhereInput<
                   WithAggregations
               >
             : GetModelFieldType<Schema, Model, Key> extends GetTypeDefs<Schema>
-              ? TypedJsonFilter
+              ? TypedJsonFilter<
+                    Schema,
+                    GetModelFieldType<Schema, Model, Key>,
+                    FieldIsArray<Schema, Model, Key>,
+                    ModelFieldIsOptional<Schema, Model, Key>
+                >
               : // primitive
                 PrimitiveFilter<
                     GetModelFieldType<Schema, Model, Key>,
@@ -341,17 +348,17 @@ type EnumFilter<
             }
           : {}));
 
-type ArrayFilter<Schema extends SchemaDef, T extends string> = {
-    equals?: MapScalarType<Schema, T>[] | null;
-    has?: MapScalarType<Schema, T> | null;
-    hasEvery?: MapScalarType<Schema, T>[];
-    hasSome?: MapScalarType<Schema, T>[];
+type ArrayFilter<Schema extends SchemaDef, Type extends string> = {
+    equals?: MapScalarType<Schema, Type>[] | null;
+    has?: MapScalarType<Schema, Type> | null;
+    hasEvery?: MapScalarType<Schema, Type>[];
+    hasSome?: MapScalarType<Schema, Type>[];
     isEmpty?: boolean;
 };
 
 // map a scalar type (primitive and enum) to TS type
-type MapScalarType<Schema extends SchemaDef, T extends string> =
-    T extends GetEnums<Schema> ? keyof GetEnum<Schema, T> : MapBaseType<T>;
+type MapScalarType<Schema extends SchemaDef, Type extends string> =
+    Type extends GetEnums<Schema> ? keyof GetEnum<Schema, Type> : MapBaseType<Type>;
 
 type PrimitiveFilter<T extends string, Nullable extends boolean, WithAggregations extends boolean> = T extends 'String'
     ? StringFilter<Nullable, WithAggregations>
@@ -458,7 +465,7 @@ export type BooleanFilter<Nullable extends boolean, WithAggregations extends boo
           : {}));
 
 export type JsonFilter = {
-    path?: string[];
+    path?: string;
     equals?: JsonValue | JsonNullValues;
     not?: JsonValue | JsonNullValues;
     string_contains?: string;
@@ -470,8 +477,66 @@ export type JsonFilter = {
     array_ends_with?: JsonValue;
 };
 
-// TODO: extra typedef filtering
-export type TypedJsonFilter = JsonFilter;
+export type TypedJsonFilter<
+    Schema extends SchemaDef,
+    TypeDefName extends GetTypeDefs<Schema>,
+    Array extends boolean,
+    Optional extends boolean,
+> = XOR<JsonFilter, TypedJsonTypedFilter<Schema, TypeDefName, Array, Optional>>;
+
+type TypedJsonTypedFilter<
+    Schema extends SchemaDef,
+    TypeDefName extends GetTypeDefs<Schema>,
+    Array extends boolean,
+    Optional extends boolean,
+> =
+    | (Array extends true ? ArrayTypedJsonFilter<Schema, TypeDefName> : NonArrayTypedJsonFilter<Schema, TypeDefName>)
+    | (Optional extends true ? null : never);
+
+type ArrayTypedJsonFilter<Schema extends SchemaDef, TypeDefName extends GetTypeDefs<Schema>> = {
+    some?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+    every?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+    none?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+};
+
+type NonArrayTypedJsonFilter<Schema extends SchemaDef, TypeDefName extends GetTypeDefs<Schema>> =
+    | {
+          is?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+          isNot?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+      }
+    | TypedJsonFieldsFilter<Schema, TypeDefName>;
+
+type TypedJsonFieldsFilter<Schema extends SchemaDef, TypeDefName extends GetTypeDefs<Schema>> = {
+    [Key in GetTypeDefFields<Schema, TypeDefName>]?: GetTypeDefFieldType<
+        Schema,
+        TypeDefName,
+        Key
+    > extends GetTypeDefs<Schema>
+        ? // nested typedef - recurse
+          TypedJsonFilter<
+              Schema,
+              GetTypeDefFieldType<Schema, TypeDefName, Key>,
+              TypeDefFieldIsArray<Schema, TypeDefName, Key>,
+              TypeDefFieldIsOptional<Schema, TypeDefName, Key>
+          >
+        : // array
+          TypeDefFieldIsArray<Schema, TypeDefName, Key> extends true
+          ? ArrayFilter<Schema, GetTypeDefFieldType<Schema, TypeDefName, Key>>
+          : // enum
+            GetTypeDefFieldType<Schema, TypeDefName, Key> extends GetEnums<Schema>
+            ? EnumFilter<
+                  Schema,
+                  GetTypeDefFieldType<Schema, TypeDefName, Key>,
+                  TypeDefFieldIsOptional<Schema, TypeDefName, Key>,
+                  false
+              >
+            : // primitive
+              PrimitiveFilter<
+                  GetTypeDefFieldType<Schema, TypeDefName, Key>,
+                  TypeDefFieldIsOptional<Schema, TypeDefName, Key>,
+                  false
+              >;
+};
 
 export type SortOrder = 'asc' | 'desc';
 export type NullsOrder = 'first' | 'last';

@@ -59,6 +59,12 @@ const _schema = {
                     name: "address",
                     type: "Address",
                     optional: true
+                },
+                tags: {
+                    name: "tags",
+                    type: "String",
+                    optional: true,
+                    array: true
                 }
             }
         },
@@ -68,6 +74,11 @@ const _schema = {
                 country: {
                     name: "country",
                     type: "String"
+                },
+                zip: {
+                    name: "zip",
+                    type: "String",
+                    optional: true
                 }
             }
         },

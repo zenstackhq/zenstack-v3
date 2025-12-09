@@ -239,7 +239,6 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: [],
                         equals: createData,
                     },
                 },
@@ -250,7 +249,18 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['a'],
+                        path: '$',
+                        equals: createData,
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.a',
                         equals: createData['a'],
                     },
                 },
@@ -261,7 +271,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['a', 'b'],
+                        path: '$.a.b',
                         equals: createData['a']['b'],
                     },
                 },
@@ -272,7 +282,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['a', 'z'],
+                        path: '$.a.z',
                         equals: createData['a']['b'],
                     },
                 },
@@ -283,7 +293,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['x'],
+                        path: '$.x',
                         equals: createData['x'],
                     },
                 },
@@ -294,7 +304,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['x', '1'],
+                        path: '$.x[1]',
                         equals: createData['x'][1],
                     },
                 },
@@ -305,12 +315,169 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['x', '0'],
+                        path: '$.x[0]',
                         equals: createData['x'][1],
                     },
                 },
             }),
         ).toResolveNull();
+
+        // null filters for non-null value
+
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.a',
+                        equals: JsonNull,
+                    },
+                },
+            }),
+        ).toResolveNull();
+
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.a',
+                        equals: DbNull,
+                    },
+                },
+            }),
+        ).toResolveNull();
+
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.a',
+                        equals: AnyNull,
+                    },
+                },
+            }),
+        ).toResolveNull();
+
+        // null filters for null value
+        await db.foo.deleteMany();
+
+        await db.foo.create({
+            data: { data: { a: null } },
+        });
+
+        // @ts-expect-error
+        db.foo.findFirst({ where: { data: { path: '$.a', equals: null } } });
+
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.a',
+                        equals: JsonNull,
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.a',
+                        equals: DbNull,
+                    },
+                },
+            }),
+        ).toResolveNull();
+
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.a',
+                        equals: AnyNull,
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+
+        // null filters for top-level nulls
+        await db.foo.deleteMany();
+        await db.foo.create({
+            data: { data: JsonNull },
+        });
+        await expect(db.foo.findFirst({ where: { data: { equals: JsonNull } } })).toResolveTruthy();
+        await expect(db.foo.findFirst({ where: { data: { equals: DbNull } } })).toResolveNull();
+        await expect(db.foo.findFirst({ where: { data: { equals: AnyNull } } })).toResolveTruthy();
+        await expect(db.foo.findFirst({ where: { data: { path: '$.foo', equals: JsonNull } } })).toResolveNull();
+        await expect(db.foo.findFirst({ where: { data: { path: '$.foo', equals: DbNull } } })).toResolveTruthy();
+        await expect(db.foo.findFirst({ where: { data: { path: '$.foo', equals: AnyNull } } })).toResolveTruthy();
+
+        // null filters for nulls in arrays
+        await db.foo.deleteMany();
+        await db.foo.create({ data: { data: { arr: [1, null] } } });
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: { path: '$.arr[1]', equals: JsonNull },
+                },
+            }),
+        ).toResolveTruthy();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: { path: '$.arr[1]', equals: DbNull },
+                },
+            }),
+        ).toResolveNull();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: { path: '$.arr[1]', equals: AnyNull },
+                },
+            }),
+        ).toResolveTruthy();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: { path: '$.arr[0]', equals: JsonNull },
+                },
+            }),
+        ).toResolveNull();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: { path: '$.arr[0]', equals: DbNull },
+                },
+            }),
+        ).toResolveFalsy();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: { path: '$.arr[0]', equals: AnyNull },
+                },
+            }),
+        ).toResolveFalsy();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: { path: '$.arr[2]', equals: JsonNull },
+                },
+            }),
+        ).toResolveNull();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: { path: '$.arr[2]', equals: DbNull },
+                },
+            }),
+        ).toResolveTruthy();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: { path: '$.arr[2]', equals: AnyNull },
+                },
+            }),
+        ).toResolveTruthy();
     });
 
     it('works with path selection string filters', async () => {
@@ -331,7 +498,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['name'],
+                        path: '$.name',
                         string_contains: 'Doe',
                     },
                 },
@@ -342,7 +509,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['name'],
+                        path: '$.name',
                         string_contains: 'doe',
                         mode: 'insensitive', // case insensitive
                     },
@@ -356,7 +523,7 @@ describe('Json filter tests', () => {
                 db.foo.findFirst({
                     where: {
                         data: {
-                            path: ['name'],
+                            path: '$.name',
                             string_contains: 'doe',
                         },
                     },
@@ -367,7 +534,7 @@ describe('Json filter tests', () => {
                 db.foo.findFirst({
                     where: {
                         data: {
-                            path: ['name'],
+                            path: '$.name',
                             string_contains: 'doe',
                             mode: 'default',
                         },
@@ -380,7 +547,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['bar'], // non-existing path
+                        path: '$.bar', // non-existing path
                         string_contains: 'Doe',
                     },
                 },
@@ -391,7 +558,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['name'],
+                        path: '$.name',
                         string_contains: 'NonExistent',
                     },
                 },
@@ -403,7 +570,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['name'],
+                        path: '$.name',
                         string_starts_with: 'Jane',
                     },
                 },
@@ -415,7 +582,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['name'],
+                        path: '$.name',
                         string_ends_with: 'Johnson',
                     },
                 },
@@ -427,7 +594,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['tags', '0'],
+                        path: '$.tags[0]',
                         string_contains: 'velop',
                     },
                 },
@@ -438,7 +605,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['tags', '1'],
+                        path: '$.tags[1]',
                         string_starts_with: 'type',
                     },
                 },
@@ -449,7 +616,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['tags', '2'],
+                        path: '$.tags[2]',
                         string_starts_with: 'type',
                     },
                 },
@@ -478,7 +645,6 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: [],
                         string_contains: 'World',
                     },
                 },
@@ -532,7 +698,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['tags'],
+                        path: '$.tags',
                         array_contains: 'react',
                     },
                 },
@@ -543,7 +709,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['numbers'],
+                        path: '$.numbers',
                         array_contains: 20,
                     },
                 },
@@ -555,7 +721,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['nested', 'items'],
+                        path: '$.nested.items',
                         array_contains: 'beta',
                     },
                 },
@@ -567,7 +733,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['tags'],
+                        path: '$.tags',
                         array_starts_with: 'typescript',
                     },
                 },
@@ -578,7 +744,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['numbers'],
+                        path: '$.numbers',
                         array_starts_with: 1,
                     },
                 },
@@ -590,7 +756,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['tags'],
+                        path: '$.tags',
                         array_ends_with: 'node',
                     },
                 },
@@ -601,7 +767,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['numbers'],
+                        path: '$.numbers',
                         array_ends_with: 30,
                     },
                 },
@@ -613,7 +779,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['tags'],
+                        path: '$.tags',
                         array_contains: 'rust',
                     },
                 },
@@ -624,7 +790,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['tags'],
+                        path: '$.tags',
                         array_starts_with: 'react',
                     },
                 },
@@ -635,7 +801,7 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['numbers'],
+                        path: '$.numbers',
                         array_ends_with: 100,
                     },
                 },
@@ -647,11 +813,227 @@ describe('Json filter tests', () => {
             db.foo.findFirst({
                 where: {
                     data: {
-                        path: ['nonexistent'],
+                        path: '$.nonexistent',
                         array_contains: 'anything',
                     },
                 },
             }),
         ).toResolveNull();
+    });
+
+    it('typed json direct filtering', async () => {
+        const db = await createTestClient(typedJsonSchema);
+
+        await db.user.create({
+            data: {
+                profile: {
+                    name: 'Alice',
+                    age: 25,
+                    address: { country: 'US' },
+                    jobs: [{ title: 'Developer' }, { title: 'Designer' }],
+                },
+            },
+        });
+
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        name: 'Alice',
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        age: {
+                            lt: 20,
+                        },
+                    },
+                },
+            }),
+        ).toResolveNull();
+
+        // deep field
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        address: {
+                            country: 'US',
+                        },
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        is: {
+                            address: {
+                                country: 'US',
+                            },
+                        },
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        isNot: {
+                            address: {
+                                country: 'US',
+                            },
+                        },
+                    },
+                },
+            }),
+        ).toResolveNull();
+
+        // mixed shallow and deep
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        name: 'Alice',
+                        address: {
+                            country: 'US',
+                        },
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+
+        // nullable fields
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        name: 'Alice',
+                        address: {
+                            zip: null,
+                        },
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+
+        // array of typed json
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        jobs: {
+                            some: {
+                                title: 'Designer',
+                            },
+                        },
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        jobs: {
+                            every: {
+                                title: 'Designer',
+                            },
+                        },
+                    },
+                },
+            }),
+        ).toResolveNull();
+
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        jobs: {
+                            none: {
+                                title: 'Designer',
+                            },
+                        },
+                    },
+                },
+            }),
+        ).toResolveNull();
+
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        jobs: {
+                            every: {
+                                title: {
+                                    startsWith: 'De',
+                                },
+                            },
+                        },
+                    },
+                },
+            }),
+        ).toResolveTruthy();
+
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        jobs: {
+                            none: {
+                                title: {
+                                    startsWith: 'De',
+                                },
+                            },
+                        },
+                    },
+                },
+            }),
+        ).toResolveFalsy();
+
+        // mixed plain json and typed json
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        // @ts-expect-error
+                        name: 'Alice',
+                        path: '$.name',
+                        equals: 'Alice',
+                    },
+                },
+            }),
+        ).toBeRejectedByValidation();
+
+        await db.user.deleteMany();
+        await db.user.create({
+            data: {
+                profile: {
+                    name: 'Alice',
+                    age: 25,
+                    jobs: [],
+                    address: null,
+                },
+            },
+        });
+
+        // null filter
+        await expect(
+            db.user.findFirst({
+                where: {
+                    profile: {
+                        address: null,
+                    },
+                },
+            }),
+        ).toResolveTruthy();
     });
 });

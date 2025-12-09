@@ -19,10 +19,12 @@ type Profile {
     gender  Gender?
     jobs    Job[]
     address Address?
+    tags    String[]?
 }
 
 type Address {
     country String
+    zip     String?
 }
 
 type Job {

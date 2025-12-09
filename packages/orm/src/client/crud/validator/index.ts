@@ -639,10 +639,6 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean, withAggregations: boolean) {
-        if (this.schema.typeDefs && type in this.schema.typeDefs) {
-            // typed JSON field
-            return this.makeTypeDefFilterSchema(type, optional);
-        }
         return match(type)
             .with('String', () => this.makeStringFilterSchema(optional, withAggregations))
             .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
@@ -697,11 +693,6 @@ export class InputValidator<Schema extends SchemaDef> {
             array_starts_with: valueSchema.optional(),
             array_ends_with: valueSchema.optional(),
         });
-    }
-
-    private makeTypeDefFilterSchema(_type: string, _optional: boolean) {
-        // TODO: strong typed JSON filtering
-        return z.never();
     }
 
     private makeDateTimeFilterSchema(optional: boolean, withAggregations: boolean): ZodType {

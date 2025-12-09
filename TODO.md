@@ -40,7 +40,7 @@
             - [x] Unique fields
             - [x] Scalar fields
             - [x] Relation fields
-            - [ ] JSON filtering
+            - [x] JSON filtering
             - [ ] Full-text search
         - [x] Sort
             - [x] Scalar fields

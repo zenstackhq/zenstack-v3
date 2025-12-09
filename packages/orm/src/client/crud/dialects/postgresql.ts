@@ -472,7 +472,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         const pattern = match(operation)
             .with('string_contains', () => `"%${value}%"`)
             .with('string_starts_with', () => `"${value}%"`)
-            .with('string_ends_with', () => `%${value}"`)
+            .with('string_ends_with', () => `"%${value}"`)
             .exhaustive();
 
         return this.eb(receiver, mode === 'insensitive' ? 'ilike' : 'like', sql.val(pattern));

@@ -297,7 +297,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return result;
     }
 
-    private makePrimitiveSchema(type: string, attributes?: AttributeApplication[]) {
+    private makeScalarSchema(type: string, attributes?: AttributeApplication[]) {
         if (this.schema.typeDefs && type in this.schema.typeDefs) {
             return this.makeTypeDefSchema(type);
         } else if (this.schema.enums && type in this.schema.enums) {
@@ -367,12 +367,12 @@ export class InputValidator<Schema extends SchemaDef> {
         schema = z.looseObject(
             Object.fromEntries(
                 Object.entries(typeDef.fields).map(([field, def]) => {
-                    let fieldSchema = this.makePrimitiveSchema(def.type);
+                    let fieldSchema = this.makeScalarSchema(def.type);
                     if (def.array) {
                         fieldSchema = fieldSchema.array();
                     }
                     if (def.optional) {
-                        fieldSchema = fieldSchema.optional();
+                        fieldSchema = fieldSchema.nullish();
                     }
                     return [field, fieldSchema];
                 }),
@@ -382,7 +382,9 @@ export class InputValidator<Schema extends SchemaDef> {
         // zod doesn't preserve object field order after parsing, here we use a
         // validation-only custom schema and use the original data if parsing
         // is successful
-        const finalSchema = z.custom((v) => schema!.safeParse(v).success);
+        const finalSchema = z.custom((v) => {
+            return schema.safeParse(v).success;
+        });
         this.setSchemaCache(key!, finalSchema);
         return finalSchema;
     }
@@ -440,7 +442,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     // array field
                     fieldSchema = this.makeArrayFilterSchema(fieldDef.type as BuiltinType);
                 } else if (this.isTypeDefType(fieldDef.type)) {
-                    fieldSchema = this.makeTypedJsonFilterSchema(fieldDef.type, !!fieldDef.optional);
+                    fieldSchema = this.makeTypedJsonFilterSchema(fieldDef.type, !!fieldDef.optional, !!fieldDef.array);
                 } else {
                     // primitive field
                     fieldSchema = this.makePrimitiveFilterSchema(
@@ -535,9 +537,79 @@ export class InputValidator<Schema extends SchemaDef> {
         return result;
     }
 
-    private makeTypedJsonFilterSchema(_type: string, optional: boolean) {
-        // TODO: direct typed JSON filtering
-        return this.makeJsonFilterSchema(optional);
+    private makeTypedJsonFilterSchema(type: string, optional: boolean, array: boolean) {
+        const typeDef = getTypeDef(this.schema, type);
+        invariant(typeDef, `Type definition "${type}" not found in schema`);
+
+        const candidates: z.ZodType[] = [];
+
+        if (!array) {
+            // fields filter
+            const fieldSchemas: Record<string, z.ZodType> = {};
+            for (const [fieldName, fieldDef] of Object.entries(typeDef.fields)) {
+                if (this.isTypeDefType(fieldDef.type)) {
+                    // recursive typed JSON
+                    fieldSchemas[fieldName] = this.makeTypedJsonFilterSchema(
+                        fieldDef.type,
+                        !!fieldDef.optional,
+                        !!fieldDef.array,
+                    ).optional();
+                } else {
+                    // array, enum, primitives
+                    if (fieldDef.array) {
+                        fieldSchemas[fieldName] = this.makeArrayFilterSchema(fieldDef.type as BuiltinType).optional();
+                    } else {
+                        const enumDef = getEnum(this.schema, fieldDef.type);
+                        if (enumDef) {
+                            fieldSchemas[fieldName] = this.makeEnumFilterSchema(
+                                enumDef,
+                                !!fieldDef.optional,
+                                false,
+                            ).optional();
+                        } else {
+                            fieldSchemas[fieldName] = this.makePrimitiveFilterSchema(
+                                fieldDef.type as BuiltinType,
+                                !!fieldDef.optional,
+                                false,
+                            ).optional();
+                        }
+                    }
+                }
+            }
+
+            candidates.push(z.strictObject(fieldSchemas));
+        }
+
+        const recursiveSchema = z.lazy(() => this.makeTypedJsonFilterSchema(type, optional, false)).optional();
+        if (array) {
+            // array filter
+            candidates.push(
+                z.strictObject({
+                    some: recursiveSchema,
+                    every: recursiveSchema,
+                    none: recursiveSchema,
+                }),
+            );
+        } else {
+            // is / isNot filter
+            candidates.push(
+                z.strictObject({
+                    is: recursiveSchema,
+                    isNot: recursiveSchema,
+                }),
+            );
+        }
+
+        // plain json filter
+        candidates.push(this.makeJsonFilterSchema(optional));
+
+        if (optional) {
+            // allow null as well
+            candidates.push(z.null());
+        }
+
+        // either plain json filter or field filters
+        return z.union(candidates);
     }
 
     private isTypeDefType(type: string) {
@@ -558,23 +630,19 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeArrayFilterSchema(type: BuiltinType) {
         return z.strictObject({
-            equals: this.makePrimitiveSchema(type).array().optional(),
-            has: this.makePrimitiveSchema(type).optional(),
-            hasEvery: this.makePrimitiveSchema(type).array().optional(),
-            hasSome: this.makePrimitiveSchema(type).array().optional(),
+            equals: this.makeScalarSchema(type).array().optional(),
+            has: this.makeScalarSchema(type).optional(),
+            hasEvery: this.makeScalarSchema(type).array().optional(),
+            hasSome: this.makeScalarSchema(type).array().optional(),
             isEmpty: z.boolean().optional(),
         });
     }
 
     private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean, withAggregations: boolean) {
-        if (this.schema.typeDefs && type in this.schema.typeDefs) {
-            // typed JSON field
-            return this.makeTypeDefFilterSchema(type, optional);
-        }
         return match(type)
             .with('String', () => this.makeStringFilterSchema(optional, withAggregations))
             .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                this.makeNumberFilterSchema(this.makePrimitiveSchema(type), optional, withAggregations),
+                this.makeNumberFilterSchema(this.makeScalarSchema(type), optional, withAggregations),
             )
             .with('Boolean', () => this.makeBooleanFilterSchema(optional, withAggregations))
             .with('DateTime', () => this.makeDateTimeFilterSchema(optional, withAggregations))
@@ -587,8 +655,13 @@ export class InputValidator<Schema extends SchemaDef> {
     private makeJsonValueSchema(nullable: boolean, forFilter: boolean): z.ZodType {
         const options: z.ZodType[] = [z.string(), z.number(), z.boolean(), z.instanceof(JsonNullClass)];
 
-        if (nullable) {
+        if (forFilter) {
             options.push(z.instanceof(DbNullClass));
+        } else {
+            if (nullable) {
+                // for mutation, allow DbNull only if nullable
+                options.push(z.instanceof(DbNullClass));
+            }
         }
 
         if (forFilter) {
@@ -609,7 +682,7 @@ export class InputValidator<Schema extends SchemaDef> {
     private makeJsonFilterSchema(optional: boolean) {
         const valueSchema = this.makeJsonValueSchema(optional, true);
         return z.strictObject({
-            path: z.string().array().optional(),
+            path: z.string().optional(),
             equals: valueSchema.optional(),
             not: valueSchema.optional(),
             string_contains: z.string().optional(),
@@ -620,11 +693,6 @@ export class InputValidator<Schema extends SchemaDef> {
             array_starts_with: valueSchema.optional(),
             array_ends_with: valueSchema.optional(),
         });
-    }
-
-    private makeTypeDefFilterSchema(_type: string, _optional: boolean) {
-        // TODO: strong typed JSON filtering
-        return z.never();
     }
 
     private makeDateTimeFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
@@ -1030,7 +1098,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     uncheckedVariantFields[field] = fieldSchema;
                 }
             } else {
-                let fieldSchema = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
+                let fieldSchema = this.makeScalarSchema(fieldDef.type, fieldDef.attributes);
 
                 if (fieldDef.array) {
                     fieldSchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
@@ -1300,7 +1368,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     uncheckedVariantFields[field] = fieldSchema;
                 }
             } else {
-                let fieldSchema = this.makePrimitiveSchema(fieldDef.type, fieldDef.attributes);
+                let fieldSchema = this.makeScalarSchema(fieldDef.type, fieldDef.attributes);
 
                 if (this.isNumericField(fieldDef)) {
                     fieldSchema = z.union([

@@ -10,7 +10,7 @@ catalog:
     '@types/react': 19.2.0
     '@types/react-dom': 19.2.0
     '@types/tmp': ^0.2.6
-    better-sqlite3: ^12.2.0
+    better-sqlite3: ^12.5.0
     decimal.js: ^10.4.3
     kysely: ~0.28.8
     langium: 3.5.0

@@ -180,6 +180,12 @@ export type GetTypeDefField<
     Field extends GetTypeDefFields<Schema, TypeDef>,
 > = GetTypeDef<Schema, TypeDef>['fields'][Field];
 
+export type GetTypeDefFieldType<
+    Schema extends SchemaDef,
+    TypeDef extends GetTypeDefs<Schema>,
+    Field extends GetTypeDefFields<Schema, TypeDef>,
+> = GetTypeDef<Schema, TypeDef>['fields'][Field]['type'];
+
 export type ScalarFields<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,

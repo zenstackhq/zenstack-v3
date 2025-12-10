@@ -454,24 +454,28 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
     }
 
-    protected override buildJsonPathSelection(receiver: Expression<any>, path: string[], asType: 'string' | 'json') {
-        if (path.length > 0) {
-            const pathValues = path.map((p: string) => this.eb.val(p));
-            if (asType === 'string') {
-                // use `jsonb_extract_path_text` to get string values without quotes
-                return this.eb.fn('jsonb_extract_path_text', [receiver, ...pathValues]);
-            } else {
-                return this.eb.fn('jsonb_extract_path', [receiver, ...pathValues]);
-            }
+    protected override buildJsonPathSelection(receiver: Expression<any>, path: string | undefined) {
+        if (path) {
+            return this.eb.fn('jsonb_path_query_first', [receiver, this.eb.val(path)]);
         } else {
-            // if we're selecting the JSON root, we'll have to resort to `trim` when selecting as string
-            // to remove the quotes
-            if (asType === 'string') {
-                return sql`trim(both '"' from ${receiver}::text)`;
-            } else {
-                return receiver;
-            }
+            return receiver;
         }
+    }
+
+    protected override buildJsonStringFilter(
+        receiver: Expression<any>,
+        operation: 'string_contains' | 'string_starts_with' | 'string_ends_with',
+        value: string,
+        mode: 'default' | 'insensitive',
+    ) {
+        // build LIKE pattern based on operation
+        const pattern = match(operation)
+            .with('string_contains', () => `"%${value}%"`)
+            .with('string_starts_with', () => `"${value}%"`)
+            .with('string_ends_with', () => `"%${value}"`)
+            .exhaustive();
+
+        return this.eb(receiver, mode === 'insensitive' ? 'ilike' : 'like', sql.val(pattern));
     }
 
     protected override buildJsonArrayFilter(
@@ -496,6 +500,18 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 ),
             )
             .exhaustive();
+    }
+
+    protected override buildJsonArrayExistsPredicate(
+        receiver: Expression<any>,
+        buildFilter: (elem: Expression<any>) => Expression<SqlBool>,
+    ) {
+        return this.eb.exists(
+            this.eb
+                .selectFrom(this.eb.fn('jsonb_array_elements', [receiver]).as('$items'))
+                .select(this.eb.lit(1).as('$t'))
+                .where(buildFilter(this.eb.ref('$items.value'))),
+        );
     }
 
     override get supportInsertWithDefault() {

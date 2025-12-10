@@ -7,6 +7,7 @@ import {
     type ExpressionBuilder,
     type RawBuilder,
     type SelectQueryBuilder,
+    type SqlBool,
 } from 'kysely';
 import { match } from 'ts-pattern';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
@@ -359,29 +360,28 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         );
     }
 
-    protected override buildJsonPathSelection(
-        receiver: Expression<any>,
-        path: string[],
-        _asType: 'string' | 'json',
-    ): Expression<any> {
-        if (path.length === 0) {
+    protected override buildJsonPathSelection(receiver: Expression<any>, path: string | undefined) {
+        if (!path) {
             return receiver;
+        } else {
+            return sql`${receiver} -> ${this.eb.val(path)}`;
         }
+    }
 
-        // build a JSON path from the path segments
-        // array indices should use bracket notation: $.a[0].b instead of $.a.0.b
-        const jsonPath =
-            '$' +
-            path
-                .map((p) => {
-                    // check if the segment is a numeric array index
-                    if (/^\d+$/.test(p)) {
-                        return `[${p}]`;
-                    }
-                    return `.${p}`;
-                })
-                .join('');
-        return this.eb.fn('json_extract', [receiver, this.eb.val(jsonPath)]);
+    protected override buildJsonStringFilter(
+        lhs: Expression<any>,
+        operation: 'string_contains' | 'string_starts_with' | 'string_ends_with',
+        value: string,
+        _mode: 'default' | 'insensitive',
+    ) {
+        // JSON strings are quoted, so we need to add quotes to the pattern
+        const pattern = match(operation)
+            .with('string_contains', () => `"%${value}%"`)
+            .with('string_starts_with', () => `"${value}%"`)
+            .with('string_ends_with', () => `"%${value}"`)
+            .exhaustive();
+
+        return this.eb(lhs, 'like', sql.val(pattern));
     }
 
     protected override buildJsonArrayFilter(
@@ -390,7 +390,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         value: unknown,
     ) {
         return match(operation)
-            .with('array_contains', () => sql<any>`EXISTS (SELECT 1 FROM json_each(${lhs}) WHERE value = ${value})`)
+            .with('array_contains', () => sql<any>`EXISTS (SELECT 1 FROM jsonb_each(${lhs}) WHERE value = ${value})`)
             .with('array_starts_with', () =>
                 this.eb(this.eb.fn('json_extract', [lhs, this.eb.val('$[0]')]), '=', value),
             )
@@ -398,6 +398,18 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 this.eb(sql`json_extract(${lhs}, '$[' || (json_array_length(${lhs}) - 1) || ']')`, '=', value),
             )
             .exhaustive();
+    }
+
+    protected override buildJsonArrayExistsPredicate(
+        receiver: Expression<any>,
+        buildFilter: (elem: Expression<any>) => Expression<SqlBool>,
+    ) {
+        return this.eb.exists(
+            this.eb
+                .selectFrom(this.eb.fn('json_each', [receiver]).as('$items'))
+                .select(this.eb.lit(1).as('$t'))
+                .where(buildFilter(this.eb.ref('$items.value'))),
+        );
     }
 
     override get supportsUpdateWithLimit() {

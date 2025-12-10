@@ -20,6 +20,7 @@ import type {
     GetSubModels,
     GetTypeDefField,
     GetTypeDefFields,
+    GetTypeDefFieldType,
     GetTypeDefs,
     IsDelegateModel,
     ModelFieldIsOptional,
@@ -29,6 +30,7 @@ import type {
     RelationInfo,
     ScalarFields,
     SchemaDef,
+    TypeDefFieldIsArray,
     TypeDefFieldIsOptional,
 } from '../schema';
 import type {
@@ -306,7 +308,12 @@ export type WhereInput<
                   WithAggregations
               >
             : GetModelFieldType<Schema, Model, Key> extends GetTypeDefs<Schema>
-              ? TypedJsonFilter
+              ? TypedJsonFilter<
+                    Schema,
+                    GetModelFieldType<Schema, Model, Key>,
+                    FieldIsArray<Schema, Model, Key>,
+                    ModelFieldIsOptional<Schema, Model, Key>
+                >
               : // primitive
                 PrimitiveFilter<
                     GetModelFieldType<Schema, Model, Key>,
@@ -329,29 +336,74 @@ type EnumFilter<
 > =
     | NullableIf<keyof GetEnum<Schema, T>, Nullable>
     | ({
+          /**
+           * Checks for equality with the specified enum value.
+           */
           equals?: NullableIf<keyof GetEnum<Schema, T>, Nullable>;
+
+          /**
+           * Checks if the enum value is in the specified list of values.
+           */
           in?: (keyof GetEnum<Schema, T>)[];
+
+          /**
+           * Checks if the enum value is not in the specified list of values.
+           */
           notIn?: (keyof GetEnum<Schema, T>)[];
+
+          /**
+           * Builds a negated filter.
+           */
           not?: EnumFilter<Schema, T, Nullable, WithAggregations>;
       } & (WithAggregations extends true
           ? {
+                /**
+                 * Filters against the count of records.
+                 */
                 _count?: NumberFilter<'Int', false, false>;
+
+                /**
+                 * Filters against the minimum value.
+                 */
                 _min?: EnumFilter<Schema, T, false, false>;
+
+                /**
+                 * Filters against the maximum value.
+                 */
                 _max?: EnumFilter<Schema, T, false, false>;
             }
           : {}));
 
-type ArrayFilter<Schema extends SchemaDef, T extends string> = {
-    equals?: MapScalarType<Schema, T>[] | null;
-    has?: MapScalarType<Schema, T> | null;
-    hasEvery?: MapScalarType<Schema, T>[];
-    hasSome?: MapScalarType<Schema, T>[];
+type ArrayFilter<Schema extends SchemaDef, Type extends string> = {
+    /**
+     * Checks if the array equals the specified array.
+     */
+    equals?: MapScalarType<Schema, Type>[] | null;
+
+    /**
+     * Checks if the array contains all elements of the specified array.
+     */
+    has?: MapScalarType<Schema, Type> | null;
+
+    /**
+     * Checks if the array contains any of the elements of the specified array.
+     */
+    hasEvery?: MapScalarType<Schema, Type>[];
+
+    /**
+     * Checks if the array contains some of the elements of the specified array.
+     */
+    hasSome?: MapScalarType<Schema, Type>[];
+
+    /**
+     * Checks if the array is empty.
+     */
     isEmpty?: boolean;
 };
 
 // map a scalar type (primitive and enum) to TS type
-type MapScalarType<Schema extends SchemaDef, T extends string> =
-    T extends GetEnums<Schema> ? keyof GetEnum<Schema, T> : MapBaseType<T>;
+type MapScalarType<Schema extends SchemaDef, Type extends string> =
+    Type extends GetEnums<Schema> ? keyof GetEnum<Schema, Type> : MapBaseType<Type>;
 
 type PrimitiveFilter<T extends string, Nullable extends boolean, WithAggregations extends boolean> = T extends 'String'
     ? StringFilter<Nullable, WithAggregations>
@@ -373,30 +425,84 @@ type CommonPrimitiveFilter<
     Nullable extends boolean,
     WithAggregations extends boolean,
 > = {
+    /**
+     * Checks for equality with the specified value.
+     */
     equals?: NullableIf<DataType, Nullable>;
+
+    /**
+     * Checks if the value is in the specified list of values.
+     */
     in?: DataType[];
+
+    /**
+     * Checks if the value is not in the specified list of values.
+     */
     notIn?: DataType[];
+
+    /**
+     * Checks if the value is less than the specified value.
+     */
     lt?: DataType;
+
+    /**
+     * Checks if the value is less than or equal to the specified value.
+     */
     lte?: DataType;
+
+    /**
+     * Checks if the value is greater than the specified value.
+     */
     gt?: DataType;
+
+    /**
+     * Checks if the value is greater than or equal to the specified value.
+     */
     gte?: DataType;
+
+    /**
+     * Builds a negated filter.
+     */
     not?: PrimitiveFilter<T, Nullable, WithAggregations>;
 };
 
 export type StringFilter<Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<string, Nullable>
     | (CommonPrimitiveFilter<string, 'String', Nullable, WithAggregations> & {
-          contains?: string;
-          startsWith?: string;
-          endsWith?: string;
           /**
-           * Not effective for "sqlite" provider
+           * Checks if the string contains the specified substring.
+           */
+          contains?: string;
+
+          /**
+           * Checks if the string starts with the specified substring.
+           */
+          startsWith?: string;
+
+          /**
+           * Checks if the string ends with the specified substring.
+           */
+          endsWith?: string;
+
+          /**
+           * Specifies the string comparison mode. Not effective for "sqlite" provider
            */
           mode?: 'default' | 'insensitive';
       } & (WithAggregations extends true
               ? {
+                    /**
+                     * Filters against the count of records.
+                     */
                     _count?: NumberFilter<'Int', false, false>;
+
+                    /**
+                     * Filters against the minimum value.
+                     */
                     _min?: StringFilter<false, false>;
+
+                    /**
+                     * Filters against the maximum value.
+                     */
                     _max?: StringFilter<false, false>;
                 }
               : {}));
@@ -410,10 +516,29 @@ export type NumberFilter<
     | (CommonPrimitiveFilter<number, T, Nullable, WithAggregations> &
           (WithAggregations extends true
               ? {
+                    /**
+                     * Filters against the count of records.
+                     */
                     _count?: NumberFilter<'Int', false, false>;
+
+                    /**
+                     * Filters against the average value.
+                     */
                     _avg?: NumberFilter<T, false, false>;
+
+                    /**
+                     * Filters against the sum value.
+                     */
                     _sum?: NumberFilter<T, false, false>;
+
+                    /**
+                     * Filters against the minimum value.
+                     */
                     _min?: NumberFilter<T, false, false>;
+
+                    /**
+                     * Filters against the maximum value.
+                     */
                     _max?: NumberFilter<T, false, false>;
                 }
               : {}));
@@ -423,8 +548,19 @@ export type DateTimeFilter<Nullable extends boolean, WithAggregations extends bo
     | (CommonPrimitiveFilter<Date | string, 'DateTime', Nullable, WithAggregations> &
           (WithAggregations extends true
               ? {
+                    /**
+                     * Filters against the count of records.
+                     */
                     _count?: NumberFilter<'Int', false, false>;
+
+                    /**
+                     * Filters against the minimum value.
+                     */
                     _min?: DateTimeFilter<false, false>;
+
+                    /**
+                     * Filters against the maximum value.
+                     */
                     _max?: DateTimeFilter<false, false>;
                 }
               : {}));
@@ -432,14 +568,40 @@ export type DateTimeFilter<Nullable extends boolean, WithAggregations extends bo
 export type BytesFilter<Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<Uint8Array | Buffer, Nullable>
     | ({
+          /**
+           * Checks for equality with the specified value.
+           */
           equals?: NullableIf<Uint8Array, Nullable>;
+
+          /**
+           * Checks if the value is in the specified list of values.
+           */
           in?: Uint8Array[];
+
+          /**
+           * Checks if the value is not in the specified list of values.
+           */
           notIn?: Uint8Array[];
+
+          /**
+           * Builds a negated filter.
+           */
           not?: BytesFilter<Nullable, WithAggregations>;
       } & (WithAggregations extends true
           ? {
+                /**
+                 * Filters against the count of records.
+                 */
                 _count?: NumberFilter<'Int', false, false>;
+
+                /**
+                 * Filters against the minimum value.
+                 */
                 _min?: BytesFilter<false, false>;
+
+                /**
+                 * Filters against the maximum value.
+                 */
                 _max?: BytesFilter<false, false>;
             }
           : {}));
@@ -447,31 +609,146 @@ export type BytesFilter<Nullable extends boolean, WithAggregations extends boole
 export type BooleanFilter<Nullable extends boolean, WithAggregations extends boolean> =
     | NullableIf<boolean, Nullable>
     | ({
+          /**
+           * Checks for equality with the specified value.
+           */
           equals?: NullableIf<boolean, Nullable>;
+
+          /**
+           * Builds a negated filter.
+           */
           not?: BooleanFilter<Nullable, WithAggregations>;
       } & (WithAggregations extends true
           ? {
+                /**
+                 * Filters against the count of records.
+                 */
                 _count?: NumberFilter<'Int', false, false>;
+
+                /**
+                 * Filters against the minimum value.
+                 */
                 _min?: BooleanFilter<false, false>;
+
+                /**
+                 * Filters against the maximum value.
+                 */
                 _max?: BooleanFilter<false, false>;
             }
           : {}));
 
 export type JsonFilter = {
-    path?: string[];
+    /**
+     * JSON path to select the value to filter on. If omitted, the whole JSON value is used.
+     */
+    path?: string;
+
+    /**
+     * Checks for equality with the specified value.
+     */
     equals?: JsonValue | JsonNullValues;
+
+    /**
+     * Builds a negated filter.
+     */
     not?: JsonValue | JsonNullValues;
+
+    /**
+     * Checks if the value is a string and contains the specified substring.
+     */
     string_contains?: string;
+
+    /**
+     * Checks if the value is a string and starts with the specified substring.
+     */
     string_starts_with?: string;
+
+    /**
+     * Checks if the value is a string and ends with the specified substring.
+     */
     string_ends_with?: string;
+
+    /**
+     * String comparison mode. Not effective for "sqlite" provider
+     */
     mode?: 'default' | 'insensitive';
+
+    /**
+     * Checks if the value is an array and contains the specified value.
+     */
     array_contains?: JsonValue;
+
+    /**
+     * Checks if the value is an array and starts with the specified value.
+     */
     array_starts_with?: JsonValue;
+
+    /**
+     * Checks if the value is an array and ends with the specified value.
+     */
     array_ends_with?: JsonValue;
 };
 
-// TODO: extra typedef filtering
-export type TypedJsonFilter = JsonFilter;
+export type TypedJsonFilter<
+    Schema extends SchemaDef,
+    TypeDefName extends GetTypeDefs<Schema>,
+    Array extends boolean,
+    Optional extends boolean,
+> = XOR<JsonFilter, TypedJsonTypedFilter<Schema, TypeDefName, Array, Optional>>;
+
+type TypedJsonTypedFilter<
+    Schema extends SchemaDef,
+    TypeDefName extends GetTypeDefs<Schema>,
+    Array extends boolean,
+    Optional extends boolean,
+> =
+    | (Array extends true ? ArrayTypedJsonFilter<Schema, TypeDefName> : NonArrayTypedJsonFilter<Schema, TypeDefName>)
+    | (Optional extends true ? null : never);
+
+type ArrayTypedJsonFilter<Schema extends SchemaDef, TypeDefName extends GetTypeDefs<Schema>> = {
+    some?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+    every?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+    none?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+};
+
+type NonArrayTypedJsonFilter<Schema extends SchemaDef, TypeDefName extends GetTypeDefs<Schema>> =
+    | {
+          is?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+          isNot?: TypedJsonFieldsFilter<Schema, TypeDefName>;
+      }
+    | TypedJsonFieldsFilter<Schema, TypeDefName>;
+
+type TypedJsonFieldsFilter<Schema extends SchemaDef, TypeDefName extends GetTypeDefs<Schema>> = {
+    [Key in GetTypeDefFields<Schema, TypeDefName>]?: GetTypeDefFieldType<
+        Schema,
+        TypeDefName,
+        Key
+    > extends GetTypeDefs<Schema>
+        ? // nested typedef - recurse
+          TypedJsonFilter<
+              Schema,
+              GetTypeDefFieldType<Schema, TypeDefName, Key>,
+              TypeDefFieldIsArray<Schema, TypeDefName, Key>,
+              TypeDefFieldIsOptional<Schema, TypeDefName, Key>
+          >
+        : // array
+          TypeDefFieldIsArray<Schema, TypeDefName, Key> extends true
+          ? ArrayFilter<Schema, GetTypeDefFieldType<Schema, TypeDefName, Key>>
+          : // enum
+            GetTypeDefFieldType<Schema, TypeDefName, Key> extends GetEnums<Schema>
+            ? EnumFilter<
+                  Schema,
+                  GetTypeDefFieldType<Schema, TypeDefName, Key>,
+                  TypeDefFieldIsOptional<Schema, TypeDefName, Key>,
+                  false
+              >
+            : // primitive
+              PrimitiveFilter<
+                  GetTypeDefFieldType<Schema, TypeDefName, Key>,
+                  TypeDefFieldIsOptional<Schema, TypeDefName, Key>,
+                  false
+              >;
+};
 
 export type SortOrder = 'asc' | 'desc';
 export type NullsOrder = 'first' | 'last';
@@ -486,7 +763,14 @@ export type OrderBy<
         ?
               | SortOrder
               | {
+                    /**
+                     * Sort order
+                     */
                     sort: SortOrder;
+
+                    /**
+                     * Treatment of null values
+                     */
                     nulls?: NullsOrder;
                 }
         : SortOrder;
@@ -494,6 +778,9 @@ export type OrderBy<
     ? {
           [Key in RelationFields<Schema, Model>]?: FieldIsArray<Schema, Model, Key> extends true
               ? {
+                    /**
+                     * Sorts by the count of related records.
+                     */
                     _count?: SortOrder;
                 }
               : OrderBy<Schema, RelationFieldType<Schema, Model, Key>, WithRelation, WithAggregation>;
@@ -501,14 +788,31 @@ export type OrderBy<
     : {}) &
     (WithAggregation extends true
         ? {
+              /**
+               * Sorts by the count of records.
+               */
               _count?: OrderBy<Schema, Model, false, false>;
+
+              /**
+               * Sorts by the minimum value.
+               */
               _min?: MinMaxInput<Schema, Model, SortOrder>;
+
+              /**
+               * Sorts by the maximum value.
+               */
               _max?: MinMaxInput<Schema, Model, SortOrder>;
           } & (NumericFields<Schema, Model> extends never
               ? {}
               : {
-                    // aggregations specific to numeric fields
+                    /**
+                     * Sorts by the average value.
+                     */
                     _avg?: SumAvgInput<Schema, Model, SortOrder>;
+
+                    /**
+                     * Sorts by the sum value.
+                     */
                     _sum?: SumAvgInput<Schema, Model, SortOrder>;
                 })
         : {});
@@ -543,8 +847,19 @@ export type SelectIncludeOmit<
     AllowCount extends boolean,
     AllowRelation extends boolean = true,
 > = {
+    /**
+     * Explicitly select fields and relations to be returned by the query.
+     */
     select?: SelectInput<Schema, Model, AllowCount, AllowRelation> | null;
+
+    /**
+     * Specifies relations to be included in the query result. All scalar fields are included.
+     */
     include?: IncludeInput<Schema, Model, AllowCount> | null;
+
+    /**
+     * Explicitly omit fields from the query result.
+     */
     omit?: OmitInput<Schema, Model> | null;
 };
 
@@ -560,6 +875,9 @@ export type SelectInput<
 type SelectCount<Schema extends SchemaDef, Model extends GetModels<Schema>> =
     | boolean
     | {
+          /**
+           * Selects specific relations to count.
+           */
           select: {
               [Key in RelationFields<Schema, Model> as FieldIsArray<Schema, Model, Key> extends true ? Key : never]?:
                   | boolean
@@ -622,10 +940,17 @@ type ToOneRelationFilter<
     Field extends RelationFields<Schema, Model>,
 > = NullableIf<
     WhereInput<Schema, RelationFieldType<Schema, Model, Field>> & {
+        /**
+         * Checks if the related record matches the specified filter.
+         */
         is?: NullableIf<
             WhereInput<Schema, RelationFieldType<Schema, Model, Field>>,
             ModelFieldIsOptional<Schema, Model, Field>
         >;
+
+        /**
+         * Checks if the related record does not match the specified filter.
+         */
         isNot?: NullableIf<
             WhereInput<Schema, RelationFieldType<Schema, Model, Field>>,
             ModelFieldIsOptional<Schema, Model, Field>
@@ -725,13 +1050,31 @@ type OppositeRelationAndFK<
 //#region Find args
 
 type FilterArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    /**
+     * Filter conditions
+     */
     where?: WhereInput<Schema, Model>;
 };
 
 type SortAndTakeArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    /**
+     * Number of records to skip
+     */
     skip?: number;
+
+    /**
+     * Number of records to take
+     */
     take?: number;
+
+    /**
+     * Order by clauses
+     */
     orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
+
+    /**
+     * Cursor for pagination
+     */
     cursor?: WhereUniqueInput<Schema, Model>;
 };
 
@@ -744,6 +1087,9 @@ export type FindArgs<
     ProviderSupportsDistinct<Schema> extends true
         ? (Collection extends true
               ? SortAndTakeArgs<Schema, Model> & {
+                    /**
+                     * Distinct fields
+                     */
                     distinct?: OrArray<NonRelationFields<Schema, Model>>;
                 }
               : {}) &
@@ -836,9 +1182,24 @@ type CreateRelationFieldPayload<
     Field extends RelationFields<Schema, Model>,
 > = Omit<
     {
+        /**
+         * Connects or create a related record.
+         */
         connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+
+        /**
+         * Creates a related record.
+         */
         create?: NestedCreateInput<Schema, Model, Field>;
+
+        /**
+         * Creates a batch of related records.
+         */
         createMany?: NestedCreateManyInput<Schema, Model, Field>;
+
+        /**
+         * Connects an existing record.
+         */
         connect?: ConnectInput<Schema, Model, Field>;
     },
     // no "createMany" for non-array fields
@@ -882,7 +1243,14 @@ type ConnectOrCreatePayload<
     Model extends GetModels<Schema>,
     Without extends string = never,
 > = {
+    /**
+     * The unique filter to find an existing record to connect.
+     */
     where: WhereUniqueInput<Schema, Model>;
+
+    /**
+     * The data to create a new record if no existing record is found.
+     */
     create: CreateInput<Schema, Model, Without>;
 };
 
@@ -891,7 +1259,14 @@ export type CreateManyInput<
     Model extends GetModels<Schema>,
     Without extends string = never,
 > = {
+    /**
+     * The data for the records to create.
+     */
     data: OrArray<Omit<CreateScalarPayload<Schema, Model>, Without> & Omit<CreateFKPayload<Schema, Model>, Without>>;
+
+    /**
+     * Specifies whether to skip creating records that would violate unique constraints.
+     */
     skipDuplicates?: boolean;
 };
 
@@ -921,7 +1296,14 @@ type NestedCreateManyInput<
 // #region Update args
 
 export type UpdateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    /**
+     * The data to update the record with.
+     */
     data: UpdateInput<Schema, Model>;
+
+    /**
+     * The unique filter to find the record to update.
+     */
     where: WhereUniqueInput<Schema, Model>;
 } & SelectIncludeOmit<Schema, Model, true>;
 
@@ -937,14 +1319,36 @@ export type UpdateManyAndReturnArgs<Schema extends SchemaDef, Model extends GetM
     Omit<SelectIncludeOmit<Schema, Model, false, false>, 'include'>;
 
 type UpdateManyPayload<Schema extends SchemaDef, Model extends GetModels<Schema>, Without extends string = never> = {
+    /**
+     * The data to update the records with.
+     */
     data: OrArray<UpdateScalarInput<Schema, Model, Without>>;
+
+    /**
+     * The filter to select records to update.
+     */
     where?: WhereInput<Schema, Model>;
+
+    /**
+     * Limit the number of records to update.
+     */
     limit?: number;
 };
 
 export type UpsertArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    /**
+     * The data to create the record if it doesn't exist.
+     */
     create: CreateInput<Schema, Model>;
+
+    /**
+     * The data to update the record with if it exists.
+     */
     update: UpdateInput<Schema, Model>;
+
+    /**
+     * The unique filter to find the record to update.
+     */
     where: WhereUniqueInput<Schema, Model>;
 } & SelectIncludeOmit<Schema, Model, true>;
 
@@ -970,16 +1374,42 @@ type ScalarUpdatePayload<
     | ScalarFieldMutationPayload<Schema, Model, Field>
     | (Field extends NumericFields<Schema, Model>
           ? {
+                /**
+                 * Sets the field to the specified value.
+                 */
                 set?: NullableIf<number, ModelFieldIsOptional<Schema, Model, Field>>;
+
+                /**
+                 * Increments the field by the specified value.
+                 */
                 increment?: number;
+
+                /**
+                 * Decrements the field by the specified value.
+                 */
                 decrement?: number;
+
+                /**
+                 * Multiplies the field by the specified value.
+                 */
                 multiply?: number;
+
+                /**
+                 * Divides the field by the specified value.
+                 */
                 divide?: number;
             }
           : never)
     | (FieldIsArray<Schema, Model, Field> extends true
           ? {
+                /**
+                 * Sets the field to the specified array.
+                 */
                 set?: MapModelFieldType<Schema, Model, Field>[];
+
+                /**
+                 * Appends the specified values to the array field.
+                 */
                 push?: OrArray<MapModelFieldType<Schema, Model, Field>, true>;
             }
           : never);
@@ -1016,16 +1446,59 @@ type ToManyRelationUpdateInput<
     Field extends RelationFields<Schema, Model>,
 > = Omit<
     {
+        /**
+         * Creates related records.
+         */
         create?: NestedCreateInput<Schema, Model, Field>;
+
+        /**
+         * Creates a batch of related records.
+         */
         createMany?: NestedCreateManyInput<Schema, Model, Field>;
+
+        /**
+         * Connects existing records.
+         */
         connect?: ConnectInput<Schema, Model, Field>;
+
+        /**
+         * Connects or create related records.
+         */
         connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+
+        /**
+         * Disconnects related records.
+         */
         disconnect?: DisconnectInput<Schema, Model, Field>;
+
+        /**
+         * Updates related records.
+         */
         update?: NestedUpdateInput<Schema, Model, Field>;
+
+        /**
+         * Upserts related records.
+         */
         upsert?: NestedUpsertInput<Schema, Model, Field>;
+
+        /**
+         * Updates a batch of related records.
+         */
         updateMany?: NestedUpdateManyInput<Schema, Model, Field>;
+
+        /**
+         * Deletes related records.
+         */
         delete?: NestedDeleteInput<Schema, Model, Field>;
+
+        /**
+         * Deletes a batch of related records.
+         */
         deleteMany?: NestedDeleteManyInput<Schema, Model, Field>;
+
+        /**
+         * Sets the related records to the specified ones.
+         */
         set?: SetRelationInput<Schema, Model, Field>;
     },
     // exclude
@@ -1040,14 +1513,40 @@ type ToOneRelationUpdateInput<
     Field extends RelationFields<Schema, Model>,
 > = Omit<
     {
+        /**
+         * Creates a related record.
+         */
         create?: NestedCreateInput<Schema, Model, Field>;
+
+        /**
+         * Connects an existing record.
+         */
         connect?: ConnectInput<Schema, Model, Field>;
+
+        /**
+         * Connects or create a related record.
+         */
         connectOrCreate?: ConnectOrCreateInput<Schema, Model, Field>;
+
+        /**
+         * Updates the related record.
+         */
         update?: NestedUpdateInput<Schema, Model, Field>;
+
+        /**
+         * Upserts the related record.
+         */
         upsert?: NestedUpsertInput<Schema, Model, Field>;
     } & (ModelFieldIsOptional<Schema, Model, Field> extends true
         ? {
+              /**
+               * Disconnects the related record.
+               */
               disconnect?: DisconnectInput<Schema, Model, Field>;
+
+              /**
+               * Deletes the related record.
+               */
               delete?: NestedDeleteInput<Schema, Model, Field>;
           }
         : {}),
@@ -1059,11 +1558,21 @@ type ToOneRelationUpdateInput<
 // #region Delete args
 
 export type DeleteArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    /**
+     * The unique filter to find the record to delete.
+     */
     where: WhereUniqueInput<Schema, Model>;
 } & SelectIncludeOmit<Schema, Model, true>;
 
 export type DeleteManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    /**
+     * Filter to select records to delete.
+     */
     where?: WhereInput<Schema, Model>;
+
+    /**
+     * Limits the number of records to delete.
+     */
     limit?: number;
 };
 
@@ -1075,6 +1584,9 @@ export type CountArgs<Schema extends SchemaDef, Model extends GetModels<Schema>>
     FindArgs<Schema, Model, true>,
     'select' | 'include' | 'distinct' | 'omit'
 > & {
+    /**
+     * Selects fields to count
+     */
     select?: CountAggregateInput<Schema, Model> | true;
 };
 
@@ -1097,18 +1609,51 @@ export type CountResult<Schema extends SchemaDef, _Model extends GetModels<Schem
 // #region Aggregate
 
 export type AggregateArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    /**
+     * Filter conditions
+     */
     where?: WhereInput<Schema, Model>;
+
+    /**
+     * Number of records to skip for the aggregation
+     */
     skip?: number;
+
+    /**
+     * Number of records to take for the aggregation
+     */
     take?: number;
+
+    /**
+     * Order by clauses
+     */
     orderBy?: OrArray<OrderBy<Schema, Model, true, false>>;
 } & {
+    /**
+     * Performs count aggregation.
+     */
     _count?: true | CountAggregateInput<Schema, Model>;
+
+    /**
+     * Performs minimum value aggregation.
+     */
     _min?: MinMaxInput<Schema, Model, true>;
+
+    /**
+     * Performs maximum value aggregation.
+     */
     _max?: MinMaxInput<Schema, Model, true>;
 } & (NumericFields<Schema, Model> extends never
         ? {}
         : {
+              /**
+               * Performs average value aggregation.
+               */
               _avg?: SumAvgInput<Schema, Model, true>;
+
+              /**
+               * Performs sum value aggregation.
+               */
               _sum?: SumAvgInput<Schema, Model, true>;
           });
 
@@ -1140,26 +1685,41 @@ export type AggregateResult<Schema extends SchemaDef, _Model extends GetModels<S
     _count: infer Count;
 }
     ? {
+          /**
+           * Count aggregation result
+           */
           _count: AggCommonOutput<Count>;
       }
     : {}) &
     (Args extends { _sum: infer Sum }
         ? {
+              /**
+               * Sum aggregation result
+               */
               _sum: AggCommonOutput<Sum>;
           }
         : {}) &
     (Args extends { _avg: infer Avg }
         ? {
+              /**
+               * Average aggregation result
+               */
               _avg: AggCommonOutput<Avg>;
           }
         : {}) &
     (Args extends { _min: infer Min }
         ? {
+              /**
+               * Minimum aggregation result
+               */
               _min: AggCommonOutput<Min>;
           }
         : {}) &
     (Args extends { _max: infer Max }
         ? {
+              /**
+               * Maximum aggregation result
+               */
               _max: AggCommonOutput<Max>;
           }
         : {});
@@ -1182,21 +1742,61 @@ type GroupByHaving<Schema extends SchemaDef, Model extends GetModels<Schema>> = 
 >;
 
 export type GroupByArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
+    /**
+     * Filter conditions
+     */
     where?: WhereInput<Schema, Model>;
+
+    /**
+     * Order by clauses
+     */
     orderBy?: OrArray<OrderBy<Schema, Model, false, true>>;
+
+    /**
+     * Fields to group by
+     */
     by: NonRelationFields<Schema, Model> | NonEmptyArray<NonRelationFields<Schema, Model>>;
+
+    /**
+     * Filter conditions for the grouped records
+     */
     having?: GroupByHaving<Schema, Model>;
+
+    /**
+     * Number of records to take for grouping
+     */
     take?: number;
+
+    /**
+     * Number of records to skip for grouping
+     */
     skip?: number;
-    // aggregations
+
+    /**
+     * Performs count aggregation.
+     */
     _count?: true | CountAggregateInput<Schema, Model>;
+
+    /**
+     * Performs minimum value aggregation.
+     */
     _min?: MinMaxInput<Schema, Model, true>;
+
+    /**
+     * Performs maximum value aggregation.
+     */
     _max?: MinMaxInput<Schema, Model, true>;
 } & (NumericFields<Schema, Model> extends never
     ? {}
     : {
-          // aggregations specific to numeric fields
+          /**
+           * Performs average value aggregation.
+           */
           _avg?: SumAvgInput<Schema, Model, true>;
+
+          /**
+           * Performs sum value aggregation.
+           */
           _sum?: SumAvgInput<Schema, Model, true>;
       });
 
@@ -1211,26 +1811,41 @@ export type GroupByResult<
             : never]: MapModelFieldType<Schema, Model, Key>;
     } & (Args extends { _count: infer Count }
         ? {
+              /**
+               * Count aggregation result
+               */
               _count: AggCommonOutput<Count>;
           }
         : {}) &
         (Args extends { _avg: infer Avg }
             ? {
+                  /**
+                   * Average aggregation result
+                   */
                   _avg: AggCommonOutput<Avg>;
               }
             : {}) &
         (Args extends { _sum: infer Sum }
             ? {
+                  /**
+                   * Sum aggregation result
+                   */
                   _sum: AggCommonOutput<Sum>;
               }
             : {}) &
         (Args extends { _min: infer Min }
             ? {
+                  /**
+                   * Minimum aggregation result
+                   */
                   _min: AggCommonOutput<Min>;
               }
             : {}) &
         (Args extends { _max: infer Max }
             ? {
+                  /**
+                   * Maximum aggregation result
+                   */
                   _max: AggCommonOutput<Max>;
               }
             : {})
@@ -1291,7 +1906,14 @@ type NestedUpdateInput<
     FieldIsArray<Schema, Model, Field> extends true
         ? OrArray<
               {
+                  /**
+                   * Unique filter to select the record to update.
+                   */
                   where: WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>;
+
+                  /**
+                   * The data to update the record with.
+                   */
                   data: UpdateInput<
                       Schema,
                       RelationFieldType<Schema, Model, Field>,
@@ -1302,7 +1924,14 @@ type NestedUpdateInput<
           >
         : XOR<
               {
+                  /**
+                   * Unique filter to select the record to update.
+                   */
                   where: WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>;
+
+                  /**
+                   * The data to update the record with.
+                   */
                   data: UpdateInput<
                       Schema,
                       RelationFieldType<Schema, Model, Field>,
@@ -1318,12 +1947,23 @@ type NestedUpsertInput<
     Field extends RelationFields<Schema, Model>,
 > = OrArray<
     {
+        /**
+         * Unique filter to select the record to update.
+         */
         where: WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>;
+
+        /**
+         * The data to create the record if it doesn't exist.
+         */
         create: CreateInput<
             Schema,
             RelationFieldType<Schema, Model, Field>,
             OppositeRelationAndFK<Schema, Model, Field>
         >;
+
+        /**
+         * The data to update the record with if it exists.
+         */
         update: UpdateInput<
             Schema,
             RelationFieldType<Schema, Model, Field>,

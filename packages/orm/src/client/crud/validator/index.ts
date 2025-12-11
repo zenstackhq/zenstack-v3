@@ -297,7 +297,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return result;
     }
 
-    private makeScalarSchema(type: string, attributes?: AttributeApplication[]) {
+    private makeScalarSchema(type: string, attributes?: readonly AttributeApplication[]) {
         if (this.schema.typeDefs && type in this.schema.typeDefs) {
             return this.makeTypeDefSchema(type);
         } else if (this.schema.enums && type in this.schema.enums) {

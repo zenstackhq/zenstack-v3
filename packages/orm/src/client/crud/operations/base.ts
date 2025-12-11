@@ -250,7 +250,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         data: any,
         fromRelation?: FromRelationContext,
         creatingForDelegate = false,
-        returnFields?: string[],
+        returnFields?: readonly string[],
     ): Promise<unknown> {
         const modelDef = this.requireModel(model);
 
@@ -662,7 +662,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         input: { data: any; skipDuplicates?: boolean },
         returnData: ReturnData,
         fromRelation?: FromRelationContext,
-        fieldsToReturn?: string[],
+        fieldsToReturn?: readonly string[],
     ): Promise<Result> {
         if (!input.data || (Array.isArray(input.data) && input.data.length === 0)) {
             // nothing todo
@@ -901,7 +901,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fromRelation?: FromRelationContext,
         allowRelationUpdate = true,
         throwIfNotFound = true,
-        fieldsToReturn?: string[],
+        fieldsToReturn?: readonly string[],
     ): Promise<unknown> {
         if (!data || typeof data !== 'object') {
             throw createInvalidInputError('data must be an object');
@@ -1207,7 +1207,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         limit: number | undefined,
         returnData: ReturnData,
         filterModel?: string,
-        fieldsToReturn?: string[],
+        fieldsToReturn?: readonly string[],
     ): Promise<Result> {
         if (typeof data !== 'object') {
             throw createInvalidInputError('data must be an object');
@@ -1923,7 +1923,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         where: any,
         limit?: number,
         filterModel?: string,
-        fieldsToReturn?: string[],
+        fieldsToReturn?: readonly string[],
     ): Promise<QueryResult<unknown>> {
         filterModel ??= model;
 

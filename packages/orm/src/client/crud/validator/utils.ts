@@ -22,7 +22,10 @@ function getArgValue<T extends string | number | boolean>(expr: Expression | und
     return expr.value as T;
 }
 
-export function addStringValidation(schema: z.ZodString, attributes: AttributeApplication[] | undefined): z.ZodSchema {
+export function addStringValidation(
+    schema: z.ZodString,
+    attributes: readonly AttributeApplication[] | undefined,
+): z.ZodSchema {
     if (!attributes || attributes.length === 0) {
         return schema;
     }
@@ -86,7 +89,10 @@ export function addStringValidation(schema: z.ZodString, attributes: AttributeAp
     return result;
 }
 
-export function addNumberValidation(schema: z.ZodNumber, attributes: AttributeApplication[] | undefined): z.ZodSchema {
+export function addNumberValidation(
+    schema: z.ZodNumber,
+    attributes: readonly AttributeApplication[] | undefined,
+): z.ZodSchema {
     if (!attributes || attributes.length === 0) {
         return schema;
     }
@@ -114,7 +120,10 @@ export function addNumberValidation(schema: z.ZodNumber, attributes: AttributeAp
     return result;
 }
 
-export function addBigIntValidation(schema: z.ZodBigInt, attributes: AttributeApplication[] | undefined): z.ZodSchema {
+export function addBigIntValidation(
+    schema: z.ZodBigInt,
+    attributes: readonly AttributeApplication[] | undefined,
+): z.ZodSchema {
     if (!attributes || attributes.length === 0) {
         return schema;
     }
@@ -145,7 +154,7 @@ export function addBigIntValidation(schema: z.ZodBigInt, attributes: AttributeAp
 
 export function addDecimalValidation(
     schema: z.ZodType<Decimal> | z.ZodString,
-    attributes: AttributeApplication[] | undefined,
+    attributes: readonly AttributeApplication[] | undefined,
     addExtraValidation: boolean,
 ): z.ZodSchema {
     let result: z.ZodSchema = schema;
@@ -224,7 +233,7 @@ export function addDecimalValidation(
 
 export function addListValidation(
     schema: z.ZodArray<any>,
-    attributes: AttributeApplication[] | undefined,
+    attributes: readonly AttributeApplication[] | undefined,
 ): z.ZodSchema {
     if (!attributes || attributes.length === 0) {
         return schema;
@@ -248,7 +257,10 @@ export function addListValidation(
     return result;
 }
 
-export function addCustomValidation(schema: z.ZodSchema, attributes: AttributeApplication[] | undefined): z.ZodSchema {
+export function addCustomValidation(
+    schema: z.ZodSchema,
+    attributes: readonly AttributeApplication[] | undefined,
+): z.ZodSchema {
     const attrs = attributes?.filter((a) => a.name === '@@validate');
     if (!attrs || attrs.length === 0) {
         return schema;

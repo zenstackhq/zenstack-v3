@@ -6,11 +6,11 @@
 /* eslint-disable */
 
 import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
-const _schema = {
-    provider: {
+export class SchemaType implements SchemaDef {
+    provider = {
         type: "postgresql"
-    },
-    models: {
+    } as const;
+    models = {
         Host: {
             name: "Host",
             fields: {
@@ -9182,8 +9182,8 @@ const _schema = {
                 roleId_resource_action: { roleId: { type: "String" }, resource: { type: "String" }, action: { type: "String" } }
             }
         }
-    },
-    enums: {
+    } as const;
+    enums = {
         SchedulingType: {
             values: {
                 ROUND_ROBIN: "ROUND_ROBIN",
@@ -9636,12 +9636,8 @@ const _schema = {
                 CUSTOM: "CUSTOM"
             }
         }
-    },
-    authType: "User",
-    plugins: {}
-} as const satisfies SchemaDef;
-type Schema = typeof _schema & {
-    __brand?: "schema";
-};
-export const schema: Schema = _schema;
-export type SchemaType = Schema;
+    } as const;
+    authType = "User" as const;
+    plugins = {};
+}
+export const schema = new SchemaType();

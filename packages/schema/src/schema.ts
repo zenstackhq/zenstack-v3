@@ -22,7 +22,7 @@ export type ModelDef = {
     name: string;
     baseModel?: string;
     fields: Record<string, FieldDef>;
-    attributes?: AttributeApplication[];
+    attributes?: readonly AttributeApplication[];
     uniqueFields: Record<
         string,
         // singular unique field
@@ -30,16 +30,16 @@ export type ModelDef = {
         // compound unique field
         | Record<string, Pick<FieldDef, 'type'>>
     >;
-    idFields: string[];
+    idFields: readonly string[];
     computedFields?: Record<string, Function>;
     isDelegate?: boolean;
-    subModels?: string[];
+    subModels?: readonly string[];
     isView?: boolean;
 };
 
 export type AttributeApplication = {
     name: string;
-    args?: AttributeArg[];
+    args?: readonly AttributeArg[];
 };
 
 export type AttributeArg = {
@@ -51,8 +51,8 @@ export type CascadeAction = 'SetNull' | 'Cascade' | 'Restrict' | 'NoAction' | 'S
 
 export type RelationInfo = {
     name?: string;
-    fields?: string[];
-    references?: string[];
+    fields?: readonly string[];
+    references?: readonly string[];
     hasDefault?: boolean;
     opposite?: string;
     onDelete?: CascadeAction;
@@ -67,11 +67,11 @@ export type FieldDef = {
     optional?: boolean;
     unique?: boolean;
     updatedAt?: boolean;
-    attributes?: AttributeApplication[];
-    default?: MappedBuiltinType | Expression | unknown[];
+    attributes?: readonly AttributeApplication[];
+    default?: MappedBuiltinType | Expression | readonly unknown[];
     omit?: boolean;
     relation?: RelationInfo;
-    foreignKeyFor?: string[];
+    foreignKeyFor?: readonly string[];
     computed?: boolean;
     originModel?: string;
     isDiscriminator?: boolean;
@@ -101,19 +101,19 @@ export type MappedBuiltinType = string | boolean | number | bigint | Decimal | D
 
 export type EnumField = {
     name: string;
-    attributes?: AttributeApplication[];
+    attributes?: readonly AttributeApplication[];
 };
 
 export type EnumDef = {
     fields?: Record<string, EnumField>;
     values: Record<string, string>;
-    attributes?: AttributeApplication[];
+    attributes?: readonly AttributeApplication[];
 };
 
 export type TypeDefDef = {
     name: string;
     fields: Record<string, FieldDef>;
-    attributes?: AttributeApplication[];
+    attributes?: readonly AttributeApplication[];
 };
 
 //#region Extraction
@@ -127,7 +127,7 @@ export type GetDelegateModels<Schema extends SchemaDef> = keyof {
 export type GetSubModels<Schema extends SchemaDef, Model extends GetModels<Schema>> = GetModel<
     Schema,
     Model
->['subModels'] extends string[]
+>['subModels'] extends readonly string[]
     ? Extract<GetModel<Schema, Model>['subModels'][number], GetModels<Schema>>
     : never;
 
@@ -193,7 +193,7 @@ export type ScalarFields<
 > = keyof {
     [Key in GetModelFields<Schema, Model> as GetModelField<Schema, Model, Key>['relation'] extends object
         ? never
-        : GetModelField<Schema, Model, Key>['foreignKeyFor'] extends string[]
+        : GetModelField<Schema, Model, Key>['foreignKeyFor'] extends readonly string[]
           ? never
           : IncludeComputed extends true
             ? Key
@@ -203,7 +203,11 @@ export type ScalarFields<
 };
 
 export type ForeignKeyFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
-    [Key in GetModelFields<Schema, Model> as GetModelField<Schema, Model, Key>['foreignKeyFor'] extends string[]
+    [Key in GetModelFields<Schema, Model> as GetModelField<
+        Schema,
+        Model,
+        Key
+    >['foreignKeyFor'] extends readonly string[]
         ? Key
         : never]: Key;
 };
@@ -289,10 +293,11 @@ export type FieldIsRelationArray<
     Field extends GetModelFields<Schema, Model>,
 > = FieldIsRelation<Schema, Model, Field> extends true ? FieldIsArray<Schema, Model, Field> : false;
 
-export type IsDelegateModel<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-> = Schema['models'][Model]['isDelegate'] extends true ? true : false;
+export type IsDelegateModel<Schema extends SchemaDef, Model extends GetModels<Schema>> = string extends Model
+    ? false
+    : Schema['models'][Model]['isDelegate'] extends true
+      ? true
+      : false;
 
 export type FieldIsDelegateRelation<
     Schema extends SchemaDef,

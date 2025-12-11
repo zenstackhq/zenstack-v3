@@ -6,11 +6,11 @@
 /* eslint-disable */
 
 import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
-const _schema = {
-    provider: {
+export class SchemaType implements SchemaDef {
+    provider = {
         type: "postgresql"
-    },
-    models: {
+    } as const;
+    models = {
         User: {
             name: "User",
             fields: {
@@ -6078,8 +6078,8 @@ const _schema = {
                 id_createdAt: { id: { type: "String" }, createdAt: { type: "DateTime" } }
             }
         }
-    },
-    enums: {
+    } as const;
+    enums = {
         AuthenticationMethod: {
             values: {
                 GITHUB: "GITHUB",
@@ -6337,12 +6337,8 @@ const _schema = {
                 FAILED: "FAILED"
             }
         }
-    },
-    authType: "User",
-    plugins: {}
-} as const satisfies SchemaDef;
-type Schema = typeof _schema & {
-    __brand?: "schema";
-};
-export const schema: Schema = _schema;
-export type SchemaType = Schema;
+    } as const;
+    authType = "User" as const;
+    plugins = {};
+}
+export const schema = new SchemaType();

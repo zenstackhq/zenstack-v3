@@ -12,17 +12,14 @@ import type {
     GetEnum,
     GetEnums,
     GetModel,
-    GetModelDiscriminator,
     GetModelField,
     GetModelFields,
     GetModelFieldType,
     GetModels,
-    GetSubModels,
     GetTypeDefField,
     GetTypeDefFields,
     GetTypeDefFieldType,
     GetTypeDefs,
-    IsDelegateModel,
     ModelFieldIsOptional,
     NonRelationFields,
     RelationFields,
@@ -62,20 +59,25 @@ export type DefaultModelResult<
     Optional = false,
     Array = false,
 > = WrapType<
-    IsDelegateModel<Schema, Model> extends true
-        ? // delegate model's selection result is a union of all sub-models
-          DelegateUnionResult<Schema, Model, Options, GetSubModels<Schema, Model>, Omit>
-        : {
-              [Key in NonRelationFields<Schema, Model> as ShouldOmitField<
-                  Schema,
-                  Model,
-                  Options,
-                  Key,
-                  Omit
-              > extends true
-                  ? never
-                  : Key]: MapModelFieldType<Schema, Model, Key>;
-          },
+    {
+        [Key in NonRelationFields<Schema, Model> as ShouldOmitField<Schema, Model, Options, Key, Omit> extends true
+            ? never
+            : Key]: MapModelFieldType<Schema, Model, Key>;
+    },
+    // IsDelegateModel<Schema, Model> extends true
+    //     ? // delegate model's selection result is a union of all sub-models
+    //       DelegateUnionResult<Schema, Model, Options, GetSubModels<Schema, Model>, Omit>
+    //     : {
+    //           [Key in NonRelationFields<Schema, Model> as ShouldOmitField<
+    //               Schema,
+    //               Model,
+    //               Options,
+    //               Key,
+    //               Omit
+    //           > extends true
+    //               ? never
+    //               : Key]: MapModelFieldType<Schema, Model, Key>;
+    //       },
     Optional,
     Array
 >;
@@ -120,15 +122,15 @@ type SchemaLevelOmit<
     Field extends GetModelFields<Schema, Model>,
 > = GetModelField<Schema, Model, Field>['omit'] extends true ? true : false;
 
-type DelegateUnionResult<
-    Schema extends SchemaDef,
-    Model extends GetModels<Schema>,
-    Options extends ClientOptions<Schema>,
-    SubModel extends GetModels<Schema>,
-    Omit = undefined,
-> = SubModel extends string // typescript union distribution
-    ? DefaultModelResult<Schema, SubModel, Options, Omit> & { [K in GetModelDiscriminator<Schema, Model>]: SubModel } // fixate discriminated field
-    : never;
+// type DelegateUnionResult<
+//     Schema extends SchemaDef,
+//     Model extends GetModels<Schema>,
+//     Options extends ClientOptions<Schema>,
+//     SubModel extends GetModels<Schema>,
+//     Omit = undefined,
+// > = SubModel extends string // typescript union distribution
+//     ? DefaultModelResult<Schema, SubModel, Options, Omit> & { [K in GetModelDiscriminator<Schema, Model>]: SubModel } // fixate discriminated field
+//     : never;
 
 type ModelSelectResult<
     Schema extends SchemaDef,
@@ -1029,7 +1031,7 @@ type OppositeRelationFields<
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,
     Opposite = OppositeRelation<Schema, Model, Field>,
-> = Opposite extends RelationInfo ? (Opposite['fields'] extends string[] ? Opposite['fields'] : []) : [];
+> = Opposite extends RelationInfo ? (Opposite['fields'] extends readonly string[] ? Opposite['fields'] : []) : [];
 
 type OppositeRelationAndFK<
     Schema extends SchemaDef,
@@ -1083,21 +1085,16 @@ export type FindArgs<
     Model extends GetModels<Schema>,
     Collection extends boolean,
     AllowFilter extends boolean = true,
-> =
-    ProviderSupportsDistinct<Schema> extends true
-        ? (Collection extends true
-              ? SortAndTakeArgs<Schema, Model> & {
-                    /**
-                     * Distinct fields
-                     */
-                    distinct?: OrArray<NonRelationFields<Schema, Model>>;
-                }
-              : {}) &
-              (AllowFilter extends true ? FilterArgs<Schema, Model> : {}) &
-              SelectIncludeOmit<Schema, Model, Collection>
-        : (Collection extends true ? SortAndTakeArgs<Schema, Model> : {}) &
-              (AllowFilter extends true ? FilterArgs<Schema, Model> : {}) &
-              SelectIncludeOmit<Schema, Model, Collection>;
+> = (Collection extends true
+    ? SortAndTakeArgs<Schema, Model> & {
+          /**
+           * Distinct fields
+           */
+          distinct?: OrArray<NonRelationFields<Schema, Model>>;
+      }
+    : {}) &
+    (AllowFilter extends true ? FilterArgs<Schema, Model> : {}) &
+    SelectIncludeOmit<Schema, Model, Collection>;
 
 export type FindManyArgs<Schema extends SchemaDef, Model extends GetModels<Schema>> = FindArgs<Schema, Model, true>;
 
@@ -2002,7 +1999,7 @@ type NestedDeleteManyInput<
 
 type NonOwnedRelationFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
     [Key in RelationFields<Schema, Model> as GetModelField<Schema, Model, Key>['relation'] extends {
-        references: unknown[];
+        references: readonly unknown[];
     }
         ? never
         : Key]: true;
@@ -2014,8 +2011,8 @@ type HasToManyRelations<Schema extends SchemaDef, Model extends GetModels<Schema
     ? false
     : true;
 
-type ProviderSupportsDistinct<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
-    ? true
-    : false;
+// type ProviderSupportsDistinct<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
+//     ? true
+//     : false;
 
 // #endregion

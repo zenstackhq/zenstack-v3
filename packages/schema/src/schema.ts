@@ -293,11 +293,10 @@ export type FieldIsRelationArray<
     Field extends GetModelFields<Schema, Model>,
 > = FieldIsRelation<Schema, Model, Field> extends true ? FieldIsArray<Schema, Model, Field> : false;
 
-export type IsDelegateModel<Schema extends SchemaDef, Model extends GetModels<Schema>> = string extends Model
-    ? false
-    : Schema['models'][Model]['isDelegate'] extends true
-      ? true
-      : false;
+export type IsDelegateModel<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+> = Schema['models'][Model]['isDelegate'] extends true ? true : false;
 
 export type FieldIsDelegateRelation<
     Schema extends SchemaDef,

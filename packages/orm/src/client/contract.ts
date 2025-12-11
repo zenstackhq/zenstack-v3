@@ -41,6 +41,7 @@ import type {
 } from './crud-types';
 import type { ClientOptions } from './options';
 import type { RuntimePlugin } from './plugin';
+import type { ZenStackPromise } from './promise';
 import type { ToKysely } from './query-builder';
 
 type TransactionUnsupportedMethods = (typeof TRANSACTION_UNSUPPORTED_METHODS)[number];
@@ -156,7 +157,7 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
     /**
      * Starts a sequential transaction.
      */
-    $transaction<P extends Promise<any>[]>(
+    $transaction<P extends ZenStackPromise<Schema, any>[]>(
         arg: [...P],
         options?: { isolationLevel?: TransactionIsolationLevel },
     ): Promise<UnwrapTuplePromises<P>>;

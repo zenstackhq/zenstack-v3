@@ -64,6 +64,7 @@ export type DefaultModelResult<
             ? never
             : Key]: MapModelFieldType<Schema, Model, Key>;
     },
+    // TODO: revisit how to efficiently implement discriminated sub model types
     // IsDelegateModel<Schema, Model> extends true
     //     ? // delegate model's selection result is a union of all sub-models
     //       DelegateUnionResult<Schema, Model, Options, GetSubModels<Schema, Model>, Omit>

@@ -152,7 +152,7 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
     $transaction<T>(
         callback: (tx: Omit<ClientContract<Schema, Options>, TransactionUnsupportedMethods>) => Promise<T>,
         options?: { isolationLevel?: TransactionIsolationLevel },
-    ): ZenStackPromise<Schema, T>;
+    ): Promise<T>;
 
     /**
      * Starts a sequential transaction.
@@ -160,7 +160,7 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
     $transaction<P extends ZenStackPromise<Schema, any>[]>(
         arg: [...P],
         options?: { isolationLevel?: TransactionIsolationLevel },
-    ): ZenStackPromise<Schema, UnwrapTuplePromises<P>>;
+    ): Promise<UnwrapTuplePromises<P>>;
 
     /**
      * Returns a new client with the specified plugin installed.

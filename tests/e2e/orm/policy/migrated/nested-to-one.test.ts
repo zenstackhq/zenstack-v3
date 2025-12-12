@@ -184,7 +184,7 @@ describe('With Policy:nested to-one', () => {
             }),
         ).toResolveTruthy();
 
-        // nested update to m2 is filtered silently
+        // nested update to m2 is filtered
         await expect(
             db.m1.update({
                 where: { id: '1' },
@@ -194,7 +194,7 @@ describe('With Policy:nested to-one', () => {
                     },
                 },
             }),
-        ).toResolveTruthy();
+        ).toBeRejectedNotFound();
 
         await expect(db.m2.findFirst()).resolves.toMatchObject({ value: 1 });
     });

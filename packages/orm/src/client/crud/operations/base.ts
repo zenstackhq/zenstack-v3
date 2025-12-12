@@ -1008,6 +1008,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             finalData = baseUpdateResult.remainingFields;
             // base update may change entity ids, update the filter
             combinedWhere = baseUpdateResult.baseEntity;
+
+            // update this entity with fields in updated base
+            if (baseUpdateResult.baseEntity) {
+                for (const [key, value] of Object.entries(baseUpdateResult.baseEntity)) {
+                    if (key in thisEntity) {
+                        thisEntity[key] = value;
+                    }
+                }
+            }
         }
 
         const updateFields: any = {};
@@ -1027,7 +1036,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     fieldDef,
                     thisEntity,
                     finalData[field],
-                    !fieldDef.array && !fieldDef.optional, // throw if not found for non-optional to-one relations
                 );
 
                 if (Object.keys(parentUpdates).length > 0) {
@@ -1347,7 +1355,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fieldDef: FieldDef,
         parentIds: any,
         args: any,
-        throwIfNotFound: boolean,
     ) {
         const fieldModel = fieldDef.type as GetModels<Schema>;
         const fromRelationContext: FromRelationContext = {
@@ -1415,6 +1422,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             where = undefined;
                             data = item;
                         }
+                        // update should throw if:
+                        // - to-many: there's a where clause and no entity is found
+                        // - to-one: always throw if no entity is found
+                        const throwIfNotFound = !fieldDef.array || !!where;
                         await this.update(kysely, fieldModel, where, data, fromRelationContext, true, throwIfNotFound);
                     }
                     break;

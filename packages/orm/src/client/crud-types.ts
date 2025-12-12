@@ -1900,7 +1900,8 @@ type NestedUpdateInput<
     Field extends RelationFields<Schema, Model>,
 > =
     FieldIsArray<Schema, Model, Field> extends true
-        ? OrArray<
+        ? // to-many
+          OrArray<
               {
                   /**
                    * Unique filter to select the record to update.
@@ -1918,12 +1919,13 @@ type NestedUpdateInput<
               },
               true
           >
-        : XOR<
+        : // to-one
+          XOR<
               {
                   /**
-                   * Unique filter to select the record to update.
+                   * Filter to select the record to update.
                    */
-                  where: WhereUniqueInput<Schema, RelationFieldType<Schema, Model, Field>>;
+                  where?: WhereInput<Schema, RelationFieldType<Schema, Model, Field>>;
 
                   /**
                    * The data to update the record with.

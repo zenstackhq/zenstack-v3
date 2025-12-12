@@ -673,18 +673,19 @@ describe('Policy tests to-many', () => {
             },
         });
 
-        const r = await db.m1.update({
-            where: { id: '1' },
-            include: { m3: true },
-            data: {
-                m3: {
-                    update: {
-                        value: 1,
+        await expect(
+            db.m1.update({
+                where: { id: '1' },
+                include: { m3: true },
+                data: {
+                    m3: {
+                        update: {
+                            value: 1,
+                        },
                     },
                 },
-            },
-        });
-        expect(r.m3).toBeNull();
+            }),
+        ).toBeRejectedNotFound();
 
         // make m3 readable
         await db.$unuseAll().m3.update({

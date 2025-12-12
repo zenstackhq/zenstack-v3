@@ -14,7 +14,7 @@ import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types'
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
-import { createInternalError } from '../../errors';
+import { createInternalError, createNotSupportedError } from '../../errors';
 import {
     getDelegateDescendantModels,
     getManyToManyRelation,
@@ -374,7 +374,13 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         value: unknown,
     ) {
         return match(operation)
-            .with('array_contains', () => sql<any>`EXISTS (SELECT 1 FROM jsonb_each(${lhs}) WHERE value = ${value})`)
+            .with('array_contains', () => {
+                if (Array.isArray(value)) {
+                    throw createNotSupportedError('Sqlite "array_contains" must be used with a single value');
+                } else {
+                    return sql<any>`EXISTS (SELECT 1 FROM jsonb_each(${lhs}) WHERE value = ${value})`;
+                }
+            })
             .with('array_starts_with', () =>
                 this.eb(this.eb.fn('json_extract', [lhs, this.eb.val('$[0]')]), '=', value),
             )
@@ -390,7 +396,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
     ) {
         return this.eb.exists(
             this.eb
-                .selectFrom(this.eb.fn('json_each', [receiver]).as('$items'))
+                .selectFrom(this.eb.fn('jsonb_each', [receiver]).as('$items'))
                 .select(this.eb.lit(1).as('$t'))
                 .where(buildFilter(this.eb.ref('$items.value'))),
         );

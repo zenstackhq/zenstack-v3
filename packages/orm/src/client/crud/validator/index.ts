@@ -1187,7 +1187,7 @@ export class InputValidator<Schema extends SchemaDef> {
             fields['update'] = array
                 ? this.orArray(
                       z.strictObject({
-                          where: this.makeWhereSchema(fieldType, true).optional(),
+                          where: this.makeWhereSchema(fieldType, true),
                           data: this.makeUpdateDataSchema(fieldType, withoutFields),
                       }),
                       true,
@@ -1195,7 +1195,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 : z
                       .union([
                           z.strictObject({
-                              where: this.makeWhereSchema(fieldType, true).optional(),
+                              where: this.makeWhereSchema(fieldType, false).optional(),
                               data: this.makeUpdateDataSchema(fieldType, withoutFields),
                           }),
                           this.makeUpdateDataSchema(fieldType, withoutFields),

@@ -668,23 +668,30 @@ describe('Policy tests to-many', () => {
                     ],
                 },
                 m3: {
-                    create: { value: 0 },
+                    create: { id: 'm3', value: 0 },
                 },
             },
         });
 
-        const r = await db.m1.update({
-            where: { id: '1' },
-            include: { m3: true },
-            data: {
-                m3: {
-                    update: {
-                        value: 1,
+        await expect(
+            db.m1.update({
+                where: { id: '1' },
+                include: { m3: true },
+                data: {
+                    m3: {
+                        update: {
+                            value: 1,
+                        },
                     },
                 },
-            },
+            }),
+        ).toBeRejectedNotFound();
+
+        // make m3 readable
+        await db.$unuseAll().m3.update({
+            where: { id: 'm3' },
+            data: { value: 2 },
         });
-        expect(r.m3).toBeNull();
 
         const r1 = await db.m1.update({
             where: { id: '1' },
@@ -692,15 +699,21 @@ describe('Policy tests to-many', () => {
             data: {
                 m3: {
                     update: {
-                        value: 2,
+                        value: 3,
                     },
                 },
             },
         });
         // m3 is ok now
-        expect(r1.m3.value).toBe(2);
+        expect(r1.m3.value).toBe(3);
         // m2 got filtered
         expect(r1.m2).toHaveLength(0);
+
+        // make m2#1 readable
+        await db.$unuseAll().m2.update({
+            where: { id: '1' },
+            data: { value: 2 },
+        });
 
         const r2 = await db.m1.update({
             where: { id: '1' },
@@ -709,7 +722,7 @@ describe('Policy tests to-many', () => {
                 m2: {
                     update: {
                         where: { id: '1' },
-                        data: { value: 2 },
+                        data: { value: 3 },
                     },
                 },
             },

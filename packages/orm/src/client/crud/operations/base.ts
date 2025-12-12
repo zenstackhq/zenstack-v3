@@ -961,9 +961,20 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
 
+        // read pre-update entity with ids so that the caller can use it to identify
+        // the entity being updated, the read data is used as return value if no update
+        // is made to the entity
+        const thisEntity = await this.getEntityIds(kysely, model, combinedWhere);
+        if (!thisEntity) {
+            if (throwIfNotFound) {
+                throw createNotFoundError(model);
+            } else {
+                return null;
+            }
+        }
+
         if (Object.keys(finalData).length === 0) {
-            // nothing to update, return the original filter so that caller can identify the entity
-            return combinedWhere;
+            return thisEntity;
         }
 
         let needIdRead = false;
@@ -1000,7 +1011,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         const updateFields: any = {};
-        let thisEntity: any = undefined;
 
         for (const field in finalData) {
             const fieldDef = this.requireField(model, field);
@@ -1009,16 +1019,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             } else {
                 if (!allowRelationUpdate) {
                     throw createNotSupportedError(`Relation update not allowed for field "${field}"`);
-                }
-                if (!thisEntity) {
-                    thisEntity = await this.getEntityIds(kysely, model, combinedWhere);
-                    if (!thisEntity) {
-                        if (throwIfNotFound) {
-                            throw createNotFoundError(model);
-                        } else {
-                            return null;
-                        }
-                    }
                 }
                 const parentUpdates = await this.processRelationUpdates(
                     kysely,
@@ -1044,8 +1044,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         if (!hasFieldUpdate) {
-            // nothing to update, return the filter so that the caller can identify the entity
-            return combinedWhere;
+            // nothing to update, return the existing entity
+            return thisEntity;
         } else {
             fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
             const query = kysely

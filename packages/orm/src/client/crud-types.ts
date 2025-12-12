@@ -1,4 +1,5 @@
 import type { ExpressionBuilder, OperandExpression, SqlBool } from 'kysely';
+import type { DbNull, JsonNull, JsonNullValues, JsonValue } from '../common-types';
 import type {
     BuiltinType,
     FieldDef,
@@ -32,8 +33,6 @@ import type {
 } from '../schema';
 import type {
     AtLeast,
-    JsonNullValues,
-    JsonValue,
     MapBaseType,
     NonEmptyArray,
     NullableIf,
@@ -45,7 +44,6 @@ import type {
     WrapType,
     XOR,
 } from '../utils/type-utils';
-import type { DbNull, JsonNull } from './null-values';
 import type { ClientOptions } from './options';
 import type { ToKyselySchema } from './query-builder';
 

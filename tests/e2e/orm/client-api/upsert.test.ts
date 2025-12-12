@@ -133,12 +133,15 @@ describe('Client upsert tests', () => {
     });
 
     it('works with upsert with empty create payload', async () => {
-        const db = await createTestClient(`
+        const db = await createTestClient(
+            `
 model User {
   id String @id @default(cuid())
   name String?
 }
-        `);
+        `,
+            { dbName: 'orm_upsert_empty_create' },
+        );
 
         // Test 1: First upsert should create the entity with empty data
         const created = await db.user.upsert({

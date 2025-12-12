@@ -2,6 +2,7 @@ import { enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers'
 import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { expressionBuilder, sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, DataSourceProviderType, FieldDef, GetModels, ModelDef, SchemaDef } from '../../../schema';
 import type { OrArray } from '../../../utils/type-utils';
 import { AGGREGATE_OPERATORS, DELEGATE_JOINED_FIELD_PREFIX, LOGICAL_COMBINATORS } from '../../constants';
@@ -15,7 +16,6 @@ import type {
     StringFilter,
 } from '../../crud-types';
 import { createConfigError, createInvalidInputError, createNotSupportedError } from '../../errors';
-import { AnyNullClass, DbNullClass, JsonNullClass } from '../../null-values';
 import type { ClientOptions } from '../../options';
 import {
     aggregate,

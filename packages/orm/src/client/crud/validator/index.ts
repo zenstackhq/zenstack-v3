@@ -3,6 +3,7 @@ import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
 import { z, ZodType } from 'zod';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import {
     type AttributeApplication,
     type BuiltinType,
@@ -32,7 +33,6 @@ import {
     type UpsertArgs,
 } from '../../crud-types';
 import { createInternalError, createInvalidInputError } from '../../errors';
-import { AnyNullClass, DbNullClass, JsonNullClass } from '../../null-values';
 import {
     fieldHasDefaultValue,
     getDiscriminatorField,

@@ -11,11 +11,11 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import z from 'zod';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
 import { createInternalError } from '../../errors';
-import { AnyNullClass, DbNullClass, JsonNullClass } from '../../null-values';
 import type { ClientOptions } from '../../options';
 import {
     buildJoinPairs,

@@ -492,6 +492,9 @@ describe('Json filter tests', () => {
         await db.foo.create({
             data: { data: { name: 'Bob Johnson', email: 'bob@example.net', tags: ['manager', 'typescript'] } },
         });
+        await db.foo.create({
+            data: { data: { name: '%Foo', email: 'foo@example.com' } },
+        });
 
         // string_contains
         await expect(
@@ -504,6 +507,17 @@ describe('Json filter tests', () => {
                 },
             }),
         ).resolves.toMatchObject({ data: { name: 'John Doe' } });
+
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.name',
+                        string_contains: '%Doe', // % should be treated as literal
+                    },
+                },
+            }),
+        ).toResolveNull();
 
         await expect(
             db.foo.findFirst({
@@ -576,6 +590,36 @@ describe('Json filter tests', () => {
                 },
             }),
         ).resolves.toMatchObject({ data: { name: 'Jane Smith' } });
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.name',
+                        string_starts_with: '%Jane', // % should be treated as literal
+                    },
+                },
+            }),
+        ).toResolveNull();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.name',
+                        string_starts_with: '%Smith', // % should be treated as literal
+                    },
+                },
+            }),
+        ).toResolveNull();
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.name',
+                        string_starts_with: '%Foo', // % should be treated as literal
+                    },
+                },
+            }),
+        ).resolves.toMatchObject({ data: { name: '%Foo' } });
 
         // string_ends_with
         await expect(
@@ -588,6 +632,16 @@ describe('Json filter tests', () => {
                 },
             }),
         ).resolves.toMatchObject({ data: { name: 'Bob Johnson' } });
+        await expect(
+            db.foo.findFirst({
+                where: {
+                    data: {
+                        path: '$.name',
+                        string_ends_with: 'Johnson%',
+                    },
+                },
+            }),
+        ).toResolveNull();
 
         // Test with array index access
         await expect(

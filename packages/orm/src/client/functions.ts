@@ -1,5 +1,5 @@
 import { invariant, lowerCaseFirst, upperCaseFirst } from '@zenstackhq/common-helpers';
-import { sql, ValueNode, type BinaryOperator, type Expression, type ExpressionBuilder } from 'kysely';
+import { sql, ValueNode, type BinaryOperator, type Expression, type ExpressionBuilder, type SqlBool } from 'kysely';
 import { match } from 'ts-pattern';
 import type { ZModelFunction, ZModelFunctionContext } from './options';
 
@@ -53,13 +53,16 @@ const textMatch = (
         op = 'like';
     }
 
+    // escape special characters in search string
+    const escapedSearch = sql`REPLACE(REPLACE(REPLACE(CAST(${searchExpr} as text), '\\', '\\\\'), '%', '\\%'), '_', '\\_')`;
+
     searchExpr = match(method)
-        .with('contains', () => eb.fn('CONCAT', [sql.lit('%'), sql`CAST(${searchExpr} as text)`, sql.lit('%')]))
-        .with('startsWith', () => eb.fn('CONCAT', [sql`CAST(${searchExpr} as text)`, sql.lit('%')]))
-        .with('endsWith', () => eb.fn('CONCAT', [sql.lit('%'), sql`CAST(${searchExpr} as text)`]))
+        .with('contains', () => eb.fn('CONCAT', [sql.lit('%'), escapedSearch, sql.lit('%')]))
+        .with('startsWith', () => eb.fn('CONCAT', [escapedSearch, sql.lit('%')]))
+        .with('endsWith', () => eb.fn('CONCAT', [sql.lit('%'), escapedSearch]))
         .exhaustive();
 
-    return eb(fieldExpr, op, searchExpr);
+    return sql<SqlBool>`${fieldExpr} ${sql.raw(op)} ${searchExpr} escape '\\'`;
 };
 
 export const has: ZModelFunction<any> = (eb, args) => {

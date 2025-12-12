@@ -541,7 +541,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         } else if (isTypeDef(this.schema, fieldDef.type)) {
             return this.buildTypedJsonFilter(receiver, filter, fieldDef.type, !!fieldDef.array);
         } else {
-            return this.true();
+            throw createInvalidInputError(`Invalid JSON filter payload`);
         }
     }
 
@@ -597,7 +597,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     // already handled
                     break;
                 default:
-                    invariant(false, `Invalid JSON filter key: ${key}`);
+                    throw createInvalidInputError(`Invalid JSON filter key: ${key}`);
             }
         }
         return this.and(...clauses);
@@ -817,22 +817,15 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     continue;
                 }
 
+                invariant(typeof value === 'string', `${key} value must be a string`);
+
+                const escapedValue = this.escapeLikePattern(value);
                 const condition = match(key)
-                    .with('contains', () =>
-                        mode === 'insensitive'
-                            ? this.eb(fieldRef, 'ilike', sql.val(`%${value}%`))
-                            : this.eb(fieldRef, 'like', sql.val(`%${value}%`)),
-                    )
+                    .with('contains', () => this.buildStringLike(fieldRef, `%${escapedValue}%`, mode === 'insensitive'))
                     .with('startsWith', () =>
-                        mode === 'insensitive'
-                            ? this.eb(fieldRef, 'ilike', sql.val(`${value}%`))
-                            : this.eb(fieldRef, 'like', sql.val(`${value}%`)),
+                        this.buildStringLike(fieldRef, `${escapedValue}%`, mode === 'insensitive'),
                     )
-                    .with('endsWith', () =>
-                        mode === 'insensitive'
-                            ? this.eb(fieldRef, 'ilike', sql.val(`%${value}`))
-                            : this.eb(fieldRef, 'like', sql.val(`%${value}`)),
-                    )
+                    .with('endsWith', () => this.buildStringLike(fieldRef, `%${escapedValue}`, mode === 'insensitive'))
                     .otherwise(() => {
                         throw createInvalidInputError(`Invalid string filter key: ${key}`);
                     });
@@ -844,6 +837,33 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         return this.and(...conditions);
+    }
+
+    private buildJsonStringFilter(
+        receiver: Expression<any>,
+        operation: 'string_contains' | 'string_starts_with' | 'string_ends_with',
+        value: string,
+        mode: 'default' | 'insensitive',
+    ) {
+        // build LIKE pattern based on operation, note that receiver is quoted
+        const escapedValue = this.escapeLikePattern(value);
+        const pattern = match(operation)
+            .with('string_contains', () => `"%${escapedValue}%"`)
+            .with('string_starts_with', () => `"${escapedValue}%"`)
+            .with('string_ends_with', () => `"%${escapedValue}"`)
+            .exhaustive();
+
+        return this.buildStringLike(receiver, pattern, mode === 'insensitive');
+    }
+
+    private escapeLikePattern(pattern: string) {
+        return pattern.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    }
+
+    private buildStringLike(receiver: Expression<any>, pattern: string, insensitive: boolean) {
+        const { supportsILike } = this.getStringCasingBehavior();
+        const op = insensitive && supportsILike ? 'ilike' : 'like';
+        return sql<SqlBool>`${receiver} ${sql.raw(op)} ${sql.val(pattern)} escape '\\'`;
     }
 
     private prepStringCasing(
@@ -1408,16 +1428,6 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Builds a JSON path selection expression.
      */
     protected abstract buildJsonPathSelection(receiver: Expression<any>, path: string | undefined): Expression<any>;
-
-    /**
-     * Builds a JSON string filter expression.
-     */
-    protected abstract buildJsonStringFilter(
-        receiver: Expression<any>,
-        operation: 'string_contains' | 'string_starts_with' | 'string_ends_with',
-        value: string,
-        mode: 'default' | 'insensitive',
-    ): Expression<SqlBool>;
 
     /**
      * Builds a JSON array filter expression.

@@ -70,9 +70,5 @@
         "glob": "^11.1.0",
         "langium-cli": "catalog:",
         "tmp": "catalog:"
-    },
-    "volta": {
-        "node": "18.19.1",
-        "npm": "10.2.4"
     }
 }

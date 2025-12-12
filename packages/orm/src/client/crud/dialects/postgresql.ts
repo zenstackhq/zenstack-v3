@@ -462,22 +462,6 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
     }
 
-    protected override buildJsonStringFilter(
-        receiver: Expression<any>,
-        operation: 'string_contains' | 'string_starts_with' | 'string_ends_with',
-        value: string,
-        mode: 'default' | 'insensitive',
-    ) {
-        // build LIKE pattern based on operation
-        const pattern = match(operation)
-            .with('string_contains', () => `"%${value}%"`)
-            .with('string_starts_with', () => `"${value}%"`)
-            .with('string_ends_with', () => `"%${value}"`)
-            .exhaustive();
-
-        return this.eb(receiver, mode === 'insensitive' ? 'ilike' : 'like', sql.val(pattern));
-    }
-
     protected override buildJsonArrayFilter(
         lhs: Expression<any>,
         operation: 'array_contains' | 'array_starts_with' | 'array_ends_with',

@@ -1027,7 +1027,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     fieldDef,
                     thisEntity,
                     finalData[field],
-                    throwIfNotFound,
+                    !fieldDef.array && !fieldDef.optional, // throw if not found for non-optional to-one relations
                 );
 
                 if (Object.keys(parentUpdates).length > 0) {

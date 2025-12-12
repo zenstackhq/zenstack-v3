@@ -759,6 +759,19 @@ describe('Json filter tests', () => {
             }),
         ).resolves.toMatchObject({ data: { tags: ['typescript', 'react', 'node'] } });
 
+        if ((db.$schema.provider.type as any) === 'postgresql') {
+            await expect(
+                db.foo.findFirst({
+                    where: {
+                        data: {
+                            path: '$.tags',
+                            array_contains: ['react'],
+                        },
+                    },
+                }),
+            ).resolves.toMatchObject({ data: { tags: ['typescript', 'react', 'node'] } });
+        }
+
         await expect(
             db.foo.findFirst({
                 where: {

@@ -376,7 +376,9 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return match(operation)
             .with('array_contains', () => {
                 if (Array.isArray(value)) {
-                    throw createNotSupportedError('Sqlite "array_contains" must be used with a single value');
+                    throw createNotSupportedError(
+                        'SQLite "array_contains" only supports checking for a single value, not an array of values',
+                    );
                 } else {
                     return sql<any>`EXISTS (SELECT 1 FROM jsonb_each(${lhs}) WHERE value = ${value})`;
                 }

@@ -368,22 +368,6 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         }
     }
 
-    protected override buildJsonStringFilter(
-        lhs: Expression<any>,
-        operation: 'string_contains' | 'string_starts_with' | 'string_ends_with',
-        value: string,
-        _mode: 'default' | 'insensitive',
-    ) {
-        // JSON strings are quoted, so we need to add quotes to the pattern
-        const pattern = match(operation)
-            .with('string_contains', () => `"%${value}%"`)
-            .with('string_starts_with', () => `"${value}%"`)
-            .with('string_ends_with', () => `"%${value}"`)
-            .exhaustive();
-
-        return this.eb(lhs, 'like', sql.val(pattern));
-    }
-
     protected override buildJsonArrayFilter(
         lhs: Expression<any>,
         operation: 'array_contains' | 'array_starts_with' | 'array_ends_with',

@@ -6,11 +6,11 @@
 /* eslint-disable */
 
 import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
-const _schema = {
-    provider: {
+export class SchemaType implements SchemaDef {
+    provider = {
         type: "postgresql"
-    },
-    models: {
+    } as const;
+    models = {
         Webhook: {
             name: "Webhook",
             fields: {
@@ -2831,8 +2831,8 @@ const _schema = {
                 projectId_teamId: { projectId: { type: "String" }, teamId: { type: "String" } }
             }
         }
-    },
-    enums: {
+    } as const;
+    enums = {
         PipelineTriggers: {
             values: {
                 responseCreated: "responseCreated",
@@ -3018,12 +3018,8 @@ const _schema = {
                 manage: "manage"
             }
         }
-    },
-    authType: "User",
-    plugins: {}
-} as const satisfies SchemaDef;
-type Schema = typeof _schema & {
-    __brand?: "schema";
-};
-export const schema: Schema = _schema;
-export type SchemaType = Schema;
+    } as const;
+    authType = "User" as const;
+    plugins = {};
+}
+export const schema = new SchemaType();

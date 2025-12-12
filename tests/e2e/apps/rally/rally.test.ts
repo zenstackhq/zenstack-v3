@@ -5,10 +5,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { schema, type SchemaType } from './zenstack/schema';
 
 describe('Rally app tests', () => {
-    let db: ClientContract<SchemaType>;
+    let db: ClientContract<SchemaType, any>;
 
     beforeEach(async () => {
-        db = await createTestClient(schema, {
+        db = (await createTestClient(schema, {
             provider: 'postgresql',
             schemaFile: path.join(__dirname, 'zenstack/schema.zmodel'),
             copyFiles: [
@@ -19,7 +19,7 @@ describe('Rally app tests', () => {
             ],
             dataSourceExtensions: ['citext'],
             usePrismaPush: true,
-        });
+        })) as any;
     });
 
     it('works with queries', async () => {

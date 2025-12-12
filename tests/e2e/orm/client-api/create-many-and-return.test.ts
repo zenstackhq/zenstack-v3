@@ -7,7 +7,7 @@ describe('Client createManyAndReturn tests', () => {
     let client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        client = await createTestClient(schema);
+        client = (await createTestClient(schema)) as any;
     });
 
     afterEach(async () => {
@@ -59,7 +59,7 @@ describe('Client createManyAndReturn tests', () => {
     });
 
     it('works with select and omit', async () => {
-        let r = await client.user.createManyAndReturn({
+        const r = await client.user.createManyAndReturn({
             data: [{ email: 'u1@test.com', name: 'name' }],
             select: { email: true },
         });
@@ -67,12 +67,12 @@ describe('Client createManyAndReturn tests', () => {
         // @ts-expect-error
         expect(r[0]!.name).toBeUndefined();
 
-        r = await client.user.createManyAndReturn({
+        const r1 = await client.user.createManyAndReturn({
             data: [{ email: 'u2@test.com', name: 'name' }],
             omit: { name: true },
         });
-        expect(r[0]!.email).toBe('u2@test.com');
+        expect(r1[0]!.email).toBe('u2@test.com');
         // @ts-expect-error
-        expect(r[0]!.name).toBeUndefined();
+        expect(r1[0]!.name).toBeUndefined();
     });
 });

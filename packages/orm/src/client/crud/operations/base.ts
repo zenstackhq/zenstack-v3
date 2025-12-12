@@ -250,7 +250,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         data: any,
         fromRelation?: FromRelationContext,
         creatingForDelegate = false,
-        returnFields?: string[],
+        returnFields?: readonly string[],
     ): Promise<unknown> {
         const modelDef = this.requireModel(model);
 
@@ -662,7 +662,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         input: { data: any; skipDuplicates?: boolean },
         returnData: ReturnData,
         fromRelation?: FromRelationContext,
-        fieldsToReturn?: string[],
+        fieldsToReturn?: readonly string[],
     ): Promise<Result> {
         if (!input.data || (Array.isArray(input.data) && input.data.length === 0)) {
             // nothing todo
@@ -901,7 +901,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fromRelation?: FromRelationContext,
         allowRelationUpdate = true,
         throwIfNotFound = true,
-        fieldsToReturn?: string[],
+        fieldsToReturn?: readonly string[],
     ): Promise<unknown> {
         if (!data || typeof data !== 'object') {
             throw createInvalidInputError('data must be an object');
@@ -961,9 +961,20 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             }
         }
 
+        // read pre-update entity with ids so that the caller can use it to identify
+        // the entity being updated, the read data is used as return value if no update
+        // is made to the entity
+        const thisEntity = await this.getEntityIds(kysely, model, combinedWhere);
+        if (!thisEntity) {
+            if (throwIfNotFound) {
+                throw createNotFoundError(model);
+            } else {
+                return null;
+            }
+        }
+
         if (Object.keys(finalData).length === 0) {
-            // nothing to update, return the original filter so that caller can identify the entity
-            return combinedWhere;
+            return thisEntity;
         }
 
         let needIdRead = false;
@@ -997,10 +1008,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             finalData = baseUpdateResult.remainingFields;
             // base update may change entity ids, update the filter
             combinedWhere = baseUpdateResult.baseEntity;
+
+            // update this entity with fields in updated base
+            if (baseUpdateResult.baseEntity) {
+                for (const [key, value] of Object.entries(baseUpdateResult.baseEntity)) {
+                    if (key in thisEntity) {
+                        thisEntity[key] = value;
+                    }
+                }
+            }
         }
 
         const updateFields: any = {};
-        let thisEntity: any = undefined;
 
         for (const field in finalData) {
             const fieldDef = this.requireField(model, field);
@@ -1010,16 +1029,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (!allowRelationUpdate) {
                     throw createNotSupportedError(`Relation update not allowed for field "${field}"`);
                 }
-                if (!thisEntity) {
-                    thisEntity = await this.getEntityIds(kysely, model, combinedWhere);
-                    if (!thisEntity) {
-                        if (throwIfNotFound) {
-                            throw createNotFoundError(model);
-                        } else {
-                            return null;
-                        }
-                    }
-                }
                 const parentUpdates = await this.processRelationUpdates(
                     kysely,
                     model,
@@ -1027,7 +1036,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     fieldDef,
                     thisEntity,
                     finalData[field],
-                    throwIfNotFound,
                 );
 
                 if (Object.keys(parentUpdates).length > 0) {
@@ -1044,8 +1052,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         if (!hasFieldUpdate) {
-            // nothing to update, return the filter so that the caller can identify the entity
-            return combinedWhere;
+            // nothing to update, return the existing entity
+            return thisEntity;
         } else {
             fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
             const query = kysely
@@ -1207,7 +1215,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         limit: number | undefined,
         returnData: ReturnData,
         filterModel?: string,
-        fieldsToReturn?: string[],
+        fieldsToReturn?: readonly string[],
     ): Promise<Result> {
         if (typeof data !== 'object') {
             throw createInvalidInputError('data must be an object');
@@ -1347,7 +1355,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         fieldDef: FieldDef,
         parentIds: any,
         args: any,
-        throwIfNotFound: boolean,
     ) {
         const fieldModel = fieldDef.type as GetModels<Schema>;
         const fromRelationContext: FromRelationContext = {
@@ -1415,6 +1422,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             where = undefined;
                             data = item;
                         }
+                        // update should throw if:
+                        // - to-many: there's a where clause and no entity is found
+                        // - to-one: always throw if no entity is found
+                        const throwIfNotFound = !fieldDef.array || !!where;
                         await this.update(kysely, fieldModel, where, data, fromRelationContext, true, throwIfNotFound);
                     }
                     break;
@@ -1923,7 +1934,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         where: any,
         limit?: number,
         filterModel?: string,
-        fieldsToReturn?: string[],
+        fieldsToReturn?: readonly string[],
     ): Promise<QueryResult<unknown>> {
         filterModel ??= model;
 

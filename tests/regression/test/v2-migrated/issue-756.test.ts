@@ -5,10 +5,6 @@ describe('Regression for issue #756', () => {
     it('verifies issue 756', async () => {
         await loadSchemaWithError(
             `
-        generator client {
-            provider = "prisma-client-js"
-        }
-
         datasource db {
             provider = "postgresql"
             url      = env("DATABASE_URL")

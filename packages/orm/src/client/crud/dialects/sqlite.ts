@@ -7,12 +7,14 @@ import {
     type ExpressionBuilder,
     type RawBuilder,
     type SelectQueryBuilder,
+    type SqlBool,
 } from 'kysely';
 import { match } from 'ts-pattern';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
-import { createInternalError } from '../../errors';
+import { createInternalError, createNotSupportedError } from '../../errors';
 import {
     getDelegateDescendantModels,
     getManyToManyRelation,
@@ -33,27 +35,35 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             return value;
         }
 
+        // Handle special null classes for JSON fields
+        if (value instanceof JsonNullClass) {
+            return 'null';
+        } else if (value instanceof DbNullClass) {
+            return null;
+        } else if (value instanceof AnyNullClass) {
+            invariant(false, 'should not reach here: AnyNull is not a valid input value');
+        }
+
+        if (type === 'Json' || (this.schema.typeDefs && type in this.schema.typeDefs)) {
+            // JSON data should be stringified
+            return JSON.stringify(value);
+        }
+
         if (Array.isArray(value)) {
             return value.map((v) => this.transformPrimitive(v, type, false));
         } else {
-            if (this.schema.typeDefs && type in this.schema.typeDefs) {
-                // typed JSON field
-                return JSON.stringify(value);
-            } else {
-                return match(type)
-                    .with('Boolean', () => (value ? 1 : 0))
-                    .with('DateTime', () =>
-                        value instanceof Date
-                            ? value.toISOString()
-                            : typeof value === 'string'
-                              ? new Date(value).toISOString()
-                              : value,
-                    )
-                    .with('Decimal', () => (value as Decimal).toString())
-                    .with('Bytes', () => Buffer.from(value as Uint8Array))
-                    .with('Json', () => JSON.stringify(value))
-                    .otherwise(() => value);
-            }
+            return match(type)
+                .with('Boolean', () => (value ? 1 : 0))
+                .with('DateTime', () =>
+                    value instanceof Date
+                        ? value.toISOString()
+                        : typeof value === 'string'
+                          ? new Date(value).toISOString()
+                          : value,
+                )
+                .with('Decimal', () => (value as Decimal).toString())
+                .with('Bytes', () => Buffer.from(value as Uint8Array))
+                .otherwise(() => value);
         }
     }
 
@@ -347,6 +357,50 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return this.eb.fn(
             'json_object',
             Object.entries(value).flatMap(([key, value]) => [sql.lit(key), value]),
+        );
+    }
+
+    protected override buildJsonPathSelection(receiver: Expression<any>, path: string | undefined) {
+        if (!path) {
+            return receiver;
+        } else {
+            return sql`${receiver} -> ${this.eb.val(path)}`;
+        }
+    }
+
+    protected override buildJsonArrayFilter(
+        lhs: Expression<any>,
+        operation: 'array_contains' | 'array_starts_with' | 'array_ends_with',
+        value: unknown,
+    ) {
+        return match(operation)
+            .with('array_contains', () => {
+                if (Array.isArray(value)) {
+                    throw createNotSupportedError(
+                        'SQLite "array_contains" only supports checking for a single value, not an array of values',
+                    );
+                } else {
+                    return sql<any>`EXISTS (SELECT 1 FROM jsonb_each(${lhs}) WHERE value = ${value})`;
+                }
+            })
+            .with('array_starts_with', () =>
+                this.eb(this.eb.fn('json_extract', [lhs, this.eb.val('$[0]')]), '=', value),
+            )
+            .with('array_ends_with', () =>
+                this.eb(sql`json_extract(${lhs}, '$[' || (json_array_length(${lhs}) - 1) || ']')`, '=', value),
+            )
+            .exhaustive();
+    }
+
+    protected override buildJsonArrayExistsPredicate(
+        receiver: Expression<any>,
+        buildFilter: (elem: Expression<any>) => Expression<SqlBool>,
+    ) {
+        return this.eb.exists(
+            this.eb
+                .selectFrom(this.eb.fn('jsonb_each', [receiver]).as('$items'))
+                .select(this.eb.lit(1).as('$t'))
+                .where(buildFilter(this.eb.ref('$items.value'))),
         );
     }
 

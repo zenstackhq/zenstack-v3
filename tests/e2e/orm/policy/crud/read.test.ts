@@ -36,7 +36,8 @@ model Foo {
 
             await expect(db.foo.create({ data: { id: 1, x: 0 } })).toBeRejectedByPolicy();
             await expect(db.$unuseAll().foo.count()).resolves.toBe(1);
-            await expect(db.foo.update({ where: { id: 1 }, data: { x: 1 } })).resolves.toMatchObject({ x: 1 });
+            await db.$unuseAll().foo.update({ where: { id: 1 }, data: { x: 1 } });
+            await expect(db.foo.update({ where: { id: 1 }, data: { x: 2 } })).resolves.toMatchObject({ x: 2 });
         });
 
         it('works with to-one relation optional owner-side read', async () => {
@@ -61,7 +62,7 @@ model Bar {
 
             await db.foo.create({ data: { id: 1, bar: { create: { id: 1, y: 0 } } } });
             await expect(db.foo.findFirst({ include: { bar: true } })).resolves.toMatchObject({ id: 1, bar: null });
-            await db.bar.update({ where: { id: 1 }, data: { y: 1 } });
+            await db.$unuseAll().bar.update({ where: { id: 1 }, data: { y: 1 } });
             await expect(db.foo.findFirst({ include: { bar: true } })).resolves.toMatchObject({
                 id: 1,
                 bar: { id: 1 },
@@ -92,7 +93,7 @@ model Bar {
 
             await db.foo.create({ data: { id: 1, bar: { create: { id: 1, y: 0 } } } });
             await expect(db.foo.findFirst({ include: { bar: true } })).resolves.toMatchObject({ id: 1, bar: null });
-            await db.bar.update({ where: { id: 1 }, data: { y: 1 } });
+            await db.$unuseAll().bar.update({ where: { id: 1 }, data: { y: 1 } });
             await expect(db.foo.findFirst({ include: { bar: true } })).resolves.toMatchObject({
                 id: 1,
                 bar: { id: 1 },
@@ -121,7 +122,7 @@ model Bar {
 
             await db.foo.create({ data: { id: 1, bar: { create: { id: 1, y: 0 } } } });
             await expect(db.foo.findFirst({ include: { bar: true } })).resolves.toMatchObject({ id: 1, bar: null });
-            await db.bar.update({ where: { id: 1 }, data: { y: 1 } });
+            await db.$unuseAll().bar.update({ where: { id: 1 }, data: { y: 1 } });
             await expect(db.foo.findFirst({ include: { bar: true } })).resolves.toMatchObject({
                 id: 1,
                 bar: { id: 1 },

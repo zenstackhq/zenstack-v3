@@ -2,6 +2,7 @@ import { enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers'
 import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { expressionBuilder, sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, DataSourceProviderType, FieldDef, GetModels, ModelDef, SchemaDef } from '../../../schema';
 import type { OrArray } from '../../../utils/type-utils';
 import { AGGREGATE_OPERATORS, DELEGATE_JOINED_FIELD_PREFIX, LOGICAL_COMBINATORS } from '../../constants';
@@ -27,10 +28,12 @@ import {
     isEnum,
     isInheritedField,
     isRelationField,
+    isTypeDef,
     makeDefaultOrderBy,
     requireField,
     requireIdFields,
     requireModel,
+    requireTypeDef,
 } from '../../query-utils';
 
 export abstract class BaseCrudDialect<Schema extends SchemaDef> {
@@ -499,24 +502,213 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             return this.buildEnumFilter(fieldRef, fieldDef, payload);
         }
 
-        return (
-            match(fieldDef.type as BuiltinType)
-                .with('String', () => this.buildStringFilter(fieldRef, payload))
-                .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                    this.buildNumberFilter(fieldRef, type, payload),
-                )
-                .with('Boolean', () => this.buildBooleanFilter(fieldRef, payload))
-                .with('DateTime', () => this.buildDateTimeFilter(fieldRef, payload))
-                .with('Bytes', () => this.buildBytesFilter(fieldRef, payload))
-                // TODO: JSON filters
-                .with('Json', () => {
-                    throw createNotSupportedError('JSON filters are not supported yet');
-                })
-                .with('Unsupported', () => {
-                    throw createInvalidInputError(`Unsupported field cannot be used in filters`);
-                })
-                .exhaustive()
-        );
+        if (isTypeDef(this.schema, fieldDef.type)) {
+            return this.buildJsonFilter(fieldRef, payload, fieldDef);
+        }
+
+        return match(fieldDef.type as BuiltinType)
+            .with('String', () => this.buildStringFilter(fieldRef, payload))
+            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
+                this.buildNumberFilter(fieldRef, type, payload),
+            )
+            .with('Boolean', () => this.buildBooleanFilter(fieldRef, payload))
+            .with('DateTime', () => this.buildDateTimeFilter(fieldRef, payload))
+            .with('Bytes', () => this.buildBytesFilter(fieldRef, payload))
+            .with('Json', () => this.buildJsonFilter(fieldRef, payload, fieldDef))
+            .with('Unsupported', () => {
+                throw createInvalidInputError(`Unsupported field cannot be used in filters`);
+            })
+            .exhaustive();
+    }
+
+    private buildJsonFilter(receiver: Expression<any>, filter: any, fieldDef: FieldDef): any {
+        invariant(filter && typeof filter === 'object', 'Json filter payload must be an object');
+
+        if (
+            [
+                'path',
+                'equals',
+                'not',
+                'string_contains',
+                'string_starts_with',
+                'string_ends_with',
+                'array_contains',
+                'array_starts_with',
+                'array_ends_with',
+            ].some((k) => k in filter)
+        ) {
+            return this.buildPlainJsonFilter(receiver, filter);
+        } else if (isTypeDef(this.schema, fieldDef.type)) {
+            return this.buildTypedJsonFilter(receiver, filter, fieldDef.type, !!fieldDef.array);
+        } else {
+            throw createInvalidInputError(`Invalid JSON filter payload`);
+        }
+    }
+
+    private buildPlainJsonFilter(receiver: Expression<any>, filter: any) {
+        const clauses: Expression<SqlBool>[] = [];
+
+        const path = filter.path;
+        const jsonReceiver = this.buildJsonPathSelection(receiver, path);
+        const stringReceiver = this.eb.cast(jsonReceiver, 'text');
+
+        const mode = filter.mode ?? 'default';
+        invariant(mode === 'default' || mode === 'insensitive', 'Invalid JSON filter mode');
+
+        for (const [key, value] of Object.entries(filter)) {
+            switch (key) {
+                case 'equals': {
+                    clauses.push(this.buildJsonValueFilterClause(jsonReceiver, value));
+                    break;
+                }
+                case 'not': {
+                    clauses.push(this.eb.not(this.buildJsonValueFilterClause(jsonReceiver, value)));
+                    break;
+                }
+                case 'string_contains': {
+                    invariant(typeof value === 'string', 'string_contains value must be a string');
+                    clauses.push(this.buildJsonStringFilter(stringReceiver, key, value, mode));
+                    break;
+                }
+                case 'string_starts_with': {
+                    invariant(typeof value === 'string', 'string_starts_with value must be a string');
+                    clauses.push(this.buildJsonStringFilter(stringReceiver, key, value, mode));
+                    break;
+                }
+                case 'string_ends_with': {
+                    invariant(typeof value === 'string', 'string_ends_with value must be a string');
+                    clauses.push(this.buildJsonStringFilter(stringReceiver, key, value, mode));
+                    break;
+                }
+                case 'array_contains': {
+                    clauses.push(this.buildJsonArrayFilter(jsonReceiver, key, value));
+                    break;
+                }
+                case 'array_starts_with': {
+                    clauses.push(this.buildJsonArrayFilter(jsonReceiver, key, value));
+                    break;
+                }
+                case 'array_ends_with': {
+                    clauses.push(this.buildJsonArrayFilter(jsonReceiver, key, value));
+                    break;
+                }
+                case 'path':
+                case 'mode':
+                    // already handled
+                    break;
+                default:
+                    throw createInvalidInputError(`Invalid JSON filter key: ${key}`);
+            }
+        }
+        return this.and(...clauses);
+    }
+
+    private buildTypedJsonFilter(receiver: Expression<any>, filter: any, typeDefName: string, array: boolean) {
+        if (array) {
+            return this.buildTypedJsonArrayFilter(receiver, filter, typeDefName);
+        } else {
+            return this.buildTypeJsonNonArrayFilter(receiver, filter, typeDefName);
+        }
+    }
+
+    private buildTypedJsonArrayFilter(receiver: Expression<any>, filter: any, typeDefName: string) {
+        invariant(filter && typeof filter === 'object', 'Typed JSON array filter payload must be an object');
+
+        const makeExistsPred = (filter: any) =>
+            this.buildJsonArrayExistsPredicate(receiver, (elem) =>
+                this.buildTypedJsonFilter(elem, filter, typeDefName, false),
+            );
+
+        const makeExistsNegatedPred = (filter: any) =>
+            this.buildJsonArrayExistsPredicate(receiver, (elem) =>
+                this.eb.not(this.buildTypedJsonFilter(elem, filter, typeDefName, false)),
+            );
+
+        const clauses: Expression<SqlBool>[] = [];
+
+        for (const [key, value] of Object.entries(filter)) {
+            if (!value || typeof value !== 'object') {
+                continue;
+            }
+            switch (key) {
+                case 'some':
+                    clauses.push(makeExistsPred(value));
+                    break;
+
+                case 'none':
+                    clauses.push(this.eb.not(makeExistsPred(value)));
+                    break;
+
+                case 'every':
+                    clauses.push(this.eb.not(makeExistsNegatedPred(value)));
+                    break;
+
+                default:
+                    invariant(false, `Invalid typed JSON array filter key: ${key}`);
+            }
+        }
+        return this.and(...clauses);
+    }
+
+    private buildTypeJsonNonArrayFilter(
+        receiver: Expression<any>,
+        filter: any,
+        typeDefName: string,
+    ): Expression<SqlBool> {
+        const clauses: Expression<SqlBool>[] = [];
+
+        if (filter === null) {
+            return this.eb(receiver, '=', 'null');
+        }
+
+        invariant(filter && typeof filter === 'object', 'Typed JSON filter payload must be an object');
+
+        if ('is' in filter || 'isNot' in filter) {
+            // is / isNot filters
+            if ('is' in filter && filter.is && typeof filter.is === 'object') {
+                clauses.push(this.buildTypedJsonFilter(receiver, filter.is, typeDefName, false));
+            }
+
+            if ('isNot' in filter && filter.isNot && typeof filter.isNot === 'object') {
+                clauses.push(this.eb.not(this.buildTypedJsonFilter(receiver, filter.isNot, typeDefName, false)));
+            }
+        } else {
+            // direct field filters
+            const typeDef = requireTypeDef(this.schema, typeDefName);
+            for (const [key, value] of Object.entries(filter)) {
+                const fieldDef = typeDef.fields[key];
+                invariant(fieldDef, `Field "${key}" not found in type definition "${typeDefName}"`);
+                const fieldReceiver = this.buildJsonPathSelection(receiver, `$.${key}`);
+                if (isTypeDef(this.schema, fieldDef.type)) {
+                    clauses.push(this.buildTypedJsonFilter(fieldReceiver, value, fieldDef.type, !!fieldDef.array));
+                } else {
+                    if (fieldDef.array) {
+                        clauses.push(this.buildArrayFilter(fieldReceiver, fieldDef, value));
+                    } else {
+                        let _receiver = fieldReceiver;
+                        if (fieldDef.type === 'String') {
+                            // trim quotes for string fields
+                            _receiver = this.eb.fn('trim', [this.eb.cast(fieldReceiver, 'text'), sql.lit('"')]);
+                        }
+                        clauses.push(this.buildPrimitiveFilter(_receiver, fieldDef, value));
+                    }
+                }
+            }
+        }
+        return this.and(...clauses);
+    }
+
+    private buildJsonValueFilterClause(lhs: Expression<any>, value: unknown) {
+        if (value instanceof DbNullClass) {
+            return this.eb(lhs, 'is', null);
+        } else if (value instanceof JsonNullClass) {
+            return this.eb.and([this.eb(lhs, '=', 'null'), this.eb(lhs, 'is not', null)]);
+        } else if (value instanceof AnyNullClass) {
+            // AnyNull matches both DB NULL and JSON null
+            return this.eb.or([this.eb(lhs, 'is', null), this.eb(lhs, '=', 'null')]);
+        } else {
+            return this.buildLiteralFilter(lhs, 'Json', value);
+        }
     }
 
     private buildLiteralFilter(lhs: Expression<any>, type: BuiltinType, rhs: unknown) {
@@ -625,22 +817,15 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     continue;
                 }
 
+                invariant(typeof value === 'string', `${key} value must be a string`);
+
+                const escapedValue = this.escapeLikePattern(value);
                 const condition = match(key)
-                    .with('contains', () =>
-                        mode === 'insensitive'
-                            ? this.eb(fieldRef, 'ilike', sql.val(`%${value}%`))
-                            : this.eb(fieldRef, 'like', sql.val(`%${value}%`)),
-                    )
+                    .with('contains', () => this.buildStringLike(fieldRef, `%${escapedValue}%`, mode === 'insensitive'))
                     .with('startsWith', () =>
-                        mode === 'insensitive'
-                            ? this.eb(fieldRef, 'ilike', sql.val(`${value}%`))
-                            : this.eb(fieldRef, 'like', sql.val(`${value}%`)),
+                        this.buildStringLike(fieldRef, `${escapedValue}%`, mode === 'insensitive'),
                     )
-                    .with('endsWith', () =>
-                        mode === 'insensitive'
-                            ? this.eb(fieldRef, 'ilike', sql.val(`%${value}`))
-                            : this.eb(fieldRef, 'like', sql.val(`%${value}`)),
-                    )
+                    .with('endsWith', () => this.buildStringLike(fieldRef, `%${escapedValue}`, mode === 'insensitive'))
                     .otherwise(() => {
                         throw createInvalidInputError(`Invalid string filter key: ${key}`);
                     });
@@ -652,6 +837,33 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         return this.and(...conditions);
+    }
+
+    private buildJsonStringFilter(
+        receiver: Expression<any>,
+        operation: 'string_contains' | 'string_starts_with' | 'string_ends_with',
+        value: string,
+        mode: 'default' | 'insensitive',
+    ) {
+        // build LIKE pattern based on operation, note that receiver is quoted
+        const escapedValue = this.escapeLikePattern(value);
+        const pattern = match(operation)
+            .with('string_contains', () => `"%${escapedValue}%"`)
+            .with('string_starts_with', () => `"${escapedValue}%"`)
+            .with('string_ends_with', () => `"%${escapedValue}"`)
+            .exhaustive();
+
+        return this.buildStringLike(receiver, pattern, mode === 'insensitive');
+    }
+
+    private escapeLikePattern(pattern: string) {
+        return pattern.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    }
+
+    private buildStringLike(receiver: Expression<any>, pattern: string, insensitive: boolean) {
+        const { supportsILike } = this.getStringCasingBehavior();
+        const op = insensitive && supportsILike ? 'ilike' : 'like';
+        return sql<SqlBool>`${receiver} ${sql.raw(op)} ${sql.val(pattern)} escape '\\'`;
     }
 
     private prepStringCasing(
@@ -1211,6 +1423,28 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Gets the string casing behavior for the dialect.
      */
     abstract getStringCasingBehavior(): { supportsILike: boolean; likeCaseSensitive: boolean };
+
+    /**
+     * Builds a JSON path selection expression.
+     */
+    protected abstract buildJsonPathSelection(receiver: Expression<any>, path: string | undefined): Expression<any>;
+
+    /**
+     * Builds a JSON array filter expression.
+     */
+    protected abstract buildJsonArrayFilter(
+        receiver: Expression<any>,
+        operation: 'array_contains' | 'array_starts_with' | 'array_ends_with',
+        value: unknown,
+    ): Expression<SqlBool>;
+
+    /**
+     * Builds a JSON array exists predicate (returning if any element matches the filter).
+     */
+    protected abstract buildJsonArrayExistsPredicate(
+        receiver: Expression<any>,
+        buildFilter: (elem: Expression<any>) => Expression<SqlBool>,
+    ): Expression<SqlBool>;
 
     // #endregion
 }

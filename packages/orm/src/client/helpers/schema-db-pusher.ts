@@ -115,9 +115,9 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             const baseModelDef = requireModel(this.schema, modelDef.baseModel);
             table = table.addForeignKeyConstraint(
                 `fk_${modelDef.baseModel}_delegate`,
-                baseModelDef.idFields,
+                baseModelDef.idFields as string[],
                 modelDef.baseModel,
-                baseModelDef.idFields,
+                baseModelDef.idFields as string[],
                 (cb) => cb.onDelete('cascade').onUpdate('cascade'),
             );
         }

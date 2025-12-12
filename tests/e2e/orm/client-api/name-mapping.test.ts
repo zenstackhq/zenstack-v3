@@ -8,10 +8,10 @@ describe('Name mapping tests', () => {
     let db: ClientContract<SchemaType>;
 
     beforeEach(async () => {
-        db = await createTestClient(schema, {
+        db = (await createTestClient(schema, {
             usePrismaPush: true,
             schemaFile: path.join(__dirname, '../schemas/name-mapping/schema.zmodel'),
-        });
+        })) as any;
     });
 
     afterEach(async () => {

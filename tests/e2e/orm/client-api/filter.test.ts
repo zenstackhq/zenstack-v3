@@ -44,6 +44,7 @@ describe('Client filter tests ', () => {
     it('supports string filters', async () => {
         const user1 = await createUser('u1@test.com');
         const user2 = await createUser('u2@test.com', { name: null });
+        await createUser('u3%@test.com', { name: null });
 
         // equals
         await expect(client.user.findFirst({ where: { id: user1.id } })).toResolveTruthy();
@@ -95,6 +96,21 @@ describe('Client filter tests ', () => {
             ).toResolveTruthy();
             await expect(
                 client.user.findFirst({
+                    where: { email: { contains: '%test' } },
+                }),
+            ).toResolveNull();
+            await expect(
+                client.user.findFirst({
+                    where: { email: { contains: 'u3%' } },
+                }),
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({
+                    where: { email: { contains: 'u3a' } },
+                }),
+            ).toResolveNull();
+            await expect(
+                client.user.findFirst({
                     where: { email: { contains: 'Test' } },
                 }),
             ).toResolveTruthy();
@@ -106,7 +122,22 @@ describe('Client filter tests ', () => {
             ).toResolveTruthy();
             await expect(
                 client.user.findFirst({
+                    where: { email: { startsWith: '%u1' } },
+                }),
+            ).toResolveNull();
+            await expect(
+                client.user.findFirst({
                     where: { email: { startsWith: 'U1' } },
+                }),
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({
+                    where: { email: { startsWith: 'u3a' } },
+                }),
+            ).toResolveNull();
+            await expect(
+                client.user.findFirst({
+                    where: { email: { startsWith: 'u3%' } },
                 }),
             ).toResolveTruthy();
 
@@ -154,6 +185,28 @@ describe('Client filter tests ', () => {
                     },
                 }),
             ).toResolveTruthy();
+
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { contains: '%u1', mode: 'insensitive' } as any,
+                    },
+                }),
+            ).toResolveNull();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { contains: 'u3%', mode: 'insensitive' } as any,
+                    },
+                }),
+            ).toResolveTruthy();
+            await expect(
+                client.user.findFirst({
+                    where: {
+                        email: { contains: 'u3a', mode: 'insensitive' } as any,
+                    },
+                }),
+            ).toResolveNull();
 
             await expect(
                 client.user.findFirst({
@@ -211,7 +264,7 @@ describe('Client filter tests ', () => {
         ).toResolveTruthy();
         await expect(
             client.user.findFirst({
-                where: { email: { notIn: ['u1@test.com', 'u2@test.com'] } },
+                where: { email: { notIn: ['u1@test.com', 'u2@test.com', 'u3%@test.com'] } },
             }),
         ).toResolveFalsy();
         await expect(
@@ -230,7 +283,7 @@ describe('Client filter tests ', () => {
             client.user.findMany({
                 where: { email: { lt: 'z@test.com' } },
             }),
-        ).toResolveWithLength(2);
+        ).toResolveWithLength(3);
         await expect(
             client.user.findMany({
                 where: { email: { lte: 'u1@test.com' } },
@@ -245,7 +298,7 @@ describe('Client filter tests ', () => {
             client.user.findMany({
                 where: { email: { gt: 'a@test.com' } },
             }),
-        ).toResolveWithLength(2);
+        ).toResolveWithLength(3);
         await expect(
             client.user.findMany({
                 where: { email: { gt: 'z@test.com' } },
@@ -255,12 +308,12 @@ describe('Client filter tests ', () => {
             client.user.findMany({
                 where: { email: { gte: 'u1@test.com' } },
             }),
-        ).toResolveWithLength(2);
+        ).toResolveWithLength(3);
         await expect(
             client.user.findMany({
                 where: { email: { gte: 'u2@test.com' } },
             }),
-        ).toResolveWithLength(1);
+        ).toResolveWithLength(2);
 
         // contains
         await expect(
@@ -270,7 +323,7 @@ describe('Client filter tests ', () => {
         ).toResolveTruthy();
         await expect(
             client.user.findFirst({
-                where: { email: { contains: '3@' } },
+                where: { email: { contains: '4@' } },
             }),
         ).toResolveFalsy();
 

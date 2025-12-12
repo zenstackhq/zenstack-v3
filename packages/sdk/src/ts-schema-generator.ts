@@ -115,14 +115,14 @@ export class TsSchemaGenerator {
         );
 
         // Generate schema content first to determine if ExpressionUtils is needed
-        const schemaObject = this.createSchemaObject(model, lite);
+        const schemaClass = this.createSchemaClass(model, lite);
 
         // Now generate the import declaration with the correct imports
         // import { type SchemaDef, type OperandExpression, ExpressionUtils } from '@zenstackhq/orm/schema';
         const runtimeImportDecl = ts.factory.createImportDeclaration(
             undefined,
             ts.factory.createImportClause(
-                false,
+                undefined,
                 undefined,
                 ts.factory.createNamedImports([
                     ts.factory.createImportSpecifier(true, undefined, ts.factory.createIdentifier('SchemaDef')),
@@ -150,71 +150,24 @@ export class TsSchemaGenerator {
         );
         statements.push(runtimeImportDecl);
 
-        // const _schema = { ... } as const satisfies SchemaDef;
-        const _schemaDecl = ts.factory.createVariableStatement(
-            [],
-            ts.factory.createVariableDeclarationList(
-                [
-                    ts.factory.createVariableDeclaration(
-                        '_schema',
-                        undefined,
-                        undefined,
-                        ts.factory.createSatisfiesExpression(
-                            ts.factory.createAsExpression(schemaObject, ts.factory.createTypeReferenceNode('const')),
-                            ts.factory.createTypeReferenceNode('SchemaDef'),
-                        ),
-                    ),
-                ],
-                ts.NodeFlags.Const,
-            ),
-        );
-        statements.push(_schemaDecl);
+        statements.push(schemaClass);
 
-        // type Schema = typeof _schema & { __brand?: 'schema' };
-        // use a branded type to prevent typescript compiler from expanding the schema type
-        const brandedSchemaType = ts.factory.createTypeAliasDeclaration(
-            undefined,
-            'Schema',
-            undefined,
-            ts.factory.createIntersectionTypeNode([
-                ts.factory.createTypeQueryNode(ts.factory.createIdentifier('_schema')),
-                ts.factory.createTypeLiteralNode([
-                    ts.factory.createPropertySignature(
-                        undefined,
-                        '__brand',
-                        ts.factory.createToken(ts.SyntaxKind.QuestionToken),
-                        ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral('schema')),
-                    ),
-                ]),
-            ]),
-        );
-        statements.push(brandedSchemaType);
-
-        // export const schema: Schema = _schema;
-        const schemaExportDecl = ts.factory.createVariableStatement(
+        // export const schema = new SchemaType();
+        const schemaDecl = ts.factory.createVariableStatement(
             [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
             ts.factory.createVariableDeclarationList(
                 [
                     ts.factory.createVariableDeclaration(
                         'schema',
                         undefined,
-                        ts.factory.createTypeReferenceNode('Schema'),
-                        ts.factory.createIdentifier('_schema'),
+                        undefined,
+                        ts.factory.createNewExpression(ts.factory.createIdentifier('SchemaType'), undefined, []),
                     ),
                 ],
                 ts.NodeFlags.Const,
             ),
         );
-        statements.push(schemaExportDecl);
-
-        // export type SchemaType = Schema;
-        const schemaTypeDeclaration = ts.factory.createTypeAliasDeclaration(
-            [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-            'SchemaType',
-            undefined,
-            ts.factory.createTypeReferenceNode('Schema'),
-        );
-        statements.push(schemaTypeDeclaration);
+        statements.push(schemaDecl);
     }
 
     private createExpressionUtilsCall(method: string, args?: ts.Expression[]): ts.CallExpression {
@@ -226,29 +179,54 @@ export class TsSchemaGenerator {
         );
     }
 
-    private createSchemaObject(model: Model, lite: boolean): ts.Expression {
-        const properties: ts.PropertyAssignment[] = [
+    private createSchemaClass(model: Model, lite: boolean) {
+        const members: ts.ClassElement[] = [
             // provider
-            ts.factory.createPropertyAssignment('provider', this.createProviderObject(model)),
+            ts.factory.createPropertyDeclaration(
+                undefined,
+                'provider',
+                undefined,
+                undefined,
+                this.createAsConst(this.createProviderObject(model)),
+            ),
 
             // models
-            ts.factory.createPropertyAssignment('models', this.createModelsObject(model, lite)),
+            ts.factory.createPropertyDeclaration(
+                undefined,
+                'models',
+                undefined,
+                undefined,
+                this.createAsConst(this.createModelsObject(model, lite)),
+            ),
 
             // typeDefs
             ...(model.declarations.some(isTypeDef)
-                ? [ts.factory.createPropertyAssignment('typeDefs', this.createTypeDefsObject(model, lite))]
+                ? [
+                      ts.factory.createPropertyDeclaration(
+                          undefined,
+                          'typeDefs',
+                          undefined,
+                          undefined,
+                          this.createAsConst(this.createTypeDefsObject(model, lite)),
+                      ),
+                  ]
                 : []),
         ];
 
         // enums
         const enums = model.declarations.filter(isEnum);
         if (enums.length > 0) {
-            properties.push(
-                ts.factory.createPropertyAssignment(
+            members.push(
+                ts.factory.createPropertyDeclaration(
+                    undefined,
                     'enums',
-                    ts.factory.createObjectLiteralExpression(
-                        enums.map((e) => ts.factory.createPropertyAssignment(e.name, this.createEnumObject(e))),
-                        true,
+                    undefined,
+                    undefined,
+                    this.createAsConst(
+                        ts.factory.createObjectLiteralExpression(
+                            enums.map((e) => ts.factory.createPropertyAssignment(e.name, this.createEnumObject(e))),
+                            true,
+                        ),
                     ),
                 ),
             );
@@ -257,21 +235,59 @@ export class TsSchemaGenerator {
         // authType
         const authType = getAuthDecl(model);
         if (authType) {
-            properties.push(ts.factory.createPropertyAssignment('authType', this.createLiteralNode(authType.name)));
+            members.push(
+                ts.factory.createPropertyDeclaration(
+                    undefined,
+                    'authType',
+                    undefined,
+                    undefined,
+                    this.createAsConst(this.createLiteralNode(authType.name)),
+                ),
+            );
         }
 
         // procedures
         const procedures = model.declarations.filter(isProcedure);
         if (procedures.length > 0) {
-            properties.push(ts.factory.createPropertyAssignment('procedures', this.createProceduresObject(procedures)));
+            members.push(
+                ts.factory.createPropertyDeclaration(
+                    undefined,
+                    'procedures',
+                    undefined,
+                    undefined,
+                    this.createAsConst(this.createProceduresObject(procedures)),
+                ),
+            );
         }
 
         // plugins
-        properties.push(
-            ts.factory.createPropertyAssignment('plugins', ts.factory.createObjectLiteralExpression([], true)),
+        members.push(
+            ts.factory.createPropertyDeclaration(
+                undefined,
+                'plugins',
+                undefined,
+                undefined,
+                ts.factory.createObjectLiteralExpression([], true),
+            ),
         );
 
-        return ts.factory.createObjectLiteralExpression(properties, true);
+        const schemaClass = ts.factory.createClassDeclaration(
+            [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+            'SchemaType',
+            undefined,
+            [
+                ts.factory.createHeritageClause(ts.SyntaxKind.ImplementsKeyword, [
+                    ts.factory.createExpressionWithTypeArguments(ts.factory.createIdentifier('SchemaDef'), undefined),
+                ]),
+            ],
+            members,
+        );
+
+        return schemaClass;
+    }
+
+    private createAsConst(expr: ts.Expression) {
+        return ts.factory.createAsExpression(expr, ts.factory.createTypeReferenceNode('const'));
     }
 
     private createProviderObject(model: Model): ts.Expression {

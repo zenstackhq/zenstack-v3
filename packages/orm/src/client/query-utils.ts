@@ -37,6 +37,14 @@ export function requireModel(schema: SchemaDef, model: string) {
     return modelDef;
 }
 
+export function requireTypeDef(schema: SchemaDef, type: string) {
+    const typeDef = getTypeDef(schema, type);
+    if (!typeDef) {
+        throw createInternalError(`Type "${type}" not found in schema`, type);
+    }
+    return typeDef;
+}
+
 export function getField(schema: SchemaDef, model: string, field: string) {
     const modelDef = getModel(schema, model);
     return modelDef?.fields[field];
@@ -188,6 +196,10 @@ export function isEnum(schema: SchemaDef, type: string) {
 
 export function getEnum(schema: SchemaDef, type: string) {
     return schema.enums?.[type];
+}
+
+export function isTypeDef(schema: SchemaDef, type: string) {
+    return !!schema.typeDefs?.[type];
 }
 
 export function buildJoinPairs(

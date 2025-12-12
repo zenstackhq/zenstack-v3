@@ -1,4 +1,5 @@
 import type Decimal from 'decimal.js';
+import type { JsonObject, JsonValue } from '../common-types';
 
 export type Optional<T extends object, K extends keyof T = keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
@@ -43,11 +44,6 @@ type TypeMap = {
 };
 
 export type MapBaseType<T extends string> = T extends keyof TypeMap ? TypeMap[T] : unknown;
-
-export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
-
-export type JsonObject = { [key: string]: JsonValue };
-export type JsonArray = Array<JsonValue>;
 
 export function call(code: string) {
     return { code };

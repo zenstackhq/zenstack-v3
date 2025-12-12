@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/tanstack-query",
-    "version": "3.0.0-beta.27",
+    "version": "3.0.0-beta.28",
     "description": "TanStack Query Client for consuming ZenStack v3's CRUD service",
     "main": "index.js",
     "type": "module",
@@ -10,7 +10,7 @@
         "lint": "eslint src --ext ts",
         "test": "vitest run",
         "pack": "pnpm pack",
-        "test:generate": "tsx scripts/generate.ts",
+        "test:generate": "tsx ../../../scripts/test-generate.ts tests",
         "test:typecheck": "tsc --noEmit --project tsconfig.test.json"
     },
     "keywords": [

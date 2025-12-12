@@ -7,8 +7,8 @@ datasource db {
     url = ':memory:'
 }
 
-generator js {
-    provider = 'prisma-client-js'
+plugin policy {
+    provider = '../../../../../packages/plugins/policy/plugin.zmodel'
 }
 
 /*

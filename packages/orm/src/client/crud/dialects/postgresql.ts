@@ -7,9 +7,11 @@ import {
     type ExpressionWrapper,
     type RawBuilder,
     type SelectQueryBuilder,
+    type SqlBool,
 } from 'kysely';
 import { match } from 'ts-pattern';
 import z from 'zod';
+import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
@@ -25,7 +27,6 @@ import {
     requireModel,
 } from '../../query-utils';
 import { BaseCrudDialect } from './base-dialect';
-
 export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
     private isoDateSchema = z.iso.datetime({ local: true, offset: true });
 
@@ -40,6 +41,15 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
     override transformPrimitive(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
         if (value === undefined) {
             return value;
+        }
+
+        // Handle special null classes for JSON fields
+        if (value instanceof JsonNullClass) {
+            return 'null';
+        } else if (value instanceof DbNullClass) {
+            return null;
+        } else if (value instanceof AnyNullClass) {
+            invariant(false, 'should not reach here: AnyNull is not a valid input value');
         }
 
         if (Array.isArray(value)) {
@@ -442,6 +452,53 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         } else {
             return `ARRAY[${values.map((v) => (typeof v === 'string' ? `'${v}'` : v))}]`;
         }
+    }
+
+    protected override buildJsonPathSelection(receiver: Expression<any>, path: string | undefined) {
+        if (path) {
+            return this.eb.fn('jsonb_path_query_first', [receiver, this.eb.val(path)]);
+        } else {
+            return receiver;
+        }
+    }
+
+    protected override buildJsonArrayFilter(
+        lhs: Expression<any>,
+        operation: 'array_contains' | 'array_starts_with' | 'array_ends_with',
+        value: unknown,
+    ) {
+        return match(operation)
+            .with('array_contains', () => {
+                const v = Array.isArray(value) ? value : [value];
+                return sql<SqlBool>`${lhs} @> ${sql.val(JSON.stringify(v))}::jsonb`;
+            })
+            .with('array_starts_with', () =>
+                this.eb(
+                    this.eb.fn('jsonb_extract_path', [lhs, this.eb.val('0')]),
+                    '=',
+                    this.transformPrimitive(value, 'Json', false),
+                ),
+            )
+            .with('array_ends_with', () =>
+                this.eb(
+                    this.eb.fn('jsonb_extract_path', [lhs, sql`(jsonb_array_length(${lhs}) - 1)::text`]),
+                    '=',
+                    this.transformPrimitive(value, 'Json', false),
+                ),
+            )
+            .exhaustive();
+    }
+
+    protected override buildJsonArrayExistsPredicate(
+        receiver: Expression<any>,
+        buildFilter: (elem: Expression<any>) => Expression<SqlBool>,
+    ) {
+        return this.eb.exists(
+            this.eb
+                .selectFrom(this.eb.fn('jsonb_array_elements', [receiver]).as('$items'))
+                .select(this.eb.lit(1).as('$t'))
+                .where(buildFilter(this.eb.ref('$items.value'))),
+        );
     }
 
     override get supportInsertWithDefault() {

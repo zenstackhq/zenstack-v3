@@ -40,7 +40,7 @@
             - [x] Unique fields
             - [x] Scalar fields
             - [x] Relation fields
-            - [ ] JSON filtering
+            - [x] JSON filtering
             - [ ] Full-text search
         - [x] Sort
             - [x] Scalar fields
@@ -86,7 +86,7 @@
         - [x] Custom table name
         - [x] Custom field name
         - [x] Global omit
-        - [ ] DbNull vs JsonNull
+        - [x] DbNull vs JsonNull
         - [ ] Migrate to tsdown
         - [x] @default validation
     - [x] Benchmark

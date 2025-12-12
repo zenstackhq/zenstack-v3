@@ -4,15 +4,6 @@ datasource db {
     extensions = [pgvector(map: "vector")]
 }
 
-generator client {
-    provider        = "prisma-client-js"
-    previewFeatures = ["postgresqlExtensions"]
-}
-
-generator json {
-    provider = "prisma-json-types-generator"
-}
-
 enum PipelineTriggers {
     responseCreated
     responseUpdated

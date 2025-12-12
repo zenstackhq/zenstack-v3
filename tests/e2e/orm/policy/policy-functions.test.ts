@@ -23,6 +23,23 @@ describe('policy functions tests', () => {
         await expect(db.foo.create({ data: { string: 'bac' } })).toResolveTruthy();
     });
 
+    it('escapes input for contains', async () => {
+        const db = await createPolicyTestClient(
+            `
+            model Foo {
+                id String @id @default(cuid())
+                string String
+                @@allow('all', contains(string, 'a%'))
+            }
+            `,
+            { debug: true },
+        );
+
+        await expect(db.foo.create({ data: { string: 'ab' } })).toBeRejectedByPolicy();
+        await expect(db.foo.create({ data: { string: 'a%' } })).toResolveTruthy();
+        await expect(db.foo.create({ data: { string: 'a%b' } })).toResolveTruthy();
+    });
+
     it('supports contains explicit case-sensitive', async () => {
         const db = await createPolicyTestClient(
             `
@@ -141,6 +158,22 @@ describe('policy functions tests', () => {
         await expect(anonDb.foo.create({ data: {} })).toBeRejectedByPolicy();
         await expect(anonDb.foo.create({ data: {} })).toBeRejectedByPolicy();
         await expect(anonDb.$setAuth({ id: 'user1', name: 'abc' }).foo.create({ data: {} })).toResolveTruthy();
+    });
+
+    it('escapes input for startsWith', async () => {
+        const db = await createPolicyTestClient(
+            `
+            model Foo {
+                id String @id @default(cuid())
+                string String
+                @@allow('all', startsWith(string, '%a'))
+            }
+            `,
+        );
+
+        await expect(db.foo.create({ data: { string: 'ba' } })).toBeRejectedByPolicy();
+        await expect(db.foo.create({ data: { string: '%a' } })).toResolveTruthy();
+        await expect(db.foo.create({ data: { string: '%ab' } })).toResolveTruthy();
     });
 
     it('supports endsWith with field', async () => {

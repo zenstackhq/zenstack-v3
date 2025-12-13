@@ -10,7 +10,7 @@
         "lint": "eslint src --ext ts",
         "test": "vitest run",
         "pack": "pnpm pack",
-        "test:generate": "tsx ../../../scripts/test-generate.ts tests",
+        "test:generate": "tsx ../../../scripts/test-generate.ts test --lite-only",
         "test:typecheck": "tsc --noEmit --project tsconfig.test.json"
     },
     "keywords": [
@@ -75,6 +75,7 @@
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
+        "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "happy-dom": "^20.0.10",

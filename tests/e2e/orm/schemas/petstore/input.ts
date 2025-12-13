@@ -6,8 +6,8 @@
 /* eslint-disable */
 
 import { type SchemaType as $Schema } from "./schema";
-import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, ClientOptions as $ClientOptions } from "@zenstackhq/orm";
-import type { SimplifiedModelResult as $SimplifiedModelResult, SelectIncludeOmit as $SelectIncludeOmit } from "@zenstackhq/orm";
+import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
+import type { SimplifiedPlainResult as $Result, SelectIncludeOmit as $SelectIncludeOmit } from "@zenstackhq/orm";
 export type UserFindManyArgs = $FindManyArgs<$Schema, "User">;
 export type UserFindUniqueArgs = $FindUniqueArgs<$Schema, "User">;
 export type UserFindFirstArgs = $FindFirstArgs<$Schema, "User">;
@@ -27,7 +27,7 @@ export type UserWhereInput = $WhereInput<$Schema, "User">;
 export type UserSelect = $SelectInput<$Schema, "User">;
 export type UserInclude = $IncludeInput<$Schema, "User">;
 export type UserOmit = $OmitInput<$Schema, "User">;
-export type UserGetPayload<Args extends $SelectIncludeOmit<$Schema, "User", true>, Options extends $ClientOptions<$Schema> = $ClientOptions<$Schema>> = $SimplifiedModelResult<$Schema, "User", Options, Args>;
+export type UserGetPayload<Args extends $SelectIncludeOmit<$Schema, "User", true>, Options extends $QueryOptions<$Schema> = $QueryOptions<$Schema>> = $Result<$Schema, "User", Args, Options>;
 export type PetFindManyArgs = $FindManyArgs<$Schema, "Pet">;
 export type PetFindUniqueArgs = $FindUniqueArgs<$Schema, "Pet">;
 export type PetFindFirstArgs = $FindFirstArgs<$Schema, "Pet">;
@@ -47,7 +47,7 @@ export type PetWhereInput = $WhereInput<$Schema, "Pet">;
 export type PetSelect = $SelectInput<$Schema, "Pet">;
 export type PetInclude = $IncludeInput<$Schema, "Pet">;
 export type PetOmit = $OmitInput<$Schema, "Pet">;
-export type PetGetPayload<Args extends $SelectIncludeOmit<$Schema, "Pet", true>, Options extends $ClientOptions<$Schema> = $ClientOptions<$Schema>> = $SimplifiedModelResult<$Schema, "Pet", Options, Args>;
+export type PetGetPayload<Args extends $SelectIncludeOmit<$Schema, "Pet", true>, Options extends $QueryOptions<$Schema> = $QueryOptions<$Schema>> = $Result<$Schema, "Pet", Args, Options>;
 export type OrderFindManyArgs = $FindManyArgs<$Schema, "Order">;
 export type OrderFindUniqueArgs = $FindUniqueArgs<$Schema, "Order">;
 export type OrderFindFirstArgs = $FindFirstArgs<$Schema, "Order">;
@@ -67,4 +67,4 @@ export type OrderWhereInput = $WhereInput<$Schema, "Order">;
 export type OrderSelect = $SelectInput<$Schema, "Order">;
 export type OrderInclude = $IncludeInput<$Schema, "Order">;
 export type OrderOmit = $OmitInput<$Schema, "Order">;
-export type OrderGetPayload<Args extends $SelectIncludeOmit<$Schema, "Order", true>, Options extends $ClientOptions<$Schema> = $ClientOptions<$Schema>> = $SimplifiedModelResult<$Schema, "Order", Options, Args>;
+export type OrderGetPayload<Args extends $SelectIncludeOmit<$Schema, "Order", true>, Options extends $QueryOptions<$Schema> = $QueryOptions<$Schema>> = $Result<$Schema, "Order", Args, Options>;

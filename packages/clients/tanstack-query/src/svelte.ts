@@ -221,7 +221,7 @@ export type ModelQueryHooks<
  */
 export function useClientQueries<Schema extends SchemaDef, Options extends QueryOptions<Schema> = QueryOptions<Schema>>(
     schema: Schema,
-): ClientHooks<Schema> {
+): ClientHooks<Schema, Options> {
     return Object.keys(schema.models).reduce(
         (acc, model) => {
             (acc as any)[lowerCaseFirst(model)] = useModelQueries(schema, model as GetModels<Schema>);

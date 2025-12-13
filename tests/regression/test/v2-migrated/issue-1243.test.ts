@@ -24,7 +24,7 @@ describe('Regression for issue 1243', () => {
         }
         `;
 
-        await createTestClient(schema);
+        await createTestClient(schema, { usePrismaPush: true });
     });
 
     it('multiple id fields', async () => {
@@ -47,6 +47,6 @@ describe('Regression for issue 1243', () => {
         }
         `;
 
-        await createTestClient(schema);
+        await createTestClient(schema, { usePrismaPush: true });
     });
 });

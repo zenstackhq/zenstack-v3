@@ -196,9 +196,7 @@ export class PrismaSchemaGenerator {
             }
         }
 
-        const allAttributes = getAllAttributes(decl).filter(
-            (attr) => this.isPrismaAttribute(attr) && !this.isInheritedMapAttribute(attr, decl),
-        );
+        const allAttributes = getAllAttributes(decl).filter((attr) => this.isPrismaAttribute(attr));
 
         for (const attr of allAttributes) {
             this.generateContainerAttribute(model, attr);
@@ -239,15 +237,6 @@ export class PrismaSchemaGenerator {
     private getDefaultPostgresSchemaName(zmodel: Model) {
         const defaultSchemaField = this.getDatasourceField(zmodel, 'defaultSchema');
         return getStringLiteral(defaultSchemaField?.value) ?? 'public';
-    }
-
-    private isInheritedMapAttribute(attr: DataModelAttribute, contextModel: DataModel) {
-        if (attr.$container === contextModel) {
-            return false;
-        }
-
-        const attrName = attr.decl.ref?.name ?? attr.decl.$refText;
-        return attrName === '@@map';
     }
 
     private isPrismaAttribute(attr: DataModelAttribute | DataFieldAttribute) {

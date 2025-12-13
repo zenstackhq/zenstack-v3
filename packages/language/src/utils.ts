@@ -561,12 +561,18 @@ export function getAllAttributes(
 
     if (isDataModel(decl) && decl.baseModel) {
         if (decl.baseModel.ref) {
-            attributes.push(...getAllAttributes(decl.baseModel.ref, seen));
+            const attrs = getAllAttributes(decl.baseModel.ref, seen).filter((attr) => !isNonInheritableAttribute(attr));
+            attributes.push(...attrs);
         }
     }
 
     attributes.push(...decl.attributes);
     return attributes;
+}
+
+function isNonInheritableAttribute(attr: DataModelAttribute) {
+    const attrName = attr.decl.ref?.name ?? attr.decl.$refText;
+    return ['@@map', '@@unique', '@@index'].includes(attrName);
 }
 
 /**

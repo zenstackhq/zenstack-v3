@@ -28,6 +28,9 @@ model Asset {
     comments  Comment[]
     assetType String
 
+    @@index([ownerId])
+    @@unique([ownerId])
+
     @@delegate(assetType)
 }
 

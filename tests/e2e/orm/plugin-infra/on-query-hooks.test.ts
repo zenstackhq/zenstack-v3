@@ -7,7 +7,7 @@ describe('On query hooks tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = (await createTestClient(schema)) as any;
+        _client = await createTestClient(schema);
     });
 
     afterEach(async () => {

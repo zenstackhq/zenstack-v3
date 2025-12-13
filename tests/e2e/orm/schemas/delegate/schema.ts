@@ -146,13 +146,11 @@ export class SchemaType implements SchemaDef {
             },
             attributes: [
                 { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }] },
-                { name: "@@unique", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }] },
                 { name: "@@delegate", args: [{ name: "discriminator", value: ExpressionUtils.field("assetType") }] }
             ],
             idFields: ["id"],
             uniqueFields: {
-                id: { type: "Int" },
-                ownerId: { type: "Int" }
+                id: { type: "Int" }
             },
             isDelegate: true,
             subModels: ["Video", "Image"]

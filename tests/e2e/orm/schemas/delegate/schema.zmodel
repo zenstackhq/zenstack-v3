@@ -29,7 +29,6 @@ model Asset {
     assetType String
 
     @@index([ownerId])
-    @@unique([ownerId])
 
     @@delegate(assetType)
 }

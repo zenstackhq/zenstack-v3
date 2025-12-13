@@ -1581,7 +1581,7 @@ export class TsSchemaGenerator {
                         ts.factory.createImportSpecifier(
                             false,
                             undefined,
-                            ts.factory.createIdentifier('ClientOptions as $ClientOptions'),
+                            ts.factory.createIdentifier('QueryOptions as $QueryOptions'),
                         ),
                     ]),
                 ),
@@ -1589,7 +1589,7 @@ export class TsSchemaGenerator {
             ),
         );
 
-        // generate: import { type SelectIncludeOmit as $SelectIncludeOmit, type SimplifiedModelResult as $SimplifiedModelResult } from '@zenstackhq/orm';
+        // generate: import { type SelectIncludeOmit as $SelectIncludeOmit, type SimplifiedPlainResult as $Result } from '@zenstackhq/orm';
         statements.push(
             ts.factory.createImportDeclaration(
                 undefined,
@@ -1600,7 +1600,7 @@ export class TsSchemaGenerator {
                         ts.factory.createImportSpecifier(
                             false,
                             undefined,
-                            ts.factory.createIdentifier('SimplifiedModelResult as $SimplifiedModelResult'),
+                            ts.factory.createIdentifier('SimplifiedPlainResult as $Result'),
                         ),
                         ts.factory.createImportSpecifier(
                             false,
@@ -1632,7 +1632,7 @@ export class TsSchemaGenerator {
                 );
             }
 
-            // generate: export type ModelGetPayload<Args extends $SelectIncludeOmit<Schema, Model, true>, Options extends ClientOptions<Schema>> = $SimplifiedModelResult<Schema, Model, Options, Args>;
+            // generate: export type ModelGetPayload<Args extends $SelectIncludeOmit<Schema, Model, true>, Options extends $QueryOptions<Schema>> = $Result<Schema, Model, Args, Options>;
             statements.push(
                 ts.factory.createTypeAliasDeclaration(
                     [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -1650,19 +1650,19 @@ export class TsSchemaGenerator {
                         ts.factory.createTypeParameterDeclaration(
                             undefined,
                             'Options',
-                            ts.factory.createTypeReferenceNode('$ClientOptions', [
+                            ts.factory.createTypeReferenceNode('$QueryOptions', [
                                 ts.factory.createTypeReferenceNode('$Schema'),
                             ]),
-                            ts.factory.createTypeReferenceNode('$ClientOptions', [
+                            ts.factory.createTypeReferenceNode('$QueryOptions', [
                                 ts.factory.createTypeReferenceNode('$Schema'),
                             ]),
                         ),
                     ],
-                    ts.factory.createTypeReferenceNode('$SimplifiedModelResult', [
+                    ts.factory.createTypeReferenceNode('$Result', [
                         ts.factory.createTypeReferenceNode('$Schema'),
                         ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(dm.name)),
-                        ts.factory.createTypeReferenceNode('Options'),
                         ts.factory.createTypeReferenceNode('Args'),
+                        ts.factory.createTypeReferenceNode('Options'),
                     ]),
                 ),
             );

@@ -44,7 +44,7 @@ import type {
     WrapType,
     XOR,
 } from '../utils/type-utils';
-import type { ClientOptions } from './options';
+import type { QueryOptions } from './options';
 import type { ToKyselySchema } from './query-builder';
 
 //#region Query results
@@ -52,8 +52,8 @@ import type { ToKyselySchema } from './query-builder';
 export type DefaultModelResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Options extends ClientOptions<Schema> = ClientOptions<Schema>,
     Omit = undefined,
+    Options extends QueryOptions<Schema> = QueryOptions<Schema>,
     Optional = false,
     Array = false,
 > = WrapType<
@@ -85,7 +85,7 @@ export type DefaultModelResult<
 type ShouldOmitField<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Options extends ClientOptions<Schema>,
+    Options extends QueryOptions<Schema>,
     Field extends GetModelFields<Schema, Model>,
     Omit,
 > =
@@ -106,7 +106,7 @@ type OptionsLevelOmit<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,
-    Options extends ClientOptions<Schema>,
+    Options extends QueryOptions<Schema>,
 > = Model extends keyof Options['omit']
     ? Field extends keyof Options['omit'][Model]
         ? Options['omit'][Model][Field] extends boolean
@@ -124,7 +124,7 @@ type SchemaLevelOmit<
 // type DelegateUnionResult<
 //     Schema extends SchemaDef,
 //     Model extends GetModels<Schema>,
-//     Options extends ClientOptions<Schema>,
+//     Options extends QueryOptions<Schema>,
 //     SubModel extends GetModels<Schema>,
 //     Omit = undefined,
 // > = SubModel extends string // typescript union distribution
@@ -134,9 +134,9 @@ type SchemaLevelOmit<
 type ModelSelectResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Options extends ClientOptions<Schema>,
     Select,
     Omit,
+    Options extends QueryOptions<Schema>,
 > = {
     [Key in keyof Select as Select[Key] extends false | undefined
         ? never
@@ -162,24 +162,24 @@ type ModelSelectResult<
                     ? ModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
-                          Options,
                           Pick<Select[Key], 'select'>,
+                          Options,
                           ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >
                     : ModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
-                          Options,
                           Pick<Select[Key], 'include' | 'omit'>,
+                          Options,
                           ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >
                 : DefaultModelResult<
                       Schema,
                       RelationFieldType<Schema, Model, Key>,
-                      Options,
                       Omit,
+                      Options,
                       ModelFieldIsOptional<Schema, Model, Key>,
                       FieldIsArray<Schema, Model, Key>
                   >
@@ -198,8 +198,8 @@ type SelectCountResult<Schema extends SchemaDef, Model extends GetModels<Schema>
 export type ModelResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Options extends ClientOptions<Schema> = ClientOptions<Schema>,
     Args = {},
+    Options extends QueryOptions<Schema> = QueryOptions<Schema>,
     Optional = false,
     Array = false,
 > = WrapType<
@@ -207,12 +207,12 @@ export type ModelResult<
         select: infer S;
         omit?: infer O;
     }
-        ? ModelSelectResult<Schema, Model, Options, S, O>
+        ? ModelSelectResult<Schema, Model, S, O, Options>
         : Args extends {
                 include: infer I;
                 omit?: infer O;
             }
-          ? DefaultModelResult<Schema, Model, Options, O> & {
+          ? DefaultModelResult<Schema, Model, O, Options, false, false> & {
                 [Key in keyof I & RelationFields<Schema, Model> as I[Key] extends false | undefined
                     ? never
                     : Key]: I[Key] extends FindArgs<
@@ -223,35 +223,42 @@ export type ModelResult<
                     ? ModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
-                          Options,
                           I[Key],
+                          Options,
                           ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >
                     : DefaultModelResult<
                           Schema,
                           RelationFieldType<Schema, Model, Key>,
-                          Options,
                           undefined,
+                          Options,
                           ModelFieldIsOptional<Schema, Model, Key>,
                           FieldIsArray<Schema, Model, Key>
                       >;
             }
           : Args extends { omit: infer O }
-            ? DefaultModelResult<Schema, Model, Options, O>
-            : DefaultModelResult<Schema, Model, Options>,
+            ? DefaultModelResult<Schema, Model, O, Options, false, false>
+            : DefaultModelResult<Schema, Model, undefined, Options, false, false>,
     Optional,
     Array
 >;
 
-export type SimplifiedModelResult<
+export type SimplifiedResult<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Options extends ClientOptions<Schema>,
     Args = {},
+    Options extends QueryOptions<Schema> = QueryOptions<Schema>,
     Optional = false,
     Array = false,
-> = Simplify<ModelResult<Schema, Model, Options, Args, Optional, Array>>;
+> = Simplify<ModelResult<Schema, Model, Args, Options, Optional, Array>>;
+
+export type SimplifiedPlainResult<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Args = {},
+    Options extends QueryOptions<Schema> = QueryOptions<Schema>,
+> = Simplify<ModelResult<Schema, Model, Args, Options, false, false>>;
 
 export type TypeDefResult<
     Schema extends SchemaDef,

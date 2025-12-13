@@ -268,7 +268,10 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
 ): ClientHooks<Schema, Options> {
     return Object.keys(schema.models).reduce(
         (acc, model) => {
-            (acc as any)[lowerCaseFirst(model)] = useModelQueries(schema, model as GetModels<Schema>);
+            (acc as any)[lowerCaseFirst(model)] = useModelQueries<Schema, GetModels<Schema>, Options>(
+                schema,
+                model as GetModels<Schema>,
+            );
             return acc;
         },
         {} as ClientHooks<Schema, Options>,
@@ -278,10 +281,11 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
 /**
  * Gets data query hooks for a specific model in the schema.
  */
-export function useModelQueries<Schema extends SchemaDef, Model extends GetModels<Schema>>(
-    schema: Schema,
-    model: Model,
-): ModelQueryHooks<Schema, Model> {
+export function useModelQueries<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Options extends QueryOptions<Schema>,
+>(schema: Schema, model: Model): ModelQueryHooks<Schema, Model, Options> {
     const modelDef = Object.values(schema.models).find((m) => m.name.toLowerCase() === model.toLowerCase());
     if (!modelDef) {
         throw new Error(`Model "${model}" not found in schema`);
@@ -381,7 +385,7 @@ export function useModelQueries<Schema extends SchemaDef, Model extends GetModel
         useSuspenseGroupBy: (args: any, options?: any) => {
             return useInternalSuspenseQuery(schema, modelName, 'groupBy', args, options);
         },
-    } as ModelQueryHooks<Schema, Model>;
+    } as ModelQueryHooks<Schema, Model, Options>;
 }
 
 export function useInternalQuery<TQueryFnData, TData>(

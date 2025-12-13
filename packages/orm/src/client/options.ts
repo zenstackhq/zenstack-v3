@@ -144,3 +144,13 @@ export type HasProcedures<Schema extends SchemaDef> = Schema extends {
 }
     ? true
     : false;
+
+/**
+ * Subset of client options relevant to query operations.
+ */
+export type QueryOptions<Schema extends SchemaDef> = Pick<ClientOptions<Schema>, 'omit'>;
+
+/**
+ * Extract QueryOptions from ClientOptions
+ */
+export type ToQueryOptions<T extends ClientOptions<any>> = Pick<T, 'omit'>;

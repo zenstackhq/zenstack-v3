@@ -32,7 +32,6 @@ describe('policy functions tests', () => {
                 @@allow('all', contains(string, 'a%'))
             }
             `,
-            { debug: true },
         );
 
         await expect(db.foo.create({ data: { string: 'ab' } })).toBeRejectedByPolicy();

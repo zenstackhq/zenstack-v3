@@ -380,7 +380,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                         'SQLite "array_contains" only supports checking for a single value, not an array of values',
                     );
                 } else {
-                    return sql<any>`EXISTS (SELECT 1 FROM jsonb_each(${lhs}) WHERE value = ${value})`;
+                    return sql<any>`EXISTS (SELECT 1 FROM json_each(${lhs}) WHERE value = ${value})`;
                 }
             })
             .with('array_starts_with', () =>
@@ -398,7 +398,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
     ) {
         return this.eb.exists(
             this.eb
-                .selectFrom(this.eb.fn('jsonb_each', [receiver]).as('$items'))
+                .selectFrom(this.eb.fn('json_each', [receiver]).as('$items'))
                 .select(this.eb.lit(1).as('$t'))
                 .where(buildFilter(this.eb.ref('$items.value'))),
         );

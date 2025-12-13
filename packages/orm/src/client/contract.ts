@@ -31,7 +31,7 @@ import type {
     GroupByResult,
     ModelResult,
     SelectSubset,
-    SimplifiedModelResult,
+    SimplifiedPlainResult,
     Subset,
     TypeDefResult,
     UpdateArgs,
@@ -39,7 +39,7 @@ import type {
     UpdateManyArgs,
     UpsertArgs,
 } from './crud-types';
-import type { ClientOptions } from './options';
+import type { ClientOptions, QueryOptions, ToQueryOptions } from './options';
 import type { RuntimePlugin } from './plugin';
 import type { ZenStackPromise } from './promise';
 import type { ToKysely } from './query-builder';
@@ -193,7 +193,7 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
      */
     $pushSchema(): Promise<void>;
 } & {
-    [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<Schema, Key, Options>;
+    [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<Schema, Key, ToQueryOptions<Options>>;
 } & Procedures<Schema>;
 
 /**
@@ -274,7 +274,7 @@ export const CRUD_EXT = [...CRUD, 'post-update'] as const;
 export type AllModelOperations<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Options extends ClientOptions<Schema>,
+    Options extends QueryOptions<Schema>,
 > = {
     /**
      * Returns a list of entities.
@@ -359,7 +359,7 @@ export type AllModelOperations<
      */
     findMany<T extends FindManyArgs<Schema, Model>>(
         args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T>[]>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
     /**
      * Returns a uniquely identified entity.
@@ -369,7 +369,7 @@ export type AllModelOperations<
      */
     findUnique<T extends FindUniqueArgs<Schema, Model>>(
         args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T> | null>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options> | null>;
 
     /**
      * Returns a uniquely identified entity or throws `NotFoundError` if not found.
@@ -379,7 +379,7 @@ export type AllModelOperations<
      */
     findUniqueOrThrow<T extends FindUniqueArgs<Schema, Model>>(
         args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T>>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
      * Returns the first entity.
@@ -389,7 +389,7 @@ export type AllModelOperations<
      */
     findFirst<T extends FindFirstArgs<Schema, Model>>(
         args?: SelectSubset<T, FindFirstArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T> | null>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options> | null>;
 
     /**
      * Returns the first entity or throws `NotFoundError` if not found.
@@ -399,7 +399,7 @@ export type AllModelOperations<
      */
     findFirstOrThrow<T extends FindFirstArgs<Schema, Model>>(
         args?: SelectSubset<T, FindFirstArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T>>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
      * Creates a new entity.
@@ -455,7 +455,7 @@ export type AllModelOperations<
      */
     create<T extends CreateArgs<Schema, Model>>(
         args: SelectSubset<T, CreateArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T>>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
      * Creates multiple entities. Only scalar fields are allowed.
@@ -506,7 +506,7 @@ export type AllModelOperations<
      */
     createManyAndReturn<T extends CreateManyAndReturnArgs<Schema, Model>>(
         args?: SelectSubset<T, CreateManyAndReturnArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T>[]>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
     /**
      * Updates a uniquely identified entity.
@@ -627,7 +627,7 @@ export type AllModelOperations<
      */
     update<T extends UpdateArgs<Schema, Model>>(
         args: SelectSubset<T, UpdateArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T>>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
      * Updates multiple entities.
@@ -677,7 +677,7 @@ export type AllModelOperations<
      */
     updateManyAndReturn<T extends UpdateManyAndReturnArgs<Schema, Model>>(
         args: Subset<T, UpdateManyAndReturnArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T>[]>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
     /**
      * Creates or updates an entity.
@@ -701,7 +701,7 @@ export type AllModelOperations<
      */
     upsert<T extends UpsertArgs<Schema, Model>>(
         args: SelectSubset<T, UpsertArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T>>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
      * Deletes a uniquely identifiable entity.
@@ -724,7 +724,7 @@ export type AllModelOperations<
      */
     delete<T extends DeleteArgs<Schema, Model>>(
         args: SelectSubset<T, DeleteArgs<Schema, Model>>,
-    ): ZenStackPromise<Schema, SimplifiedModelResult<Schema, Model, Options, T>>;
+    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
      * Deletes multiple entities.
@@ -835,7 +835,7 @@ export type OperationsIneligibleForDelegateModels = 'create' | 'createMany' | 'c
 export type ModelOperations<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Options extends ClientOptions<Schema> = ClientOptions<Schema>,
+    Options extends QueryOptions<Schema> = QueryOptions<Schema>,
 > = Omit<
     AllModelOperations<Schema, Model, Options>,
     // exclude operations not applicable to delegate models
@@ -851,7 +851,7 @@ export type ModelOperations<
  * Relations are recursively included to allow nested auth data like { user: { profile: { ... } } }
  */
 type AuthModelType<Schema extends SchemaDef, Model extends GetModels<Schema>> = Partial<
-    DefaultModelResult<Schema, Model, ClientOptions<Schema>>
+    DefaultModelResult<Schema, Model>
 > & {
     [Key in RelationFields<Schema, Model>]?: FieldIsArray<Schema, Model, Key> extends true
         ? AuthModelType<Schema, RelationFieldType<Schema, Model, Key>>[]

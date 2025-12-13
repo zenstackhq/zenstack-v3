@@ -260,6 +260,9 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.0
+      '@zenstackhq/cli':
+        specifier: workspace:*
+        version: link:../../cli
       '@zenstackhq/eslint-config':
         specifier: workspace:*
         version: link:../../config/eslint-config

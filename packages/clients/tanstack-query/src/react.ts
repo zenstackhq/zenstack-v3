@@ -24,7 +24,6 @@ import type {
     AggregateArgs,
     AggregateResult,
     BatchResult,
-    ClientOptions,
     CountArgs,
     CountResult,
     CreateArgs,
@@ -37,8 +36,10 @@ import type {
     FindUniqueArgs,
     GroupByArgs,
     GroupByResult,
+    QueryOptions,
     SelectSubset,
-    SimplifiedModelResult,
+    SimplifiedPlainResult,
+    SimplifiedResult,
     Subset,
     UpdateArgs,
     UpdateManyAndReturnArgs,
@@ -129,101 +130,99 @@ export type ModelMutationModelResult<
     Model extends GetModels<Schema>,
     TArgs,
     Array extends boolean = false,
-> = Omit<
-    ModelMutationResult<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, TArgs, false, Array>, TArgs>,
-    'mutateAsync'
-> & {
+    Options extends QueryOptions<Schema> = QueryOptions<Schema>,
+> = Omit<ModelMutationResult<SimplifiedResult<Schema, Model, TArgs, Options, false, Array>, TArgs>, 'mutateAsync'> & {
     mutateAsync<T extends TArgs>(
         args: T,
-        options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T, false, Array>, T>,
-    ): Promise<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T, false, Array>>;
+        options?: ModelMutationOptions<SimplifiedResult<Schema, Model, T, Options, false, Array>, T>,
+    ): Promise<SimplifiedResult<Schema, Model, T, Options, false, Array>>;
 };
 
-export type ClientHooks<Schema extends SchemaDef> = {
-    [Model in GetModels<Schema> as `${Uncapitalize<Model>}`]: ModelQueryHooks<Schema, Model>;
+export type ClientHooks<Schema extends SchemaDef, Options extends QueryOptions<Schema> = QueryOptions<Schema>> = {
+    [Model in GetModels<Schema> as `${Uncapitalize<Model>}`]: ModelQueryHooks<Schema, Model, Options>;
 };
 
 // Note that we can potentially use TypeScript's mapped type to directly map from ORM contract, but that seems
 // to significantly slow down tsc performance ...
-export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Schema>> = TrimDelegateModelOperations<
+export type ModelQueryHooks<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Options extends QueryOptions<Schema> = QueryOptions<Schema>,
+> = TrimDelegateModelOperations<
     Schema,
     Model,
     {
         useFindUnique<T extends FindUniqueArgs<Schema, Model>>(
             args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
-            options?: ModelQueryOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T> | null>,
-        ): ModelQueryResult<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T> | null>;
+            options?: ModelQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options> | null>,
+        ): ModelQueryResult<SimplifiedPlainResult<Schema, Model, T, Options> | null>;
 
         useSuspenseFindUnique<T extends FindUniqueArgs<Schema, Model>>(
             args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
-            options?: ModelSuspenseQueryOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T> | null>,
-        ): ModelSuspenseQueryResult<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T> | null>;
+            options?: ModelSuspenseQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options> | null>,
+        ): ModelSuspenseQueryResult<SimplifiedPlainResult<Schema, Model, T, Options> | null>;
 
         useFindFirst<T extends FindFirstArgs<Schema, Model>>(
             args?: SelectSubset<T, FindFirstArgs<Schema, Model>>,
-            options?: ModelQueryOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T> | null>,
-        ): ModelQueryResult<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T> | null>;
+            options?: ModelQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options> | null>,
+        ): ModelQueryResult<SimplifiedPlainResult<Schema, Model, T, Options> | null>;
 
         useSuspenseFindFirst<T extends FindFirstArgs<Schema, Model>>(
             args?: SelectSubset<T, FindFirstArgs<Schema, Model>>,
-            options?: ModelSuspenseQueryOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T> | null>,
-        ): ModelSuspenseQueryResult<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T> | null>;
+            options?: ModelSuspenseQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options> | null>,
+        ): ModelSuspenseQueryResult<SimplifiedPlainResult<Schema, Model, T, Options> | null>;
 
         useFindMany<T extends FindManyArgs<Schema, Model>>(
             args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
-            options?: ModelQueryOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[]>,
-        ): ModelQueryResult<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[]>;
+            options?: ModelQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options>[]>,
+        ): ModelQueryResult<SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
         useSuspenseFindMany<T extends FindManyArgs<Schema, Model>>(
             args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
-            options?: ModelSuspenseQueryOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[]>,
-        ): ModelSuspenseQueryResult<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[]>;
+            options?: ModelSuspenseQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options>[]>,
+        ): ModelSuspenseQueryResult<SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
         useInfiniteFindMany<T extends FindManyArgs<Schema, Model>>(
             args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
-            options?: ModelInfiniteQueryOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[]>,
-        ): ModelInfiniteQueryResult<InfiniteData<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[]>>;
+            options?: ModelInfiniteQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options>[]>,
+        ): ModelInfiniteQueryResult<InfiniteData<SimplifiedPlainResult<Schema, Model, T, Options>[]>>;
 
         useSuspenseInfiniteFindMany<T extends FindManyArgs<Schema, Model>>(
             args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
-            options?: ModelSuspenseInfiniteQueryOptions<
-                SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[]
-            >,
-        ): ModelSuspenseInfiniteQueryResult<
-            InfiniteData<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[]>
-        >;
+            options?: ModelSuspenseInfiniteQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options>[]>,
+        ): ModelSuspenseInfiniteQueryResult<InfiniteData<SimplifiedPlainResult<Schema, Model, T, Options>[]>>;
 
         useCreate<T extends CreateArgs<Schema, Model>>(
-            options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>, T>,
-        ): ModelMutationModelResult<Schema, Model, T>;
+            options?: ModelMutationOptions<SimplifiedPlainResult<Schema, Model, T, Options>, T>,
+        ): ModelMutationModelResult<Schema, Model, T, false, Options>;
 
         useCreateMany<T extends CreateManyArgs<Schema, Model>>(
             options?: ModelMutationOptions<BatchResult, T>,
         ): ModelMutationResult<BatchResult, T>;
 
         useCreateManyAndReturn<T extends CreateManyAndReturnArgs<Schema, Model>>(
-            options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[], T>,
-        ): ModelMutationModelResult<Schema, Model, T, true>;
+            options?: ModelMutationOptions<SimplifiedPlainResult<Schema, Model, T, Options>[], T>,
+        ): ModelMutationModelResult<Schema, Model, T, true, Options>;
 
         useUpdate<T extends UpdateArgs<Schema, Model>>(
-            options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>, T>,
-        ): ModelMutationModelResult<Schema, Model, T>;
+            options?: ModelMutationOptions<SimplifiedPlainResult<Schema, Model, T, Options>, T>,
+        ): ModelMutationModelResult<Schema, Model, T, false, Options>;
 
         useUpdateMany<T extends UpdateManyArgs<Schema, Model>>(
             options?: ModelMutationOptions<BatchResult, T>,
         ): ModelMutationResult<BatchResult, T>;
 
         useUpdateManyAndReturn<T extends UpdateManyAndReturnArgs<Schema, Model>>(
-            options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>[], T>,
-        ): ModelMutationModelResult<Schema, Model, T, true>;
+            options?: ModelMutationOptions<SimplifiedPlainResult<Schema, Model, T, Options>[], T>,
+        ): ModelMutationModelResult<Schema, Model, T, true, Options>;
 
         useUpsert<T extends UpsertArgs<Schema, Model>>(
-            options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>, T>,
-        ): ModelMutationModelResult<Schema, Model, T>;
+            options?: ModelMutationOptions<SimplifiedPlainResult<Schema, Model, T, Options>, T>,
+        ): ModelMutationModelResult<Schema, Model, T, false, Options>;
 
         useDelete<T extends DeleteArgs<Schema, Model>>(
-            options?: ModelMutationOptions<SimplifiedModelResult<Schema, Model, ClientOptions<Schema>, T>, T>,
-        ): ModelMutationModelResult<Schema, Model, T>;
+            options?: ModelMutationOptions<SimplifiedPlainResult<Schema, Model, T, Options>, T>,
+        ): ModelMutationModelResult<Schema, Model, T, false, Options>;
 
         useDeleteMany<T extends DeleteManyArgs<Schema, Model>>(
             options?: ModelMutationOptions<BatchResult, T>,
@@ -264,20 +263,29 @@ export type ModelQueryHooks<Schema extends SchemaDef, Model extends GetModels<Sc
 /**
  * Gets data query hooks for all models in the schema.
  */
-export function useClientQueries<Schema extends SchemaDef>(schema: Schema): ClientHooks<Schema> {
-    return Object.keys(schema.models).reduce((acc, model) => {
-        (acc as any)[lowerCaseFirst(model)] = useModelQueries(schema, model as GetModels<Schema>);
-        return acc;
-    }, {} as ClientHooks<Schema>);
+export function useClientQueries<Schema extends SchemaDef, Options extends QueryOptions<Schema> = QueryOptions<Schema>>(
+    schema: Schema,
+): ClientHooks<Schema, Options> {
+    return Object.keys(schema.models).reduce(
+        (acc, model) => {
+            (acc as any)[lowerCaseFirst(model)] = useModelQueries<Schema, GetModels<Schema>, Options>(
+                schema,
+                model as GetModels<Schema>,
+            );
+            return acc;
+        },
+        {} as ClientHooks<Schema, Options>,
+    );
 }
 
 /**
  * Gets data query hooks for a specific model in the schema.
  */
-export function useModelQueries<Schema extends SchemaDef, Model extends GetModels<Schema>>(
-    schema: Schema,
-    model: Model,
-): ModelQueryHooks<Schema, Model> {
+export function useModelQueries<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Options extends QueryOptions<Schema>,
+>(schema: Schema, model: Model): ModelQueryHooks<Schema, Model, Options> {
     const modelDef = Object.values(schema.models).find((m) => m.name.toLowerCase() === model.toLowerCase());
     if (!modelDef) {
         throw new Error(`Model "${model}" not found in schema`);
@@ -377,7 +385,7 @@ export function useModelQueries<Schema extends SchemaDef, Model extends GetModel
         useSuspenseGroupBy: (args: any, options?: any) => {
             return useInternalSuspenseQuery(schema, modelName, 'groupBy', args, options);
         },
-    } as ModelQueryHooks<Schema, Model>;
+    } as ModelQueryHooks<Schema, Model, Options>;
 }
 
 export function useInternalQuery<TQueryFnData, TData>(

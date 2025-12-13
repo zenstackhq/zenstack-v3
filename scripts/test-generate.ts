@@ -7,18 +7,23 @@ const _dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fil
 
 async function main() {
     const baseDir = process.argv[2] || '.';
+    const options = process.argv.slice(3);
 
     const zmodelFiles = [...glob.sync(path.resolve(baseDir, '**/schema.zmodel'), { ignore: '**/node_modules/**' })];
     for (const file of zmodelFiles) {
-        console.log(`Generating TS schema for: ${file}`);
-        await generate(file);
+        console.log(
+            `Generating TS schema for: ${file}${options.length > 0 ? ` with options: ${options.join(' ')}` : ''}`,
+        );
+        await generate(file, options);
     }
 }
 
-async function generate(schemaPath: string) {
+async function generate(schemaPath: string, options: string[]) {
     const cliPath = path.join(_dirname, '../packages/cli/dist/index.js');
     const RUNTIME = process.env.RUNTIME ?? 'node';
-    execSync(`${RUNTIME} ${cliPath} generate --schema ${schemaPath}`, { cwd: path.dirname(schemaPath) });
+    execSync(`${RUNTIME} ${cliPath} generate --schema ${schemaPath} ${options.join(' ')}`, {
+        cwd: path.dirname(schemaPath),
+    });
 }
 
 main();

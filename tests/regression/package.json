@@ -4,6 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "build": "pnpm run generate",
         "generate": "tsx ../../scripts/test-generate.ts ./test",
         "test": "pnpm generate && tsc && vitest run"
     },

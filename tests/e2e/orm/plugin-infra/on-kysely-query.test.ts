@@ -8,7 +8,7 @@ describe('On kysely query tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = (await createTestClient(schema)) as any;
+        _client = await createTestClient(schema);
     });
 
     afterEach(async () => {

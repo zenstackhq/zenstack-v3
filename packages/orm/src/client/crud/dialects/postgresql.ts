@@ -22,6 +22,7 @@ import {
     getDelegateDescendantModels,
     getManyToManyRelation,
     isRelationField,
+    isTypeDef,
     requireField,
     requireIdFields,
     requireModel,
@@ -52,13 +53,25 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             invariant(false, 'should not reach here: AnyNull is not a valid input value');
         }
 
-        if (Array.isArray(value)) {
-            if (type === 'Json' && !forArrayField) {
-                // node-pg incorrectly handles array values passed to non-array JSON fields,
-                // the workaround is to JSON stringify the value
-                // https://github.com/brianc/node-postgres/issues/374
+        // node-pg incorrectly handles array values passed to non-array JSON fields,
+        // the workaround is to JSON stringify the value
+        // https://github.com/brianc/node-postgres/issues/374
+
+        if (isTypeDef(this.schema, type)) {
+            // type-def fields (regardless array or scalar) are stored as scalar `Json` and
+            // their input values need to be stringified if not already (i.e., provided in
+            // default values)
+            if (typeof value !== 'string') {
                 return JSON.stringify(value);
             } else {
+                return value;
+            }
+        } else if (Array.isArray(value)) {
+            if (type === 'Json' && !forArrayField) {
+                // scalar `Json` fields need their input stringified
+                return JSON.stringify(value);
+            } else {
+                // `Json[]` fields need their input as array (not stringified)
                 return value.map((v) => this.transformPrimitive(v, type, false));
             }
         } else {

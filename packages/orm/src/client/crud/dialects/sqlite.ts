@@ -19,6 +19,7 @@ import {
     getDelegateDescendantModels,
     getManyToManyRelation,
     getRelationForeignKeyFieldPairs,
+    isTypeDef,
     requireField,
     requireIdFields,
     requireModel,
@@ -30,7 +31,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return 'sqlite' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType, _forArrayField: boolean): unknown {
+    override transformPrimitive(value: unknown, type: BuiltinType): unknown {
         if (value === undefined) {
             return value;
         }
@@ -44,13 +45,13 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
             invariant(false, 'should not reach here: AnyNull is not a valid input value');
         }
 
-        if (type === 'Json' || (this.schema.typeDefs && type in this.schema.typeDefs)) {
+        if (type === 'Json' || isTypeDef(this.schema, type)) {
             // JSON data should be stringified
             return JSON.stringify(value);
         }
 
         if (Array.isArray(value)) {
-            return value.map((v) => this.transformPrimitive(v, type, false));
+            return value.map((v) => this.transformPrimitive(v, type));
         } else {
             return match(type)
                 .with('Boolean', () => (value ? 1 : 0))

@@ -22,6 +22,7 @@ import {
     getDelegateDescendantModels,
     getManyToManyRelation,
     isRelationField,
+    isTypeDef,
     requireField,
     requireIdFields,
     requireModel,
@@ -38,7 +39,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         return 'postgresql' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
+    override transformPrimitive(value: unknown, type: BuiltinType): unknown {
         if (value === undefined) {
             return value;
         }
@@ -53,13 +54,13 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
 
         if (Array.isArray(value)) {
-            if (type === 'Json' && !forArrayField) {
-                // node-pg incorrectly handles array values passed to non-array JSON fields,
-                // the workaround is to JSON stringify the value
+            if (type === 'Json' || isTypeDef(this.schema, type)) {
+                // node-pg incorrectly handles array values passed to JSON fields,the workaround is to
+                // JSON stringify the value
                 // https://github.com/brianc/node-postgres/issues/374
                 return JSON.stringify(value);
             } else {
-                return value.map((v) => this.transformPrimitive(v, type, false));
+                return value.map((v) => this.transformPrimitive(v, type));
             }
         } else {
             return match(type)
@@ -476,14 +477,14 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 this.eb(
                     this.eb.fn('jsonb_extract_path', [lhs, this.eb.val('0')]),
                     '=',
-                    this.transformPrimitive(value, 'Json', false),
+                    this.transformPrimitive(value, 'Json'),
                 ),
             )
             .with('array_ends_with', () =>
                 this.eb(
                     this.eb.fn('jsonb_extract_path', [lhs, sql`(jsonb_array_length(${lhs}) - 1)::text`]),
                     '=',
-                    this.transformPrimitive(value, 'Json', false),
+                    this.transformPrimitive(value, 'Json'),
                 ),
             )
             .exhaustive();

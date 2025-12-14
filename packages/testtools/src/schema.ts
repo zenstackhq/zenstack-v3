@@ -74,10 +74,15 @@ export async function generateTsSchema(
 }
 
 async function compileAndLoad(workDir: string) {
-    execSync('npx tsc', {
-        cwd: workDir,
-        stdio: 'inherit',
-    });
+    try {
+        execSync('npx tsc', {
+            cwd: workDir,
+            stdio: 'inherit',
+        });
+    } catch (err) {
+        console.error('Failed to compile generated schema:', err);
+        throw err;
+    }
 
     // load the schema module
     const module = await import(path.join(workDir, 'schema.js'));

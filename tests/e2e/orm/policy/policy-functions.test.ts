@@ -259,10 +259,9 @@ describe('policy functions tests', () => {
 
         const now = new Date();
 
-        const created = await db.foo.create({
+        await db.foo.create({
             data: { id: '1', dt: new Date(now.getTime() + 1000) },
         });
-        console.log(created);
 
         // violates `dt <= now()`
         await expect(db.foo.update({ where: { id: '1' }, data: { dt: now } })).toBeRejectedNotFound();

@@ -307,17 +307,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     Array.isArray(value.set)
                 ) {
                     // deal with nested "set" for scalar lists
-                    createFields[field] = this.dialect.transformPrimitive(
-                        value.set,
-                        fieldDef.type as BuiltinType,
-                        true,
-                    );
+                    createFields[field] = this.dialect.transformPrimitive(value.set, fieldDef.type as BuiltinType);
                 } else {
-                    createFields[field] = this.dialect.transformPrimitive(
-                        value,
-                        fieldDef.type as BuiltinType,
-                        !!fieldDef.array,
-                    );
+                    createFields[field] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType);
                 }
             } else {
                 const subM2M = getManyToManyRelation(this.schema, model, field);
@@ -689,7 +681,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             for (const [name, value] of Object.entries(item)) {
                 const fieldDef = this.requireField(model, name);
                 invariant(!fieldDef.relation, 'createMany does not support relations');
-                newItem[name] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType, !!fieldDef.array);
+                newItem[name] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType);
             }
             if (fromRelation) {
                 for (const { fk, pk } of relationKeyPairs) {
@@ -726,7 +718,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             item[field] = this.dialect.transformPrimitive(
                                 fieldDef.default,
                                 fieldDef.type as BuiltinType,
-                                !!fieldDef.array,
                             );
                         }
                     }
@@ -827,15 +818,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (typeof fieldDef?.default === 'object' && 'kind' in fieldDef.default) {
                     const generated = this.evalGenerator(fieldDef.default);
                     if (generated !== undefined) {
-                        values[field] = this.dialect.transformPrimitive(
-                            generated,
-                            fieldDef.type as BuiltinType,
-                            !!fieldDef.array,
-                        );
+                        values[field] = this.dialect.transformPrimitive(generated, fieldDef.type as BuiltinType);
                     }
                 } else if (fieldDef?.updatedAt) {
                     // TODO: should this work at kysely level instead?
-                    values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                    values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime');
                 } else if (fieldDef?.default !== undefined) {
                     let value = fieldDef.default;
                     if (fieldDef.type === 'Json') {
@@ -846,11 +833,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             value = JSON.parse(value);
                         }
                     }
-                    values[field] = this.dialect.transformPrimitive(
-                        value,
-                        fieldDef.type as BuiltinType,
-                        !!fieldDef.array,
-                    );
+                    values[field] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType);
                 }
             }
         }
@@ -956,7 +939,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (finalData === data) {
                     finalData = clone(data);
                 }
-                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime');
                 autoUpdatedFields.push(fieldName);
             }
         }
@@ -1093,7 +1076,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return this.transformScalarListUpdate(model, field, fieldDef, data[field]);
         }
 
-        return this.dialect.transformPrimitive(data[field], fieldDef.type as BuiltinType, !!fieldDef.array);
+        return this.dialect.transformPrimitive(data[field], fieldDef.type as BuiltinType);
     }
 
     private isNumericIncrementalUpdate(fieldDef: FieldDef, value: any) {
@@ -1158,7 +1141,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         );
 
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, false);
+        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType);
         const eb = expressionBuilder<any, any>();
         const fieldRef = this.dialect.fieldRef(model, field);
 
@@ -1181,7 +1164,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     ) {
         invariant(Object.keys(payload).length === 1, 'Only one of "set", "push" can be provided');
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, true);
+        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType);
         const eb = expressionBuilder<any, any>();
         const fieldRef = this.dialect.fieldRef(model, field);
 

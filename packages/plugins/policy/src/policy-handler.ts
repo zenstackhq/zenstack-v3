@@ -657,11 +657,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 invariant(item.kind === 'ValueNode', 'expecting a ValueNode');
                 result.push({
                     node: ValueNode.create(
-                        this.dialect.transformPrimitive(
-                            (item as ValueNode).value,
-                            fieldDef.type as BuiltinType,
-                            !!fieldDef.array,
-                        ),
+                        this.dialect.transformPrimitive((item as ValueNode).value, fieldDef.type as BuiltinType),
                     ),
                     raw: (item as ValueNode).value,
                 });
@@ -673,7 +669,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 // are all foreign keys
                 if (!isImplicitManyToManyJoinTable) {
                     const fieldDef = QueryUtils.requireField(this.client.$schema, model, fields[i]!);
-                    value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType, !!fieldDef.array);
+                    value = this.dialect.transformPrimitive(item, fieldDef.type as BuiltinType);
                 }
                 if (Array.isArray(value)) {
                     result.push({

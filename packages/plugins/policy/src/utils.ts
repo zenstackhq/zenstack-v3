@@ -19,14 +19,14 @@ import {
  * Creates a `true` value node.
  */
 export function trueNode<Schema extends SchemaDef>(dialect: BaseCrudDialect<Schema>) {
-    return ValueNode.createImmediate(dialect.transformPrimitive(true, 'Boolean', false));
+    return ValueNode.createImmediate(dialect.transformPrimitive(true, 'Boolean'));
 }
 
 /**
  * Creates a `false` value node.
  */
 export function falseNode<Schema extends SchemaDef>(dialect: BaseCrudDialect<Schema>) {
-    return ValueNode.createImmediate(dialect.transformPrimitive(false, 'Boolean', false));
+    return ValueNode.createImmediate(dialect.transformPrimitive(false, 'Boolean'));
 }
 
 /**

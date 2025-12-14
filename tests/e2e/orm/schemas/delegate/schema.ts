@@ -145,6 +145,7 @@ export class SchemaType implements SchemaDef {
                 }
             },
             attributes: [
+                { name: "@@index", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("ownerId")]) }] },
                 { name: "@@delegate", args: [{ name: "discriminator", value: ExpressionUtils.field("assetType") }] }
             ],
             idFields: ["id"],

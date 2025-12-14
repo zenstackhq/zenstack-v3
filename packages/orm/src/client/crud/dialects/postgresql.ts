@@ -55,7 +55,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
         if (Array.isArray(value)) {
             if (type === 'Json' || isTypeDef(this.schema, type)) {
-                // node-pg incorrectly handles array values passed to JSON fields,the workaround is to
+                // node-pg incorrectly handles array values passed to JSON fields, the workaround is to
                 // JSON stringify the value
                 // https://github.com/brianc/node-postgres/issues/374
                 return JSON.stringify(value);

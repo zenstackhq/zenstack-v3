@@ -1,8 +1,8 @@
 import { createTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
 
-describe('Issue some regression tests', () => {
-    it('should work', async () => {
+describe('Issue 493 regression tests', () => {
+    it('should correctly handle JSON and typed-JSON array fields for PostgreSQL', async () => {
         const schema = `
 type InlineButton {
     id            String

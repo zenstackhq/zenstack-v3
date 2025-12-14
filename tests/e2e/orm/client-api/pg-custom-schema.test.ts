@@ -278,6 +278,44 @@ model Bar {
         ).rejects.toThrow('"public" must be included in the "schemas" array');
     });
 
+    it('does not require public schema when all models and enums have explicit schema', async () => {
+        const db = await createTestClient(
+            `
+datasource db {
+    provider = 'postgresql'
+    schemas = ['mySchema']
+    url = '$DB_URL'
+}
+
+enum Role {
+    ADMIN
+    USER
+    @@schema('mySchema')
+}
+
+model Foo {
+    id Int @id
+    name String
+    role Role
+    @@schema('mySchema')
+}
+
+model Bar {
+    id Int @id
+    name String
+    @@schema('mySchema')
+}
+`,
+            {
+                provider: 'postgresql',
+                usePrismaPush: true,
+            },
+        );
+
+        await expect(db.foo.create({ data: { id: 1, name: 'test', role: 'ADMIN' } })).toResolveTruthy();
+        await expect(db.bar.create({ data: { id: 1, name: 'test' } })).toResolveTruthy();
+    });
+
     it('allows specifying schema only on a few models', async () => {
         let fooQueriesVerified = false;
         let barQueriesVerified = false;

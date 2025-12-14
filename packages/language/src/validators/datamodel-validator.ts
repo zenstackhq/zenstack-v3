@@ -250,7 +250,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
             return;
         }
 
-        if (this.isFieldInheritedFromDelegateModel(field)) {
+        if (this.isFieldInheritedFromDelegateModel(field, contextModel)) {
             // relation fields inherited from delegate model don't need opposite relation
             return;
         }
@@ -431,8 +431,8 @@ export default class DataModelValidator implements AstValidator<DataModel> {
     }
 
     // checks if the given field is inherited directly or indirectly from a delegate model
-    private isFieldInheritedFromDelegateModel(field: DataField) {
-        return isDelegateModel(field.$container);
+    private isFieldInheritedFromDelegateModel(field: DataField, contextModel: DataModel) {
+        return field.$container !== contextModel && isDelegateModel(field.$container);
     }
 
     private validateInherits(model: DataModel, accept: ValidationAcceptor) {

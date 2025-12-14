@@ -114,4 +114,54 @@ describe('Delegate Tests', () => {
             'can only be applied once',
         );
     });
+
+    it('rejects relation missing the opposite side', async () => {
+        await loadSchemaWithError(
+            `
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
+        model A {
+            id Int @id @default(autoincrement())
+            b B @relation(fields: [bId], references: [id])
+            bId Int
+            type String
+            @@delegate(type)
+        }
+
+        model B {
+            id Int @id @default(autoincrement())
+        }
+        `,
+            'missing an opposite relation',
+        );
+
+        await loadSchema(
+            `
+        datasource db {
+            provider = 'sqlite'
+            url      = 'file:./dev.db'
+        }
+        
+        model A {
+            id Int @id @default(autoincrement())
+            b B @relation(fields: [bId], references: [id])
+            bId Int
+            type String
+            @@delegate(type)
+        }
+
+        model B {
+            id Int @id @default(autoincrement())
+            a A[]
+        }
+
+        model C extends A {
+            c String
+        }
+        `,
+        );
+    });
 });

@@ -247,6 +247,37 @@ model Foo {
         ).rejects.toThrow('"mySchema" must be included in the "schemas" array');
     });
 
+    it('requires implicit public schema to be included in schemas', async () => {
+        await expect(
+            createTestClient(
+                `
+datasource db {
+    provider = 'postgresql'
+    schemas = ['mySchema']
+    url = '$DB_URL'
+}
+
+enum Role {
+    ADMIN
+    USER
+}
+
+model Foo {
+    id Int @id
+    name String
+    role Role
+    @@schema('mySchema')
+}
+
+model Bar {
+    id Int @id
+    name String
+}
+`,
+            ),
+        ).rejects.toThrow('"public" must be included in the "schemas" array');
+    });
+
     it('allows specifying schema only on a few models', async () => {
         let fooQueriesVerified = false;
         let barQueriesVerified = false;

@@ -1,6 +1,6 @@
 import type { ValidationAcceptor } from 'langium';
 import { SUPPORTED_PROVIDERS } from '../constants';
-import { DataSource, isConfigArrayExpr, isInvocationExpr, isLiteralExpr } from '../generated/ast';
+import { DataSource, isConfigArrayExpr, isDataModel, isEnum, isInvocationExpr, isLiteralExpr } from '../generated/ast';
 import { getStringLiteral } from '../utils';
 import { validateDuplicatedDeclarations, type AstValidator } from './common';
 
@@ -70,14 +70,28 @@ export default class DataSourceValidator implements AstValidator<DataSource> {
                 accept('error', '"schemas" must be an array of string literals', {
                     node: schemasField,
                 });
-            } else if (
-                // validate `defaultSchema` is included in `schemas`
-                defaultSchemaValue &&
-                !schemasValue.items.some((e) => getStringLiteral(e) === defaultSchemaValue)
-            ) {
-                accept('error', `"${defaultSchemaValue}" must be included in the "schemas" array`, {
-                    node: schemasField,
-                });
+            } else {
+                const schemasArray = schemasValue.items.map((e) => getStringLiteral(e)!);
+
+                if (defaultSchemaValue) {
+                    // validate `defaultSchema` is included in `schemas`
+                    if (!schemasArray.includes(defaultSchemaValue)) {
+                        accept('error', `"${defaultSchemaValue}" must be included in the "schemas" array`, {
+                            node: schemasField,
+                        });
+                    }
+                } else {
+                    // if no explicit default schema is specified, and there are models or enums without '@@schema',
+                    // "public" is implicitly used, so it must be included in the "schemas" array
+                    const hasImplicitPublicSchema = ds.$container.declarations.some(
+                        (d) => (isDataModel(d) || isEnum(d)) && !d.attributes.some((a) => a.decl.$refText === 'schema'),
+                    );
+                    if (hasImplicitPublicSchema && !schemasArray.includes('public')) {
+                        accept('error', `"public" must be included in the "schemas" array`, {
+                            node: schemasField,
+                        });
+                    }
+                }
             }
         }
     }

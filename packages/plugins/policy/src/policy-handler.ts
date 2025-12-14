@@ -90,6 +90,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const { mutationModel } = this.getMutationModel(node);
 
+        this.tryRejectNonexistentModel(mutationModel);
+
         // --- Pre mutation work ---
 
         if (InsertQueryNode.is(node)) {
@@ -330,6 +332,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             // unable to extract table name, can be a subquery, which will be handled when nested transformation happens
             return super.transformJoin(node);
         }
+
+        this.tryRejectNonexistentModel(table.model);
 
         // build a nested query with policy filter applied
         const filter = this.buildPolicyFilter(table.model, table.alias, 'read');
@@ -872,6 +876,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             const extractResult = this.extractTableName(table);
             if (extractResult) {
                 const { model, alias } = extractResult;
+                this.tryRejectNonexistentModel(model);
                 const filter = this.buildPolicyFilter(model, alias, 'read');
                 return acc ? conjunction(this.dialect, [acc, filter]) : filter;
             }
@@ -1009,6 +1014,12 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             );
 
         return eb.and([aQuery, bQuery]).toOperationNode();
+    }
+
+    private tryRejectNonexistentModel(model: string) {
+        if (!QueryUtils.hasModel(this.client.$schema, model) && !this.isManyToManyJoinTable(model)) {
+            throw createRejectedByPolicyError(model, RejectedByPolicyReason.NO_ACCESS);
+        }
     }
 
     // #endregion

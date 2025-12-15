@@ -1,4 +1,5 @@
 import type { ZModelServices } from '@zenstackhq/language';
+import colors from 'colors';
 import {
     isEnum,
     type Attribute,
@@ -38,7 +39,7 @@ export function syncEnums({
     if (provider.isSupportedFeature('NativeEnum')) {
         for (const dbEnum of dbEnums) {
             const { modified, name } = resolveNameCasing(options.modelCasing, dbEnum.enum_type);
-            if (modified) console.log(`Mapping enum ${dbEnum.enum_type} to ${name}`);
+            if (modified) console.log(colors.gray(`Mapping enum ${dbEnum.enum_type} to ${name}`));
             const factory = new EnumFactory().setName(name);
             if (modified || options.alwaysMap)
                 factory.addAttribute((builder) =>
@@ -344,16 +345,18 @@ export function syncTable({
     table.indexes.forEach((index) => {
         if (index.predicate) {
             //These constraints are not supported by Zenstack, because Zenstack currently does not fully support check constraints. Read more: https://pris.ly/d/check-constraints
-            console.log(
-                'These constraints are not supported by Zenstack. Read more: https://pris.ly/d/check-constraints',
-                `- Model: "${table.name}", constraint: "${index.name}"`,
+            console.warn(
+                colors.yellow(
+                    `These constraints are not supported by Zenstack. Read more: https://pris.ly/d/check-constraints\n- Model: "${table.name}", constraint: "${index.name}"`,
+                ),
             );
             return;
         }
         if (index.columns.find((c) => c.expression)) {
-            console.log(
-                'These constraints are not supported by Zenstack. Read more: https://pris.ly/d/check-constraints',
-                `- Model: "${table.name}", constraint: "${index.name}"`,
+            console.warn(
+                colors.yellow(
+                    `These constraints are not supported by Zenstack. Read more: https://pris.ly/d/check-constraints\n- Model: "${table.name}", constraint: "${index.name}"`,
+                ),
             );
             return;
         }

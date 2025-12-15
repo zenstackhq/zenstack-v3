@@ -1,15 +1,17 @@
 import { config } from '@dotenvx/dotenvx';
 import { ZModelCodeGenerator } from '@zenstackhq/language';
 import { DataModel, Enum, type Model } from '@zenstackhq/language/ast';
+import colors from 'colors';
 import fs from 'node:fs';
 import path from 'node:path';
+import ora from 'ora';
 import { execPrisma } from '../utils/exec-utils';
 import {
     generateTempPrismaSchema,
     getSchemaFile,
     handleSubProcessError,
-    requireDataSourceUrl,
     loadSchemaDocument,
+    requireDataSourceUrl,
 } from './action-utils';
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers } from './pull/provider';
@@ -77,6 +79,7 @@ async function runPush(options: PushOptions) {
 }
 
 async function runPull(options: PullOptions) {
+    const spinner = ora();
     try {
         const schemaFile = getSchemaFile(options.schema);
         const { model, services } = await loadSchemaDocument(schemaFile, { returnServices: true });
@@ -98,14 +101,19 @@ async function runPull(options: PullOptions) {
         if (!provider) {
             throw new Error(`No introspection provider found for: ${datasource.provider}`);
         }
-        console.log('Starging introspect the database...');
+
+        spinner.start('Introspecting database...');
         const { enums: allEnums, tables: allTables } = await provider.introspect(datasource.url);
+        spinner.succeed('Database introspected');
+
         const enums = provider.isSupportedFeature('Schema')
             ? allEnums.filter((e) => datasource.allSchemas.includes(e.schema_name))
             : allEnums;
         const tables = provider.isSupportedFeature('Schema')
             ? allTables.filter((t) => datasource.allSchemas.includes(t.schema))
             : allTables;
+
+        console.log(colors.blue('Syncing schema...'));
 
         const newModel: Model = {
             $type: 'Model',
@@ -165,11 +173,21 @@ async function runPull(options: PullOptions) {
             });
         }
 
+        console.log(colors.blue('Schema synced'));
+
         const cwd = new URL(`file://${process.cwd()}`).pathname;
         const docs = services.shared.workspace.LangiumDocuments.all
             .filter(({ uri }) => uri.path.toLowerCase().startsWith(cwd.toLowerCase()))
             .toArray();
         const docsSet = new Set(docs.map((d) => d.uri.toString()));
+
+        console.log(colors.bold('\nApplying changes to ZModel...'));
+
+        const deletedModels: string[] = [];
+        const deletedEnums: string[] = [];
+        const addedFields: string[] = [];
+        const deletedAttributes: string[] = [];
+        const deletedFields: string[] = [];
 
         //Delete models
         services.shared.workspace.IndexManager.allElements('DataModel', docsSet)
@@ -181,7 +199,7 @@ async function runPull(options: PullOptions) {
                 const model = decl.node!.$container as Model;
                 const index = model.declarations.findIndex((d) => d === decl.node);
                 model.declarations.splice(index, 1);
-                console.log(`Delete model ${decl.name}`);
+                deletedModels.push(colors.red(`- Model ${decl.name} deleted`));
             });
 
         // Delete Enums
@@ -195,7 +213,7 @@ async function runPull(options: PullOptions) {
                     const model = decl.node!.$container as Model;
                     const index = model.declarations.findIndex((d) => d === decl.node);
                     model.declarations.splice(index, 1);
-                    console.log(`Delete enum ${decl.name}`);
+                    deletedEnums.push(colors.red(`- Enum ${decl.name} deleted`));
                 });
         //
         newModel.declarations
@@ -239,14 +257,16 @@ async function runPull(options: PullOptions) {
 
                     if (originalFields.length > 1) {
                         console.warn(
-                            `Found more original fields, need to tweak the search algorith. ${originalDataModel.name}->[${originalFields.map((of) => of.name).join(', ')}](${f.name})`,
+                            colors.yellow(
+                                `Found more original fields, need to tweak the search algorith. ${originalDataModel.name}->[${originalFields.map((of) => of.name).join(', ')}](${f.name})`,
+                            ),
                         );
                         return;
                     }
                     const originalField = originalFields.at(0);
                     Object.freeze(originalField);
                     if (!originalField) {
-                        console.log(`Added field ${f.name} to ${originalDataModel.name}`);
+                        addedFields.push(colors.green(`+ Field ${f.name} added to ${originalDataModel.name}`));
                         (f as any).$container = originalDataModel;
                         originalDataModel.fields.push(f as any);
                         if (f.$type === 'DataField' && f.type.reference?.ref) {
@@ -260,7 +280,7 @@ async function runPull(options: PullOptions) {
                         }
                         return;
                     }
-                    if (f.name === 'profiles') console.log(f.attributes.length);
+
                     originalField.attributes
                         .filter(
                             (attr) =>
@@ -271,7 +291,9 @@ async function runPull(options: PullOptions) {
                             const field = attr.$container;
                             const index = field.attributes.findIndex((d) => d === attr);
                             field.attributes.splice(index, 1);
-                            console.log(`Delete attribute from field:${field.name} ${attr.decl.$refText}`);
+                            deletedAttributes.push(
+                                colors.yellow(`- Attribute ${attr.decl.$refText} deleted from field: ${field.name}`),
+                            );
                         });
                 });
                 originalDataModel.fields
@@ -295,9 +317,34 @@ async function runPull(options: PullOptions) {
                         const _model = f.$container;
                         const index = _model.fields.findIndex((d) => d === f);
                         _model.fields.splice(index, 1);
-                        console.log(`Delete field ${f.name}`);
+                        deletedFields.push(colors.red(`- Field ${f.name} deleted from ${_model.name}`));
                     });
             });
+
+        if (deletedModels.length > 0) {
+            console.log(colors.bold('\nDeleted Models:'));
+            deletedModels.forEach((msg) => console.log(msg));
+        }
+
+        if (deletedEnums.length > 0) {
+            console.log(colors.bold('\nDeleted Enums:'));
+            deletedEnums.forEach((msg) => console.log(msg));
+        }
+
+        if (addedFields.length > 0) {
+            console.log(colors.bold('\nAdded Fields:'));
+            addedFields.forEach((msg) => console.log(msg));
+        }
+
+        if (deletedAttributes.length > 0) {
+            console.log(colors.bold('\nDeleted Attributes:'));
+            deletedAttributes.forEach((msg) => console.log(msg));
+        }
+
+        if (deletedFields.length > 0) {
+            console.log(colors.bold('\nDeleted Fields:'));
+            deletedFields.forEach((msg) => console.log(msg));
+        }
 
         if (options.out && !fs.lstatSync(options.out).isFile()) {
             throw new Error(`Output path ${options.out} is not a file`);
@@ -311,7 +358,7 @@ async function runPull(options: PullOptions) {
         if (options.out) {
             const zmodelSchema = generator.generate(newModel);
 
-            console.log(`Writing to ${options.out}`);
+            console.log(colors.blue(`Writing to ${options.out}`));
 
             const outPath = options.out ? path.resolve(options.out) : schemaFile;
 
@@ -319,12 +366,15 @@ async function runPull(options: PullOptions) {
         } else {
             docs.forEach(({ uri, parseResult: { value: model } }) => {
                 const zmodelSchema = generator.generate(model);
-                console.log(`Writing to ${uri.path}`);
+                console.log(colors.blue(`Writing to ${uri.path}`));
                 fs.writeFileSync(uri.fsPath, zmodelSchema);
             });
         }
+
+        console.log(colors.green.bold('\nPull completed successfully!'));
     } catch (error) {
-        console.log(error);
+        spinner.fail('Pull failed');
+        console.error(error);
         throw error;
     }
 }

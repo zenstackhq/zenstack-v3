@@ -139,50 +139,34 @@ type ModelSelectResult<
     Options extends QueryOptions<Schema>,
 > = {
     [Key in keyof Select as Select[Key] extends false | undefined
-        ? never
-        : Key extends keyof Omit
-          ? Omit[Key] extends true
-              ? never
-              : Key
-          : Key extends '_count'
-            ? Select[Key] extends SelectCount<Schema, Model>
-                ? Key
-                : never
+        ? // not selected
+          never
+        : Key extends '_count'
+          ? // select "_count"
+            Select[Key] extends SelectCount<Schema, Model>
+              ? Key
+              : never
+          : Key extends keyof Omit
+            ? Omit[Key] extends true
+                ? //   omit
+                  never
+                : Key
             : Key]: Key extends '_count'
-        ? SelectCountResult<Schema, Model, Select[Key]>
+        ? // select "_count" result
+          SelectCountResult<Schema, Model, Select[Key]>
         : Key extends NonRelationFields<Schema, Model>
-          ? MapModelFieldType<Schema, Model, Key>
+          ? // scalar field result
+            MapModelFieldType<Schema, Model, Key>
           : Key extends RelationFields<Schema, Model>
-            ? Select[Key] extends FindArgs<
+            ? // relation field result (recurse)
+              ModelResult<
                   Schema,
                   RelationFieldType<Schema, Model, Key>,
+                  Select[Key],
+                  Options,
+                  ModelFieldIsOptional<Schema, Model, Key>,
                   FieldIsArray<Schema, Model, Key>
               >
-                ? 'select' extends keyof Select[Key]
-                    ? ModelResult<
-                          Schema,
-                          RelationFieldType<Schema, Model, Key>,
-                          Pick<Select[Key], 'select'>,
-                          Options,
-                          ModelFieldIsOptional<Schema, Model, Key>,
-                          FieldIsArray<Schema, Model, Key>
-                      >
-                    : ModelResult<
-                          Schema,
-                          RelationFieldType<Schema, Model, Key>,
-                          Pick<Select[Key], 'include' | 'omit'>,
-                          Options,
-                          ModelFieldIsOptional<Schema, Model, Key>,
-                          FieldIsArray<Schema, Model, Key>
-                      >
-                : DefaultModelResult<
-                      Schema,
-                      RelationFieldType<Schema, Model, Key>,
-                      Omit,
-                      Options,
-                      ModelFieldIsOptional<Schema, Model, Key>,
-                      FieldIsArray<Schema, Model, Key>
-                  >
             : never;
 };
 
@@ -204,40 +188,29 @@ export type ModelResult<
     Array = false,
 > = WrapType<
     Args extends {
-        select: infer S;
-        omit?: infer O;
-    }
+        select: infer S extends object;
+        omit?: infer O extends object;
+    } & Record<string, unknown>
         ? ModelSelectResult<Schema, Model, S, O, Options>
         : Args extends {
-                include: infer I;
-                omit?: infer O;
-            }
-          ? DefaultModelResult<Schema, Model, O, Options, false, false> & {
+                include: infer I extends object;
+                omit?: infer O extends object;
+            } & Record<string, unknown>
+          ? // select all non-omitted scalar fields
+            DefaultModelResult<Schema, Model, O, Options, false, false> & {
+                // recurse for "include" relations
                 [Key in keyof I & RelationFields<Schema, Model> as I[Key] extends false | undefined
                     ? never
-                    : Key]: I[Key] extends FindArgs<
+                    : Key]: ModelResult<
                     Schema,
                     RelationFieldType<Schema, Model, Key>,
+                    I[Key],
+                    Options,
+                    ModelFieldIsOptional<Schema, Model, Key>,
                     FieldIsArray<Schema, Model, Key>
-                >
-                    ? ModelResult<
-                          Schema,
-                          RelationFieldType<Schema, Model, Key>,
-                          I[Key],
-                          Options,
-                          ModelFieldIsOptional<Schema, Model, Key>,
-                          FieldIsArray<Schema, Model, Key>
-                      >
-                    : DefaultModelResult<
-                          Schema,
-                          RelationFieldType<Schema, Model, Key>,
-                          undefined,
-                          Options,
-                          ModelFieldIsOptional<Schema, Model, Key>,
-                          FieldIsArray<Schema, Model, Key>
-                      >;
+                >;
             }
-          : Args extends { omit: infer O }
+          : Args extends { omit: infer O } & Record<string, unknown>
             ? DefaultModelResult<Schema, Model, O, Options, false, false>
             : DefaultModelResult<Schema, Model, undefined, Options, false, false>,
     Optional,

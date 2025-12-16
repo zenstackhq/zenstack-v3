@@ -167,6 +167,7 @@ async function find() {
             select: {
                 posts: {
                     where: { title: 'Foo' },
+                    take: 1,
                     select: {
                         author: {
                             select: {

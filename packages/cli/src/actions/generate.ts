@@ -36,7 +36,7 @@ export async function run(options: Options) {
 
 \`\`\`ts
 import { ZenStackClient } from '@zenstackhq/orm';
-import { schema } from '${outputPath}/schema';
+import { schema } from '${path.relative('.', outputPath)}/schema';
 
 const client = new ZenStackClient(schema, {
     dialect: { ... }

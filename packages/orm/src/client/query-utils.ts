@@ -232,18 +232,22 @@ export function getManyToManyRelation(schema: SchemaDef, model: string, field: s
     if (!fieldDef.array || !fieldDef.relation?.opposite) {
         return undefined;
     }
+
+    // in case the m2m relation field is inherited from a delegate base, get the base model
+    const realModel = fieldDef.originModel ?? model;
+
     const oppositeFieldDef = requireField(schema, fieldDef.type, fieldDef.relation.opposite);
     if (oppositeFieldDef.array) {
         // Prisma's convention for many-to-many relation:
         // - model are sorted alphabetically by name
         // - join table is named _<model1>To<model2>, unless an explicit name is provided by `@relation`
         // - foreign keys are named A and B (based on the order of the model)
-        const sortedModelNames = [model, fieldDef.type].sort();
+        const sortedModelNames = [realModel, fieldDef.type].sort();
 
         let orderedFK: [string, string];
-        if (model !== fieldDef.type) {
+        if (realModel !== fieldDef.type) {
             // not a self-relation, model name's sort order determines fk order
-            orderedFK = sortedModelNames[0] === model ? ['A', 'B'] : ['B', 'A'];
+            orderedFK = sortedModelNames[0] === realModel ? ['A', 'B'] : ['B', 'A'];
         } else {
             // for self-relations, since model names are identical, relation field name's
             // sort order determines fk order
@@ -251,7 +255,7 @@ export function getManyToManyRelation(schema: SchemaDef, model: string, field: s
             orderedFK = sortedFieldNames[0] === field ? ['A', 'B'] : ['B', 'A'];
         }
 
-        const modelIdFields = requireIdFields(schema, model);
+        const modelIdFields = requireIdFields(schema, realModel);
         invariant(modelIdFields.length === 1, 'Only single-field ID is supported for many-to-many relation');
         const otherIdFields = requireIdFields(schema, fieldDef.type);
         invariant(otherIdFields.length === 1, 'Only single-field ID is supported for many-to-many relation');

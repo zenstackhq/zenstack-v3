@@ -250,7 +250,7 @@ export default class ExpressionValidator implements AstValidator<Expression> {
     }
 
     private validateUnaryExpr(expr: UnaryExpr, accept: ValidationAcceptor) {
-        if (expr.operand.$resolvedType?.decl !== 'Boolean') {
+        if (expr.operand.$resolvedType && expr.operand.$resolvedType.decl !== 'Boolean') {
             accept('error', `operand of "${expr.operator}" must be of Boolean type`, { node: expr.operand });
         }
     }

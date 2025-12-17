@@ -1,7 +1,7 @@
 import { createPolicyTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
 
-describe('Regression tests for issues 510', () => {
+describe('Regression tests for issue 510', () => {
     it('verifies the issue', async () => {
         const schema = `
 type ID {

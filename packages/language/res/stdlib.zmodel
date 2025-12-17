@@ -356,7 +356,7 @@ enum SortOrder {
 attribute @@index(_ fields: FieldReference[], name: String?, map: String?, length: Int?, sort: SortOrder?, clustered: Boolean?, type: IndexType?) @@@prisma
 
 /**
- * Defines meta information about the F.
+ * Defines meta information about the relation.
  *
  * @param name: Sometimes (e.g. to disambiguate a relation)	Defines the name of the relationship. In an m-n-relation, it also determines the name of the underlying relation table.
  * @param fields: A list of fields of the current model

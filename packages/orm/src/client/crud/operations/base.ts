@@ -904,7 +904,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         const format = expr.value;
 
-        invariant(typeof format === 'string', 'generated identifier format value must be a string')
+        invariant(typeof format === 'string', 'generated identifier format value must be a string');
         invariant(format.includes('%s'), 'generated identifier format strings must include "%s"');
 
         // replaceAll instead? Does anyone even need that...?

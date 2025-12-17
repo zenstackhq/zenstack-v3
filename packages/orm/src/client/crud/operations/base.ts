@@ -861,20 +861,32 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (ExpressionUtils.isCall(defaultValue)) {
             return match(defaultValue.function)
                 .with('cuid', () => this.formatGeneratedValue(createId(), defaultValue.args?.[1]))
-                .with('uuid', () =>
-                    defaultValue.args?.[0] &&
-                    ExpressionUtils.isLiteral(defaultValue.args?.[0]) &&
-                    this.formatGeneratedValue(defaultValue.args[0].value === 7
+                .with('uuid', () => {
+                    const version = defaultValue.args?.[0] && ExpressionUtils.isLiteral(defaultValue.args[0])
+                        ? defaultValue.args[0].value
+                        : undefined;
+
+                    const generated = version === 7
                         ? uuid.v7()
-                        : uuid.v4(), defaultValue.args?.[1]),
-                )
-                .with('nanoid', () =>
-                    defaultValue.args?.[0] &&
-                    ExpressionUtils.isLiteral(defaultValue.args[0]) &&
-                    this.formatGeneratedValue(typeof defaultValue.args[0].value === 'number'
-                        ? nanoid(defaultValue.args[0].value)
-                        : nanoid(), defaultValue.args?.[1]),
-                )
+                        : uuid.v4();
+
+                    const format = defaultValue.args?.[1];
+
+                    return this.formatGeneratedValue(generated, format);
+                })
+                .with('nanoid', () => {
+                    const length = defaultValue.args?.[0] && ExpressionUtils.isLiteral(defaultValue.args[0])
+                        ? defaultValue.args[0].value
+                        : undefined;
+
+                    const generated = typeof length === 'number'
+                        ? nanoid(length)
+                        : nanoid();
+
+                    const format = defaultValue.args?.[1];
+
+                    return this.formatGeneratedValue(generated, format);
+                })
                 .with('ulid', () => this.formatGeneratedValue(ulid(), defaultValue.args?.[0]))
                 .otherwise(() => undefined);
         } else if (
@@ -893,11 +905,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    private formatGeneratedValue(generated?: string, expr?: Expression) {
-        if (!generated) {
-            return undefined;
-        }
-
+    private formatGeneratedValue(generated: string, expr?: Expression) {
         if (!expr || !ExpressionUtils.isLiteral(expr)) {
             return generated;
         }

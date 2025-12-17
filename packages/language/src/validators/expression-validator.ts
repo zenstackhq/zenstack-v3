@@ -12,6 +12,7 @@ import {
     isReferenceExpr,
     isThisExpr,
     MemberAccessExpr,
+    UnaryExpr,
     type ExpressionType,
 } from '../generated/ast';
 
@@ -66,6 +67,9 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                 break;
             case 'BinaryExpr':
                 this.validateBinaryExpr(expr, accept);
+                break;
+            case 'UnaryExpr':
+                this.validateUnaryExpr(expr, accept);
                 break;
         }
     }
@@ -242,6 +246,12 @@ export default class ExpressionValidator implements AstValidator<Expression> {
             case '^':
                 this.validateCollectionPredicate(expr, accept);
                 break;
+        }
+    }
+
+    private validateUnaryExpr(expr: UnaryExpr, accept: ValidationAcceptor) {
+        if (expr.operand.$resolvedType && expr.operand.$resolvedType.decl !== 'Boolean') {
+            accept('error', `operand of "${expr.operator}" must be of Boolean type`, { node: expr.operand });
         }
     }
 

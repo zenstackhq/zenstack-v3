@@ -21,7 +21,7 @@ model Post {
     title     String   @length(1, 256)
     content   String
     published Boolean  @default(false)
-    author    User     @relation(fields: [authorId], references: [id])
+    author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
     authorId  String
 }
 `;

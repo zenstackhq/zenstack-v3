@@ -198,7 +198,7 @@ export class ZenStackQueryExecutor extends DefaultQueryExecutor {
             if (parameters) {
                 compiled = { ...compiled, parameters };
             }
-            return connection.executeQuery<any>(compiled);
+            return this.internalExecuteQuery(connection, compiled);
         }
 
         if (
@@ -246,7 +246,7 @@ export class ZenStackQueryExecutor extends DefaultQueryExecutor {
             queryId,
         );
 
-        const result = await connection.executeQuery<any>(compiled);
+        const result = await this.internalExecuteQuery(connection, compiled);
 
         if (!this.driver.isTransactionConnection(connection)) {
             // not in a transaction, just call all after-mutation hooks
@@ -470,7 +470,7 @@ export class ZenStackQueryExecutor extends DefaultQueryExecutor {
         const compiled = this.compileQuery(selectQueryNode, createQueryId());
         // execute the query directly with the given connection to avoid triggering
         // any other side effects
-        const result = await connection.executeQuery(compiled);
+        const result = await this.internalExecuteQuery(connection, compiled);
         return result.rows as Record<string, unknown>[];
     }
 
@@ -481,6 +481,14 @@ export class ZenStackQueryExecutor extends DefaultQueryExecutor {
             return WhereNode.create(condition1);
         } else {
             return condition2;
+        }
+    }
+
+    private async internalExecuteQuery(connection: DatabaseConnection, compiledQuery: CompiledQuery) {
+        try {
+            return await connection.executeQuery<any>(compiledQuery);
+        } catch (err) {
+            throw createDBQueryError('Failed to execute query', err, compiledQuery.sql, compiledQuery.parameters);
         }
     }
 }

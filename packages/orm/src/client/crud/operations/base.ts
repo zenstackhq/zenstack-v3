@@ -860,22 +860,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     private evalGenerator(defaultValue: Expression) {
         if (ExpressionUtils.isCall(defaultValue)) {
             return match(defaultValue.function)
-                .with('cuid', () => createId())
+                .with('cuid', () => this.formatGeneratedValue(createId(), defaultValue.args?.[1]))
                 .with('uuid', () =>
                     defaultValue.args?.[0] &&
                     ExpressionUtils.isLiteral(defaultValue.args?.[0]) &&
-                    defaultValue.args[0].value === 7
+                    this.formatGeneratedValue(defaultValue.args[0].value === 7
                         ? uuid.v7()
-                        : uuid.v4(),
+                        : uuid.v4(), defaultValue.args?.[1]),
                 )
                 .with('nanoid', () =>
                     defaultValue.args?.[0] &&
                     ExpressionUtils.isLiteral(defaultValue.args[0]) &&
-                    typeof defaultValue.args[0].value === 'number'
+                    this.formatGeneratedValue(typeof defaultValue.args[0].value === 'number'
                         ? nanoid(defaultValue.args[0].value)
-                        : nanoid(),
+                        : nanoid(), defaultValue.args?.[1]),
                 )
-                .with('ulid', () => ulid())
+                .with('ulid', () => this.formatGeneratedValue(ulid(), defaultValue.args?.[0]))
                 .otherwise(() => undefined);
         } else if (
             ExpressionUtils.isMember(defaultValue) &&
@@ -891,6 +891,24 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         } else {
             return undefined;
         }
+    }
+
+    private formatGeneratedValue(generated?: string, expr?: Expression) {
+        if (!generated) {
+            return undefined;
+        }
+
+        if (!expr || !ExpressionUtils.isLiteral(expr)) {
+            return generated;
+        }
+
+        const format = expr.value;
+
+        invariant(typeof format === 'string', 'generated identifier format value must be a string')
+        invariant(format.includes('%s'), 'generated identifier format strings must include "%s"');
+
+        // replaceAll instead? Does anyone even need that...?
+        return format.replace('%s', generated);
     }
 
     protected async update(

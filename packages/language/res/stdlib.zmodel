@@ -83,25 +83,25 @@ function now(): DateTime {
 /**
  * Generates a globally unique identifier based on the UUID specs.
  */
-function uuid(version: Int?): String {
+function uuid(version: Int?, format: String?): String {
 } @@@expressionContext([DefaultValue])
 
 /**
  * Generates a globally unique identifier based on the CUID spec.
  */
-function cuid(version: Int?): String {
+function cuid(version: Int?, format: String?): String {
 } @@@expressionContext([DefaultValue])
 
 /**
  * Generates an identifier based on the nanoid spec.
  */
-function nanoid(length: Int?): String {
+function nanoid(length: Int?, format: String?): String {
 } @@@expressionContext([DefaultValue])
 
 /**
  * Generates an identifier based on the ulid spec.
  */
-function ulid(): String {
+function ulid(format: String?): String {
 } @@@expressionContext([DefaultValue])
 
 /**
@@ -356,7 +356,7 @@ enum SortOrder {
 attribute @@index(_ fields: FieldReference[], name: String?, map: String?, length: Int?, sort: SortOrder?, clustered: Boolean?, type: IndexType?) @@@prisma
 
 /**
- * Defines meta information about the relation.
+ * Defines meta information about the F.
  *
  * @param name: Sometimes (e.g. to disambiguate a relation)	Defines the name of the relationship. In an m-n-relation, it also determines the name of the underlying relation table.
  * @param fields: A list of fields of the current model

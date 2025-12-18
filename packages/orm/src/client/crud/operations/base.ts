@@ -870,9 +870,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ? uuid.v7()
                         : uuid.v4();
 
-                    const format = defaultValue.args?.[1];
-
-                    return this.formatGeneratedValue(generated, format);
+                    return this.formatGeneratedValue(generated, defaultValue.args?.[1]);
                 })
                 .with('nanoid', () => {
                     const length = defaultValue.args?.[0] && ExpressionUtils.isLiteral(defaultValue.args[0])
@@ -883,9 +881,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ? nanoid(length)
                         : nanoid();
 
-                    const format = defaultValue.args?.[1];
-
-                    return this.formatGeneratedValue(generated, format);
+                    return this.formatGeneratedValue(generated, defaultValue.args?.[1]);
                 })
                 .with('ulid', () => this.formatGeneratedValue(ulid(), defaultValue.args?.[0]))
                 .otherwise(() => undefined);
@@ -905,17 +901,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
     }
 
-    private formatGeneratedValue(generated: string, expr?: Expression) {
-        if (!expr || !ExpressionUtils.isLiteral(expr)) {
+    private formatGeneratedValue(generated: string, formatExpr?: Expression) {
+        if (!formatExpr || !ExpressionUtils.isLiteral(formatExpr) || typeof formatExpr.value !== 'string') {
             return generated;
         }
 
-        const format = expr.value;
-
-        invariant(typeof format === 'string', 'generated identifier format value must be a string');
-        invariant(format.includes('%s'), 'generated identifier format strings must include "%s"');
-
-        return format.replaceAll('%s', generated);
+        return formatExpr.value.replaceAll('%s', generated);
     }
 
     protected async update(

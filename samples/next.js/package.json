@@ -1,6 +1,6 @@
 {
     "name": "next.js",
-    "version": "3.0.0-beta.32",
+    "version": "3.0.0-beta.33",
     "private": true,
     "scripts": {
         "generate": "zen generate --lite",
@@ -18,7 +18,7 @@
         "better-sqlite3": "catalog:",
         "kysely": "catalog:",
         "lorem-ipsum": "^2.0.8",
-        "next": "16.0.7",
+        "next": "catalog:",
         "react": "catalog:",
         "react-dom": "catalog:"
     },

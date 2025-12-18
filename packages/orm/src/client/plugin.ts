@@ -24,8 +24,10 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
      */
     description?: string;
 
+    // TODO: revisit
     /**
      * Custom function implementations.
+     * @private
      */
     functions?: Record<string, ZModelFunction<Schema>>;
 

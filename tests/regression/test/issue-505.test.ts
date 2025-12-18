@@ -1,7 +1,7 @@
 import { createTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
 
-describe('Regression tests for issues 505', () => {
+describe('Regression tests for issue 505', () => {
     it('verifies the issue', async () => {
         const db = await createTestClient(
             `

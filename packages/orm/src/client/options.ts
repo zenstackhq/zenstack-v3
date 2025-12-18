@@ -50,6 +50,8 @@ export type ClientOptions<Schema extends SchemaDef> = {
 
     /**
      * Custom function definitions.
+     *
+     * @private
      */
     functions?: Record<string, ZModelFunction<Schema>>;
 

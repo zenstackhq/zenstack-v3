@@ -25,6 +25,16 @@
                 "types": "./dist/index.d.cts",
                 "default": "./dist/index.cjs"
             }
+        },
+        "./ast": {
+            "import": {
+                "types": "./dist/ast.d.ts",
+                "default": "./dist/ast.js"
+            },
+            "require": {
+                "types": "./dist/ast.d.cts",
+                "default": "./dist/ast.cjs"
+            }
         }
     },
     "dependencies": {

@@ -175,8 +175,8 @@ async function loadPluginModule(provider: string, basePath: string) {
         }
     };
 
+    const jiti = createJiti(pathToFileURL(basePath).toString());
     const importAsTs = async (spec: string) => {
-        const jiti = createJiti(pathToFileURL(basePath).toString());
         try {
             const result = (await jiti.import(spec, { default: true })) as CliPlugin;
             return result;

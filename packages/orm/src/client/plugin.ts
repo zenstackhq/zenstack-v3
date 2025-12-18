@@ -3,6 +3,7 @@ import type { ClientContract } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
 import type { AllCrudOperation } from './crud/operations/base';
+import type { ZModelFunction } from './options';
 
 /**
  * ZenStack runtime plugin.
@@ -23,11 +24,12 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
      */
     description?: string;
 
-    // TODO: revisit later
-    // /**
-    //  * Custom function implementations.
-    //  */
-    // functions?: Record<string, ZModelFunction<Schema>>;
+    // TODO: revisit
+    /**
+     * Custom function implementations.
+     * @private
+     */
+    functions?: Record<string, ZModelFunction<Schema>>;
 
     /**
      * Intercepts an ORM query.

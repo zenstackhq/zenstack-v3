@@ -554,20 +554,18 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private getFunctionImpl(functionName: string) {
-        return this.clientOptions.functions?.[functionName];
-        // TODO: revisit later
-        // // check built-in functions
-        // let func = this.clientOptions.functions?.[functionName];
-        // if (!func) {
-        //     // check plugins
-        //     for (const plugin of this.clientOptions.plugins ?? []) {
-        //         if (plugin.functions?.[functionName]) {
-        //             func = plugin.functions[functionName];
-        //             break;
-        //         }
-        //     }
-        // }
-        // return func;
+        // check built-in functions
+        let func = this.clientOptions.functions?.[functionName];
+        if (!func) {
+            // check plugins
+            for (const plugin of this.clientOptions.plugins ?? []) {
+                if (plugin.functions?.[functionName]) {
+                    func = plugin.functions[functionName];
+                    break;
+                }
+            }
+        }
+        return func;
     }
 
     private transformCallArg(

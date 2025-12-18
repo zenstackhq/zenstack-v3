@@ -12,10 +12,10 @@ catalog:
     '@types/tmp': ^0.2.6
     better-sqlite3: ^12.5.0
     decimal.js: ^10.4.3
-    kysely: ~0.28.8
+    kysely: ~0.28.9
     langium: 3.5.0
     langium-cli: 3.5.0
-    next: 16.0.7
+    next: 16.0.10
     pg: ^8.13.1
     prisma: ^6.19.0
     react: 19.2.0

@@ -25,7 +25,7 @@ export async function run(projectPath: string) {
     for (const pkg of packages) {
         const resolved = resolveCommand(pm.agent, 'add', [
             pkg.name,
-            ...(pkg.dev ? [pm.agent.startsWith('yarn') ? '--dev' : '--save-dev'] : []),
+            ...(pkg.dev ? [pm.agent.startsWith('yarn') || pm.agent === 'bun' ? '--dev' : '--save-dev'] : []),
         ]);
         if (!resolved) {
             throw new CliError(`Unable to determine how to install package "${pkg.name}". Please install it manually.`);

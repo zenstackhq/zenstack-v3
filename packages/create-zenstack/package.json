@@ -1,6 +1,6 @@
 {
     "name": "create-zenstack",
-    "version": "3.0.0-beta.32",
+    "version": "3.0.0-beta.33",
     "description": "Create a new ZenStack project",
     "type": "module",
     "scripts": {

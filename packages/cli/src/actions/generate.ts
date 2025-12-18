@@ -200,15 +200,17 @@ async function loadPluginModule(provider: string, basePath: string) {
 
     // try ESM index files in provider directory
     for (const suffix of esmSuffixes) {
-        if (fs.existsSync(path.join(moduleSpec, `index${suffix}`))) {
-            return await importAsEsm(path.join(moduleSpec, `index${suffix}`));
+        const indexPath = path.join(moduleSpec, `index${suffix}`);
+        if (fs.existsSync(indexPath)) {
+            return await importAsEsm(pathToFileURL(indexPath).toString());
         }
     }
 
     // try TS index files in provider directory
     for (const suffix of tsSuffixes) {
-        if (fs.existsSync(path.join(moduleSpec, `index${suffix}`))) {
-            return await importAsTs(path.join(moduleSpec, `index${suffix}`));
+        const indexPath = path.join(moduleSpec, `index${suffix}`);
+        if (fs.existsSync(indexPath)) {
+            return await importAsTs(indexPath);
         }
     }
 

@@ -1,11 +1,11 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import {
-    BaseCrudDialect,
-    CRUD_EXT,
     getCrudDialect,
     QueryUtils,
     SchemaUtils,
+    type BaseCrudDialect,
     type ClientContract,
+    type CRUD_EXT,
 } from '@zenstackhq/orm';
 import type {
     BinaryExpression,

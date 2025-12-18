@@ -47,7 +47,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
             return;
         }
 
-        if (!this.validateArgs(funcDecl, expr.args, accept)) {
+        if (!this.validateArgs(funcDecl, expr, accept)) {
             return;
         }
 
@@ -112,17 +112,17 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         return !!attr.decl.ref?.attributes.some((attr) => attr.decl.$refText === '@@@validation');
     }
 
-    private validateArgs(funcDecl: FunctionDecl, args: Argument[], accept: ValidationAcceptor) {
+    private validateArgs(funcDecl: FunctionDecl, expr: InvocationExpr, accept: ValidationAcceptor) {
         let success = true;
         for (let i = 0; i < funcDecl.params.length; i++) {
             const param = funcDecl.params[i];
             if (!param) {
                 continue;
             }
-            const arg = args[i];
+            const arg = expr.args[i];
             if (!arg) {
                 if (!param.optional) {
-                    accept('error', `missing argument for parameter "${param.name}"`, { node: funcDecl });
+                    accept('error', `missing argument for parameter "${param.name}"`, { node: expr });
                     success = false;
                 }
             } else {

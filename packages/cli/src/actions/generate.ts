@@ -188,14 +188,16 @@ async function loadPluginModule(provider: string, basePath: string) {
     const esmSuffixes = ['.js', '.mjs'];
     const tsSuffixes = ['.ts', '.mts'];
 
-    // try provider as ESM file
-    if (esmSuffixes.some((suffix) => moduleSpec.endsWith(suffix))) {
-        return await importAsEsm(moduleSpec);
-    }
+    if (fs.existsSync(moduleSpec) && fs.statSync(moduleSpec).isFile()) {
+        // try provider as ESM file
+        if (esmSuffixes.some((suffix) => moduleSpec.endsWith(suffix))) {
+            return await importAsEsm(pathToFileURL(moduleSpec).toString());
+        }
 
-    // try provider as TS file
-    if (tsSuffixes.some((suffix) => moduleSpec.endsWith(suffix))) {
-        return await importAsTs(moduleSpec);
+        // try provider as TS file
+        if (tsSuffixes.some((suffix) => moduleSpec.endsWith(suffix))) {
+            return await importAsTs(moduleSpec);
+        }
     }
 
     // try ESM index files in provider directory

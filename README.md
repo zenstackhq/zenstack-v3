@@ -5,7 +5,7 @@
     <img src="https://raw.githubusercontent.com/zenstackhq/zenstack-docs/main/static/img/logo.png" height="128">
     </picture>
     </a>
-    <h1>ZenStack V3</h1>
+    <h1>ZenStack: Battery-Included TypeScript ORM</h1>
     <a href="https://www.npmjs.com/package/@zenstackhq/cli?activeTab=versions">
         <img src="https://img.shields.io/npm/v/%40zenstackhq%2Fcli/next">
     </a>
@@ -21,27 +21,23 @@
     </a>
 </div>
 
-> V3 is currently in beta phase and not ready for production use. Feedback and bug reports are greatly appreciated. Please visit this dedicated [discord channel](https://discord.com/channels/1035538056146595961/1352359627525718056) for chat and support.
-
 # What's ZenStack
 
-> Read full documentation at 👉🏻 https://zenstack.dev/v3.
+> Read full documentation at 👉🏻 https://zenstack.dev/docs.
 
 ZenStack is a TypeScript database toolkit for developing full-stack or backend Node.js/Bun applications. It provides a unified data modeling and access solution with the following features:
 
 - A modern schema-first ORM that's compatible with [Prisma](https://github.com/prisma/prisma)'s schema and API
-- Versatile data access APIs: high-level (Prisma-style) ORM queries + low-level ([Kysely](https://github.com/kysely-org/kysely)) query builder
-- Built-in access control and data validation (coming soon)
-- Advanced data modeling patterns like [polymorphism](https://zenstack.dev/blog/polymorphism)
-- Designed for extensibility and flexibility: plugins, life-cycle hooks, etc.
-- Automatic CRUD web APIs with adapters for popular frameworks (coming soon)
-- Automatic [TanStack Query](https://github.com/TanStack/query) hooks for easy CRUD from the frontend (coming soon)
+- Versatile query APIs: high-level Prisma-style ORM queries + low-level [Kysely](https://github.com/kysely-org/kysely) query builder
+- Built-in access control and data validation
+- Advanced data modeling patterns like [polymorphism](https://zenstack.dev/docs/orm/polymorphism)
+- Designed for extensibility and flexibility
+- Automatic CRUD web APIs with adapters for popular frameworks
+- Automatic [TanStack Query](https://github.com/TanStack/query) hooks for easy CRUD from the frontend
 
 # What's New in V3
 
-ZenStack V3 is a major rewrite of [V2](https://github.com/zenstackhq/zenstack). The biggest change is V3 doesn't have a runtime dependency to Prisma anymore. Instead of working as a big wrapper of Prisma as in V2, V3 made a bold move and implemented the entire ORM engine using [Kysely](https://github.com/kysely-org/kysely), while keeping the query API fully compatible with Prisma.
-
-Please check [this blog post](https://zenstack.dev/blog/next-chapter-1) for why we made this big architectural change decision.
+ZenStack V3 is a major rewrite of [V2](https://github.com/zenstackhq/zenstack/docs/2.x). It replaced Prisma ORM with its own ORM engine built on top of [Kysely](https://kysely.dev) while keeping a Prisma-compatible query API. This architecture change brings the level of flexibility that we couldn't imagine in previous versions. Please check [this blog post](https://zenstack.dev/blog/next-chapter-1) for why we made this bold decision.
 
 Even without using advanced features, ZenStack offers the following benefits as a drop-in replacement to Prisma:
 
@@ -49,12 +45,9 @@ Even without using advanced features, ZenStack offers the following benefits as 
 2. More TypeScript type inference, less code generation.
 3. Fully-typed query-builder API as a better escape hatch compared to Prisma's [raw queries](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries) or [typed SQL](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/typedsql).
 
-> Although ZenStack v3's ORM runtime doesn't depend on Prisma anymore (specifically, `@prisma/client`), it still relies on Prisma to handle database migration. See [database migration](https://zenstack.dev/docs/3.x/orm/migration) for more details.
+# Try It Now
 
-# Quick Start
-
-- [ORM](./samples/orm): A simple example demonstrating ZenStack ORM usage.
-- [Next.js + TanStack Query](./samples/next.js): A full-stack sample demonstrating using TanStack Query to consume ZenStack's automatic CRUD services in a Next.js app.
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/~/github.com/zenstackhq/v3-doc-quick-start?file=zenstack%2fschema.zmodel&file=main.ts&view=editor&showSidebar=0&hideNavigation=1&hideExplorer=1)
 
 ## Installation
 
@@ -63,7 +56,7 @@ Even without using advanced features, ZenStack offers the following benefits as 
 Use the following command to scaffold a simple TypeScript command line application with ZenStack configured:
 
 ```bash
-npm create zenstack@next my-project
+npm create zenstack@latest my-project
 ```
 
 ### 2. Setting up an existing project
@@ -71,7 +64,7 @@ npm create zenstack@next my-project
 Or, if you have an existing project, use the CLI to initialize it:
 
 ```bash
-npx @zenstackhq/cli@next init
+npx @zenstackhq/cli@latest init
 ```
 
 ### 3. Setting up manually
@@ -79,12 +72,42 @@ npx @zenstackhq/cli@next init
 Alternatively, you can set it up manually:
 
 ```bash
-npm install -D @zenstackhq/cli@next
-npm install @zenstackhq/orm@next
+npm install -D @zenstackhq/cli
+npm install @zenstackhq/orm
 ```
 
 Then create a `zenstack` folder and a `schema.zmodel` file in it.
 
 # Documentation
 
-Please visit the [doc site](https://zenstack.dev/docs/3.x/) for detailed documentation.
+[https://zenstack.dev/docs/](https://zenstack.dev/docs/)
+
+# Sponsors
+
+Thank you for your generous support!
+
+## Current Sponsors
+
+<table>
+  <tr>
+   <td align="center"><a href="https://suhyl.com/"><img src="https://avatars.githubusercontent.com/u/124434734?s=200&v=4" width="100" style="border-radius:50%" alt="Suhyl"/><br />Suhyl</a></td>
+   <td align="center"><a href="https://www.marblism.com/"><img src="https://avatars.githubusercontent.com/u/143199531?s=200&v=4" width="100" style="border-radius:50%" alt="Marblism"/><br />Marblism</a></td>
+   <td align="center"><a href="https://www.mermaidchart.com/"><img src="https://avatars.githubusercontent.com/u/117662492?s=200&v=4" width="100" style="border-radius:50%" alt="Mermaid Chart"/><br />Mermaid Chart</a></td>
+   <td align="center"><a href="https://coderabbit.ai/"><img src="https://avatars.githubusercontent.com/u/132028505?v=4" width="100" style="border-radius:50%" alt="CodeRabbit"/><br />CodeRabbit</a></td>
+   <td align="center"><a href="https://github.com/j0hannr"><img src="https://avatars.githubusercontent.com/u/52762073?v=4" width="100" style="border-radius:50%" alt="Johann Rohn"/><br />Johann Rohn</a></td>
+  </tr>
+</table>
+
+## Previous Sponsors
+
+<table>
+  <tr>
+   <td align="center"><a href="https://github.com/baenie"><img src="https://avatars.githubusercontent.com/u/58309104?v=4" width="100" style="border-radius:50%" alt="Benjamin Zecirovic"/><br />Benjamin Zecirovic</a></td>
+   <td align="center"><a href="https://github.com/umussetu"><img src="https://avatars.githubusercontent.com/u/152648499?v=4" width="100" style="border-radius:50%" alt="Ulric"/><br />Ulric</a></td>
+   <td align="center"><a href="https://github.com/iamfj"><img src="https://avatars.githubusercontent.com/u/24557998?v=4" width="100" style="border-radius:50%" alt="Fabian Jocks"/><br />Fabian Jocks</a></td>
+  </tr>
+</table>
+
+# Community
+
+Join our [discord server](https://discord.gg/Ykhr738dUe) for chat and updates!

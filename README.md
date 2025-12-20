@@ -25,15 +25,15 @@
 
 > Read full documentation at 👉🏻 https://zenstack.dev/docs.
 
-ZenStack is a TypeScript database toolkit for developing full-stack or backend Node.js/Bun applications. It provides a unified data modeling and access solution with the following features:
+ZenStack is a TypeScript database toolkit for developing full-stack or backend Node.js/Bun applications. It provides a unified data modeling and query solution with the following features:
 
-- A modern schema-first ORM that's compatible with [Prisma](https://github.com/prisma/prisma)'s schema and API
-- Versatile query APIs: high-level Prisma-style ORM queries + low-level [Kysely](https://github.com/kysely-org/kysely) query builder
-- Built-in access control and data validation
-- Advanced data modeling patterns like [polymorphism](https://zenstack.dev/docs/orm/polymorphism)
-- Designed for extensibility and flexibility
-- Automatic CRUD web APIs with adapters for popular frameworks
-- Automatic [TanStack Query](https://github.com/TanStack/query) hooks for easy CRUD from the frontend
+- 🔧 Modern schema-first ORM that's compatible with [Prisma](https://github.com/prisma/prisma)'s schema and API
+- 📊 Versatile API - high-level ORM queries + low-level [Kysely](https://kysely.dev) query builder
+- 🔐 Built-in access control and data validation
+- 🚀 Advanced data modeling patterns like [polymorphism](https://zenstack.dev/docs/orm/polymorphism)
+- 🧩 Designed for extensibility and flexibility
+- ⚙️ Automatic CRUD web APIs with adapters for popular frameworks
+- 🏖️ Automatic [TanStack Query](https://github.com/TanStack/query) hooks for easy CRUD from the frontend
 
 # What's New in V3
 

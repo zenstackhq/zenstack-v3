@@ -243,7 +243,7 @@ type MapProcedureParams<Schema extends SchemaDef, Params> = {
  * Creates a new ZenStack client instance.
  */
 export interface ClientConstructor {
-    new <Schema extends SchemaDef, Options extends ClientOptions<Schema>>(
+    new <Schema extends SchemaDef, Options extends ClientOptions<Schema> = ClientOptions<Schema>>(
         schema: Schema,
         options: Options,
     ): ClientContract<Schema, Options>;

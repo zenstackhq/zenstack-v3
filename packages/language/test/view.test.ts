@@ -43,7 +43,7 @@ datasource db {
 
 view A {
     id Int
-    @@id([id]
+    @@id([id])
 }
         `,
                 '`@@id` is not allowed for views',
@@ -59,11 +59,26 @@ datasource db {
 
 view A {
     id Int
-    @@index([id]
+    @@index([id])
 }
         `,
                 '`@@index` is not allowed for views',
             ),
         );
+    });
+
+    it('allows @@unique on views', async () => {
+        await expect(
+            loadSchema(`
+datasource db {
+    provider = 'sqlite'
+}
+
+view A {
+    x Int
+    @@unique([x])
+}
+    `),
+        ).resolves.toBeTruthy();
     });
 });

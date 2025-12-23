@@ -6660,7 +6660,7 @@ export class SchemaType implements SchemaDef {
                     type: "Int",
                     id: true,
                     unique: true,
-                    attributes: [{ name: "@id" }, { name: "@unique" }]
+                    attributes: [{ name: "@unique" }]
                 },
                 uid: {
                     name: "uid",

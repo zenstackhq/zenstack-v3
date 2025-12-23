@@ -27,6 +27,7 @@ import {
 import {
     getAllAttributes,
     getAttributeArg,
+    getContainingDataModel,
     getStringLiteral,
     hasAttribute,
     isAuthOrAuthMemberAccess,
@@ -293,10 +294,23 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
         }
     }
 
+    @check('@id')
+    private _checkId(attr: AttributeApplication, accept: ValidationAcceptor) {
+        const dm = getContainingDataModel(attr);
+        if (dm?.isView) {
+            accept('error', `\`@id\` is not allowed for views`, { node: attr });
+        }
+    }
+
     @check('@@id')
     @check('@@index')
     @check('@@unique')
     private _checkConstraint(attr: AttributeApplication, accept: ValidationAcceptor) {
+        const dm = getContainingDataModel(attr);
+        if (dm?.isView && (attr.decl.$refText === '@@id' || attr.decl.$refText === '@@index')) {
+            accept('error', `\`${attr.decl.$refText}\` is not allowed for views`, { node: attr });
+        }
+
         const fields = getAttributeArg(attr, 'fields');
         const attrName = attr.decl.ref?.name;
         if (!fields) {

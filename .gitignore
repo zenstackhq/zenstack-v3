@@ -8,3 +8,4 @@ dist
 *.tgz
 .pnpm-store
 *.vsix
+.DS_Store

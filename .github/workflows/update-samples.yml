@@ -68,7 +68,7 @@ jobs:
                   node-version: 20.x
                   cache: 'npm'
 
-            - name: Update @zenstackhq packages to next
+            - name: Update @zenstackhq packages to latest
               if: steps.check-package.outputs.exists == 'true'
               run: |
                   # Get all @zenstackhq packages in the repo
@@ -89,10 +89,10 @@ jobs:
                   echo "Updating packages in ${{ matrix.repo }}:"
                   echo "$PACKAGES"
 
-                  # Update each package to next tag
+                  # Update each package to latest tag
                   for pkg in $PACKAGES; do
-                    echo "Updating $pkg to next"
-                    npm install "$pkg@next"
+                    echo "Updating $pkg to latest"
+                    npm install "$pkg@latest"
                   done
 
                   # Finally run generate
@@ -111,5 +111,5 @@ jobs:
                   fi
 
                   git add .
-                  git commit -m "chore: update @zenstackhq packages to next release"
+                  git commit -m "chore: update @zenstackhq packages to latest release"
                   git push

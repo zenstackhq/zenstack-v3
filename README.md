@@ -25,7 +25,7 @@
 
 # What's ZenStack
 
-> Read full documentation at 👉🏻 https://zenstack.dev.
+> Read full documentation at 👉🏻 https://zenstack.dev/v3.
 
 ZenStack is a TypeScript database toolkit for developing full-stack or backend Node.js/Bun applications. It provides a unified data modeling and access solution with the following features:
 
@@ -49,7 +49,7 @@ Even without using advanced features, ZenStack offers the following benefits as 
 2. More TypeScript type inference, less code generation.
 3. Fully-typed query-builder API as a better escape hatch compared to Prisma's [raw queries](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries) or [typed SQL](https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/typedsql).
 
-> Although ZenStack v3's ORM runtime doesn't depend on Prisma anymore (specifically, `@prisma/client`), it still relies on Prisma to handle database migration. See [database migration](https://zenstack.dev/docs/orm/migration) for more details.
+> Although ZenStack v3's ORM runtime doesn't depend on Prisma anymore (specifically, `@prisma/client`), it still relies on Prisma to handle database migration. See [database migration](https://zenstack.dev/docs/3.x/orm/migration) for more details.
 
 # Quick Start
 
@@ -63,7 +63,7 @@ Even without using advanced features, ZenStack offers the following benefits as 
 Use the following command to scaffold a simple TypeScript command line application with ZenStack configured:
 
 ```bash
-npm create zenstack@latest my-project
+npm create zenstack@next my-project
 ```
 
 ### 2. Setting up an existing project
@@ -71,7 +71,7 @@ npm create zenstack@latest my-project
 Or, if you have an existing project, use the CLI to initialize it:
 
 ```bash
-npx @zenstackhq/cli@latest init
+npx @zenstackhq/cli@next init
 ```
 
 ### 3. Setting up manually
@@ -79,12 +79,12 @@ npx @zenstackhq/cli@latest init
 Alternatively, you can set it up manually:
 
 ```bash
-npm install -D @zenstackhq/cli
-npm install @zenstackhq/orm
+npm install -D @zenstackhq/cli@next
+npm install @zenstackhq/orm@next
 ```
 
 Then create a `zenstack` folder and a `schema.zmodel` file in it.
 
 # Documentation
 
-Please visit the [doc site](https://zenstack.dev/docs/) for detailed documentation.
+Please visit the [doc site](https://zenstack.dev/docs/3.x/) for detailed documentation.

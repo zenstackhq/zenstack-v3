@@ -11,7 +11,7 @@ Before you start working on anything major, please make sure to open an issue or
 
 Test cases are run against both SQLite and Postgres. You should have a postgres server (16 or above) running (either natively or via Docker). The default connection is:
 
-`postgresql://${TEST_PG_USER}:${TEST_PG_PASSWORD}$@${TEST_PG_HOST}$:${TEST_PG_PORT}$`
+`postgresql://${TEST_PG_USER}:${TEST_PG_PASSWORD}$@${TEST_PG_HOST}$:${TEST_PG_PORT}`
 
 The default values for the environment variables (if not set) are:
 

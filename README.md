@@ -37,7 +37,7 @@ ZenStack is a TypeScript database toolkit for developing full-stack or backend N
 
 # What's New in V3
 
-ZenStack V3 is a major rewrite of [V2](https://github.com/zenstackhq/zenstack/docs/2.x). It replaced Prisma ORM with its own ORM engine built on top of [Kysely](https://kysely.dev) while keeping a Prisma-compatible query API. This architecture change brings the level of flexibility that we couldn't imagine in previous versions. Please check [this blog post](https://zenstack.dev/blog/next-chapter-1) for why we made this bold decision.
+ZenStack V3 is a major rewrite of [V2](https://github.com/zenstackhq/zenstack). It replaced Prisma ORM with its own ORM engine built on top of [Kysely](https://kysely.dev) while keeping a Prisma-compatible query API. This architecture change brings the level of flexibility that we couldn't imagine in previous versions. Please check [this blog post](https://zenstack.dev/blog/next-chapter-1) for why we made this bold decision.
 
 Even without using advanced features, ZenStack offers the following benefits as a drop-in replacement to Prisma:
 

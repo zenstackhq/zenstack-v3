@@ -5,7 +5,7 @@
     <img src="https://raw.githubusercontent.com/zenstackhq/zenstack-docs/main/static/img/logo.png" height="128">
     </picture>
     </a>
-    <h1>ZenStack: Battery-Included TypeScript ORM</h1>
+    <h1>ZenStack: Modern Data Layer for TypeScript Apps</h1>
     <a href="https://www.npmjs.com/package/@zenstackhq/cli?activeTab=versions">
         <img src="https://img.shields.io/npm/v/%40zenstackhq%2Fcli/next">
     </a>

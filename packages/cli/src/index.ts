@@ -50,7 +50,7 @@ function createProgram() {
         .description(
             `${colors.bold.blue(
                 'ζ',
-            )} ZenStack is the data layer for modern TypeScript apps.\n\nDocumentation: https://zenstack.dev/docs/3.x`,
+            )} ZenStack is the modern data layer for TypeScript apps.\n\nDocumentation: https://zenstack.dev/docs`,
         )
         .showHelpAfterError()
         .showSuggestionAfterError();

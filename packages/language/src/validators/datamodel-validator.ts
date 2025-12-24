@@ -50,6 +50,7 @@ export default class DataModelValidator implements AstValidator<DataModel> {
         const modelUniqueFields = getModelUniqueFields(dm);
 
         if (
+            !dm.isView &&
             idFields.length === 0 &&
             modelLevelIds.length === 0 &&
             uniqueFields.length === 0 &&

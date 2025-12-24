@@ -501,7 +501,7 @@ export function getAllLoadedAndReachableDataModelsAndTypeDefs(
     return allDataModels;
 }
 
-export function getContainingDataModel(node: Expression): DataModel | undefined {
+export function getContainingDataModel(node: AstNode): DataModel | undefined {
     let curr: AstNode | undefined = node.$container;
     while (curr) {
         if (isDataModel(curr)) {

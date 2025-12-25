@@ -43,7 +43,7 @@ model Comment {
 `;
 
 describe('generated id format strings', () => {
-    it('supports top-level generated id format strings', async () => {
+    it('supports top-level ids', async () => {
         const client = await createTestClient(schema);
 
         const user = await client.user.create({
@@ -60,7 +60,7 @@ describe('generated id format strings', () => {
         expect(user.ulid).toMatch(/^user_ulid_/);
     });
 
-    it('supports nested generated id format strings', async () => {
+    it('supports nested ids', async () => {
         const client = await createTestClient(schema);
 
         const user = await client.user.create({
@@ -92,7 +92,7 @@ describe('generated id format strings', () => {
         expect(post.ulid).toMatch(/^post_ulid_/);
     });
 
-    it('supports deeply nested generated id format strings', async () => {
+    it('supports deeply nested ids', async () => {
         const client = await createTestClient(schema);
 
         const user = await client.user.create({

@@ -906,7 +906,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return generated;
         }
 
-        return formatExpr.value.replaceAll('%s', generated);
+        // Replace non-escaped %s with the generated value, then unescape \%s to %s
+        return formatExpr.value.replace(/(?<!\\)%s/g, generated).replace(/\\%s/g, '%s');
     }
 
     protected async update(

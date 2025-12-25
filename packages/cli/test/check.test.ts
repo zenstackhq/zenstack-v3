@@ -83,17 +83,12 @@ describe('CLI validate command test', () => {
 
     it('should validate schema with syntax errors', () => {
         const modelWithSyntaxError = `
-datasource db {
-    provider = "sqlite"
-    url = "file:./dev.db"
-}
-
 model User {
     id String @id @default(cuid())
     email String @unique
     // Missing closing brace - syntax error
         `;
-        const workDir = createProject(modelWithSyntaxError, false);
+        const workDir = createProject(modelWithSyntaxError);
 
         // Should throw an error due to syntax error
         expect(() => runCli('check', workDir)).toThrow();

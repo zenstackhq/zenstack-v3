@@ -39,8 +39,8 @@
         },
         "./svelte": {
             "types": "./dist/svelte/index.svelte.d.ts",
-            "default": "./dist/svelte/index.svelte.js",
-            "svelte": "./dist/svelte/index.svelte.js"
+            "svelte": "./dist/svelte/index.svelte.js",
+            "default": "./dist/svelte/index.svelte.js"
         },
         "./package.json": "./package.json"
     },

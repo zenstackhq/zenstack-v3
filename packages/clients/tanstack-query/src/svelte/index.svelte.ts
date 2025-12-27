@@ -356,10 +356,11 @@ export function useInternalInfiniteQuery<TQueryFnData, TData>(
         Omit<
             CreateInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>,
             'queryKey' | 'initialPageParam'
-        >
+        > &
+            QueryContext
     >,
 ) {
-    const { endpoint, fetch } = useQuerySettings();
+    const { endpoint, fetch } = useFetchOptions(options);
 
     const queryKey = $derived(getQueryKey(model, operation, args(), { infinite: true, optimisticUpdate: false }));
 

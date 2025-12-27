@@ -8,5 +8,8 @@ export default defineConfig({
         include: ['**/*.test.ts'],
         testTimeout: 100000,
         hookTimeout: 100000,
+        coverage: {
+            provider: 'v8',
+        },
     },
 });

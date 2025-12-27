@@ -8,7 +8,7 @@ import { logInternalError, type CommonAdapterOptions } from '../common';
  */
 export interface SvelteKitRouteHandlerOptions<Schema extends SchemaDef> extends CommonAdapterOptions<Schema> {
     /**
-     * Callback for getting a ZenStackClient for the given request
+     * Callback for getting a ZenStackClient for the given request event
      */
     getClient: (event: RequestEvent) => ClientContract<Schema> | Promise<ClientContract<Schema>>;
 }
@@ -34,7 +34,7 @@ function createHandler<Schema extends SchemaDef>(options: SvelteKitRouteHandlerO
             }
         }
 
-        const path = event.params['path']; // url.pathname.substring(options.prefix.length);
+        const path = event.params['path'];
         if (!path) {
             return json({ message: 'route is missing path parameter' }, { status: 400 });
         }

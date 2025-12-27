@@ -1,0 +1,10 @@
+{
+    "extends": "@zenstackhq/typescript-config/base.json",
+    "include": ["src/**/*.ts"],
+    "exclude": ["src/svelte"],
+    "compilerOptions": {
+        "lib": ["ESNext"],
+        "outDir": "dist",
+        "noEmit": false
+    }
+}

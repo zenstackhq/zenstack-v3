@@ -1,0 +1,40 @@
+{
+    "name": "@zenstackhq/client-helpers",
+    "version": "3.0.0",
+    "description": "Helpers for implementing clients that consume ZenStack's CRUD service",
+    "type": "module",
+    "scripts": {
+        "build": "tsc --noEmit && tsup-node && pnpm test:typecheck",
+        "watch": "tsup-node --watch",
+        "lint": "eslint src --ext ts",
+        "test": "vitest run",
+        "test:typecheck": "tsc --noEmit --project tsconfig.test.json",
+        "pack": "pnpm pack"
+    },
+    "author": "ZenStack Team",
+    "license": "MIT",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./fetch": {
+            "types": "./dist/fetch.d.ts",
+            "default": "./dist/fetch.js"
+        }
+    },
+    "dependencies": {
+        "@zenstackhq/common-helpers": "workspace:*",
+        "@zenstackhq/schema": "workspace:*",
+        "decimal.js": "catalog:",
+        "superjson": "^2.2.3"
+    },
+    "devDependencies": {
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
+        "@zenstackhq/sdk": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*"
+    }
+}

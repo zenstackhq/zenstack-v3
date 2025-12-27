@@ -9,7 +9,7 @@ const queryClient = new QueryClient();
 export default function Providers({ children }: { children: ReactNode }) {
     return (
         <QueryClientProvider client={queryClient}>
-            <QuerySettingsProvider value={{ endpoint: '/api/model' }}>{children}</QuerySettingsProvider>
+            <QuerySettingsProvider value={{ endpoint: '/api/model', logging: true }}>{children}</QuerySettingsProvider>
         </QueryClientProvider>
     );
 }

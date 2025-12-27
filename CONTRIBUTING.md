@@ -6,7 +6,7 @@ Before you start working on anything major, please make sure to open an issue or
 
 ## Prerequisites
 
-- Node.js: v20 or above
+- Node.js: v22 or above
 - PNPM: as specified in [package.json](./package.json)
 
 Test cases are run against both SQLite and Postgres. You should have a postgres server (16 or above) running (either natively or via Docker). The default connection is:

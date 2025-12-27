@@ -1,21 +1,40 @@
 'use client';
 
+import { Post } from '@/zenstack/models';
 import { schema } from '@/zenstack/schema-lite';
-import { useClientQueries } from '@zenstackhq/tanstack-query/react';
+import { FetchFn, useClientQueries } from '@zenstackhq/tanstack-query/react';
 import { LoremIpsum } from 'lorem-ipsum';
 import Image from 'next/image';
+import { useState } from 'react';
 
 const lorem = new LoremIpsum({ wordsPerSentence: { max: 6, min: 4 } });
 
 export default function Home() {
-    const clientQueries = useClientQueries(schema);
+    const [showPublishedOnly, setShowPublishedOnly] = useState(false);
+    const [enableFetch, setEnableFetch] = useState(true);
+    const [optimistic, setOptimistic] = useState(false);
+
+    const fetch: FetchFn = async (url, init) => {
+        // simulate a delay for showing optimistic update effect
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return globalThis.fetch(url, init);
+    };
+
+    const clientQueries = useClientQueries(schema, { fetch });
     const { data: users, isFetched: isUsersFetched } = clientQueries.user.useFindMany();
-    const { data: posts } = clientQueries.post.useFindMany({
-        orderBy: { createdAt: 'desc' },
-        include: { author: true },
-    });
-    const createPost = clientQueries.post.useCreate();
-    const deletePost = clientQueries.post.useDelete();
+
+    const { data: posts } = clientQueries.post.useFindMany(
+        {
+            where: showPublishedOnly ? { published: true } : undefined,
+            orderBy: { createdAt: 'desc' },
+            include: { author: true },
+        },
+        { enabled: enableFetch },
+    );
+
+    const createPost = clientQueries.post.useCreate({ optimisticUpdate: optimistic });
+    const deletePost = clientQueries.post.useDelete({ optimisticUpdate: optimistic });
+    const updatePost = clientQueries.post.useUpdate({ optimisticUpdate: optimistic });
 
     const onCreatePost = () => {
         if (!users) {
@@ -40,6 +59,13 @@ export default function Home() {
     const onDeletePost = (postId: string) => {
         deletePost.mutate({
             where: { id: postId },
+        });
+    };
+
+    const onTogglePublishPost = (post: Post) => {
+        updatePost.mutate({
+            where: { id: post.id },
+            data: { published: !post.published },
         });
     };
 
@@ -74,22 +100,69 @@ export default function Home() {
                         </div>
                     </div>
 
-                    <div className="flex flex-col container">
-                        {posts?.map((post) => (
-                            <div key={post.id} className="py-4">
-                                <div className="flex justify-between">
-                                    <h2 className="text-xl font-semibold">{post.title}</h2>
-                                    <button
-                                        className="ml-4 rounded-md px-2 py-1 text-white cursor-pointer underline text-xs"
-                                        onClick={() => onDeletePost(post.id)}
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                                <p className="text-sm text-gray-500">by {post.author.name}</p>
-                            </div>
-                        ))}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-sm text-gray-700 dark:text-gray-300">
+                            <input
+                                type="checkbox"
+                                checked={showPublishedOnly}
+                                onChange={(e) => setShowPublishedOnly(e.target.checked)}
+                                className="mr-2"
+                            />
+                            Show published only
+                        </label>
+
+                        <label className="text-sm text-gray-700 dark:text-gray-300">
+                            <input
+                                type="checkbox"
+                                checked={enableFetch}
+                                onChange={(e) => setEnableFetch(e.target.checked)}
+                                className="mr-2"
+                            />
+                            Enable fetch
+                        </label>
+
+                        <label className="text-sm text-gray-700 dark:text-gray-300">
+                            <input
+                                type="checkbox"
+                                checked={optimistic}
+                                onChange={(e) => setOptimistic(e.target.checked)}
+                                className="mr-2"
+                            />
+                            Optimistic update
+                        </label>
                     </div>
+
+                    <ul className="flex flex-col gap-2 container">
+                        {posts?.map((post) => (
+                            <li key={post.id}>
+                                <div className="flex justify-between">
+                                    <div className="flex gap-2 items-baseline">
+                                        <h2 className="text-xl font-semibold">{post.title}</h2>
+                                        {post.$optimistic ? <span className="text-sm">pending</span> : null}
+                                    </div>
+                                    <div className="ml-4 flex w-32">
+                                        <button
+                                            className="rounded-md px-2 py-1 text-white cursor-pointer underline text-xs"
+                                            onClick={() => onDeletePost(post.id)}
+                                        >
+                                            Delete
+                                        </button>
+                                        <button
+                                            className="rounded-md px-2 py-1 text-white cursor-pointer underline text-xs"
+                                            onClick={() => onTogglePublishPost(post)}
+                                        >
+                                            {post.published ? 'Unpublish' : 'Publish'}
+                                        </button>
+                                    </div>
+                                </div>
+                                {post.$optimistic ? null : (
+                                    <p className="text-sm text-gray-500">
+                                        by {post.author.name} {!post.published ? '(Draft)' : ''}
+                                    </p>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </main>
         </div>

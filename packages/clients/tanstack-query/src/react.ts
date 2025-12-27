@@ -19,6 +19,8 @@ import {
     type UseSuspenseQueryOptions,
     type UseSuspenseQueryResult,
 } from '@tanstack/react-query';
+import { createInvalidator, createOptimisticUpdater } from '@zenstackhq/client-helpers';
+import { fetcher, makeUrl, marshal } from '@zenstackhq/client-helpers/fetch';
 import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import type {
     AggregateArgs,
@@ -48,20 +50,16 @@ import type {
 } from '@zenstackhq/orm';
 import type { GetModels, SchemaDef } from '@zenstackhq/schema';
 import { createContext, useContext } from 'react';
-import {
-    fetcher,
-    getQueryKey,
-    makeUrl,
-    marshal,
-    setupInvalidation,
-    setupOptimisticUpdate,
-    type APIContext,
-    type ExtraMutationOptions,
-    type ExtraQueryOptions,
-} from './utils/common';
-import type { TrimDelegateModelOperations, WithOptimistic } from './utils/types';
-
-export type { FetchFn } from './utils/common';
+import { getAllQueries, invalidateQueriesMatchingPredicate } from './common/client';
+import { getQueryKey } from './common/query-key';
+import type {
+    ExtraMutationOptions,
+    ExtraQueryOptions,
+    QueryContext,
+    TrimDelegateModelOperations,
+    WithOptimistic,
+} from './common/types';
+export type { FetchFn } from '@zenstackhq/client-helpers/fetch';
 
 /**
  * The default query endpoint.
@@ -71,7 +69,7 @@ export const DEFAULT_QUERY_ENDPOINT = '/api/model';
 /**
  * React context for query settings.
  */
-export const QuerySettingsContext = createContext<APIContext>({
+export const QuerySettingsContext = createContext<QueryContext>({
     endpoint: DEFAULT_QUERY_ENDPOINT,
     fetch: undefined,
 });
@@ -262,15 +260,20 @@ export type ModelQueryHooks<
 
 /**
  * Gets data query hooks for all models in the schema.
+ *
+ * @param schema The schema.
+ * @param options Options for all queries originated from this hook.
  */
 export function useClientQueries<Schema extends SchemaDef, Options extends QueryOptions<Schema> = QueryOptions<Schema>>(
     schema: Schema,
+    options?: QueryContext,
 ): ClientHooks<Schema, Options> {
     return Object.keys(schema.models).reduce(
         (acc, model) => {
             (acc as any)[lowerCaseFirst(model)] = useModelQueries<Schema, GetModels<Schema>, Options>(
                 schema,
                 model as GetModels<Schema>,
+                options,
             );
             return acc;
         },
@@ -285,7 +288,7 @@ export function useModelQueries<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Options extends QueryOptions<Schema>,
->(schema: Schema, model: Model): ModelQueryHooks<Schema, Model, Options> {
+>(schema: Schema, model: Model, rootOptions?: QueryContext): ModelQueryHooks<Schema, Model, Options> {
     const modelDef = Object.values(schema.models).find((m) => m.name.toLowerCase() === model.toLowerCase());
     if (!modelDef) {
         throw new Error(`Model "${model}" not found in schema`);
@@ -295,95 +298,101 @@ export function useModelQueries<
 
     return {
         useFindUnique: (args: any, options?: any) => {
-            return useInternalQuery(schema, modelName, 'findUnique', args, options);
+            return useInternalQuery(schema, modelName, 'findUnique', args, { ...rootOptions, ...options });
         },
 
         useSuspenseFindUnique: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'findUnique', args, options);
+            return useInternalSuspenseQuery(schema, modelName, 'findUnique', args, { ...rootOptions, ...options });
         },
 
         useFindFirst: (args: any, options?: any) => {
-            return useInternalQuery(schema, modelName, 'findFirst', args, options);
+            return useInternalQuery(schema, modelName, 'findFirst', args, { ...rootOptions, ...options });
         },
 
         useSuspenseFindFirst: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'findFirst', args, options);
+            return useInternalSuspenseQuery(schema, modelName, 'findFirst', args, { ...rootOptions, ...options });
         },
 
         useFindMany: (args: any, options?: any) => {
-            return useInternalQuery(schema, modelName, 'findMany', args, options);
+            return useInternalQuery(schema, modelName, 'findMany', args, { ...rootOptions, ...options });
         },
 
         useSuspenseFindMany: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'findMany', args, options);
+            return useInternalSuspenseQuery(schema, modelName, 'findMany', args, { ...rootOptions, ...options });
         },
 
         useInfiniteFindMany: (args: any, options?: any) => {
-            return useInternalInfiniteQuery(schema, modelName, 'findMany', args, options);
+            return useInternalInfiniteQuery(schema, modelName, 'findMany', args, { ...rootOptions, ...options });
         },
 
         useSuspenseInfiniteFindMany: (args: any, options?: any) => {
-            return useInternalSuspenseInfiniteQuery(schema, modelName, 'findMany', args, options);
+            return useInternalSuspenseInfiniteQuery(schema, modelName, 'findMany', args, {
+                ...rootOptions,
+                ...options,
+            });
         },
 
         useCreate: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'POST', 'create', options);
+            return useInternalMutation(schema, modelName, 'POST', 'create', { ...rootOptions, ...options });
         },
 
         useCreateMany: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'POST', 'createMany', options);
+            return useInternalMutation(schema, modelName, 'POST', 'createMany', { ...rootOptions, ...options });
         },
 
         useCreateManyAndReturn: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'POST', 'createManyAndReturn', options);
+            return useInternalMutation(schema, modelName, 'POST', 'createManyAndReturn', {
+                ...rootOptions,
+                ...options,
+            });
         },
 
         useUpdate: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'PUT', 'update', options);
+            return useInternalMutation(schema, modelName, 'PUT', 'update', { ...rootOptions, ...options });
         },
 
         useUpdateMany: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'PUT', 'updateMany', options);
+            return useInternalMutation(schema, modelName, 'PUT', 'updateMany', { ...rootOptions, ...options });
         },
 
         useUpdateManyAndReturn: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'PUT', 'updateManyAndReturn', options);
+            return useInternalMutation(schema, modelName, 'PUT', 'updateManyAndReturn', { ...rootOptions, ...options });
         },
 
         useUpsert: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'POST', 'upsert', options);
+            return useInternalMutation(schema, modelName, 'POST', 'upsert', { ...rootOptions, ...options });
         },
 
         useDelete: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'DELETE', 'delete', options);
+            return useInternalMutation(schema, modelName, 'DELETE', 'delete', { ...rootOptions, ...options });
         },
 
         useDeleteMany: (options?: any) => {
-            return useInternalMutation(schema, modelName, 'DELETE', 'deleteMany', options);
+            return useInternalMutation(schema, modelName, 'DELETE', 'deleteMany', { ...rootOptions, ...options });
         },
 
         useCount: (args: any, options?: any) => {
-            return useInternalQuery(schema, modelName, 'count', args, options);
+            return useInternalQuery(schema, modelName, 'count', args, { ...rootOptions, ...options });
         },
 
         useSuspenseCount: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'count', args, options);
+            return useInternalSuspenseQuery(schema, modelName, 'count', args, { ...rootOptions, ...options });
         },
 
         useAggregate: (args: any, options?: any) => {
-            return useInternalQuery(schema, modelName, 'aggregate', args, options);
+            return useInternalQuery(schema, modelName, 'aggregate', args, { ...rootOptions, ...options });
         },
 
         useSuspenseAggregate: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'aggregate', args, options);
+            return useInternalSuspenseQuery(schema, modelName, 'aggregate', args, { ...rootOptions, ...options });
         },
 
         useGroupBy: (args: any, options?: any) => {
-            return useInternalQuery(schema, modelName, 'groupBy', args, options);
+            return useInternalQuery(schema, modelName, 'groupBy', args, { ...rootOptions, ...options });
         },
 
         useSuspenseGroupBy: (args: any, options?: any) => {
-            return useInternalSuspenseQuery(schema, modelName, 'groupBy', args, options);
+            return useInternalSuspenseQuery(schema, modelName, 'groupBy', args, { ...rootOptions, ...options });
         },
     } as ModelQueryHooks<Schema, Model, Options>;
 }
@@ -395,7 +404,7 @@ export function useInternalQuery<TQueryFnData, TData>(
     args?: unknown,
     options?: Omit<UseQueryOptions<TQueryFnData, DefaultError, TData>, 'queryKey'> & ExtraQueryOptions,
 ) {
-    const { endpoint, fetch } = useHooksContext();
+    const { endpoint, fetch } = useFetchOptions(options);
     const reqUrl = makeUrl(endpoint, model, operation, args);
     const queryKey = getQueryKey(model, operation, args, {
         infinite: false,
@@ -418,7 +427,7 @@ export function useInternalSuspenseQuery<TQueryFnData, TData>(
     args?: unknown,
     options?: Omit<UseSuspenseQueryOptions<TQueryFnData, DefaultError, TData>, 'queryKey'> & ExtraQueryOptions,
 ) {
-    const { endpoint, fetch } = useHooksContext();
+    const { endpoint, fetch } = useFetchOptions(options);
     const reqUrl = makeUrl(endpoint, model, operation, args);
     const queryKey = getQueryKey(model, operation, args, {
         infinite: false,
@@ -440,14 +449,15 @@ export function useInternalInfiniteQuery<TQueryFnData, TData>(
     operation: string,
     args: unknown,
     options:
-        | Omit<
+        | (Omit<
               UseInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>,
               'queryKey' | 'initialPageParam'
-          >
+          > &
+              QueryContext)
         | undefined,
 ) {
     options = options ?? { getNextPageParam: () => undefined };
-    const { endpoint, fetch } = useHooksContext();
+    const { endpoint, fetch } = useFetchOptions(options);
     const queryKey = getQueryKey(model, operation, args, { infinite: true, optimisticUpdate: false });
     return {
         queryKey,
@@ -468,11 +478,11 @@ export function useInternalSuspenseInfiniteQuery<TQueryFnData, TData>(
     operation: string,
     args: unknown,
     options: Omit<
-        UseSuspenseInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>,
+        UseSuspenseInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>> & QueryContext,
         'queryKey' | 'initialPageParam'
     >,
 ) {
-    const { endpoint, fetch } = useHooksContext();
+    const { endpoint, fetch } = useFetchOptions(options);
     const queryKey = getQueryKey(model, operation, args, { infinite: true, optimisticUpdate: false });
     return {
         queryKey,
@@ -505,7 +515,7 @@ export function useInternalMutation<TArgs, R = any>(
     operation: string,
     options?: Omit<UseMutationOptions<R, DefaultError, TArgs>, 'mutationFn'> & ExtraMutationOptions,
 ) {
-    const { endpoint, fetch, logging } = useHooksContext();
+    const { endpoint, fetch, logging } = useFetchOptions(options);
     const queryClient = useQueryClient();
     const mutationFn = (data: any) => {
         const reqUrl =
@@ -526,37 +536,73 @@ export function useInternalMutation<TArgs, R = any>(
     const invalidateQueries = options?.invalidateQueries !== false;
     const optimisticUpdate = !!options?.optimisticUpdate;
 
-    if (operation) {
+    if (!optimisticUpdate) {
+        // if optimistic update is not enabled, invalidate related queries on success
         if (invalidateQueries) {
-            setupInvalidation(
+            const invalidator = createInvalidator(
                 model,
                 operation,
                 schema,
-                finalOptions,
-                (predicate) => queryClient.invalidateQueries({ predicate }),
+                (predicate) => invalidateQueriesMatchingPredicate(queryClient, predicate),
                 logging,
             );
-        }
+            const origOnSuccess = finalOptions.onSuccess;
+            finalOptions.onSuccess = async (...args) => {
+                // execute invalidator prior to user-provided onSuccess
+                await invalidator(...args);
 
-        if (optimisticUpdate) {
-            setupOptimisticUpdate(
+                // call user-provided onSuccess
+                await origOnSuccess?.(...args);
+            };
+        }
+    } else {
+        // schedule optimistic update on mutate
+        const optimisticUpdater = createOptimisticUpdater(
+            model,
+            operation,
+            schema,
+            { optimisticDataProvider: finalOptions.optimisticDataProvider },
+            getAllQueries(queryClient),
+            logging,
+        );
+        const origOnMutate = finalOptions.onMutate;
+        finalOptions.onMutate = async (...args) => {
+            // execute optimistic update
+            await optimisticUpdater(...args);
+
+            // call user-provided onMutate
+            return origOnMutate?.(...args);
+        };
+
+        if (invalidateQueries) {
+            // invalidate related queries on settled (success or error)
+            const invalidator = createInvalidator(
                 model,
                 operation,
                 schema,
-                finalOptions,
-                queryClient.getQueryCache().getAll(),
-                (queryKey, data) => {
-                    // update query cache
-                    queryClient.setQueryData<unknown>(queryKey, data);
-                    // cancel on-flight queries to avoid redundant cache updates,
-                    // the settlement of the current mutation will trigger a new revalidation
-                    queryClient.cancelQueries({ queryKey }, { revert: false, silent: true });
-                },
-                invalidateQueries ? (predicate) => queryClient.invalidateQueries({ predicate }) : undefined,
+                (predicate) => invalidateQueriesMatchingPredicate(queryClient, predicate),
                 logging,
             );
+            const origOnSettled = finalOptions.onSettled;
+            finalOptions.onSettled = async (...args) => {
+                // execute invalidator prior to user-provided onSettled
+                await invalidator(...args);
+
+                // call user-provided onSettled
+                return origOnSettled?.(...args);
+            };
         }
     }
 
     return useMutation(finalOptions);
+}
+
+function useFetchOptions(options: QueryContext | undefined) {
+    const { endpoint, fetch, logging } = useHooksContext();
+    // options take precedence over context
+    return {
+        endpoint: options?.endpoint ?? endpoint,
+        fetch: options?.fetch ?? fetch,
+        logging: options?.logging ?? logging,
+    };
 }

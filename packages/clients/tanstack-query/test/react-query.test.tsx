@@ -7,8 +7,8 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import nock from 'nock';
 import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { getQueryKey } from '../src/common/query-key';
 import { QuerySettingsProvider, useClientQueries } from '../src/react';
-import { getQueryKey } from '../src/utils/common';
 import { schema } from './schemas/basic/schema-lite';
 
 const BASE_URL = 'http://localhost';

@@ -147,7 +147,7 @@
         "h3": "^1.15.4",
         "hono": "^4.6.3",
         "next": "catalog:",
-        "nuxt": "^4.2.0",
+        "nuxt": "catalog:",
         "supertest": "^7.1.4",
         "zod": "^4.1.0"
     },

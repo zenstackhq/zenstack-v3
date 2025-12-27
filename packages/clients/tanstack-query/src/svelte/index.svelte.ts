@@ -15,7 +15,12 @@ import {
     type QueryFunction,
     type QueryKey,
 } from '@tanstack/svelte-query';
-import { createInvalidator, createOptimisticUpdater, type InvalidationPredicate } from '@zenstackhq/client-helpers';
+import {
+    createInvalidator,
+    createOptimisticUpdater,
+    DEFAULT_QUERY_ENDPOINT,
+    type InvalidationPredicate,
+} from '@zenstackhq/client-helpers';
 import { fetcher, makeUrl, marshal } from '@zenstackhq/client-helpers/fetch';
 import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import type {
@@ -56,13 +61,6 @@ import type {
     WithOptimistic,
 } from '../common/types';
 export type { FetchFn } from '@zenstackhq/client-helpers/fetch';
-
-// export type StoreOrVal<T> = T | Readable<T>;
-
-/**
- * The default query endpoint.
- */
-export const DEFAULT_QUERY_ENDPOINT = '/api/model';
 
 /**
  * Key for setting and getting the global query context.

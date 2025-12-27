@@ -28,6 +28,9 @@
         "test": "vitest run",
         "pack": "pnpm pack"
     },
+    "exports": {
+        "./package.json": "./package.json"
+    },
     "dependencies": {
         "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",

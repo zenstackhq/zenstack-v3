@@ -1,0 +1,78 @@
+import type { Logger, OptimisticDataProvider } from '@zenstackhq/client-helpers';
+import type { FetchFn } from '@zenstackhq/client-helpers/fetch';
+import type { OperationsIneligibleForDelegateModels } from '@zenstackhq/orm';
+import type { GetModels, IsDelegateModel, SchemaDef } from '@zenstackhq/schema';
+
+/**
+ * Context type for configuring the hooks.
+ */
+export type QueryContext = {
+    /**
+     * The endpoint to use for the queries.
+     */
+    endpoint?: string;
+
+    /**
+     * A custom fetch function for sending the HTTP requests.
+     */
+    fetch?: FetchFn;
+
+    /**
+     * If logging is enabled.
+     */
+    logging?: Logger;
+};
+
+/**
+ * Extra query options.
+ */
+export type ExtraQueryOptions = {
+    /**
+     * Whether to opt-in to optimistic updates for this query. Defaults to `true`.
+     */
+    optimisticUpdate?: boolean;
+} & QueryContext;
+
+/**
+ * Extra mutation options.
+ */
+export type ExtraMutationOptions = {
+    /**
+     * Whether to automatically invalidate queries potentially affected by the mutation. Defaults to `true`.
+     */
+    invalidateQueries?: boolean;
+
+    /**
+     * Whether to optimistically update queries potentially affected by the mutation. Defaults to `false`.
+     */
+    optimisticUpdate?: boolean;
+
+    /**
+     * A callback for computing optimistic update data for each query cache entry.
+     */
+    optimisticDataProvider?: OptimisticDataProvider;
+} & QueryContext;
+
+type HooksOperationsIneligibleForDelegateModels = OperationsIneligibleForDelegateModels extends any
+    ? `use${Capitalize<OperationsIneligibleForDelegateModels>}`
+    : never;
+
+/**
+ * Trim operations that are ineligible for delegate models from the given model operations type.
+ */
+export type TrimDelegateModelOperations<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    T extends Record<string, unknown>,
+> = IsDelegateModel<Schema, Model> extends true ? Omit<T, HooksOperationsIneligibleForDelegateModels> : T;
+
+type WithOptimisticFlag<T> = T extends object
+    ? T & {
+          /**
+           * Indicates if the item is in an optimistic update state
+           */
+          $optimistic?: boolean;
+      }
+    : T;
+
+export type WithOptimistic<T> = T extends Array<infer U> ? Array<WithOptimisticFlag<U>> : WithOptimisticFlag<T>;

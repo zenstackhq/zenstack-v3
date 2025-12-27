@@ -1,4 +1,4 @@
-const isProduction = process.env['NODE_ENV'] === 'production';
+const isProduction = typeof process !== 'undefined' && process.env['NODE_ENV'] === 'production';
 const prefix = 'Invariant failed';
 
 export function invariant(condition: unknown, message?: string): asserts condition {

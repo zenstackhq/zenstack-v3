@@ -19,9 +19,10 @@ export interface SvelteKitHandlerOptions<Schema extends SchemaDef> extends Commo
 }
 
 /**
- * SvelteKit server hooks handler for handling CRUD requests.
+ * SvelteKit server hooks handler for handling CRUD requests. This handler is to be used in `hooks.server.ts`.
+ * @deprecated use `SvelteKitRouteHandler` instead.
  */
-export default function createHandler<Schema extends SchemaDef>(options: SvelteKitHandlerOptions<Schema>): Handle {
+function createHandler<Schema extends SchemaDef>(options: SvelteKitHandlerOptions<Schema>): Handle {
     return async ({ event, resolve }) => {
         if (event.url.pathname.startsWith(options.prefix)) {
             const client = await options.getClient(event);

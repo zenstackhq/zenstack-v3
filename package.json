@@ -12,6 +12,7 @@
         "test:all": "pnpm run test:sqlite && pnpm run test:pg",
         "test:pg": "TEST_DB_PROVIDER=postgresql turbo run test",
         "test:sqlite": "TEST_DB_PROVIDER=sqlite turbo run test",
+        "test:coverage": "vitest run --coverage",
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
         "pr": "gh pr create --fill-first --base dev",
         "merge-main": "gh pr create --title \"merge dev to main\" --body \"\" --base main --head dev",
@@ -26,8 +27,10 @@
     "devDependencies": {
         "@eslint/js": "^9.29.0",
         "@types/node": "catalog:",
+        "@vitest/coverage-v8": "^4.0.16",
         "eslint": "~9.29.0",
         "glob": "^11.1.0",
+        "npm-run-all": "^4.1.5",
         "prettier": "^3.5.3",
         "prisma": "catalog:",
         "tsup": "^8.5.0",
@@ -40,7 +43,10 @@
     },
     "pnpm": {
         "onlyBuiltDependencies": [
-            "better-sqlite3"
+            "@parcel/watcher",
+            "better-sqlite3",
+            "esbuild",
+            "vue-demi"
         ]
     }
 }

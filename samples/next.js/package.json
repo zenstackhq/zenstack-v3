@@ -1,11 +1,10 @@
 {
     "name": "next.js",
-    "version": "3.0.0",
     "private": true,
     "scripts": {
         "generate": "zen generate --lite",
         "db:init": "pnpm generate && zen db push && npx tsx zenstack/seed.ts",
-        "dev": "next dev",
+        "dev": "next dev --port 3301",
         "build": "pnpm generate && next build",
         "start": "next start",
         "lint": "eslint"

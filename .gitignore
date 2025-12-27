@@ -9,3 +9,4 @@ dist
 .pnpm-store
 *.vsix
 .DS_Store
+coverage

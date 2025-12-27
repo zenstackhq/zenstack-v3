@@ -1,4 +1,4 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json, type RequestEvent, type RequestHandler } from '@sveltejs/kit';
 import type { ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { logInternalError, type CommonAdapterOptions } from '../common';
@@ -10,7 +10,7 @@ export interface SvelteKitRouteHandlerOptions<Schema extends SchemaDef> extends 
     /**
      * Callback for getting a ZenStackClient for the given request
      */
-    getClient: (request: Request) => ClientContract<Schema> | Promise<ClientContract<Schema>>;
+    getClient: (event: RequestEvent) => ClientContract<Schema> | Promise<ClientContract<Schema>>;
 }
 
 /**
@@ -18,30 +18,30 @@ export interface SvelteKitRouteHandlerOptions<Schema extends SchemaDef> extends 
  * API route file.
  */
 function createHandler<Schema extends SchemaDef>(options: SvelteKitRouteHandlerOptions<Schema>): RequestHandler {
-    return async ({ request, url, params }) => {
-        const client = await options.getClient(request);
+    return async (event) => {
+        const client = await options.getClient(event);
         if (!client) {
             return json({ message: 'unable to get ZenStackClient from request context' }, { status: 400 });
         }
 
-        const query = Object.fromEntries(url.searchParams);
+        const query = Object.fromEntries(event.url.searchParams);
         let requestBody: unknown;
-        if (request.body) {
+        if (event.request.body) {
             try {
-                requestBody = await request.json();
+                requestBody = await event.request.json();
             } catch {
                 return json({ message: 'invalid JSON payload' }, { status: 400 });
             }
         }
 
-        const path = params['path']; // url.pathname.substring(options.prefix.length);
+        const path = event.params['path']; // url.pathname.substring(options.prefix.length);
         if (!path) {
             return json({ message: 'route is missing path parameter' }, { status: 400 });
         }
 
         try {
             const r = await options.apiHandler.handleRequest({
-                method: request.method,
+                method: event.request.method,
                 path,
                 query,
                 requestBody,

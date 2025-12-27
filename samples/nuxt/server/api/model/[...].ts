@@ -1,5 +1,6 @@
 import { RPCApiHandler } from '@zenstackhq/server/api';
 import { createEventHandler } from '@zenstackhq/server/nuxt';
+import { db } from '~~/server/utils/db';
 import { schema } from '~~/zenstack/schema';
 
 const handler = createEventHandler({

@@ -42,7 +42,10 @@
     },
     "pnpm": {
         "onlyBuiltDependencies": [
-            "better-sqlite3"
+            "@parcel/watcher",
+            "better-sqlite3",
+            "esbuild",
+            "vue-demi"
         ]
     }
 }

@@ -70,13 +70,13 @@ export function createOptimisticUpdater(
     operation: string,
     schema: SchemaDef,
     options: OptimisticUpdateOptions,
-    getAllQueries: readonly QueryInfo[],
+    getAllQueries: () => readonly QueryInfo[],
     logging: Logger | undefined,
 ) {
     return async (...args: unknown[]) => {
         const [mutationArgs] = args;
 
-        for (const queryInfo of getAllQueries) {
+        for (const queryInfo of getAllQueries()) {
             const logInfo = JSON.stringify({
                 model: queryInfo.model,
                 operation: queryInfo.operation,

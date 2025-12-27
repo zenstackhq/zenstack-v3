@@ -466,7 +466,7 @@ export function useInternalMutation<TArgs, R = any>(
                 operation,
                 schema,
                 { optimisticDataProvider: result.optimisticDataProvider },
-                getAllQueries(queryClient),
+                () => getAllQueries(queryClient),
                 logging,
             );
 

@@ -557,7 +557,7 @@ export function useInternalMutation<TArgs, R = any>(
             operation,
             schema,
             { optimisticDataProvider: finalOptions.optimisticDataProvider },
-            getAllQueries(queryClient),
+            () => getAllQueries(queryClient),
             logging,
         );
         const origOnMutate = finalOptions.onMutate;

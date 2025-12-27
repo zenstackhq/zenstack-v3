@@ -467,7 +467,7 @@ export function useInternalMutation<TArgs, R = any>(
                 schema,
                 { optimisticDataProvider: optionsValue?.optimisticDataProvider },
                 // @ts-ignore
-                getAllQueries(queryClient),
+                () => getAllQueries(queryClient),
                 logging,
             );
 

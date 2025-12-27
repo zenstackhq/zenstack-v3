@@ -34,7 +34,7 @@ describe('Optimistic update tests', () => {
                 },
             ];
 
-            const updater = createOptimisticUpdater('User', 'update', schema, {}, queries, undefined);
+            const updater = createOptimisticUpdater('User', 'update', schema, {}, () => queries, undefined);
 
             await updater({ where: { id: '1' }, data: { name: 'Johnny' } });
 
@@ -70,7 +70,7 @@ describe('Optimistic update tests', () => {
                 },
             ];
 
-            const updater = createOptimisticUpdater('User', 'update', schema, {}, queries, undefined);
+            const updater = createOptimisticUpdater('User', 'update', schema, {}, () => queries, undefined);
 
             await updater({ where: { id: '1' }, data: { name: 'Johnny' } });
 
@@ -114,7 +114,7 @@ describe('Optimistic update tests', () => {
                 'update',
                 schema,
                 { optimisticDataProvider },
-                queries,
+                () => queries,
                 undefined,
             );
 
@@ -166,7 +166,7 @@ describe('Optimistic update tests', () => {
                 'update',
                 schema,
                 { optimisticDataProvider },
-                queries,
+                () => queries,
                 undefined,
             );
 
@@ -213,7 +213,7 @@ describe('Optimistic update tests', () => {
                 'update',
                 schema,
                 { optimisticDataProvider },
-                queries,
+                () => queries,
                 undefined,
             );
 
@@ -263,7 +263,7 @@ describe('Optimistic update tests', () => {
                 'update',
                 schema,
                 { optimisticDataProvider },
-                queries,
+                () => queries,
                 undefined,
             );
 
@@ -307,7 +307,7 @@ describe('Optimistic update tests', () => {
                 },
             ];
 
-            const updater = createOptimisticUpdater('User', 'update', schema, {}, queries, undefined);
+            const updater = createOptimisticUpdater('User', 'update', schema, {}, () => queries, undefined);
 
             await updater({ where: { id: '1' }, data: { name: 'Johnny' } });
 
@@ -342,7 +342,7 @@ describe('Optimistic update tests', () => {
                 },
             ];
 
-            const updater = createOptimisticUpdater('User', 'update', schema, {}, queries, logger);
+            const updater = createOptimisticUpdater('User', 'update', schema, {}, () => queries, logger);
 
             await updater({ where: { id: '1' }, data: { name: 'Johnny' } });
 
@@ -376,7 +376,7 @@ describe('Optimistic update tests', () => {
                 },
             ];
 
-            const updater = createOptimisticUpdater('User', 'update', schema, {}, queries, logger);
+            const updater = createOptimisticUpdater('User', 'update', schema, {}, () => queries, logger);
 
             await updater({ where: { id: '1' }, data: {} });
 
@@ -419,7 +419,7 @@ describe('Optimistic update tests', () => {
                 'update',
                 schema,
                 { optimisticDataProvider },
-                queries,
+                () => queries,
                 logger,
             );
 
@@ -465,7 +465,7 @@ describe('Optimistic update tests', () => {
                 'update',
                 schema,
                 { optimisticDataProvider },
-                queries,
+                () => queries,
                 logger,
             );
 
@@ -490,7 +490,7 @@ describe('Optimistic update tests', () => {
 
             const queries: QueryInfo[] = [];
 
-            const updater = createOptimisticUpdater('User', 'update', schema, {}, queries, undefined);
+            const updater = createOptimisticUpdater('User', 'update', schema, {}, () => queries, undefined);
 
             // Should not throw
             await expect(updater({ where: { id: '1' }, data: {} })).resolves.toBeUndefined();
@@ -534,7 +534,7 @@ describe('Optimistic update tests', () => {
                 },
             ];
 
-            const updater = createOptimisticUpdater('Post', 'update', schema, {}, queries, undefined);
+            const updater = createOptimisticUpdater('Post', 'update', schema, {}, () => queries, undefined);
 
             await updater({ where: { id: '1' }, data: { title: 'Updated Post 1' } });
 
@@ -577,7 +577,7 @@ describe('Optimistic update tests', () => {
                 'update',
                 schema,
                 { optimisticDataProvider },
-                queries,
+                () => queries,
                 undefined,
             );
 
@@ -619,7 +619,7 @@ describe('Optimistic update tests', () => {
                 },
             ];
 
-            const updater = createOptimisticUpdater('User', 'update', schema, {}, queries, undefined);
+            const updater = createOptimisticUpdater('User', 'update', schema, {}, () => queries, undefined);
 
             await updater({ where: { id: '1' }, data: { name: 'Johnny' } });
 
@@ -674,7 +674,7 @@ describe('Optimistic update tests', () => {
                 'update',
                 schema,
                 { optimisticDataProvider },
-                queries,
+                () => queries,
                 undefined,
             );
 
@@ -730,7 +730,7 @@ describe('Optimistic update tests', () => {
                 },
             ];
 
-            const updater = createOptimisticUpdater('User', 'update', schema, {}, queries, undefined);
+            const updater = createOptimisticUpdater('User', 'update', schema, {}, () => queries, undefined);
 
             await updater({ where: { id: '1' }, data: { name: 'Johnny' } });
 

@@ -10,6 +10,7 @@ export default defineConfig({
         hookTimeout: 100000,
         coverage: {
             provider: 'v8',
+            exclude: ['tests/**', 'samples/**', 'packages/**/tests/**'],
         },
     },
 });

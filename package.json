@@ -16,7 +16,8 @@
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
         "pr": "gh pr create --fill-first --base dev",
         "merge-main": "gh pr create --title \"merge dev to main\" --body \"\" --base main --head dev",
-        "bump-version": "gh workflow run .github/workflows/bump-version.yml --ref dev",
+        "bump-patch": "gh workflow run .github/workflows/bump-version.yml --ref dev -f version_type=patch",
+        "bump-minor": "gh workflow run .github/workflows/bump-version.yml --ref dev -f version_type=minor",
         "publish-all": "pnpm --filter \"./packages/**\" -r publish --access public",
         "publish-preview": "pnpm --filter \"./packages/**\" -r publish --force --registry https://preview.registry.zenstack.dev/",
         "unpublish-preview": "pnpm --filter \"./packages/**\" -r --shell-mode exec -- npm unpublish -f --registry https://preview.registry.zenstack.dev/ \"\\$PNPM_PACKAGE_NAME\""

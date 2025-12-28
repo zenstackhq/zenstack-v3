@@ -211,6 +211,22 @@ describe('Name mapping tests', () => {
             }),
         ).resolves.toEqual([expect.objectContaining({ email: 'u1@test.com', role: 'USER' })]);
 
+        await expect(
+            db.user.findMany({
+                where: {
+                    AND: [
+                        { role: { in: ['USER'] } },
+                        { role: { in: ['USER'] } },
+                        { OR: [{ role: { in: ['USER'] } }] },
+                    ],
+                },
+                select: {
+                    email: true,
+                    role: true,
+                },
+            }),
+        ).resolves.toEqual([expect.objectContaining({ email: 'u1@test.com', role: 'USER' })]);
+
         // select all
         await expect(
             db.user.findFirst({

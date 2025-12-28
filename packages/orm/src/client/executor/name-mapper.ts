@@ -25,7 +25,6 @@ import {
     ValueListNode,
     ValueNode,
     ValuesNode,
-    WhereNode,
 } from 'kysely';
 import type { EnumDef, EnumField, FieldDef, ModelDef, SchemaDef } from '../../schema';
 import {
@@ -185,21 +184,20 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return ColumnNode.create(mappedName);
     }
 
-    protected override transformWhere(node: WhereNode): WhereNode {
+    protected override transformBinaryOperation(node: BinaryOperationNode): BinaryOperationNode {
         if (
-            BinaryOperationNode.is(node.where) &&
-            ReferenceNode.is(node.where.leftOperand) &&
-            ColumnNode.is(node.where.leftOperand.column) &&
-            node.where.leftOperand.table &&
-            TableNode.is(node.where.leftOperand.table) &&
-            // where: { enumColumn: Enum.VALUE }
-            (ValueNode.is(node.where.rightOperand) ||
-                // where: { enumColumn: { in: [Enum.VALUE] } }
-                PrimitiveValueListNode.is(node.where.rightOperand))
+            ReferenceNode.is(node.leftOperand) &&
+            ColumnNode.is(node.leftOperand.column) &&
+            node.leftOperand.table &&
+            TableNode.is(node.leftOperand.table) &&
+            //  { enumColumn: Enum.VALUE }
+            (ValueNode.is(node.rightOperand) ||
+                //  { enumColumn: { in: [Enum.VALUE] } }
+                PrimitiveValueListNode.is(node.rightOperand))
         ) {
-            const tableName = node.where.leftOperand.table.table.identifier.name;
-            const columnNode = node.where.leftOperand.column;
-            const valueNode = node.where.rightOperand;
+            const tableName = node.leftOperand.table.table.identifier.name;
+            const columnNode = node.leftOperand.column;
+            const valueNode = node.rightOperand;
 
             let resultValue: OperationNode = valueNode;
 
@@ -207,18 +205,21 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 resultValue = this.processEnumMappingForValue(tableName, columnNode, valueNode) as OperationNode;
             } else if (PrimitiveValueListNode.is(valueNode)) {
                 resultValue = PrimitiveValueListNode.create(
-                    this.processEnumMappingForValues(tableName, valueNode.values.map(() => columnNode), valueNode.values),
+                    this.processEnumMappingForValues(
+                        tableName,
+                        valueNode.values.map(() => columnNode),
+                        valueNode.values,
+                    ),
                 );
             }
 
-            return super.transformWhere(
-                WhereNode.create(
-                    BinaryOperationNode.create(node.where.leftOperand, node.where.operator, resultValue)
-                )
-            );
+            return super.transformBinaryOperation({
+                ...node,
+                rightOperand: resultValue,
+            });
         }
 
-        return super.transformWhere(node);
+        return super.transformBinaryOperation(node);
     }
 
     protected override transformUpdateQuery(node: UpdateQueryNode) {

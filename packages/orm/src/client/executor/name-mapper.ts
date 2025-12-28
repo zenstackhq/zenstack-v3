@@ -1,6 +1,7 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import {
     AliasNode,
+    BinaryOperationNode,
     CaseWhenBuilder,
     ColumnNode,
     ColumnUpdateNode,
@@ -10,6 +11,7 @@ import {
     FromNode,
     IdentifierNode,
     InsertQueryNode,
+    type OperationNode,
     OperationNodeTransformer,
     PrimitiveValueListNode,
     ReferenceNode,
@@ -17,13 +19,13 @@ import {
     SelectAllNode,
     SelectionNode,
     SelectQueryNode,
+    type SimpleReferenceExpressionNode,
     TableNode,
     UpdateQueryNode,
     ValueListNode,
     ValueNode,
     ValuesNode,
-    type OperationNode,
-    type SimpleReferenceExpressionNode,
+    WhereNode,
 } from 'kysely';
 import type { EnumDef, EnumField, FieldDef, ModelDef, SchemaDef } from '../../schema';
 import {
@@ -181,6 +183,38 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
         const mappedName = this.mapFieldName(scope.model, node.column.name);
         return ColumnNode.create(mappedName);
+    }
+
+    protected override transformWhere(node: WhereNode): WhereNode {
+        if (
+            BinaryOperationNode.is(node.where) &&
+            ReferenceNode.is(node.where.leftOperand) &&
+            ColumnNode.is(node.where.leftOperand.column) &&
+            node.where.leftOperand.table &&
+            TableNode.is(node.where.leftOperand.table) &&
+            // where: { enumColumn: Enum.VALUE }
+            (ValueNode.is(node.where.rightOperand) ||
+                // where: { enumColumn: { in: [Enum.VALUE] } }
+                PrimitiveValueListNode.is(node.where.rightOperand))
+        ) {
+            const tableName = node.where.leftOperand.table.table.identifier.name;
+            const columnNode = node.where.leftOperand.column;
+            const valueNode = node.where.rightOperand;
+
+            let resultValue: OperationNode = valueNode;
+
+            if (ValueNode.is(valueNode)) {
+                resultValue = this.processEnumMappingForValue(tableName, columnNode, valueNode) as OperationNode;
+            } else if (PrimitiveValueListNode.is(valueNode)) {
+                resultValue = PrimitiveValueListNode.create(
+                    this.processEnumMappingForValues(tableName, [columnNode], valueNode.values),
+                );
+            }
+
+            return WhereNode.create(BinaryOperationNode.create(node.where.leftOperand, node.where.operator, resultValue));
+        }
+
+        return super.transformWhere(node);
     }
 
     protected override transformUpdateQuery(node: UpdateQueryNode) {

@@ -46,6 +46,16 @@ describe('Name mapping tests', () => {
             user_role: 'role_user',
         });
 
+        rawRead = await db.$qbRaw
+            .selectFrom('users')
+            .where('user_role', '=', 'role_user')
+            .selectAll()
+            .executeTakeFirst();
+        await expect(rawRead).toMatchObject({
+            user_email: 'u1@test.com',
+            user_role: 'role_user',
+        });
+
         await expect(
             db.user.create({
                 data: {
@@ -60,6 +70,15 @@ describe('Name mapping tests', () => {
         rawRead = await db.$qbRaw
             .selectFrom('users')
             .where('user_email', '=', 'u1_1@test.com')
+            .selectAll()
+            .executeTakeFirst();
+        await expect(rawRead).toMatchObject({
+            user_role: 'MODERATOR',
+        });
+
+        rawRead = await db.$qbRaw
+            .selectFrom('users')
+            .where('user_role', '=', 'MODERATOR')
             .selectAll()
             .executeTakeFirst();
         await expect(rawRead).toMatchObject({
@@ -145,6 +164,52 @@ describe('Name mapping tests', () => {
             role: 'USER',
             posts: [{ title: 'Post1' }],
         });
+
+        await expect(
+            db.user.findFirst({
+                where: { role: 'USER' },
+                select: {
+                    email: true,
+                    role: true,
+                },
+            }),
+        ).resolves.toMatchObject({
+            email: 'u1@test.com',
+            role: 'USER',
+        });
+
+        await expect(
+            db.user.findMany({
+                where: { role: 'USER' },
+                select: {
+                    email: true,
+                    role: true,
+                },
+            }),
+        ).resolves.toEqual([expect.objectContaining({ email: 'u1@test.com', role: 'USER' })]);
+
+        await expect(
+            db.user.findFirst({
+                where: { role: { in: ['USER'] } },
+                select: {
+                    email: true,
+                    role: true,
+                },
+            }),
+        ).resolves.toMatchObject({
+            email: 'u1@test.com',
+            role: 'USER',
+        });
+
+        await expect(
+            db.user.findMany({
+                where: { role: { in: ['USER'] } },
+                select: {
+                    email: true,
+                    role: true,
+                },
+            }),
+        ).resolves.toEqual([expect.objectContaining({ email: 'u1@test.com', role: 'USER' })]);
 
         // select all
         await expect(

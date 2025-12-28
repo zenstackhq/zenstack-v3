@@ -207,11 +207,15 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 resultValue = this.processEnumMappingForValue(tableName, columnNode, valueNode) as OperationNode;
             } else if (PrimitiveValueListNode.is(valueNode)) {
                 resultValue = PrimitiveValueListNode.create(
-                    this.processEnumMappingForValues(tableName, [columnNode], valueNode.values),
+                    this.processEnumMappingForValues(tableName, valueNode.values.map(() => columnNode), valueNode.values),
                 );
             }
 
-            return WhereNode.create(BinaryOperationNode.create(node.where.leftOperand, node.where.operator, resultValue));
+            return super.transformWhere(
+                WhereNode.create(
+                    BinaryOperationNode.create(node.where.leftOperand, node.where.operator, resultValue)
+                )
+            );
         }
 
         return super.transformWhere(node);

@@ -25,6 +25,7 @@ import {
     DataModel,
     Enum,
     EnumField,
+    isBinaryExpr,
     type ExpressionType,
     FunctionDecl,
     FunctionParam,
@@ -121,7 +122,8 @@ export class ZModelLinker extends DefaultLinker {
             const target = provider(reference.$refText);
             if (target) {
                 reference._ref = target;
-                reference._nodeDescription = this.descriptions.createDescription(target, target.name, document);
+                const targetName = (target as any).name ?? (target as any).binding ?? reference.$refText;
+                reference._nodeDescription = this.descriptions.createDescription(target, targetName, document);
 
                 // Add the reference to the document's array of references
                 document.references.push(reference);
@@ -249,13 +251,25 @@ export class ZModelLinker extends DefaultLinker {
 
     private resolveReference(node: ReferenceExpr, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         this.resolveDefault(node, document, extraScopes);
+        const target = node.target.ref;
 
-        if (node.target.ref) {
-            // resolve type
-            if (node.target.ref.$type === EnumField) {
-                this.resolveToBuiltinTypeOrDecl(node, node.target.ref.$container);
+        if (target) {
+            if (isBinaryExpr(target) && ['?', '!', '^'].includes(target.operator)) {
+                const collectionType = target.left.$resolvedType;
+                if (collectionType?.decl) {
+                    node.$resolvedType = {
+                        decl: collectionType.decl,
+                        array: false,
+                        nullable: collectionType.nullable,
+                    };
+                }
+            } else if (target.$type === EnumField) {
+                this.resolveToBuiltinTypeOrDecl(node, target.$container);
             } else {
-                this.resolveToDeclaredType(node, (node.target.ref as DataField | FunctionParam).type);
+                const targetWithType = target as Partial<DataField | FunctionParam>;
+                if (targetWithType.type) {
+                    this.resolveToDeclaredType(node, targetWithType.type);
+                }
             }
         }
     }
@@ -506,6 +520,9 @@ export class ZModelLinker extends DefaultLinker {
     //#region Utils
 
     private resolveToDeclaredType(node: AstNode, type: FunctionParamType | DataFieldType) {
+        if (!type) {
+            return;
+        }
         let nullable = false;
         if (isDataFieldType(type)) {
             nullable = type.optional;

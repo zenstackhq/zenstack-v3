@@ -15,6 +15,7 @@ import {
 type ExpressionEvaluatorContext = {
     auth?: any;
     thisValue?: any;
+    scope?: Record<string, any>;
 };
 
 /**
@@ -64,6 +65,9 @@ export class ExpressionEvaluator {
     }
 
     private evaluateField(expr: FieldExpression, context: ExpressionEvaluatorContext): any {
+        if (context.scope && expr.field in context.scope) {
+            return context.scope[expr.field];
+        }
         return context.thisValue?.[expr.field];
     }
 
@@ -113,8 +117,28 @@ export class ExpressionEvaluator {
         invariant(Array.isArray(left), 'expected array');
 
         return match(op)
-            .with('?', () => left.some((item: any) => this.evaluate(expr.right, { ...context, thisValue: item })))
-            .with('!', () => left.every((item: any) => this.evaluate(expr.right, { ...context, thisValue: item })))
+            .with('?', () =>
+                left.some((item: any) =>
+                    this.evaluate(expr.right, {
+                        ...context,
+                        thisValue: item,
+                        scope: expr.binding
+                            ? { ...(context.scope ?? {}), [expr.binding]: item }
+                            : context.scope,
+                    }),
+                ),
+            )
+            .with('!', () =>
+                left.every((item: any) =>
+                    this.evaluate(expr.right, {
+                        ...context,
+                        thisValue: item,
+                        scope: expr.binding
+                            ? { ...(context.scope ?? {}), [expr.binding]: item }
+                            : context.scope,
+                    }),
+                ),
+            )
             .with(
                 '^',
                 () =>
@@ -122,6 +146,9 @@ export class ExpressionEvaluator {
                         this.evaluate(expr.right, {
                             ...context,
                             thisValue: item,
+                            scope: expr.binding
+                                ? { ...(context.scope ?? {}), [expr.binding]: item }
+                                : context.scope,
                         }),
                     ),
             )

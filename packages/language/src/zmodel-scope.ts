@@ -7,6 +7,7 @@ import {
     StreamScope,
     UriUtils,
     interruptAndCheck,
+    stream,
     type AstNode,
     type AstNodeDescription,
     type LangiumCoreServices,
@@ -18,7 +19,9 @@ import {
 import { match } from 'ts-pattern';
 import {
     BinaryExpr,
+    Expression,
     MemberAccessExpr,
+    isBinaryExpr,
     isDataField,
     isDataModel,
     isEnumField,
@@ -145,6 +148,9 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             .when(isReferenceExpr, (operand) => {
                 // operand is a reference, it can only be a model/type-def field
                 const ref = operand.target.ref;
+                if (isBinaryExpr(ref) && isCollectionPredicate(ref)) {
+                    return this.createScopeForCollectionElement(ref.left, globalScope, allowTypeDefScope);
+                }
                 if (isDataField(ref)) {
                     return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
                 }
@@ -188,6 +194,21 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
         // // typedef's fields are only added to the scope if the access starts with `auth().`
         const allowTypeDefScope = isAuthOrAuthMemberAccess(collection);
 
+        const collectionScope = this.createScopeForCollectionElement(collection, globalScope, allowTypeDefScope);
+
+        if (collectionPredicate.binding) {
+            const description = this.descriptions.createDescription(
+                collectionPredicate,
+                collectionPredicate.binding,
+                collectionPredicate.$document!,
+            );
+            return new StreamScope(stream([description]), collectionScope);
+        }
+
+        return collectionScope;
+    }
+
+    private createScopeForCollectionElement(collection: Expression, globalScope: Scope, allowTypeDefScope: boolean) {
         return match(collection)
             .when(isReferenceExpr, (expr) => {
                 // collection is a reference - model or typedef field

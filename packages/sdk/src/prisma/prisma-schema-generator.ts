@@ -15,6 +15,7 @@ import {
     Enum,
     EnumField,
     Expression,
+    isBinaryExpr,
     GeneratorDecl,
     InvocationExpr,
     isArrayExpr,
@@ -352,10 +353,15 @@ export class PrismaSchemaGenerator {
                 new Array(...node.items.map((item) => this.makeAttributeArgValue(item))),
             );
         } else if (isReferenceExpr(node)) {
+            const ref = node.target.ref!;
+            const refName = (ref as any).name ?? (isBinaryExpr(ref) ? ref.binding : undefined);
+            if (!refName) {
+                throw Error(`Unsupported reference expression target: ${ref.$type}`);
+            }
             return new PrismaAttributeArgValue(
                 'FieldReference',
                 new PrismaFieldReference(
-                    node.target.ref!.name,
+                    refName,
                     node.args.map((arg) => new PrismaFieldReferenceArg(arg.name, this.exprToText(arg.value))),
                 ),
             );

@@ -491,9 +491,16 @@ function isValidAttributeTarget(attrDecl: Attribute, targetDecl: DataField) {
         return true;
     }
 
-    const fieldTypes = (targetField.args[0].value as ArrayExpr).items.map(
-        (item) => (item as ReferenceExpr).target.ref?.name,
-    );
+    const fieldTypes = (targetField.args[0].value as ArrayExpr).items
+        .map((item) => {
+            if (!isReferenceExpr(item)) {
+                return undefined;
+            }
+
+            const ref = item.target.ref;
+            return ref && 'name' in ref ? (ref as any).name : undefined;
+        })
+        .filter((name): name is string => !!name);
 
     let allowed = false;
     for (const allowedType of fieldTypes) {

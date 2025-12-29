@@ -46,6 +46,13 @@ declare module './ast' {
         $resolvedParam?: AttributeParam;
     }
 
+    interface BinaryExpr {
+        /**
+         * Optional iterator binding for collection predicates
+         */
+        binding?: string;
+    }
+
     export interface DataModel {
         /**
          * All fields including those marked with `@ignore`

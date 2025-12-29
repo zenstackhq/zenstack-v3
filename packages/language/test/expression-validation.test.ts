@@ -98,4 +98,48 @@ describe('Expression Validation Tests', () => {
             'incompatible operand types',
         );
     });
+
+    it('should allow collection predicate with iterator binding', async () => {
+        await loadSchema(`
+            datasource db {
+                provider = 'sqlite'
+                url      = 'file:./dev.db'
+            }
+
+            model User {
+                id Int @id
+                memberships Membership[]
+                @@allow('read', memberships?[m, m.tenantId == id])
+            }
+
+            model Membership {
+                id Int @id
+                tenantId Int
+                user User @relation(fields: [userId], references: [id])
+                userId Int
+            }
+        `);
+    });
+
+    it('should keep supporting unbound collection predicate syntax', async () => {
+        await loadSchema(`
+            datasource db {
+                provider = 'sqlite'
+                url      = 'file:./dev.db'
+            }
+
+            model User {
+                id Int @id
+                memberships Membership[]
+                @@allow('read', memberships?[tenantId == id])
+            }
+
+            model Membership {
+                id Int @id
+                tenantId Int
+                user User @relation(fields: [userId], references: [id])
+                userId Int
+            }
+        `);
+    });
 });

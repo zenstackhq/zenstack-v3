@@ -142,7 +142,7 @@ export function isMemberAccessTarget(item: unknown): item is MemberAccessTarget 
     return reflection.isInstance(item, MemberAccessTarget);
 }
 
-export type ReferenceTarget = DataField | EnumField | FunctionParam;
+export type ReferenceTarget = BinaryExpr | DataField | EnumField | FunctionParam;
 
 export const ReferenceTarget = 'ReferenceTarget';
 
@@ -256,6 +256,7 @@ export function isAttributeParamType(item: unknown): item is AttributeParamType 
 export interface BinaryExpr extends langium.AstNode {
     readonly $container: Argument | ArrayExpr | AttributeArg | BinaryExpr | FieldInitializer | FunctionDecl | MemberAccessExpr | ReferenceArg | UnaryExpr;
     readonly $type: 'BinaryExpr';
+    binding?: RegularID;
     left: Expression;
     operator: '!' | '!=' | '&&' | '<' | '<=' | '==' | '>' | '>=' | '?' | '^' | 'in' | '||';
     right: Expression;
@@ -826,7 +827,6 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
         switch (subtype) {
             case ArrayExpr:
-            case BinaryExpr:
             case MemberAccessExpr:
             case NullExpr:
             case ObjectExpr:
@@ -842,6 +842,9 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
             case Plugin:
             case Procedure: {
                 return this.isSubtype(AbstractDeclaration, supertype);
+            }
+            case BinaryExpr: {
+                return this.isSubtype(Expression, supertype) || this.isSubtype(ReferenceTarget, supertype);
             }
             case BooleanLiteral:
             case NumberLiteral:
@@ -973,6 +976,7 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: BinaryExpr,
                     properties: [
+                        { name: 'binding' },
                         { name: 'left' },
                         { name: 'operator' },
                         { name: 'right' }

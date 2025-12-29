@@ -90,7 +90,10 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         if (['uuid', 'ulid', 'cuid', 'nanoid'].includes(funcDecl.name)) {
             const formatParamIdx = funcDecl.params.findIndex(param => param.name === 'format');
             const formatArg = getLiteral<string>(expr.args[formatParamIdx]?.value);
-            if (formatArg && !formatArg.includes('%s')) {
+            if (
+                formatArg !== undefined &&
+                !/(?<!\\)%s/g.test(formatArg) // an unescaped %s must be present
+            ) {
                 accept('error', 'argument must include "%s"', {
                     node: expr.args[formatParamIdx]!,
                 });

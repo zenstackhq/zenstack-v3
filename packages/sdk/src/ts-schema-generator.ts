@@ -1271,11 +1271,17 @@ export class TsSchemaGenerator {
     }
 
     private createBinaryExpression(expr: BinaryExpr) {
-        return this.createExpressionUtilsCall('binary', [
+        const args = [
             this.createExpression(expr.left),
             this.createLiteralNode(expr.operator),
             this.createExpression(expr.right),
-        ]);
+        ];
+
+        if (expr.binding) {
+            args.push(this.createLiteralNode(expr.binding));
+        }
+
+        return this.createExpressionUtilsCall('binary', args);
     }
 
     private createUnaryExpression(expr: UnaryExpr) {
@@ -1292,13 +1298,28 @@ export class TsSchemaGenerator {
     }
 
     private createRefExpression(expr: ReferenceExpr): any {
-        if (isDataField(expr.target.ref)) {
+        const target = expr.target.ref;
+        if (isDataField(target)) {
             return this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]);
-        } else if (isEnumField(expr.target.ref)) {
-            return this.createLiteralExpression('StringLiteral', expr.target.$refText);
-        } else {
-            throw new Error(`Unsupported reference type: ${expr.target.$refText}`);
         }
+
+        if (isEnumField(target)) {
+            return this.createLiteralExpression('StringLiteral', expr.target.$refText);
+        }
+
+        const refName =
+            target && 'name' in target && typeof (target as { name?: unknown }).name === 'string'
+                ? (target as { name: string }).name
+                : isBinaryExpr(target) && typeof target.binding === 'string'
+                  ? target.binding
+                  : undefined;
+
+        if (refName) {
+            return this.createExpressionUtilsCall('field', [this.createLiteralNode(refName)]);
+        }
+
+        // Fallback: treat unknown reference targets (e.g. unresolved iterator bindings) as named fields
+        return this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]);
     }
 
     private createCallExpression(expr: InvocationExpr) {

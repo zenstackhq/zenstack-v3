@@ -130,6 +130,50 @@ model Foo {
         await expect(db.$setAuth({ profiles: [{ age: 15 }, { age: 20 }] }).foo.findFirst()).toResolveTruthy();
     });
 
+    it('uses iterator binding inside collection predicate for auth model', async () => {
+        const db = await createPolicyTestClient(
+            `
+model User {
+    id Int @id
+    tenantId Int
+    memberships Membership[] @relation("UserMemberships")
+}
+
+model Membership {
+    id Int @id
+    tenantId Int
+    userId Int
+    user User @relation("UserMemberships", fields: [userId], references: [id])
+}
+
+model Foo {
+    id Int @id
+    tenantId Int
+    @@allow('read', auth().memberships?[m, m.tenantId == this.tenantId])
+}
+`,
+        );
+
+        await db.$unuseAll().foo.createMany({
+            data: [
+                { id: 1, tenantId: 1 },
+                { id: 2, tenantId: 2 },
+            ],
+        });
+
+        // allowed because iterator binding matches tenantId = 1
+        await expect(
+            db.$setAuth({ tenantId: 1, memberships: [{ id: 10, tenantId: 1 }] }).foo.findMany(),
+        ).resolves.toEqual([
+            { id: 1, tenantId: 1 },
+        ]);
+
+        // denied because membership tenantId doesn't match
+        await expect(
+            db.$setAuth({ tenantId: 1, memberships: [{ id: 20, tenantId: 3 }] }).foo.findMany(),
+        ).resolves.toEqual([]);
+    });
+
     it('works with shallow auth model collection predicates involving fields - some', async () => {
         const db = await createPolicyTestClient(
             `

@@ -354,7 +354,12 @@ export class PrismaSchemaGenerator {
             );
         } else if (isReferenceExpr(node)) {
             const ref = node.target.ref!;
-            const refName = (ref as any).name ?? (isBinaryExpr(ref) ? ref.binding : undefined);
+            const refName =
+                ('name' in ref && typeof (ref as { name?: unknown }).name === 'string')
+                    ? (ref as { name: string }).name
+                    : isBinaryExpr(ref) && typeof ref.binding === 'string'
+                      ? ref.binding
+                      : undefined;
             if (!refName) {
                 throw Error(`Unsupported reference expression target: ${ref.$type}`);
             }

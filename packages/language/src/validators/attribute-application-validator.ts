@@ -11,7 +11,6 @@ import {
     DataFieldAttribute,
     DataModelAttribute,
     InternalAttribute,
-    ReferenceExpr,
     isArrayExpr,
     isAttribute,
     isConfigArrayExpr,
@@ -498,7 +497,7 @@ function isValidAttributeTarget(attrDecl: Attribute, targetDecl: DataField) {
             }
 
             const ref = item.target.ref;
-            return ref && 'name' in ref ? (ref as any).name : undefined;
+            return ref && 'name' in ref && typeof ref.name === 'string' ? ref.name : undefined;
         })
         .filter((name): name is string => !!name);
 

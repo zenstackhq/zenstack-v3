@@ -122,7 +122,12 @@ export class ZModelLinker extends DefaultLinker {
             const target = provider(reference.$refText);
             if (target) {
                 reference._ref = target;
-                const targetName = (target as any).name ?? (target as any).binding ?? reference.$refText;
+                let targetName = reference.$refText;
+                if ('name' in target && typeof target.name === 'string') {
+                    targetName = target.name;
+                } else if ('binding' in target && typeof (target as { binding?: unknown }).binding === 'string') {
+                    targetName = (target as { binding: string }).binding;
+                }
                 reference._nodeDescription = this.descriptions.createDescription(target, targetName, document);
 
                 // Add the reference to the document's array of references
@@ -265,11 +270,10 @@ export class ZModelLinker extends DefaultLinker {
                 }
             } else if (target.$type === EnumField) {
                 this.resolveToBuiltinTypeOrDecl(node, target.$container);
-            } else {
-                const targetWithType = target as Partial<DataField | FunctionParam>;
-                if (targetWithType.type) {
-                    this.resolveToDeclaredType(node, targetWithType.type);
-                }
+            } else if (isDataField(target)) {
+                this.resolveToDeclaredType(node, target.type);
+            } else if (target.$type === FunctionParam && (target as FunctionParam).type) {
+                this.resolveToDeclaredType(node, (target as FunctionParam).type);
             }
         }
     }

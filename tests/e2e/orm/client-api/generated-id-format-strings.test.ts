@@ -143,9 +143,10 @@ describe('generated id format strings', () => {
         const escapedSchema = `
 model EscapedTest {
     id                Int    @id
-    escaped           String @default(uuid(4, "prefix_\\\\%s_suffix"))
     consecutive       String @default(uuid(4, "%s%s"))
     mixedEscaped      String @default(uuid(4, "\\\\%s_%s_end"))
+    mixedEscaped2      String @default(uuid(4, "%s_\\\\%s_end"))
+    mixedEscaped3      String @default(uuid(4, "\\\\%s_\\\\%s_%s"))
     startWithPattern  String @default(uuid(4, "%s_suffix"))
     endWithPattern    String @default(uuid(4, "prefix_%s"))
 }
@@ -158,14 +159,17 @@ model EscapedTest {
             },
         });
 
-        // Escaped \%s should become literal %s in output
-        expect(record.escaped).toMatch(/^prefix_%s_suffix$/);
-
         // Consecutive %s%s should both be replaced
         expect(record.consecutive).toMatch(/^[0-9a-f-]{36}[0-9a-f-]{36}$/);
 
         // Mixed: first \%s stays as %s, second %s is replaced
         expect(record.mixedEscaped).toMatch(/^%s_[0-9a-f-]{36}_end$/);
+
+        // Mixed: first %s is replaced, second \%s stays as %s
+        expect(record.mixedEscaped2).toMatch(/^[0-9a-f-]{36}_%s_end$/);
+
+        // Mixed: first and second \%s stays as %s, third %s is replaced
+        expect(record.mixedEscaped3).toMatch(/^%s_%s_[0-9a-f-]{36}$/);
 
         // Pattern at start
         expect(record.startWithPattern).toMatch(/^[0-9a-f-]{36}_suffix$/);

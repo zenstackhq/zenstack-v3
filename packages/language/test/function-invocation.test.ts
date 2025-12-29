@@ -147,9 +147,70 @@ describe('Function Invocation Tests', () => {
             }  
         `,
         );
+
+        await loadSchema(
+            `
+            datasource db {
+                provider = 'sqlite'
+                url      = 'file:./dev.db'
+            }
+
+            model User {
+                id String @id @default(uuid(7, '\\\\%s_%s'))
+            }  
+        `,
+        );
+
+        await loadSchema(
+            `
+            datasource db {
+                provider = 'sqlite'
+                url      = 'file:./dev.db'
+            }
+
+            model User {
+                id String @id @default(uuid(7, '%s_\\\\%s'))
+            }  
+        `,
+        );
     });
 
     it('id functions should reject invalid format strings', async () => {
+        await loadSchemaWithError(`
+            datasource db {
+                provider = 'sqlite'
+                url      = 'file:./dev.db'
+            }
+
+            model User {
+                id String @id @default(cuid(2, ''))
+            }  
+        `, 'argument must include');
+
+        await loadSchemaWithError(
+            `
+            datasource db {
+                provider = 'sqlite'
+                url      = 'file:./dev.db'
+            }
+
+            model User {
+                id String @id @default(uuid(4, '\\\\%s'))
+            }  
+        `, 'argument must include');
+
+        await loadSchemaWithError(
+            `
+            datasource db {
+                provider = 'sqlite'
+                url      = 'file:./dev.db'
+            }
+
+            model User {
+                id String @id @default(uuid(4, '\\\\%s\\\\%s'))
+            }  
+        `, 'argument must include');
+
         await loadSchemaWithError(
             `
             datasource db {

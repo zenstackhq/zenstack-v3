@@ -477,6 +477,9 @@ importers:
       better-sqlite3:
         specifier: 'catalog:'
         version: 12.5.0
+      cuid:
+        specifier: ^3.0.0
+        version: 3.0.0
       decimal.js:
         specifier: 'catalog:'
         version: 10.6.0
@@ -1013,6 +1016,9 @@ importers:
       better-sqlite3:
         specifier: 'catalog:'
         version: 12.5.0
+      cuid:
+        specifier: ^3.0.0
+        version: 3.0.0
       decimal.js:
         specifier: 'catalog:'
         version: 10.6.0
@@ -4579,6 +4585,10 @@ packages:
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+
+  cuid@3.0.0:
+    resolution: {integrity: sha512-WZYYkHdIDnaxdeP8Misq3Lah5vFjJwGuItJuV+tvMafosMzw0nF297T7mrm8IOWiPJkV6gc7sa8pzx27+w25Zg==}
+    deprecated: Cuid and other k-sortable and non-cryptographic ids (Ulid, ObjectId, KSUID, all UUIDs) are all insecure. Use @paralleldrive/cuid2 instead.
 
   damerau-levenshtein@1.0.8:
     resolution: {integrity: sha512-sdQSFB7+llfUcQHUQO3+B8ERRj0Oa4w9POWMI/puGtuf7gFywGmkaLCElnudfTiKZV+NvHqL0ifzdrI8Ro7ESA==}
@@ -12008,6 +12018,8 @@ snapshots:
     optional: true
 
   csstype@3.2.3: {}
+
+  cuid@3.0.0: {}
 
   damerau-levenshtein@1.0.8: {}
 

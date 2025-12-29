@@ -184,39 +184,51 @@ export class QueryNameMapper extends OperationNodeTransformer {
         return ColumnNode.create(mappedName);
     }
 
-    protected override transformBinaryOperation(node: BinaryOperationNode): BinaryOperationNode {
+    protected override transformBinaryOperation(node: BinaryOperationNode) {
+        // transform enum name mapping for enum values used inside binary operations
+        //   1. simple value: column = EnumValue
+        //   2. list value: column IN [EnumValue, EnumValue2]
+
+        // note: Kysely only allows column ref on the left side of a binary operation
+
         if (
             ReferenceNode.is(node.leftOperand) &&
             ColumnNode.is(node.leftOperand.column) &&
-            node.leftOperand.table &&
-            TableNode.is(node.leftOperand.table) &&
-            //  { enumColumn: Enum.VALUE }
-            (ValueNode.is(node.rightOperand) ||
-                //  { enumColumn: { in: [Enum.VALUE] } }
-                PrimitiveValueListNode.is(node.rightOperand))
+            (ValueNode.is(node.rightOperand) || PrimitiveValueListNode.is(node.rightOperand))
         ) {
-            const tableName = node.leftOperand.table.table.identifier.name;
             const columnNode = node.leftOperand.column;
-            const valueNode = node.rightOperand;
 
-            let resultValue: OperationNode = valueNode;
+            // resolve field from scope in case it's not directly qualified with a table name
+            const resolvedScope = this.resolveFieldFromScopes(
+                columnNode.column.name,
+                node.leftOperand.table?.table.identifier.name,
+            );
 
-            if (ValueNode.is(valueNode)) {
-                resultValue = this.processEnumMappingForValue(tableName, columnNode, valueNode) as OperationNode;
-            } else if (PrimitiveValueListNode.is(valueNode)) {
-                resultValue = PrimitiveValueListNode.create(
-                    this.processEnumMappingForValues(
-                        tableName,
-                        valueNode.values.map(() => columnNode),
-                        valueNode.values,
-                    ),
-                );
+            if (resolvedScope?.model) {
+                const valueNode = node.rightOperand;
+                let resultValue: OperationNode = valueNode;
+
+                if (ValueNode.is(valueNode)) {
+                    resultValue = this.processEnumMappingForValue(
+                        resolvedScope.model,
+                        columnNode,
+                        valueNode,
+                    ) as OperationNode;
+                } else if (PrimitiveValueListNode.is(valueNode)) {
+                    resultValue = PrimitiveValueListNode.create(
+                        this.processEnumMappingForValues(
+                            resolvedScope.model,
+                            valueNode.values.map(() => columnNode),
+                            valueNode.values,
+                        ),
+                    );
+                }
+
+                return super.transformBinaryOperation({
+                    ...node,
+                    rightOperand: resultValue,
+                });
             }
-
-            return super.transformBinaryOperation({
-                ...node,
-                rightOperand: resultValue,
-            });
         }
 
         return super.transformBinaryOperation(node);

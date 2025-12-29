@@ -8,10 +8,10 @@ describe('Name mapping tests', () => {
     let db: ClientContract<SchemaType>;
 
     beforeEach(async () => {
-        db = (await createTestClient(schema, {
+        db = await createTestClient(schema, {
             usePrismaPush: true,
             schemaFile: path.join(__dirname, '../schemas/name-mapping/schema.zmodel'),
-        })) as any;
+        });
     });
 
     afterEach(async () => {
@@ -214,11 +214,7 @@ describe('Name mapping tests', () => {
         await expect(
             db.user.findMany({
                 where: {
-                    AND: [
-                        { role: { in: ['USER'] } },
-                        { role: { in: ['USER'] } },
-                        { OR: [{ role: { in: ['USER'] } }] },
-                    ],
+                    AND: [{ role: { in: ['USER'] } }, { role: { in: ['USER'] } }, { OR: [{ role: { in: ['USER'] } }] }],
                 },
                 select: {
                     email: true,
@@ -260,6 +256,38 @@ describe('Name mapping tests', () => {
                 .selectFrom('User')
                 .select(['User.email', 'User.role'])
                 .where('email', '=', 'u1@test.com')
+                .executeTakeFirst(),
+        ).resolves.toMatchObject({
+            email: 'u1@test.com',
+            role: 'USER',
+        });
+
+        // name mapping for enum value in where clause, with unqualified column name
+        await expect(
+            db.$qb.selectFrom('User').select(['User.email', 'User.role']).where('role', '=', 'USER').executeTakeFirst(),
+        ).resolves.toMatchObject({
+            email: 'u1@test.com',
+            role: 'USER',
+        });
+
+        // name mapping for enum value in simple where clause, with qualified column name
+        await expect(
+            db.$qb
+                .selectFrom('User as u')
+                .select(['u.email', 'u.role'])
+                .where('u.role', '=', 'USER')
+                .executeTakeFirst(),
+        ).resolves.toMatchObject({
+            email: 'u1@test.com',
+            role: 'USER',
+        });
+
+        // enum value in list
+        await expect(
+            db.$qb
+                .selectFrom('User')
+                .select(['User.email', 'User.role'])
+                .where('role', 'in', ['USER', 'ADMIN'])
                 .executeTakeFirst(),
         ).resolves.toMatchObject({
             email: 'u1@test.com',

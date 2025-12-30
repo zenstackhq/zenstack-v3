@@ -198,7 +198,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         const versionArg = expr.args[0]?.value;
         if (versionArg) {
             const version = getLiteral<number>(versionArg);
-            if (version !== 4 && version !== 7) {
+            if (version !== undefined && version !== 4 && version !== 7) {
                 accept('error', 'first argument must be 4 or 7', {
                     node: expr.args[0]!,
                 });
@@ -212,7 +212,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         const versionArg = expr.args[0]?.value;
         if (versionArg) {
             const version = getLiteral<number>(versionArg);
-            if (version !== 1 && version !== 2) {
+            if (version !== undefined && version !== 1 && version !== 2) {
                 accept('error', 'first argument must be 1 or 2', {
                     node: expr.args[0]!,
                 });

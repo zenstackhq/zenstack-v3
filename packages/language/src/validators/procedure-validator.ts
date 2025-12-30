@@ -4,7 +4,6 @@ import { validateAttributeApplication } from './attribute-application-validator'
 import type { AstValidator } from './common';
 
 const RESERVED_PROCEDURE_NAMES = new Set([
-    // avoid prototype pollution / surprising JS behavior
     '__proto__',
     'prototype',
     'constructor',

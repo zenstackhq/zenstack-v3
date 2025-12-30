@@ -47,23 +47,14 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
     });
 
     it('supports $procs and $procedures routes', async () => {
-        const r1 = await api.handleRequest({
+        const r = await api.handleRequest({
             client,
             method: 'get',
             path: '/$procs/greet',
             query: { q: JSON.stringify('alice') },
         });
-        expect(r1.status).toBe(200);
-        expect(r1.body).toEqual({ data: 'hello alice' });
-
-        const r2 = await api.handleRequest({
-            client,
-            method: 'get',
-            path: '/$procedures/greet',
-            query: { q: JSON.stringify('bob') },
-        });
-        expect(r2.status).toBe(200);
-        expect(r2.body).toEqual({ data: 'hello bob' });
+        expect(r.status).toBe(200);
+        expect(r.body).toEqual({ data: 'hello alice' });
     });
 
     it('returns 422 for invalid input', async () => {

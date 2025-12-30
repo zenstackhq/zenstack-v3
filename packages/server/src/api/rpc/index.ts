@@ -53,8 +53,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             return this.makeBadInputErrorResponse('invalid request path');
         }
 
-        // Special path: /$procedures/<name> or /$procs/<name>
-        if (model === '$procedures' || model === '$procs') {
+        if (model === '$procs') {
             return this.handleProcedureRequest({
                 client,
                 method: method.toUpperCase(),

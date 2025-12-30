@@ -3218,7 +3218,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const { json, meta } = SuperJSON.serialize(new Decimal('1.23'));
             const r = await handler({
                 method: 'get',
-                path: '/$procedures/echoDecimal',
+                path: '/$procs/echoDecimal',
                 query: {
                     q: JSON.stringify(json),
                     meta: JSON.stringify({ serialization: meta }),
@@ -3234,7 +3234,7 @@ mutation procedure sum(a: Int, b: Int): Int
         it('supports GET procedures without args when param is optional', async () => {
             const r = await handler({
                 method: 'get',
-                path: '/$procedures/greet',
+                path: '/$procs/greet',
                 query: {},
                 client,
             });
@@ -3246,7 +3246,7 @@ mutation procedure sum(a: Int, b: Int): Int
         it('errors for missing required single-param arg', async () => {
             const r = await handler({
                 method: 'get',
-                path: '/$procedures/echoInt',
+                path: '/$procs/echoInt',
                 query: {},
                 client,
             });
@@ -3266,7 +3266,7 @@ mutation procedure sum(a: Int, b: Int): Int
         it('supports GET procedures without args when all params are optional', async () => {
             const r = await handler({
                 method: 'get',
-                path: '/$procedures/opt2',
+                path: '/$procs/opt2',
                 query: {},
                 client,
             });
@@ -3278,7 +3278,7 @@ mutation procedure sum(a: Int, b: Int): Int
         it('supports array-typed single param via q JSON array', async () => {
             const r = await handler({
                 method: 'get',
-                path: '/$procedures/sumIds',
+                path: '/$procs/sumIds',
                 query: { q: JSON.stringify([1, 2, 3]) },
                 client,
             });
@@ -3290,7 +3290,7 @@ mutation procedure sum(a: Int, b: Int): Int
         it('supports enum-typed params with validation', async () => {
             const r = await handler({
                 method: 'get',
-                path: '/$procedures/echoRole',
+                path: '/$procs/echoRole',
                 query: { q: JSON.stringify('ADMIN') },
                 client,
             });
@@ -3302,7 +3302,7 @@ mutation procedure sum(a: Int, b: Int): Int
         it('supports typedef params (object payload)', async () => {
             const r = await handler({
                 method: 'get',
-                path: '/$procedures/echoOverview',
+                path: '/$procs/echoOverview',
                 query: { q: JSON.stringify({ total: 123 }) },
                 client,
             });
@@ -3314,7 +3314,7 @@ mutation procedure sum(a: Int, b: Int): Int
         it('errors for wrong type input', async () => {
             const r = await handler({
                 method: 'get',
-                path: '/$procedures/echoInt',
+                path: '/$procs/echoInt',
                 query: { q: JSON.stringify('not-an-int') },
                 client,
             });
@@ -3335,7 +3335,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const { json, meta } = SuperJSON.serialize({ a: 1, b: 2 });
             const r = await handler({
                 method: 'post',
-                path: '/$procedures/sum',
+                path: '/$procs/sum',
                 query: {
                     q: JSON.stringify(json),
                     meta: JSON.stringify({ serialization: meta }),
@@ -3350,7 +3350,7 @@ mutation procedure sum(a: Int, b: Int): Int
         it('errors for too many args (positional array)', async () => {
             const r = await handler({
                 method: 'post',
-                path: '/$procedures/sum',
+                path: '/$procs/sum',
                 query: { q: JSON.stringify([1, 2, 3]) },
                 client,
             });
@@ -3370,7 +3370,7 @@ mutation procedure sum(a: Int, b: Int): Int
         it('errors for unknown argument keys (object mapping)', async () => {
             const r = await handler({
                 method: 'post',
-                path: '/$procedures/sum',
+                path: '/$procs/sum',
                 query: { q: JSON.stringify({ a: 1, b: 2, c: 3 }) },
                 client,
             });

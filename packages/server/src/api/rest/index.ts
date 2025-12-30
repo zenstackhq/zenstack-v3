@@ -343,8 +343,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         }
 
         try {
-            // Custom procedures escape hatch
-            if (path.startsWith('/$procedures/') || path.startsWith('/$procs/')) {
+            if (path.startsWith('/$procs/')) {
                 const proc = path.split('/')[2];
                 return await this.processProcedureRequest({ client, method, proc, query, requestBody });
             }

@@ -174,11 +174,6 @@ export type ProcedureHooks<Schema extends SchemaDef> = Schema extends { procedur
            * Preferred procedures API.
            */
           $procs: ProcedureHookGroup<Schema>;
-
-          /**
-           * Backward-compatible procedures API.
-           */
-          $procedures: ProcedureHookGroup<Schema>;
       }
     : {};
 
@@ -292,7 +287,7 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
 
     const procedures = (schema as any).procedures as Record<string, { mutation?: boolean }> | undefined;
     if (procedures) {
-        const buildProcedureHooks = (endpointModel: '$procs' | '$procedures') => {
+        const buildProcedureHooks = (endpointModel: '$procs') => {
             return Object.keys(procedures).reduce((acc, name) => {
                 const procDef = procedures[name];
                 if (procDef?.mutation) {
@@ -313,7 +308,6 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
         };
 
         (result as any).$procs = buildProcedureHooks('$procs');
-        (result as any).$procedures = buildProcedureHooks('$procedures');
     }
 
     return result;
@@ -321,7 +315,7 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
 
 export function useInternalProcedureQuery<TQueryFnData, TData>(
     schema: SchemaDef,
-    endpointModel: '$procs' | '$procedures',
+    endpointModel: '$procs',
     procedure: string,
     args?: Accessor<unknown>,
     options?: Accessor<Omit<CreateQueryOptions<TQueryFnData, DefaultError, TData>, 'queryKey'> & ExtraQueryOptions>,
@@ -331,7 +325,7 @@ export function useInternalProcedureQuery<TQueryFnData, TData>(
 
 export function useInternalProcedureInfiniteQuery<TQueryFnData, TData>(
     schema: SchemaDef,
-    endpointModel: '$procs' | '$procedures',
+    endpointModel: '$procs',
     procedure: string,
     args: Accessor<unknown>,
     options?: Accessor<
@@ -344,7 +338,7 @@ export function useInternalProcedureInfiniteQuery<TQueryFnData, TData>(
 
 export function useInternalProcedureMutation<TArgs, R = any>(
     _schema: SchemaDef,
-    endpointModel: '$procs' | '$procedures',
+    endpointModel: '$procs',
     procedure: string,
     options?: Accessor<Omit<CreateMutationOptions<R, DefaultError, TArgs>, 'mutationFn'> & QueryContext>,
 ) {

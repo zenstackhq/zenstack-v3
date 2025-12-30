@@ -73,6 +73,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             case 'aggregate':
             case 'groupBy':
             case 'count':
+            case 'exists':
                 if (method !== 'GET') {
                     return this.makeBadInputErrorResponse('invalid request method, only GET is supported');
                 }

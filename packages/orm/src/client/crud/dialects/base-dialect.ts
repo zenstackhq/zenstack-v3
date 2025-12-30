@@ -448,15 +448,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     private buildArrayFilter(fieldRef: Expression<any>, fieldDef: FieldDef, payload: any) {
-        const fieldType = fieldDef.type as BuiltinType;
-
-        // Allow direct array payloads to mean equality on the list
-        if (Array.isArray(payload)) {
-            const value = this.transformPrimitive(payload, fieldType, !!fieldDef.array);
-            return this.buildLiteralFilter(fieldRef, fieldType, this.eb.val(value));
-        }
-
         const clauses: Expression<SqlBool>[] = [];
+        const fieldType = fieldDef.type as BuiltinType;
 
         for (const [key, _value] of Object.entries(payload)) {
             if (_value === undefined) {

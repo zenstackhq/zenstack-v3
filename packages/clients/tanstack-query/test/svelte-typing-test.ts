@@ -1,7 +1,9 @@
 import { useClientQueries } from '../src/svelte/index.svelte';
 import { schema } from './schemas/basic/schema-lite';
+import { schema as proceduresSchema } from './schemas/procedures/schema-lite';
 
 const client = useClientQueries(schema);
+const proceduresClient = useClientQueries(proceduresSchema);
 
 // @ts-expect-error missing args
 client.user.useFindUnique();
@@ -106,3 +108,24 @@ client.foo.useCreate();
 
 client.foo.useUpdate();
 client.bar.useCreate();
+
+// procedures (query)
+check(proceduresClient.$procs.greet.useQuery().data?.toUpperCase());
+check(proceduresClient.$procs.greet.useQuery(() => 'bob').data?.toUpperCase());
+check(proceduresClient.$procs.greet.useQuery(() => 'bob').queryKey);
+check(proceduresClient.$procs.greetMany.useInfiniteQuery(() => 'bob').data?.pages[0]?.[0]?.toUpperCase());
+check(proceduresClient.$procs.greetMany.useInfiniteQuery(() => 'bob').queryKey);
+check(proceduresClient.$procedures.greet.useQuery(() => 'bob').data?.toUpperCase());
+// @ts-expect-error greet is not a mutation procedure
+proceduresClient.$procs.greet.useMutation();
+
+// procedures (mutation)
+proceduresClient.$procs.sum.useMutation().mutate([1, 2]);
+// @ts-expect-error wrong arg shape for multi-param procedure
+proceduresClient.$procs.sum.useMutation().mutate({ a: 1, b: 2 });
+proceduresClient.$procs.sum
+    .useMutation()
+    .mutateAsync([1, 2])
+    .then((d) => check(d.toFixed(2)));
+
+proceduresClient.$procedures.sum.useMutation().mutate([1, 2]);

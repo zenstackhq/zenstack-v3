@@ -1131,6 +1131,7 @@ export class TsSchemaGenerator {
                     ...(param.optional
                         ? [ts.factory.createPropertyAssignment('optional', ts.factory.createTrue())]
                         : []),
+                    ...(param.type.array ? [ts.factory.createPropertyAssignment('array', ts.factory.createTrue())] : []),
                     ts.factory.createPropertyAssignment(
                         'type',
                         ts.factory.createStringLiteral(param.type.type ?? param.type.reference!.$refText),
@@ -1161,6 +1162,16 @@ export class TsSchemaGenerator {
                                 ts.factory.createStringLiteral(param.type.type ?? param.type.reference!.$refText),
                             ),
                         ),
+                        ...(param.type.array
+                            ? [
+                                  ts.factory.createPropertySignature(
+                                      undefined,
+                                      ts.factory.createStringLiteral('array'),
+                                      undefined,
+                                      ts.factory.createLiteralTypeNode(ts.factory.createTrue()),
+                                  ),
+                              ]
+                            : []),
                         ...(param.optional
                             ? [
                                   ts.factory.createPropertySignature(
@@ -1183,6 +1194,9 @@ export class TsSchemaGenerator {
                     'returnType',
                     ts.factory.createStringLiteral(proc.returnType.type ?? proc.returnType.reference!.$refText),
                 ),
+                ...(proc.returnType.array
+                    ? [ts.factory.createPropertyAssignment('returnArray', ts.factory.createTrue())]
+                    : []),
                 ...(proc.mutation ? [ts.factory.createPropertyAssignment('mutation', ts.factory.createTrue())] : []),
             ],
             true,

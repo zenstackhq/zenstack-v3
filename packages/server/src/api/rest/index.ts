@@ -9,6 +9,13 @@ import UrlPattern from 'url-pattern';
 import z from 'zod';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
 import { getZodErrorMessage, log, registerCustomSerializers } from '../utils';
+import {
+    getProcedureDef,
+    mapProcedureArgs as mapProcedureArgsCommon,
+    processSuperJsonRequestPayload,
+    unmarshalQ as unmarshalQCommon,
+    validateProcedureArgs,
+} from '../common/procedures';
 
 /**
  * Options for {@link RestApiHandler}
@@ -336,6 +343,12 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         }
 
         try {
+            // Custom procedures escape hatch
+            if (path.startsWith('/$procedures/') || path.startsWith('/$procs/')) {
+                const proc = path.split('/')[2];
+                return await this.processProcedureRequest({ client, method, proc, query, requestBody });
+            }
+
             switch (method) {
                 case 'GET': {
                     let match = this.matchUrlPattern(path, UrlPatterns.SINGLE);
@@ -471,6 +484,173 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
 
     private handleGenericError(err: unknown): Response | PromiseLike<Response> {
         return this.makeError('unknownError', err instanceof Error ? `${err.message}\n${err.stack}` : 'Unknown error');
+    }
+
+    private async processProcedureRequest({
+        client,
+        method,
+        proc,
+        query,
+        requestBody,
+    }: {
+        client: ClientContract<Schema>;
+        method: string;
+        proc?: string;
+        query?: Record<string, string | string[]>;
+        requestBody?: unknown;
+    }): Promise<Response> {
+        if (!proc) {
+            return this.makeProcBadInputErrorResponse('missing procedure name');
+        }
+
+        const procDef = getProcedureDef(this.schema, proc);
+        if (!procDef) {
+            return this.makeProcBadInputErrorResponse(`unknown procedure: ${proc}`);
+        }
+
+        const isMutation = !!procDef.mutation;
+        if (isMutation) {
+            if (method !== 'POST') {
+                return this.makeProcBadInputErrorResponse('invalid request method, only POST is supported');
+            }
+        } else {
+            if (method !== 'GET') {
+                return this.makeProcBadInputErrorResponse('invalid request method, only GET is supported');
+            }
+        }
+
+        let argsPayload: unknown;
+        if (method === 'POST') {
+            if (typeof requestBody !== 'undefined') {
+                argsPayload = requestBody;
+            } else {
+                try {
+                    argsPayload = query?.['q']
+                        ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
+                        : undefined;
+                } catch (err) {
+                    return this.makeProcBadInputErrorResponse(
+                        err instanceof Error ? err.message : 'invalid "q" query parameter',
+                    );
+                }
+            }
+        } else {
+            try {
+                argsPayload = query?.['q']
+                    ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
+                    : undefined;
+            } catch (err) {
+                return this.makeProcBadInputErrorResponse(
+                    err instanceof Error ? err.message : 'invalid "q" query parameter',
+                );
+            }
+        }
+
+        // support SuperJSON request payload format used by other RPC-style endpoints
+        let processedArgsPayload = argsPayload;
+        if (argsPayload && typeof argsPayload === 'object' && !Array.isArray(argsPayload) && 'meta' in (argsPayload as any)) {
+            const { result, error } = await processSuperJsonRequestPayload(argsPayload);
+            if (error) {
+                return this.makeProcBadInputErrorResponse(error);
+            }
+            processedArgsPayload = result;
+        }
+
+        let positionalArgs: unknown[];
+        try {
+            positionalArgs = this.mapProcedureArgs(procDef, processedArgsPayload);
+        } catch (err) {
+            return this.makeProcBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
+        }
+
+        try {
+            positionalArgs = validateProcedureArgs(client, proc, positionalArgs);
+        } catch (err) {
+            if (err instanceof ORMError) {
+                return this.makeProcORMErrorResponse(err);
+            }
+            return this.makeProcBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
+        }
+
+        try {
+            log(this.log, 'debug', () => `handling "$procedures.${proc}" request`);
+
+            const clientResult = await (client as any).$procedures?.[proc](...positionalArgs);
+
+            const { json, meta } = SuperJSON.serialize(clientResult);
+            const responseBody: any = { data: json };
+            if (meta) {
+                responseBody.meta = { serialization: meta };
+            }
+
+            return { status: 200, body: responseBody };
+        } catch (err) {
+            log(this.log, 'error', `error occurred when handling "$procedures.${proc}" request`, err);
+            if (err instanceof ORMError) {
+                return this.makeProcORMErrorResponse(err);
+            }
+            return this.makeProcGenericErrorResponse(err);
+        }
+    }
+
+    private mapProcedureArgs(
+        procDef: { params: ReadonlyArray<{ name: string; optional?: boolean; array?: boolean }> },
+        payload: unknown,
+    ): unknown[] {
+        return mapProcedureArgsCommon(procDef, payload);
+    }
+
+    private unmarshalQ(value: string, meta: string | undefined) {
+        return unmarshalQCommon(value, meta);
+    }
+
+    private makeProcBadInputErrorResponse(message: string): Response {
+        const resp = this.makeError('invalidPayload', message, 400);
+        log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
+        return resp;
+    }
+
+    private makeProcGenericErrorResponse(err: unknown): Response {
+        const message = err instanceof Error ? err.message : 'unknown error';
+        const resp = this.makeError('unknownError', message, 500);
+        log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
+        return resp;
+    }
+
+    private makeProcORMErrorResponse(err: ORMError): Response {
+        const reason = paramCase(String(err.reason));
+
+        const resp = match(err.reason)
+            .with(ORMErrorReason.NOT_FOUND, () => {
+                return this.makeError('notFound', err.message, 404, { reason, model: err.model });
+            })
+            .with(ORMErrorReason.INVALID_INPUT, () => {
+                return this.makeError('validationError', err.message, 422, {
+                    reason,
+                    rejectedByValidation: true,
+                    model: err.model,
+                });
+            })
+            .with(ORMErrorReason.REJECTED_BY_POLICY, () => {
+                return this.makeError('forbidden', err.message, 403, {
+                    reason,
+                    rejectedByPolicy: true,
+                    rejectReason: err.rejectedByPolicyReason,
+                    model: err.model,
+                });
+            })
+            .with(ORMErrorReason.DB_QUERY_ERROR, () => {
+                return this.makeError('queryError', err.message, 400, {
+                    reason,
+                    dbErrorCode: err.dbErrorCode,
+                });
+            })
+            .otherwise(() => {
+                return this.makeError('unknownError', err.message, 500, { reason });
+            });
+
+        log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
+        return resp;
     }
 
     private async processSingleRead(

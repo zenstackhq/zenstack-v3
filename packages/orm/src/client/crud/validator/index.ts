@@ -9,6 +9,7 @@ import {
     type BuiltinType,
     type EnumDef,
     type FieldDef,
+    type ProcedureDef,
     type GetModels,
     type ModelDef,
     type SchemaDef,
@@ -68,6 +69,93 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private get extraValidationsEnabled() {
         return this.client.$options.validateInput !== false;
+    }
+
+    validateProcedureArgs(proc: string, args: unknown): unknown[] {
+        const procDef = (this.schema.procedures ?? {})[proc] as ProcedureDef | undefined;
+        invariant(procDef, `Procedure "${proc}" not found in schema`);
+
+        if (!Array.isArray(args)) {
+            throw createInvalidInputError('Procedure arguments must be an array', `$procedures.${proc}`);
+        }
+
+        if (args.length > procDef.params.length) {
+            throw createInvalidInputError(
+                `Too many procedure arguments: expected at most ${procDef.params.length}, got ${args.length}`,
+                `$procedures.${proc}`,
+            );
+        }
+
+        // Validate each parameter using the procedure signature. Missing trailing optional parameters are allowed.
+        for (let i = 0; i < procDef.params.length; i++) {
+            const param = procDef.params[i]!;
+            const value = args[i];
+
+            if (typeof value === 'undefined') {
+                // When a value is not provided, allow it only if the parameter is optional.
+                // Note: callers can still explicitly pass `undefined`.
+                if (i >= args.length) {
+                    if (param.optional) {
+                        continue;
+                    }
+                    throw createInvalidInputError(
+                        `Missing procedure argument: ${param.name}`,
+                        `$procedures.${proc}`,
+                    );
+                }
+
+                if (param.optional) {
+                    continue;
+                }
+
+                throw createInvalidInputError(
+                    `Invalid procedure argument: ${param.name} is required`,
+                    `$procedures.${proc}`,
+                );
+            }
+
+            const schema = this.makeProcedureParamSchema(param);
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                throw createInvalidInputError(
+                    `Invalid procedure argument: ${param.name}: ${formatError(parsed.error)}`,
+                    `$procedures.${proc}`,
+                );
+            }
+        }
+
+        return args;
+    }
+
+    private makeProcedureParamSchema(param: { type: string; array?: boolean; optional?: boolean }): z.ZodType {
+        let schema: z.ZodType;
+
+        if (this.schema.typeDefs && param.type in this.schema.typeDefs) {
+            schema = this.makeTypeDefSchema(param.type);
+        } else if (this.schema.enums && param.type in this.schema.enums) {
+            schema = this.makeEnumSchema(param.type);
+        } else if (param.type in (this.schema.models ?? {})) {
+            // For model-typed values, accept any object (no deep shape validation).
+            schema = z.record(z.string(), z.unknown());
+        } else {
+            // Builtin scalar types.
+            schema = this.makeScalarSchema(param.type as BuiltinType);
+
+            // If a type isn't recognized by any of the above branches, `makeScalarSchema` returns `unknown`.
+            // Treat it as configuration/schema error.
+            if (schema instanceof z.ZodUnknown) {
+                throw createInternalError(`Unsupported procedure parameter type: ${param.type}`);
+            }
+        }
+
+        if (param.array) {
+            schema = schema.array();
+        }
+        if (param.optional) {
+            schema = schema.optional();
+        }
+
+        return schema;
     }
 
     validateFindArgs(

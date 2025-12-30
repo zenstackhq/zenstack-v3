@@ -3163,4 +3163,240 @@ describe('REST server tests', () => {
             });
         });
     });
+
+    describe('REST server tests - procedures', () => {
+        const schema = `
+model User {
+    id String @id @default(cuid())
+    email String @unique
+}
+
+enum Role {
+    ADMIN
+    USER
+}
+
+type Overview {
+    total Int
+}
+
+procedure echoDecimal(x: Decimal): Decimal
+procedure greet(name: String?): String
+procedure echoInt(x: Int): Int
+procedure opt2(a: Int?, b: Int?): Int
+procedure sumIds(ids: Int[]): Int
+procedure echoRole(r: Role): Role
+procedure echoOverview(o: Overview): Overview
+
+mutation procedure sum(a: Int, b: Int): Int
+`;
+
+        beforeEach(async () => {
+            client = await createTestClient(schema, {
+                procedures: {
+                    echoDecimal: async (_client, x: Decimal) => x,
+                    greet: async (_client, name?: string) => `hi ${name ?? 'anon'}`,
+                    echoInt: async (_client, x: number) => x,
+                    opt2: async (_client, a?: number, b?: number) => (a ?? 0) + (b ?? 0),
+                    sumIds: async (_client, ids: number[]) => ids.reduce((acc, x) => acc + x, 0),
+                    echoRole: async (_client, r: string) => r,
+                    echoOverview: async (_client, o: any) => o,
+                    sum: async (_client, a: number, b: number) => a + b,
+                },
+            });
+
+            const _handler = new RestApiHandler({
+                schema: client.$schema,
+                endpoint: 'http://localhost/api',
+                pageSize: 5,
+            });
+
+            handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
+        });
+
+        it('supports GET query procedures with q/meta (SuperJSON)', async () => {
+            const { json, meta } = SuperJSON.serialize(new Decimal('1.23'));
+            const r = await handler({
+                method: 'get',
+                path: '/$procedures/echoDecimal',
+                query: {
+                    q: JSON.stringify(json),
+                    meta: JSON.stringify({ serialization: meta }),
+                },
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: '1.23' });
+            expect(r.body.meta?.serialization).toBeTruthy();
+        });
+
+        it('supports GET procedures without args when param is optional', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procedures/greet',
+                query: {},
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 'hi anon' });
+        });
+
+        it('errors for missing required single-param arg', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procedures/echoInt',
+                query: {},
+                client,
+            });
+
+            expect(r.status).toBe(400);
+            expect(r.body).toMatchObject({
+                errors: [
+                    {
+                        status: 400,
+                        code: 'invalid-payload',
+                        detail: 'missing procedure argument: x',
+                    },
+                ],
+            });
+        });
+
+        it('supports GET procedures without args when all params are optional', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procedures/opt2',
+                query: {},
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 0 });
+        });
+
+        it('supports array-typed single param via q JSON array', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procedures/sumIds',
+                query: { q: JSON.stringify([1, 2, 3]) },
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 6 });
+        });
+
+        it('supports enum-typed params with validation', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procedures/echoRole',
+                query: { q: JSON.stringify('ADMIN') },
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 'ADMIN' });
+        });
+
+        it('supports typedef params (object payload)', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procedures/echoOverview',
+                query: { q: JSON.stringify({ total: 123 }) },
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: { total: 123 } });
+        });
+
+        it('errors for wrong type input', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procedures/echoInt',
+                query: { q: JSON.stringify('not-an-int') },
+                client,
+            });
+
+            expect(r.status).toBe(422);
+            expect(r.body).toMatchObject({
+                errors: [
+                    {
+                        status: 422,
+                        code: 'validation-error',
+                    },
+                ],
+            });
+            expect(r.body.errors?.[0]?.detail).toMatch(/invalid input/i);
+        });
+
+        it('supports POST mutation procedures with args passed via q/meta', async () => {
+            const { json, meta } = SuperJSON.serialize({ a: 1, b: 2 });
+            const r = await handler({
+                method: 'post',
+                path: '/$procedures/sum',
+                query: {
+                    q: JSON.stringify(json),
+                    meta: JSON.stringify({ serialization: meta }),
+                },
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 3 });
+        });
+
+        it('errors for too many args (positional array)', async () => {
+            const r = await handler({
+                method: 'post',
+                path: '/$procedures/sum',
+                query: { q: JSON.stringify([1, 2, 3]) },
+                client,
+            });
+
+            expect(r.status).toBe(400);
+            expect(r.body).toMatchObject({
+                errors: [
+                    {
+                        status: 400,
+                        code: 'invalid-payload',
+                    },
+                ],
+            });
+            expect(r.body.errors?.[0]?.detail).toMatch(/too many procedure arguments/i);
+        });
+
+        it('errors for unknown argument keys (object mapping)', async () => {
+            const r = await handler({
+                method: 'post',
+                path: '/$procedures/sum',
+                query: { q: JSON.stringify({ a: 1, b: 2, c: 3 }) },
+                client,
+            });
+
+            expect(r.status).toBe(400);
+            expect(r.body).toMatchObject({
+                errors: [
+                    {
+                        status: 400,
+                        code: 'invalid-payload',
+                    },
+                ],
+            });
+            expect(r.body.errors?.[0]?.detail).toMatch(/unknown procedure argument/i);
+        });
+
+        it('supports /$procs alias path', async () => {
+            const r = await handler({
+                method: 'post',
+                path: '/$procs/sum',
+                query: { q: JSON.stringify([1, 2]) },
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 3 });
+        });
+    });
 });

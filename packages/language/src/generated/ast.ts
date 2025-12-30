@@ -53,7 +53,9 @@ export type ZModelKeywordNames =
     | "Object"
     | "String"
     | "TransitiveFieldReference"
+    | "Undefined"
     | "Unsupported"
+    | "Void"
     | "["
     | "]"
     | "^"
@@ -120,10 +122,10 @@ export function isExpression(item: unknown): item is Expression {
     return reflection.isInstance(item, Expression);
 }
 
-export type ExpressionType = 'Any' | 'Boolean' | 'DateTime' | 'Float' | 'Int' | 'Null' | 'Object' | 'String' | 'Unsupported';
+export type ExpressionType = 'Any' | 'BigInt' | 'Boolean' | 'Bytes' | 'DateTime' | 'Decimal' | 'Float' | 'Int' | 'Json' | 'Null' | 'Object' | 'String' | 'Undefined' | 'Unsupported' | 'Void';
 
 export function isExpressionType(item: unknown): item is ExpressionType {
-    return item === 'String' || item === 'Int' || item === 'Float' || item === 'Boolean' || item === 'DateTime' || item === 'Null' || item === 'Object' || item === 'Any' || item === 'Unsupported';
+    return item === 'String' || item === 'Int' || item === 'Float' || item === 'Boolean' || item === 'BigInt' || item === 'Decimal' || item === 'DateTime' || item === 'Json' || item === 'Bytes' || item === 'Null' || item === 'Object' || item === 'Any' || item === 'Void' || item === 'Undefined' || item === 'Unsupported';
 }
 
 export type LiteralExpr = BooleanLiteral | NumberLiteral | StringLiteral;
@@ -156,10 +158,10 @@ export function isRegularID(item: unknown): item is RegularID {
     return item === 'model' || item === 'enum' || item === 'attribute' || item === 'datasource' || item === 'plugin' || item === 'abstract' || item === 'in' || item === 'view' || item === 'import' || item === 'type' || (typeof item === 'string' && (/[_a-zA-Z][\w_]*/.test(item)));
 }
 
-export type RegularIDWithTypeNames = 'Any' | 'BigInt' | 'Boolean' | 'Bytes' | 'DateTime' | 'Decimal' | 'Float' | 'Int' | 'Json' | 'Null' | 'Object' | 'String' | 'Unsupported' | RegularID;
+export type RegularIDWithTypeNames = 'Any' | 'BigInt' | 'Boolean' | 'Bytes' | 'DateTime' | 'Decimal' | 'Float' | 'Int' | 'Json' | 'Null' | 'Object' | 'String' | 'Undefined' | 'Unsupported' | 'Void' | RegularID;
 
 export function isRegularIDWithTypeNames(item: unknown): item is RegularIDWithTypeNames {
-    return isRegularID(item) || item === 'String' || item === 'Boolean' || item === 'Int' || item === 'BigInt' || item === 'Float' || item === 'Decimal' || item === 'DateTime' || item === 'Json' || item === 'Bytes' || item === 'Null' || item === 'Object' || item === 'Any' || item === 'Unsupported';
+    return isRegularID(item) || item === 'String' || item === 'Boolean' || item === 'Int' || item === 'BigInt' || item === 'Float' || item === 'Decimal' || item === 'DateTime' || item === 'Json' || item === 'Bytes' || item === 'Null' || item === 'Object' || item === 'Any' || item === 'Void' || item === 'Undefined' || item === 'Unsupported';
 }
 
 export type TypeDeclaration = DataModel | Enum | TypeDef;
@@ -477,7 +479,7 @@ export function isFunctionDecl(item: unknown): item is FunctionDecl {
 }
 
 export interface FunctionParam extends langium.AstNode {
-    readonly $container: FunctionDecl | Procedure;
+    readonly $container: FunctionDecl;
     readonly $type: 'FunctionParam';
     name: RegularID;
     optional: boolean;
@@ -648,7 +650,7 @@ export interface Procedure extends langium.AstNode {
     attributes: Array<InternalAttribute>;
     mutation: boolean;
     name: RegularID;
-    params: Array<FunctionParam | ProcedureParam>;
+    params: Array<ProcedureParam>;
     returnType: FunctionParamType;
 }
 

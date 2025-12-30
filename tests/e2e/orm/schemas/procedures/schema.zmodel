@@ -1,0 +1,35 @@
+datasource db {
+    provider = 'sqlite'
+    url = 'file:./test.db'
+}
+
+enum Role {
+    ADMIN
+    USER
+}
+
+type Overview {
+    userIds Int[]
+    total Int
+    roles Role[]
+    meta Json?
+}
+
+model User {
+    id Int @id @default(autoincrement())
+    name String
+    role Role
+}
+
+procedure getUser(id: Int): User
+procedure listUsers(): User[]
+procedure findByIds(ids: Int[]): User[]
+procedure overview(): Overview
+procedure getRole(): Role
+procedure getRoles(): Role[]
+procedure getNull(): Null
+procedure getVoid(): Void
+procedure getUndefined(): Undefined
+procedure greet(name: String?): String
+procedure echoJson(payload: Json): Json
+procedure echoBytes(payload: Bytes): Bytes

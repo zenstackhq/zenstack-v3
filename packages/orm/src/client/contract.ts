@@ -1,6 +1,8 @@
 import type Decimal from 'decimal.js';
 import {
     type FieldIsArray,
+    type GetEnum,
+    type GetEnums,
     type GetModels,
     type GetTypeDefs,
     type IsDelegateModel,
@@ -212,17 +214,44 @@ type _TypeMap = {
     Decimal: Decimal;
     Boolean: boolean;
     DateTime: Date;
+    Json: unknown;
+    Bytes: Uint8Array;
+    Null: null;
+    Object: Record<string, unknown>;
+    Any: unknown;
+    Unsupported: unknown;
+    Void: void;
+    Undefined: undefined;
 };
+
+type EnumValue<Schema extends SchemaDef, Enum extends GetEnums<Schema>> = GetEnum<Schema, Enum>[keyof GetEnum<
+    Schema,
+    Enum
+>];
 
 type MapType<Schema extends SchemaDef, T extends string> = T extends keyof _TypeMap
     ? _TypeMap[T]
     : T extends GetModels<Schema>
       ? ModelResult<Schema, T>
+      : T extends GetTypeDefs<Schema>
+        ? TypeDefResult<Schema, T>
+        : T extends GetEnums<Schema>
+          ? EnumValue<Schema, T>
       : unknown;
 
 export type Procedures<Schema extends SchemaDef> =
     Schema['procedures'] extends Record<string, ProcedureDef>
         ? {
+              /**
+               * Preferred procedures API.
+               */
+              $procs: {
+                  [Key in keyof Schema['procedures']]: ProcedureFunc<Schema, Schema['procedures'][Key]>;
+              };
+
+              /**
+               * Backward-compatible alias for `$procs`.
+               */
               $procedures: {
                   [Key in keyof Schema['procedures']]: ProcedureFunc<Schema, Schema['procedures'][Key]>;
               };
@@ -231,13 +260,31 @@ export type Procedures<Schema extends SchemaDef> =
 
 export type ProcedureFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
     ...args: MapProcedureParams<Schema, Proc['params']>
-) => Promise<MapType<Schema, Proc['returnType']>>;
+) => Promise<MapProcedureReturn<Schema, Proc>>;
 
-type MapProcedureParams<Schema extends SchemaDef, Params> = {
-    [P in keyof Params]: Params[P] extends { type: infer U }
-        ? OrUndefinedIf<MapType<Schema, U & string>, Params[P] extends { optional: true } ? true : false>
-        : never;
-};
+type MapProcedureReturn<Schema extends SchemaDef, Proc extends ProcedureDef> = Proc extends { returnType: infer R }
+    ? Proc extends { returnArray: true }
+        ? Array<MapType<Schema, R & string>>
+        : MapType<Schema, R & string>
+    : never;
+
+type MapProcedureParam<Schema extends SchemaDef, P> = P extends { type: infer U }
+    ? OrUndefinedIf<
+          P extends { array: true } ? Array<MapType<Schema, U & string>> : MapType<Schema, U & string>,
+          P extends { optional: true } ? true : false
+      >
+    : never;
+
+/**
+ * Maps procedure params to a union of tuple prefixes, allowing trailing optional params to be omitted.
+ */
+type MapProcedureParams<Schema extends SchemaDef, Params> = Params extends readonly []
+    ? []
+    : Params extends readonly [...infer Rest, infer Last]
+      ? Last extends { optional: true }
+          ? MapProcedureParams<Schema, Rest> | [...MapProcedureParams<Schema, Rest>, MapProcedureParam<Schema, Last>]
+          : [...MapProcedureParams<Schema, Rest>, MapProcedureParam<Schema, Last>]
+      : [];
 
 /**
  * Creates a new ZenStack client instance.

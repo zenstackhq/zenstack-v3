@@ -24,6 +24,7 @@ import type {
     DefaultModelResult,
     DeleteArgs,
     DeleteManyArgs,
+    ExistsArgs,
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
@@ -828,6 +829,10 @@ export type AllModelOperations<
     groupBy<T extends GroupByArgs<Schema, Model>>(
         args: Subset<T, GroupByArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, Simplify<GroupByResult<Schema, Model, T>>>;
+
+    exists<T extends ExistsArgs<Schema, Model>>(
+        args?: Subset<T, ExistsArgs<Schema, Model>>,
+    ): ZenStackPromise<Schema, boolean>;
 };
 
 export type OperationsIneligibleForDelegateModels = 'create' | 'createMany' | 'createManyAndReturn' | 'upsert';

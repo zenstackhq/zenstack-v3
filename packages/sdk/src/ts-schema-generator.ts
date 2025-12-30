@@ -1539,6 +1539,7 @@ export class TsSchemaGenerator {
             'FindManyArgs',
             'FindUniqueArgs',
             'FindFirstArgs',
+            'ExistsArgs',
             'CreateArgs',
             'CreateManyArgs',
             'CreateManyAndReturnArgs',

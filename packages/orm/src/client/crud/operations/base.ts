@@ -68,9 +68,10 @@ export type CoreCrudOperation =
     | 'deleteMany'
     | 'count'
     | 'aggregate'
-    | 'groupBy';
+    | 'groupBy'
+    | 'exists';
 
-export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
+export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow'
 
 // context for nested relation operations
 export type FromRelationContext = {
@@ -143,6 +144,33 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             where: filter,
             select: this.makeIdSelect(model),
         });
+    }
+
+    protected async existsNonUnique(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        filter: any,
+    ): Promise<unknown | undefined> {
+        const query = kysely.selectNoFrom((eb) => (
+            eb.exists(
+                this.dialect
+                .buildSelectModel(model, model)
+                // @ts-expect-error
+                .select(sql.lit(1))
+                .where(() => this.dialect.buildFilter(model, model, filter))
+            ).as('exists')
+        )).modifyEnd(this.makeContextComment({ model, operation: 'read' }));
+
+        let result: {exists: number}[] = [];
+        const compiled = kysely.getExecutor().compileQuery(query.toOperationNode(), createQueryId());
+        try {
+            const r = await kysely.getExecutor().executeQuery(compiled);
+            result = r.rows as {exists: number}[];
+        } catch (err) {
+            throw createDBQueryError('Failed to execute query', err, compiled.sql, compiled.parameters);
+        }
+
+        return result[0]?.exists === 1;
     }
 
     protected async read(

@@ -1,5 +1,6 @@
-import { createId } from '@paralleldrive/cuid2';
+import { createId as cuid2 } from '@paralleldrive/cuid2';
 import { clone, enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers';
+import { default as cuid1 } from 'cuid';
 import {
     createQueryId,
     DeleteResult,
@@ -859,23 +860,27 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
     private evalGenerator(defaultValue: Expression) {
         if (ExpressionUtils.isCall(defaultValue)) {
+            const firstArgVal =
+                defaultValue.args?.[0] && ExpressionUtils.isLiteral(defaultValue.args[0])
+                    ? defaultValue.args[0].value
+                    : undefined;
             return match(defaultValue.function)
-                .with('cuid', () => createId())
-                .with('uuid', () =>
-                    defaultValue.args?.[0] &&
-                    ExpressionUtils.isLiteral(defaultValue.args?.[0]) &&
-                    defaultValue.args[0].value === 7
-                        ? uuid.v7()
-                        : uuid.v4(),
-                )
-                .with('nanoid', () =>
-                    defaultValue.args?.[0] &&
-                    ExpressionUtils.isLiteral(defaultValue.args[0]) &&
-                    typeof defaultValue.args[0].value === 'number'
-                        ? nanoid(defaultValue.args[0].value)
-                        : nanoid(),
-                )
-                .with('ulid', () => ulid())
+                .with('cuid', () => {
+                    const version = firstArgVal;
+                    const generated = version === 2 ? cuid2() : cuid1();
+                    return this.formatGeneratedValue(generated, defaultValue.args?.[1]);
+                })
+                .with('uuid', () => {
+                    const version = firstArgVal;
+                    const generated = version === 7 ? uuid.v7() : uuid.v4();
+                    return this.formatGeneratedValue(generated, defaultValue.args?.[1]);
+                })
+                .with('nanoid', () => {
+                    const length = firstArgVal;
+                    const generated = typeof length === 'number' ? nanoid(length) : nanoid();
+                    return this.formatGeneratedValue(generated, defaultValue.args?.[1]);
+                })
+                .with('ulid', () => this.formatGeneratedValue(ulid(), defaultValue.args?.[0]))
                 .otherwise(() => undefined);
         } else if (
             ExpressionUtils.isMember(defaultValue) &&
@@ -891,6 +896,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         } else {
             return undefined;
         }
+    }
+
+    private formatGeneratedValue(generated: string, formatExpr?: Expression) {
+        if (!formatExpr || !ExpressionUtils.isLiteral(formatExpr) || typeof formatExpr.value !== 'string') {
+            return generated;
+        }
+
+        // Replace non-escaped %s with the generated value, then unescape \%s to %s
+        return formatExpr.value.replace(/(?<!\\)%s/g, generated).replace(/\\%s/g, '%s');
     }
 
     protected async update(

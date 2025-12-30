@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/orm",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "description": "ZenStack ORM",
     "type": "module",
     "scripts": {
@@ -83,8 +83,9 @@
     },
     "dependencies": {
         "@paralleldrive/cuid2": "^2.2.2",
-        "@zenstackhq/schema": "workspace:*",
         "@zenstackhq/common-helpers": "workspace:*",
+        "@zenstackhq/schema": "workspace:*",
+        "cuid": "^3.0.0",
         "decimal.js": "catalog:",
         "json-stable-stringify": "^1.3.0",
         "kysely": "catalog:",
@@ -98,8 +99,8 @@
     "peerDependencies": {
         "better-sqlite3": "catalog:",
         "pg": "catalog:",
-        "zod": "catalog:",
-        "sql.js": "catalog:"
+        "sql.js": "catalog:",
+        "zod": "catalog:"
     },
     "peerDependenciesMeta": {
         "better-sqlite3": {
@@ -115,12 +116,12 @@
     "devDependencies": {
         "@types/better-sqlite3": "catalog:",
         "@types/pg": "^8.0.0",
+        "@types/sql.js": "^1.4.9",
         "@types/toposort": "^2.0.7",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "tsx": "^4.19.2",
-        "zod": "^4.1.0",
-        "@types/sql.js": "^1.4.9"
+        "zod": "^4.1.0"
     }
 }

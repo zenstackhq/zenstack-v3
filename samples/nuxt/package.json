@@ -1,0 +1,30 @@
+{
+    "name": "nuxt",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "generate": "zen generate --lite",
+        "db:init": "pnpm generate && zen db push && npx tsx zenstack/seed.ts",
+        "dev": "nuxt dev --port 3302",
+        "build": "pnpm generate && nuxt build",
+        "preview": "nuxt preview",
+        "postinstall": "nuxt prepare"
+    },
+    "dependencies": {
+        "@tailwindcss/vite": "^4.1.18",
+        "@tanstack/vue-query": "catalog:",
+        "@zenstackhq/orm": "workspace:*",
+        "@zenstackhq/server": "workspace:*",
+        "@zenstackhq/tanstack-query": "workspace:*",
+        "better-sqlite3": "catalog:",
+        "lorem-ipsum": "^2.0.8",
+        "nuxt": "catalog:",
+        "tailwindcss": "^4.1.18",
+        "vue": "catalog:",
+        "vue-router": "^4.6.4"
+    },
+    "devDependencies": {
+        "@types/better-sqlite3": "catalog:",
+        "@zenstackhq/cli": "workspace:*"
+    }
+}

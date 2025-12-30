@@ -8,5 +8,9 @@ export default defineConfig({
         include: ['**/*.test.ts'],
         testTimeout: 100000,
         hookTimeout: 100000,
+        coverage: {
+            provider: 'v8',
+            exclude: ['tests/**', 'samples/**', 'packages/**/tests/**'],
+        },
     },
 });

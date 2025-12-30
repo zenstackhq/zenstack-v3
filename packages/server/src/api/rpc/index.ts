@@ -221,7 +221,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
     }
 
     private async processRequestPayload(args: any) {
-        const { meta, ...rest } = args;
+        const { meta, ...rest } = args ?? {};
         if (meta?.serialization) {
             try {
                 // superjson deserialization
@@ -229,6 +229,9 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             } catch (err) {
                 return { result: undefined, error: `failed to deserialize request payload: ${(err as Error).message}` };
             }
+        } else {
+            // drop meta when no serialization info is present
+            args = rest;
         }
         return { result: args, error: undefined };
     }

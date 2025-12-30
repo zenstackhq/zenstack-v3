@@ -1,12 +1,13 @@
 {
     "name": "@zenstackhq/common-helpers",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "description": "ZenStack Common Helpers",
     "type": "module",
     "scripts": {
         "build": "tsc --noEmit && tsup-node",
         "watch": "tsup-node --watch",
         "lint": "eslint src --ext ts",
+        "test": "vitest run",
         "pack": "pnpm pack"
     },
     "keywords": [],
@@ -29,6 +30,7 @@
     },
     "devDependencies": {
         "@zenstackhq/typescript-config": "workspace:*",
-        "@zenstackhq/eslint-config": "workspace:*"
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*"
     }
 }

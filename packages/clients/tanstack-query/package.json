@@ -1,12 +1,15 @@
 {
     "name": "@zenstackhq/tanstack-query",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "description": "TanStack Query Client for consuming ZenStack v3's CRUD service",
-    "main": "index.js",
     "type": "module",
     "scripts": {
-        "build": "tsc --noEmit && tsup-node && pnpm test:generate && pnpm test:typecheck",
-        "watch": "tsup-node --watch",
+        "build": "pnpm build:general && pnpm build:svelte && pnpm test:generate && pnpm test:typecheck",
+        "build:general": "tsc -p tsconfig.general.json",
+        "build:svelte": "svelte-package -i src/svelte -o dist/svelte -t --tsconfig ./tsconfig.svelte.json",
+        "watch:general": "tsc -p tsconfig.general.json -w",
+        "watch:svelte": "svelte-package -i src/svelte -o dist/svelte -t --watch -p",
+        "watch": "run-p watch:*",
         "lint": "eslint src --ext ts",
         "test": "vitest run",
         "pack": "pnpm pack",
@@ -22,72 +25,57 @@
     ],
     "author": "ZenStack Team",
     "license": "MIT",
+    "files": [
+        "dist"
+    ],
     "exports": {
         "./react": {
-            "import": {
-                "types": "./dist/react.d.ts",
-                "default": "./dist/react.js"
-            },
-            "require": {
-                "types": "./dist/react.d.cts",
-                "default": "./dist/react.cjs"
-            }
+            "types": "./dist/react.d.ts",
+            "default": "./dist/react.js"
         },
         "./vue": {
-            "import": {
-                "types": "./dist/vue.d.ts",
-                "default": "./dist/vue.js"
-            },
-            "require": {
-                "types": "./dist/vue.d.cts",
-                "default": "./dist/vue.cjs"
-            }
+            "types": "./dist/vue.d.ts",
+            "default": "./dist/vue.js"
         },
         "./svelte": {
-            "import": {
-                "types": "./dist/svelte.d.ts",
-                "default": "./dist/svelte.js"
-            },
-            "require": {
-                "types": "./dist/svelte.d.cts",
-                "default": "./dist/svelte.cjs"
-            }
+            "types": "./dist/svelte/index.svelte.d.ts",
+            "svelte": "./dist/svelte/index.svelte.js",
+            "default": "./dist/svelte/index.svelte.js"
         },
-        "./package.json": {
-            "import": "./package.json",
-            "require": "./package.json"
-        }
+        "./package.json": "./package.json"
     },
     "dependencies": {
+        "@zenstackhq/client-helpers": "workspace:*",
         "@zenstackhq/common-helpers": "workspace:*",
-        "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/schema": "workspace:*",
-        "decimal.js": "catalog:",
-        "superjson": "^2.2.3"
+        "decimal.js": "catalog:"
     },
     "devDependencies": {
+        "@tanstack/query-core": "catalog:",
         "@tanstack/react-query": "catalog:",
-        "@tanstack/vue-query": "5.90.6",
-        "@tanstack/svelte-query": "5.90.2",
+        "@tanstack/svelte-query": "catalog:",
+        "@tanstack/vue-query": "catalog:",
         "@testing-library/dom": "^10.4.1",
         "@testing-library/react": "^16.3.0",
         "@types/react": "catalog:",
+        "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/language": "workspace:*",
+        "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
-        "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "happy-dom": "^20.0.10",
         "nock": "^14.0.10",
         "react": "catalog:",
+        "svelte": "catalog:",
         "vue": "catalog:",
-        "svelte": "catalog:"
+        "@sveltejs/package": "^2.5.7"
     },
     "peerDependencies": {
         "@tanstack/react-query": "^5.0.0",
-        "@tanstack/vue-query": "^5.0.0",
-        "@tanstack/svelte-query": "^5.0.0"
+        "@tanstack/svelte-query": "^6.0.0",
+        "@tanstack/vue-query": "^5.0.0"
     },
     "peerDependenciesMeta": {
         "@tanstack/react-query": {

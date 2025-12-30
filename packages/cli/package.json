@@ -3,7 +3,7 @@
     "publisher": "zenstack",
     "displayName": "ZenStack CLI",
     "description": "FullStack database toolkit with built-in access control and automatic API generation.",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "type": "module",
     "author": {
         "name": "ZenStack Team"
@@ -27,6 +27,9 @@
         "lint": "eslint src --ext ts",
         "test": "vitest run",
         "pack": "pnpm pack"
+    },
+    "exports": {
+        "./package.json": "./package.json"
     },
     "dependencies": {
         "@zenstackhq/common-helpers": "workspace:*",

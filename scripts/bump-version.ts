@@ -32,13 +32,26 @@ function getWorkspacePackageJsonFiles(workspaceFile: string): string[] {
     return result;
 }
 
-function incrementVersion(version: string): string {
+function incrementVersion(version: string, type: 'patch' | 'minor' = 'patch'): string {
     const parts = version.split('.');
-    const last = parts.length - 1;
-    const lastNum = parseInt(parts[last], 10);
-    if (isNaN(lastNum)) throw new Error(`Invalid version: ${version}`);
-    parts[last] = (lastNum + 1).toString();
-    return parts.join('.');
+    if (parts.length !== 3) throw new Error(`Invalid version format: ${version}`);
+
+    const [major, minor, patch] = parts.map(p => parseInt(p, 10));
+    if (isNaN(major) || isNaN(minor) || isNaN(patch)) {
+        throw new Error(`Invalid version: ${version}`);
+    }
+
+    if (type === 'minor') {
+        return `${major}.${minor + 1}.0`;
+    } else {
+        return `${major}.${minor}.${patch + 1}`;
+    }
+}
+
+// get version type from command line argument
+const versionType = process.argv[2] as 'patch' | 'minor' | undefined;
+if (versionType && versionType !== 'patch' && versionType !== 'minor') {
+    throw new Error(`Invalid version type: ${versionType}. Expected 'patch' or 'minor'.`);
 }
 
 // find all package.json files in the workspace
@@ -50,7 +63,7 @@ const rootPackageJson = path.resolve(_dirname, '../package.json');
 const rootPkg = JSON.parse(fs.readFileSync(rootPackageJson, 'utf8')) as { version?: string };
 if (!rootPkg.version) throw new Error('No "version" key found in package.json');
 const rootVersion = rootPkg.version;
-const newVersion = incrementVersion(rootVersion);
+const newVersion = incrementVersion(rootVersion, versionType || 'patch');
 
 for (const file of packageFiles) {
     const content = fs.readFileSync(file, 'utf8');

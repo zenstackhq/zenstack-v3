@@ -87,6 +87,19 @@ export default class FunctionInvocationValidator implements AstValidator<Express
             }
         }
 
+        if (['uuid', 'ulid', 'cuid', 'nanoid'].includes(funcDecl.name)) {
+            const formatParamIdx = funcDecl.params.findIndex((param) => param.name === 'format');
+            const formatArg = getLiteral<string>(expr.args[formatParamIdx]?.value);
+            if (
+                formatArg !== undefined &&
+                !/(?<!\\)%s/g.test(formatArg) // an unescaped %s must be present
+            ) {
+                accept('error', 'argument must include "%s"', {
+                    node: expr.args[formatParamIdx]!,
+                });
+            }
+        }
+
         // run checkers for specific functions
         const checker = invocationCheckers.get(expr.function.$refText);
         if (checker) {
@@ -177,6 +190,48 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         }
 
         return true;
+    }
+
+    @func('uuid')
+    private _checkUuid(expr: InvocationExpr, accept: ValidationAcceptor) {
+        // first argument must be 4 or 7 if provided
+        const versionArg = expr.args[0]?.value;
+        if (versionArg) {
+            const version = getLiteral<number>(versionArg);
+            if (version !== undefined && version !== 4 && version !== 7) {
+                accept('error', 'first argument must be 4 or 7', {
+                    node: expr.args[0]!,
+                });
+            }
+        }
+    }
+
+    @func('cuid')
+    private _checkCuid(expr: InvocationExpr, accept: ValidationAcceptor) {
+        // first argument must be 1 or 2 if provided
+        const versionArg = expr.args[0]?.value;
+        if (versionArg) {
+            const version = getLiteral<number>(versionArg);
+            if (version !== undefined && version !== 1 && version !== 2) {
+                accept('error', 'first argument must be 1 or 2', {
+                    node: expr.args[0]!,
+                });
+            }
+        }
+    }
+
+    @func('nanoid')
+    private _checkNanoid(expr: InvocationExpr, accept: ValidationAcceptor) {
+        // first argument must be positive if provided
+        const lengthArg = expr.args[0]?.value;
+        if (lengthArg) {
+            const length = getLiteral<number>(lengthArg);
+            if (length !== undefined && length <= 0) {
+                accept('error', 'first argument must be a positive number', {
+                    node: expr.args[0]!,
+                });
+            }
+        }
     }
 
     @func('auth')

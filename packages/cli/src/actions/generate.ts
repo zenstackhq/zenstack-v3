@@ -46,7 +46,7 @@ const client = new ZenStackClient(schema, {
 });
 \`\`\`
 
-Check documentation: https://zenstack.dev/docs/3.x`);
+Check documentation: https://zenstack.dev/docs/`);
     }
 }
 

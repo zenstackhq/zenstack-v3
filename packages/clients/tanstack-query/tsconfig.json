@@ -2,6 +2,7 @@
     "extends": "@zenstackhq/typescript-config/base.json",
     "include": ["src/**/*.ts"],
     "compilerOptions": {
-        "lib": ["ESNext"]
+        "lib": ["ESNext"],
+        "noEmit": true
     }
 }

@@ -1,2 +1,9 @@
 export { RestApiHandler, type RestApiHandlerOptions } from './rest';
-export { RPCApiHandler, type RPCApiHandlerOptions } from './rpc';
+export {
+	RPCBadInputErrorResponse,
+	RPCGenericErrorResponse,
+	RPCApiHandler,
+	type RPCApiHandlerOptions,
+	type RPCCustomOperation,
+	type RPCCustomOperationContext,
+} from './rpc';

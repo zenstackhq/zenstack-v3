@@ -4,7 +4,12 @@ import { createPolicyTestClient, createTestClient } from '@zenstackhq/testtools'
 import Decimal from 'decimal.js';
 import SuperJSON from 'superjson';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { RPCApiHandler } from '../../src/api';
+import {
+    RPCBadInputErrorResponse,
+    RPCGenericErrorResponse,
+    RPCApiHandler,
+    type RPCApiHandlerOptions,
+} from '../../src/api';
 import { schema } from '../utils';
 
 describe('RPC API Handler Tests', () => {
@@ -353,6 +358,107 @@ describe('RPC API Handler Tests', () => {
         expect(r.error.message).toContain('invalid "q" query parameter');
     });
 
+    it('custom operation works', async () => {
+        const handleRequest = makeHandler({
+            customOperations: {
+                echo: async ({ requestBody }) => {
+                    if (!requestBody) {
+                        throw new RPCBadInputErrorResponse('missing body');
+                    }
+                    return { status: 200, body: { data: requestBody } };
+                },
+            },
+        });
+
+        const r = await handleRequest({
+            method: 'post',
+            path: '/post/echo',
+            client: rawClient,
+            requestBody: { message: 'hello' },
+        });
+
+        expect(r.status).toBe(200);
+        expect(r.data).toEqual({ message: 'hello' });
+    });
+
+    it('custom operation auto unmarshals query', async () => {
+        const serialized = SuperJSON.serialize({ where: { id: '1', created: new Date() } });
+
+        const handleRequest = makeHandler({
+            customOperations: {
+                passthrough: async ({ query }) => ({ status: 200, body: { data: query?.q } }),
+            },
+        });
+
+        const r = await handleRequest({
+            method: 'get',
+            path: '/post/passthrough',
+            client: rawClient,
+            query: {
+                q: JSON.stringify(serialized.json),
+                meta: JSON.stringify({ serialization: serialized.meta }),
+            },
+        });
+
+        expect(r.status).toBe(200);
+        expect(r.data.where.id).toBe('1');
+        expect(r.data.where.created).toBeInstanceOf(Date);
+    });
+
+    it('custom operation maps errors', async () => {
+        const handleRequest = makeHandler({
+            customOperations: {
+                bad: async () => {
+                    throw new RPCBadInputErrorResponse('nope');
+                },
+                boom: async () => {
+                    throw new RPCGenericErrorResponse('boom');
+                },
+            },
+        });
+
+        const bad = await handleRequest({ method: 'get', path: '/post/bad', client: rawClient });
+        expect(bad.status).toBe(400);
+        expect(bad.error.message).toBe('nope');
+
+        const boom = await handleRequest({ method: 'get', path: '/post/boom', client: rawClient });
+        expect(boom.status).toBe(500);
+        expect(boom.error.message).toBe('boom');
+    });
+
+    it('custom operation cannot override built-in', () => {
+        expect(() =>
+            new RPCApiHandler({
+                schema: client.$schema,
+                customOperations: {
+                    findMany: async () => ({ status: 200, body: { data: null } }),
+                },
+            }),
+        ).toThrow(/cannot override built-in operation/);
+    });
+
+    it('custom operation name must be identifier', () => {
+        expect(() =>
+            new RPCApiHandler({
+                schema: client.$schema,
+                customOperations: {
+                    'not-valid': async () => ({ status: 200, body: { data: null } }),
+                },
+            }),
+        ).toThrow(/valid identifier/);
+    });
+
+    it('custom operation must be function', () => {
+        expect(() =>
+            new RPCApiHandler({
+                schema: client.$schema,
+                customOperations: {
+                    nope: 'oops' as any,
+                },
+            }),
+        ).toThrow(/must be a function/);
+    });
+
     it('field types', async () => {
         const schema = `
         model Foo {
@@ -508,8 +614,8 @@ describe('RPC API Handler Tests', () => {
         expect(r.data).toBeNull();
     });
 
-    function makeHandler() {
-        const handler = new RPCApiHandler({ schema: client.$schema });
+    function makeHandler(options?: Partial<RPCApiHandlerOptions<SchemaDef>>) {
+        const handler = new RPCApiHandler({ schema: client.$schema, ...(options ?? {}) });
         return async (args: any) => {
             const r = await handler.handleRequest({
                 ...args,

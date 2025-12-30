@@ -76,3 +76,15 @@ type WithOptimisticFlag<T> = T extends object
     : T;
 
 export type WithOptimistic<T> = T extends Array<infer U> ? Array<WithOptimisticFlag<U>> : WithOptimisticFlag<T>;
+
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export type CustomOperationKind = 'query' | 'suspenseQuery' | 'infiniteQuery' | 'suspenseInfiniteQuery' | 'mutation';
+
+export type CustomOperationDefinition<TArgs = unknown, TResult = unknown> = {
+    kind: CustomOperationKind;
+    method?: HttpMethod;
+    /** Phantom fields for typing */
+    __args?: TArgs;
+    __result?: TResult;
+};

@@ -54,6 +54,7 @@ import { getContext, setContext } from 'svelte';
 import { getAllQueries, invalidateQueriesMatchingPredicate } from '../common/client';
 import { getQueryKey } from '../common/query-key';
 import type {
+    CustomOperationDefinition,
     ExtraMutationOptions,
     ExtraQueryOptions,
     QueryContext,
@@ -120,8 +121,30 @@ export type ModelMutationModelResult<
     ): Promise<SimplifiedResult<Schema, Model, T, Options, false, Array>>;
 };
 
-export type ClientHooks<Schema extends SchemaDef, Options extends QueryOptions<Schema> = QueryOptions<Schema>> = {
-    [Model in GetModels<Schema> as `${Uncapitalize<Model>}`]: ModelQueryHooks<Schema, Model, Options>;
+type CustomOperationHooks<CustomOperations extends Record<string, CustomOperationDefinition<any, any>> = {}> = {
+    [K in keyof CustomOperations as `use${Capitalize<string & K>}`]: CustomOperations[K] extends CustomOperationDefinition<
+        infer TArgs,
+        infer TResult
+    >
+        ? CustomOperations[K]['kind'] extends 'mutation'
+            ? (options?: ModelMutationOptions<TResult, TArgs>) => ModelMutationResult<TResult, TArgs>
+            : CustomOperations[K]['kind'] extends 'infiniteQuery' | 'suspenseInfiniteQuery'
+              ? (args?: TArgs, options?: ModelInfiniteQueryOptions<TResult>) => ModelInfiniteQueryResult<TResult>
+              : (args?: TArgs, options?: ModelQueryOptions<TResult>) => ModelQueryResult<TResult>
+        : never;
+};
+
+export type ClientHooks<
+    Schema extends SchemaDef,
+    Options extends QueryOptions<Schema> = QueryOptions<Schema>,
+    CustomOperations extends Record<string, CustomOperationDefinition<any, any>> = {},
+> = {
+    [Model in GetModels<Schema> as `${Uncapitalize<Model>}`]: ModelQueryHooks<
+        Schema,
+        Model,
+        Options,
+        CustomOperations
+    >;
 };
 
 // Note that we can potentially use TypeScript's mapped type to directly map from ORM contract, but that seems
@@ -130,6 +153,7 @@ export type ModelQueryHooks<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Options extends QueryOptions<Schema> = QueryOptions<Schema>,
+    CustomOperations extends Record<string, CustomOperationDefinition<any, any>> = {},
 > = TrimDelegateModelOperations<
     Schema,
     Model,
@@ -202,26 +226,37 @@ export type ModelQueryHooks<
             args: Accessor<Subset<T, GroupByArgs<Schema, Model>>>,
             options?: Accessor<ModelQueryOptions<GroupByResult<Schema, Model, T>>>,
         ): ModelQueryResult<GroupByResult<Schema, Model, T>>;
-    }
+    } & CustomOperationHooks<CustomOperations>
 >;
 
 /**
  * Gets data query hooks for all models in the schema.
  */
-export function useClientQueries<Schema extends SchemaDef, Options extends QueryOptions<Schema> = QueryOptions<Schema>>(
+export function useClientQueries<
+    Schema extends SchemaDef,
+    Options extends QueryOptions<Schema> = QueryOptions<Schema>,
+    CustomOperations extends Record<string, CustomOperationDefinition<any, any>> = {},
+>(
     schema: Schema,
     options?: Accessor<QueryContext>,
-): ClientHooks<Schema, Options> {
+    customOperations?: CustomOperations,
+): ClientHooks<Schema, Options, CustomOperations> {
     return Object.keys(schema.models).reduce(
         (acc, model) => {
-            (acc as any)[lowerCaseFirst(model)] = useModelQueries<Schema, GetModels<Schema>, Options>(
+            (acc as any)[lowerCaseFirst(model)] = useModelQueries<
+                Schema,
+                GetModels<Schema>,
+                Options,
+                CustomOperations
+            >(
                 schema,
                 model as GetModels<Schema>,
                 options,
+                customOperations,
             );
             return acc;
         },
-        {} as ClientHooks<Schema, Options>,
+        {} as ClientHooks<Schema, Options, CustomOperations>,
     );
 }
 
@@ -232,7 +267,13 @@ export function useModelQueries<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Options extends QueryOptions<Schema>,
->(schema: Schema, model: Model, rootOptions?: Accessor<QueryContext>): ModelQueryHooks<Schema, Model, Options> {
+    CustomOperations extends Record<string, CustomOperationDefinition<any, any>> = {},
+>(
+    schema: Schema,
+    model: Model,
+    rootOptions?: Accessor<QueryContext>,
+    customOperations?: CustomOperations,
+): ModelQueryHooks<Schema, Model, Options, CustomOperations> {
     const modelDef = Object.values(schema.models).find((m) => m.name.toLowerCase() === model.toLowerCase());
     if (!modelDef) {
         throw new Error(`Model "${model}" not found in schema`);
@@ -248,7 +289,7 @@ export function useModelQueries<
         };
     };
 
-    return {
+    const builtIns = {
         useFindUnique: (args: any, options?: any) => {
             return useInternalQuery(schema, modelName, 'findUnique', args, merge(rootOptions, options));
         },
@@ -313,6 +354,67 @@ export function useModelQueries<
             return useInternalQuery(schema, modelName, 'groupBy', args, options);
         },
     } as unknown as ModelQueryHooks<Schema, Model, Options>;
+
+    const custom = createCustomOperationHooks(schema, modelName, rootOptions, customOperations, merge);
+
+    return { ...builtIns, ...custom } as ModelQueryHooks<Schema, Model, Options, CustomOperations>;
+}
+
+function createCustomOperationHooks<
+    Schema extends SchemaDef,
+    CustomOperations extends Record<string, CustomOperationDefinition<any, any>> = {},
+>(
+    schema: Schema,
+    modelName: string,
+    rootOptions: Accessor<QueryContext> | undefined,
+    customOperations: CustomOperations | undefined,
+    mergeOptions: (rootOpt: unknown, opt: unknown) => Accessor<any>,
+) {
+    if (!customOperations) {
+        return {} as CustomOperationHooks<CustomOperations>;
+    }
+
+    const hooks: Record<string, unknown> = {};
+    for (const [name, def] of Object.entries(customOperations)) {
+        const hookName = `use${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+        const merged = (options?: unknown) => mergeOptions(rootOptions, options);
+
+        switch (def.kind) {
+            case 'query':
+            case 'suspenseQuery':
+                hooks[hookName] = (args?: unknown, options?: unknown) =>
+                    useInternalQuery(schema, modelName, name, args, merged(options as Accessor<unknown> | undefined));
+                break;
+            case 'infiniteQuery':
+            case 'suspenseInfiniteQuery':
+                hooks[hookName] = (args?: unknown, options?: unknown) => {
+                    const mergedOptions = merged(options as Accessor<unknown> | undefined);
+                    const withDefault = () => {
+                        const value = mergedOptions?.() as any;
+                        if (value && typeof value.getNextPageParam !== 'function') {
+                            value.getNextPageParam = () => undefined;
+                        }
+                        return value;
+                    };
+                    return useInternalInfiniteQuery(schema, modelName, name, args, withDefault as any);
+                };
+                break;
+            case 'mutation':
+                hooks[hookName] = (options?: unknown) =>
+                    useInternalMutation(
+                        schema,
+                        modelName,
+                        (def.method ?? 'POST') as any,
+                        name,
+                        merged(options as Accessor<unknown> | undefined) as any,
+                    );
+                break;
+            default:
+                break;
+        }
+    }
+
+    return hooks as CustomOperationHooks<CustomOperations>;
 }
 
 export function useInternalQuery<TQueryFnData, TData>(

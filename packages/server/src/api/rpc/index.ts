@@ -8,6 +8,40 @@ import { log, registerCustomSerializers } from '../utils';
 
 registerCustomSerializers();
 
+const BUILT_IN_OPERATIONS = new Set([
+    'create',
+    'createMany',
+    'createManyAndReturn',
+    'upsert',
+    'findFirst',
+    'findUnique',
+    'findMany',
+    'aggregate',
+    'groupBy',
+    'count',
+    'update',
+    'updateMany',
+    'updateManyAndReturn',
+    'delete',
+    'deleteMany',
+]);
+
+const JS_IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+export class RPCBadInputErrorResponse extends Error {}
+
+export class RPCGenericErrorResponse extends Error {}
+
+export type RPCCustomOperationContext<Schema extends SchemaDef = SchemaDef> = RequestContext<Schema> & {
+    model: string;
+    operation: string;
+    args?: unknown;
+};
+
+export type RPCCustomOperation<Schema extends SchemaDef = SchemaDef> = (
+    args: RPCCustomOperationContext<Schema>,
+) => Promise<Response> | Response;
+
 /**
  * Options for {@link RPCApiHandler}
  */
@@ -21,13 +55,21 @@ export type RPCApiHandlerOptions<Schema extends SchemaDef = SchemaDef> = {
      * Logging configuration
      */
     log?: LogConfig;
+
+    /**
+     * Custom operations callable via RPC path. Keys must be valid JS identifiers and must not
+     * overlap with built-in operations.
+     */
+    customOperations?: Record<string, RPCCustomOperation<Schema>>;
 };
 
 /**
  * RPC style API request handler that mirrors the ZenStackClient API
  */
 export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiHandler<Schema> {
-    constructor(private readonly options: RPCApiHandlerOptions<Schema>) {}
+    constructor(private readonly options: RPCApiHandlerOptions<Schema>) {
+        this.validateCustomOperations();
+    }
 
     get schema(): Schema {
         return this.options.schema;
@@ -50,6 +92,11 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
         method = method.toUpperCase();
         let args: unknown;
         let resCode = 200;
+
+        const { query: normalizedQuery, qArgs, error: queryError } = this.normalizeQuery(query);
+        if (queryError) {
+            return this.makeBadInputErrorResponse(queryError);
+        }
 
         switch (op) {
             case 'create':
@@ -76,13 +123,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                 if (method !== 'GET') {
                     return this.makeBadInputErrorResponse('invalid request method, only GET is supported');
                 }
-                try {
-                    args = query?.['q']
-                        ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
-                        : {};
-                } catch {
-                    return this.makeBadInputErrorResponse('invalid "q" query parameter');
-                }
+                args = qArgs ?? {};
                 break;
 
             case 'update':
@@ -103,19 +144,33 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                 if (method !== 'DELETE') {
                     return this.makeBadInputErrorResponse('invalid request method, only DELETE is supported');
                 }
-                try {
-                    args = query?.['q']
-                        ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
-                        : {};
-                } catch (err) {
-                    return this.makeBadInputErrorResponse(
-                        err instanceof Error ? err.message : 'invalid "q" query parameter',
-                    );
-                }
+                args = qArgs ?? {};
                 break;
 
             default:
-                return this.makeBadInputErrorResponse('invalid operation: ' + op);
+                break;
+        }
+
+        if (!BUILT_IN_OPERATIONS.has(op)) {
+            const custom = this.options.customOperations?.[op];
+            if (custom) {
+                try {
+                    return await custom({
+                        client,
+                        method,
+                        path,
+                        query: normalizedQuery,
+                        requestBody,
+                        model,
+                        operation: op,
+                        args: qArgs,
+                    });
+                } catch (err) {
+                    return this.mapCustomOperationError(err);
+                }
+            }
+
+            return this.makeBadInputErrorResponse('invalid operation: ' + op);
         }
 
         const { result: processedArgs, error } = await this.processRequestPayload(args);
@@ -255,5 +310,68 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
         }
 
         return parsedValue;
+    }
+
+    private normalizeQuery(originalQuery: RequestContext<Schema>['query']) {
+        if (!originalQuery) {
+            return { query: originalQuery, qArgs: undefined as unknown };
+        }
+
+        const qValue = (originalQuery as any).q;
+        if (typeof qValue === 'undefined') {
+            return { query: originalQuery, qArgs: undefined as unknown };
+        }
+
+        if (typeof qValue !== 'string') {
+            return { query: originalQuery, qArgs: undefined as unknown, error: 'invalid "q" query parameter' };
+        }
+
+        try {
+            const parsed = this.unmarshalQ(qValue, (originalQuery as any).meta as string | undefined);
+            return { query: { ...(originalQuery as any), q: parsed }, qArgs: parsed };
+        } catch (err) {
+            return {
+                query: originalQuery,
+                qArgs: undefined as unknown,
+                error: err instanceof Error ? err.message : 'invalid "q" query parameter',
+            };
+        }
+    }
+
+    private mapCustomOperationError(err: unknown): Response {
+        if (err instanceof RPCBadInputErrorResponse) {
+            return this.makeBadInputErrorResponse(err.message);
+        }
+
+        if (err instanceof ORMError) {
+            return this.makeORMErrorResponse(err);
+        }
+
+        if (err instanceof RPCGenericErrorResponse) {
+            return this.makeGenericErrorResponse(err);
+        }
+
+        return this.makeGenericErrorResponse(err);
+    }
+
+    private validateCustomOperations() {
+        const customOps = this.options.customOperations;
+        if (!customOps) {
+            return;
+        }
+
+        Object.entries(customOps).forEach(([name, fn]) => {
+            if (!JS_IDENTIFIER_RE.test(name)) {
+                throw new Error(`custom operation name must be a valid identifier: ${name}`);
+            }
+
+            if (BUILT_IN_OPERATIONS.has(name)) {
+                throw new Error(`custom operation cannot override built-in operation: ${name}`);
+            }
+
+            if (typeof fn !== 'function') {
+                throw new Error(`custom operation must be a function: ${name}`);
+            }
+        });
     }
 }

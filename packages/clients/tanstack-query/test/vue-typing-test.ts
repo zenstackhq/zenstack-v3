@@ -118,7 +118,6 @@ check(proceduresClient.$procs.greet.useQuery('bob').data.value?.toUpperCase());
 check(proceduresClient.$procs.greet.useQuery('bob').queryKey.value);
 check(proceduresClient.$procs.greetMany.useInfiniteQuery('bob').data.value?.pages[0]?.[0]?.toUpperCase());
 check(proceduresClient.$procs.greetMany.useInfiniteQuery('bob').queryKey.value);
-check(proceduresClient.$procedures.greet.useQuery('bob').data.value?.toUpperCase());
 // @ts-expect-error greet is not a mutation procedure
 proceduresClient.$procs.greet.useMutation();
 
@@ -130,5 +129,3 @@ proceduresClient.$procs.sum
     .useMutation()
     .mutateAsync([1, 2])
     .then((d) => check(d.toFixed(2)));
-
-proceduresClient.$procedures.sum.useMutation().mutate([1, 2]);

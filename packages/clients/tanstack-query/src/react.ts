@@ -74,12 +74,14 @@ type ProcedureReturn<Schema extends SchemaDef, Name extends keyof ExtractProcedu
     ProcedureFunc<Schema, ExtractProcedures<Schema>[Name]>
 >>;
 
-type ProcedurePayload<Schema extends SchemaDef, Name extends keyof ExtractProcedures<Schema>> =
-    ProcedureArgsTuple<Schema, Name> extends []
+type NormalizeProcedurePayload<TArgs> = TArgs extends []
         ? undefined
-        : ProcedureArgsTuple<Schema, Name> extends [infer A]
-          ? A
-          : ProcedureArgsTuple<Schema, Name>;
+        : TArgs extends [infer A]
+            ? A
+            : TArgs;
+
+type ProcedurePayload<Schema extends SchemaDef, Name extends keyof ExtractProcedures<Schema>> =
+        NormalizeProcedurePayload<ProcedureArgsTuple<Schema, Name>>;
 
 /**
  * React context for query settings.
@@ -427,7 +429,7 @@ export function useInternalProcedureSuspenseQuery<TQueryFnData, TData>(
 
 export function useInternalProcedureInfiniteQuery<TQueryFnData, TData>(
     schema: SchemaDef,
-    endpointModel: '$procs',
+        endpointModel: '$procs',
     procedure: string,
     args: unknown,
     options:
@@ -443,7 +445,7 @@ export function useInternalProcedureInfiniteQuery<TQueryFnData, TData>(
 
 export function useInternalProcedureSuspenseInfiniteQuery<TQueryFnData, TData>(
     schema: SchemaDef,
-    endpointModel: '$procs',
+        endpointModel: '$procs',
     procedure: string,
     args: unknown,
     options: Omit<
@@ -462,8 +464,15 @@ export function useInternalProcedureMutation<TArgs, R = any>(
 ) {
     const { endpoint, fetch } = useFetchOptions(options);
     const mutationFn = (data: any) => {
-        const reqUrl = makeUrl(endpoint, endpointModel, procedure, data);
-        return fetcher<R>(reqUrl, { method: 'POST' }, fetch) as Promise<R>;
+        const reqUrl = makeUrl(endpoint, endpointModel, procedure);
+        const fetchInit: RequestInit = {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+            },
+            body: marshal(data),
+        };
+        return fetcher<R>(reqUrl, fetchInit, fetch) as Promise<R>;
     };
 
     return useMutation({ ...options, mutationFn });

@@ -1,5 +1,6 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { isPlugin, LiteralExpr, Plugin, type Model } from '@zenstackhq/language/ast';
+import { ZModelLanguageMetaData } from '@zenstackhq/language';
+import { isPlugin, isDataModel, type DataModel, LiteralExpr, Plugin, type Model } from '@zenstackhq/language/ast';
 import { getLiteral, getLiteralArray } from '@zenstackhq/language/utils';
 import { type CliPlugin } from '@zenstackhq/sdk';
 import colors from 'colors';
@@ -16,6 +17,7 @@ type Options = {
     schema?: string;
     output?: string;
     silent: boolean;
+    watch: boolean;
     lite: boolean;
     liteOnly: boolean;
 };
@@ -24,6 +26,93 @@ type Options = {
  * CLI action for generating code from schema
  */
 export async function run(options: Options) {
+    const model = await pureGenerate(options, false);
+
+    if (options.watch) {
+        const logsEnabled = !options.silent;
+
+        if (logsEnabled) {
+            console.log(colors.green(`\nEnable watch mode!`));
+        }
+
+        const schemaExtensions = ZModelLanguageMetaData.fileExtensions;
+
+        // Get real models file path (cuz its merged into single document -> we need use cst nodes)
+        const getModelAllPaths = (model: Model) => new Set(
+            (
+                model.declarations.filter(
+                    (v) =>
+                        isDataModel(v) &&
+                        v.$cstNode?.parent?.element.$type === 'Model' &&
+                        !!v.$cstNode.parent.element.$document?.uri?.fsPath,
+                ) as DataModel[]
+            ).map((v) => v.$cstNode!.parent!.element.$document!.uri!.fsPath),
+        );
+
+        const { watch } = await import('chokidar');
+
+        const watchedPaths = getModelAllPaths(model);
+        let reGenerateSchemaTimeout: ReturnType<typeof setTimeout> | undefined;
+
+        if (logsEnabled) {
+            const logPaths = [...watchedPaths].map((at) => `- ${at}`).join('\n');
+            console.log(`Watched file paths:\n${logPaths}`);
+        }
+
+        const watcher = watch([...watchedPaths], {
+            alwaysStat: false,
+            ignoreInitial: true,
+            ignorePermissionErrors: true,
+            ignored: (at) => !schemaExtensions.some((ext) => at.endsWith(ext)),
+        });
+
+        const reGenerateSchema = () => {
+            clearTimeout(reGenerateSchemaTimeout);
+
+            // prevent save multiple files and run multiple times
+            reGenerateSchemaTimeout = setTimeout(async () => {
+                if (logsEnabled) {
+                    console.log('Got changes, run generation!');
+                }
+
+                try {
+                    const newModel = await pureGenerate(options, true);
+                    const allModelsPaths = getModelAllPaths(newModel);
+                    const newModelPaths = [...allModelsPaths].filter((at) => !watchedPaths.has(at));
+
+                    if (newModelPaths.length) {
+                        if (logsEnabled) {
+                            const logPaths = [...newModelPaths].map((at) => `- ${at}`).join('\n');
+                            console.log(`Add file(s) to watch:\n${logPaths}`);
+                        }
+
+                        newModelPaths.forEach((at) => watchedPaths.add(at));
+                        watcher.add(newModelPaths);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }, 500);
+        };
+
+        watcher.on('unlink', (pathAt) => {
+            if (logsEnabled) {
+                console.log(`Remove file from watch: ${pathAt}`);
+            }
+
+            watchedPaths.delete(pathAt);
+            watcher.unwatch(pathAt);
+
+            reGenerateSchema();
+        });
+
+        watcher.on('change', () => {
+            reGenerateSchema();
+        });
+    }
+}
+
+async function pureGenerate(options: Options, fromWatch: boolean) {
     const start = Date.now();
 
     const schemaFile = getSchemaFile(options.schema);
@@ -35,7 +124,9 @@ export async function run(options: Options) {
 
     if (!options.silent) {
         console.log(colors.green(`Generation completed successfully in ${Date.now() - start}ms.\n`));
-        console.log(`You can now create a ZenStack client with it.
+
+        if (!fromWatch) {
+            console.log(`You can now create a ZenStack client with it.
 
 \`\`\`ts
 import { ZenStackClient } from '@zenstackhq/orm';
@@ -47,7 +138,10 @@ const client = new ZenStackClient(schema, {
 \`\`\`
 
 Check documentation: https://zenstack.dev/docs/`);
+        }
     }
+
+    return model;
 }
 
 function getOutputPath(options: Options, schemaFile: string) {

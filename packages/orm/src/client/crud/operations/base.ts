@@ -150,7 +150,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         kysely: ToKysely<Schema>,
         model: GetModels<Schema>,
         filter: any,
-    ): Promise<unknown | undefined> {
+    ): Promise<boolean> {
         const query = kysely.selectNoFrom((eb) => (
             eb.exists(
                 this.dialect
@@ -161,16 +161,16 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             ).as('exists')
         )).modifyEnd(this.makeContextComment({ model, operation: 'read' }));
 
-        let result: {exists: number}[] = [];
+        let result: { exists: number | boolean }[] = [];
         const compiled = kysely.getExecutor().compileQuery(query.toOperationNode(), createQueryId());
         try {
             const r = await kysely.getExecutor().executeQuery(compiled);
-            result = r.rows as {exists: number}[];
+            result = r.rows as { exists: number | boolean}[];
         } catch (err) {
             throw createDBQueryError('Failed to execute query', err, compiled.sql, compiled.parameters);
         }
 
-        return result[0]?.exists === 1;
+        return !!result[0]?.exists;
     }
 
     protected async read(

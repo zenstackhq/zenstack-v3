@@ -178,7 +178,7 @@ procedure getUndefined(): Undefined
 
         r = await handleProcRequest({
             method: 'post',
-            path: '/$procedures/echo',
+            path: '/$procs/echo',
             requestBody: 'hello',
         });
         expect(r.status).toBe(400);
@@ -195,7 +195,7 @@ procedure getUndefined(): Undefined
 
         r = await handleProcRequest({
             method: 'get',
-            path: '/$procedures/createUser',
+            path: '/$procs/createUser',
             query: { q: JSON.stringify({ email: 'user2@abc.com' }) },
         });
         expect(r.status).toBe(400);

@@ -221,7 +221,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
     }
 
     private async processRequestPayload(args: any) {
-        const { meta, ...rest } = args;
+        const { meta, ...rest } = args ?? {};
         if (meta?.serialization) {
             try {
                 // superjson deserialization

@@ -248,18 +248,64 @@ export type Procedures<Schema extends SchemaDef> =
               $procs: {
                   [Key in keyof Schema['procedures']]: ProcedureFunc<Schema, Schema['procedures'][Key]>;
               };
-
-              /**
-               * Backward-compatible alias for `$procs`.
-               */
-              $procedures: {
-                  [Key in keyof Schema['procedures']]: ProcedureFunc<Schema, Schema['procedures'][Key]>;
-              };
           }
         : {};
 
+type _ProcedureParamNames<Params> = Params extends ReadonlyArray<infer P>
+    ? P extends { name: infer N extends string }
+        ? N
+        : never
+    : never;
+
+type _RequiredProcedureParamNames<Params> = Params extends ReadonlyArray<infer P>
+    ? P extends { name: infer N extends string }
+        ? P extends { optional: true }
+            ? never
+            : N
+        : never
+    : never;
+
+type _OptionalProcedureParamNames<Params> = Params extends ReadonlyArray<infer P>
+    ? P extends { name: infer N extends string }
+        ? P extends { optional: true }
+            ? N
+            : never
+        : never
+    : never;
+
+type _HasRequiredProcedureParams<Params> = _RequiredProcedureParamNames<Params> extends never ? false : true;
+
+type _ProcedureParamByName<Params, Name extends string> = Params extends ReadonlyArray<infer P>
+    ? Extract<P, { name: Name }>
+    : never;
+
+type MapProcedureArgsObject<Schema extends SchemaDef, Params> = Simplify<
+    {
+        [K in _RequiredProcedureParamNames<Params>]: MapProcedureParam<Schema, _ProcedureParamByName<Params, K>>;
+    } & {
+        [K in _OptionalProcedureParamNames<Params>]?: MapProcedureParam<Schema, _ProcedureParamByName<Params, K>>;
+    }
+>;
+
+type ProcedureEnvelope<Schema extends SchemaDef, Params> = _ProcedureParamNames<Params> extends never
+    ? { args?: Record<string, never> }
+    : _HasRequiredProcedureParams<Params> extends true
+      ? { args: MapProcedureArgsObject<Schema, Params> }
+      : { args?: MapProcedureArgsObject<Schema, Params> };
+
+type ProcedureCallParams<Schema extends SchemaDef, Params> = _HasRequiredProcedureParams<Params> extends true
+    ? [input: ProcedureEnvelope<Schema, Params>]
+    : [] | [input: ProcedureEnvelope<Schema, Params>];
+
 export type ProcedureFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
-    ...args: MapProcedureParams<Schema, Proc['params']>
+    ...args: ProcedureCallParams<Schema, Proc['params']>
+) => Promise<MapProcedureReturn<Schema, Proc>>;
+
+/**
+ * Signature for procedure handlers configured via client options.
+ */
+export type ProcedureHandlerFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
+    ...args: ProcedureCallParams<Schema, Proc['params']>
 ) => Promise<MapProcedureReturn<Schema, Proc>>;
 
 type MapProcedureReturn<Schema extends SchemaDef, Proc extends ProcedureDef> = Proc extends { returnType: infer R }
@@ -274,17 +320,6 @@ type MapProcedureParam<Schema extends SchemaDef, P> = P extends { type: infer U 
           P extends { optional: true } ? true : false
       >
     : never;
-
-/**
- * Maps procedure params to a union of tuple prefixes, allowing trailing optional params to be omitted.
- */
-type MapProcedureParams<Schema extends SchemaDef, Params> = Params extends readonly []
-    ? []
-    : Params extends readonly [...infer Rest, infer Last]
-      ? Last extends { optional: true }
-          ? MapProcedureParams<Schema, Rest> | [...MapProcedureParams<Schema, Rest>, MapProcedureParam<Schema, Last>]
-          : [...MapProcedureParams<Schema, Rest>, MapProcedureParam<Schema, Last>]
-      : [];
 
 /**
  * Creates a new ZenStack client instance.

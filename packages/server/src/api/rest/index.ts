@@ -555,15 +555,15 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             processedArgsPayload = result;
         }
 
-        let positionalArgs: unknown[];
+        let procInput: unknown;
         try {
-            positionalArgs = this.mapProcedureArgs(procDef, processedArgsPayload);
+            procInput = this.mapProcedureArgs(procDef, processedArgsPayload);
         } catch (err) {
             return this.makeProcBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
         }
 
         try {
-            positionalArgs = validateProcedureArgs(client, proc, positionalArgs);
+            validateProcedureArgs(client, proc, procInput);
         } catch (err) {
             if (err instanceof ORMError) {
                 return this.makeProcORMErrorResponse(err);
@@ -572,9 +572,9 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         }
 
         try {
-            log(this.log, 'debug', () => `handling "$procedures.${proc}" request`);
+            log(this.log, 'debug', () => `handling "$procs.${proc}" request`);
 
-            const clientResult = await (client as any).$procedures?.[proc](...positionalArgs);
+            const clientResult = await (client as any).$procs[proc](procInput);
 
             const { json, meta } = SuperJSON.serialize(clientResult);
             const responseBody: any = { data: json };
@@ -584,7 +584,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
 
             return { status: 200, body: responseBody };
         } catch (err) {
-            log(this.log, 'error', `error occurred when handling "$procedures.${proc}" request`, err);
+            log(this.log, 'error', `error occurred when handling "$procs.${proc}" request`, err);
             if (err instanceof ORMError) {
                 return this.makeProcORMErrorResponse(err);
             }
@@ -595,7 +595,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
     private mapProcedureArgs(
         procDef: { params: ReadonlyArray<{ name: string; optional?: boolean; array?: boolean }> },
         payload: unknown,
-    ): unknown[] {
+    ): unknown {
         return mapProcedureArgsCommon(procDef, payload);
     }
 

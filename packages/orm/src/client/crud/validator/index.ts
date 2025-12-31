@@ -71,47 +71,78 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.client.$options.validateInput !== false;
     }
 
-    validateProcedureArgs(proc: string, args: unknown): unknown[] {
+    validateProcedureInput(proc: string, input: unknown): unknown {
         const procDef = (this.schema.procedures ?? {})[proc] as ProcedureDef | undefined;
         invariant(procDef, `Procedure "${proc}" not found in schema`);
 
-        if (!Array.isArray(args)) {
-            throw createInvalidInputError('Procedure arguments must be an array', `$procedures.${proc}`);
+        const params = procDef.params ?? [];
+
+        // For procedures where every parameter is optional, allow omitting the input entirely.
+        if (typeof input === 'undefined') {
+            if (params.length === 0) {
+                return undefined;
+            }
+            if (params.every((p) => p.optional)) {
+                return undefined;
+            }
+            throw createInvalidInputError('Missing procedure arguments', `$procs.${proc}`);
         }
 
-        if (args.length > procDef.params.length) {
-            throw createInvalidInputError(
-                `Too many procedure arguments: expected at most ${procDef.params.length}, got ${args.length}`,
-                `$procedures.${proc}`,
-            );
+        if (!input || typeof input !== 'object' || Array.isArray(input)) {
+            throw createInvalidInputError('Procedure input must be an object', `$procs.${proc}`);
         }
 
-        // Validate each parameter using the procedure signature. Missing trailing optional parameters are allowed.
-        for (let i = 0; i < procDef.params.length; i++) {
-            const param = procDef.params[i]!;
-            const value = args[i];
+        const envelope = input as Record<string, unknown>;
+        const argsPayload = Object.prototype.hasOwnProperty.call(envelope, 'args') ? (envelope as any).args : undefined;
 
-            if (typeof value === 'undefined') {
-                // When a value is not provided, allow it only if the parameter is optional.
-                // Note: callers can still explicitly pass `undefined`.
-                if (i >= args.length) {
-                    if (param.optional) {
-                        continue;
-                    }
-                    throw createInvalidInputError(
-                        `Missing procedure argument: ${param.name}`,
-                        `$procedures.${proc}`,
-                    );
-                }
+        if (params.length === 0) {
+            if (typeof argsPayload === 'undefined') {
+                return input;
+            }
+            if (!argsPayload || typeof argsPayload !== 'object' || Array.isArray(argsPayload)) {
+                throw createInvalidInputError('Procedure `args` must be an object', `$procs.${proc}`);
+            }
+            if (Object.keys(argsPayload as any).length === 0) {
+                return input;
+            }
+            throw createInvalidInputError('Procedure does not accept arguments', `$procs.${proc}`);
+        }
 
+        if (typeof argsPayload === 'undefined') {
+            if (params.every((p) => p.optional)) {
+                return input;
+            }
+            throw createInvalidInputError('Missing procedure arguments', `$procs.${proc}`);
+        }
+
+        if (!argsPayload || typeof argsPayload !== 'object' || Array.isArray(argsPayload)) {
+            throw createInvalidInputError('Procedure `args` must be an object', `$procs.${proc}`);
+        }
+
+        const obj = argsPayload as Record<string, unknown>;
+
+        // reject unknown keys to avoid silently ignoring user mistakes
+        for (const key of Object.keys(obj)) {
+            if (!params.some((p) => p.name === key)) {
+                throw createInvalidInputError(`Unknown procedure argument: ${key}`, `$procs.${proc}`);
+            }
+        }
+
+        for (const param of params) {
+            const value = (obj as any)[param.name];
+
+            if (!Object.prototype.hasOwnProperty.call(obj, param.name)) {
                 if (param.optional) {
                     continue;
                 }
+                throw createInvalidInputError(`Missing procedure argument: ${param.name}`, `$procs.${proc}`);
+            }
 
-                throw createInvalidInputError(
-                    `Invalid procedure argument: ${param.name} is required`,
-                    `$procedures.${proc}`,
-                );
+            if (typeof value === 'undefined') {
+                if (param.optional) {
+                    continue;
+                }
+                throw createInvalidInputError(`Invalid procedure argument: ${param.name} is required`, `$procs.${proc}`);
             }
 
             const schema = this.makeProcedureParamSchema(param);
@@ -119,12 +150,12 @@ export class InputValidator<Schema extends SchemaDef> {
             if (!parsed.success) {
                 throw createInvalidInputError(
                     `Invalid procedure argument: ${param.name}: ${formatError(parsed.error)}`,
-                    `$procedures.${proc}`,
+                    `$procs.${proc}`,
                 );
             }
         }
 
-        return args;
+        return input;
     }
 
     private makeProcedureParamSchema(param: { type: string; array?: boolean; optional?: boolean }): z.ZodType {

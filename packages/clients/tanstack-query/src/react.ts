@@ -83,6 +83,10 @@ type NormalizeProcedurePayload<TArgs> = TArgs extends []
 type ProcedurePayload<Schema extends SchemaDef, Name extends keyof ExtractProcedures<Schema>> =
         NormalizeProcedurePayload<ProcedureArgsTuple<Schema, Name>>;
 
+type ProcedureHookFn<Payload, Options, Result> = undefined extends Payload
+    ? (args?: Payload, options?: Options) => Result
+    : (args: Payload, options?: Options) => Result;
+
 /**
  * React context for query settings.
  */
@@ -169,25 +173,29 @@ type ProcedureHookGroup<Schema extends SchemaDef> = {
               ): UseMutationResult<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>;
           }
         : {
-              useQuery(
-                  args?: ProcedurePayload<Schema, Name>,
-                  options?: ModelQueryOptions<ProcedureReturn<Schema, Name>>,
-              ): ModelQueryResult<ProcedureReturn<Schema, Name>>;
+              useQuery: ProcedureHookFn<
+                  ProcedurePayload<Schema, Name>,
+                  ModelQueryOptions<ProcedureReturn<Schema, Name>>,
+                  ModelQueryResult<ProcedureReturn<Schema, Name>>
+              >;
 
-              useSuspenseQuery(
-                  args?: ProcedurePayload<Schema, Name>,
-                  options?: ModelSuspenseQueryOptions<ProcedureReturn<Schema, Name>>,
-              ): ModelSuspenseQueryResult<ProcedureReturn<Schema, Name>>;
+              useSuspenseQuery: ProcedureHookFn<
+                  ProcedurePayload<Schema, Name>,
+                  ModelSuspenseQueryOptions<ProcedureReturn<Schema, Name>>,
+                  ModelSuspenseQueryResult<ProcedureReturn<Schema, Name>>
+              >;
 
-              useInfiniteQuery(
-                  args?: ProcedurePayload<Schema, Name>,
-                  options?: ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
-              ): ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>;
+              useInfiniteQuery: ProcedureHookFn<
+                  ProcedurePayload<Schema, Name>,
+                  ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+                  ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+              >;
 
-              useSuspenseInfiniteQuery(
-                  args?: ProcedurePayload<Schema, Name>,
-                  options?: ModelSuspenseInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
-              ): ModelSuspenseInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>;
+              useSuspenseInfiniteQuery: ProcedureHookFn<
+                  ProcedurePayload<Schema, Name>,
+                  ModelSuspenseInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+                  ModelSuspenseInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+              >;
           };
 };
 

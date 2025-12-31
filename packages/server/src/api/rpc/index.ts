@@ -252,15 +252,15 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             processedArgsPayload = result;
         }
 
-        let positionalArgs: unknown[];
+        let procInput: unknown;
         try {
-            positionalArgs = this.mapProcedureArgs(procDef, processedArgsPayload);
+            procInput = this.mapProcedureArgs(procDef, processedArgsPayload);
         } catch (err) {
             return this.makeBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
         }
 
         try {
-            positionalArgs = validateProcedureArgs(client, proc, positionalArgs);
+            validateProcedureArgs(client, proc, procInput);
         } catch (err) {
             if (err instanceof ORMError) {
                 return this.makeORMErrorResponse(err);
@@ -269,9 +269,9 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
         }
 
         try {
-            log(this.options.log, 'debug', () => `handling "$procedures.${proc}" request`);
+            log(this.options.log, 'debug', () => `handling "$procs.${proc}" request`);
 
-            const clientResult = await (client as any).$procedures?.[proc](...positionalArgs);
+            const clientResult = await (client as any).$procs?.[proc](procInput);
 
             const { json, meta } = SuperJSON.serialize(clientResult);
             const responseBody: any = { data: json };
@@ -280,10 +280,10 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             }
 
             const response = { status: 200, body: responseBody };
-            log(this.options.log, 'debug', () => `sending response for "$procedures.${proc}" request: ${safeJSONStringify(response)}`);
+            log(this.options.log, 'debug', () => `sending response for "$procs.${proc}" request: ${safeJSONStringify(response)}`);
             return response;
         } catch (err) {
-            log(this.options.log, 'error', `error occurred when handling "$procedures.${proc}" request`, err);
+            log(this.options.log, 'error', `error occurred when handling "$procs.${proc}" request`, err);
             if (err instanceof ORMError) {
                 return this.makeORMErrorResponse(err);
             }
@@ -294,7 +294,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
     private mapProcedureArgs(
         procDef: { params: ReadonlyArray<{ name: string; optional?: boolean; array?: boolean }> },
         payload: unknown,
-    ): unknown[] {
+    ): unknown {
         return mapProcedureArgsCommon(procDef, payload);
     }
 
@@ -341,8 +341,8 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             .with(ORMErrorReason.REJECTED_BY_POLICY, () => {
                 status = 403;
                 error.rejectedByPolicy = true;
-                error.rejectReason = err.rejectedByPolicyReason;
                 error.model = err.model;
+                error.rejectReason = err.rejectedByPolicyReason;
             })
             .with(ORMErrorReason.DB_QUERY_ERROR, () => {
                 status = 400;

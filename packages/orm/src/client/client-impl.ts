@@ -216,17 +216,12 @@ export class ClientImpl {
 
     get $procs() {
         return Object.keys(this.$schema.procedures ?? {}).reduce((acc, name) => {
-            acc[name] = (...args: unknown[]) => this.handleProc(name, args);
+            acc[name] = (input?: unknown) => this.handleProc(name, input);
             return acc;
         }, {} as any);
     }
 
-    get $procedures() {
-        // Backward-compatible alias.
-        return this.$procs as any;
-    }
-
-    private async handleProc(name: string, args: unknown[]) {
+    private async handleProc(name: string, input: unknown) {
         if (!('procedures' in this.$options) || !this.$options || typeof this.$options.procedures !== 'object') {
             throw createConfigError('Procedures are not configured for the client.');
         }
@@ -247,14 +242,14 @@ export class ClientImpl {
 
         // Validate inputs using the same validator infrastructure as CRUD operations.
         const inputValidator = new InputValidator(this as any);
-        const validatedArgs = inputValidator.validateProcedureArgs(name, args);
+        const validatedInput = inputValidator.validateProcedureInput(name, input);
 
         const handler = procOptions[name] as Function;
 
-        const invokeWithClient = async (client: any, _args: readonly unknown[]) => {
-            let proceed = async (nextArgs: readonly unknown[]) => {
-                // Handler signature: (client, ...args)
-                return handler.apply(client, [client, ...nextArgs]);
+        const invokeWithClient = async (client: any, _input: unknown) => {
+            let proceed = async (nextInput: unknown) => {
+                // Handler signature: (client, input?)
+                return handler.apply(client, [client, nextInput]);
             };
 
             // apply plugins
@@ -263,27 +258,27 @@ export class ClientImpl {
                 const onProcedure = plugin.onProcedure;
                 if (onProcedure) {
                     const _proceed = proceed;
-                    proceed = (nextArgs: readonly unknown[]) =>
+                    proceed = (nextInput: unknown) =>
                         onProcedure({
                             client,
                             name,
                             mutation: !!procDef.mutation,
-                            args: nextArgs,
-                            proceed: (finalArgs: readonly unknown[]) => _proceed(finalArgs),
+                            input: nextInput,
+                            proceed: (finalInput: unknown) => _proceed(finalInput),
                         }) as Promise<unknown>;
                 }
             }
 
-            return proceed(_args);
+            return proceed(_input);
         };
 
         // Transaction support: mutation procedures automatically run inside a transaction
         // unless we're already in one.
         if (procDef.mutation && !this.isTransaction) {
-            return this.$transaction((tx) => invokeWithClient(tx as any, validatedArgs));
+            return this.$transaction((tx) => invokeWithClient(tx as any, validatedInput));
         }
 
-        return invokeWithClient(this as any, validatedArgs);
+        return invokeWithClient(this as any, validatedInput);
     }
 
     async $connect() {

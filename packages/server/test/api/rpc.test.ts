@@ -142,9 +142,9 @@ procedure getUndefined(): Undefined
 
         const procClient = await createPolicyTestClient(procSchema, {
             procedures: {
-                echo: async (_client, input) => input,
-                createUser: async (client, email) => {
-                    return client.user.create({ data: { email } });
+                echo: async (_client, input: any) => input.args.input,
+                createUser: async (client, input: any) => {
+                    return client.user.create({ data: { email: input.args.email } });
                 },
                 getFalse: async () => false,
                 getUndefined: async () => undefined,
@@ -171,7 +171,7 @@ procedure getUndefined(): Undefined
         let r = await handleProcRequest({
             method: 'get',
             path: '/$procs/echo',
-            query: { q: JSON.stringify('hello') },
+            query: { q: JSON.stringify({ args: { input: 'hello' } }) },
         });
         expect(r.status).toBe(200);
         expect(r.data).toBe('hello');
@@ -179,7 +179,7 @@ procedure getUndefined(): Undefined
         r = await handleProcRequest({
             method: 'post',
             path: '/$procs/echo',
-            requestBody: 'hello',
+            requestBody: { args: { input: 'hello' } },
         });
         expect(r.status).toBe(400);
         expect(r.error?.message).toMatch(/only GET is supported/i);
@@ -188,7 +188,7 @@ procedure getUndefined(): Undefined
         r = await handleProcRequest({
             method: 'post',
             path: '/$procs/createUser',
-            requestBody: { email: 'user1@abc.com' },
+            requestBody: { args: { email: 'user1@abc.com' } },
         });
         expect(r.status).toBe(200);
         expect(r.data).toEqual(expect.objectContaining({ email: 'user1@abc.com' }));
@@ -196,7 +196,7 @@ procedure getUndefined(): Undefined
         r = await handleProcRequest({
             method: 'get',
             path: '/$procs/createUser',
-            query: { q: JSON.stringify({ email: 'user2@abc.com' }) },
+            query: { q: JSON.stringify({ args: { email: 'user2@abc.com' } }) },
         });
         expect(r.status).toBe(400);
         expect(r.error?.message).toMatch(/only POST is supported/i);
@@ -238,12 +238,17 @@ procedure echoOverview(o: Overview): Overview
 
         const procClient = await createPolicyTestClient(procSchema, {
             procedures: {
-                echoInt: async (_client, x) => x,
-                opt2: async (_client, a, b) => (a ?? 0) + (b ?? 0),
-                sum3: async (_client, a, b, c) => a + b + c,
-                sumIds: async (_client, ids) => ids.reduce((acc: number, x: number) => acc + x, 0),
-                echoRole: async (_client, r) => r,
-                echoOverview: async (_client, o) => o,
+                echoInt: async (_client, input: any) => input.args.x,
+                opt2: async (_client, input?: any) => {
+                    const a = input?.args?.a as number | undefined;
+                    const b = input?.args?.b as number | undefined;
+                    return (a ?? 0) + (b ?? 0);
+                },
+                sum3: async (_client, input: any) => input.args.a + input.args.b + input.args.c,
+                sumIds: async (_client, input: any) =>
+                    (input.args.ids as number[]).reduce((acc: number, x: number) => acc + x, 0),
+                echoRole: async (_client, input: any) => input.args.r,
+                echoOverview: async (_client, input: any) => input.args.o,
             },
         });
 
@@ -267,7 +272,7 @@ procedure echoOverview(o: Overview): Overview
         let r = await handleProcRequest({
             method: 'get',
             path: '/$procs/sum3',
-            query: { q: JSON.stringify({ a: 1, b: 2, c: 3 }) },
+            query: { q: JSON.stringify({ args: { a: 1, b: 2, c: 3 } }) },
         });
         expect(r.status).toBe(200);
         expect(r.data).toBe(6);
@@ -281,13 +286,17 @@ procedure echoOverview(o: Overview): Overview
         r = await handleProcRequest({
             method: 'get',
             path: '/$procs/sumIds',
-            query: { q: JSON.stringify([1, 2, 3]) },
+            query: { q: JSON.stringify({ args: { ids: [1, 2, 3] } }) },
         });
         expect(r.status).toBe(200);
         expect(r.data).toBe(6);
 
         // enum param validation
-        r = await handleProcRequest({ method: 'get', path: '/$procs/echoRole', query: { q: JSON.stringify('ADMIN') } });
+        r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/echoRole',
+            query: { q: JSON.stringify({ args: { r: 'ADMIN' } }) },
+        });
         expect(r.status).toBe(200);
         expect(r.data).toBe('ADMIN');
 
@@ -295,30 +304,34 @@ procedure echoOverview(o: Overview): Overview
         r = await handleProcRequest({
             method: 'get',
             path: '/$procs/echoOverview',
-            query: { q: JSON.stringify({ total: 123 }) },
+            query: { q: JSON.stringify({ args: { o: { total: 123 } } }) },
         });
         expect(r.status).toBe(200);
         expect(r.data).toMatchObject({ total: 123 });
 
         // wrong type input
-        r = await handleProcRequest({ method: 'get', path: '/$procs/echoInt', query: { q: JSON.stringify('x') } });
+        r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/echoInt',
+            query: { q: JSON.stringify({ args: { x: 'x' } }) },
+        });
         expect(r.status).toBe(422);
         expect(r.error?.message).toMatch(/invalid input/i);
 
-        // too many args
+        // invalid args payload type
         r = await handleProcRequest({
             method: 'get',
             path: '/$procs/sum3',
-            query: { q: JSON.stringify([1, 2, 3, 4]) },
+            query: { q: JSON.stringify({ args: [1, 2, 3, 4] }) },
         });
         expect(r.status).toBe(400);
-        expect(r.error?.message).toMatch(/too many procedure arguments/i);
+        expect(r.error?.message).toMatch(/args/i);
 
         // unknown keys
         r = await handleProcRequest({
             method: 'get',
             path: '/$procs/sum3',
-            query: { q: JSON.stringify({ a: 1, b: 2, c: 3, d: 4 }) },
+            query: { q: JSON.stringify({ args: { a: 1, b: 2, c: 3, d: 4 } }) },
         });
         expect(r.status).toBe(400);
         expect(r.error?.message).toMatch(/unknown procedure argument/i);

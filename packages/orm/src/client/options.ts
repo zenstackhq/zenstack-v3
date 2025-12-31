@@ -1,7 +1,8 @@
 import type { Dialect, Expression, ExpressionBuilder, KyselyConfig } from 'kysely';
 import type { GetModel, GetModelFields, GetModels, ProcedureDef, ScalarFields, SchemaDef } from '../schema';
 import type { PrependParameter } from '../utils/type-utils';
-import type { ClientContract, CRUD_EXT, ProcedureFunc } from './contract';
+import type { ClientContract, CRUD_EXT } from './contract';
+import type { ProcedureHandlerFunc } from './contract';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
 import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
@@ -136,7 +137,7 @@ export type ProceduresOptions<Schema extends SchemaDef> = Schema extends {
     ? {
           [Key in keyof Schema['procedures']]: PrependParameter<
               ClientContract<Schema>,
-              ProcedureFunc<Schema, Schema['procedures'][Key]>
+              ProcedureHandlerFunc<Schema, Schema['procedures'][Key]>
           >;
       }
     : {};

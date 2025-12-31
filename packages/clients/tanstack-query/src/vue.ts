@@ -83,6 +83,10 @@ type NormalizeProcedurePayload<TArgs> = TArgs extends []
 type ProcedurePayload<Schema extends SchemaDef, Name extends keyof ExtractProcedures<Schema>> =
         NormalizeProcedurePayload<ProcedureArgsTuple<Schema, Name>>;
 
+type ProcedureHookFn<Payload, Options, Result> = undefined extends Payload
+    ? (args?: MaybeRefOrGetter<Payload>, options?: MaybeRefOrGetter<Options>) => Result
+    : (args: MaybeRefOrGetter<Payload>, options?: MaybeRefOrGetter<Options>) => Result;
+
 /**
  * Provide context for query settings.
  *
@@ -168,15 +172,17 @@ type ProcedureHookGroup<Schema extends SchemaDef> = {
               >;
           }
         : {
-              useQuery(
-                  args?: MaybeRefOrGetter<ProcedurePayload<Schema, Name>>,
-                  options?: MaybeRefOrGetter<ModelQueryOptions<ProcedureReturn<Schema, Name>>>,
-              ): ModelQueryResult<ProcedureReturn<Schema, Name>>;
+              useQuery: ProcedureHookFn<
+                  ProcedurePayload<Schema, Name>,
+                  ModelQueryOptions<ProcedureReturn<Schema, Name>>,
+                  ModelQueryResult<ProcedureReturn<Schema, Name>>
+              >;
 
-              useInfiniteQuery(
-                  args?: MaybeRefOrGetter<ProcedurePayload<Schema, Name>>,
-                  options?: MaybeRefOrGetter<ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>>,
-              ): ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>;
+              useInfiniteQuery: ProcedureHookFn<
+                  ProcedurePayload<Schema, Name>,
+                  ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+                  ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+              >;
           };
 };
 

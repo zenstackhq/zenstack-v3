@@ -113,19 +113,21 @@ client.foo.useUpdate();
 client.bar.useCreate();
 
 // procedures (query)
-check(proceduresClient.$procs.greet.useQuery(undefined).data.value?.toUpperCase());
-check(proceduresClient.$procs.greet.useQuery('bob').data.value?.toUpperCase());
-check(proceduresClient.$procs.greet.useQuery('bob').queryKey.value);
-check(proceduresClient.$procs.greetMany.useInfiniteQuery('bob').data.value?.pages[0]?.[0]?.toUpperCase());
-check(proceduresClient.$procs.greetMany.useInfiniteQuery('bob').queryKey.value);
+check(proceduresClient.$procs.greet.useQuery().data.value?.toUpperCase());
+check(proceduresClient.$procs.greet.useQuery({ args: { name: 'bob' } }).data.value?.toUpperCase());
+check(proceduresClient.$procs.greet.useQuery({ args: { name: 'bob' } }).queryKey.value);
+check(
+    proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).data.value?.pages[0]?.[0]?.toUpperCase(),
+);
+check(proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).queryKey.value);
 // @ts-expect-error greet is not a mutation procedure
 proceduresClient.$procs.greet.useMutation();
 
 // procedures (mutation)
-proceduresClient.$procs.sum.useMutation().mutate([1, 2]);
+proceduresClient.$procs.sum.useMutation().mutate({ args: { a: 1, b: 2 } });
 // @ts-expect-error wrong arg shape for multi-param procedure
-proceduresClient.$procs.sum.useMutation().mutate({ a: 1, b: 2 });
+proceduresClient.$procs.sum.useMutation().mutate([1, 2]);
 proceduresClient.$procs.sum
     .useMutation()
-    .mutateAsync([1, 2])
+    .mutateAsync({ args: { a: 1, b: 2 } })
     .then((d) => check(d.toFixed(2)));

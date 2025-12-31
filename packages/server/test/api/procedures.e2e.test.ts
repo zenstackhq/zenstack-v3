@@ -26,8 +26,13 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
     beforeEach(async () => {
         client = await createTestClient(schema, {
             procedures: {
-                greet: async (_db, name?: string) => `hello ${name ?? 'world'}`,
-                createTwoAndFail: async (db, email1: string, email2: string) => {
+                greet: async (_db, input?: any) => {
+                    const name = input?.args?.name as string | undefined;
+                    return `hello ${name ?? 'world'}`;
+                },
+                createTwoAndFail: async (db, input: any) => {
+                    const email1 = input.args.email1 as string;
+                    const email2 = input.args.email2 as string;
                     await db.user.create({ data: { email: email1 } });
                     await db.user.create({ data: { email: email2 } });
                     throw new Error('boom');
@@ -46,12 +51,12 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
         await client?.$disconnect();
     });
 
-    it('supports $procs and $procedures routes', async () => {
-        const r = await api.handleRequest({
+    it('supports $procs routes', async () => {
+        let r = await api.handleRequest({
             client,
             method: 'get',
             path: '/$procs/greet',
-            query: { q: JSON.stringify('alice') },
+            query: { q: JSON.stringify({ args: { name: 'alice' } }) },
         });
         expect(r.status).toBe(200);
         expect(r.body).toEqual({ data: 'hello alice' });
@@ -62,7 +67,7 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
             client,
             method: 'get',
             path: '/$procs/greet',
-            query: { q: JSON.stringify(123) },
+            query: { q: JSON.stringify({ args: { name: 123 } }) },
         });
 
         expect(r.status).toBe(422);
@@ -83,7 +88,7 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
             client,
             method: 'post',
             path: '/$procs/createTwoAndFail',
-            requestBody: ['a@a.com', 'b@b.com'],
+            requestBody: { args: { email1: 'a@a.com', email2: 'b@b.com' } },
         });
 
         expect(r.status).toBe(500);

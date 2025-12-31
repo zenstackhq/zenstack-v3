@@ -13,7 +13,7 @@ const baseSchema = {
 } as const;
 
 describe('ORM procedures', () => {
-    it('exposes `$procs` and `$procedures` (alias)', async () => {
+    it('exposes `$procs`', async () => {
         const schema: any = {
             ...baseSchema,
             procedures: {
@@ -29,9 +29,7 @@ describe('ORM procedures', () => {
         });
 
         expect(typeof client.$procs.hello).toBe('function');
-        expect(typeof client.$procedures.hello).toBe('function');
         expect(await client.$procs.hello()).toBe('ok');
-        expect(await client.$procedures.hello()).toBe('ok');
     });
 
     it('throws config error when procedures are not configured', async () => {
@@ -79,11 +77,11 @@ describe('ORM procedures', () => {
         const client: any = new ZenStackClient(schema, {
             dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
             procedures: {
-                echoInt: async (_client: any, n: number) => n,
+                echoInt: async (_client: any, input: any) => input.args.n,
             },
         });
 
-        await expect(client.$procs.echoInt('1')).rejects.toThrow(/invalid input/i);
+        await expect(client.$procs.echoInt({ args: { n: '1' } })).rejects.toThrow(/invalid input/i);
     });
 
     it('runs procedure through onProcedure hooks', async () => {
@@ -106,7 +104,7 @@ describe('ORM procedures', () => {
             id: 'p1',
             onProcedure: async (ctx) => {
                 calls.push(`p1:${ctx.name}`);
-                return ctx.proceed(ctx.args);
+                return ctx.proceed(ctx.input);
             },
         });
 
@@ -114,9 +112,15 @@ describe('ORM procedures', () => {
             id: 'p2',
             onProcedure: async (ctx) => {
                 calls.push(`p2:${ctx.name}`);
-                // mutate args: add +1 to first arg
-                const nextArgs = [Number(ctx.args[0]) + 1, ctx.args[1]];
-                return ctx.proceed(nextArgs);
+                // mutate args: add +1 to `a`
+                const nextInput: any = {
+                    ...(ctx.input as any),
+                    args: {
+                        ...((ctx.input as any)?.args ?? {}),
+                        a: Number((ctx.input as any)?.args?.a) + 1,
+                    },
+                };
+                return ctx.proceed(nextInput);
             },
         });
 
@@ -124,11 +128,11 @@ describe('ORM procedures', () => {
             dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
             plugins: [p1, p2],
             procedures: {
-                add: async (_client: any, a: number, b: number) => a + b,
+                add: async (_client: any, input: any) => input.args.a + input.args.b,
             },
         });
 
-        await expect(client.$procs.add(1, 2)).resolves.toBe(4);
+        await expect(client.$procs.add({ args: { a: 1, b: 2 } })).resolves.toBe(4);
         expect(calls).toEqual(['p2:add', 'p1:add']);
     });
 

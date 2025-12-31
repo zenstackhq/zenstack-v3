@@ -3192,17 +3192,80 @@ mutation procedure sum(a: Int, b: Int): Int
 `;
 
         beforeEach(async () => {
-            client = await createTestClient(schema, {
+            interface ProcEnvelope<TArgs extends object> {
+                args: TArgs;
+            }
+
+            type Role = 'ADMIN' | 'USER';
+
+            interface Overview {
+                total: number;
+            }
+
+            interface EchoDecimalArgs {
+                x: Decimal;
+            }
+
+            interface GreetArgs {
+                name?: string | null;
+            }
+
+            interface EchoIntArgs {
+                x: number;
+            }
+
+            interface Opt2Args {
+                a?: number | null;
+                b?: number | null;
+            }
+
+            interface SumIdsArgs {
+                ids: number[];
+            }
+
+            interface EchoRoleArgs {
+                r: Role;
+            }
+
+            interface EchoOverviewArgs {
+                o: Overview;
+            }
+
+            interface SumArgs {
+                a: number;
+                b: number;
+            }
+
+            interface Procedures {
+                echoDecimal: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoDecimalArgs>) => Promise<Decimal>;
+                greet: (_client: ClientContract<SchemaDef>, input?: ProcEnvelope<GreetArgs>) => Promise<string>;
+                echoInt: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoIntArgs>) => Promise<number>;
+                opt2: (_client: ClientContract<SchemaDef>, input?: ProcEnvelope<Opt2Args>) => Promise<number>;
+                sumIds: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<SumIdsArgs>) => Promise<number>;
+                echoRole: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoRoleArgs>) => Promise<Role>;
+                echoOverview: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoOverviewArgs>) => Promise<Overview>;
+                sum: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<SumArgs>) => Promise<number>;
+            }
+
+            client = await createTestClient(schema as unknown as SchemaDef, {
                 procedures: {
-                    echoDecimal: async (_client, x: Decimal) => x,
-                    greet: async (_client, name?: string) => `hi ${name ?? 'anon'}`,
-                    echoInt: async (_client, x: number) => x,
-                    opt2: async (_client, a?: number, b?: number) => (a ?? 0) + (b ?? 0),
-                    sumIds: async (_client, ids: number[]) => ids.reduce((acc, x) => acc + x, 0),
-                    echoRole: async (_client, r: string) => r,
-                    echoOverview: async (_client, o: any) => o,
-                    sum: async (_client, a: number, b: number) => a + b,
-                },
+                    echoDecimal: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoDecimalArgs>) => input.args.x,
+                    greet: async (_client: ClientContract<SchemaDef>, input?: ProcEnvelope<GreetArgs>) => {
+                        const name = input?.args?.name as string | undefined;
+                        return `hi ${name ?? 'anon'}`;
+                    },
+                    echoInt: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoIntArgs>) => input.args.x,
+                    opt2: async (_client: ClientContract<SchemaDef>, input?: ProcEnvelope<Opt2Args>) => {
+                        const a = input?.args?.a as number | undefined;
+                        const b = input?.args?.b as number | undefined;
+                        return (a ?? 0) + (b ?? 0);
+                    },
+                    sumIds: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<SumIdsArgs>) =>
+                        (input.args.ids as number[]).reduce((acc, x) => acc + x, 0),
+                    echoRole: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoRoleArgs>) => input.args.r,
+                    echoOverview: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoOverviewArgs>) => input.args.o,
+                    sum: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<SumArgs>) => input.args.a + input.args.b,
+                } as Procedures,
             });
 
             const _handler = new RestApiHandler({
@@ -3215,7 +3278,7 @@ mutation procedure sum(a: Int, b: Int): Int
         });
 
         it('supports GET query procedures with q/meta (SuperJSON)', async () => {
-            const { json, meta } = SuperJSON.serialize(new Decimal('1.23'));
+            const { json, meta } = SuperJSON.serialize({ args: { x: new Decimal('1.23') } });
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoDecimal',
@@ -3257,7 +3320,7 @@ mutation procedure sum(a: Int, b: Int): Int
                     {
                         status: 400,
                         code: 'invalid-payload',
-                        detail: 'missing procedure argument: x',
+                        detail: 'missing procedure arguments',
                     },
                 ],
             });
@@ -3275,11 +3338,11 @@ mutation procedure sum(a: Int, b: Int): Int
             expect(r.body).toMatchObject({ data: 0 });
         });
 
-        it('supports array-typed single param via q JSON array', async () => {
+        it('supports array-typed single param via envelope args', async () => {
             const r = await handler({
                 method: 'get',
                 path: '/$procs/sumIds',
-                query: { q: JSON.stringify([1, 2, 3]) },
+                query: { q: JSON.stringify({ args: { ids: [1, 2, 3] } }) },
                 client,
             });
 
@@ -3291,7 +3354,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoRole',
-                query: { q: JSON.stringify('ADMIN') },
+                query: { q: JSON.stringify({ args: { r: 'ADMIN' } }) },
                 client,
             });
 
@@ -3303,7 +3366,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoOverview',
-                query: { q: JSON.stringify({ total: 123 }) },
+                query: { q: JSON.stringify({ args: { o: { total: 123 } } }) },
                 client,
             });
 
@@ -3315,7 +3378,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoInt',
-                query: { q: JSON.stringify('not-an-int') },
+                query: { q: JSON.stringify({ args: { x: 'not-an-int' } }) },
                 client,
             });
 
@@ -3332,7 +3395,7 @@ mutation procedure sum(a: Int, b: Int): Int
         });
 
         it('supports POST mutation procedures with args passed via q/meta', async () => {
-            const { json, meta } = SuperJSON.serialize({ a: 1, b: 2 });
+            const { json, meta } = SuperJSON.serialize({ args: { a: 1, b: 2 } });
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
@@ -3347,11 +3410,11 @@ mutation procedure sum(a: Int, b: Int): Int
             expect(r.body).toMatchObject({ data: 3 });
         });
 
-        it('errors for too many args (positional array)', async () => {
+        it('errors for invalid `args` payload type', async () => {
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
-                query: { q: JSON.stringify([1, 2, 3]) },
+                query: { q: JSON.stringify({ args: [1, 2, 3] }) },
                 client,
             });
 
@@ -3364,14 +3427,14 @@ mutation procedure sum(a: Int, b: Int): Int
                     },
                 ],
             });
-            expect(r.body.errors?.[0]?.detail).toMatch(/too many procedure arguments/i);
+            expect(r.body.errors?.[0]?.detail).toMatch(/args/i);
         });
 
         it('errors for unknown argument keys (object mapping)', async () => {
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
-                query: { q: JSON.stringify({ a: 1, b: 2, c: 3 }) },
+                query: { q: JSON.stringify({ args: { a: 1, b: 2, c: 3 } }) },
                 client,
             });
 
@@ -3391,7 +3454,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
-                query: { q: JSON.stringify([1, 2]) },
+                query: { q: JSON.stringify({ args: { a: 1, b: 2 } }) },
                 client,
             });
 

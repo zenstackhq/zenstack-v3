@@ -24,7 +24,7 @@ describe('ORM procedures', () => {
         const client: any = new ZenStackClient(schema, {
             dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
             procedures: {
-                hello: async (_client: any) => 'ok',
+                hello: async () => 'ok',
             },
         });
 
@@ -77,7 +77,7 @@ describe('ORM procedures', () => {
         const client: any = new ZenStackClient(schema, {
             dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
             procedures: {
-                echoInt: async (_client: any, input: any) => input.args.n,
+                echoInt: async ({ args }: any) => args.n,
             },
         });
 
@@ -128,7 +128,7 @@ describe('ORM procedures', () => {
             dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
             plugins: [p1, p2],
             procedures: {
-                add: async (_client: any, input: any) => input.args.a + input.args.b,
+                add: async ({ args }: any) => args.a + args.b,
             },
         });
 
@@ -148,8 +148,8 @@ describe('ORM procedures', () => {
         const client: any = new ZenStackClient(schema, {
             dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
             procedures: {
-                mut: async (c: any) => c.isTransaction,
-                qry: async (c: any) => c.isTransaction,
+                mut: async ({ client }: any) => client.isTransaction,
+                qry: async ({ client }: any) => client.isTransaction,
             },
         });
 

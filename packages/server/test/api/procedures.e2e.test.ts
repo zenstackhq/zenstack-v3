@@ -26,15 +26,15 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
     beforeEach(async () => {
         client = await createTestClient(schema, {
             procedures: {
-                greet: async (_db, input?: any) => {
-                    const name = input?.args?.name as string | undefined;
+                greet: async ({ args }: any) => {
+                    const name = args?.name as string | undefined;
                     return `hello ${name ?? 'world'}`;
                 },
-                createTwoAndFail: async (db, input: any) => {
-                    const email1 = input.args.email1 as string;
-                    const email2 = input.args.email2 as string;
-                    await db.user.create({ data: { email: email1 } });
-                    await db.user.create({ data: { email: email2 } });
+                createTwoAndFail: async ({ client, args }: any) => {
+                    const email1 = args.email1 as string;
+                    const email2 = args.email2 as string;
+                    await client.user.create({ data: { email: email1 } });
+                    await client.user.create({ data: { email: email2 } });
                     throw new Error('boom');
                 },
             },

@@ -12,7 +12,7 @@ import {
     type SchemaDef,
 } from '../schema';
 import type { AnyKysely } from '../utils/kysely-utils';
-import type { OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
+import type { MaybePromise, OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
 import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
 import type {
     AggregateArgs,
@@ -297,16 +297,25 @@ type ProcedureCallParams<Schema extends SchemaDef, Params> = _HasRequiredProcedu
     ? [input: ProcedureEnvelope<Schema, Params>]
     : [] | [input: ProcedureEnvelope<Schema, Params>];
 
+type ProcedureArgs<Schema extends SchemaDef, Params> = _ProcedureParamNames<Params> extends never
+    ? Record<string, never>
+    : MapProcedureArgsObject<Schema, Params>;
+
+type ProcedureHandlerCtx<Schema extends SchemaDef, Params> = { client: ClientContract<Schema> } &
+    (_HasRequiredProcedureParams<Params> extends true
+        ? { args: ProcedureArgs<Schema, Params> }
+        : { args?: ProcedureArgs<Schema, Params> });
+
 export type ProcedureFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
     ...args: ProcedureCallParams<Schema, Proc['params']>
-) => Promise<MapProcedureReturn<Schema, Proc>>;
+) => MaybePromise<MapProcedureReturn<Schema, Proc>>;
 
 /**
  * Signature for procedure handlers configured via client options.
  */
 export type ProcedureHandlerFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
-    ...args: ProcedureCallParams<Schema, Proc['params']>
-) => Promise<MapProcedureReturn<Schema, Proc>>;
+    ctx: ProcedureHandlerCtx<Schema, Proc['params']>
+) => MaybePromise<MapProcedureReturn<Schema, Proc>>;
 
 type MapProcedureReturn<Schema extends SchemaDef, Proc extends ProcedureDef> = Proc extends { returnType: infer R }
     ? Proc extends { returnArray: true }

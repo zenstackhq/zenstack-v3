@@ -248,8 +248,9 @@ export class ClientImpl {
 
         const invokeWithClient = async (client: any, _input: unknown) => {
             let proceed = async (nextInput: unknown) => {
-                // Handler signature: (client, input?)
-                return handler.apply(client, [client, nextInput]);
+                // Handler signature: (ctx)
+                const args = nextInput && typeof nextInput === 'object' && 'args' in (nextInput as any) ? (nextInput as any).args : undefined;
+                return handler({ client, args });
             };
 
             // apply plugins

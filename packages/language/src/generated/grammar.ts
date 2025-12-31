@@ -3163,10 +3163,6 @@ export const ZModelGrammar = (): Grammar => loadedZModelGrammar ?? (loadedZModel
           },
           {
             "$type": "Keyword",
-            "value": "Undefined"
-          },
-          {
-            "$type": "Keyword",
             "value": "Unsupported"
           }
         ]

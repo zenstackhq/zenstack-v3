@@ -574,7 +574,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         try {
             log(this.log, 'debug', () => `handling "$procs.${proc}" request`);
 
-            const clientResult = await (client as any).$procs[proc](procInput);
+            const clientResult = await (client as any).$procs?.[proc](procInput);
 
             const { json, meta } = SuperJSON.serialize(clientResult);
             const responseBody: any = { data: json };

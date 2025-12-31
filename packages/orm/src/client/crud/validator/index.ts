@@ -40,6 +40,8 @@ import {
     getEnum,
     getTypeDef,
     getUniqueFields,
+    isEnum,
+    isTypeDef,
     requireField,
     requireModel,
 } from '../../query-utils';
@@ -88,7 +90,7 @@ export class InputValidator<Schema extends SchemaDef> {
             throw createInvalidInputError('Missing procedure arguments', `$procs.${proc}`);
         }
 
-        if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        if (typeof input !== 'object' ) {
             throw createInvalidInputError('Procedure input must be an object', `$procs.${proc}`);
         }
 
@@ -120,13 +122,6 @@ export class InputValidator<Schema extends SchemaDef> {
         }
 
         const obj = argsPayload as Record<string, unknown>;
-
-        // reject unknown keys to avoid silently ignoring user mistakes
-        for (const key of Object.keys(obj)) {
-            if (!params.some((p) => p.name === key)) {
-                throw createInvalidInputError(`Unknown procedure argument: ${key}`, `$procs.${proc}`);
-            }
-        }
 
         for (const param of params) {
             const value = (obj as any)[param.name];
@@ -161,9 +156,9 @@ export class InputValidator<Schema extends SchemaDef> {
     private makeProcedureParamSchema(param: { type: string; array?: boolean; optional?: boolean }): z.ZodType {
         let schema: z.ZodType;
 
-        if (this.schema.typeDefs && param.type in this.schema.typeDefs) {
+        if (isTypeDef(this.schema, param.type)) {
             schema = this.makeTypeDefSchema(param.type);
-        } else if (this.schema.enums && param.type in this.schema.enums) {
+        } else if (isEnum(this.schema, param.type)) {
             schema = this.makeEnumSchema(param.type);
         } else if (param.type in (this.schema.models ?? {})) {
             // For model-typed values, accept any object (no deep shape validation).

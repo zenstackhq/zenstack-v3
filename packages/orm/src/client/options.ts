@@ -135,10 +135,7 @@ export type ProceduresOptions<Schema extends SchemaDef> = Schema extends {
     procedures: Record<string, ProcedureDef>;
 }
     ? {
-          [Key in keyof Schema['procedures']]: PrependParameter<
-              ClientContract<Schema>,
-              ProcedureHandlerFunc<Schema, Schema['procedures'][Key]>
-          >;
+          [Key in keyof Schema['procedures']]: ProcedureHandlerFunc<Schema, Schema['procedures'][Key]>;
       }
     : {};
 

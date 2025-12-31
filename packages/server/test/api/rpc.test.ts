@@ -142,9 +142,9 @@ procedure getUndefined(): Undefined
 
         const procClient = await createPolicyTestClient(procSchema, {
             procedures: {
-                echo: async (_client, input: any) => input.args.input,
-                createUser: async (client, input: any) => {
-                    return client.user.create({ data: { email: input.args.email } });
+                echo: async ({ args }: any) => args.input,
+                createUser: async ({ client, args }: any) => {
+                    return client.user.create({ data: { email: args.email } });
                 },
                 getFalse: async () => false,
                 getUndefined: async () => undefined,
@@ -238,17 +238,16 @@ procedure echoOverview(o: Overview): Overview
 
         const procClient = await createPolicyTestClient(procSchema, {
             procedures: {
-                echoInt: async (_client, input: any) => input.args.x,
-                opt2: async (_client, input?: any) => {
-                    const a = input?.args?.a as number | undefined;
-                    const b = input?.args?.b as number | undefined;
+                echoInt: async ({ args }: any) => args.x,
+                opt2: async ({ args }: any) => {
+                    const a = args?.a as number | undefined;
+                    const b = args?.b as number | undefined;
                     return (a ?? 0) + (b ?? 0);
                 },
-                sum3: async (_client, input: any) => input.args.a + input.args.b + input.args.c,
-                sumIds: async (_client, input: any) =>
-                    (input.args.ids as number[]).reduce((acc: number, x: number) => acc + x, 0),
-                echoRole: async (_client, input: any) => input.args.r,
-                echoOverview: async (_client, input: any) => input.args.o,
+                sum3: async ({ args }: any) => args.a + args.b + args.c,
+                sumIds: async ({ args }: any) => (args.ids as number[]).reduce((acc: number, x: number) => acc + x, 0),
+                echoRole: async ({ args }: any) => args.r,
+                echoOverview: async ({ args }: any) => args.o,
             },
         });
 

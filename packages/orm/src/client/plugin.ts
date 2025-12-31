@@ -77,17 +77,17 @@ export type OnProcedureHookContext<Schema extends SchemaDef> = {
     mutation: boolean;
 
     /**
-        * Procedure invocation input (envelope).
-        *
-        * The canonical shape is `{ args?: Record<string, unknown> }`.
-        * When a procedure has required params, `args` is required.
+     * Procedure invocation input (envelope).
+     *
+     * The canonical shape is `{ args?: Record<string, unknown> }`.
+     * When a procedure has required params, `args` is required.
      */
-        input: unknown;
+    input: unknown;
 
     /**
-        * Continues the invocation. The input passed here is forwarded to the next handler.
+     * Continues the invocation. The input passed here is forwarded to the next handler.
      */
-        proceed: (input: unknown) => Promise<unknown>;
+    proceed: (input: unknown) => Promise<unknown>;
 
     /**
      * The ZenStack client that is invoking the procedure.

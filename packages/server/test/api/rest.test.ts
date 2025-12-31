@@ -3192,8 +3192,14 @@ mutation procedure sum(a: Int, b: Int): Int
 `;
 
         beforeEach(async () => {
-            interface ProcEnvelope<TArgs extends object> {
+            interface ProcCtx<TArgs extends object> {
+                client: ClientContract<SchemaDef>;
                 args: TArgs;
+            }
+
+            interface ProcCtxOptionalArgs<TArgs extends object> {
+                client: ClientContract<SchemaDef>;
+                args?: TArgs;
             }
 
             type Role = 'ADMIN' | 'USER';
@@ -3237,34 +3243,33 @@ mutation procedure sum(a: Int, b: Int): Int
             }
 
             interface Procedures {
-                echoDecimal: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoDecimalArgs>) => Promise<Decimal>;
-                greet: (_client: ClientContract<SchemaDef>, input?: ProcEnvelope<GreetArgs>) => Promise<string>;
-                echoInt: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoIntArgs>) => Promise<number>;
-                opt2: (_client: ClientContract<SchemaDef>, input?: ProcEnvelope<Opt2Args>) => Promise<number>;
-                sumIds: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<SumIdsArgs>) => Promise<number>;
-                echoRole: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoRoleArgs>) => Promise<Role>;
-                echoOverview: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoOverviewArgs>) => Promise<Overview>;
-                sum: (_client: ClientContract<SchemaDef>, input: ProcEnvelope<SumArgs>) => Promise<number>;
+                echoDecimal: (ctx: ProcCtx<EchoDecimalArgs>) => Promise<Decimal>;
+                greet: (ctx: ProcCtxOptionalArgs<GreetArgs>) => Promise<string>;
+                echoInt: (ctx: ProcCtx<EchoIntArgs>) => Promise<number>;
+                opt2: (ctx: ProcCtxOptionalArgs<Opt2Args>) => Promise<number>;
+                sumIds: (ctx: ProcCtx<SumIdsArgs>) => Promise<number>;
+                echoRole: (ctx: ProcCtx<EchoRoleArgs>) => Promise<Role>;
+                echoOverview: (ctx: ProcCtx<EchoOverviewArgs>) => Promise<Overview>;
+                sum: (ctx: ProcCtx<SumArgs>) => Promise<number>;
             }
 
             client = await createTestClient(schema as unknown as SchemaDef, {
                 procedures: {
-                    echoDecimal: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoDecimalArgs>) => input.args.x,
-                    greet: async (_client: ClientContract<SchemaDef>, input?: ProcEnvelope<GreetArgs>) => {
-                        const name = input?.args?.name as string | undefined;
+                    echoDecimal: async ({ args }: ProcCtx<EchoDecimalArgs>) => args.x,
+                    greet: async ({ args }: ProcCtxOptionalArgs<GreetArgs>) => {
+                        const name = args?.name as string | undefined;
                         return `hi ${name ?? 'anon'}`;
                     },
-                    echoInt: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoIntArgs>) => input.args.x,
-                    opt2: async (_client: ClientContract<SchemaDef>, input?: ProcEnvelope<Opt2Args>) => {
-                        const a = input?.args?.a as number | undefined;
-                        const b = input?.args?.b as number | undefined;
+                    echoInt: async ({ args }: ProcCtx<EchoIntArgs>) => args.x,
+                    opt2: async ({ args }: ProcCtxOptionalArgs<Opt2Args>) => {
+                        const a = args?.a as number | undefined;
+                        const b = args?.b as number | undefined;
                         return (a ?? 0) + (b ?? 0);
                     },
-                    sumIds: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<SumIdsArgs>) =>
-                        (input.args.ids as number[]).reduce((acc, x) => acc + x, 0),
-                    echoRole: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoRoleArgs>) => input.args.r,
-                    echoOverview: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<EchoOverviewArgs>) => input.args.o,
-                    sum: async (_client: ClientContract<SchemaDef>, input: ProcEnvelope<SumArgs>) => input.args.a + input.args.b,
+                    sumIds: async ({ args }: ProcCtx<SumIdsArgs>) => (args.ids as number[]).reduce((acc, x) => acc + x, 0),
+                    echoRole: async ({ args }: ProcCtx<EchoRoleArgs>) => args.r,
+                    echoOverview: async ({ args }: ProcCtx<EchoOverviewArgs>) => args.o,
+                    sum: async ({ args }: ProcCtx<SumArgs>) => args.a + args.b,
                 } as Procedures,
             });
 

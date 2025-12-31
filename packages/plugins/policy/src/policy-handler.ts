@@ -52,6 +52,7 @@ import {
     createUnsupportedError,
     disjunction,
     falseNode,
+    getColumnName,
     getTableName,
     isBeforeInvocation,
     trueNode,
@@ -320,10 +321,45 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             where: undefined,
         });
 
+        let selections = baseResult.selections;
+        const model = getTableName(node.from);
+        if (model && selections?.some((selection) => this.involvesFieldLevelPolicy(model, selection))) {
+            const updatedSelections: SelectionNode[] = [];
+            for (const selection of selections) {
+                updatedSelections.push(this.injectSelectionWithFieldLevelPolicy(model, selection));
+            }
+            selections = updatedSelections;
+        }
+
         return {
             ...baseResult,
+            selections,
             where: whereNode,
         };
+    }
+
+    private involvesFieldLevelPolicy(model: string, selection: SelectionNode): boolean {
+        const modelDef = QueryUtils.requireModel(this.client.$schema, model);
+
+        const hasFieldLevelPolicy = (fieldName: string) => {
+            const fieldDef = modelDef.fields[fieldName];
+            if (!fieldDef) {
+                return false;
+            }
+            return !!fieldDef.attributes?.some((attr) => ['@allow', '@deny'].includes(attr.name));
+        };
+
+        if (SelectAllNode.is(selection.selection)) {
+            const fields = Object.keys(modelDef.fields);
+            return fields.some(hasFieldLevelPolicy);
+        } else {
+            const column = getColumnName(selection.selection);
+            return column ? hasFieldLevelPolicy(column) : false;
+        }
+    }
+
+    private injectSelectionWithFieldLevelPolicy(model: string, selection: SelectionNode): SelectionNode {
+        throw new Error('Method not implemented.');
     }
 
     protected override transformJoin(node: JoinNode) {

@@ -95,6 +95,14 @@ function useQuerySettings() {
     return { endpoint: endpoint ?? DEFAULT_QUERY_ENDPOINT, ...rest };
 }
 
+function merge(rootOpt: unknown, opt: unknown): Accessor<any> {
+    return () => {
+        const rootOptVal = typeof rootOpt === 'function' ? (rootOpt as any)() : rootOpt;
+        const optVal = typeof opt === 'function' ? (opt as any)() : opt;
+        return { ...rootOptVal, ...optVal };
+    };
+}
+
 export type ModelQueryOptions<T> = Omit<CreateQueryOptions<T, DefaultError>, 'queryKey'> & ExtraQueryOptions;
 
 export type ModelQueryResult<T> = CreateQueryResult<WithOptimistic<T>, DefaultError> & { queryKey: QueryKey };
@@ -133,37 +141,37 @@ export type ClientHooks<Schema extends SchemaDef, Options extends QueryOptions<S
 
 type ProcedureHookGroup<Schema extends SchemaDef> = {
     [Name in keyof ExtractProcedures<Schema>]: ExtractProcedures<Schema>[Name] extends { mutation: true }
-        ? {
-              useMutation(
-                  options?: Omit<
-                      CreateMutationOptions<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>,
-                      'mutationFn'
-                  > &
-                      QueryContext,
-              ): CreateMutationResult<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>;
-          }
-        : {
-              useQuery: ProcedureHookFn<
-                  ProcedurePayload<Schema, Name>,
-                  Omit<ModelQueryOptions<ProcedureReturn<Schema, Name>>, 'optimisticUpdate'>,
-                  CreateQueryResult<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: QueryKey }
-              >;
+    ? {
+        useMutation(
+            options?: Omit<
+                CreateMutationOptions<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>,
+                'mutationFn'
+            > &
+                QueryContext,
+        ): CreateMutationResult<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>;
+    }
+    : {
+        useQuery: ProcedureHookFn<
+            ProcedurePayload<Schema, Name>,
+            Omit<ModelQueryOptions<ProcedureReturn<Schema, Name>>, 'optimisticUpdate'>,
+            CreateQueryResult<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: QueryKey }
+        >;
 
-              useInfiniteQuery: ProcedureHookFn<
-                  ProcedurePayload<Schema, Name>,
-                  ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
-                  ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
-              >;
-          };
+        useInfiniteQuery: ProcedureHookFn<
+            ProcedurePayload<Schema, Name>,
+            ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+            ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+        >;
+    };
 };
 
 export type ProcedureHooks<Schema extends SchemaDef> = Schema extends { procedures: Record<string, any> }
     ? {
-          /**
-           * Preferred procedures API.
-           */
-          $procs: ProcedureHookGroup<Schema>;
-      }
+        /**
+         * Preferred procedures API.
+         */
+        $procs: ProcedureHookGroup<Schema>;
+    }
     : {};
 
 // Note that we can potentially use TypeScript's mapped type to directly map from ORM contract, but that seems
@@ -254,14 +262,6 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
     schema: Schema,
     options?: Accessor<QueryContext>,
 ): ClientHooks<Schema, Options> {
-    const merge = (rootOpt: unknown, opt: unknown): Accessor<any> => {
-        return () => {
-            const rootOptVal = typeof rootOpt === 'function' ? rootOpt() : rootOpt;
-            const optVal = typeof opt === 'function' ? opt() : opt;
-            return { ...rootOptVal, ...optVal };
-        };
-    };
-
     const result = Object.keys(schema.models).reduce(
         (acc, model) => {
             (acc as any)[lowerCaseFirst(model)] = useModelQueries<Schema, GetModels<Schema>, Options>(
@@ -316,14 +316,6 @@ export function useModelQueries<
     }
 
     const modelName = modelDef.name;
-
-    const merge = (rootOpt: unknown, opt: unknown): Accessor<any> => {
-        return () => {
-            const rootOptVal = typeof rootOpt === 'function' ? rootOpt() : rootOpt;
-            const optVal = typeof opt === 'function' ? opt() : opt;
-            return { ...rootOptVal, ...optVal };
-        };
-    };
 
     return {
         useFindUnique: (args: any, options?: any) => {
@@ -434,7 +426,7 @@ export function useInternalInfiniteQuery<TQueryFnData, TData>(
             CreateInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>,
             'queryKey' | 'initialPageParam'
         > &
-            QueryContext
+        QueryContext
     >,
 ) {
     const { endpoint, fetch } = useFetchOptions(options);

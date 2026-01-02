@@ -35,7 +35,7 @@ export type RPCApiHandlerOptions<Schema extends SchemaDef = SchemaDef> = {
  * RPC style API request handler that mirrors the ZenStackClient API
  */
 export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiHandler<Schema> {
-    constructor(private readonly options: RPCApiHandlerOptions<Schema>) {}
+    constructor(private readonly options: RPCApiHandlerOptions<Schema>) { }
 
     get schema(): Schema {
         return this.options.schema;
@@ -154,7 +154,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
 
             const clientResult = await (client as any)[model][op](processedArgs);
             let responseBody: any = { data: clientResult };
-            
+
             // superjson serialize response
             if (clientResult) {
                 const { json, meta } = SuperJSON.serialize(clientResult);
@@ -318,7 +318,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                 status = 400;
                 error.dbErrorCode = err.dbErrorCode;
             })
-            .otherwise(() => {});
+            .otherwise(() => { });
 
         const resp = { status, body: { error } };
         log(this.options.log, 'debug', () => `sending error response: ${safeJSONStringify(resp)}`);

@@ -11,7 +11,7 @@ import type { ApiHandler, LogConfig, RequestContext, Response } from '../../type
 import { getZodErrorMessage, log, registerCustomSerializers } from '../utils';
 import {
     getProcedureDef,
-    mapProcedureArgs as mapProcedureArgsCommon,
+    mapProcedureArgs,
 } from '../common/procedures';
 import {
     processSuperJsonRequestPayload,
@@ -528,7 +528,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
 
         let procInput: unknown;
         try {
-            procInput = this.mapProcedureArgs(procDef, processedArgsPayload);
+            procInput = mapProcedureArgs(procDef, processedArgsPayload);
         } catch (err) {
             return this.makeProcBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
         }
@@ -553,13 +553,6 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             }
             return this.makeProcGenericErrorResponse(err);
         }
-    }
-
-    private mapProcedureArgs(
-        procDef: { params: ReadonlyArray<{ name: string; optional?: boolean; array?: boolean }> },
-        payload: unknown,
-    ): unknown {
-        return mapProcedureArgsCommon(procDef, payload);
     }
 
     private makeProcBadInputErrorResponse(message: string): Response {
@@ -933,16 +926,16 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             prev:
                 offset - limit >= 0 && offset - limit <= total - 1
                     ? this.replaceURLSearchParams(baseUrl, {
-                          'page[offset]': offset - limit,
-                          'page[limit]': limit,
-                      })
+                        'page[offset]': offset - limit,
+                        'page[limit]': limit,
+                    })
                     : null,
             next:
                 offset + limit <= total - 1
                     ? this.replaceURLSearchParams(baseUrl, {
-                          'page[offset]': offset + limit,
-                          'page[limit]': limit,
-                      })
+                        'page[offset]': offset + limit,
+                        'page[limit]': limit,
+                    })
                     : null,
         }));
     }
@@ -2008,8 +2001,8 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
                     } else {
                         currPayload[relation] = select
                             ? {
-                                  select: { ...select },
-                              }
+                                select: { ...select },
+                            }
                             : true;
                     }
                 }

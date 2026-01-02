@@ -7,7 +7,7 @@ import type { ApiHandler, LogConfig, RequestContext, Response } from '../../type
 import { log, registerCustomSerializers } from '../utils';
 import {
     getProcedureDef,
-    mapProcedureArgs as mapProcedureArgsCommon,
+    mapProcedureArgs,
 } from '../common/procedures';
 import {
     processSuperJsonRequestPayload,
@@ -233,7 +233,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
 
         let procInput: unknown;
         try {
-            procInput = this.mapProcedureArgs(procDef, processedArgsPayload);
+            procInput = mapProcedureArgs(procDef, processedArgsPayload);
         } catch (err) {
             return this.makeBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
         }
@@ -259,13 +259,6 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             }
             return this.makeGenericErrorResponse(err);
         }
-    }
-
-    private mapProcedureArgs(
-        procDef: { params: ReadonlyArray<{ name: string; optional?: boolean; array?: boolean }> },
-        payload: unknown,
-    ): unknown {
-        return mapProcedureArgsCommon(procDef, payload);
     }
 
     private isValidModel(client: ClientContract<Schema>, model: string) {

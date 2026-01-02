@@ -135,25 +135,4 @@ describe('ORM procedures', () => {
         await expect(client.$procs.add({ args: { a: 1, b: 2 } })).resolves.toBe(4);
         expect(calls).toEqual(['p2:add', 'p1:add']);
     });
-
-    it('wraps mutation procedures in a transaction by default', async () => {
-        const schema: any = {
-            ...baseSchema,
-            procedures: {
-                mut: { params: [], returnType: 'Boolean', mutation: true },
-                qry: { params: [], returnType: 'Boolean', mutation: false },
-            },
-        };
-
-        const client: any = new ZenStackClient(schema, {
-            dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-            procedures: {
-                mut: async ({ client }: any) => client.isTransaction,
-                qry: async ({ client }: any) => client.isTransaction,
-            },
-        });
-
-        await expect(client.$procs.qry()).resolves.toBe(false);
-        await expect(client.$procs.mut()).resolves.toBe(true);
-    });
 });

@@ -1,7 +1,5 @@
-import { InputValidator, ORMError } from '@zenstackhq/orm';
-import type { ClientContract } from '@zenstackhq/orm';
+import { ORMError } from '@zenstackhq/orm';
 import type { ProcedureDef, SchemaDef } from '@zenstackhq/orm/schema';
-import SuperJSON from 'superjson';
 
 export const PROCEDURE_ROUTE_PREFIXES = ['$procs'] as const;
 
@@ -11,58 +9,6 @@ export function getProcedureDef(schema: SchemaDef, proc: string): ProcedureDef |
         return undefined;
     }
     return procs[proc];
-}
-
-export function unmarshalQ(value: string, meta: string | undefined) {
-    let parsedValue: any;
-    try {
-        parsedValue = JSON.parse(value);
-    } catch {
-        throw new Error('invalid "q" query parameter');
-    }
-
-    if (meta) {
-        let parsedMeta: any;
-        try {
-            parsedMeta = JSON.parse(meta);
-        } catch {
-            throw new Error('invalid "meta" query parameter');
-        }
-
-        if (parsedMeta.serialization) {
-            return SuperJSON.deserialize({ json: parsedValue, meta: parsedMeta.serialization });
-        }
-    }
-
-    return parsedValue;
-}
-
-/**
- * Supports the SuperJSON request payload format used by other RPC-style endpoints:
- * `{ meta: { serialization }, ...json }`.
- */
-export async function processSuperJsonRequestPayload(payload: unknown) {
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !('meta' in (payload as any))) {
-        return { result: payload, error: undefined as string | undefined };
-    }
-
-    const { meta, ...rest } = payload as any;
-    if (meta?.serialization) {
-        try {
-            return {
-                result: SuperJSON.deserialize({ json: rest, meta: meta.serialization }),
-                error: undefined as string | undefined,
-            };
-        } catch (err) {
-            return {
-                result: undefined,
-                error: `failed to deserialize request payload: ${(err as Error).message}`,
-            };
-        }
-    }
-
-    // drop meta when no serialization info is present
-    return { result: rest, error: undefined as string | undefined };
 }
 
 export function mapProcedureArgs(
@@ -138,20 +84,6 @@ export function mapProcedureArgs(
     }
 
     return payload;
-}
-
-export function validateProcedureArgs<Schema extends SchemaDef>(
-    client: ClientContract<Schema>,
-    proc: string,
-    input: unknown,
-): unknown {
-    // Respect the global input validation toggle.
-    if (client.$options.validateInput === false) {
-        return input;
-    }
-
-    const validator = new InputValidator(client as any);
-    return validator.validateProcedureInput(proc, input);
 }
 
 export function isOrmError(err: unknown): err is ORMError {

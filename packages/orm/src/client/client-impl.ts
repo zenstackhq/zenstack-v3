@@ -237,7 +237,7 @@ export class ClientImpl {
             }
         >;
         if (!procOptions[name] || typeof procOptions[name] !== 'function') {
-            throw new Error(`Procedure "${name}" does not have a handler configured.`);
+            throw createConfigError(`Procedure "${name}" does not have a handler configured.`);
         }
 
         // Validate inputs using the same validator infrastructure as CRUD operations.
@@ -248,9 +248,10 @@ export class ClientImpl {
 
         const invokeWithClient = async (client: any, _input: unknown) => {
             let proceed = async (nextInput: unknown) => {
-                // Handler signature: (ctx)
-                const args = nextInput && typeof nextInput === 'object' && 'args' in (nextInput as any) ? (nextInput as any).args : undefined;
-                return handler({ client, args });
+                const sanitizedNextInput =
+                    nextInput && typeof nextInput === 'object' && !Array.isArray(nextInput) ? nextInput : {};
+
+                return handler({ client, ...sanitizedNextInput });
             };
 
             // apply plugins
@@ -272,12 +273,6 @@ export class ClientImpl {
 
             return proceed(_input);
         };
-
-        // Transaction support: mutation procedures automatically run inside a transaction
-        // unless we're already in one.
-        if (procDef.mutation && !this.isTransaction) {
-            return this.$transaction((tx) => invokeWithClient(tx as any, validatedInput));
-        }
 
         return invokeWithClient(this as any, validatedInput);
     }

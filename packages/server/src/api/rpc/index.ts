@@ -8,10 +8,11 @@ import { log, registerCustomSerializers } from '../utils';
 import {
     getProcedureDef,
     mapProcedureArgs as mapProcedureArgsCommon,
-    processSuperJsonRequestPayload,
-    unmarshalQ as unmarshalQCommon,
-    validateProcedureArgs,
 } from '../common/procedures';
+import {
+    processSuperJsonRequestPayload,
+    unmarshalQ,
+} from '../common/utils';
 
 registerCustomSerializers();
 
@@ -95,7 +96,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                 }
                 try {
                     args = query?.['q']
-                        ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
+                        ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
                         : {};
                 } catch {
                     return this.makeBadInputErrorResponse('invalid "q" query parameter');
@@ -122,7 +123,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                 }
                 try {
                     args = query?.['q']
-                        ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
+                        ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
                         : {};
                 } catch (err) {
                     return this.makeBadInputErrorResponse(
@@ -152,12 +153,15 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             );
 
             const clientResult = await (client as any)[model][op](processedArgs);
-
-            // superjson serialize response (must handle falsy values like 0/false/null/undefined)
-            const { json, meta } = SuperJSON.serialize(clientResult);
-            const responseBody: any = { data: json };
-            if (meta) {
-                responseBody.meta = { serialization: meta };
+            let responseBody: any = { data: clientResult };
+            
+            // superjson serialize response
+            if (clientResult) {
+                const { json, meta } = SuperJSON.serialize(clientResult);
+                responseBody = { data: json };
+                if (meta) {
+                    responseBody.meta = { serialization: meta };
+                }
             }
 
             const response = { status: resCode, body: responseBody };
@@ -211,60 +215,26 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             }
         }
 
-        let argsPayload: unknown;
-        if (method === 'POST') {
-            if (typeof requestBody !== 'undefined') {
-                argsPayload = requestBody;
-            } else {
-                // allow mutation procedures to pass arguments via query string too,
-                // so that arrays/primitives and SuperJSON metadata are supported
-                try {
-                    argsPayload = query?.['q']
-                        ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
-                        : undefined;
-                } catch (err) {
-                    return this.makeBadInputErrorResponse(
-                        err instanceof Error ? err.message : 'invalid "q" query parameter',
-                    );
-                }
-            }
-        } else {
+        let argsPayload = method === 'POST' ? requestBody : undefined;
+        if (method === 'GET') {
             try {
                 argsPayload = query?.['q']
-                    ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
+                    ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
                     : undefined;
             } catch (err) {
                 return this.makeBadInputErrorResponse(err instanceof Error ? err.message : 'invalid "q" query parameter');
             }
         }
 
-        let processedArgsPayload = argsPayload;
-        if (
-            argsPayload &&
-            typeof argsPayload === 'object' &&
-            !Array.isArray(argsPayload) &&
-            'meta' in (argsPayload as any)
-        ) {
-            const { result, error } = await processSuperJsonRequestPayload(argsPayload);
-            if (error) {
-                return this.makeBadInputErrorResponse(error);
-            }
-            processedArgsPayload = result;
+        const { result: processedArgsPayload, error } = await processSuperJsonRequestPayload(argsPayload);
+        if (error) {
+            return this.makeBadInputErrorResponse(error);
         }
 
         let procInput: unknown;
         try {
             procInput = this.mapProcedureArgs(procDef, processedArgsPayload);
         } catch (err) {
-            return this.makeBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
-        }
-
-        try {
-            validateProcedureArgs(client, proc, procInput);
-        } catch (err) {
-            if (err instanceof ORMError) {
-                return this.makeORMErrorResponse(err);
-            }
             return this.makeBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
         }
 
@@ -369,9 +339,5 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             args = rest;
         }
         return { result: args, error: undefined };
-    }
-
-    private unmarshalQ(value: string, meta: string | undefined) {
-        return unmarshalQCommon(value, meta);
     }
 }

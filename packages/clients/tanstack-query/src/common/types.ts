@@ -1,6 +1,6 @@
 import type { Logger, OptimisticDataProvider } from '@zenstackhq/client-helpers';
 import type { FetchFn } from '@zenstackhq/client-helpers/fetch';
-import type { OperationsIneligibleForDelegateModels } from '@zenstackhq/orm';
+import type { OperationsIneligibleForDelegateModels, ProcedureFunc } from '@zenstackhq/orm';
 import type { GetModels, IsDelegateModel, SchemaDef } from '@zenstackhq/schema';
 
 /**
@@ -76,3 +76,24 @@ type WithOptimisticFlag<T> = T extends object
     : T;
 
 export type WithOptimistic<T> = T extends Array<infer U> ? Array<WithOptimisticFlag<U>> : WithOptimisticFlag<T>;
+
+export type ExtractProcedures<Schema extends SchemaDef> = Schema extends { procedures: Record<string, any> }
+    ? NonNullable<Schema['procedures']>
+    : never;
+
+export type ProcedureArgsTuple<Schema extends SchemaDef, Name extends keyof ExtractProcedures<Schema>> = Parameters<
+    ProcedureFunc<Schema, ExtractProcedures<Schema>[Name]>
+>;
+
+export type ProcedureReturn<Schema extends SchemaDef, Name extends keyof ExtractProcedures<Schema>> = Awaited<ReturnType<
+    ProcedureFunc<Schema, ExtractProcedures<Schema>[Name]>
+>>;
+
+export type NormalizeProcedurePayload<TArgs> = TArgs extends []
+        ? undefined
+        : TArgs extends [infer A]
+            ? A
+            : TArgs;
+
+export type ProcedurePayload<Schema extends SchemaDef, Name extends keyof ExtractProcedures<Schema>> =
+        NormalizeProcedurePayload<ProcedureArgsTuple<Schema, Name>>;

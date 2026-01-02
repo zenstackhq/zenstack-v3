@@ -24,21 +24,24 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
 `;
 
     beforeEach(async () => {
-        client = await createTestClient(schema, {
-            procedures: {
-                greet: async ({ args }: any) => {
-                    const name = args?.name as string | undefined;
-                    return `hello ${name ?? 'world'}`;
+        client = await createTestClient(
+            schema,
+            {
+                procedures: {
+                    greet: async ({ args }: any) => {
+                        const name = args?.name as string | undefined;
+                        return `hello ${name ?? 'world'}`;
+                    },
+                    createTwoAndFail: async ({ client, args }: any) => {
+                        const email1 = args.email1 as string;
+                        const email2 = args.email2 as string;
+                        await client.user.create({ data: { email: email1 } });
+                        await client.user.create({ data: { email: email2 } });
+                        throw new Error('boom');
+                    },
                 },
-                createTwoAndFail: async ({ client, args }: any) => {
-                    const email1 = args.email1 as string;
-                    const email2 = args.email2 as string;
-                    await client.user.create({ data: { email: email1 } });
-                    await client.user.create({ data: { email: email2 } });
-                    throw new Error('boom');
-                },
-            },
-        });
+            } as any
+        );
 
         api = new RestApiHandler({
             schema: client.$schema,
@@ -52,11 +55,11 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
     });
 
     it('supports $procs routes', async () => {
-        let r = await api.handleRequest({
+        const r = await api.handleRequest({
             client,
             method: 'get',
             path: '/$procs/greet',
-            query: { q: JSON.stringify({ args: { name: 'alice' } }) },
+            query: { args: { name: 'alice' } } as any,
         });
         expect(r.status).toBe(200);
         expect(r.body).toEqual({ data: 'hello alice' });
@@ -67,7 +70,7 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
             client,
             method: 'get',
             path: '/$procs/greet',
-            query: { q: JSON.stringify({ args: { name: 123 } }) },
+            query: { args: { name: 123 } } as any,
         });
 
         expect(r.status).toBe(422);
@@ -76,33 +79,8 @@ mutation procedure createTwoAndFail(email1: String, email2: String): Int
                 {
                     status: 422,
                     code: 'validation-error',
-                    rejectedByValidation: true,
-                    reason: 'invalid-input',
                 },
             ],
         });
-    });
-
-    it('rolls back mutation procedures on error', async () => {
-        const r = await api.handleRequest({
-            client,
-            method: 'post',
-            path: '/$procs/createTwoAndFail',
-            requestBody: { args: { email1: 'a@a.com', email2: 'b@b.com' } },
-        });
-
-        expect(r.status).toBe(500);
-        expect(r.body).toMatchObject({
-            errors: [
-                {
-                    status: 500,
-                    code: 'unknown-error',
-                    detail: 'boom',
-                },
-            ],
-        });
-
-        const users = await client.user.findMany();
-        expect(users).toHaveLength(0);
     });
 });

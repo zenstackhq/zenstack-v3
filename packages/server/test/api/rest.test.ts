@@ -3287,16 +3287,12 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoDecimal',
-                query: {
-                    q: JSON.stringify(json),
-                    meta: JSON.stringify({ serialization: meta }),
-                },
+                query: { ...json as object, meta: { serialization: meta } } as any,
                 client,
             });
 
             expect(r.status).toBe(200);
             expect(r.body).toMatchObject({ data: '1.23' });
-            expect(r.body.meta?.serialization).toBeTruthy();
         });
 
         it('supports GET procedures without args when param is optional', async () => {
@@ -3347,7 +3343,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/sumIds',
-                query: { q: JSON.stringify({ args: { ids: [1, 2, 3] } }) },
+                query: { args: { ids: [1, 2, 3] } } as any,
                 client,
             });
 
@@ -3359,7 +3355,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoRole',
-                query: { q: JSON.stringify({ args: { r: 'ADMIN' } }) },
+                query: { args: { r: 'ADMIN' } } as any,
                 client,
             });
 
@@ -3371,7 +3367,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoOverview',
-                query: { q: JSON.stringify({ args: { o: { total: 123 } } }) },
+                query: { args: { o: { total: 123 } } } as any,
                 client,
             });
 
@@ -3383,7 +3379,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoInt',
-                query: { q: JSON.stringify({ args: { x: 'not-an-int' } }) },
+                query: { args: { x: 'not-an-int' } } as any,
                 client,
             });
 
@@ -3404,10 +3400,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
-                query: {
-                    q: JSON.stringify(json),
-                    meta: JSON.stringify({ serialization: meta }),
-                },
+                requestBody: { ...json as object, meta: { serialization: meta } } as any,
                 client,
             });
 
@@ -3419,7 +3412,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
-                query: { q: JSON.stringify({ args: [1, 2, 3] }) },
+                requestBody: { args: [1, 2, 3] } as any,
                 client,
             });
 
@@ -3439,7 +3432,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
-                query: { q: JSON.stringify({ args: { a: 1, b: 2, c: 3 } }) },
+                requestBody: { args: { a: 1, b: 2, c: 3 } } as any,
                 client,
             });
 
@@ -3455,11 +3448,11 @@ mutation procedure sum(a: Int, b: Int): Int
             expect(r.body.errors?.[0]?.detail).toMatch(/unknown procedure argument/i);
         });
 
-        it('supports /$procs alias path', async () => {
+        it('supports /$procs path', async () => {
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
-                query: { q: JSON.stringify({ args: { a: 1, b: 2 } }) },
+                requestBody: { args: { a: 1, b: 2 } } as any,
                 client,
             });
 

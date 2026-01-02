@@ -12,10 +12,10 @@ import { getZodErrorMessage, log, registerCustomSerializers } from '../utils';
 import {
     getProcedureDef,
     mapProcedureArgs as mapProcedureArgsCommon,
-    processSuperJsonRequestPayload,
-    unmarshalQ as unmarshalQCommon,
-    validateProcedureArgs,
 } from '../common/procedures';
+import {
+    processSuperJsonRequestPayload,
+} from '../common/utils';
 
 /**
  * Options for {@link RestApiHandler}
@@ -518,41 +518,12 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             }
         }
 
-        let argsPayload: unknown;
-        if (method === 'POST') {
-            if (typeof requestBody !== 'undefined') {
-                argsPayload = requestBody;
-            } else {
-                try {
-                    argsPayload = query?.['q']
-                        ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
-                        : undefined;
-                } catch (err) {
-                    return this.makeProcBadInputErrorResponse(
-                        err instanceof Error ? err.message : 'invalid "q" query parameter',
-                    );
-                }
-            }
-        } else {
-            try {
-                argsPayload = query?.['q']
-                    ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
-                    : undefined;
-            } catch (err) {
-                return this.makeProcBadInputErrorResponse(
-                    err instanceof Error ? err.message : 'invalid "q" query parameter',
-                );
-            }
-        }
+        const argsPayload = method === 'POST' ? requestBody : query;
 
-        // support SuperJSON request payload format used by other RPC-style endpoints
-        let processedArgsPayload = argsPayload;
-        if (argsPayload && typeof argsPayload === 'object' && !Array.isArray(argsPayload) && 'meta' in (argsPayload as any)) {
-            const { result, error } = await processSuperJsonRequestPayload(argsPayload);
-            if (error) {
-                return this.makeProcBadInputErrorResponse(error);
-            }
-            processedArgsPayload = result;
+        // support SuperJSON request payload format
+        const { result: processedArgsPayload, error } = await processSuperJsonRequestPayload(argsPayload);
+        if (error) {
+            return this.makeProcBadInputErrorResponse(error);
         }
 
         let procInput: unknown;
@@ -563,20 +534,12 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         }
 
         try {
-            validateProcedureArgs(client, proc, procInput);
-        } catch (err) {
-            if (err instanceof ORMError) {
-                return this.makeProcORMErrorResponse(err);
-            }
-            return this.makeProcBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
-        }
-
-        try {
             log(this.log, 'debug', () => `handling "$procs.${proc}" request`);
 
             const clientResult = await (client as any).$procs?.[proc](procInput);
+            const toSerialize = this.toPlainObject(clientResult);
 
-            const { json, meta } = SuperJSON.serialize(clientResult);
+            const { json, meta } = SuperJSON.serialize(toSerialize);
             const responseBody: any = { data: json };
             if (meta) {
                 responseBody.meta = { serialization: meta };
@@ -586,7 +549,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         } catch (err) {
             log(this.log, 'error', `error occurred when handling "$procs.${proc}" request`, err);
             if (err instanceof ORMError) {
-                return this.makeProcORMErrorResponse(err);
+                throw err; // top-level handler will take care of it
             }
             return this.makeProcGenericErrorResponse(err);
         }
@@ -599,10 +562,6 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         return mapProcedureArgsCommon(procDef, payload);
     }
 
-    private unmarshalQ(value: string, meta: string | undefined) {
-        return unmarshalQCommon(value, meta);
-    }
-
     private makeProcBadInputErrorResponse(message: string): Response {
         const resp = this.makeError('invalidPayload', message, 400);
         log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
@@ -612,42 +571,6 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
     private makeProcGenericErrorResponse(err: unknown): Response {
         const message = err instanceof Error ? err.message : 'unknown error';
         const resp = this.makeError('unknownError', message, 500);
-        log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
-        return resp;
-    }
-
-    private makeProcORMErrorResponse(err: ORMError): Response {
-        const reason = paramCase(String(err.reason));
-
-        const resp = match(err.reason)
-            .with(ORMErrorReason.NOT_FOUND, () => {
-                return this.makeError('notFound', err.message, 404, { reason, model: err.model });
-            })
-            .with(ORMErrorReason.INVALID_INPUT, () => {
-                return this.makeError('validationError', err.message, 422, {
-                    reason,
-                    rejectedByValidation: true,
-                    model: err.model,
-                });
-            })
-            .with(ORMErrorReason.REJECTED_BY_POLICY, () => {
-                return this.makeError('forbidden', err.message, 403, {
-                    reason,
-                    rejectedByPolicy: true,
-                    rejectReason: err.rejectedByPolicyReason,
-                    model: err.model,
-                });
-            })
-            .with(ORMErrorReason.DB_QUERY_ERROR, () => {
-                return this.makeError('queryError', err.message, 400, {
-                    reason,
-                    dbErrorCode: err.dbErrorCode,
-                });
-            })
-            .otherwise(() => {
-                return this.makeError('unknownError', err.message, 500, { reason });
-            });
-
         log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
         return resp;
     }

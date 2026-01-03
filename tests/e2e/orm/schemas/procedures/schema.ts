@@ -23,16 +23,21 @@ export class SchemaType implements SchemaDef {
                 },
                 name: {
                     name: "name",
-                    type: "String"
+                    type: "String",
+                    unique: true,
+                    attributes: [{ name: "@unique" }]
                 },
                 role: {
                     name: "role",
-                    type: "Role"
+                    type: "Role",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("USER") }] }],
+                    default: "USER"
                 }
             },
             idFields: ["id"],
             uniqueFields: {
-                id: { type: "Int" }
+                id: { type: "Int" },
+                name: { type: "String" }
             }
         }
     } as const;
@@ -89,83 +94,53 @@ export class SchemaType implements SchemaDef {
             returnType: "User",
             returnArray: true
         },
-        findByIds: {
+        signUp: {
             params: [
-                { name: "ids", array: true, type: "Int" }
-            ] as [
-                ids: {
-                    "name": "ids";
-                    "type": "Int";
-                    "array": true;
-                }
-            ],
-            returnType: "User",
-            returnArray: true
-        },
-        overview: {
-            params: [] as [
-            ],
-            returnType: "Overview"
-        },
-        getRole: {
-            params: [] as [
-            ],
-            returnType: "Role"
-        },
-        getRoles: {
-            params: [] as [
-            ],
-            returnType: "Role",
-            returnArray: true
-        },
-        getNull: {
-            params: [] as [
-            ],
-            returnType: "Null"
-        },
-        getVoid: {
-            params: [] as [
-            ],
-            returnType: "Void"
-        },
-        getUndefined: {
-            params: [] as [
-            ],
-            returnType: "Undefined"
-        },
-        greet: {
-            params: [
-                { name: "name", optional: true, type: "String" }
+                { name: "name", type: "String" },
+                { name: "role", optional: true, type: "Role" }
             ] as [
                 name: {
                     "name": "name";
                     "type": "String";
+                },
+                role: {
+                    "name": "role";
+                    "type": "Role";
                     "optional": true;
                 }
             ],
-            returnType: "String"
+            returnType: "User",
+            mutation: true
         },
-        echoJson: {
+        setAdmin: {
             params: [
-                { name: "payload", type: "Json" }
+                { name: "userId", type: "Int" }
             ] as [
-                payload: {
-                    "name": "payload";
-                    "type": "Json";
+                userId: {
+                    "name": "userId";
+                    "type": "Int";
                 }
             ],
-            returnType: "Json"
+            returnType: "Void"
         },
-        echoBytes: {
+        getOverview: {
+            params: [] as [
+            ],
+            returnType: "Overview"
+        },
+        createMultiple: {
             params: [
-                { name: "payload", type: "Bytes" }
+                { name: "names", array: true, type: "String" }
             ] as [
-                payload: {
-                    "name": "payload";
-                    "type": "Bytes";
+                names: {
+                    "name": "names";
+                    "type": "String";
+                    "array": true;
                 }
             ],
-            returnType: "Bytes"
+            returnType: "User",
+            returnArray: true,
+            mutation: true
         }
     } as const;
     plugins = {};

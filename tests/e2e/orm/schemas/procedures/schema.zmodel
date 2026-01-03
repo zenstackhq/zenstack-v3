@@ -17,19 +17,13 @@ type Overview {
 
 model User {
     id Int @id @default(autoincrement())
-    name String
-    role Role
+    name String @unique
+    role Role @default(USER)
 }
 
 procedure getUser(id: Int): User
 procedure listUsers(): User[]
-procedure findByIds(ids: Int[]): User[]
-procedure overview(): Overview
-procedure getRole(): Role
-procedure getRoles(): Role[]
-procedure getNull(): Null
-procedure getVoid(): Void
-procedure getUndefined(): Undefined
-procedure greet(name: String?): String
-procedure echoJson(payload: Json): Json
-procedure echoBytes(payload: Bytes): Bytes
+mutation procedure signUp(name: String, role: Role?): User
+procedure setAdmin(userId: Int): Void
+procedure getOverview(): Overview
+mutation procedure createMultiple(names: String[]): User[]

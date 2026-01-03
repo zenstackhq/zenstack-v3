@@ -24,6 +24,6 @@ model User {
 procedure getUser(id: Int): User
 procedure listUsers(): User[]
 mutation procedure signUp(name: String, role: Role?): User
-procedure setAdmin(userId: Int): Void
+mutation procedure setAdmin(userId: Int): Void
 procedure getOverview(): Overview
 mutation procedure createMultiple(names: String[]): User[]

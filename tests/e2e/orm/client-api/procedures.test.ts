@@ -11,14 +11,14 @@ describe('Procedures tests', () => {
         client = await createTestClient(schema, {
             procedures: {
                 // Query procedure that returns a single User
-                getUser: async ({ args: { id } }) => {
+                getUser: async ({ client, args: { id } }) => {
                     return await client.user.findUniqueOrThrow({
                         where: { id },
                     });
                 },
 
                 // Query procedure that returns an array of Users
-                listUsers: async () => {
+                listUsers: async ({ client }) => {
                     return await client.user.findMany();
                 },
 
@@ -41,7 +41,7 @@ describe('Procedures tests', () => {
                 },
 
                 // Query procedure that returns a custom type
-                getOverview: async () => {
+                getOverview: async ({ client }) => {
                     const userIds = await client.user.findMany({ select: { id: true } });
                     const total = await client.user.count();
                     return {
@@ -197,5 +197,21 @@ describe('Procedures tests', () => {
                 expect.objectContaining({ name: 'Bob' }),
             ]),
         );
+    });
+
+    it('respects the outer transaction context', async () => {
+        // outer client creates a transaction
+        await expect(
+            client.$transaction(async (tx) => {
+                await tx.$procs.signUp({ args: { name: 'Alice' } });
+                await tx.$procs.signUp({ args: { name: 'Alice' } });
+            }),
+        ).rejects.toThrow();
+        await expect(client.user.count()).resolves.toBe(0);
+
+        // without transaction
+        await client.$procs.signUp({ args: { name: 'Alice' } });
+        await expect(client.$procs.signUp({ args: { name: 'Alice' } })).rejects.toThrow();
+        await expect(client.user.count()).resolves.toBe(1);
     });
 });

@@ -121,7 +121,8 @@ export class SchemaType implements SchemaDef {
                     "type": "Int";
                 }
             ],
-            returnType: "Void"
+            returnType: "Void",
+            mutation: true
         },
         getOverview: {
             params: [] as [

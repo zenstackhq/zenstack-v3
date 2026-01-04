@@ -181,7 +181,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const r = await kysely.getExecutor().executeQuery(compiled);
             result = r.rows;
         } catch (err) {
-            throw createDBQueryError('Failed to execute query', err, compiled.sql, compiled.parameters);
+            throw createDBQueryError(`Failed to execute query: ${err}`, err, compiled.sql, compiled.parameters);
         }
 
         return result;

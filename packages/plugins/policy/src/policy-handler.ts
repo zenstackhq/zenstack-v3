@@ -1,6 +1,6 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import type { BaseCrudDialect, ClientContract, ProceedKyselyQueryFunction } from '@zenstackhq/orm';
-import { getCrudDialect, QueryUtils, RejectedByPolicyReason, SchemaUtils, type CRUD_EXT } from '@zenstackhq/orm';
+import type { BaseCrudDialect, ClientContract, CRUD_EXT, ProceedKyselyQueryFunction } from '@zenstackhq/orm';
+import { getCrudDialect, QueryUtils, RejectedByPolicyReason, SchemaUtils } from '@zenstackhq/orm';
 import {
     ExpressionUtils,
     type BuiltinType,
@@ -52,15 +52,17 @@ import {
     createUnsupportedError,
     disjunction,
     falseNode,
-    getColumnName,
     getTableName,
     isBeforeInvocation,
+    isTrueNode,
     trueNode,
 } from './utils';
 
 export type CrudQueryNode = SelectQueryNode | InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
 
 export type MutationQueryNode = InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
+
+type FieldLevelPolicyOperations = Exclude<CRUD_EXT, 'create' | 'delete'>;
 
 export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransformer {
     private readonly dialect: BaseCrudDialect<Schema>;
@@ -73,6 +75,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     get kysely() {
         return this.client.$qb;
     }
+
+    // #region main entry point
 
     async handle(node: RootOperationNode, proceed: ProceedKyselyQueryFunction) {
         if (!this.isCrudQueryNode(node)) {
@@ -91,6 +95,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const { mutationModel } = this.getMutationModel(node);
 
+        // reject non-existing model
         this.tryRejectNonexistentModel(mutationModel);
 
         // --- Pre mutation work ---
@@ -225,6 +230,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
     }
 
+    // #endregion
+
     // correction to kysely mutation result may be needed because we might have added
     // returning clause to the query and caused changes to the result shape
     private postProcessMutationResult(result: QueryResult<any>, node: MutationQueryNode) {
@@ -239,66 +246,6 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
     }
 
-    hasPostUpdatePolicies(model: string) {
-        const policies = this.getModelPolicies(model, 'post-update');
-        return policies.length > 0;
-    }
-
-    private async loadBeforeUpdateEntities(
-        model: string,
-        where: WhereNode | undefined,
-        proceed: ProceedKyselyQueryFunction,
-    ) {
-        const beforeUpdateAccessFields = this.getFieldsAccessForBeforeUpdatePolicies(model);
-        if (!beforeUpdateAccessFields || beforeUpdateAccessFields.length === 0) {
-            return undefined;
-        }
-
-        // combine update's where with policy filter
-        const policyFilter = this.buildPolicyFilter(model, model, 'update');
-        const combinedFilter = where ? conjunction(this.dialect, [where.where, policyFilter]) : policyFilter;
-
-        const query: SelectQueryNode = {
-            kind: 'SelectQueryNode',
-            from: FromNode.create([TableNode.create(model)]),
-            where: WhereNode.create(combinedFilter),
-            selections: [...beforeUpdateAccessFields.map((f) => SelectionNode.create(ColumnNode.create(f)))],
-        };
-        const result = await proceed(query);
-        return { fields: beforeUpdateAccessFields, rows: result.rows };
-    }
-
-    private getFieldsAccessForBeforeUpdatePolicies(model: string) {
-        const policies = this.getModelPolicies(model, 'post-update');
-        if (policies.length === 0) {
-            return undefined;
-        }
-
-        const fields = new Set<string>();
-        const fieldCollector = new (class extends SchemaUtils.ExpressionVisitor {
-            protected override visitMember(e: MemberExpression): void {
-                if (isBeforeInvocation(e.receiver)) {
-                    invariant(e.members.length === 1, 'before() can only be followed by a scalar field access');
-                    fields.add(e.members[0]!);
-                }
-                super.visitMember(e);
-            }
-        })();
-
-        for (const policy of policies) {
-            fieldCollector.visit(policy.condition);
-        }
-
-        if (fields.size === 0) {
-            return undefined;
-        }
-
-        // make sure id fields are included
-        QueryUtils.requireIdFields(this.client.$schema, model).forEach((f) => fields.add(f));
-
-        return Array.from(fields).sort();
-    }
-
     // #region overrides
 
     protected override transformSelectQuery(node: SelectQueryNode) {
@@ -306,60 +253,56 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             return super.transformSelectQuery(node);
         }
 
-        let whereNode = this.transformNode(node.where);
+        // reject non-existing tables
+        this.tryRejectNonexistingTables(node.from.froms);
 
-        // get combined policy filter for all froms, and merge into where clause
-        const policyFilter = this.createPolicyFilterForFrom(node.from);
-        if (policyFilter) {
-            whereNode = WhereNode.create(
-                whereNode?.where ? conjunction(this.dialect, [whereNode.where, policyFilter]) : policyFilter,
-            );
-        }
+        let result = super.transformSelectQuery(node);
 
-        const baseResult = super.transformSelectQuery({
-            ...node,
-            where: undefined,
-        });
-
-        let selections = baseResult.selections;
-        const model = getTableName(node.from);
-        if (model && selections?.some((selection) => this.involvesFieldLevelPolicy(model, selection))) {
-            const updatedSelections: SelectionNode[] = [];
-            for (const selection of selections) {
-                updatedSelections.push(this.injectSelectionWithFieldLevelPolicy(model, selection));
-            }
-            selections = updatedSelections;
-        }
-
-        return {
-            ...baseResult,
-            selections,
-            where: whereNode,
-        };
-    }
-
-    private involvesFieldLevelPolicy(model: string, selection: SelectionNode): boolean {
-        const modelDef = QueryUtils.requireModel(this.client.$schema, model);
-
-        const hasFieldLevelPolicy = (fieldName: string) => {
-            const fieldDef = modelDef.fields[fieldName];
-            if (!fieldDef) {
+        const hasFieldLevelPolicies = node.from.froms.some((table) => {
+            const extractedTable = this.extractTableName(table);
+            if (extractedTable) {
+                return this.hasFieldLevelPolicies(extractedTable.model);
+            } else {
                 return false;
             }
-            return !!fieldDef.attributes?.some((attr) => ['@allow', '@deny'].includes(attr.name));
-        };
+        });
 
-        if (SelectAllNode.is(selection.selection)) {
-            const fields = Object.keys(modelDef.fields);
-            return fields.some(hasFieldLevelPolicy);
+        if (hasFieldLevelPolicies) {
+            // when a select query involves field-level policies, we build a nested query selecting all fields guarded with:
+            //    CASE WHEN <field policy> THEN <field> ELSE NULL END
+            // model-level policies is also applied at this nested query level
+
+            const updatedFroms: OperationNode[] = [];
+            for (const table of result.from!.froms) {
+                const extractedTable = this.extractTableName(table);
+                if (extractedTable?.model) {
+                    const { query } = this.createSelectAllFieldsWithPolicies(
+                        extractedTable.model,
+                        extractedTable.alias,
+                        'read',
+                    );
+                    updatedFroms.push(query);
+                } else {
+                    // keep the original from
+                    updatedFroms.push(table);
+                }
+            }
+            result = { ...result, from: FromNode.create(updatedFroms) };
         } else {
-            const column = getColumnName(selection.selection);
-            return column ? hasFieldLevelPolicy(column) : false;
-        }
-    }
+            // when there's no field-level policies, we merge model-level policy filters into where clause directly
+            // for generating simpler SQL
 
-    private injectSelectionWithFieldLevelPolicy(model: string, selection: SelectionNode): SelectionNode {
-        throw new Error('Method not implemented.');
+            let whereNode = this.transformNode(node.where);
+            const policyFilter = this.createPolicyFilterForFrom(node.from);
+            if (policyFilter && !isTrueNode(policyFilter)) {
+                whereNode = WhereNode.create(
+                    whereNode?.where ? conjunction(this.dialect, [whereNode.where, policyFilter]) : policyFilter,
+                );
+            }
+            result = { ...result, where: whereNode };
+        }
+
+        return result;
     }
 
     protected override transformJoin(node: JoinNode) {
@@ -369,20 +312,26 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             return super.transformJoin(node);
         }
 
+        // reject non-existing model
         this.tryRejectNonexistentModel(table.model);
 
-        // build a nested query with policy filter applied
-        const filter = this.buildPolicyFilter(table.model, table.alias, 'read');
+        const result = super.transformJoin(node);
 
-        const nestedSelect: SelectQueryNode = {
-            kind: 'SelectQueryNode',
-            from: FromNode.create([node.table]),
-            selections: [SelectionNode.createSelectAll()],
-            where: WhereNode.create(filter),
-        };
+        const { hasPolicies, query: nestedQuery } = this.createSelectAllFieldsWithPolicies(
+            table.model,
+            table.alias,
+            'read',
+        );
+
+        // join table has no policies, keep it as is
+        if (!hasPolicies) {
+            return result;
+        }
+
+        // otherwise replace it with the nested query guarded with policies
         return {
-            ...node,
-            table: AliasNode.create(ParensNode.create(nestedSelect), IdentifierNode.create(table.alias ?? table.model)),
+            ...result,
+            table: nestedQuery,
         };
     }
 
@@ -467,6 +416,9 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         let filter = this.buildPolicyFilter(mutationModel, alias, 'delete');
 
         if (node.using) {
+            // reject non-existing tables
+            this.tryRejectNonexistingTables(node.using.tables);
+
             // for delete with using (join), we need to merge join tables' policy filters to the "where" clause
             const joinFilter = this.createPolicyFilterForTables(node.using.tables);
             if (joinFilter) {
@@ -478,6 +430,170 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             ...result,
             where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
         };
+    }
+
+    // #endregion
+
+    // #region post-update
+
+    private async loadBeforeUpdateEntities(
+        model: string,
+        where: WhereNode | undefined,
+        proceed: ProceedKyselyQueryFunction,
+    ) {
+        const beforeUpdateAccessFields = this.getFieldsAccessForBeforeUpdatePolicies(model);
+        if (!beforeUpdateAccessFields || beforeUpdateAccessFields.length === 0) {
+            return undefined;
+        }
+
+        // combine update's where with policy filter
+        const policyFilter = this.buildPolicyFilter(model, model, 'update');
+        const combinedFilter = where ? conjunction(this.dialect, [where.where, policyFilter]) : policyFilter;
+
+        const query: SelectQueryNode = {
+            kind: 'SelectQueryNode',
+            from: FromNode.create([TableNode.create(model)]),
+            where: WhereNode.create(combinedFilter),
+            selections: [...beforeUpdateAccessFields.map((f) => SelectionNode.create(ColumnNode.create(f)))],
+        };
+        const result = await proceed(query);
+        return { fields: beforeUpdateAccessFields, rows: result.rows };
+    }
+
+    private getFieldsAccessForBeforeUpdatePolicies(model: string) {
+        const policies = this.getModelPolicies(model, 'post-update');
+        if (policies.length === 0) {
+            return undefined;
+        }
+
+        const fields = new Set<string>();
+        const fieldCollector = new (class extends SchemaUtils.ExpressionVisitor {
+            protected override visitMember(e: MemberExpression): void {
+                if (isBeforeInvocation(e.receiver)) {
+                    invariant(e.members.length === 1, 'before() can only be followed by a scalar field access');
+                    fields.add(e.members[0]!);
+                }
+                super.visitMember(e);
+            }
+        })();
+
+        for (const policy of policies) {
+            fieldCollector.visit(policy.condition);
+        }
+
+        if (fields.size === 0) {
+            return undefined;
+        }
+
+        // make sure id fields are included
+        QueryUtils.requireIdFields(this.client.$schema, model).forEach((f) => fields.add(f));
+
+        return Array.from(fields).sort();
+    }
+
+    private hasPostUpdatePolicies(model: string) {
+        const policies = this.getModelPolicies(model, 'post-update');
+        return policies.length > 0;
+    }
+
+    // #endregion
+
+    // #region field-level policies
+
+    private createSelectAllFieldsWithPolicies(
+        model: string,
+        alias: string | undefined,
+        operation: FieldLevelPolicyOperations,
+    ) {
+        let hasPolicies = false;
+        const modelDef = QueryUtils.requireModel(this.client.$schema, model);
+        const selections: SelectionNode[] = [];
+        for (const fieldDef of Object.values(modelDef.fields).filter(
+            // exclude relation/computed/inherited fields
+            (f) => !f.relation && !f.computed && !f.originModel,
+        )) {
+            const { hasPolicies: fieldHasPolicies, selection } = this.createFieldSelectionWithPolicy(
+                model,
+                fieldDef.name,
+                operation,
+            );
+            hasPolicies = hasPolicies || fieldHasPolicies;
+            selections.push(selection);
+        }
+
+        const modelPolicyFilter = this.buildPolicyFilter(model, alias, operation);
+        if (!isTrueNode(modelPolicyFilter)) {
+            hasPolicies = true;
+        }
+
+        const nestedQuery: SelectQueryNode = {
+            kind: 'SelectQueryNode',
+            from: FromNode.create([TableNode.create(model)]),
+            where: isTrueNode(modelPolicyFilter) ? undefined : WhereNode.create(modelPolicyFilter),
+            selections,
+        };
+
+        return { hasPolicies, query: AliasNode.create(nestedQuery, IdentifierNode.create(alias ?? model)) };
+    }
+
+    private createFieldSelectionWithPolicy(model: string, field: string, operation: FieldLevelPolicyOperations) {
+        const filter = this.buildFieldPolicyFilter(model, field, operation);
+        if (isTrueNode(filter)) {
+            return { hasPolicies: false, selection: SelectionNode.create(ColumnNode.create(field)) };
+        }
+        const eb = expressionBuilder<any, any>();
+        // CASE WHEN <filter> THEN <field> ELSE NULL END
+        const selection = eb
+            .case()
+            .when(new ExpressionWrapper(filter))
+            .then(eb.ref(field))
+            .else(null)
+            .end()
+            .as(field)
+            .toOperationNode();
+        return { hasPolicies: true, selection: SelectionNode.create(selection) };
+    }
+
+    private hasFieldLevelPolicies(model: string): unknown {
+        const modelDef = QueryUtils.requireModel(this.client.$schema, model);
+        return Object.values(modelDef.fields).some((fieldDef) =>
+            fieldDef.attributes?.some((attr) => ['@allow', '@deny'].includes(attr.name)),
+        );
+    }
+
+    private buildFieldPolicyFilter(model: string, field: string, operation: Exclude<CRUD_EXT, 'delete'>) {
+        const policies = this.getFieldPolicies(model, field, operation);
+
+        const allows = policies
+            .filter((policy) => policy.kind === 'allow')
+            .map((policy) => this.compilePolicyCondition(model, model, operation, policy));
+
+        const denies = policies
+            .filter((policy) => policy.kind === 'deny')
+            .map((policy) => this.compilePolicyCondition(model, model, operation, policy));
+
+        // 'post-update' is by default allowed, other operations are by default denied
+        let combinedPolicy: OperationNode;
+
+        if (allows.length === 0) {
+            // field access is allowed by default
+            combinedPolicy = trueNode(this.dialect);
+        } else {
+            // or(...allows)
+            combinedPolicy = disjunction(this.dialect, allows);
+        }
+
+        // and(...!denies)
+        if (denies.length !== 0) {
+            const combinedDenies = conjunction(
+                this.dialect,
+                denies.map((d) => buildIsFalse(d, this.dialect)),
+            );
+            // or(...allows) && and(...!denies)
+            combinedPolicy = conjunction(this.dialect, [combinedPolicy, combinedDenies]);
+        }
+
+        return combinedPolicy;
     }
 
     // #endregion
@@ -912,7 +1028,6 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             const extractResult = this.extractTableName(table);
             if (extractResult) {
                 const { model, alias } = extractResult;
-                this.tryRejectNonexistentModel(model);
                 const filter = this.buildPolicyFilter(model, alias, 'read');
                 return acc ? conjunction(this.dialect, [acc, filter]) : filter;
             }
@@ -960,6 +1075,37 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                             (operation !== 'post-update' && policy.operations.includes('all')) ||
                             policy.operations.includes(operation),
                     ),
+            );
+        }
+        return result;
+    }
+
+    private getFieldPolicies(model: string, field: string, operation: CRUD_EXT) {
+        const fieldDef = QueryUtils.requireField(this.client.$schema, model, field);
+        const result: Policy[] = [];
+
+        const extractOperations = (expr: Expression) => {
+            invariant(ExpressionUtils.isLiteral(expr), 'expecting a literal');
+            invariant(typeof expr.value === 'string', 'expecting a string literal');
+            return expr.value
+                .split(',')
+                .filter((v) => !!v)
+                .map((v) => v.trim()) as PolicyOperation[];
+        };
+
+        if (fieldDef.attributes) {
+            result.push(
+                ...fieldDef.attributes
+                    .filter((attr) => attr.name === '@allow' || attr.name === '@deny')
+                    .map(
+                        (attr) =>
+                            ({
+                                kind: attr.name === '@allow' ? 'allow' : 'deny',
+                                operations: extractOperations(attr.args![0]!.value),
+                                condition: attr.args![1]!.value,
+                            }) as const,
+                    )
+                    .filter((policy) => policy.operations.includes('all') || policy.operations.includes(operation)),
             );
         }
         return result;
@@ -1055,6 +1201,15 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     private tryRejectNonexistentModel(model: string) {
         if (!QueryUtils.hasModel(this.client.$schema, model) && !this.isManyToManyJoinTable(model)) {
             throw createRejectedByPolicyError(model, RejectedByPolicyReason.NO_ACCESS);
+        }
+    }
+
+    private tryRejectNonexistingTables(tables: readonly OperationNode[]) {
+        for (const table of tables) {
+            const extractResult = this.extractTableName(table);
+            if (extractResult) {
+                this.tryRejectNonexistentModel(extractResult.model);
+            }
         }
     }
 

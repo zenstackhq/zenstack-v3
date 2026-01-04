@@ -10,11 +10,10 @@ attribute @@allow(_ operation: String @@@completionHint(["'create'", "'read'", "
  * Defines an access policy that allows the annotated field to be read or updated.
  * You can pass a third argument as `true` to make it override the model-level policies.
  *
- * @param operation: comma-separated list of "create", "read", "update", "post-update", "delete". Use "all" to denote all operations.
+ * @param operation: comma-separated list of "read", "update". Use "all" to denote all operations.
  * @param condition: a boolean expression that controls if the operation should be allowed.
- * @param override: a boolean value that controls if the field-level policy should override the model-level policy.
  */
-attribute @allow(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'post-update'", "'delete'", "'all'"]), _ condition: Boolean, _ override: Boolean?)
+attribute @allow(_ operation: String @@@completionHint(["'read'", "'update'", "'all'"]), _ condition: Boolean)
 
 /**
  * Defines an access policy that denies a set of operations when the given condition is true.
@@ -27,10 +26,10 @@ attribute @@deny(_ operation: String @@@completionHint(["'create'", "'read'", "'
 /**
  * Defines an access policy that denies the annotated field to be read or updated.
  *
- * @param operation: comma-separated list of "create", "read", "update", "post-update", "delete". Use "all" to denote all operations.
+ * @param operation: comma-separated list of "read", "update". Use "all" to denote all operations.
  * @param condition: a boolean expression that controls if the operation should be denied.
  */
-attribute @deny(_ operation: String @@@completionHint(["'create'", "'read'", "'update'", "'delete'", "'all'"]), _ condition: Boolean)
+attribute @deny(_ operation: String @@@completionHint(["'read'", "'update'", "'all'"]), _ condition: Boolean)
 
 /**
  * Delegates the access control decision to a relation. Only to-one relations are supported.

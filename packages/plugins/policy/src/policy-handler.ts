@@ -278,7 +278,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         if (hasFieldLevelPolicies) {
             // when a select query involves field-level policies, we build a nested query selecting all fields guarded with:
             //    CASE WHEN <field policy> THEN <field> ELSE NULL END
-            // model-level policies is also applied at this nested query level
+            // model-level policies are also applied at this nested query level
 
             const updatedFroms: OperationNode[] = [];
             for (const table of result.from!.froms) {

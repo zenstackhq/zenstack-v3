@@ -31,7 +31,7 @@ describe('field-level policy tests', () => {
 
             let r;
 
-            // y and x are unreadable
+            // y and z are unreadable
 
             // create read-back
             r = await db.model.create({
@@ -472,7 +472,7 @@ describe('field-level policy tests', () => {
             let r;
 
             // y is unreadable
-            r = await db.model.create({
+            await db.model.create({
                 data: {
                     id: 1,
                     x: 0,
@@ -590,7 +590,7 @@ describe('field-level policy tests', () => {
     });
 
     describe.skip('update tests', () => {
-        it('update simple', async () => {
+        it('works with simple updates', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -625,13 +625,7 @@ describe('field-level policy tests', () => {
                     where: { id: 1 },
                     data: { y: 2 },
                 }),
-            ).toBeRejectedByPolicy();
-            await expect(
-                db.model.update({
-                    where: { id: 1 },
-                    data: { x: 2 },
-                }),
-            ).toBeRejectedByPolicy();
+            ).toBeRejectedNotFound();
 
             await db.model.create({
                 data: { id: 2, x: 0, y: 1, ownerId: 1 },
@@ -660,7 +654,8 @@ describe('field-level policy tests', () => {
             ).toResolveTruthy();
         });
 
-        it('update with override', async () => {
+        // TODO: field-level policy override
+        it.skip('update with override', async () => {
             const db = await createPolicyTestClient(
                 `
         model Model {
@@ -1143,7 +1138,8 @@ describe('field-level policy tests', () => {
             );
         });
 
-        it('updateMany override', async () => {
+        // TODO: field-level policy override
+        it.skip('updateMany override', async () => {
             const db = await createPolicyTestClient(
                 `
         model Model {

@@ -78,16 +78,19 @@ export class QueryNameMapper extends OperationNodeTransformer {
         // process "from" clauses
         const processedFroms = node.from.froms.map((from) => this.processSelectTable(from));
 
-        // process "join" clauses, note that "from" needs to be added as scopes since join conditions
-        // can refer to "from" tables
-        const processedJoins = this.withScopes([...processedFroms.map(({ scope }) => scope)], () =>
-            (node.joins ?? []).map((join) => this.processSelectTable(join.table)),
-        );
+        // process "join" clauses, note that "from" and previous joins need to be added as scopes since join conditions
+        // can refer to "from" tables and previous joins
+        const processedJoins: ReturnType<typeof this.processSelectTable>[] = [];
+        const cumulativeScopes = [...processedFroms.map(({ scope }) => scope)];
+        for (const join of node.joins ?? []) {
+            const processedJoin = this.withScopes(cumulativeScopes, () => this.processSelectTable(join.table));
+            processedJoins.push(processedJoin);
+            cumulativeScopes.push(processedJoin.scope);
+        }
 
         // merge the scopes of froms and joins since they're all visible in the query body
-        const scopes = [...processedFroms.map(({ scope }) => scope), ...processedJoins.map(({ scope }) => scope)];
 
-        return this.withScopes(scopes, () => {
+        return this.withScopes(cumulativeScopes, () => {
             // transform join clauses, "on" is transformed within the scopes
             const joins = node.joins
                 ? node.joins.map((join, i) => ({

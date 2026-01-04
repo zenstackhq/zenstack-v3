@@ -98,7 +98,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         // reject non-existing model
         this.tryRejectNonexistentModel(mutationModel);
 
-        // --- Pre mutation work ---
+        // #region Pre mutation work
 
         if (InsertQueryNode.is(node)) {
             // pre-create policy evaluation happens before execution of the query
@@ -128,11 +128,15 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             beforeUpdateInfo = await this.loadBeforeUpdateEntities(mutationModel, node.where, proceed);
         }
 
-        // proceed with query
+        // #endregion
+
+        // #region query execution
 
         const result = await proceed(this.transformNode(node));
 
-        // --- Post mutation work ---
+        // #endregion
+
+        // #region Post mutation work
 
         if (hasPostUpdatePolicies && result.rows.length > 0) {
             // verify if before-update rows and post-update rows still id-match
@@ -210,9 +214,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                     'some or all updated rows failed to pass post-update policy check',
                 );
             }
+
+            // #endregion
         }
 
-        // --- Read back ---
+        // #region Read back
 
         if (!node.returning || this.onlyReturningId(node)) {
             // no need to check read back
@@ -228,6 +234,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             }
             return readBackResult;
         }
+
+        // #endregion
     }
 
     // #endregion
@@ -292,8 +300,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             // when there's no field-level policies, we merge model-level policy filters into where clause directly
             // for generating simpler SQL
 
-            let whereNode = this.transformNode(node.where);
-            const policyFilter = this.createPolicyFilterForFrom(node.from);
+            let whereNode = result.where;
+            const policyFilter = this.createPolicyFilterForFrom(result.from);
             if (policyFilter && !isTrueNode(policyFilter)) {
                 whereNode = WhereNode.create(
                     whereNode?.where ? conjunction(this.dialect, [whereNode.where, policyFilter]) : policyFilter,
@@ -538,7 +546,10 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             selections,
         };
 
-        return { hasPolicies, query: AliasNode.create(nestedQuery, IdentifierNode.create(alias ?? model)) };
+        return {
+            hasPolicies,
+            query: AliasNode.create(ParensNode.create(nestedQuery), IdentifierNode.create(alias ?? model)),
+        };
     }
 
     private createFieldSelectionWithPolicy(model: string, field: string, operation: FieldLevelPolicyOperations) {
@@ -559,7 +570,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return { hasPolicies: true, selection: SelectionNode.create(selection) };
     }
 
-    private hasFieldLevelPolicies(model: string): unknown {
+    private hasFieldLevelPolicies(model: string) {
         const modelDef = QueryUtils.getModel(this.client.$schema, model);
         if (!modelDef) {
             return false;

@@ -396,6 +396,9 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         let filter = this.buildPolicyFilter(mutationModel, alias, 'update');
 
         if (node.from) {
+            // reject non-existing tables
+            this.tryRejectNonexistingTables(node.from.froms);
+
             // for update with from (join), we need to merge join tables' policy filters to the "where" clause
             const joinFilter = this.createPolicyFilterForFrom(node.from);
             if (joinFilter) {
@@ -1099,7 +1102,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return result;
     }
 
-    private getFieldPolicies(model: string, field: string, operation: CRUD_EXT) {
+    private getFieldPolicies(model: string, field: string, operation: FieldLevelPolicyOperations) {
         const fieldDef = QueryUtils.requireField(this.client.$schema, model, field);
         const result: Policy[] = [];
 

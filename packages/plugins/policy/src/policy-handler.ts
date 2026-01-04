@@ -583,7 +583,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         );
     }
 
-    private buildFieldPolicyFilter(model: string, field: string, operation: Exclude<CRUD_EXT, 'delete'>) {
+    private buildFieldPolicyFilter(model: string, field: string, operation: FieldLevelPolicyOperations) {
         const policies = this.getFieldPolicies(model, field, operation);
 
         const allows = policies

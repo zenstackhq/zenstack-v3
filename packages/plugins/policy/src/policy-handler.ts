@@ -275,7 +275,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             const updatedFroms: OperationNode[] = [];
             for (const table of result.from!.froms) {
                 const extractedTable = this.extractTableName(table);
-                if (extractedTable?.model) {
+                if (extractedTable?.model && QueryUtils.getModel(this.client.$schema, extractedTable.model)) {
                     const { query } = this.createSelectAllFieldsWithPolicies(
                         extractedTable.model,
                         extractedTable.alias,
@@ -314,6 +314,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         // reject non-existing model
         this.tryRejectNonexistentModel(table.model);
+
+        if (!QueryUtils.getModel(this.client.$schema, table.model)) {
+            // not a defined model, could be m2m join table, keep as is
+            return super.transformJoin(node);
+        }
 
         const result = super.transformJoin(node);
 
@@ -555,7 +560,10 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     private hasFieldLevelPolicies(model: string): unknown {
-        const modelDef = QueryUtils.requireModel(this.client.$schema, model);
+        const modelDef = QueryUtils.getModel(this.client.$schema, model);
+        if (!modelDef) {
+            return false;
+        }
         return Object.values(modelDef.fields).some((fieldDef) =>
             fieldDef.attributes?.some((attr) => ['@allow', '@deny'].includes(attr.name)),
         );

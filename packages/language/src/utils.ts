@@ -149,6 +149,13 @@ export function isRelationshipField(field: DataField) {
     return isDataModel(field.type.reference?.ref);
 }
 
+/**
+ * Returns if the given field is a computed field.
+ */
+export function isComputedField(field: DataField) {
+    return hasAttribute(field, '@computed');
+}
+
 export function isDelegateModel(node: AstNode) {
     return isDataModel(node) && hasAttribute(node, '@@delegate');
 }

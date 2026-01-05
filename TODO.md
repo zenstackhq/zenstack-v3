@@ -77,7 +77,6 @@
         - [x] JSDoc for CRUD methods
         - [x] Cache validation schemas
         - [x] Compound ID
-        - [ ] Cross field comparison
         - [x] Many-to-many relation
         - [x] Self relation
         - [ ] Empty AND/OR/NOT behavior
@@ -101,6 +100,7 @@
 - [x] Validation
 - [ ] Access Policy
     - [ ] Short-circuit pre-create check for scalar-field only policies
+    - [x] Field-level policies
     - [x] Inject "on conflict do update"
     - [x] `check` function
     - [ ] Custom functions

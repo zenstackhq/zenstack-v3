@@ -587,6 +587,135 @@ describe('field-level policy tests', () => {
                 ),
             ).rejects.toThrow(/Field-level policies are not allowed for relation fields/);
         });
+
+        it('evaluates computed field to null when based on non-readable field', async () => {
+            const db = await createPolicyTestClient(
+                `
+        model Model {
+            id Int @id @default(autoincrement())
+            x Int
+            y Int @allow('read', x > 0)
+            incY Int @computed
+
+            @@allow('all', true)
+        }
+        `,
+                {
+                    computedFields: {
+                        Model: {
+                            incY: (eb: any) => eb('y', '+', 1),
+                        },
+                    },
+                } as any,
+            );
+
+            // y is unreadable, so computed field based on it should be null
+            await db.model.create({
+                data: { id: 1, x: 0, y: 5 },
+            });
+
+            let r = await db.model.findUnique({ where: { id: 1 } });
+            expect(r.y).toBeNull();
+            expect(r.incY).toBeNull();
+
+            r = await db.model.findUnique({ where: { id: 1 }, select: { incY: true } });
+            expect(r.incY).toBeNull();
+
+            // y is readable, so computed field should also be readable
+            await db.model.create({
+                data: { id: 2, x: 1, y: 5 },
+            });
+
+            r = await db.model.findUnique({ where: { id: 2 } });
+            expect(r.y).toEqual(5);
+            expect(r.incY).toEqual(6);
+
+            r = await db.model.findUnique({ where: { id: 2 }, select: { incY: true } });
+            expect(r.incY).toEqual(6);
+        });
+
+        it('evaluates query builder synthesized selection to null when based on non-readable field', async () => {
+            const db = await createPolicyTestClient(
+                `
+        model User {
+            id Int @id @default(autoincrement())
+            admin Boolean @default(false)
+            models Model[]
+
+            @@allow('all', true)
+        }
+
+        model Model {
+            id Int @id @default(autoincrement())
+            x Int
+            y Int @allow('read', owner.admin)
+            z String @allow('read', owner.admin)
+            owner User @relation(fields: [ownerId], references: [id])
+            ownerId Int
+
+            @@allow('all', true)
+        }
+        `,
+            );
+
+            await db.user.create({ data: { id: 1, admin: false } });
+            await db.user.create({ data: { id: 2, admin: true } });
+
+            await db.$unuseAll().model.create({
+                data: { id: 1, x: 10, y: 20, z: 'hello', ownerId: 1 },
+            });
+
+            await db.$unuseAll().model.create({
+                data: { id: 2, x: 30, y: 40, z: 'world', ownerId: 2 },
+            });
+
+            // y and z are unreadable for model #1, so:
+            // - direct field selection returns null
+            // - function calls on unreadable fields return null
+            await expect(
+                db.$qb
+                    .selectFrom('Model')
+                    .select((eb: any) => [eb('y', '+', 1).as('incY'), eb.fn('upper', ['z']).as('upperZ')])
+                    .where('id', '=', 1)
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({ incY: null, upperZ: null });
+
+            // y and z are readable for model #2, so function calls should work
+            await expect(
+                db.$qb
+                    .selectFrom('Model')
+                    .select((eb: any) => [eb('y', '+', 1).as('incY'), eb.fn('upper', ['z']).as('upperZ')])
+                    .where('id', '=', 2)
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({ incY: 41, upperZ: 'WORLD' });
+
+            // Test with joins - unreadable fields in synthesized selections
+            await expect(
+                db.$qb
+                    .selectFrom('User')
+                    .leftJoin('Model as m', 'm.ownerId', 'User.id')
+                    .select((eb: any) => [
+                        'User.id',
+                        eb('m.y', '+', 1).as('incY'),
+                        eb.fn('upper', ['m.z']).as('upperZ'),
+                    ])
+                    .where('User.id', '=', 1)
+                    .executeTakeFirst(),
+            ).resolves.toEqual({ id: 1, incY: null, upperZ: null });
+
+            await expect(
+                db.$qb
+                    .selectFrom('User')
+                    .leftJoin('Model as m', 'm.ownerId', 'User.id')
+                    .select((eb: any) => [
+                        'User.id',
+                        eb('m.y', '+', 1).as('incY'),
+                        eb.fn('upper', ['m.z']).as('upperZ'),
+                    ])
+                    .where('User.id', '=', 2)
+                    .executeTakeFirst(),
+            ).resolves.toEqual({ id: 2, incY: 41, upperZ: 'WORLD' });
+        });
     });
 
     describe('update tests', () => {

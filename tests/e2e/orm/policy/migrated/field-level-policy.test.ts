@@ -663,7 +663,7 @@ describe('field-level policy tests', () => {
         });
 
         // TODO: field-level policy override
-        it.skip('update with override', async () => {
+        it.skip('works override', async () => {
             const db = await createPolicyTestClient(
                 `
         model Model {
@@ -740,7 +740,7 @@ describe('field-level policy tests', () => {
             ).toBeRejectedByPolicy(); // can't be allowed by override due to field-level deny
         });
 
-        it('update filter with relation', async () => {
+        it('works with filter with relation', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -801,7 +801,7 @@ describe('field-level policy tests', () => {
             ).toResolveTruthy();
         });
 
-        it('update with nested to-many relation', async () => {
+        it('works with nested to-many relation', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -852,7 +852,7 @@ describe('field-level policy tests', () => {
             ).toResolveTruthy();
         });
 
-        it('update with nested to-one relation', async () => {
+        it('works with nested to-one relation', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -921,7 +921,7 @@ describe('field-level policy tests', () => {
             ).toResolveTruthy();
         });
 
-        it('update with connect to-many relation', async () => {
+        it('works with connect to-many relation', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -1060,7 +1060,7 @@ describe('field-level policy tests', () => {
             ).toResolveTruthy();
         });
 
-        it('update with connect to-one relation', async () => {
+        it('works with connect to-one relation', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -1172,7 +1172,7 @@ describe('field-level policy tests', () => {
             ).toResolveTruthy();
         });
 
-        it('updateMany simple', async () => {
+        it('works simple updateMany', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -1223,8 +1223,42 @@ describe('field-level policy tests', () => {
             );
         });
 
+        it('works with query builder', async () => {
+            const db = await createPolicyTestClient(
+                `
+        model Model {
+            id Int @id @default(autoincrement())
+            x Int
+            y Int @allow('update', x > 0)
+            @@allow('all', true)
+        }
+        `,
+            );
+
+            await db.model.create({ data: { id: 1, x: 0, y: 0 } });
+
+            // y not updatable
+            await expect(
+                db.$qb.updateTable('Model').set({ y: 2 }).where('id', '=', 1).execute(),
+            ).toBeRejectedByPolicy();
+
+            // x updatable
+            await expect(
+                db.$qb.updateTable('Model').set({ x: 1 }).where('id', '=', 1).executeTakeFirst(),
+            ).resolves.toMatchObject({ numUpdatedRows: 1n });
+
+            // now y is updatable
+            await expect(db.$qb.updateTable('Model').set({ y: 2 }).executeTakeFirst()).resolves.toMatchObject({
+                numUpdatedRows: 1n,
+            });
+
+            await expect(db.model.findUnique({ where: { id: 1 } })).resolves.toEqual(
+                expect.objectContaining({ x: 1, y: 2 }),
+            );
+        });
+
         // TODO: field-level policy override
-        it.skip('updateMany override', async () => {
+        it.skip('works with updateMany override', async () => {
             const db = await createPolicyTestClient(
                 `
         model Model {
@@ -1252,7 +1286,7 @@ describe('field-level policy tests', () => {
             await expect(db.model.updateMany({ data: { x: 2, y: 3 } })).resolves.toEqual({ count: 0 });
         });
 
-        it('updateMany nested', async () => {
+        it('works with nested updateMany', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -1319,7 +1353,7 @@ describe('field-level policy tests', () => {
     });
 
     describe('misc tests', () => {
-        it('this expression', async () => {
+        it('works with this expression', async () => {
             const _db = await createPolicyTestClient(
                 `
             model User {
@@ -1349,7 +1383,7 @@ describe('field-level policy tests', () => {
             expect(r.username).toBeNull();
         });
 
-        it('collection predicate', async () => {
+        it('works with collection predicate', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -1442,7 +1476,7 @@ describe('field-level policy tests', () => {
             expect(r.b).toBe(2);
         });
 
-        it('deny only without field access', async () => {
+        it('works with deny only without field access', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {
@@ -1473,7 +1507,7 @@ describe('field-level policy tests', () => {
             ).toBeRejectedByPolicy();
         });
 
-        it('deny only with field access', async () => {
+        it('works with deny only with field access', async () => {
             const db = await createPolicyTestClient(
                 `
         model User {

@@ -567,7 +567,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     ) {
         let hasPolicies = false;
         const modelDef = QueryUtils.requireModel(this.client.$schema, model);
-        const selections: SelectionNode[] = [];
+
+        let selections: SelectionNode[] = [];
         for (const fieldDef of Object.values(modelDef.fields).filter(
             // exclude relation/computed/inherited fields
             (f) => !f.relation && !f.computed && !f.originModel,
@@ -579,6 +580,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             );
             hasPolicies = hasPolicies || fieldHasPolicies;
             selections.push(selection);
+        }
+
+        if (!hasPolicies) {
+            // if there're no field-level policies, simplify to select all
+            selections = [SelectionNode.create(SelectAllNode.create())];
         }
 
         const modelPolicyFilter = this.buildPolicyFilter(model, alias, operation);

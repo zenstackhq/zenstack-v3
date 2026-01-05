@@ -1,7 +1,7 @@
 import { createPolicyTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
 
-describe('field-level policy tests', () => {
+describe('field-level policy tests migrated from v2', () => {
     describe('read tests', () => {
         it('works with read rules', async () => {
             const db = await createPolicyTestClient(
@@ -455,6 +455,90 @@ describe('field-level policy tests', () => {
             r = await db.model.findUnique({ include: { owner: true }, where: { id: 2 } });
             expect(r).toEqual(expect.objectContaining({ x: 1, y: 0 }));
             expect(r.owner).toBeTruthy();
+        });
+
+        it('works with using fk policies to restrict relation reads', async () => {
+            const db = await createPolicyTestClient(
+                `
+        model User {
+            id Int @id @default(autoincrement())
+            admin Boolean @default(false)
+            posts Post[]
+
+            @@allow('all', true)
+        }
+
+        model Post {
+            id Int @id @default(autoincrement())
+            title String
+            authorId Int @allow('read', auth().admin)
+            author User @relation(fields: [authorId], references: [id])
+
+            @@allow('all', true)
+        }
+        `,
+            );
+
+            await db.user.create({ data: { id: 1, admin: false } });
+            await db.user.create({ data: { id: 2, admin: true } });
+
+            await db.$unuseAll().post.create({
+                data: { id: 1, title: 'Post 1', authorId: 1 },
+            });
+
+            let r;
+
+            // Non-admin user: authorId is unreadable, which prevents relation from being fetched
+            const nonAdminDb = db.$setAuth({ id: 1, admin: false });
+
+            r = await nonAdminDb.post.findUnique({ where: { id: 1 }, include: { author: true } });
+            expect(r.authorId).toBeNull();
+            expect(r.author).toBeNull(); // author is null because FK is not readable
+
+            r = await nonAdminDb.post.findUnique({ where: { id: 1 }, select: { author: true } });
+            expect(r.author).toBeNull();
+
+            // Selecting only the author field with nested select
+            r = await nonAdminDb.post.findUnique({
+                where: { id: 1 },
+                select: { author: { select: { id: true } } },
+            });
+            expect(r.author).toBeNull();
+
+            // Admin user: authorId is readable, so relation can be fetched
+            const adminDb = db.$setAuth({ id: 2, admin: true });
+
+            r = await adminDb.post.findUnique({ where: { id: 1 }, include: { author: true } });
+            expect(r.authorId).toEqual(1);
+            expect(r.author).toMatchObject({ id: 1, admin: false });
+
+            r = await adminDb.post.findUnique({ where: { id: 1 }, select: { author: true } });
+            expect(r.author).toMatchObject({ id: 1, admin: false });
+
+            r = await adminDb.post.findUnique({
+                where: { id: 1 },
+                select: { author: { select: { id: true, admin: true } } },
+            });
+            expect(r.author).toMatchObject({ id: 1, admin: false });
+
+            // Test with query builder
+            await expect(
+                nonAdminDb.$qb
+                    .selectFrom('Post')
+                    .leftJoin('User', 'User.id', 'Post.authorId')
+                    .select(['Post.id', 'Post.authorId', 'User.id as userId'])
+                    .where('Post.id', '=', 1)
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({ id: 1, authorId: null, userId: null });
+
+            await expect(
+                adminDb.$qb
+                    .selectFrom('Post')
+                    .leftJoin('User', 'User.id', 'Post.authorId')
+                    .select(['Post.id', 'Post.authorId', 'User.id as userId'])
+                    .where('Post.id', '=', 1)
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({ id: 1, authorId: 1, userId: 1 });
         });
 
         it('works with all ORM find APIs', async () => {

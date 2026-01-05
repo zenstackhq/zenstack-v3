@@ -1,6 +1,6 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import { ZModelLanguageMetaData } from '@zenstackhq/language';
-import { isPlugin, isDataModel, type DataModel, LiteralExpr, Plugin, type Model } from '@zenstackhq/language/ast';
+import { type AbstractDeclaration, isPlugin, LiteralExpr, Plugin, type Model } from '@zenstackhq/language/ast';
 import { getLiteral, getLiteralArray } from '@zenstackhq/language/utils';
 import { type CliPlugin } from '@zenstackhq/sdk';
 import colors from 'colors';
@@ -32,26 +32,25 @@ export async function run(options: Options) {
         const logsEnabled = !options.silent;
 
         if (logsEnabled) {
-            console.log(colors.green(`\nEnable watch mode!`));
+            console.log(colors.green(`\nEnabled watch mode!`));
         }
 
         const schemaExtensions = ZModelLanguageMetaData.fileExtensions;
 
         // Get real models file path (cuz its merged into single document -> we need use cst nodes)
-        const getModelAllPaths = (model: Model) => new Set(
+        const getRootModelWatchPaths = (model: Model) => new Set<string>(
             (
                 model.declarations.filter(
                     (v) =>
-                        isDataModel(v) &&
                         v.$cstNode?.parent?.element.$type === 'Model' &&
                         !!v.$cstNode.parent.element.$document?.uri?.fsPath,
-                ) as DataModel[]
+                ) as AbstractDeclaration[]
             ).map((v) => v.$cstNode!.parent!.element.$document!.uri!.fsPath),
         );
 
         const { watch } = await import('chokidar');
 
-        const watchedPaths = getModelAllPaths(model);
+        const watchedPaths = getRootModelWatchPaths(model);
         let reGenerateSchemaTimeout: ReturnType<typeof setTimeout> | undefined;
 
         if (logsEnabled) {
@@ -77,17 +76,28 @@ export async function run(options: Options) {
 
                 try {
                     const newModel = await pureGenerate(options, true);
-                    const allModelsPaths = getModelAllPaths(newModel);
+                    const allModelsPaths = getRootModelWatchPaths(newModel);
                     const newModelPaths = [...allModelsPaths].filter((at) => !watchedPaths.has(at));
+                    const removeModelPaths = [...watchedPaths].filter((at) => !allModelsPaths.has(at));
 
                     if (newModelPaths.length) {
                         if (logsEnabled) {
                             const logPaths = [...newModelPaths].map((at) => `- ${at}`).join('\n');
-                            console.log(`Add file(s) to watch:\n${logPaths}`);
+                            console.log(`Added file(s) to watch:\n${logPaths}`);
                         }
 
                         newModelPaths.forEach((at) => watchedPaths.add(at));
                         watcher.add(newModelPaths);
+                    }
+
+                    if (removeModelPaths.length) {
+                        if (logsEnabled) {
+                            const logPaths = [...removeModelPaths].map((at) => `- ${at}`).join('\n');
+                            console.log(`Added file(s) to watch:\n${logPaths}`);
+                        }
+
+                        removeModelPaths.forEach((at) => watchedPaths.add(at));
+                        watcher.add(removeModelPaths);
                     }
                 } catch (e) {
                     console.error(e);
@@ -97,7 +107,7 @@ export async function run(options: Options) {
 
         watcher.on('unlink', (pathAt) => {
             if (logsEnabled) {
-                console.log(`Remove file from watch: ${pathAt}`);
+                console.log(`Removed file from watch: ${pathAt}`);
             }
 
             watchedPaths.delete(pathAt);

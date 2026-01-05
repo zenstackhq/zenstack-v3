@@ -82,7 +82,7 @@ export async function run(options: Options) {
 
                     if (newModelPaths.length) {
                         if (logsEnabled) {
-                            const logPaths = [...newModelPaths].map((at) => `- ${at}`).join('\n');
+                            const logPaths = newModelPaths.map((at) => `- ${at}`).join('\n');
                             console.log(`Added file(s) to watch:\n${logPaths}`);
                         }
 
@@ -92,12 +92,12 @@ export async function run(options: Options) {
 
                     if (removeModelPaths.length) {
                         if (logsEnabled) {
-                            const logPaths = [...removeModelPaths].map((at) => `- ${at}`).join('\n');
-                            console.log(`Added file(s) to watch:\n${logPaths}`);
+                            const logPaths = removeModelPaths.map((at) => `- ${at}`).join('\n');
+                            console.log(`Removed file(s) from watch:\n${logPaths}`);
                         }
 
-                        removeModelPaths.forEach((at) => watchedPaths.add(at));
-                        watcher.add(removeModelPaths);
+                        removeModelPaths.forEach((at) => watchedPaths.delete(at));
+                        watcher.unwatch(removeModelPaths);
                     }
                 } catch (e) {
                     console.error(e);

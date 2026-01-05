@@ -589,7 +589,7 @@ describe('field-level policy tests', () => {
         });
     });
 
-    describe.skip('update tests', () => {
+    describe('update tests', () => {
         it('works with simple updates', async () => {
             const db = await createPolicyTestClient(
                 `
@@ -620,6 +620,8 @@ describe('field-level policy tests', () => {
             await db.model.create({
                 data: { id: 1, x: 0, y: 0, ownerId: 1 },
             });
+
+            // denied by both model-level and field-level policies
             await expect(
                 db.model.update({
                     where: { id: 1 },
@@ -630,12 +632,16 @@ describe('field-level policy tests', () => {
             await db.model.create({
                 data: { id: 2, x: 0, y: 1, ownerId: 1 },
             });
+
+            // denied by field-level policy
             await expect(
                 db.model.update({
                     where: { id: 2 },
                     data: { y: 2 },
                 }),
             ).toBeRejectedByPolicy();
+
+            // allowed when not updating y
             await expect(
                 db.model.update({
                     where: { id: 2 },
@@ -646,6 +652,8 @@ describe('field-level policy tests', () => {
             await db.model.create({
                 data: { id: 3, x: 1, y: 1, ownerId: 1 },
             });
+
+            // allowed when updating y
             await expect(
                 db.model.update({
                     where: { id: 3 },
@@ -765,12 +773,16 @@ describe('field-level policy tests', () => {
             await db.model.create({
                 data: { id: 1, x: 0, y: 0, ownerId: 1 },
             });
+
+            // rejected by y field-level policy
             await expect(
                 db.model.update({
                     where: { id: 1 },
                     data: { y: 2 },
                 }),
             ).toBeRejectedByPolicy();
+
+            // allowed since not updating y
             await expect(
                 db.model.update({
                     where: { id: 1 },
@@ -936,16 +948,40 @@ describe('field-level policy tests', () => {
             await db.model.create({ data: { id: 1, value: 0 } });
             await db.model.create({ data: { id: 2, value: 1 } });
 
+            // connect/disconnect from owning side
+
             await expect(
                 db.model.update({
                     where: { id: 1 },
                     data: { owner: { connect: { id: 1 } } },
                 }),
             ).toBeRejectedByPolicy();
+
+            // force connect
+            await db.$unuseAll().model.update({
+                where: { id: 1 },
+                data: { owner: { connect: { id: 1 } } },
+            });
+
+            // disconnect with filter
             await expect(
                 db.model.update({
                     where: { id: 1 },
                     data: { owner: { disconnect: { id: 1 } } },
+                }),
+            ).toBeRejectedByPolicy();
+
+            // force connect
+            await db.$unuseAll().model.update({
+                where: { id: 1 },
+                data: { owner: { connect: { id: 1 } } },
+            });
+
+            // disconnect
+            await expect(
+                db.model.update({
+                    where: { id: 1 },
+                    data: { owner: { disconnect: true } },
                 }),
             ).toBeRejectedByPolicy();
 
@@ -961,6 +997,8 @@ describe('field-level policy tests', () => {
                     data: { owner: { disconnect: { id: 1 } } },
                 }),
             ).toResolveTruthy();
+
+            // connect/disconnect from non-owning side
 
             await expect(
                 db.user.update({
@@ -968,7 +1006,9 @@ describe('field-level policy tests', () => {
                     data: { models: { connect: { id: 1 } } },
                 }),
             ).toBeRejectedByPolicy();
-            await db.$withoutPolicy().user.update({
+
+            // force connect
+            await db.$unuseAll().user.update({
                 where: { id: 1 },
                 data: { models: { connect: { id: 1 } } },
             });
@@ -997,6 +1037,21 @@ describe('field-level policy tests', () => {
                     data: { models: { disconnect: { id: 2 } } },
                 }),
             ).toResolveTruthy();
+
+            // model#1 needs to be disconnected but it violates the policy
+            await expect(
+                db.user.update({
+                    where: { id: 1 },
+                    data: { models: { set: { id: 2 } } },
+                }),
+            ).toBeRejectedByPolicy();
+
+            // force model#1 disconnect
+            await db.$unuseAll().model.update({
+                where: { id: 1 },
+                data: { ownerId: null },
+            });
+
             await expect(
                 db.user.update({
                     where: { id: 1 },
@@ -1038,18 +1093,25 @@ describe('field-level policy tests', () => {
                     data: { owner: { connect: { id: 1 } } },
                 }),
             ).toBeRejectedByPolicy();
+
+            // force connect
+            await db.$unuseAll().model.update({
+                where: { id: 1 },
+                data: { owner: { connect: { id: 1 } } },
+            });
+
             await expect(
                 db.model.update({
                     where: { id: 1 },
                     data: { owner: { disconnect: { id: 1 } } },
                 }),
             ).toBeRejectedByPolicy();
-            await expect(
-                db.model.update({
-                    where: { id: 1 },
-                    data: { owner: { set: { id: 1 } } },
-                }),
-            ).toBeRejectedByPolicy();
+
+            // force disconnect
+            await db.$unuseAll().model.update({
+                where: { id: 1 },
+                data: { owner: { disconnect: true } },
+            });
 
             await expect(
                 db.model.update({
@@ -1070,7 +1132,7 @@ describe('field-level policy tests', () => {
                     data: { model: { connect: { id: 1 } } },
                 }),
             ).toBeRejectedByPolicy();
-            await db.$withoutPolicy().user.update({
+            await db.$unuseAll().user.update({
                 where: { id: 1 },
                 data: { model: { connect: { id: 1 } } },
             });
@@ -1081,12 +1143,27 @@ describe('field-level policy tests', () => {
                 }),
             ).toBeRejectedByPolicy();
 
+            // connecting model#2 results in disconnecting model#1, which is denied by policy
+            await expect(
+                db.user.update({
+                    where: { id: 1 },
+                    data: { model: { connect: { id: 2 } } },
+                }),
+            ).toBeRejectedByPolicy();
+
+            // force disconnect of model#1
+            await db.$unuseAll().model.update({
+                where: { id: 1 },
+                data: { ownerId: null },
+            });
+
             await expect(
                 db.user.update({
                     where: { id: 1 },
                     data: { model: { connect: { id: 2 } } },
                 }),
             ).toResolveTruthy();
+
             await expect(
                 db.user.update({
                     where: { id: 1 },
@@ -1129,7 +1206,15 @@ describe('field-level policy tests', () => {
                 },
             });
 
-            await expect(db.model.updateMany({ data: { y: 2 } })).resolves.toEqual({ count: 1 });
+            await expect(db.model.updateMany({ data: { y: 2 } })).toBeRejectedByPolicy();
+            await expect(db.model.findUnique({ where: { id: 1 } })).resolves.toEqual(
+                expect.objectContaining({ x: 0, y: 0 }),
+            );
+            await expect(db.model.findUnique({ where: { id: 2 } })).resolves.toEqual(
+                expect.objectContaining({ x: 1, y: 0 }),
+            );
+
+            await expect(db.model.updateMany({ where: { x: 1 }, data: { y: 2 } })).resolves.toEqual({ count: 1 });
             await expect(db.model.findUnique({ where: { id: 1 } })).resolves.toEqual(
                 expect.objectContaining({ x: 0, y: 0 }),
             );
@@ -1202,13 +1287,13 @@ describe('field-level policy tests', () => {
             });
 
             await expect(
-                db.user.update({ where: { id: 1 }, data: { models: { updateMany: { data: { y: 2 } } } } }),
-            ).toResolveTruthy();
+                db.user.update({ where: { id: 1 }, data: { models: { updateMany: { where: {}, data: { y: 2 } } } } }),
+            ).toBeRejectedByPolicy();
             await expect(db.model.findUnique({ where: { id: 1 } })).resolves.toEqual(
                 expect.objectContaining({ x: 0, y: 0 }),
             );
             await expect(db.model.findUnique({ where: { id: 2 } })).resolves.toEqual(
-                expect.objectContaining({ x: 1, y: 2 }),
+                expect.objectContaining({ x: 1, y: 0 }),
             );
 
             await expect(
@@ -1216,7 +1301,7 @@ describe('field-level policy tests', () => {
                     where: { id: 1 },
                     data: { models: { updateMany: { where: { id: 1 }, data: { y: 2 } } } },
                 }),
-            ).toResolveTruthy();
+            ).toBeRejectedByPolicy();
             await expect(db.model.findUnique({ where: { id: 1 } })).resolves.toEqual(
                 expect.objectContaining({ x: 0, y: 0 }),
             );
@@ -1224,16 +1309,16 @@ describe('field-level policy tests', () => {
             await expect(
                 db.user.update({
                     where: { id: 1 },
-                    data: { models: { updateMany: { where: { id: 2 }, data: { y: 3 } } } },
+                    data: { models: { updateMany: { where: { id: 2 }, data: { y: 2 } } } },
                 }),
             ).toResolveTruthy();
             await expect(db.model.findUnique({ where: { id: 2 } })).resolves.toEqual(
-                expect.objectContaining({ x: 1, y: 3 }),
+                expect.objectContaining({ x: 1, y: 2 }),
             );
         });
     });
 
-    describe.skip('misc tests', () => {
+    describe('misc tests', () => {
         it('this expression', async () => {
             const _db = await createPolicyTestClient(
                 `
@@ -1257,11 +1342,11 @@ describe('field-level policy tests', () => {
 
             // anonymous
             r = await _db.user.findFirst();
-            expect(r.username).toBeUndefined();
+            expect(r.username).toBeNull();
 
             // non-owner
             r = await _db.$setAuth({ id: 2 }).user.findFirst();
-            expect(r.username).toBeUndefined();
+            expect(r.username).toBeNull();
         });
 
         it('collection predicate', async () => {
@@ -1312,8 +1397,8 @@ describe('field-level policy tests', () => {
             });
 
             let r = await db.user.findUnique({ where: { id: 1 } });
-            expect(r.a).toBeUndefined();
-            expect(r.b).toBeUndefined();
+            expect(r.a).toBeNull();
+            expect(r.b).toBeNull();
 
             await db.user.create({
                 data: {
@@ -1326,7 +1411,7 @@ describe('field-level policy tests', () => {
                 },
             });
             r = await db.user.findUnique({ where: { id: 2 } });
-            expect(r.a).toBeUndefined();
+            expect(r.a).toBeNull();
             expect(r.b).toBe(2);
 
             await db.user.create({

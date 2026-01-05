@@ -55,6 +55,7 @@ import {
     getTableName,
     isBeforeInvocation,
     isTrueNode,
+    logicalNot,
     trueNode,
 } from './utils';
 
@@ -100,27 +101,17 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         // #region Pre mutation work
 
+        // create
         if (InsertQueryNode.is(node)) {
-            // pre-create policy evaluation happens before execution of the query
-            const isManyToManyJoinTable = this.isManyToManyJoinTable(mutationModel);
-            let needCheckPreCreate = true;
-
-            // many-to-many join table is not a model so can't have policies on it
-            if (!isManyToManyJoinTable) {
-                // check constant policies
-                const constCondition = this.tryGetConstantPolicy(mutationModel, 'create');
-                if (constCondition === true) {
-                    needCheckPreCreate = false;
-                } else if (constCondition === false) {
-                    throw createRejectedByPolicyError(mutationModel, RejectedByPolicyReason.NO_ACCESS);
-                }
-            }
-
-            if (needCheckPreCreate) {
-                await this.enforcePreCreatePolicy(node, mutationModel, isManyToManyJoinTable, proceed);
-            }
+            await this.preCreateCheck(mutationModel, node, proceed);
         }
 
+        // update
+        if (UpdateQueryNode.is(node)) {
+            await this.preUpdateCheck(mutationModel, node, proceed);
+        }
+
+        // post-update: load before-update entities if needed
         const hasPostUpdatePolicies = UpdateQueryNode.is(node) && this.hasPostUpdatePolicies(mutationModel);
 
         let beforeUpdateInfo: Awaited<ReturnType<typeof this.loadBeforeUpdateEntities>> | undefined;
@@ -130,7 +121,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         // #endregion
 
-        // #region query execution
+        // #region mutation execution
 
         const result = await proceed(this.transformNode(node));
 
@@ -238,23 +229,76 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         // #endregion
     }
 
-    // #endregion
+    private async preCreateCheck(mutationModel: string, node: InsertQueryNode, proceed: ProceedKyselyQueryFunction) {
+        const isManyToManyJoinTable = this.isManyToManyJoinTable(mutationModel);
+        let needCheckPreCreate = true;
 
-    // correction to kysely mutation result may be needed because we might have added
-    // returning clause to the query and caused changes to the result shape
-    private postProcessMutationResult(result: QueryResult<any>, node: MutationQueryNode) {
-        if (node.returning) {
-            return result;
-        } else {
-            return {
-                ...result,
-                rows: [],
-                numAffectedRows: result.numAffectedRows ?? BigInt(result.rows.length),
-            };
+        // many-to-many join table is not a model so can't have policies on it
+        if (!isManyToManyJoinTable) {
+            // check constant policies
+            const constCondition = this.tryGetConstantPolicy(mutationModel, 'create');
+            if (constCondition === true) {
+                needCheckPreCreate = false;
+            } else if (constCondition === false) {
+                throw createRejectedByPolicyError(mutationModel, RejectedByPolicyReason.NO_ACCESS);
+            }
+        }
+
+        if (needCheckPreCreate) {
+            await this.enforcePreCreatePolicy(node, mutationModel, isManyToManyJoinTable, proceed);
         }
     }
 
-    // #region overrides
+    private async preUpdateCheck(mutationModel: string, node: UpdateQueryNode, proceed: ProceedKyselyQueryFunction) {
+        // check if any rows will be filtered out by field-level update policies, and reject the whole update if so
+
+        const fieldsToUpdate =
+            node.updates
+                ?.map((u) => (ColumnNode.is(u.column) ? u.column.column.name : undefined))
+                .filter((f): f is string => !!f) ?? [];
+        const fieldUpdatePolicies = fieldsToUpdate.map((f) => this.buildFieldPolicyFilter(mutationModel, f, 'update'));
+
+        // filter combining field-level update policies
+        const fieldLevelFilter = conjunction(this.dialect, fieldUpdatePolicies);
+        if (isTrueNode(fieldLevelFilter)) {
+            return;
+        }
+
+        // model-level update policy filter
+        const modelLevelFilter = this.buildPolicyFilter(mutationModel, undefined, 'update');
+
+        // filter combining model-level update policy and update where
+        const updateFilter = conjunction(this.dialect, [modelLevelFilter, node.where?.where ?? trueNode(this.dialect)]);
+
+        // build a query to count rows that will be rejected by field-level policies
+        // `SELECT COALESCE(SUM((not <fieldsFilter>) as integer), 0) AS $filteredCount WHERE <updateFilter> AND <rowFilter>`
+        const preUpdateCheckQuery = expressionBuilder<any, any>()
+            .selectFrom(mutationModel)
+            .select((eb) =>
+                eb.fn
+                    .coalesce(
+                        eb.fn.sum(
+                            eb.cast(new ExpressionWrapper(logicalNot(this.dialect, fieldLevelFilter)), 'integer'),
+                        ),
+                        eb.lit(0),
+                    )
+                    .as('$filteredCount'),
+            )
+            .where(() => new ExpressionWrapper(updateFilter));
+
+        const preUpdateResult = await proceed(preUpdateCheckQuery.toOperationNode());
+        if (preUpdateResult.rows[0].$filteredCount > 0) {
+            throw createRejectedByPolicyError(
+                mutationModel,
+                RejectedByPolicyReason.NO_ACCESS,
+                'some rows cannot be updated due to field policies',
+            );
+        }
+    }
+
+    // #endregion
+
+    // #region Transformations
 
     protected override transformSelectQuery(node: SelectQueryNode) {
         if (!node.from) {
@@ -269,7 +313,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         const hasFieldLevelPolicies = node.from.froms.some((table) => {
             const extractedTable = this.extractTableName(table);
             if (extractedTable) {
-                return this.hasFieldLevelPolicies(extractedTable.model);
+                return this.hasFieldLevelPolicies(extractedTable.model, 'read');
             } else {
                 return false;
             }
@@ -573,14 +617,12 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return { hasPolicies: true, selection: SelectionNode.create(selection) };
     }
 
-    private hasFieldLevelPolicies(model: string) {
+    private hasFieldLevelPolicies(model: string, operation: FieldLevelPolicyOperations) {
         const modelDef = QueryUtils.getModel(this.client.$schema, model);
         if (!modelDef) {
             return false;
         }
-        return Object.values(modelDef.fields).some((fieldDef) =>
-            fieldDef.attributes?.some((attr) => ['@allow', '@deny'].includes(attr.name)),
-        );
+        return Object.keys(modelDef.fields).some((field) => this.getFieldPolicies(model, field, operation).length > 0);
     }
 
     private buildFieldPolicyFilter(model: string, field: string, operation: FieldLevelPolicyOperations) {
@@ -1232,6 +1274,20 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             if (extractResult) {
                 this.tryRejectNonexistentModel(extractResult.model);
             }
+        }
+    }
+
+    // correction to kysely mutation result may be needed because we might have added
+    // returning clause to the query and caused changes to the result shape
+    private postProcessMutationResult(result: QueryResult<any>, node: MutationQueryNode) {
+        if (node.returning) {
+            return result;
+        } else {
+            return {
+                ...result,
+                rows: [],
+                numAffectedRows: result.numAffectedRows ?? BigInt(result.rows.length),
+            };
         }
     }
 

@@ -78,67 +78,39 @@ export class SchemaType implements SchemaDef {
     authType = "User" as const;
     procedures = {
         getUser: {
-            params: [
-                { name: "id", type: "Int" }
-            ] as [
-                id: {
-                    "name": "id";
-                    "type": "Int";
-                }
-            ],
+            params: {
+                id: { name: "id", type: "Int" }
+            },
             returnType: "User"
         },
         listUsers: {
-            params: [] as [
-            ],
+            params: {},
             returnType: "User",
             returnArray: true
         },
         signUp: {
-            params: [
-                { name: "name", type: "String" },
-                { name: "role", optional: true, type: "Role" }
-            ] as [
-                name: {
-                    "name": "name";
-                    "type": "String";
-                },
-                role: {
-                    "name": "role";
-                    "type": "Role";
-                    "optional": true;
-                }
-            ],
+            params: {
+                name: { name: "name", type: "String" },
+                role: { name: "role", optional: true, type: "Role" }
+            },
             returnType: "User",
             mutation: true
         },
         setAdmin: {
-            params: [
-                { name: "userId", type: "Int" }
-            ] as [
-                userId: {
-                    "name": "userId";
-                    "type": "Int";
-                }
-            ],
+            params: {
+                userId: { name: "userId", type: "Int" }
+            },
             returnType: "Void",
             mutation: true
         },
         getOverview: {
-            params: [] as [
-            ],
+            params: {},
             returnType: "Overview"
         },
         createMultiple: {
-            params: [
-                { name: "names", array: true, type: "String" }
-            ] as [
-                names: {
-                    "name": "names";
-                    "type": "String";
-                    "array": true;
-                }
-            ],
+            params: {
+                names: { name: "names", array: true, type: "String" }
+            },
             returnType: "User",
             returnArray: true,
             mutation: true

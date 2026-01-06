@@ -35,8 +35,11 @@ import type {
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
+    GetProcedure,
+    GetProcedureNames,
     GroupByArgs,
     GroupByResult,
+    ProcedureEnvelope,
     QueryOptions,
     SelectSubset,
     SimplifiedPlainResult,
@@ -52,10 +55,8 @@ import { computed, inject, provide, toValue, unref, type MaybeRefOrGetter, type 
 import { getAllQueries, invalidateQueriesMatchingPredicate } from './common/client';
 import { getQueryKey } from './common/query-key';
 import type {
-    ExtractProcedures,
     ExtraMutationOptions,
     ExtraQueryOptions,
-    ProcedurePayload,
     ProcedureReturn,
     QueryContext,
     TrimDelegateModelOperations,
@@ -64,9 +65,15 @@ import type {
 export type { FetchFn } from '@zenstackhq/client-helpers/fetch';
 export const VueQueryContextKey = 'zenstack-vue-query-context';
 
-type ProcedureHookFn<Payload, Options, Result> = undefined extends Payload
-    ? (args?: MaybeRefOrGetter<Payload>, options?: MaybeRefOrGetter<Options>) => Result
-    : (args: MaybeRefOrGetter<Payload>, options?: MaybeRefOrGetter<Options>) => Result;
+type ProcedureHookFn<
+    Schema extends SchemaDef,
+    ProcName extends GetProcedureNames<Schema>,
+    Options,
+    Result,
+    Input = ProcedureEnvelope<Schema, ProcName>,
+> = { args: undefined } extends Input
+    ? (args?: MaybeRefOrGetter<Input>, options?: MaybeRefOrGetter<Options>) => Result
+    : (args: MaybeRefOrGetter<Input>, options?: MaybeRefOrGetter<Options>) => Result;
 
 /**
  * Provide context for query settings.
@@ -133,13 +140,17 @@ export type ClientHooks<Schema extends SchemaDef, Options extends QueryOptions<S
 } & ProcedureHooks<Schema>;
 
 type ProcedureHookGroup<Schema extends SchemaDef> = {
-    [Name in keyof ExtractProcedures<Schema>]: ExtractProcedures<Schema>[Name] extends { mutation: true }
+    [Name in GetProcedureNames<Schema>]: GetProcedure<Schema, Name> extends { mutation: true }
         ? {
               useMutation(
                   options?: MaybeRefOrGetter<
                       Omit<
                           UnwrapRef<
-                              UseMutationOptions<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>
+                              UseMutationOptions<
+                                  ProcedureReturn<Schema, Name>,
+                                  DefaultError,
+                                  ProcedureEnvelope<Schema, Name>
+                              >
                           >,
                           'mutationFn'
                       > &
@@ -148,19 +159,21 @@ type ProcedureHookGroup<Schema extends SchemaDef> = {
               ): UseMutationReturnType<
                   ProcedureReturn<Schema, Name>,
                   DefaultError,
-                  ProcedurePayload<Schema, Name>,
+                  ProcedureEnvelope<Schema, Name>,
                   unknown
               >;
           }
         : {
               useQuery: ProcedureHookFn<
-                  ProcedurePayload<Schema, Name>,
+                  Schema,
+                  Name,
                   Omit<ModelQueryOptions<ProcedureReturn<Schema, Name>>, 'optimisticUpdate'>,
                   UseQueryReturnType<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: Ref<QueryKey> }
               >;
 
               useInfiniteQuery: ProcedureHookFn<
-                  ProcedurePayload<Schema, Name>,
+                  Schema,
+                  Name,
                   ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
                   ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
               >;
@@ -170,7 +183,7 @@ type ProcedureHookGroup<Schema extends SchemaDef> = {
 export type ProcedureHooks<Schema extends SchemaDef> = Schema extends { procedures: Record<string, any> }
     ? {
           /**
-           * Preferred procedures API.
+           * Custom procedures.
            */
           $procs: ProcedureHookGroup<Schema>;
       }
@@ -301,13 +314,7 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
                         useQuery: (args?: any, hookOptions?: any) =>
                             useInternalQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
                         useInfiniteQuery: (args?: any, hookOptions?: any) =>
-                            useInternalInfiniteQuery(
-                                schema,
-                                endpointModel,
-                                name,
-                                args,
-                                merge(options, hookOptions),
-                            ),
+                            useInternalInfiniteQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
                     };
                 }
                 return acc;

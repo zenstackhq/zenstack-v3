@@ -80,7 +80,7 @@ export type FieldDef = {
 export type ProcedureParam = { name: string; type: string; array?: boolean; optional?: boolean };
 
 export type ProcedureDef = {
-    params: readonly [...ProcedureParam[]];
+    params: Record<string, ProcedureParam>;
     returnType: string;
     returnArray?: boolean;
     mutation?: boolean;

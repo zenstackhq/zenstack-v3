@@ -77,7 +77,7 @@ export class InputValidator<Schema extends SchemaDef> {
         const procDef = (this.schema.procedures ?? {})[proc] as ProcedureDef | undefined;
         invariant(procDef, `Procedure "${proc}" not found in schema`);
 
-        const params = procDef.params ?? [];
+        const params = Object.values(procDef.params ?? {});
 
         // For procedures where every parameter is optional, allow omitting the input entirely.
         if (typeof input === 'undefined') {
@@ -90,7 +90,7 @@ export class InputValidator<Schema extends SchemaDef> {
             throw createInvalidInputError('Missing procedure arguments', `$procs.${proc}`);
         }
 
-        if (typeof input !== 'object' ) {
+        if (typeof input !== 'object') {
             throw createInvalidInputError('Procedure input must be an object', `$procs.${proc}`);
         }
 
@@ -137,7 +137,10 @@ export class InputValidator<Schema extends SchemaDef> {
                 if (param.optional) {
                     continue;
                 }
-                throw createInvalidInputError(`Invalid procedure argument: ${param.name} is required`, `$procs.${proc}`);
+                throw createInvalidInputError(
+                    `Invalid procedure argument: ${param.name} is required`,
+                    `$procs.${proc}`,
+                );
             }
 
             const schema = this.makeProcedureParamSchema(param);

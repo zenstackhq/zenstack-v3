@@ -117,11 +117,13 @@ client.bar.useCreate();
 // procedures (query)
 check(proceduresClient.$procs.greet.useQuery().data?.toUpperCase());
 check(proceduresClient.$procs.greet.useQuery({ args: { name: 'bob' } }).data?.toUpperCase());
-check(proceduresClient.$procs.greet.useQuery({ args: { name: 'bob' } }).queryKey);
-check(
-    proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).data?.pages[0]?.[0]?.toUpperCase(),
-);
+check(proceduresClient.$procs.greet.useQuery({ args: { name: 'bob' } }, { enabled: true }).queryKey);
+// @ts-expect-error wrong arg shape
+proceduresClient.$procs.greet.useQuery({ args: { hello: 'world' } });
+check(proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).data?.pages[0]?.[0]?.toUpperCase());
 check(proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).queryKey);
+// @ts-expect-error missing args
+proceduresClient.$procs.greetMany.useQuery();
 // @ts-expect-error greet is not a mutation procedure
 proceduresClient.$procs.greet.useMutation();
 

@@ -1,5 +1,5 @@
 import { ORMError } from '@zenstackhq/orm';
-import type { ProcedureDef, SchemaDef } from '@zenstackhq/orm/schema';
+import type { ProcedureDef, ProcedureParam, SchemaDef } from '@zenstackhq/orm/schema';
 
 export const PROCEDURE_ROUTE_PREFIXES = ['$procs'] as const;
 
@@ -58,18 +58,17 @@ export function getProcedureDef(schema: SchemaDef, proc: string): ProcedureDef |
  * @throws {Error} "unknown procedure argument: <key>"
  * @throws {Error} "missing procedure argument: <name>"
  */
-export function mapProcedureArgs(
-    procDef: { params: ReadonlyArray<{ name: string; optional?: boolean; array?: boolean }> },
-    payload: unknown,
-): unknown {
-    const params = procDef.params ?? [];
+export function mapProcedureArgs(procDef: { params: Record<string, ProcedureParam> }, payload: unknown): unknown {
+    const params = Object.values(procDef.params ?? {});
     if (params.length === 0) {
         if (typeof payload === 'undefined') {
             return undefined;
         }
         if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
             const envelope = payload as Record<string, unknown>;
-            const argsPayload = Object.prototype.hasOwnProperty.call(envelope, 'args') ? (envelope as any).args : undefined;
+            const argsPayload = Object.prototype.hasOwnProperty.call(envelope, 'args')
+                ? (envelope as any).args
+                : undefined;
 
             if (typeof argsPayload === 'undefined') {
                 return payload;

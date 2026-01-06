@@ -499,7 +499,7 @@ export class InputValidator<Schema extends SchemaDef> {
         }
 
         // expression builder
-        fields['$expr'] = z.custom((v) => typeof v === 'function').optional();
+        fields['$expr'] = z.custom((v) => typeof v === 'function', { error: '"$expr" must be a function' }).optional();
 
         // logical operators
         fields['AND'] = this.orArray(

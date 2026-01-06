@@ -21,6 +21,10 @@
         "zen": "bin/cli",
         "zenstack": "bin/cli"
     },
+    "files": [
+        "dist",
+        "bin"
+    ],
     "scripts": {
         "build": "tsc --noEmit && tsup-node",
         "watch": "tsup-node --watch",

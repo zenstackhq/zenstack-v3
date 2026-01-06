@@ -10,6 +10,9 @@
         "lint": "eslint src --ext ts"
     },
     "keywords": [],
+    "files": [
+        "dist"
+    ],
     "author": "",
     "license": "MIT",
     "exports": {

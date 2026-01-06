@@ -22,7 +22,8 @@
         "zenstack": "bin/cli"
     },
     "files": [
-        "dist"
+        "dist",
+        "bin"
     ],
     "scripts": {
         "build": "tsc --noEmit && tsup-node",

@@ -382,9 +382,13 @@ export class InputValidator<Schema extends SchemaDef> {
         // zod doesn't preserve object field order after parsing, here we use a
         // validation-only custom schema and use the original data if parsing
         // is successful
-        const finalSchema = z.custom((v) => {
-            return schema.safeParse(v).success;
+        const finalSchema = z.any().superRefine((value, ctx) => {
+            const parseResult = schema.safeParse(value);
+            if (!parseResult.success) {
+                parseResult.error.issues.forEach((issue) => ctx.addIssue(issue as any));
+            }
         });
+
         this.setSchemaCache(key!, finalSchema);
         return finalSchema;
     }

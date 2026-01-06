@@ -36,8 +36,11 @@ import type {
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
+    GetProcedure,
+    GetProcedureNames,
     GroupByArgs,
     GroupByResult,
+    ProcedureEnvelope,
     QueryOptions,
     SelectSubset,
     SimplifiedPlainResult,
@@ -53,10 +56,8 @@ import { createContext, useContext } from 'react';
 import { getAllQueries, invalidateQueriesMatchingPredicate } from './common/client';
 import { getQueryKey } from './common/query-key';
 import type {
-    ExtractProcedures,
     ExtraMutationOptions,
     ExtraQueryOptions,
-    ProcedurePayload,
     ProcedureReturn,
     QueryContext,
     TrimDelegateModelOperations,
@@ -64,9 +65,15 @@ import type {
 } from './common/types';
 export type { FetchFn } from '@zenstackhq/client-helpers/fetch';
 
-type ProcedureHookFn<Payload, Options, Result> = undefined extends Payload
-    ? (args?: Payload, options?: Options) => Result
-    : (args: Payload, options?: Options) => Result;
+type ProcedureHookFn<
+    Schema extends SchemaDef,
+    ProcName extends GetProcedureNames<Schema>,
+    Options,
+    Result,
+    Input = ProcedureEnvelope<Schema, ProcName>,
+> = { args: undefined } extends Input
+    ? (input?: Input, options?: Options) => Result
+    : (input: Input, options?: Options) => Result;
 
 /**
  * React context for query settings.
@@ -143,37 +150,41 @@ export type ClientHooks<Schema extends SchemaDef, Options extends QueryOptions<S
 } & ProcedureHooks<Schema>;
 
 type ProcedureHookGroup<Schema extends SchemaDef> = {
-    [Name in keyof ExtractProcedures<Schema>]: ExtractProcedures<Schema>[Name] extends { mutation: true }
+    [Name in GetProcedureNames<Schema>]: GetProcedure<Schema, Name> extends { mutation: true }
         ? {
               useMutation(
                   options?: Omit<
-                      UseMutationOptions<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>,
+                      UseMutationOptions<ProcedureReturn<Schema, Name>, DefaultError, ProcedureEnvelope<Schema, Name>>,
                       'mutationFn'
                   > &
                       QueryContext,
-              ): UseMutationResult<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>;
+              ): UseMutationResult<ProcedureReturn<Schema, Name>, DefaultError, ProcedureEnvelope<Schema, Name>>;
           }
         : {
               useQuery: ProcedureHookFn<
-                  ProcedurePayload<Schema, Name>,
+                  Schema,
+                  Name,
                   Omit<ModelQueryOptions<ProcedureReturn<Schema, Name>>, 'optimisticUpdate'>,
                   UseQueryResult<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: QueryKey }
               >;
 
               useSuspenseQuery: ProcedureHookFn<
-                  ProcedurePayload<Schema, Name>,
+                  Schema,
+                  Name,
                   Omit<ModelSuspenseQueryOptions<ProcedureReturn<Schema, Name>>, 'optimisticUpdate'>,
                   UseSuspenseQueryResult<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: QueryKey }
               >;
 
               useInfiniteQuery: ProcedureHookFn<
-                  ProcedurePayload<Schema, Name>,
+                  Schema,
+                  Name,
                   ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
                   ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
               >;
 
               useSuspenseInfiniteQuery: ProcedureHookFn<
-                  ProcedurePayload<Schema, Name>,
+                  Schema,
+                  Name,
                   ModelSuspenseInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
                   ModelSuspenseInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
               >;
@@ -183,7 +194,7 @@ type ProcedureHookGroup<Schema extends SchemaDef> = {
 export type ProcedureHooks<Schema extends SchemaDef> = Schema extends { procedures: Record<string, any> }
     ? {
           /**
-           * Preferred procedures API.
+           * Custom procedures.
            */
           $procs: ProcedureHookGroup<Schema>;
       }

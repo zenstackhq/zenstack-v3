@@ -2,60 +2,58 @@
 // NOTE: Test fixture schema used for TanStack Query typing tests.                            //
 //////////////////////////////////////////////////////////////////////////////////////////////
 
- 
-
-import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
+import { type SchemaDef, ExpressionUtils } from '@zenstackhq/orm/schema';
 
 export class SchemaType implements SchemaDef {
     provider = {
-        type: "sqlite",
+        type: 'sqlite',
     } as const;
 
     models = {
         User: {
-            name: "User",
+            name: 'User',
             fields: {
                 id: {
-                    name: "id",
-                    type: "String",
+                    name: 'id',
+                    type: 'String',
                     id: true,
-                    default: ExpressionUtils.call("cuid"),
+                    default: ExpressionUtils.call('cuid'),
                 },
                 email: {
-                    name: "email",
-                    type: "String",
+                    name: 'email',
+                    type: 'String',
                     unique: true,
                 },
             },
-            idFields: ["id"],
+            idFields: ['id'],
             uniqueFields: {
-                id: { type: "String" },
-                email: { type: "String" },
+                id: { type: 'String' },
+                email: { type: 'String' },
             },
         },
     } as const;
 
     procedures = {
         greet: {
-            params: [{ name: "name", type: "String", optional: true }] as const,
-            returnType: "String",
+            params: { name: { name: 'name', type: 'String', optional: true } },
+            returnType: 'String',
         },
         greetMany: {
-            params: [{ name: "name", type: "String", optional: true }] as const,
-            returnType: "String",
+            params: { name: { name: 'name', type: 'String' } },
+            returnType: 'String',
             returnArray: true,
         },
         sum: {
-            params: [
-                { name: "a", type: "Int" },
-                { name: "b", type: "Int" },
-            ] as const,
-            returnType: "Int",
+            params: {
+                a: { name: 'a', type: 'Int' },
+                b: { name: 'b', type: 'Int' },
+            },
+            returnType: 'Int',
             mutation: true,
         },
     } as const;
 
-    authType = "User" as const;
+    authType = 'User' as const;
     plugins = {};
 }
 

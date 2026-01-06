@@ -2,7 +2,7 @@ import type { Dialect, Expression, ExpressionBuilder, KyselyConfig } from 'kysel
 import type { GetModel, GetModelFields, GetModels, ProcedureDef, ScalarFields, SchemaDef } from '../schema';
 import type { PrependParameter } from '../utils/type-utils';
 import type { ClientContract, CRUD_EXT } from './contract';
-import type { ProcedureHandlerFunc } from './contract';
+import type { GetProcedureNames, ProcedureHandlerFunc } from './crud-types';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
 import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
@@ -135,7 +135,7 @@ export type ProceduresOptions<Schema extends SchemaDef> = Schema extends {
     procedures: Record<string, ProcedureDef>;
 }
     ? {
-          [Key in keyof Schema['procedures']]: ProcedureHandlerFunc<Schema, Schema['procedures'][Key]>;
+          [Key in GetProcedureNames<Schema>]: ProcedureHandlerFunc<Schema, Key>;
       }
     : {};
 

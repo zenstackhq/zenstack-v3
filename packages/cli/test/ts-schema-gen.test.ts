@@ -196,12 +196,12 @@ procedure getIds(): Int[]
 
         expect(schema.procedures).toMatchObject({
             findByIds: {
-                params: [{ name: 'ids', type: 'Int', array: true }],
+                params: { ids: { name: 'ids', type: 'Int', array: true } },
                 returnType: 'User',
                 returnArray: true,
             },
             getIds: {
-                params: [],
+                params: {},
                 returnType: 'Int',
                 returnArray: true,
             },

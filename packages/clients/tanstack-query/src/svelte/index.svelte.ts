@@ -37,8 +37,11 @@ import type {
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
+    GetProcedure,
+    GetProcedureNames,
     GroupByArgs,
     GroupByResult,
+    ProcedureEnvelope,
     QueryOptions,
     SelectSubset,
     SimplifiedPlainResult,
@@ -54,10 +57,8 @@ import { getContext, setContext } from 'svelte';
 import { getAllQueries, invalidateQueriesMatchingPredicate } from '../common/client';
 import { getQueryKey } from '../common/query-key';
 import type {
-    ExtractProcedures,
     ExtraMutationOptions,
     ExtraQueryOptions,
-    ProcedurePayload,
     ProcedureReturn,
     QueryContext,
     TrimDelegateModelOperations,
@@ -65,9 +66,15 @@ import type {
 } from '../common/types';
 export type { FetchFn } from '@zenstackhq/client-helpers/fetch';
 
-type ProcedureHookFn<Payload, Options, Result> = undefined extends Payload
-    ? (args?: Accessor<Payload>, options?: Accessor<Options>) => Result
-    : (args: Accessor<Payload>, options?: Accessor<Options>) => Result;
+type ProcedureHookFn<
+    Schema extends SchemaDef,
+    ProcName extends GetProcedureNames<Schema>,
+    Options,
+    Result,
+    Input = ProcedureEnvelope<Schema, ProcName>,
+> = { args: undefined } extends Input
+    ? (args?: Accessor<Input>, options?: Accessor<Options>) => Result
+    : (args: Accessor<Input>, options?: Accessor<Options>) => Result;
 
 /**
  * Key for setting and getting the global query context.
@@ -140,38 +147,44 @@ export type ClientHooks<Schema extends SchemaDef, Options extends QueryOptions<S
 } & ProcedureHooks<Schema>;
 
 type ProcedureHookGroup<Schema extends SchemaDef> = {
-    [Name in keyof ExtractProcedures<Schema>]: ExtractProcedures<Schema>[Name] extends { mutation: true }
-    ? {
-        useMutation(
-            options?: Omit<
-                CreateMutationOptions<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>,
-                'mutationFn'
-            > &
-                QueryContext,
-        ): CreateMutationResult<ProcedureReturn<Schema, Name>, DefaultError, ProcedurePayload<Schema, Name>>;
-    }
-    : {
-        useQuery: ProcedureHookFn<
-            ProcedurePayload<Schema, Name>,
-            Omit<ModelQueryOptions<ProcedureReturn<Schema, Name>>, 'optimisticUpdate'>,
-            CreateQueryResult<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: QueryKey }
-        >;
+    [Name in GetProcedureNames<Schema>]: GetProcedure<Schema, Name> extends { mutation: true }
+        ? {
+              useMutation(
+                  options?: Omit<
+                      CreateMutationOptions<
+                          ProcedureReturn<Schema, Name>,
+                          DefaultError,
+                          ProcedureEnvelope<Schema, Name>
+                      >,
+                      'mutationFn'
+                  > &
+                      QueryContext,
+              ): CreateMutationResult<ProcedureReturn<Schema, Name>, DefaultError, ProcedureEnvelope<Schema, Name>>;
+          }
+        : {
+              useQuery: ProcedureHookFn<
+                  Schema,
+                  Name,
+                  Omit<ModelQueryOptions<ProcedureReturn<Schema, Name>>, 'optimisticUpdate'>,
+                  CreateQueryResult<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: QueryKey }
+              >;
 
-        useInfiniteQuery: ProcedureHookFn<
-            ProcedurePayload<Schema, Name>,
-            ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
-            ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
-        >;
-    };
+              useInfiniteQuery: ProcedureHookFn<
+                  Schema,
+                  Name,
+                  ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+                  ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+              >;
+          };
 };
 
 export type ProcedureHooks<Schema extends SchemaDef> = Schema extends { procedures: Record<string, any> }
     ? {
-        /**
-         * Preferred procedures API.
-         */
-        $procs: ProcedureHookGroup<Schema>;
-    }
+          /**
+           * Custom procedures.
+           */
+          $procs: ProcedureHookGroup<Schema>;
+      }
     : {};
 
 // Note that we can potentially use TypeScript's mapped type to directly map from ORM contract, but that seems
@@ -426,7 +439,7 @@ export function useInternalInfiniteQuery<TQueryFnData, TData>(
             CreateInfiniteQueryOptions<TQueryFnData, DefaultError, InfiniteData<TData>>,
             'queryKey' | 'initialPageParam'
         > &
-        QueryContext
+            QueryContext
     >,
 ) {
     const { endpoint, fetch } = useFetchOptions(options);

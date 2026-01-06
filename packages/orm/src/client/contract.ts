@@ -1,8 +1,5 @@
-import type Decimal from 'decimal.js';
 import {
     type FieldIsArray,
-    type GetEnum,
-    type GetEnums,
     type GetModels,
     type GetTypeDefs,
     type IsDelegateModel,
@@ -12,7 +9,7 @@ import {
     type SchemaDef,
 } from '../schema';
 import type { AnyKysely } from '../utils/kysely-utils';
-import type { MaybePromise, OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
+import type { Simplify, UnwrapTuplePromises } from '../utils/type-utils';
 import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
 import type {
     AggregateArgs,
@@ -29,9 +26,10 @@ import type {
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
+    GetProcedureNames,
     GroupByArgs,
     GroupByResult,
-    ModelResult,
+    ProcedureFunc,
     SelectSubset,
     SimplifiedPlainResult,
     Subset,
@@ -196,7 +194,7 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
     $pushSchema(): Promise<void>;
 } & {
     [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<Schema, Key, ToQueryOptions<Options>>;
-} & Procedures<Schema>;
+} & ProcedureOperations<Schema>;
 
 /**
  * The contract for a client in a transaction.
@@ -206,129 +204,17 @@ export type TransactionClientContract<Schema extends SchemaDef, Options extends 
     TransactionUnsupportedMethods
 >;
 
-type _TypeMap = {
-    String: string;
-    Int: number;
-    Float: number;
-    BigInt: bigint;
-    Decimal: Decimal;
-    Boolean: boolean;
-    DateTime: Date;
-    Json: unknown;
-    Bytes: Uint8Array;
-    Null: null;
-    Object: Record<string, unknown>;
-    Any: unknown;
-    Unsupported: unknown;
-    Void: void;
-    Undefined: undefined;
-};
-
-type EnumValue<Schema extends SchemaDef, Enum extends GetEnums<Schema>> = GetEnum<Schema, Enum>[keyof GetEnum<
-    Schema,
-    Enum
->];
-
-type MapType<Schema extends SchemaDef, T extends string> = T extends keyof _TypeMap
-    ? _TypeMap[T]
-    : T extends GetModels<Schema>
-      ? ModelResult<Schema, T>
-      : T extends GetTypeDefs<Schema>
-        ? TypeDefResult<Schema, T>
-        : T extends GetEnums<Schema>
-          ? EnumValue<Schema, T>
-      : unknown;
-
-export type Procedures<Schema extends SchemaDef> =
+export type ProcedureOperations<Schema extends SchemaDef> =
     Schema['procedures'] extends Record<string, ProcedureDef>
         ? {
               /**
-               * Preferred procedures API.
+               * Custom procedures.
                */
               $procs: {
-                  [Key in keyof Schema['procedures']]: ProcedureFunc<Schema, Schema['procedures'][Key]>;
+                  [Key in GetProcedureNames<Schema>]: ProcedureFunc<Schema, Key>;
               };
           }
         : {};
-
-type _ProcedureParamNames<Params> = Params extends ReadonlyArray<infer P>
-    ? P extends { name: infer N extends string }
-        ? N
-        : never
-    : never;
-
-type _RequiredProcedureParamNames<Params> = Params extends ReadonlyArray<infer P>
-    ? P extends { name: infer N extends string }
-        ? P extends { optional: true }
-            ? never
-            : N
-        : never
-    : never;
-
-type _OptionalProcedureParamNames<Params> = Params extends ReadonlyArray<infer P>
-    ? P extends { name: infer N extends string }
-        ? P extends { optional: true }
-            ? N
-            : never
-        : never
-    : never;
-
-type _HasRequiredProcedureParams<Params> = _RequiredProcedureParamNames<Params> extends never ? false : true;
-
-type _ProcedureParamByName<Params, Name extends string> = Params extends ReadonlyArray<infer P>
-    ? Extract<P, { name: Name }>
-    : never;
-
-type MapProcedureArgsObject<Schema extends SchemaDef, Params> = Simplify<
-    {
-        [K in _RequiredProcedureParamNames<Params>]: MapProcedureParam<Schema, _ProcedureParamByName<Params, K>>;
-    } & {
-        [K in _OptionalProcedureParamNames<Params>]?: MapProcedureParam<Schema, _ProcedureParamByName<Params, K>>;
-    }
->;
-
-type ProcedureEnvelope<Schema extends SchemaDef, Params> = _ProcedureParamNames<Params> extends never
-    ? { args?: Record<string, never> }
-    : _HasRequiredProcedureParams<Params> extends true
-      ? { args: MapProcedureArgsObject<Schema, Params> }
-      : { args?: MapProcedureArgsObject<Schema, Params> };
-
-type ProcedureCallParams<Schema extends SchemaDef, Params> = _HasRequiredProcedureParams<Params> extends true
-    ? [input: ProcedureEnvelope<Schema, Params>]
-    : [] | [input: ProcedureEnvelope<Schema, Params>];
-
-type ProcedureArgs<Schema extends SchemaDef, Params> = _ProcedureParamNames<Params> extends never
-    ? Record<string, never>
-    : MapProcedureArgsObject<Schema, Params>;
-
-type ProcedureHandlerCtx<Schema extends SchemaDef, Params> = { client: ClientContract<Schema> } &
-    (_HasRequiredProcedureParams<Params> extends true
-        ? { args: ProcedureArgs<Schema, Params> }
-        : { args?: ProcedureArgs<Schema, Params> });
-
-export type ProcedureFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
-    ...args: ProcedureCallParams<Schema, Proc['params']>
-) => MaybePromise<MapProcedureReturn<Schema, Proc>>;
-
-/**
- * Signature for procedure handlers configured via client options.
- */
-export type ProcedureHandlerFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
-    ctx: ProcedureHandlerCtx<Schema, Proc['params']>
-) => MaybePromise<MapProcedureReturn<Schema, Proc>>;
-
-type MapProcedureReturn<Schema extends SchemaDef, Proc extends ProcedureDef> = Proc extends { returnType: infer R }
-    ? Proc extends { returnArray: true }
-        ? Array<MapType<Schema, R & string>>
-        : MapType<Schema, R & string>
-    : never;
-
-type MapProcedureParam<Schema extends SchemaDef, P> = P extends { type: infer U }
-    ? OrUndefinedIf<
-          P extends { array: true } ? Array<MapType<Schema, U & string>> : MapType<Schema, U & string>,
-          P extends { optional: true } ? true : false
-      >
-    : never;
 
 /**
  * Creates a new ZenStack client instance.

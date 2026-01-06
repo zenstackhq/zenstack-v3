@@ -31,7 +31,7 @@ export type WrapType<T, Optional = false, Array = false> = Array extends true
       ? T | null
       : T;
 
-type TypeMap = {
+export type TypeMap = {
     String: string;
     Boolean: boolean;
     Int: number;
@@ -41,6 +41,12 @@ type TypeMap = {
     DateTime: Date;
     Bytes: Uint8Array;
     Json: JsonValue;
+    Null: null;
+    Object: Record<string, unknown>;
+    Any: unknown;
+    Unsupported: unknown;
+    Void: void;
+    Undefined: undefined;
 };
 
 export type MapBaseType<T extends string> = T extends keyof TypeMap ? TypeMap[T] : unknown;

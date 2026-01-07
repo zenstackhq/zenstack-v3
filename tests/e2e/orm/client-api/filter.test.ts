@@ -353,7 +353,7 @@ describe('Client filter tests ', () => {
         ).toResolveWithLength(2);
         await expect(
             client.user.findMany({
-                where: { email: { between: ['a@test.com', 'u3@test.com'] } },
+                where: { email: { between: ['a@test.com', 'u3%@test.com'] } },
             }),
         ).toResolveWithLength(3);
         await expect(

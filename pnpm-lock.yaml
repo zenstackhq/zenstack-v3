@@ -183,6 +183,9 @@ importers:
       '@zenstackhq/sdk':
         specifier: workspace:*
         version: link:../sdk
+      chokidar:
+        specifier: ^5.0.0
+        version: 5.0.0
       colors:
         specifier: 1.4.0
         version: 1.4.0

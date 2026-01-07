@@ -39,6 +39,7 @@
         "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
+        "chokidar": "^5.0.0",
         "colors": "1.4.0",
         "commander": "^8.3.0",
         "execa": "^9.6.0",

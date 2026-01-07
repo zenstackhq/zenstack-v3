@@ -32,6 +32,7 @@ import type {
     CreateManyArgs,
     DeleteArgs,
     DeleteManyArgs,
+    ExistsArgs,
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
@@ -145,6 +146,11 @@ export type ModelQueryHooks<
             options?: MaybeRefOrGetter<ModelQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options> | null>>,
         ): ModelQueryResult<SimplifiedPlainResult<Schema, Model, T, Options> | null>;
 
+        useExists<T extends ExistsArgs<Schema, Model>>(
+            args?: MaybeRefOrGetter<Subset<T, ExistsArgs<Schema, Model>>>,
+            options?: MaybeRefOrGetter<ModelQueryOptions<boolean>>,
+        ): ModelQueryResult<boolean>;
+
         useFindMany<T extends FindManyArgs<Schema, Model>>(
             args?: MaybeRefOrGetter<SelectSubset<T, FindManyArgs<Schema, Model>>>,
             options?: MaybeRefOrGetter<ModelQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options>[]>>,
@@ -256,6 +262,10 @@ export function useModelQueries<
 
         useFindFirst: (args: any, options?: any) => {
             return useInternalQuery(schema, modelName, 'findFirst', args, merge(rootOptions, options));
+        },
+
+        useExists: (args: any, options?: any) => {
+            return useInternalQuery(schema, modelName, 'exists', args, merge(rootOptions, options));
         },
 
         useFindMany: (args: any, options?: any) => {

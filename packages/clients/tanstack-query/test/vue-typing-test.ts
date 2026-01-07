@@ -18,6 +18,9 @@ check(client.user.useFindUnique({ where: { id: '1' }, include: { posts: true } }
 check(client.user.useFindFirst().data.value?.email);
 check(client.user.useFindFirst().data.value?.$optimistic);
 
+check(client.user.useExists().data.value);
+check(client.user.useExists({ where: { id: '1' } }).data.value);
+
 check(client.user.useFindMany().data.value?.[0]?.email);
 check(client.user.useFindMany().data.value?.[0]?.$optimistic);
 

@@ -28,6 +28,15 @@ describe('RPC API Handler Tests', () => {
         expect(r.data).toHaveLength(0);
 
         r = await handleRequest({
+            method: 'get',
+            path: '/user/exists',
+            query: { q: JSON.stringify({ where: { id: 'user1' }})},
+            client: rawClient,
+        });
+        expect(r.status).toBe(200);
+        expect(r.data).toBe(false);
+
+        r = await handleRequest({
             method: 'post',
             path: '/user/create',
             query: {},
@@ -56,6 +65,15 @@ describe('RPC API Handler Tests', () => {
                 ]),
             }),
         );
+
+        r = await handleRequest({
+            method: 'get',
+            path: '/user/exists',
+            query: { q: JSON.stringify({ where: { id: 'user1' }})},
+            client: rawClient,
+        });
+        expect(r.status).toBe(200);
+        expect(r.data).toBe(true);
 
         r = await handleRequest({
             method: 'get',

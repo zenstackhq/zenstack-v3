@@ -25,6 +25,7 @@ import {
     type CreateManyArgs,
     type DeleteArgs,
     type DeleteManyArgs,
+    type ExistsArgs,
     type FindArgs,
     type GroupByArgs,
     type UpdateArgs,
@@ -79,6 +80,19 @@ export class InputValidator<Schema extends SchemaDef> {
             FindArgs<Schema, GetModels<Schema>, true> | undefined,
             Parameters<typeof this.makeFindSchema>[1]
         >(model, 'find', options, (model, options) => this.makeFindSchema(model, options), args);
+    }
+
+    validateExistsArgs(
+        model: GetModels<Schema>,
+        args: unknown,
+    ): ExistsArgs<Schema, GetModels<Schema>> | undefined {
+        return this.validate<ExistsArgs<Schema, GetModels<Schema>>>(
+            model,
+            'exists',
+            undefined,
+            (model) => this.makeExistsSchema(model),
+            args,
+        );
     }
 
     validateCreateArgs(model: GetModels<Schema>, args: unknown): CreateArgs<Schema, GetModels<Schema>> {
@@ -295,6 +309,12 @@ export class InputValidator<Schema extends SchemaDef> {
             result = result.optional();
         }
         return result;
+    }
+
+    private makeExistsSchema(model: string) {
+        return z.strictObject({
+            where: this.makeWhereSchema(model, false).optional(),
+        }).optional();
     }
 
     private makeScalarSchema(type: string, attributes?: readonly AttributeApplication[]) {

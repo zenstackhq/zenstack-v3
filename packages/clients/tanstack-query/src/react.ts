@@ -33,6 +33,7 @@ import type {
     CreateManyArgs,
     DeleteArgs,
     DeleteManyArgs,
+    ExistsArgs,
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
@@ -164,6 +165,11 @@ export type ModelQueryHooks<
             args?: SelectSubset<T, FindFirstArgs<Schema, Model>>,
             options?: ModelSuspenseQueryOptions<SimplifiedPlainResult<Schema, Model, T, Options> | null>,
         ): ModelSuspenseQueryResult<SimplifiedPlainResult<Schema, Model, T, Options> | null>;
+
+        useExists<T extends ExistsArgs<Schema, Model>>(
+            args?: Subset<T, ExistsArgs<Schema, Model>>,
+            options?: ModelQueryOptions<boolean>,
+        ): ModelQueryResult<boolean>;
 
         useFindMany<T extends FindManyArgs<Schema, Model>>(
             args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
@@ -306,6 +312,10 @@ export function useModelQueries<
 
         useSuspenseFindFirst: (args: any, options?: any) => {
             return useInternalSuspenseQuery(schema, modelName, 'findFirst', args, { ...rootOptions, ...options });
+        },
+
+        useExists: (args: any, options?: any) => {
+            return useInternalQuery(schema, modelName, 'exists', args, { ...rootOptions, ...options });
         },
 
         useFindMany: (args: any, options?: any) => {

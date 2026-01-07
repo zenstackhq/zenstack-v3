@@ -27,6 +27,7 @@ import { CountOperationHandler } from './crud/operations/count';
 import { CreateOperationHandler } from './crud/operations/create';
 import { DeleteOperationHandler } from './crud/operations/delete';
 import { FindOperationHandler } from './crud/operations/find';
+import { ExistsOperationHandler } from './crud/operations/exists';
 import { GroupByOperationHandler } from './crud/operations/group-by';
 import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/validator';
@@ -596,6 +597,16 @@ function createModelCrudHandler(
                 args,
                 new GroupByOperationHandler<any>(client, model, inputValidator),
                 true,
+            );
+        },
+
+        exists: (args: unknown) => {
+            return createPromise(
+                'exists',
+                'exists',
+                args,
+                new ExistsOperationHandler<any>(client, model, inputValidator),
+                false,
             );
         },
     } as ModelOperations<any, any>;

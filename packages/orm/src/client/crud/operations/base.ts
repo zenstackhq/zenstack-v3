@@ -69,7 +69,8 @@ export type CoreCrudOperation =
     | 'deleteMany'
     | 'count'
     | 'aggregate'
-    | 'groupBy';
+    | 'groupBy'
+    | 'exists';
 
 export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
 
@@ -144,6 +145,32 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             where: filter,
             select: this.makeIdSelect(model),
         });
+    }
+
+    protected async existsNonUnique(
+        kysely: ToKysely<Schema>,
+        model: GetModels<Schema>,
+        filter: any,
+    ): Promise<boolean> {
+        const query = kysely.selectNoFrom((eb) => (
+            eb.exists(
+                this.dialect
+                .buildSelectModel(model, model)
+                .select(sql.lit(1).as('$t'))
+                .where(() => this.dialect.buildFilter(model, model, filter))
+            ).as('exists')
+        )).modifyEnd(this.makeContextComment({ model, operation: 'read' }));
+
+        let result: { exists: number | boolean }[] = [];
+        const compiled = kysely.getExecutor().compileQuery(query.toOperationNode(), createQueryId());
+        try {
+            const r = await kysely.getExecutor().executeQuery(compiled);
+            result = r.rows as { exists: number | boolean}[];
+        } catch (err) {
+            throw createDBQueryError('Failed to execute query', err, compiled.sql, compiled.parameters);
+        }
+
+        return !!result[0]?.exists;
     }
 
     protected async read(

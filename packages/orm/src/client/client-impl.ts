@@ -606,7 +606,7 @@ function createModelCrudHandler(
                 'exists',
                 args,
                 new ExistsOperationHandler<any>(client, model, inputValidator),
-                true,
+                false,
             );
         },
     } as ModelOperations<any, any>;

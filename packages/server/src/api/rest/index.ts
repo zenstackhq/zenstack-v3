@@ -1940,6 +1940,16 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
                 }
             }
         } else {
+            if (op === 'between') {
+                const parts = value
+                    .split(',')
+                    .filter((i) => i)
+                    .map((v) => this.coerce(fieldDef, v));
+                if (parts.length !== 2) {
+                    throw new InvalidValueError(`"between" expects exactly 2 comma-separated values`);
+                }
+                return { between: [parts[0]!, parts[1]!] };
+            }
             const coerced = this.coerce(fieldDef, value);
             switch (op) {
                 case 'icontains':

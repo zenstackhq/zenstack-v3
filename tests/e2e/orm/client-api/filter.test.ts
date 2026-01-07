@@ -673,12 +673,22 @@ describe('Client filter tests ', () => {
         ).toResolveWithLength(1);
         await expect(
             client.user.findMany({
+                where: { createdAt: { between: [past.toISOString(), user1.createdAt] } },
+            }),
+        ).toResolveWithLength(1);
+        await expect(
+            client.user.findMany({
                 where: { createdAt: { between: [past, user2.createdAt] } },
             }),
         ).toResolveWithLength(2);
         await expect(
             client.user.findMany({
                 where: { createdAt: { between: [past, future] } },
+            }),
+        ).toResolveWithLength(2);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [past.toISOString(), future.toISOString()] } },
             }),
         ).toResolveWithLength(2);
         await expect(

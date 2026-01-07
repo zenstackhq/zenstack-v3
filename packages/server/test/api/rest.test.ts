@@ -571,7 +571,7 @@ describe('REST server tests', () => {
                     r = await handler({
                         method: 'get',
                         path: '/post',
-                        query: { ['filter[viewCount$between]']: [[1, 2]] },
+                        query: { ['filter[viewCount$between]']: '1,2' },
                         client,
                     });
                     expect(r.body.data).toHaveLength(1);

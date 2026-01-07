@@ -575,6 +575,7 @@ describe('REST server tests', () => {
                         client,
                     });
                     expect(r.body.data).toHaveLength(1);
+                    expect(r.body.data[0]).toMatchObject({ id: 2 });
 
                     // Boolean filter
                     r = await handler({

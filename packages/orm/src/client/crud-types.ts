@@ -442,7 +442,7 @@ type CommonPrimitiveFilter<
     gte?: DataType;
 
     /**
-     * Checks if the value is between the specified values.
+     * Checks if the value is between the specified values (inclusive).
      */
     between?: [start: DataType, end: DataType];
 

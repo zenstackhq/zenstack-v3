@@ -315,6 +315,53 @@ describe('Client filter tests ', () => {
             }),
         ).toResolveWithLength(2);
 
+        // between
+        await expect(
+            client.user.findMany({
+                where: { email: { between: ['a@test.com', 'a@test.com'] } },
+            }),
+        ).toResolveWithLength(0);
+        await expect(
+            client.user.findMany({
+                where: { email: { between: ['a@test.com', 'b@test.com'] } },
+            }),
+        ).toResolveWithLength(0);
+        await expect(
+            client.user.findMany({
+                where: { email: { between: ['u1@test.com', 'u1@test.com'] } },
+            }),
+        ).toResolveWithLength(1);
+        await expect(
+            client.user.findMany({
+                where: { email: { between: ['u2@test.com', 'u2@test.com'] } },
+            }),
+        ).toResolveWithLength(1);
+        await expect(
+            client.user.findMany({
+                where: { email: { between: ['u1@test.com', 'u2@test.com'] } },
+            }),
+        ).toResolveWithLength(2);
+        await expect(
+            client.user.findMany({
+                where: { email: { between: ['u2@test.com', 'u3%@test.com'] } },
+            }),
+        ).toResolveWithLength(2);
+        await expect(
+            client.user.findMany({
+                where: { email: { between: ['a@test.com', 'u3@test.com'] } },
+            }),
+        ).toResolveWithLength(3);
+        await expect(
+            client.user.findMany({
+                where: { email: { between: ['a@test.com', 'z@test.com'] } },
+            }),
+        ).toResolveWithLength(3);
+        await expect(
+            client.user.findMany({
+                where: { email: { between: ['u1@test.com', 'u3%@test.com'] } },
+            }),
+        ).toResolveWithLength(3);
+
         // contains
         await expect(
             client.user.findFirst({
@@ -408,6 +455,13 @@ describe('Client filter tests ', () => {
         await expect(client.profile.findMany({ where: { age: { gt: 19 } } })).toResolveWithLength(1);
         await expect(client.profile.findMany({ where: { age: { gte: 20 } } })).toResolveWithLength(1);
         await expect(client.profile.findMany({ where: { age: { gte: 21 } } })).toResolveWithLength(0);
+
+        // between
+        await expect(client.profile.findMany({ where: { age: { between: [20, 20] } } })).toResolveWithLength(1);
+        await expect(client.profile.findMany({ where: { age: { between: [19, 20] } } })).toResolveWithLength(1);
+        await expect(client.profile.findMany({ where: { age: { between: [20, 21] } } })).toResolveWithLength(1);
+        await expect(client.profile.findMany({ where: { age: { between: [19, 19] } } })).toResolveWithLength(0);
+        await expect(client.profile.findMany({ where: { age: { between: [21, 21] } } })).toResolveWithLength(0);
 
         // not
         await expect(
@@ -576,6 +630,39 @@ describe('Client filter tests ', () => {
                 where: { createdAt: { gte: user2.createdAt } },
             }),
         ).resolves.toMatchObject(user2);
+
+        // between
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [user1.createdAt, user1.createdAt] } },
+            }),
+        ).toResolveWithLength(1);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [user2.createdAt, user2.createdAt] } },
+            }),
+        ).toResolveWithLength(1);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [user1.createdAt, user2.createdAt] } },
+            }),
+        ).toResolveWithLength(2);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [new Date('2020-01-01'), new Date('2020-01-02')] } },
+            }),
+        ).toResolveWithLength(0);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [new Date('2020-01-01'), user1.createdAt] } },
+            }),
+        ).toResolveWithLength(1);
+
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [new Date('2020-01-01'), user2.createdAt] } },
+            }),
+        ).toResolveWithLength(2);
 
         // not
         await expect(

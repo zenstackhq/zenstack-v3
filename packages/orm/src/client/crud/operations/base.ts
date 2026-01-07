@@ -156,8 +156,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             eb.exists(
                 this.dialect
                 .buildSelectModel(model, model)
-                // @ts-expect-error
-                .select(sql.lit(1))
+                .select(sql.lit(1).as('$t'))
                 .where(() => this.dialect.buildFilter(model, model, filter))
             ).as('exists')
         )).modifyEnd(this.makeContextComment({ model, operation: 'read' }));

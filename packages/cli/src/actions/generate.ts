@@ -1,4 +1,4 @@
-import { invariant } from '@zenstackhq/common-helpers';
+import { invariant, singleDebounce } from '@zenstackhq/common-helpers';
 import { ZModelLanguageMetaData } from '@zenstackhq/language';
 import { type AbstractDeclaration, isPlugin, LiteralExpr, Plugin, type Model } from '@zenstackhq/language/ast';
 import { getLiteral, getLiteralArray } from '@zenstackhq/language/utils';
@@ -50,8 +50,6 @@ export async function run(options: Options) {
         );
 
         const watchedPaths = getRootModelWatchPaths(model);
-        let reGenerateSchemaTimeout: ReturnType<typeof setTimeout> | undefined;
-        let generationInProgress = false;
 
         if (logsEnabled) {
             const logPaths = [...watchedPaths].map((at) => `- ${at}`).join('\n');
@@ -65,53 +63,41 @@ export async function run(options: Options) {
             ignored: (at) => !schemaExtensions.some((ext) => at.endsWith(ext)),
         });
 
-        const reGenerateSchema = () => {
-            clearTimeout(reGenerateSchemaTimeout);
+        // prevent save multiple files and run multiple times
+        const reGenerateSchema = singleDebounce(async () => {
+            if (logsEnabled) {
+                console.log('Got changes, run generation!');
+            }
 
-            // prevent save multiple files and run multiple times
-            reGenerateSchemaTimeout = setTimeout(async () => {
-                if (generationInProgress) {
-                    return;
-                }
+            try {
+                const newModel = await pureGenerate(options, true);
+                const allModelsPaths = getRootModelWatchPaths(newModel);
+                const newModelPaths = [...allModelsPaths].filter((at) => !watchedPaths.has(at));
+                const removeModelPaths = [...watchedPaths].filter((at) => !allModelsPaths.has(at));
 
-                generationInProgress = true;
-
-                if (logsEnabled) {
-                    console.log('Got changes, run generation!');
-                }
-
-                try {
-                    const newModel = await pureGenerate(options, true);
-                    const allModelsPaths = getRootModelWatchPaths(newModel);
-                    const newModelPaths = [...allModelsPaths].filter((at) => !watchedPaths.has(at));
-                    const removeModelPaths = [...watchedPaths].filter((at) => !allModelsPaths.has(at));
-
-                    if (newModelPaths.length) {
-                        if (logsEnabled) {
-                            const logPaths = newModelPaths.map((at) => `- ${at}`).join('\n');
-                            console.log(`Added file(s) to watch:\n${logPaths}`);
-                        }
-
-                        newModelPaths.forEach((at) => watchedPaths.add(at));
-                        watcher.add(newModelPaths);
+                if (newModelPaths.length) {
+                    if (logsEnabled) {
+                        const logPaths = newModelPaths.map((at) => `- ${at}`).join('\n');
+                        console.log(`Added file(s) to watch:\n${logPaths}`);
                     }
 
-                    if (removeModelPaths.length) {
-                        if (logsEnabled) {
-                            const logPaths = removeModelPaths.map((at) => `- ${at}`).join('\n');
-                            console.log(`Removed file(s) from watch:\n${logPaths}`);
-                        }
-
-                        removeModelPaths.forEach((at) => watchedPaths.delete(at));
-                        watcher.unwatch(removeModelPaths);
-                    }
-                } catch (e) {
-                    console.error(e);
+                    newModelPaths.forEach((at) => watchedPaths.add(at));
+                    watcher.add(newModelPaths);
                 }
 
-                generationInProgress = false;
-            }, 500);
-        };
+                if (removeModelPaths.length) {
+                    if (logsEnabled) {
+                        const logPaths = removeModelPaths.map((at) => `- ${at}`).join('\n');
+                        console.log(`Removed file(s) from watch:\n${logPaths}`);
+                    }
+
+                    removeModelPaths.forEach((at) => watchedPaths.delete(at));
+                    watcher.unwatch(removeModelPaths);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }, 500, true);
 
         watcher.on('unlink', (pathAt) => {
             if (logsEnabled) {

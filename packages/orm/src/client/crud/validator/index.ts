@@ -745,6 +745,7 @@ export class InputValidator<Schema extends SchemaDef> {
             lte: baseSchema.optional(),
             gt: baseSchema.optional(),
             gte: baseSchema.optional(),
+            between: baseSchema.array().optional(),
             not: makeThis().optional(),
             ...(withAggregations?.includes('_count')
                 ? { _count: this.makeNumberFilterSchema(z.number().int(), false, false).optional() }

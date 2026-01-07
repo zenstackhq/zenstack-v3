@@ -96,6 +96,7 @@ const FilterOperations = [
     'lte',
     'gt',
     'gte',
+    'between',
     'contains',
     'icontains',
     'search',

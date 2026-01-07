@@ -520,9 +520,9 @@ describe('Client filter tests ', () => {
     });
 
     it('supports date filters', async () => {
-        const now = new Date()
-        const past = new Date(now.getTime() - 1)
-        const future = new Date(now.getTime() + 2)
+        const now = new Date();
+        const past = new Date(now.getTime() - 1);
+        const future = new Date(now.getTime() + 2);
         const user1 = await createUser('u1@test.com', {
             createdAt: now,
         });

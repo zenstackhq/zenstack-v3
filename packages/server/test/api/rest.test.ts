@@ -568,6 +568,14 @@ describe('REST server tests', () => {
                     expect(r.body.data).toHaveLength(1);
                     expect(r.body.data[0]).toMatchObject({ id: 1 });
 
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[viewCount$between]']: [[1, 2]] },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(1);
+
                     // Boolean filter
                     r = await handler({
                         method: 'get',

@@ -611,6 +611,22 @@ describe('REST server tests', () => {
                     expect(r.body.data).toHaveLength(1);
                     expect(r.body.data[0]).toMatchObject({ id: 2 });
 
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[viewCount$between]']: '2,1' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(0);
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[viewCount$between]']: '0,2' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(2);
+
                     // DateTime filter
                     r = await handler({
                         method: 'get',

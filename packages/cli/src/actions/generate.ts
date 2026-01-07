@@ -8,6 +8,7 @@ import { createJiti } from 'jiti';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { watch } from 'chokidar';
 import ora, { type Ora } from 'ora';
 import { CliError } from '../cli-error';
 import * as corePlugins from '../plugins';
@@ -48,10 +49,9 @@ export async function run(options: Options) {
             ).map((v) => v.$cstNode!.parent!.element.$document!.uri!.fsPath),
         );
 
-        const { watch } = await import('chokidar');
-
         const watchedPaths = getRootModelWatchPaths(model);
         let reGenerateSchemaTimeout: ReturnType<typeof setTimeout> | undefined;
+        let generationInProgress = false;
 
         if (logsEnabled) {
             const logPaths = [...watchedPaths].map((at) => `- ${at}`).join('\n');
@@ -70,6 +70,12 @@ export async function run(options: Options) {
 
             // prevent save multiple files and run multiple times
             reGenerateSchemaTimeout = setTimeout(async () => {
+                if (generationInProgress) {
+                    return;
+                }
+
+                generationInProgress = true;
+
                 if (logsEnabled) {
                     console.log('Got changes, run generation!');
                 }
@@ -102,6 +108,8 @@ export async function run(options: Options) {
                 } catch (e) {
                     console.error(e);
                 }
+
+                generationInProgress = false;
             }, 500);
         };
 

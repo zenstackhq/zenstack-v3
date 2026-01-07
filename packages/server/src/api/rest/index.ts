@@ -1943,7 +1943,6 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             if (op === 'between') {
                 const parts = value
                     .split(',')
-                    .filter((i) => i)
                     .map((v) => this.coerce(fieldDef, v));
                 if (parts.length !== 2) {
                     throw new InvalidValueError(`"between" expects exactly 2 comma-separated values`);

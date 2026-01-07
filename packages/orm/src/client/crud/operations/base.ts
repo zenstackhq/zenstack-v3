@@ -72,7 +72,7 @@ export type CoreCrudOperation =
     | 'groupBy'
     | 'exists';
 
-export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow'
+export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
 
 // context for nested relation operations
 export type FromRelationContext = {

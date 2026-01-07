@@ -830,6 +830,23 @@ export type AllModelOperations<
         args: Subset<T, GroupByArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, Simplify<GroupByResult<Schema, Model, T>>>;
 
+    /**
+     * Checks if an entity exists.
+     * @param args - exists args
+     * @returns whether a matching entity was found
+     *
+     * @example
+     * ```ts
+     * // check if a user exists
+     * await db.user.exists({
+     *     where: { id: 1 },
+     * }); // result: `boolean`
+     * 
+     * // check with a relation
+     * await db.user.exists({
+     *     where: { posts: { some: { published: true } } },
+     * }); // result: `boolean`
+     */
     exists<T extends ExistsArgs<Schema, Model>>(
         args?: Subset<T, ExistsArgs<Schema, Model>>,
     ): ZenStackPromise<Schema, boolean>;

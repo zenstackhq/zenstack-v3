@@ -116,7 +116,7 @@ export class ZenStackQueryExecutor extends DefaultQueryExecutor {
                 } else {
                     // wrap error
                     throw createDBQueryError(
-                        'Failed to execute query',
+                        `Failed to execute query: ${err}`,
                         err,
                         compiledQuery.sql,
                         compiledQuery.parameters,
@@ -488,7 +488,12 @@ export class ZenStackQueryExecutor extends DefaultQueryExecutor {
         try {
             return await connection.executeQuery<any>(compiledQuery);
         } catch (err) {
-            throw createDBQueryError('Failed to execute query', err, compiledQuery.sql, compiledQuery.parameters);
+            throw createDBQueryError(
+                `Failed to execute query: ${err}`,
+                err,
+                compiledQuery.sql,
+                compiledQuery.parameters,
+            );
         }
     }
 }

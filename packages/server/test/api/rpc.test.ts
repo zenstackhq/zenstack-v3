@@ -383,6 +383,7 @@ describe('RPC API Handler Tests', () => {
             float Float
             decimal Decimal
             boolean Boolean
+            stringList String[]
             bytes Bytes
             bars Bar[]
         }
@@ -404,6 +405,7 @@ describe('RPC API Handler Tests', () => {
         const dateValue = new Date();
         const bytesValue = new Uint8Array([1, 2, 3, 4]);
         const barBytesValue = new Uint8Array([7, 8, 9]);
+        const stringListValue = ['a', 'b', 'c'];
 
         const createData = {
             string: 'string',
@@ -414,6 +416,7 @@ describe('RPC API Handler Tests', () => {
             decimal: decimalValue,
             boolean: true,
             bytes: bytesValue,
+            stringList: stringListValue,
             bars: {
                 create: { bytes: barBytesValue },
             },
@@ -442,6 +445,8 @@ describe('RPC API Handler Tests', () => {
         expect(data.date instanceof Date).toBeTruthy();
         expect(Decimal.isDecimal(data.decimal)).toBeTruthy();
         expect(data.bars[0].bytes).toBeInstanceOf(Uint8Array);
+        expect(Array.isArray(data.stringList)).toBeTruthy();
+        expect(data.stringList).toEqual(stringListValue);
 
         // find with filter not found
         const serializedQ = SuperJSON.serialize({
@@ -524,6 +529,27 @@ describe('RPC API Handler Tests', () => {
         });
         expect(r.status).toBe(200);
         expect(r.data).toBeNull();
+
+        // validate update on stringList
+        const serializedUpdate = SuperJSON.serialize({
+            where: { id: 1 },
+            data: {
+                stringList: ['d', 'e', 'f'],
+            },
+        });
+        r = await handleRequest({
+            method: 'patch',
+            path: '/foo/update',
+            query: {},
+            client,
+            requestBody: {
+                ...(serializedUpdate.json as any),
+                meta: { serialization: serializedUpdate.meta },
+            },
+        });
+        expect(r.status).toBe(200);
+        expect(r.data).toBeTruthy();
+        expect(r.data.stringList).toEqual(['d', 'e', 'f']);
     });
 
     function makeHandler() {

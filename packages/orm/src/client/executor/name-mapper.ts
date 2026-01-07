@@ -1,6 +1,7 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import {
     AliasNode,
+    BinaryOperationNode,
     CaseWhenBuilder,
     ColumnNode,
     ColumnUpdateNode,
@@ -10,6 +11,7 @@ import {
     FromNode,
     IdentifierNode,
     InsertQueryNode,
+    type OperationNode,
     OperationNodeTransformer,
     PrimitiveValueListNode,
     ReferenceNode,
@@ -17,13 +19,12 @@ import {
     SelectAllNode,
     SelectionNode,
     SelectQueryNode,
+    type SimpleReferenceExpressionNode,
     TableNode,
     UpdateQueryNode,
     ValueListNode,
     ValueNode,
     ValuesNode,
-    type OperationNode,
-    type SimpleReferenceExpressionNode,
 } from 'kysely';
 import type { EnumDef, EnumField, FieldDef, ModelDef, SchemaDef } from '../../schema';
 import {
@@ -77,16 +78,19 @@ export class QueryNameMapper extends OperationNodeTransformer {
         // process "from" clauses
         const processedFroms = node.from.froms.map((from) => this.processSelectTable(from));
 
-        // process "join" clauses, note that "from" needs to be added as scopes since join conditions
-        // can refer to "from" tables
-        const processedJoins = this.withScopes([...processedFroms.map(({ scope }) => scope)], () =>
-            (node.joins ?? []).map((join) => this.processSelectTable(join.table)),
-        );
+        // process "join" clauses, note that "from" and previous joins need to be added as scopes since join conditions
+        // can refer to "from" tables and previous joins
+        const processedJoins: ReturnType<typeof this.processSelectTable>[] = [];
+        const cumulativeScopes = [...processedFroms.map(({ scope }) => scope)];
+        for (const join of node.joins ?? []) {
+            const processedJoin = this.withScopes(cumulativeScopes, () => this.processSelectTable(join.table));
+            processedJoins.push(processedJoin);
+            cumulativeScopes.push(processedJoin.scope);
+        }
 
         // merge the scopes of froms and joins since they're all visible in the query body
-        const scopes = [...processedFroms.map(({ scope }) => scope), ...processedJoins.map(({ scope }) => scope)];
 
-        return this.withScopes(scopes, () => {
+        return this.withScopes(cumulativeScopes, () => {
             // transform join clauses, "on" is transformed within the scopes
             const joins = node.joins
                 ? node.joins.map((join, i) => ({
@@ -181,6 +185,56 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
         const mappedName = this.mapFieldName(scope.model, node.column.name);
         return ColumnNode.create(mappedName);
+    }
+
+    protected override transformBinaryOperation(node: BinaryOperationNode) {
+        // transform enum name mapping for enum values used inside binary operations
+        //   1. simple value: column = EnumValue
+        //   2. list value: column IN [EnumValue, EnumValue2]
+
+        // note: Kysely only allows column ref on the left side of a binary operation
+
+        if (
+            ReferenceNode.is(node.leftOperand) &&
+            ColumnNode.is(node.leftOperand.column) &&
+            (ValueNode.is(node.rightOperand) || PrimitiveValueListNode.is(node.rightOperand))
+        ) {
+            const columnNode = node.leftOperand.column;
+
+            // resolve field from scope in case it's not directly qualified with a table name
+            const resolvedScope = this.resolveFieldFromScopes(
+                columnNode.column.name,
+                node.leftOperand.table?.table.identifier.name,
+            );
+
+            if (resolvedScope?.model) {
+                const valueNode = node.rightOperand;
+                let resultValue: OperationNode = valueNode;
+
+                if (ValueNode.is(valueNode)) {
+                    resultValue = this.processEnumMappingForValue(
+                        resolvedScope.model,
+                        columnNode,
+                        valueNode,
+                    ) as OperationNode;
+                } else if (PrimitiveValueListNode.is(valueNode)) {
+                    resultValue = PrimitiveValueListNode.create(
+                        this.processEnumMappingForValues(
+                            resolvedScope.model,
+                            valueNode.values.map(() => columnNode),
+                            valueNode.values,
+                        ),
+                    );
+                }
+
+                return super.transformBinaryOperation({
+                    ...node,
+                    rightOperand: resultValue,
+                });
+            }
+        }
+
+        return super.transformBinaryOperation(node);
     }
 
     protected override transformUpdateQuery(node: UpdateQueryNode) {

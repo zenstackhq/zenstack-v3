@@ -467,6 +467,7 @@ describe('Client filter tests ', () => {
         await expect(client.profile.findMany({ where: { age: { between: [20, 21] } } })).toResolveWithLength(1);
         await expect(client.profile.findMany({ where: { age: { between: [19, 19] } } })).toResolveWithLength(0);
         await expect(client.profile.findMany({ where: { age: { between: [21, 21] } } })).toResolveWithLength(0);
+        await expect(client.profile.findMany({ where: { age: { between: [21, 20] } } })).toResolveWithLength(0);
 
         // not
         await expect(
@@ -519,11 +520,14 @@ describe('Client filter tests ', () => {
     });
 
     it('supports date filters', async () => {
+        const now = new Date()
+        const past = new Date(now.getTime() - 1)
+        const future = new Date(now.getTime() + 2)
         const user1 = await createUser('u1@test.com', {
-            createdAt: new Date(),
+            createdAt: now,
         });
         const user2 = await createUser('u2@test.com', {
-            createdAt: new Date(Date.now() + 1000),
+            createdAt: new Date(now.getTime() + 1),
         });
 
         // equals
@@ -644,30 +648,54 @@ describe('Client filter tests ', () => {
         ).toResolveWithLength(1);
         await expect(
             client.user.findMany({
-                where: { createdAt: { between: [user2.createdAt, user2.createdAt] } },
-            }),
-        ).toResolveWithLength(1);
-        await expect(
-            client.user.findMany({
                 where: { createdAt: { between: [user1.createdAt, user2.createdAt] } },
             }),
         ).toResolveWithLength(2);
         await expect(
             client.user.findMany({
-                where: { createdAt: { between: [new Date('2020-01-01'), new Date('2020-01-02')] } },
+                where: { createdAt: { between: [user2.createdAt, user2.createdAt] } },
+            }),
+        ).toResolveWithLength(1);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [user2.createdAt, user1.createdAt] } },
             }),
         ).toResolveWithLength(0);
         await expect(
             client.user.findMany({
-                where: { createdAt: { between: [new Date('2020-01-01'), user1.createdAt] } },
+                where: { createdAt: { between: [past, past] } },
             }),
-        ).toResolveWithLength(1);
-
+        ).toResolveWithLength(0);
         await expect(
             client.user.findMany({
-                where: { createdAt: { between: [new Date('2020-01-01'), user2.createdAt] } },
+                where: { createdAt: { between: [past, user1.createdAt] } },
+            }),
+        ).toResolveWithLength(1);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [past, user2.createdAt] } },
             }),
         ).toResolveWithLength(2);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [past, future] } },
+            }),
+        ).toResolveWithLength(2);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [future, past] } },
+            }),
+        ).toResolveWithLength(0);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [future, user1.createdAt] } },
+            }),
+        ).toResolveWithLength(0);
+        await expect(
+            client.user.findMany({
+                where: { createdAt: { between: [future, future] } },
+            }),
+        ).toResolveWithLength(0);
 
         // not
         await expect(

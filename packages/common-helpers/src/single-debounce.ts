@@ -4,8 +4,11 @@ export function singleDebounce(cb: () => void | PromiseLike<void>, debounceMc: n
     let pendingInProgress = false;
 
     const run = async () => {
-        if (inProgress && reRunOnInProgressCall) {
-            pendingInProgress = true;
+        if (inProgress) {
+            if (reRunOnInProgressCall) {
+                pendingInProgress = true;
+            }
+
             return;
         }
 

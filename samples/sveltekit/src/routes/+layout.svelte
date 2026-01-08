@@ -16,9 +16,7 @@
   setQuerySettingsContext({ endpoint: "/api/model", logging: true });
 </script>
 
-<svelte:head
-  ><link rel="icon" href="{favicon}"
-/></svelte:head>
+<svelte:head><link rel="icon" href={favicon} /></svelte:head>
 
 <QueryClientProvider client={queryClient}>
   <div

@@ -116,10 +116,13 @@ client.bar.useCreate();
 check(proceduresClient.$procs.greet.useQuery().data.value?.toUpperCase());
 check(proceduresClient.$procs.greet.useQuery({ args: { name: 'bob' } }).data.value?.toUpperCase());
 check(proceduresClient.$procs.greet.useQuery({ args: { name: 'bob' } }).queryKey.value);
-check(
-    proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).data.value?.pages[0]?.[0]?.toUpperCase(),
-);
-check(proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).queryKey.value);
+
+//   Infinite queries for procedures are currently disabled, will add back later if needed
+// check(
+//     proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).data.value?.pages[0]?.[0]?.toUpperCase(),
+// );
+// check(proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).queryKey.value);
+
 // @ts-expect-error greet is not a mutation procedure
 proceduresClient.$procs.greet.useMutation();
 

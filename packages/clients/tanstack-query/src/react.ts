@@ -175,19 +175,21 @@ type ProcedureHookGroup<Schema extends SchemaDef> = {
                   UseSuspenseQueryResult<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: QueryKey }
               >;
 
-              useInfiniteQuery: ProcedureHookFn<
-                  Schema,
-                  Name,
-                  ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
-                  ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
-              >;
+              //   Infinite queries for procedures are currently disabled, will add back later if needed
+              //
+              //   useInfiniteQuery: ProcedureHookFn<
+              //       Schema,
+              //       Name,
+              //       ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+              //       ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+              //   >;
 
-              useSuspenseInfiniteQuery: ProcedureHookFn<
-                  Schema,
-                  Name,
-                  ModelSuspenseInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
-                  ModelSuspenseInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
-              >;
+              //   useSuspenseInfiniteQuery: ProcedureHookFn<
+              //       Schema,
+              //       Name,
+              //       ModelSuspenseInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+              //       ModelSuspenseInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+              //   >;
           };
 };
 

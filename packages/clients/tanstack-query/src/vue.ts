@@ -171,12 +171,14 @@ type ProcedureHookGroup<Schema extends SchemaDef> = {
                   UseQueryReturnType<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: Ref<QueryKey> }
               >;
 
-              useInfiniteQuery: ProcedureHookFn<
-                  Schema,
-                  Name,
-                  ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
-                  ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
-              >;
+              //   Infinite queries for procedures are currently disabled, will add back later if needed
+              //
+              //   useInfiniteQuery: ProcedureHookFn<
+              //       Schema,
+              //       Name,
+              //       ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+              //       ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+              //   >;
           };
 };
 

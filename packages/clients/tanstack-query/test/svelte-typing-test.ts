@@ -10,7 +10,12 @@ client.user.useFindUnique();
 
 check(client.user.useFindUnique(() => ({ where: { id: '1' } })).data?.email);
 check(client.user.useFindUnique(() => ({ where: { id: '1' } })).queryKey);
-check(client.user.useFindUnique(() => ({ where: { id: '1' } }), () => ({ optimisticUpdate: true, enabled: false })));
+check(
+    client.user.useFindUnique(
+        () => ({ where: { id: '1' } }),
+        () => ({ optimisticUpdate: true, enabled: false }),
+    ),
+);
 
 // @ts-expect-error unselected field
 check(client.user.useFindUnique(() => ({ select: { email: true }, where: { id: '1' } })).data?.name);
@@ -45,28 +50,34 @@ check(client.user.useGroupBy(() => ({ by: ['email'], _max: { name: true } })).da
 // @ts-expect-error missing args
 client.user.useCreate().mutate();
 client.user.useCreate().mutate({ data: { email: 'test@example.com' } });
-client.user.useCreate(() => ({ optimisticUpdate: true, invalidateQueries: false, retry: 3 })).mutate({
-    data: { email: 'test@example.com' },
-});
+client.user
+    .useCreate(() => ({ optimisticUpdate: true, invalidateQueries: false, retry: 3 }))
+    .mutate({
+        data: { email: 'test@example.com' },
+    });
 
-client.user.useCreate()
+client.user
+    .useCreate()
     .mutateAsync({ data: { email: 'test@example.com' }, include: { posts: true } })
     .then((d) => check(d.posts[0]?.title));
 
-client.user.useCreateMany()
+client.user
+    .useCreateMany()
     .mutateAsync({
         data: [{ email: 'test@example.com' }, { email: 'test2@example.com' }],
         skipDuplicates: true,
     })
     .then((d) => d.count);
 
-client.user.useCreateManyAndReturn()
+client.user
+    .useCreateManyAndReturn()
     .mutateAsync({
         data: [{ email: 'test@example.com' }],
     })
     .then((d) => check(d[0]?.name));
 
-client.user.useCreateManyAndReturn()
+client.user
+    .useCreateManyAndReturn()
     .mutateAsync({
         data: [{ email: 'test@example.com' }],
         select: { email: true },
@@ -85,7 +96,8 @@ client.user.useUpdate().mutate(
 
 client.user.useUpdateMany().mutate({ data: { email: 'updated@example.com' } });
 
-client.user.useUpdateManyAndReturn()
+client.user
+    .useUpdateManyAndReturn()
     .mutateAsync({ data: { email: 'updated@example.com' } })
     .then((d) => check(d[0]?.email));
 
@@ -113,12 +125,15 @@ client.bar.useCreate();
 check(proceduresClient.$procs.greet.useQuery().data?.toUpperCase());
 check(proceduresClient.$procs.greet.useQuery(() => ({ args: { name: 'bob' } })).data?.toUpperCase());
 check(proceduresClient.$procs.greet.useQuery(() => ({ args: { name: 'bob' } })).queryKey);
-check(
-    proceduresClient.$procs.greetMany
-        .useInfiniteQuery(() => ({ args: { name: 'bob' } }))
-        .data?.pages[0]?.[0]?.toUpperCase(),
-);
-check(proceduresClient.$procs.greetMany.useInfiniteQuery(() => ({ args: { name: 'bob' } })).queryKey);
+
+//   Infinite queries for procedures are currently disabled, will add back later if needed
+// check(
+//     proceduresClient.$procs.greetMany
+//         .useInfiniteQuery(() => ({ args: { name: 'bob' } }))
+//         .data?.pages[0]?.[0]?.toUpperCase(),
+// );
+// check(proceduresClient.$procs.greetMany.useInfiniteQuery(() => ({ args: { name: 'bob' } })).queryKey);
+
 // @ts-expect-error greet is not a mutation procedure
 proceduresClient.$procs.greet.useMutation();
 

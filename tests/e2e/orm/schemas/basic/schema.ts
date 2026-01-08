@@ -30,7 +30,12 @@ export class SchemaType implements SchemaDef {
                 updatedAt: {
                     name: "updatedAt",
                     type: "DateTime",
-                    updatedAt: true,
+                    updatedAt: {
+                        ignore: [
+                            'id',
+                            'createdAt',
+                        ],
+                    },
                     attributes: [{ name: "@updatedAt" }]
                 },
                 email: {

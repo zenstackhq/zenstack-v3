@@ -130,6 +130,58 @@ describe('Client update tests', () => {
             expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
         });
 
+        it('does not update updatedAt if only ignored fields are present', async () => {
+            const user = await createUser(client, 'u1@test.com');
+            const originalUpdatedAt = user.updatedAt;
+
+            await client.user.update({
+                where: { id: user.id },
+                data: {
+                    id: 'User2',
+                },
+            });
+
+            let updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
+            expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
+
+            await client.user.update({
+                where: { id: 'User2' },
+                data: {
+                    createdAt: new Date(),
+                },
+            });
+
+            updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
+            expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
+
+            await client.user.update({
+                where: { id: 'User2' },
+                data: {
+                    id: 'User1',
+                    createdAt: new Date(),
+                },
+            });
+
+            updatedUser = await client.user.findUnique({ where: { id: 'User1' } });
+            expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
+        });
+
+        it('updates updatedAt if any non-ignored fields are present', async () => {
+            const user = await createUser(client, 'u1@test.com');
+            const originalUpdatedAt = user.updatedAt;
+
+            await client.user.update({
+                where: { id: user.id },
+                data: {
+                    id: 'User2',
+                    name: 'User2',
+                },
+            });
+
+            const updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
+            expect(updatedUser?.updatedAt.getTime()).toBeGreaterThan(originalUpdatedAt.getTime());
+        });
+
         it('works with numeric incremental update', async () => {
             await createUser(client, 'u1@test.com', {
                 profile: { create: { id: '1', bio: 'bio' } },

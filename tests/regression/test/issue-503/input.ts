@@ -6,11 +6,12 @@
 /* eslint-disable */
 
 import { type SchemaType as $Schema } from "./schema";
-import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
+import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, ExistsArgs as $ExistsArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
 import type { SimplifiedPlainResult as $Result, SelectIncludeOmit as $SelectIncludeOmit } from "@zenstackhq/orm";
 export type InternalChatFindManyArgs = $FindManyArgs<$Schema, "InternalChat">;
 export type InternalChatFindUniqueArgs = $FindUniqueArgs<$Schema, "InternalChat">;
 export type InternalChatFindFirstArgs = $FindFirstArgs<$Schema, "InternalChat">;
+export type InternalChatExistsArgs = $ExistsArgs<$Schema, "InternalChat">;
 export type InternalChatCreateArgs = $CreateArgs<$Schema, "InternalChat">;
 export type InternalChatCreateManyArgs = $CreateManyArgs<$Schema, "InternalChat">;
 export type InternalChatCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "InternalChat">;
@@ -31,6 +32,7 @@ export type InternalChatGetPayload<Args extends $SelectIncludeOmit<$Schema, "Int
 export type MessageFindManyArgs = $FindManyArgs<$Schema, "Message">;
 export type MessageFindUniqueArgs = $FindUniqueArgs<$Schema, "Message">;
 export type MessageFindFirstArgs = $FindFirstArgs<$Schema, "Message">;
+export type MessageExistsArgs = $ExistsArgs<$Schema, "Message">;
 export type MessageCreateArgs = $CreateArgs<$Schema, "Message">;
 export type MessageCreateManyArgs = $CreateManyArgs<$Schema, "Message">;
 export type MessageCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Message">;
@@ -51,6 +53,7 @@ export type MessageGetPayload<Args extends $SelectIncludeOmit<$Schema, "Message"
 export type MediaFindManyArgs = $FindManyArgs<$Schema, "Media">;
 export type MediaFindUniqueArgs = $FindUniqueArgs<$Schema, "Media">;
 export type MediaFindFirstArgs = $FindFirstArgs<$Schema, "Media">;
+export type MediaExistsArgs = $ExistsArgs<$Schema, "Media">;
 export type MediaCreateArgs = $CreateArgs<$Schema, "Media">;
 export type MediaCreateManyArgs = $CreateManyArgs<$Schema, "Media">;
 export type MediaCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Media">;

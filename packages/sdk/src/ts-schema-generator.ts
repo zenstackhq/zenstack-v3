@@ -563,8 +563,18 @@ export class TsSchemaGenerator {
             objectFields.push(ts.factory.createPropertyAssignment('array', ts.factory.createTrue()));
         }
 
-        if (hasAttribute(field, '@updatedAt')) {
-            objectFields.push(ts.factory.createPropertyAssignment('updatedAt', ts.factory.createTrue()));
+        const updatedAtAttrib = getAttribute(field, '@updatedAt') as DataFieldAttribute | undefined;
+
+        if (updatedAtAttrib) {
+            const ignoreArg = updatedAtAttrib.args.find(arg => arg.name === 'ignore');
+            objectFields.push(ts.factory.createPropertyAssignment('updatedAt', ignoreArg
+                ? ts.factory.createObjectLiteralExpression([
+                    ts.factory.createPropertyAssignment('ignore', ts.factory.createArrayLiteralExpression(
+                        (ignoreArg.value as ArrayExpr).items.map((item) => ts.factory.createStringLiteral((item as ReferenceExpr).target.$refText))
+                    ))
+                ])
+                : ts.factory.createTrue()
+            ));
         }
 
         if (hasAttribute(field, '@omit')) {

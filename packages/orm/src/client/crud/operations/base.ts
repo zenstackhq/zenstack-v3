@@ -994,11 +994,15 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const autoUpdatedFields: string[] = [];
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
             if (fieldDef.updatedAt) {
+                const updatedScalarFieldsArr = Object.keys(data).filter((field) => isScalarField(this.schema, modelDef.name, field));
+                const ignoredFieldsSet = new Set(typeof fieldDef.updatedAt === 'boolean' ? [] : fieldDef.updatedAt.ignore);
                 if (finalData === data) {
                     finalData = clone(data);
                 }
-                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                if (updatedScalarFieldsArr.some((field) => !ignoredFieldsSet.has(field))) {
+                    finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
                 autoUpdatedFields.push(fieldName);
+                }
             }
         }
 

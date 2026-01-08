@@ -403,7 +403,7 @@ attribute @omit()
 /**
  * Automatically stores the time when a record was last updated.
  */
-attribute @updatedAt() @@@targetField([DateTimeField]) @@@prisma
+attribute @updatedAt(_ ignore: FieldReference[]?) @@@targetField([DateTimeField]) @@@prisma
 
 /**
  * Add full text index (MySQL only).

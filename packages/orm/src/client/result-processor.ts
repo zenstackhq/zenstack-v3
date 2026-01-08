@@ -49,7 +49,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 // merge delegate descendant fields
                 if (value) {
                     // descendant fields are packed as JSON
-                    const subRow = this.dialect.transformOutput(value, 'Json');
+                    const subRow = this.dialect.transformOutput(value, 'Json', false);
 
                     // process the sub-row
                     const subModel = key.slice(DELEGATE_JOINED_FIELD_PREFIX.length) as GetModels<Schema>;
@@ -93,10 +93,10 @@ export class ResultProcessor<Schema extends SchemaDef> {
     private processFieldValue(value: unknown, fieldDef: FieldDef) {
         const type = fieldDef.type as BuiltinType;
         if (Array.isArray(value)) {
-            value.forEach((v, i) => (value[i] = this.dialect.transformOutput(v, type)));
+            value.forEach((v, i) => (value[i] = this.dialect.transformOutput(v, type, !!fieldDef.array)));
             return value;
         } else {
-            return this.dialect.transformOutput(value, type);
+            return this.dialect.transformOutput(value, type, !!fieldDef.array);
         }
     }
 

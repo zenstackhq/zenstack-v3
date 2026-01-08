@@ -3,16 +3,13 @@ import { ORMError, ORMErrorReason, type ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import SuperJSON from 'superjson';
 import { match } from 'ts-pattern';
+import z from 'zod';
+import { fromError } from 'zod-validation-error/v4';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
+import { getProcedureDef, mapProcedureArgs, PROCEDURE_ROUTE_PREFIXES } from '../common/procedures';
+import { loggerSchema } from '../common/schemas';
+import { processSuperJsonRequestPayload, unmarshalQ } from '../common/utils';
 import { log, registerCustomSerializers } from '../utils';
-import {
-    getProcedureDef,
-    mapProcedureArgs,
-} from '../common/procedures';
-import {
-    processSuperJsonRequestPayload,
-    unmarshalQ,
-} from '../common/utils';
 
 registerCustomSerializers();
 
@@ -35,7 +32,17 @@ export type RPCApiHandlerOptions<Schema extends SchemaDef = SchemaDef> = {
  * RPC style API request handler that mirrors the ZenStackClient API
  */
 export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiHandler<Schema> {
-    constructor(private readonly options: RPCApiHandlerOptions<Schema>) { }
+    constructor(private readonly options: RPCApiHandlerOptions<Schema>) {
+        this.validateOptions(options);
+    }
+
+    private validateOptions(options: RPCApiHandlerOptions<Schema>) {
+        const schema = z.strictObject({ schema: z.object(), log: loggerSchema.optional() });
+        const parseResult = schema.safeParse(options);
+        if (!parseResult.success) {
+            throw new Error(`Invalid options: ${fromError(parseResult.error)}`);
+        }
+    }
 
     get schema(): Schema {
         return this.options.schema;
@@ -54,7 +61,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             return this.makeBadInputErrorResponse('invalid request path');
         }
 
-        if (model === '$procs') {
+        if (model === PROCEDURE_ROUTE_PREFIXES) {
             return this.handleProcedureRequest({
                 client,
                 method: method.toUpperCase(),
@@ -96,9 +103,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                     return this.makeBadInputErrorResponse('invalid request method, only GET is supported');
                 }
                 try {
-                    args = query?.['q']
-                        ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
-                        : {};
+                    args = query?.['q'] ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined) : {};
                 } catch {
                     return this.makeBadInputErrorResponse('invalid "q" query parameter');
                 }
@@ -123,9 +128,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                     return this.makeBadInputErrorResponse('invalid request method, only DELETE is supported');
                 }
                 try {
-                    args = query?.['q']
-                        ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
-                        : {};
+                    args = query?.['q'] ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined) : {};
                 } catch (err) {
                     return this.makeBadInputErrorResponse(
                         err instanceof Error ? err.message : 'invalid "q" query parameter',
@@ -223,7 +226,9 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                     ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
                     : undefined;
             } catch (err) {
-                return this.makeBadInputErrorResponse(err instanceof Error ? err.message : 'invalid "q" query parameter');
+                return this.makeBadInputErrorResponse(
+                    err instanceof Error ? err.message : 'invalid "q" query parameter',
+                );
             }
         }
 
@@ -251,7 +256,11 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             }
 
             const response = { status: 200, body: responseBody };
-            log(this.options.log, 'debug', () => `sending response for "$procs.${proc}" request: ${safeJSONStringify(response)}`);
+            log(
+                this.options.log,
+                'debug',
+                () => `sending response for "$procs.${proc}" request: ${safeJSONStringify(response)}`,
+            );
             return response;
         } catch (err) {
             log(this.options.log, 'error', `error occurred when handling "$procs.${proc}" request`, err);
@@ -312,7 +321,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                 status = 400;
                 error.dbErrorCode = err.dbErrorCode;
             })
-            .otherwise(() => { });
+            .otherwise(() => {});
 
         const resp = { status, body: { error } };
         log(this.options.log, 'debug', () => `sending error response: ${safeJSONStringify(resp)}`);

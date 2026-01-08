@@ -7,15 +7,12 @@ import tsjapi, { type Linker, type Paginator, type Relator, type Serializer, typ
 import { match } from 'ts-pattern';
 import UrlPattern from 'url-pattern';
 import z from 'zod';
+import { fromError } from 'zod-validation-error/v4';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
+import { getProcedureDef, mapProcedureArgs } from '../common/procedures';
+import { loggerSchema } from '../common/schemas';
+import { processSuperJsonRequestPayload } from '../common/utils';
 import { getZodErrorMessage, log, registerCustomSerializers } from '../utils';
-import {
-    getProcedureDef,
-    mapProcedureArgs,
-} from '../common/procedures';
-import {
-    processSuperJsonRequestPayload,
-} from '../common/utils';
 
 /**
  * Options for {@link RestApiHandler}
@@ -58,8 +55,14 @@ export type RestApiHandlerOptions<Schema extends SchemaDef = SchemaDef> = {
      */
     urlSegmentCharset?: string;
 
+    /**
+     * Mapping from model names to URL segment names.
+     */
     modelNameMapping?: Record<string, string>;
 
+    /**
+     * Mapping from model names to unique field name to be used as resource's ID.
+     */
     externalIdMapping?: Record<string, string>;
 };
 
@@ -260,6 +263,8 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
     private externalIdMapping: Record<string, string>;
 
     constructor(private readonly options: RestApiHandlerOptions<Schema>) {
+        this.validateOptions(options);
+
         this.idDivider = options.idDivider ?? DEFAULT_ID_DIVIDER;
         const segmentCharset = options.urlSegmentCharset ?? 'a-zA-Z0-9-_~ %';
 
@@ -280,6 +285,23 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
 
         this.buildTypeMap();
         this.buildSerializers();
+    }
+
+    private validateOptions(options: RestApiHandlerOptions<Schema>) {
+        const schema = z.strictObject({
+            schema: z.object(),
+            log: loggerSchema.optional(),
+            endpoint: z.string().min(1),
+            pageSize: z.number().positive().optional(),
+            idDivider: z.string().min(1).optional(),
+            urlSegmentCharset: z.string().min(1).optional(),
+            modelNameMapping: z.record(z.string(), z.string()).optional(),
+            externalIdMapping: z.record(z.string(), z.string()).optional(),
+        });
+        const parseResult = schema.safeParse(options);
+        if (!parseResult.success) {
+            throw new Error(`Invalid options: ${fromError(parseResult.error)}`);
+        }
     }
 
     get schema() {
@@ -530,7 +552,9 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         try {
             procInput = mapProcedureArgs(procDef, processedArgsPayload);
         } catch (err) {
-            return this.makeProcBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
+            return this.makeProcBadInputErrorResponse(
+                err instanceof Error ? err.message : 'invalid procedure arguments',
+            );
         }
 
         try {
@@ -926,16 +950,16 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             prev:
                 offset - limit >= 0 && offset - limit <= total - 1
                     ? this.replaceURLSearchParams(baseUrl, {
-                        'page[offset]': offset - limit,
-                        'page[limit]': limit,
-                    })
+                          'page[offset]': offset - limit,
+                          'page[limit]': limit,
+                      })
                     : null,
             next:
                 offset + limit <= total - 1
                     ? this.replaceURLSearchParams(baseUrl, {
-                        'page[offset]': offset + limit,
-                        'page[limit]': limit,
-                    })
+                          'page[offset]': offset + limit,
+                          'page[limit]': limit,
+                      })
                     : null,
         }));
     }
@@ -2001,8 +2025,8 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
                     } else {
                         currPayload[relation] = select
                             ? {
-                                select: { ...select },
-                            }
+                                  select: { ...select },
+                              }
                             : true;
                     }
                 }

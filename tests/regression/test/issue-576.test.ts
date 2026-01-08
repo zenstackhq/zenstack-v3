@@ -14,6 +14,13 @@ enum Tag {
 model Foo {
     id Int @id
     tags Tag[]
+    bar Bar?
+}
+
+model Bar {
+    id Int @id
+    fooId Int @unique
+    foo Foo @relation(fields: [fooId], references: [id])
 }
 `,
             { provider: 'postgresql', usePrismaPush: true },
@@ -27,7 +34,42 @@ model Foo {
                 },
             }),
         ).resolves.toMatchObject({ id: 1, tags: ['TAG1', 'TAG2'] });
-        await expect(db.foo.findFirst()).resolves.toMatchObject({ tags: ['TAG1', 'TAG2'] });
+        await expect(
+            db.foo.update({
+                where: { id: 1 },
+                data: {
+                    tags: { set: ['TAG2', 'TAG3'] },
+                },
+            }),
+        ).resolves.toMatchObject({ id: 1, tags: ['TAG2', 'TAG3'] });
+
+        await expect(db.foo.findFirst()).resolves.toMatchObject({ tags: ['TAG2', 'TAG3'] });
+        await expect(db.foo.findFirst({ where: { tags: { equals: ['TAG2', 'TAG3'] } } })).resolves.toMatchObject({
+            tags: ['TAG2', 'TAG3'],
+        });
+        await expect(db.foo.findFirst({ where: { tags: { has: 'TAG1' } } })).toResolveNull();
+
+        // nested create
+        await expect(
+            db.bar.create({
+                data: { id: 1, foo: { create: { id: 2, tags: ['TAG1'] } } },
+                include: { foo: true },
+            }),
+        ).resolves.toMatchObject({ foo: expect.objectContaining({ tags: ['TAG1'] }) });
+
+        // nested find
+        await expect(
+            db.bar.findFirst({
+                where: { foo: { tags: { has: 'TAG1' } } },
+                include: { foo: true },
+            }),
+        ).resolves.toMatchObject({ foo: expect.objectContaining({ tags: ['TAG1'] }) });
+
+        await expect(
+            db.bar.findFirst({
+                where: { foo: { tags: { equals: ['TAG2'] } } },
+            }),
+        ).toResolveNull();
     });
 
     it('should support enum array stored in JSON field', async () => {

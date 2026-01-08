@@ -9,9 +9,9 @@ import {
     type BuiltinType,
     type EnumDef,
     type FieldDef,
-    type ProcedureDef,
     type GetModels,
     type ModelDef,
+    type ProcedureDef,
     type SchemaDef,
 } from '../../../schema';
 import { extractFields } from '../../../utils/object-utils';
@@ -199,10 +199,7 @@ export class InputValidator<Schema extends SchemaDef> {
         >(model, 'find', options, (model, options) => this.makeFindSchema(model, options), args);
     }
 
-    validateExistsArgs(
-        model: GetModels<Schema>,
-        args: unknown,
-    ): ExistsArgs<Schema, GetModels<Schema>> | undefined {
+    validateExistsArgs(model: GetModels<Schema>, args: unknown): ExistsArgs<Schema, GetModels<Schema>> | undefined {
         return this.validate<ExistsArgs<Schema, GetModels<Schema>>>(
             model,
             'exists',
@@ -429,9 +426,11 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeExistsSchema(model: string) {
-        return z.strictObject({
-            where: this.makeWhereSchema(model, false).optional(),
-        }).optional();
+        return z
+            .strictObject({
+                where: this.makeWhereSchema(model, false).optional(),
+            })
+            .optional();
     }
 
     private makeScalarSchema(type: string, attributes?: readonly AttributeApplication[]) {
@@ -577,7 +576,12 @@ export class InputValidator<Schema extends SchemaDef> {
                 if (enumDef) {
                     // enum
                     if (Object.keys(enumDef.values).length > 0) {
-                        fieldSchema = this.makeEnumFilterSchema(enumDef, !!fieldDef.optional, withAggregations);
+                        fieldSchema = this.makeEnumFilterSchema(
+                            enumDef,
+                            !!fieldDef.optional,
+                            withAggregations,
+                            !!fieldDef.array,
+                        );
                     }
                 } else if (fieldDef.array) {
                     // array field
@@ -614,7 +618,12 @@ export class InputValidator<Schema extends SchemaDef> {
                                     if (enumDef) {
                                         // enum
                                         if (Object.keys(enumDef.values).length > 0) {
-                                            fieldSchema = this.makeEnumFilterSchema(enumDef, !!def.optional, false);
+                                            fieldSchema = this.makeEnumFilterSchema(
+                                                enumDef,
+                                                !!def.optional,
+                                                false,
+                                                false,
+                                            );
                                         } else {
                                             fieldSchema = z.never();
                                         }
@@ -696,24 +705,23 @@ export class InputValidator<Schema extends SchemaDef> {
                         !!fieldDef.array,
                     ).optional();
                 } else {
-                    // array, enum, primitives
-                    if (fieldDef.array) {
+                    // enum, array, primitives
+                    const enumDef = getEnum(this.schema, fieldDef.type);
+                    if (enumDef) {
+                        fieldSchemas[fieldName] = this.makeEnumFilterSchema(
+                            enumDef,
+                            !!fieldDef.optional,
+                            false,
+                            !!fieldDef.array,
+                        ).optional();
+                    } else if (fieldDef.array) {
                         fieldSchemas[fieldName] = this.makeArrayFilterSchema(fieldDef.type as BuiltinType).optional();
                     } else {
-                        const enumDef = getEnum(this.schema, fieldDef.type);
-                        if (enumDef) {
-                            fieldSchemas[fieldName] = this.makeEnumFilterSchema(
-                                enumDef,
-                                !!fieldDef.optional,
-                                false,
-                            ).optional();
-                        } else {
-                            fieldSchemas[fieldName] = this.makePrimitiveFilterSchema(
-                                fieldDef.type as BuiltinType,
-                                !!fieldDef.optional,
-                                false,
-                            ).optional();
-                        }
+                        fieldSchemas[fieldName] = this.makePrimitiveFilterSchema(
+                            fieldDef.type as BuiltinType,
+                            !!fieldDef.optional,
+                            false,
+                        ).optional();
                     }
                 }
             }
@@ -757,12 +765,15 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.schema.typeDefs && type in this.schema.typeDefs;
     }
 
-    private makeEnumFilterSchema(enumDef: EnumDef, optional: boolean, withAggregations: boolean) {
+    private makeEnumFilterSchema(enumDef: EnumDef, optional: boolean, withAggregations: boolean, array: boolean) {
         const baseSchema = z.enum(Object.keys(enumDef.values) as [string, ...string[]]);
+        if (array) {
+            return this.internalMakeArrayFilterSchema(baseSchema);
+        }
         const components = this.makeCommonPrimitiveFilterComponents(
             baseSchema,
             optional,
-            () => z.lazy(() => this.makeEnumFilterSchema(enumDef, optional, withAggregations)),
+            () => z.lazy(() => this.makeEnumFilterSchema(enumDef, optional, withAggregations, array)),
             ['equals', 'in', 'notIn', 'not'],
             withAggregations ? ['_count', '_min', '_max'] : undefined,
         );
@@ -770,11 +781,15 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeArrayFilterSchema(type: BuiltinType) {
+        return this.internalMakeArrayFilterSchema(this.makeScalarSchema(type));
+    }
+
+    private internalMakeArrayFilterSchema(elementSchema: ZodType) {
         return z.strictObject({
-            equals: this.makeScalarSchema(type).array().optional(),
-            has: this.makeScalarSchema(type).optional(),
-            hasEvery: this.makeScalarSchema(type).array().optional(),
-            hasSome: this.makeScalarSchema(type).array().optional(),
+            equals: elementSchema.array().optional(),
+            has: elementSchema.optional(),
+            hasEvery: elementSchema.array().optional(),
+            hasSome: elementSchema.array().optional(),
             isEmpty: z.boolean().optional(),
         });
     }

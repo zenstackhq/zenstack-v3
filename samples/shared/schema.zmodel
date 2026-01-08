@@ -1,0 +1,28 @@
+datasource db {
+    provider = 'sqlite'
+    url = 'file:./dev.db'
+}
+
+/// User model
+model User {
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    email     String   @unique
+    name      String?
+    posts     Post[]
+}
+
+/// Post model
+model Post {
+    id        String   @id @default(cuid())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    title     String
+    published Boolean  @default(false)
+    author    User     @relation(fields: [authorId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+    authorId  String
+}
+
+mutation procedure signUp(email: String): User
+procedure listPublicPosts(): Post[]

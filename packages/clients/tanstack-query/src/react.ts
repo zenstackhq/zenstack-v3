@@ -55,6 +55,7 @@ import type {
 import type { GetModels, SchemaDef } from '@zenstackhq/schema';
 import { createContext, useContext } from 'react';
 import { getAllQueries, invalidateQueriesMatchingPredicate } from './common/client';
+import { CUSTOM_PROC_ROUTE_NAME } from './common/constants';
 import { getQueryKey } from './common/query-key';
 import type {
     ExtraMutationOptions,
@@ -350,30 +351,36 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
 
     const procedures = (schema as any).procedures as Record<string, { mutation?: boolean }> | undefined;
     if (procedures) {
-        const buildProcedureHooks = (endpointModel: '$procs') => {
+        const buildProcedureHooks = () => {
             return Object.keys(procedures).reduce((acc, name) => {
                 const procDef = procedures[name];
                 if (procDef?.mutation) {
                     acc[name] = {
                         useMutation: (hookOptions?: any) =>
-                            useInternalMutation(schema, endpointModel, 'POST', name, { ...options, ...hookOptions }),
+                            useInternalMutation(schema, CUSTOM_PROC_ROUTE_NAME, 'POST', name, {
+                                ...options,
+                                ...hookOptions,
+                            }),
                     };
                 } else {
                     acc[name] = {
                         useQuery: (args?: any, hookOptions?: any) =>
-                            useInternalQuery(schema, endpointModel, name, args, { ...options, ...hookOptions }),
+                            useInternalQuery(schema, CUSTOM_PROC_ROUTE_NAME, name, args, {
+                                ...options,
+                                ...hookOptions,
+                            }),
                         useSuspenseQuery: (args?: any, hookOptions?: any) =>
-                            useInternalSuspenseQuery(schema, endpointModel, name, args, {
+                            useInternalSuspenseQuery(schema, CUSTOM_PROC_ROUTE_NAME, name, args, {
                                 ...options,
                                 ...hookOptions,
                             }),
                         useInfiniteQuery: (args?: any, hookOptions?: any) =>
-                            useInternalInfiniteQuery(schema, endpointModel, name, args, {
+                            useInternalInfiniteQuery(schema, CUSTOM_PROC_ROUTE_NAME, name, args, {
                                 ...options,
                                 ...hookOptions,
                             }),
                         useSuspenseInfiniteQuery: (args?: any, hookOptions?: any) =>
-                            useInternalSuspenseInfiniteQuery(schema, endpointModel, name, args, {
+                            useInternalSuspenseInfiniteQuery(schema, CUSTOM_PROC_ROUTE_NAME, name, args, {
                                 ...options,
                                 ...hookOptions,
                             }),
@@ -383,7 +390,7 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
             }, {} as any);
         };
 
-        (result as any).$procs = buildProcedureHooks('$procs');
+        (result as any).$procs = buildProcedureHooks();
     }
 
     return result;
@@ -645,64 +652,68 @@ export function useInternalMutation<TArgs, R = any>(
     };
 
     const finalOptions = { ...options, mutationFn };
-    const invalidateQueries = options?.invalidateQueries !== false;
-    const optimisticUpdate = !!options?.optimisticUpdate;
+    if (model !== CUSTOM_PROC_ROUTE_NAME) {
+        // not a custom procedure, set up optimistic update and invalidation
 
-    if (!optimisticUpdate) {
-        // if optimistic update is not enabled, invalidate related queries on success
-        if (invalidateQueries) {
-            const invalidator = createInvalidator(
+        const invalidateQueries = options?.invalidateQueries !== false;
+        const optimisticUpdate = !!options?.optimisticUpdate;
+
+        if (!optimisticUpdate) {
+            // if optimistic update is not enabled, invalidate related queries on success
+            if (invalidateQueries) {
+                const invalidator = createInvalidator(
+                    model,
+                    operation,
+                    schema,
+                    (predicate) => invalidateQueriesMatchingPredicate(queryClient, predicate),
+                    logging,
+                );
+                const origOnSuccess = finalOptions.onSuccess;
+                finalOptions.onSuccess = async (...args) => {
+                    // execute invalidator prior to user-provided onSuccess
+                    await invalidator(...args);
+
+                    // call user-provided onSuccess
+                    await origOnSuccess?.(...args);
+                };
+            }
+        } else {
+            // schedule optimistic update on mutate
+            const optimisticUpdater = createOptimisticUpdater(
                 model,
                 operation,
                 schema,
-                (predicate) => invalidateQueriesMatchingPredicate(queryClient, predicate),
+                { optimisticDataProvider: finalOptions.optimisticDataProvider },
+                () => getAllQueries(queryClient),
                 logging,
             );
-            const origOnSuccess = finalOptions.onSuccess;
-            finalOptions.onSuccess = async (...args) => {
-                // execute invalidator prior to user-provided onSuccess
-                await invalidator(...args);
+            const origOnMutate = finalOptions.onMutate;
+            finalOptions.onMutate = async (...args) => {
+                // execute optimistic update
+                await optimisticUpdater(...args);
 
-                // call user-provided onSuccess
-                await origOnSuccess?.(...args);
+                // call user-provided onMutate
+                return origOnMutate?.(...args);
             };
-        }
-    } else {
-        // schedule optimistic update on mutate
-        const optimisticUpdater = createOptimisticUpdater(
-            model,
-            operation,
-            schema,
-            { optimisticDataProvider: finalOptions.optimisticDataProvider },
-            () => getAllQueries(queryClient),
-            logging,
-        );
-        const origOnMutate = finalOptions.onMutate;
-        finalOptions.onMutate = async (...args) => {
-            // execute optimistic update
-            await optimisticUpdater(...args);
 
-            // call user-provided onMutate
-            return origOnMutate?.(...args);
-        };
+            if (invalidateQueries) {
+                // invalidate related queries on settled (success or error)
+                const invalidator = createInvalidator(
+                    model,
+                    operation,
+                    schema,
+                    (predicate) => invalidateQueriesMatchingPredicate(queryClient, predicate),
+                    logging,
+                );
+                const origOnSettled = finalOptions.onSettled;
+                finalOptions.onSettled = async (...args) => {
+                    // execute invalidator prior to user-provided onSettled
+                    await invalidator(...args);
 
-        if (invalidateQueries) {
-            // invalidate related queries on settled (success or error)
-            const invalidator = createInvalidator(
-                model,
-                operation,
-                schema,
-                (predicate) => invalidateQueriesMatchingPredicate(queryClient, predicate),
-                logging,
-            );
-            const origOnSettled = finalOptions.onSettled;
-            finalOptions.onSettled = async (...args) => {
-                // execute invalidator prior to user-provided onSettled
-                await invalidator(...args);
-
-                // call user-provided onSettled
-                return origOnSettled?.(...args);
-            };
+                    // call user-provided onSettled
+                    return origOnSettled?.(...args);
+                };
+            }
         }
     }
 

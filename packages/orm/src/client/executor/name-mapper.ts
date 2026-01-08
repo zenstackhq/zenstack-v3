@@ -530,9 +530,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
         let schema = this.schema.provider.defaultSchema ?? 'public';
         const schemaAttr = this.schema.models[model]?.attributes?.find((attr) => attr.name === '@@schema');
         if (schemaAttr) {
-            const nameArg = schemaAttr.args?.find((arg) => arg.name === 'map');
-            if (nameArg && nameArg.value.kind === 'literal') {
-                schema = nameArg.value.value as string;
+            const mapArg = schemaAttr.args?.find((arg) => arg.name === 'map');
+            if (mapArg && mapArg.value.kind === 'literal') {
+                schema = mapArg.value.value as string;
             }
         }
         return schema;

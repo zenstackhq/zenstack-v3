@@ -48,7 +48,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return value;
     }
 
-    transformOutput(value: unknown, _type: BuiltinType) {
+    transformOutput(value: unknown, _type: BuiltinType, _array: boolean) {
         return value;
     }
 

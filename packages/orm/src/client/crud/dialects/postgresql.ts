@@ -9,6 +9,7 @@ import {
     type SelectQueryBuilder,
     type SqlBool,
 } from 'kysely';
+import { parse as parsePostgresArray } from 'postgres-array';
 import { match } from 'ts-pattern';
 import z from 'zod';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
@@ -20,7 +21,9 @@ import type { ClientOptions } from '../../options';
 import {
     buildJoinPairs,
     getDelegateDescendantModels,
+    getEnum,
     getManyToManyRelation,
+    isEnum,
     isRelationField,
     isTypeDef,
     requireField,
@@ -28,6 +31,7 @@ import {
     requireModel,
 } from '../../query-utils';
 import { BaseCrudDialect } from './base-dialect';
+
 export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
     private isoDateSchema = z.iso.datetime({ local: true, offset: true });
 
@@ -70,6 +74,16 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             if (type === 'Json' && !forArrayField) {
                 // scalar `Json` fields need their input stringified
                 return JSON.stringify(value);
+            }
+            if (isEnum(this.schema, type)) {
+                // cast to enum array `CAST(ARRAY[...] AS "enum_type"[])`
+                return this.eb.cast(
+                    sql`ARRAY[${sql.join(
+                        value.map((v) => this.transformPrimitive(v, type, false)),
+                        sql.raw(','),
+                    )}]`,
+                    this.createSchemaQualifiedEnumType(type, true),
+                );
             } else {
                 // `Json[]` fields need their input as array (not stringified)
                 return value.map((v) => this.transformPrimitive(v, type, false));
@@ -96,7 +110,33 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
     }
 
-    override transformOutput(value: unknown, type: BuiltinType) {
+    private createSchemaQualifiedEnumType(type: string, array: boolean) {
+        // determines the postgres schema name for the enum type, and returns the
+        // qualified name
+
+        let qualified = type;
+
+        const enumDef = getEnum(this.schema, type);
+        if (enumDef) {
+            // check if the enum has a custom "@@schema" attribute
+            const schemaAttr = enumDef.attributes?.find((attr) => attr.name === '@@schema');
+            if (schemaAttr) {
+                const mapArg = schemaAttr.args?.find((arg) => arg.name === 'map');
+                if (mapArg && mapArg.value.kind === 'literal') {
+                    const schemaName = mapArg.value.value as string;
+                    qualified = `"${schemaName}"."${type}"`;
+                }
+            } else {
+                // no custom schema, use default from datasource or 'public'
+                const defaultSchema = this.schema.provider.defaultSchema ?? 'public';
+                qualified = `"${defaultSchema}"."${type}"`;
+            }
+        }
+
+        return array ? sql.raw(`${qualified}[]`) : sql.raw(qualified);
+    }
+
+    override transformOutput(value: unknown, type: BuiltinType, array: boolean) {
         if (value === null || value === undefined) {
             return value;
         }
@@ -105,7 +145,11 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             .with('Bytes', () => this.transformOutputBytes(value))
             .with('BigInt', () => this.transformOutputBigInt(value))
             .with('Decimal', () => this.transformDecimal(value))
-            .otherwise(() => super.transformOutput(value, type));
+            .when(
+                (type) => isEnum(this.schema, type),
+                () => this.transformOutputEnum(value, array),
+            )
+            .otherwise(() => super.transformOutput(value, type, array));
     }
 
     private transformOutputBigInt(value: unknown) {
@@ -160,6 +204,19 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
               typeof value === 'string' && value.startsWith('\\x')
               ? Uint8Array.from(Buffer.from(value.slice(2), 'hex'))
               : value;
+    }
+
+    private transformOutputEnum(value: unknown, array: boolean) {
+        if (array && typeof value === 'string') {
+            try {
+                // postgres returns enum arrays as `{"val 1",val2}` strings, parse them back
+                // to string arrays here
+                return parsePostgresArray(value);
+            } catch {
+                // fall through - return as-is if parsing fails
+            }
+        }
+        return value;
     }
 
     override buildRelationSelection(

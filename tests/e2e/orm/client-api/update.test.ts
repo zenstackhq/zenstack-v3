@@ -131,12 +131,8 @@ describe('Client update tests', () => {
         });
 
         it('does not update updatedAt if only ignored fields are present', async () => {
-            const originalUpdatedAt = new Date();
-            const user = await createUser(client, 'u1@test.com', {
-                name: 'User1',
-                role: 'ADMIN',
-                updatedAt: originalUpdatedAt,
-            });
+            const user = await createUser(client, 'u1@test.com');
+            const originalUpdatedAt = user.updatedAt;
 
             await client.user.update({
                 where: { id: user.id },
@@ -146,7 +142,7 @@ describe('Client update tests', () => {
             });
 
             let updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
-            expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
+            expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
 
             await client.user.update({
                 where: { id: 'User2' },
@@ -156,7 +152,7 @@ describe('Client update tests', () => {
             });
 
             updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
-            expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
+            expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
 
             await client.user.update({
                 where: { id: 'User2' },
@@ -167,7 +163,7 @@ describe('Client update tests', () => {
             });
 
             updatedUser = await client.user.findUnique({ where: { id: 'User1' } });
-            expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
+            expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
         });
 
         it('updates updatedAt if any non-ignored fields are present', async () => {

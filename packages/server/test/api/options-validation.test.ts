@@ -72,7 +72,7 @@ describe('API Handler Options Validation', () => {
             }).toThrow('Invalid options');
         });
 
-        it('should accept empty string endpoint', () => {
+        it('should throw error when endpoint is empty string', () => {
             // Note: Zod z.string() validation allows empty strings
             // The endpoint validation doesn't enforce non-empty string
             expect(() => {
@@ -80,7 +80,7 @@ describe('API Handler Options Validation', () => {
                     schema: client.$schema,
                     endpoint: '',
                 });
-            }).not.toThrow();
+            }).toThrow('Invalid options');
         });
 
         it('should throw error when endpoint is not a string', () => {

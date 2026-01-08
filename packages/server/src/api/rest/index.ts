@@ -291,7 +291,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         const schema = z.strictObject({
             schema: z.object(),
             log: loggerSchema.optional(),
-            endpoint: z.string(),
+            endpoint: z.string().min(1),
             pageSize: z.number().positive().optional(),
             idDivider: z.string().min(1).optional(),
             urlSegmentCharset: z.string().min(1).optional(),

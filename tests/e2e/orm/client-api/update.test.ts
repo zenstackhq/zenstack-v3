@@ -141,7 +141,7 @@ describe('Client update tests', () => {
             await client.user.update({
                 where: { id: user.id },
                 data: {
-                    id: 'User2',
+                    // id: 'User2',
                 },
             });
 

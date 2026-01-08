@@ -38,8 +38,11 @@ import type {
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
+    GetProcedure,
+    GetProcedureNames,
     GroupByArgs,
     GroupByResult,
+    ProcedureEnvelope,
     QueryOptions,
     SelectSubset,
     SimplifiedPlainResult,
@@ -57,11 +60,22 @@ import { getQueryKey } from '../common/query-key';
 import type {
     ExtraMutationOptions,
     ExtraQueryOptions,
+    ProcedureReturn,
     QueryContext,
     TrimDelegateModelOperations,
     WithOptimistic,
 } from '../common/types';
 export type { FetchFn } from '@zenstackhq/client-helpers/fetch';
+
+type ProcedureHookFn<
+    Schema extends SchemaDef,
+    ProcName extends GetProcedureNames<Schema>,
+    Options,
+    Result,
+    Input = ProcedureEnvelope<Schema, ProcName>,
+> = { args: undefined } extends Input
+    ? (args?: Accessor<Input>, options?: Accessor<Options>) => Result
+    : (args: Accessor<Input>, options?: Accessor<Options>) => Result;
 
 /**
  * Key for setting and getting the global query context.
@@ -87,6 +101,14 @@ export function setQuerySettingsContext(context: QueryContext) {
 function useQuerySettings() {
     const { endpoint, ...rest } = getContext<QueryContext>(SvelteQueryContextKey) ?? {};
     return { endpoint: endpoint ?? DEFAULT_QUERY_ENDPOINT, ...rest };
+}
+
+function merge(rootOpt: unknown, opt: unknown): Accessor<any> {
+    return () => {
+        const rootOptVal = typeof rootOpt === 'function' ? (rootOpt as any)() : rootOpt;
+        const optVal = typeof opt === 'function' ? (opt as any)() : opt;
+        return { ...rootOptVal, ...optVal };
+    };
 }
 
 export type ModelQueryOptions<T> = Omit<CreateQueryOptions<T, DefaultError>, 'queryKey'> & ExtraQueryOptions;
@@ -123,7 +145,50 @@ export type ModelMutationModelResult<
 
 export type ClientHooks<Schema extends SchemaDef, Options extends QueryOptions<Schema> = QueryOptions<Schema>> = {
     [Model in GetModels<Schema> as `${Uncapitalize<Model>}`]: ModelQueryHooks<Schema, Model, Options>;
+} & ProcedureHooks<Schema>;
+
+type ProcedureHookGroup<Schema extends SchemaDef> = {
+    [Name in GetProcedureNames<Schema>]: GetProcedure<Schema, Name> extends { mutation: true }
+        ? {
+              useMutation(
+                  options?: Omit<
+                      CreateMutationOptions<
+                          ProcedureReturn<Schema, Name>,
+                          DefaultError,
+                          ProcedureEnvelope<Schema, Name>
+                      >,
+                      'mutationFn'
+                  > &
+                      QueryContext,
+              ): CreateMutationResult<ProcedureReturn<Schema, Name>, DefaultError, ProcedureEnvelope<Schema, Name>>;
+          }
+        : {
+              useQuery: ProcedureHookFn<
+                  Schema,
+                  Name,
+                  Omit<ModelQueryOptions<ProcedureReturn<Schema, Name>>, 'optimisticUpdate'>,
+                  CreateQueryResult<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: QueryKey }
+              >;
+
+              //   Infinite queries for procedures are currently disabled, will add back later if needed
+              //
+              //   useInfiniteQuery: ProcedureHookFn<
+              //       Schema,
+              //       Name,
+              //       ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+              //       ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+              //   >;
+          };
 };
+
+export type ProcedureHooks<Schema extends SchemaDef> = Schema extends { procedures: Record<string, any> }
+    ? {
+          /**
+           * Custom procedures.
+           */
+          $procs: ProcedureHookGroup<Schema>;
+      }
+    : {};
 
 // Note that we can potentially use TypeScript's mapped type to directly map from ORM contract, but that seems
 // to significantly slow down tsc performance ...
@@ -218,7 +283,7 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
     schema: Schema,
     options?: Accessor<QueryContext>,
 ): ClientHooks<Schema, Options> {
-    return Object.keys(schema.models).reduce(
+    const result = Object.keys(schema.models).reduce(
         (acc, model) => {
             (acc as any)[lowerCaseFirst(model)] = useModelQueries<Schema, GetModels<Schema>, Options>(
                 schema,
@@ -229,6 +294,33 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
         },
         {} as ClientHooks<Schema, Options>,
     );
+
+    const procedures = (schema as any).procedures as Record<string, { mutation?: boolean }> | undefined;
+    if (procedures) {
+        const buildProcedureHooks = (endpointModel: '$procs') => {
+            return Object.keys(procedures).reduce((acc, name) => {
+                const procDef = procedures[name];
+                if (procDef?.mutation) {
+                    acc[name] = {
+                        useMutation: (hookOptions?: any) =>
+                            useInternalMutation(schema, endpointModel, 'POST', name, merge(options, hookOptions)),
+                    };
+                } else {
+                    acc[name] = {
+                        useQuery: (args?: any, hookOptions?: any) =>
+                            useInternalQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
+                        useInfiniteQuery: (args?: any, hookOptions?: any) =>
+                            useInternalInfiniteQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
+                    };
+                }
+                return acc;
+            }, {} as any);
+        };
+
+        (result as any).$procs = buildProcedureHooks('$procs');
+    }
+
+    return result;
 }
 
 /**
@@ -245,14 +337,6 @@ export function useModelQueries<
     }
 
     const modelName = modelDef.name;
-
-    const merge = (rootOpt: unknown, opt: unknown): Accessor<any> => {
-        return () => {
-            const rootOptVal = typeof rootOpt === 'function' ? rootOpt() : rootOpt;
-            const optVal = typeof opt === 'function' ? opt() : opt;
-            return { ...rootOptVal, ...optVal };
-        };
-    };
 
     return {
         useFindUnique: (args: any, options?: any) => {

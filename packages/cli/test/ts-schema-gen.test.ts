@@ -184,6 +184,30 @@ model Post {
         });
     });
 
+    it('generates correct procedures with array params and returns', async () => {
+        const { schema } = await generateTsSchema(`
+model User {
+    id Int @id
+}
+
+procedure findByIds(ids: Int[]): User[]
+procedure getIds(): Int[]
+        `);
+
+        expect(schema.procedures).toMatchObject({
+            findByIds: {
+                params: { ids: { name: 'ids', type: 'Int', array: true } },
+                returnType: 'User',
+                returnArray: true,
+            },
+            getIds: {
+                params: {},
+                returnType: 'Int',
+                returnArray: true,
+            },
+        });
+    });
+
     it('merges fields and attributes from mixins', async () => {
         const { schema } = await generateTsSchema(`
 type Timestamped {

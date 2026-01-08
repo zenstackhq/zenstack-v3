@@ -3163,4 +3163,301 @@ describe('REST server tests', () => {
             });
         });
     });
+
+    describe('REST server tests - procedures', () => {
+        const schema = `
+model User {
+    id String @id @default(cuid())
+    email String @unique
+}
+
+enum Role {
+    ADMIN
+    USER
+}
+
+type Overview {
+    total Int
+}
+
+procedure echoDecimal(x: Decimal): Decimal
+procedure greet(name: String?): String
+procedure echoInt(x: Int): Int
+procedure opt2(a: Int?, b: Int?): Int
+procedure sumIds(ids: Int[]): Int
+procedure echoRole(r: Role): Role
+procedure echoOverview(o: Overview): Overview
+
+mutation procedure sum(a: Int, b: Int): Int
+`;
+
+        beforeEach(async () => {
+            interface ProcCtx<TArgs extends object> {
+                client: ClientContract<SchemaDef>;
+                args: TArgs;
+            }
+
+            interface ProcCtxOptionalArgs<TArgs extends object> {
+                client: ClientContract<SchemaDef>;
+                args?: TArgs;
+            }
+
+            type Role = 'ADMIN' | 'USER';
+
+            interface Overview {
+                total: number;
+            }
+
+            interface EchoDecimalArgs {
+                x: Decimal;
+            }
+
+            interface GreetArgs {
+                name?: string | null;
+            }
+
+            interface EchoIntArgs {
+                x: number;
+            }
+
+            interface Opt2Args {
+                a?: number | null;
+                b?: number | null;
+            }
+
+            interface SumIdsArgs {
+                ids: number[];
+            }
+
+            interface EchoRoleArgs {
+                r: Role;
+            }
+
+            interface EchoOverviewArgs {
+                o: Overview;
+            }
+
+            interface SumArgs {
+                a: number;
+                b: number;
+            }
+
+            interface Procedures {
+                echoDecimal: (ctx: ProcCtx<EchoDecimalArgs>) => Promise<Decimal>;
+                greet: (ctx: ProcCtxOptionalArgs<GreetArgs>) => Promise<string>;
+                echoInt: (ctx: ProcCtx<EchoIntArgs>) => Promise<number>;
+                opt2: (ctx: ProcCtxOptionalArgs<Opt2Args>) => Promise<number>;
+                sumIds: (ctx: ProcCtx<SumIdsArgs>) => Promise<number>;
+                echoRole: (ctx: ProcCtx<EchoRoleArgs>) => Promise<Role>;
+                echoOverview: (ctx: ProcCtx<EchoOverviewArgs>) => Promise<Overview>;
+                sum: (ctx: ProcCtx<SumArgs>) => Promise<number>;
+            }
+
+            client = await createTestClient(schema as unknown as SchemaDef, {
+                procedures: {
+                    echoDecimal: async ({ args }: ProcCtx<EchoDecimalArgs>) => args.x,
+                    greet: async ({ args }: ProcCtxOptionalArgs<GreetArgs>) => {
+                        const name = args?.name as string | undefined;
+                        return `hi ${name ?? 'anon'}`;
+                    },
+                    echoInt: async ({ args }: ProcCtx<EchoIntArgs>) => args.x,
+                    opt2: async ({ args }: ProcCtxOptionalArgs<Opt2Args>) => {
+                        const a = args?.a as number | undefined;
+                        const b = args?.b as number | undefined;
+                        return (a ?? 0) + (b ?? 0);
+                    },
+                    sumIds: async ({ args }: ProcCtx<SumIdsArgs>) => (args.ids as number[]).reduce((acc, x) => acc + x, 0),
+                    echoRole: async ({ args }: ProcCtx<EchoRoleArgs>) => args.r,
+                    echoOverview: async ({ args }: ProcCtx<EchoOverviewArgs>) => args.o,
+                    sum: async ({ args }: ProcCtx<SumArgs>) => args.a + args.b,
+                } as Procedures,
+            });
+
+            const _handler = new RestApiHandler({
+                schema: client.$schema,
+                endpoint: 'http://localhost/api',
+                pageSize: 5,
+            });
+
+            handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
+        });
+
+        it('supports GET query procedures with q/meta (SuperJSON)', async () => {
+            const { json, meta } = SuperJSON.serialize({ args: { x: new Decimal('1.23') } });
+            const r = await handler({
+                method: 'get',
+                path: '/$procs/echoDecimal',
+                query: { ...json as object, meta: { serialization: meta } } as any,
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: '1.23' });
+        });
+
+        it('supports GET procedures without args when param is optional', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procs/greet',
+                query: {},
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 'hi anon' });
+        });
+
+        it('errors for missing required single-param arg', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procs/echoInt',
+                query: {},
+                client,
+            });
+
+            expect(r.status).toBe(400);
+            expect(r.body).toMatchObject({
+                errors: [
+                    {
+                        status: 400,
+                        code: 'invalid-payload',
+                        detail: 'missing procedure arguments',
+                    },
+                ],
+            });
+        });
+
+        it('supports GET procedures without args when all params are optional', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procs/opt2',
+                query: {},
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 0 });
+        });
+
+        it('supports array-typed single param via envelope args', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procs/sumIds',
+                query: { args: { ids: [1, 2, 3] } } as any,
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 6 });
+        });
+
+        it('supports enum-typed params with validation', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procs/echoRole',
+                query: { args: { r: 'ADMIN' } } as any,
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 'ADMIN' });
+        });
+
+        it('supports typedef params (object payload)', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procs/echoOverview',
+                query: { args: { o: { total: 123 } } } as any,
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: { total: 123 } });
+        });
+
+        it('errors for wrong type input', async () => {
+            const r = await handler({
+                method: 'get',
+                path: '/$procs/echoInt',
+                query: { args: { x: 'not-an-int' } } as any,
+                client,
+            });
+
+            expect(r.status).toBe(422);
+            expect(r.body).toMatchObject({
+                errors: [
+                    {
+                        status: 422,
+                        code: 'validation-error',
+                    },
+                ],
+            });
+            expect(r.body.errors?.[0]?.detail).toMatch(/invalid input/i);
+        });
+
+        it('supports POST mutation procedures with args passed via q/meta', async () => {
+            const { json, meta } = SuperJSON.serialize({ args: { a: 1, b: 2 } });
+            const r = await handler({
+                method: 'post',
+                path: '/$procs/sum',
+                requestBody: { ...json as object, meta: { serialization: meta } } as any,
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 3 });
+        });
+
+        it('errors for invalid `args` payload type', async () => {
+            const r = await handler({
+                method: 'post',
+                path: '/$procs/sum',
+                requestBody: { args: [1, 2, 3] } as any,
+                client,
+            });
+
+            expect(r.status).toBe(400);
+            expect(r.body).toMatchObject({
+                errors: [
+                    {
+                        status: 400,
+                        code: 'invalid-payload',
+                    },
+                ],
+            });
+            expect(r.body.errors?.[0]?.detail).toMatch(/args/i);
+        });
+
+        it('errors for unknown argument keys (object mapping)', async () => {
+            const r = await handler({
+                method: 'post',
+                path: '/$procs/sum',
+                requestBody: { args: { a: 1, b: 2, c: 3 } } as any,
+                client,
+            });
+
+            expect(r.status).toBe(400);
+            expect(r.body).toMatchObject({
+                errors: [
+                    {
+                        status: 400,
+                        code: 'invalid-payload',
+                    },
+                ],
+            });
+            expect(r.body.errors?.[0]?.detail).toMatch(/unknown procedure argument/i);
+        });
+
+        it('supports /$procs path', async () => {
+            const r = await handler({
+                method: 'post',
+                path: '/$procs/sum',
+                requestBody: { args: { a: 1, b: 2 } } as any,
+                client,
+            });
+
+            expect(r.status).toBe(200);
+            expect(r.body).toMatchObject({ data: 3 });
+        });
+    });
 });

@@ -23,6 +23,7 @@ import type {
     GetTypeDefs,
     ModelFieldIsOptional,
     NonRelationFields,
+    ProcedureDef,
     RelationFields,
     RelationFieldType,
     RelationInfo,
@@ -34,16 +35,20 @@ import type {
 import type {
     AtLeast,
     MapBaseType,
+    MaybePromise,
     NonEmptyArray,
     NullableIf,
     Optional,
     OrArray,
+    OrUndefinedIf,
     PartialIf,
     Simplify,
+    TypeMap,
     ValueOfPotentialTuple,
     WrapType,
     XOR,
 } from '../utils/type-utils';
+import type { ClientContract } from './contract';
 import type { QueryOptions } from './options';
 import type { ToKyselySchema } from './query-builder';
 
@@ -1978,6 +1983,91 @@ type NestedDeleteManyInput<
 
 // #endregion
 
+// #region Procedures
+
+export type GetProcedureNames<Schema extends SchemaDef> = Schema extends { procedures: Record<string, ProcedureDef> }
+    ? keyof Schema['procedures']
+    : never;
+
+export type GetProcedureParams<Schema extends SchemaDef, ProcName extends GetProcedureNames<Schema>> = Schema extends {
+    procedures: Record<string, ProcedureDef>;
+}
+    ? Schema['procedures'][ProcName]['params']
+    : never;
+
+export type GetProcedure<Schema extends SchemaDef, ProcName extends GetProcedureNames<Schema>> = Schema extends {
+    procedures: Record<string, ProcedureDef>;
+}
+    ? Schema['procedures'][ProcName]
+    : never;
+
+type _OptionalProcedureParamNames<Params> = keyof {
+    [K in keyof Params as Params[K] extends { optional: true } ? K : never]: K;
+};
+
+type _RequiredProcedureParamNames<Params> = keyof {
+    [K in keyof Params as Params[K] extends { optional: true } ? never : K]: K;
+};
+
+type _HasRequiredProcedureParams<Params> = _RequiredProcedureParamNames<Params> extends never ? false : true;
+
+type MapProcedureArgsObject<Schema extends SchemaDef, Params> = Simplify<
+    Optional<
+        {
+            [K in keyof Params]: MapProcedureParam<Schema, Params[K]>;
+        },
+        _OptionalProcedureParamNames<Params>
+    >
+>;
+
+export type ProcedureEnvelope<
+    Schema extends SchemaDef,
+    ProcName extends GetProcedureNames<Schema>,
+    Params = GetProcedureParams<Schema, ProcName>,
+> = keyof Params extends never
+    ? // no params
+      { args?: Record<string, never> }
+    : _HasRequiredProcedureParams<Params> extends true
+      ? // has required params
+        { args: MapProcedureArgsObject<Schema, Params> }
+      : // no required params
+        { args?: MapProcedureArgsObject<Schema, Params> };
+
+type ProcedureHandlerCtx<Schema extends SchemaDef, ProcName extends GetProcedureNames<Schema>> = {
+    client: ClientContract<Schema>;
+} & ProcedureEnvelope<Schema, ProcName>;
+
+/**
+ * Shape of a procedure's runtime function.
+ */
+export type ProcedureFunc<Schema extends SchemaDef, ProcName extends GetProcedureNames<Schema>> = (
+    ...args: _HasRequiredProcedureParams<GetProcedureParams<Schema, ProcName>> extends true
+        ? [input: ProcedureEnvelope<Schema, ProcName>]
+        : [input?: ProcedureEnvelope<Schema, ProcName>]
+) => MaybePromise<MapProcedureReturn<Schema, GetProcedure<Schema, ProcName>>>;
+
+/**
+ * Signature for procedure handlers configured via client options.
+ */
+export type ProcedureHandlerFunc<Schema extends SchemaDef, ProcName extends GetProcedureNames<Schema>> = (
+    ctx: ProcedureHandlerCtx<Schema, ProcName>,
+) => MaybePromise<MapProcedureReturn<Schema, GetProcedure<Schema, ProcName>>>;
+
+type MapProcedureReturn<Schema extends SchemaDef, Proc> = Proc extends { returnType: infer R }
+    ? Proc extends { returnArray: true }
+        ? Array<MapType<Schema, R & string>>
+        : MapType<Schema, R & string>
+    : never;
+
+type MapProcedureParam<Schema extends SchemaDef, P> = P extends { type: infer U }
+    ? OrUndefinedIf<
+          P extends { array: true } ? Array<MapType<Schema, U & string>> : MapType<Schema, U & string>,
+          P extends { optional: true } ? true : false
+      >
+    : never;
+
+// #endregion
+
 // #region Utilities
 
 type NonOwnedRelationFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
@@ -1993,6 +2083,21 @@ type HasToManyRelations<Schema extends SchemaDef, Model extends GetModels<Schema
 } extends never
     ? false
     : true;
+
+type EnumValue<Schema extends SchemaDef, Enum extends GetEnums<Schema>> = GetEnum<Schema, Enum>[keyof GetEnum<
+    Schema,
+    Enum
+>];
+
+type MapType<Schema extends SchemaDef, T extends string> = T extends keyof TypeMap
+    ? TypeMap[T]
+    : T extends GetModels<Schema>
+      ? ModelResult<Schema, T>
+      : T extends GetTypeDefs<Schema>
+        ? TypeDefResult<Schema, T>
+        : T extends GetEnums<Schema>
+          ? EnumValue<Schema, T>
+          : unknown;
 
 // type ProviderSupportsDistinct<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
 //     ? true

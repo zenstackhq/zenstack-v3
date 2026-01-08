@@ -36,8 +36,11 @@ import type {
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
+    GetProcedure,
+    GetProcedureNames,
     GroupByArgs,
     GroupByResult,
+    ProcedureEnvelope,
     QueryOptions,
     SelectSubset,
     SimplifiedPlainResult,
@@ -55,12 +58,23 @@ import { getQueryKey } from './common/query-key';
 import type {
     ExtraMutationOptions,
     ExtraQueryOptions,
+    ProcedureReturn,
     QueryContext,
     TrimDelegateModelOperations,
     WithOptimistic,
 } from './common/types';
 export type { FetchFn } from '@zenstackhq/client-helpers/fetch';
 export const VueQueryContextKey = 'zenstack-vue-query-context';
+
+type ProcedureHookFn<
+    Schema extends SchemaDef,
+    ProcName extends GetProcedureNames<Schema>,
+    Options,
+    Result,
+    Input = ProcedureEnvelope<Schema, ProcName>,
+> = { args: undefined } extends Input
+    ? (args?: MaybeRefOrGetter<Input>, options?: MaybeRefOrGetter<Options>) => Result
+    : (args: MaybeRefOrGetter<Input>, options?: MaybeRefOrGetter<Options>) => Result;
 
 /**
  * Provide context for query settings.
@@ -124,7 +138,59 @@ export type ModelMutationModelResult<
 
 export type ClientHooks<Schema extends SchemaDef, Options extends QueryOptions<Schema> = QueryOptions<Schema>> = {
     [Model in GetModels<Schema> as `${Uncapitalize<Model>}`]: ModelQueryHooks<Schema, Model, Options>;
+} & ProcedureHooks<Schema>;
+
+type ProcedureHookGroup<Schema extends SchemaDef> = {
+    [Name in GetProcedureNames<Schema>]: GetProcedure<Schema, Name> extends { mutation: true }
+        ? {
+              useMutation(
+                  options?: MaybeRefOrGetter<
+                      Omit<
+                          UnwrapRef<
+                              UseMutationOptions<
+                                  ProcedureReturn<Schema, Name>,
+                                  DefaultError,
+                                  ProcedureEnvelope<Schema, Name>
+                              >
+                          >,
+                          'mutationFn'
+                      > &
+                          QueryContext
+                  >,
+              ): UseMutationReturnType<
+                  ProcedureReturn<Schema, Name>,
+                  DefaultError,
+                  ProcedureEnvelope<Schema, Name>,
+                  unknown
+              >;
+          }
+        : {
+              useQuery: ProcedureHookFn<
+                  Schema,
+                  Name,
+                  Omit<ModelQueryOptions<ProcedureReturn<Schema, Name>>, 'optimisticUpdate'>,
+                  UseQueryReturnType<ProcedureReturn<Schema, Name>, DefaultError> & { queryKey: Ref<QueryKey> }
+              >;
+
+              //   Infinite queries for procedures are currently disabled, will add back later if needed
+              //
+              //   useInfiniteQuery: ProcedureHookFn<
+              //       Schema,
+              //       Name,
+              //       ModelInfiniteQueryOptions<ProcedureReturn<Schema, Name>>,
+              //       ModelInfiniteQueryResult<InfiniteData<ProcedureReturn<Schema, Name>>>
+              //   >;
+          };
 };
+
+export type ProcedureHooks<Schema extends SchemaDef> = Schema extends { procedures: Record<string, any> }
+    ? {
+          /**
+           * Custom procedures.
+           */
+          $procs: ProcedureHookGroup<Schema>;
+      }
+    : {};
 
 // Note that we can potentially use TypeScript's mapped type to directly map from ORM contract, but that seems
 // to significantly slow down tsc performance ...
@@ -221,7 +287,15 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
     schema: Schema,
     options?: MaybeRefOrGetter<QueryContext>,
 ): ClientHooks<Schema, Options> {
-    return Object.keys(schema.models).reduce(
+    const merge = (rootOpt: MaybeRefOrGetter<unknown> | undefined, opt: MaybeRefOrGetter<unknown> | undefined): any => {
+        return computed(() => {
+            const rootVal = toValue(rootOpt) ?? {};
+            const optVal = toValue(opt) ?? {};
+            return { ...(rootVal as object), ...(optVal as object) };
+        });
+    };
+
+    const result = Object.keys(schema.models).reduce(
         (acc, model) => {
             (acc as any)[lowerCaseFirst(model)] = useModelQueries<Schema, GetModels<Schema>, Options>(
                 schema,
@@ -232,6 +306,33 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
         },
         {} as ClientHooks<Schema, Options>,
     );
+
+    const procedures = (schema as any).procedures as Record<string, { mutation?: boolean }> | undefined;
+    if (procedures) {
+        const buildProcedureHooks = (endpointModel: '$procs') => {
+            return Object.keys(procedures).reduce((acc, name) => {
+                const procDef = procedures[name];
+                if (procDef?.mutation) {
+                    acc[name] = {
+                        useMutation: (hookOptions?: any) =>
+                            useInternalMutation(schema, endpointModel, 'POST', name, merge(options, hookOptions)),
+                    };
+                } else {
+                    acc[name] = {
+                        useQuery: (args?: any, hookOptions?: any) =>
+                            useInternalQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
+                        useInfiniteQuery: (args?: any, hookOptions?: any) =>
+                            useInternalInfiniteQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
+                    };
+                }
+                return acc;
+            }, {} as any);
+        };
+
+        (result as any).$procs = buildProcedureHooks('$procs');
+    }
+
+    return result;
 }
 
 /**

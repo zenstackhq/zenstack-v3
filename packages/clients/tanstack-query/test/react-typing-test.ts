@@ -1,7 +1,9 @@
 import { useClientQueries } from '../src/react';
 import { schema } from './schemas/basic/schema-lite';
+import { schema as proceduresSchema } from './schemas/procedures/schema-lite';
 
 const client = useClientQueries(schema);
+const proceduresClient = useClientQueries(proceduresSchema);
 
 // @ts-expect-error missing args
 client.user.useFindUnique();
@@ -114,3 +116,28 @@ client.foo.useCreate();
 
 client.foo.useUpdate();
 client.bar.useCreate();
+
+// procedures (query)
+check(proceduresClient.$procs.greet.useQuery().data?.toUpperCase());
+check(proceduresClient.$procs.greet.useQuery({ args: { name: 'bob' } }).data?.toUpperCase());
+check(proceduresClient.$procs.greet.useQuery({ args: { name: 'bob' } }, { enabled: true }).queryKey);
+// @ts-expect-error wrong arg shape
+proceduresClient.$procs.greet.useQuery({ args: { hello: 'world' } });
+
+//   Infinite queries for procedures are currently disabled, will add back later if needed
+// check(proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).data?.pages[0]?.[0]?.toUpperCase());
+// check(proceduresClient.$procs.greetMany.useInfiniteQuery({ args: { name: 'bob' } }).queryKey);
+
+// @ts-expect-error missing args
+proceduresClient.$procs.greetMany.useQuery();
+// @ts-expect-error greet is not a mutation procedure
+proceduresClient.$procs.greet.useMutation();
+
+// procedures (mutation)
+proceduresClient.$procs.sum.useMutation().mutate({ args: { a: 1, b: 2 } });
+// @ts-expect-error wrong arg shape for multi-param procedure
+proceduresClient.$procs.sum.useMutation().mutate([1, 2]);
+proceduresClient.$procs.sum
+    .useMutation()
+    .mutateAsync({ args: { a: 1, b: 2 } })
+    .then((d) => check(d.toFixed(2)));

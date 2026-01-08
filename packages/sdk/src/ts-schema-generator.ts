@@ -1124,65 +1124,38 @@ export class TsSchemaGenerator {
     }
 
     private createProcedureObject(proc: Procedure) {
-        const params = ts.factory.createArrayLiteralExpression(
+        const params = ts.factory.createObjectLiteralExpression(
             proc.params.map((param) =>
-                ts.factory.createObjectLiteralExpression([
-                    ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(param.name)),
-                    ...(param.optional
-                        ? [ts.factory.createPropertyAssignment('optional', ts.factory.createTrue())]
-                        : []),
-                    ts.factory.createPropertyAssignment(
-                        'type',
-                        ts.factory.createStringLiteral(param.type.type ?? param.type.reference!.$refText),
-                    ),
-                ]),
+                ts.factory.createPropertyAssignment(
+                    param.name,
+                    ts.factory.createObjectLiteralExpression([
+                        ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(param.name)),
+                        ...(param.optional
+                            ? [ts.factory.createPropertyAssignment('optional', ts.factory.createTrue())]
+                            : []),
+                        ...(param.type.array
+                            ? [ts.factory.createPropertyAssignment('array', ts.factory.createTrue())]
+                            : []),
+                        ts.factory.createPropertyAssignment(
+                            'type',
+                            ts.factory.createStringLiteral(param.type.type ?? param.type.reference!.$refText),
+                        ),
+                    ]),
+                ),
             ),
             true,
         );
 
-        const paramsType = ts.factory.createTupleTypeNode([
-            ...proc.params.map((param) =>
-                ts.factory.createNamedTupleMember(
-                    undefined,
-                    ts.factory.createIdentifier(param.name),
-                    undefined,
-                    ts.factory.createTypeLiteralNode([
-                        ts.factory.createPropertySignature(
-                            undefined,
-                            ts.factory.createStringLiteral('name'),
-                            undefined,
-                            ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(param.name)),
-                        ),
-                        ts.factory.createPropertySignature(
-                            undefined,
-                            ts.factory.createStringLiteral('type'),
-                            undefined,
-                            ts.factory.createLiteralTypeNode(
-                                ts.factory.createStringLiteral(param.type.type ?? param.type.reference!.$refText),
-                            ),
-                        ),
-                        ...(param.optional
-                            ? [
-                                  ts.factory.createPropertySignature(
-                                      undefined,
-                                      ts.factory.createStringLiteral('optional'),
-                                      undefined,
-                                      ts.factory.createLiteralTypeNode(ts.factory.createTrue()),
-                                  ),
-                              ]
-                            : []),
-                    ]),
-                ),
-            ),
-        ]);
-
         return ts.factory.createObjectLiteralExpression(
             [
-                ts.factory.createPropertyAssignment('params', ts.factory.createAsExpression(params, paramsType)),
+                ts.factory.createPropertyAssignment('params', params),
                 ts.factory.createPropertyAssignment(
                     'returnType',
                     ts.factory.createStringLiteral(proc.returnType.type ?? proc.returnType.reference!.$refText),
                 ),
+                ...(proc.returnType.array
+                    ? [ts.factory.createPropertyAssignment('returnArray', ts.factory.createTrue())]
+                    : []),
                 ...(proc.mutation ? [ts.factory.createPropertyAssignment('mutation', ts.factory.createTrue())] : []),
             ],
             true,

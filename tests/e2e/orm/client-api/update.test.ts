@@ -131,8 +131,12 @@ describe('Client update tests', () => {
         });
 
         it('does not update updatedAt if only ignored fields are present', async () => {
-            const user = await createUser(client, 'u1@test.com');
-            const originalUpdatedAt = user.updatedAt;
+            const originalUpdatedAt = new Date();
+            const user = await createUser(client, 'u1@test.com', {
+                name: 'User1',
+                role: 'ADMIN',
+                updatedAt: originalUpdatedAt,
+            });
 
             await client.user.update({
                 where: { id: user.id },

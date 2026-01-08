@@ -54,6 +54,7 @@ import type {
 import type { GetModels, SchemaDef } from '@zenstackhq/schema';
 import { computed, inject, provide, toValue, unref, type MaybeRefOrGetter, type Ref, type UnwrapRef } from 'vue';
 import { getAllQueries, invalidateQueriesMatchingPredicate } from './common/client';
+import { CUSTOM_PROC_ROUTE_NAME } from './common/constants';
 import { getQueryKey } from './common/query-key';
 import type {
     ExtraMutationOptions,
@@ -309,27 +310,39 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
 
     const procedures = (schema as any).procedures as Record<string, { mutation?: boolean }> | undefined;
     if (procedures) {
-        const buildProcedureHooks = (endpointModel: '$procs') => {
+        const buildProcedureHooks = () => {
             return Object.keys(procedures).reduce((acc, name) => {
                 const procDef = procedures[name];
                 if (procDef?.mutation) {
                     acc[name] = {
                         useMutation: (hookOptions?: any) =>
-                            useInternalMutation(schema, endpointModel, 'POST', name, merge(options, hookOptions)),
+                            useInternalMutation(
+                                schema,
+                                CUSTOM_PROC_ROUTE_NAME,
+                                'POST',
+                                name,
+                                merge(options, hookOptions),
+                            ),
                     };
                 } else {
                     acc[name] = {
                         useQuery: (args?: any, hookOptions?: any) =>
-                            useInternalQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
+                            useInternalQuery(schema, CUSTOM_PROC_ROUTE_NAME, name, args, merge(options, hookOptions)),
                         useInfiniteQuery: (args?: any, hookOptions?: any) =>
-                            useInternalInfiniteQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
+                            useInternalInfiniteQuery(
+                                schema,
+                                CUSTOM_PROC_ROUTE_NAME,
+                                name,
+                                args,
+                                merge(options, hookOptions),
+                            ),
                     };
                 }
                 return acc;
             }, {} as any);
         };
 
-        (result as any).$procs = buildProcedureHooks('$procs');
+        (result as any).$procs = buildProcedureHooks();
     }
 
     return result;
@@ -552,63 +565,70 @@ export function useInternalMutation<TArgs, R = any>(
             mutationFn,
         } as UnwrapRef<UseMutationOptions<R, DefaultError, TArgs>> & ExtraMutationOptions;
 
-        const invalidateQueries = optionsValue?.invalidateQueries !== false;
-        const optimisticUpdate = !!optionsValue?.optimisticUpdate;
+        if (model !== CUSTOM_PROC_ROUTE_NAME) {
+            // not a custom procedure, set up optimistic update and invalidation
 
-        if (!optimisticUpdate) {
-            if (invalidateQueries) {
-                const invalidator = createInvalidator(
+            const invalidateQueries = optionsValue?.invalidateQueries !== false;
+            const optimisticUpdate = !!optionsValue?.optimisticUpdate;
+
+            if (!optimisticUpdate) {
+                if (invalidateQueries) {
+                    const invalidator = createInvalidator(
+                        model,
+                        operation,
+                        schema,
+                        (predicate: InvalidationPredicate) =>
+                            invalidateQueriesMatchingPredicate(queryClient, predicate),
+                        logging,
+                    );
+                    // execute invalidator prior to user-provided onSuccess
+                    result.onSuccess = async (...args) => {
+                        await invalidator(...args);
+                        const origOnSuccess: any = toValue(optionsValue?.onSuccess);
+                        await origOnSuccess?.(...args);
+                    };
+                }
+            } else {
+                const optimisticUpdater = createOptimisticUpdater(
                     model,
                     operation,
                     schema,
-                    (predicate: InvalidationPredicate) => invalidateQueriesMatchingPredicate(queryClient, predicate),
+                    { optimisticDataProvider: result.optimisticDataProvider },
+                    () => getAllQueries(queryClient),
                     logging,
                 );
-                // execute invalidator prior to user-provided onSuccess
-                result.onSuccess = async (...args) => {
-                    await invalidator(...args);
-                    const origOnSuccess: any = toValue(optionsValue?.onSuccess);
-                    await origOnSuccess?.(...args);
+
+                // optimistic update on mutate
+                const origOnMutate = result.onMutate;
+                result.onMutate = async (...args) => {
+                    // execute optimistic updater prior to user-provided onMutate
+                    await optimisticUpdater(...args);
+
+                    // call user-provided onMutate
+                    return unref(origOnMutate)?.(...args);
                 };
-            }
-        } else {
-            const optimisticUpdater = createOptimisticUpdater(
-                model,
-                operation,
-                schema,
-                { optimisticDataProvider: result.optimisticDataProvider },
-                () => getAllQueries(queryClient),
-                logging,
-            );
 
-            // optimistic update on mutate
-            const origOnMutate = result.onMutate;
-            result.onMutate = async (...args) => {
-                // execute optimistic updater prior to user-provided onMutate
-                await optimisticUpdater(...args);
+                if (invalidateQueries) {
+                    const invalidator = createInvalidator(
+                        model,
+                        operation,
+                        schema,
+                        (predicate: InvalidationPredicate) =>
+                            invalidateQueriesMatchingPredicate(queryClient, predicate),
+                        logging,
+                    );
+                    const origOnSettled = result.onSettled;
+                    result.onSettled = async (...args) => {
+                        // execute invalidator prior to user-provided onSettled
+                        await invalidator(...args);
 
-                // call user-provided onMutate
-                return unref(origOnMutate)?.(...args);
-            };
-
-            if (invalidateQueries) {
-                const invalidator = createInvalidator(
-                    model,
-                    operation,
-                    schema,
-                    (predicate: InvalidationPredicate) => invalidateQueriesMatchingPredicate(queryClient, predicate),
-                    logging,
-                );
-                const origOnSettled = result.onSettled;
-                result.onSettled = async (...args) => {
-                    // execute invalidator prior to user-provided onSettled
-                    await invalidator(...args);
-
-                    // call user-provided onSettled
-                    return unref(origOnSettled)?.(...args);
-                };
+                        // call user-provided onSettled
+                        return unref(origOnSettled)?.(...args);
+                    };
+                }
             }
         }
+
         return result;
     });
 

@@ -4,7 +4,7 @@ import { RPCApiHandler } from '@zenstackhq/server/api';
 import { NextRequestHandler } from '@zenstackhq/server/next';
 
 const handler = NextRequestHandler({
-    apiHandler: new RPCApiHandler({ schema }),
+    apiHandler: new RPCApiHandler({ schema, log: ['debug', 'error'] }),
     // fully open ZenStackClient is used here for demo purposes only, in a real application,
     // you should use one with access policies enabled
     getClient: () => db,

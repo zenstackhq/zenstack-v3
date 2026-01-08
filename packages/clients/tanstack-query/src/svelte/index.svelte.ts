@@ -56,6 +56,7 @@ import type {
 import type { GetModels, SchemaDef } from '@zenstackhq/schema';
 import { getContext, setContext } from 'svelte';
 import { getAllQueries, invalidateQueriesMatchingPredicate } from '../common/client';
+import { CUSTOM_PROC_ROUTE_NAME } from '../common/constants';
 import { getQueryKey } from '../common/query-key';
 import type {
     ExtraMutationOptions,
@@ -297,27 +298,39 @@ export function useClientQueries<Schema extends SchemaDef, Options extends Query
 
     const procedures = (schema as any).procedures as Record<string, { mutation?: boolean }> | undefined;
     if (procedures) {
-        const buildProcedureHooks = (endpointModel: '$procs') => {
+        const buildProcedureHooks = () => {
             return Object.keys(procedures).reduce((acc, name) => {
                 const procDef = procedures[name];
                 if (procDef?.mutation) {
                     acc[name] = {
                         useMutation: (hookOptions?: any) =>
-                            useInternalMutation(schema, endpointModel, 'POST', name, merge(options, hookOptions)),
+                            useInternalMutation(
+                                schema,
+                                CUSTOM_PROC_ROUTE_NAME,
+                                'POST',
+                                name,
+                                merge(options, hookOptions),
+                            ),
                     };
                 } else {
                     acc[name] = {
                         useQuery: (args?: any, hookOptions?: any) =>
-                            useInternalQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
+                            useInternalQuery(schema, CUSTOM_PROC_ROUTE_NAME, name, args, merge(options, hookOptions)),
                         useInfiniteQuery: (args?: any, hookOptions?: any) =>
-                            useInternalInfiniteQuery(schema, endpointModel, name, args, merge(options, hookOptions)),
+                            useInternalInfiniteQuery(
+                                schema,
+                                CUSTOM_PROC_ROUTE_NAME,
+                                name,
+                                args,
+                                merge(options, hookOptions),
+                            ),
                     };
                 }
                 return acc;
             }, {} as any);
         };
 
-        (result as any).$procs = buildProcedureHooks('$procs');
+        (result as any).$procs = buildProcedureHooks();
     }
 
     return result;
@@ -533,70 +546,74 @@ export function useInternalMutation<TArgs, R = any>(
             mutationFn,
         };
 
-        if (!optimisticUpdate) {
-            // if optimistic update is not enabled, invalidate related queries on success
-            if (invalidateQueries) {
-                const invalidator = createInvalidator(
+        if (model !== CUSTOM_PROC_ROUTE_NAME) {
+            // not a custom procedure, set up optimistic update and invalidation
+
+            if (!optimisticUpdate) {
+                // if optimistic update is not enabled, invalidate related queries on success
+                if (invalidateQueries) {
+                    const invalidator = createInvalidator(
+                        model,
+                        operation,
+                        schema,
+                        (predicate: InvalidationPredicate) =>
+                            // @ts-ignore
+                            invalidateQueriesMatchingPredicate(queryClient, predicate),
+                        logging,
+                    );
+
+                    // execute invalidator prior to user-provided onSuccess
+                    const origOnSuccess = optionsValue?.onSuccess;
+                    const wrappedOnSuccess: typeof origOnSuccess = async (...args) => {
+                        await invalidator(...args);
+                        await origOnSuccess?.(...args);
+                    };
+                    result.onSuccess = wrappedOnSuccess;
+                }
+            } else {
+                const optimisticUpdater = createOptimisticUpdater(
                     model,
                     operation,
                     schema,
-                    (predicate: InvalidationPredicate) =>
-                        // @ts-ignore
-                        invalidateQueriesMatchingPredicate(queryClient, predicate),
+                    { optimisticDataProvider: optionsValue?.optimisticDataProvider },
+                    // @ts-ignore
+                    () => getAllQueries(queryClient),
                     logging,
                 );
 
-                // execute invalidator prior to user-provided onSuccess
-                const origOnSuccess = optionsValue?.onSuccess;
-                const wrappedOnSuccess: typeof origOnSuccess = async (...args) => {
-                    await invalidator(...args);
-                    await origOnSuccess?.(...args);
-                };
-                result.onSuccess = wrappedOnSuccess;
-            }
-        } else {
-            const optimisticUpdater = createOptimisticUpdater(
-                model,
-                operation,
-                schema,
-                { optimisticDataProvider: optionsValue?.optimisticDataProvider },
-                // @ts-ignore
-                () => getAllQueries(queryClient),
-                logging,
-            );
+                const origOnMutate = optionsValue.onMutate;
+                const wrappedOnMutate: typeof origOnMutate = async (...args) => {
+                    // execute optimistic updater prior to user-provided onMutate
+                    await optimisticUpdater(...args);
 
-            const origOnMutate = optionsValue.onMutate;
-            const wrappedOnMutate: typeof origOnMutate = async (...args) => {
-                // execute optimistic updater prior to user-provided onMutate
-                await optimisticUpdater(...args);
-
-                // call user-provided onMutate
-                return origOnMutate?.(...args);
-            };
-
-            result.onMutate = wrappedOnMutate;
-
-            if (invalidateQueries) {
-                const invalidator = createInvalidator(
-                    model,
-                    operation,
-                    schema,
-                    (predicate: InvalidationPredicate) =>
-                        // @ts-ignore
-                        invalidateQueriesMatchingPredicate(queryClient, predicate),
-                    logging,
-                );
-                const origOnSettled = optionsValue.onSettled;
-                const wrappedOnSettled: typeof origOnSettled = async (...args) => {
-                    // execute invalidator prior to user-provided onSettled
-                    await invalidator(...args);
-
-                    // call user-provided onSettled
-                    await origOnSettled?.(...args);
+                    // call user-provided onMutate
+                    return origOnMutate?.(...args);
                 };
 
-                // replace onSettled in mergedOpt
-                result.onSettled = wrappedOnSettled;
+                result.onMutate = wrappedOnMutate;
+
+                if (invalidateQueries) {
+                    const invalidator = createInvalidator(
+                        model,
+                        operation,
+                        schema,
+                        (predicate: InvalidationPredicate) =>
+                            // @ts-ignore
+                            invalidateQueriesMatchingPredicate(queryClient, predicate),
+                        logging,
+                    );
+                    const origOnSettled = optionsValue.onSettled;
+                    const wrappedOnSettled: typeof origOnSettled = async (...args) => {
+                        // execute invalidator prior to user-provided onSettled
+                        await invalidator(...args);
+
+                        // call user-provided onSettled
+                        await origOnSettled?.(...args);
+                    };
+
+                    // replace onSettled in mergedOpt
+                    result.onSettled = wrappedOnSettled;
+                }
             }
         }
 

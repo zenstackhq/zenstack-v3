@@ -1,7 +1,7 @@
 import { ORMError } from '@zenstackhq/orm';
 import type { ProcedureDef, ProcedureParam, SchemaDef } from '@zenstackhq/orm/schema';
 
-export const PROCEDURE_ROUTE_PREFIXES = ['$procs'] as const;
+export const PROCEDURE_ROUTE_PREFIXES = '$procs' as const;
 
 export function getProcedureDef(schema: SchemaDef, proc: string): ProcedureDef | undefined {
     const procs = schema.procedures ?? {};

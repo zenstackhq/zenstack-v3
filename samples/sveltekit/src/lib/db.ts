@@ -7,4 +7,19 @@ export const db = new ZenStackClient(schema, {
   dialect: new SqliteDialect({
     database: new SQLite("./src/zenstack/dev.db"),
   }),
+  procedures: {
+    signUp: ({ client, args }) =>
+      client.user.create({
+        data: { ...args },
+      }),
+    listPublicPosts: ({ client }) =>
+      client.post.findMany({
+        where: {
+          published: true,
+        },
+        orderBy: {
+          updatedAt: "desc",
+        },
+      }),
+  },
 });

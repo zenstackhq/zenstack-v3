@@ -1,6 +1,6 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import type { BaseCrudDialect, ClientContract, ProceedKyselyQueryFunction } from '@zenstackhq/orm';
-import { getCrudDialect, QueryUtils, RejectedByPolicyReason, SchemaUtils, type CRUD_EXT } from '@zenstackhq/orm';
+import type { BaseCrudDialect, ClientContract, CRUD_EXT, ProceedKyselyQueryFunction } from '@zenstackhq/orm';
+import { getCrudDialect, QueryUtils, RejectedByPolicyReason, SchemaUtils } from '@zenstackhq/orm';
 import {
     ExpressionUtils,
     type BuiltinType,
@@ -54,12 +54,16 @@ import {
     falseNode,
     getTableName,
     isBeforeInvocation,
+    isTrueNode,
+    logicalNot,
     trueNode,
 } from './utils';
 
 export type CrudQueryNode = SelectQueryNode | InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
 
 export type MutationQueryNode = InsertQueryNode | UpdateQueryNode | DeleteQueryNode;
+
+type FieldLevelPolicyOperations = Exclude<CRUD_EXT, 'create' | 'delete'>;
 
 export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransformer {
     private readonly dialect: BaseCrudDialect<Schema>;
@@ -72,6 +76,8 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     get kysely() {
         return this.client.$qb;
     }
+
+    // #region main entry point
 
     async handle(node: RootOperationNode, proceed: ProceedKyselyQueryFunction) {
         if (!this.isCrudQueryNode(node)) {
@@ -90,31 +96,22 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
         const { mutationModel } = this.getMutationModel(node);
 
+        // reject non-existing model
         this.tryRejectNonexistentModel(mutationModel);
 
-        // --- Pre mutation work ---
+        // #region Pre mutation work
 
+        // create
         if (InsertQueryNode.is(node)) {
-            // pre-create policy evaluation happens before execution of the query
-            const isManyToManyJoinTable = this.isManyToManyJoinTable(mutationModel);
-            let needCheckPreCreate = true;
-
-            // many-to-many join table is not a model so can't have policies on it
-            if (!isManyToManyJoinTable) {
-                // check constant policies
-                const constCondition = this.tryGetConstantPolicy(mutationModel, 'create');
-                if (constCondition === true) {
-                    needCheckPreCreate = false;
-                } else if (constCondition === false) {
-                    throw createRejectedByPolicyError(mutationModel, RejectedByPolicyReason.NO_ACCESS);
-                }
-            }
-
-            if (needCheckPreCreate) {
-                await this.enforcePreCreatePolicy(node, mutationModel, isManyToManyJoinTable, proceed);
-            }
+            await this.preCreateCheck(mutationModel, node, proceed);
         }
 
+        // update
+        if (UpdateQueryNode.is(node)) {
+            await this.preUpdateCheck(mutationModel, node, proceed);
+        }
+
+        // post-update: load before-update entities if needed
         const hasPostUpdatePolicies = UpdateQueryNode.is(node) && this.hasPostUpdatePolicies(mutationModel);
 
         let beforeUpdateInfo: Awaited<ReturnType<typeof this.loadBeforeUpdateEntities>> | undefined;
@@ -122,11 +119,15 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             beforeUpdateInfo = await this.loadBeforeUpdateEntities(mutationModel, node.where, proceed);
         }
 
-        // proceed with query
+        // #endregion
+
+        // #region mutation execution
 
         const result = await proceed(this.transformNode(node));
 
-        // --- Post mutation work ---
+        // #endregion
+
+        // #region Post mutation work
 
         if (hasPostUpdatePolicies && result.rows.length > 0) {
             // verify if before-update rows and post-update rows still id-match
@@ -204,9 +205,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                     'some or all updated rows failed to pass post-update policy check',
                 );
             }
+
+            // #endregion
         }
 
-        // --- Read back ---
+        // #region Read back
 
         if (!node.returning || this.onlyReturningId(node)) {
             // no need to check read back
@@ -222,26 +225,276 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             }
             return readBackResult;
         }
+
+        // #endregion
     }
 
-    // correction to kysely mutation result may be needed because we might have added
-    // returning clause to the query and caused changes to the result shape
-    private postProcessMutationResult(result: QueryResult<any>, node: MutationQueryNode) {
-        if (node.returning) {
-            return result;
-        } else {
-            return {
-                ...result,
-                rows: [],
-                numAffectedRows: result.numAffectedRows ?? BigInt(result.rows.length),
-            };
+    private async preCreateCheck(mutationModel: string, node: InsertQueryNode, proceed: ProceedKyselyQueryFunction) {
+        const isManyToManyJoinTable = this.isManyToManyJoinTable(mutationModel);
+        let needCheckPreCreate = true;
+
+        // many-to-many join table is not a model so can't have policies on it
+        if (!isManyToManyJoinTable) {
+            // check constant policies
+            const constCondition = this.tryGetConstantPolicy(mutationModel, 'create');
+            if (constCondition === true) {
+                needCheckPreCreate = false;
+            } else if (constCondition === false) {
+                throw createRejectedByPolicyError(mutationModel, RejectedByPolicyReason.NO_ACCESS);
+            }
+        }
+
+        if (needCheckPreCreate) {
+            await this.enforcePreCreatePolicy(node, mutationModel, isManyToManyJoinTable, proceed);
         }
     }
 
-    hasPostUpdatePolicies(model: string) {
-        const policies = this.getModelPolicies(model, 'post-update');
-        return policies.length > 0;
+    private async preUpdateCheck(mutationModel: string, node: UpdateQueryNode, proceed: ProceedKyselyQueryFunction) {
+        // check if any rows will be filtered out by field-level update policies, and reject the whole update if so
+
+        const fieldsToUpdate =
+            node.updates
+                ?.map((u) => (ColumnNode.is(u.column) ? u.column.column.name : undefined))
+                .filter((f): f is string => !!f) ?? [];
+        const fieldUpdatePolicies = fieldsToUpdate.map((f) => this.buildFieldPolicyFilter(mutationModel, f, 'update'));
+
+        // filter combining field-level update policies
+        const fieldLevelFilter = conjunction(this.dialect, fieldUpdatePolicies);
+        if (isTrueNode(fieldLevelFilter)) {
+            return;
+        }
+
+        // model-level update policy filter
+        const modelLevelFilter = this.buildPolicyFilter(mutationModel, undefined, 'update');
+
+        // filter combining model-level update policy and update where
+        const updateFilter = conjunction(this.dialect, [modelLevelFilter, node.where?.where ?? trueNode(this.dialect)]);
+
+        // build a query to count rows that will be rejected by field-level policies
+        // `SELECT COALESCE(SUM((not <fieldsFilter>) as integer), 0) AS $filteredCount WHERE <updateFilter> AND <rowFilter>`
+        const preUpdateCheckQuery = expressionBuilder<any, any>()
+            .selectFrom(mutationModel)
+            .select((eb) =>
+                eb.fn
+                    .coalesce(
+                        eb.fn.sum(
+                            eb.cast(new ExpressionWrapper(logicalNot(this.dialect, fieldLevelFilter)), 'integer'),
+                        ),
+                        eb.lit(0),
+                    )
+                    .as('$filteredCount'),
+            )
+            .where(() => new ExpressionWrapper(updateFilter));
+
+        const preUpdateResult = await proceed(preUpdateCheckQuery.toOperationNode());
+        if (preUpdateResult.rows[0].$filteredCount > 0) {
+            throw createRejectedByPolicyError(
+                mutationModel,
+                RejectedByPolicyReason.NO_ACCESS,
+                'some rows cannot be updated due to field policies',
+            );
+        }
     }
+
+    // #endregion
+
+    // #region Transformations
+
+    protected override transformSelectQuery(node: SelectQueryNode) {
+        if (!node.from) {
+            return super.transformSelectQuery(node);
+        }
+
+        // reject non-existing tables
+        this.tryRejectNonexistingTables(node.from.froms);
+
+        let result = super.transformSelectQuery(node);
+
+        const hasFieldLevelPolicies = node.from.froms.some((table) => {
+            const extractedTable = this.extractTableName(table);
+            if (extractedTable) {
+                return this.hasFieldLevelPolicies(extractedTable.model, 'read');
+            } else {
+                return false;
+            }
+        });
+
+        if (hasFieldLevelPolicies) {
+            // when a select query involves field-level policies, we build a nested query selecting all fields guarded with:
+            //    CASE WHEN <field policy> THEN <field> ELSE NULL END
+            // model-level policies are also applied at this nested query level
+
+            const updatedFroms: OperationNode[] = [];
+            for (const table of result.from!.froms) {
+                const extractedTable = this.extractTableName(table);
+                if (extractedTable?.model && QueryUtils.getModel(this.client.$schema, extractedTable.model)) {
+                    const { query } = this.createSelectAllFieldsWithPolicies(
+                        extractedTable.model,
+                        extractedTable.alias,
+                        'read',
+                    );
+                    updatedFroms.push(query);
+                } else {
+                    // keep the original from
+                    updatedFroms.push(table);
+                }
+            }
+            result = { ...result, from: FromNode.create(updatedFroms) };
+        } else {
+            // when there's no field-level policies, we merge model-level policy filters into where clause directly
+            // for generating simpler SQL
+
+            let whereNode = result.where;
+            const policyFilter = this.createPolicyFilterForFrom(result.from);
+            if (policyFilter && !isTrueNode(policyFilter)) {
+                whereNode = WhereNode.create(
+                    whereNode?.where ? conjunction(this.dialect, [whereNode.where, policyFilter]) : policyFilter,
+                );
+            }
+            result = { ...result, where: whereNode };
+        }
+
+        return result;
+    }
+
+    protected override transformJoin(node: JoinNode) {
+        const table = this.extractTableName(node.table);
+        if (!table) {
+            // unable to extract table name, can be a subquery, which will be handled when nested transformation happens
+            return super.transformJoin(node);
+        }
+
+        // reject non-existing model
+        this.tryRejectNonexistentModel(table.model);
+
+        if (!QueryUtils.getModel(this.client.$schema, table.model)) {
+            // not a defined model, could be m2m join table, keep as is
+            return super.transformJoin(node);
+        }
+
+        const result = super.transformJoin(node);
+
+        const { hasPolicies, query: nestedQuery } = this.createSelectAllFieldsWithPolicies(
+            table.model,
+            table.alias,
+            'read',
+        );
+
+        // join table has no policies, keep it as is
+        if (!hasPolicies) {
+            return result;
+        }
+
+        // otherwise replace it with the nested query guarded with policies
+        return {
+            ...result,
+            table: nestedQuery,
+        };
+    }
+
+    protected override transformInsertQuery(node: InsertQueryNode) {
+        // pre-insert check is done in `handle()`
+
+        let onConflict = node.onConflict;
+
+        if (onConflict?.updates) {
+            // for "on conflict do update", we need to apply policy filter to the "where" clause
+            const { mutationModel, alias } = this.getMutationModel(node);
+            const filter = this.buildPolicyFilter(mutationModel, alias, 'update');
+            if (onConflict.updateWhere) {
+                onConflict = {
+                    ...onConflict,
+                    updateWhere: WhereNode.create(conjunction(this.dialect, [onConflict.updateWhere.where, filter])),
+                };
+            } else {
+                onConflict = {
+                    ...onConflict,
+                    updateWhere: WhereNode.create(filter),
+                };
+            }
+        }
+
+        // merge updated onConflict
+        const processedNode = onConflict ? { ...node, onConflict } : node;
+
+        const result = super.transformInsertQuery(processedNode);
+
+        // if any field is to be returned, we select ID fields here which will be used
+        // for reading back post-insert
+        let returning = result.returning;
+        if (returning) {
+            const { mutationModel } = this.getMutationModel(node);
+            const idFields = QueryUtils.requireIdFields(this.client.$schema, mutationModel);
+            returning = ReturningNode.create(idFields.map((f) => SelectionNode.create(ColumnNode.create(f))));
+        }
+
+        return {
+            ...result,
+            returning,
+        };
+    }
+
+    protected override transformUpdateQuery(node: UpdateQueryNode) {
+        const result = super.transformUpdateQuery(node);
+        const { mutationModel, alias } = this.getMutationModel(node);
+        let filter = this.buildPolicyFilter(mutationModel, alias, 'update');
+
+        if (node.from) {
+            // reject non-existing tables
+            this.tryRejectNonexistingTables(node.from.froms);
+
+            // for update with from (join), we need to merge join tables' policy filters to the "where" clause
+            const joinFilter = this.createPolicyFilterForFrom(node.from);
+            if (joinFilter) {
+                filter = conjunction(this.dialect, [filter, joinFilter]);
+            }
+        }
+
+        let returning = result.returning;
+
+        // regarding returning:
+        // 1. if fields are to be returned, we only select id fields here which will be used for reading back
+        //    post-update
+        // 2. if there are post-update policies, we need to make sure id fields are selected for joining with
+        //    before-update rows
+
+        if (returning || this.hasPostUpdatePolicies(mutationModel)) {
+            const idFields = QueryUtils.requireIdFields(this.client.$schema, mutationModel);
+            returning = ReturningNode.create(idFields.map((f) => SelectionNode.create(ColumnNode.create(f))));
+        }
+
+        return {
+            ...result,
+            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
+            returning,
+        };
+    }
+
+    protected override transformDeleteQuery(node: DeleteQueryNode) {
+        const result = super.transformDeleteQuery(node);
+        const { mutationModel, alias } = this.getMutationModel(node);
+        let filter = this.buildPolicyFilter(mutationModel, alias, 'delete');
+
+        if (node.using) {
+            // reject non-existing tables
+            this.tryRejectNonexistingTables(node.using.tables);
+
+            // for delete with using (join), we need to merge join tables' policy filters to the "where" clause
+            const joinFilter = this.createPolicyFilterForTables(node.using.tables);
+            if (joinFilter) {
+                filter = conjunction(this.dialect, [filter, joinFilter]);
+            }
+        }
+
+        return {
+            ...result,
+            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
+        };
+    }
+
+    // #endregion
+
+    // #region post-update
 
     private async loadBeforeUpdateEntities(
         model: string,
@@ -298,150 +551,119 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         return Array.from(fields).sort();
     }
 
-    // #region overrides
+    private hasPostUpdatePolicies(model: string) {
+        const policies = this.getModelPolicies(model, 'post-update');
+        return policies.length > 0;
+    }
 
-    protected override transformSelectQuery(node: SelectQueryNode) {
-        if (!node.from) {
-            return super.transformSelectQuery(node);
-        }
+    // #endregion
 
-        let whereNode = this.transformNode(node.where);
+    // #region field-level policies
 
-        // get combined policy filter for all froms, and merge into where clause
-        const policyFilter = this.createPolicyFilterForFrom(node.from);
-        if (policyFilter) {
-            whereNode = WhereNode.create(
-                whereNode?.where ? conjunction(this.dialect, [whereNode.where, policyFilter]) : policyFilter,
+    private createSelectAllFieldsWithPolicies(
+        model: string,
+        alias: string | undefined,
+        operation: FieldLevelPolicyOperations,
+    ) {
+        let hasPolicies = false;
+        const modelDef = QueryUtils.requireModel(this.client.$schema, model);
+
+        let selections: SelectionNode[] = [];
+        for (const fieldDef of Object.values(modelDef.fields).filter(
+            // exclude relation/computed/inherited fields
+            (f) => !f.relation && !f.computed && !f.originModel,
+        )) {
+            const { hasPolicies: fieldHasPolicies, selection } = this.createFieldSelectionWithPolicy(
+                model,
+                fieldDef.name,
+                operation,
             );
+            hasPolicies = hasPolicies || fieldHasPolicies;
+            selections.push(selection);
         }
 
-        const baseResult = super.transformSelectQuery({
-            ...node,
-            where: undefined,
-        });
-
-        return {
-            ...baseResult,
-            where: whereNode,
-        };
-    }
-
-    protected override transformJoin(node: JoinNode) {
-        const table = this.extractTableName(node.table);
-        if (!table) {
-            // unable to extract table name, can be a subquery, which will be handled when nested transformation happens
-            return super.transformJoin(node);
+        if (!hasPolicies) {
+            // if there're no field-level policies, simplify to select all
+            selections = [SelectionNode.create(SelectAllNode.create())];
         }
 
-        this.tryRejectNonexistentModel(table.model);
+        const modelPolicyFilter = this.buildPolicyFilter(model, alias, operation);
+        if (!isTrueNode(modelPolicyFilter)) {
+            hasPolicies = true;
+        }
 
-        // build a nested query with policy filter applied
-        const filter = this.buildPolicyFilter(table.model, table.alias, 'read');
-
-        const nestedSelect: SelectQueryNode = {
+        const nestedQuery: SelectQueryNode = {
             kind: 'SelectQueryNode',
-            from: FromNode.create([node.table]),
-            selections: [SelectionNode.createSelectAll()],
-            where: WhereNode.create(filter),
+            from: FromNode.create([TableNode.create(model)]),
+            where: isTrueNode(modelPolicyFilter) ? undefined : WhereNode.create(modelPolicyFilter),
+            selections,
         };
+
         return {
-            ...node,
-            table: AliasNode.create(ParensNode.create(nestedSelect), IdentifierNode.create(table.alias ?? table.model)),
+            hasPolicies,
+            query: AliasNode.create(ParensNode.create(nestedQuery), IdentifierNode.create(alias ?? model)),
         };
     }
 
-    protected override transformInsertQuery(node: InsertQueryNode) {
-        // pre-insert check is done in `handle()`
-
-        let onConflict = node.onConflict;
-
-        if (onConflict?.updates) {
-            // for "on conflict do update", we need to apply policy filter to the "where" clause
-            const { mutationModel, alias } = this.getMutationModel(node);
-            const filter = this.buildPolicyFilter(mutationModel, alias, 'update');
-            if (onConflict.updateWhere) {
-                onConflict = {
-                    ...onConflict,
-                    updateWhere: WhereNode.create(conjunction(this.dialect, [onConflict.updateWhere.where, filter])),
-                };
-            } else {
-                onConflict = {
-                    ...onConflict,
-                    updateWhere: WhereNode.create(filter),
-                };
-            }
+    private createFieldSelectionWithPolicy(model: string, field: string, operation: FieldLevelPolicyOperations) {
+        const filter = this.buildFieldPolicyFilter(model, field, operation);
+        if (isTrueNode(filter)) {
+            return { hasPolicies: false, selection: SelectionNode.create(ColumnNode.create(field)) };
         }
-
-        // merge updated onConflict
-        const processedNode = onConflict ? { ...node, onConflict } : node;
-
-        const result = super.transformInsertQuery(processedNode);
-
-        // if any field is to be returned, we select ID fields here which will be used
-        // for reading back post-insert
-        let returning = result.returning;
-        if (returning) {
-            const { mutationModel } = this.getMutationModel(node);
-            const idFields = QueryUtils.requireIdFields(this.client.$schema, mutationModel);
-            returning = ReturningNode.create(idFields.map((f) => SelectionNode.create(ColumnNode.create(f))));
-        }
-
-        return {
-            ...result,
-            returning,
-        };
+        const eb = expressionBuilder<any, any>();
+        // CASE WHEN <filter> THEN <field> ELSE NULL END
+        const selection = eb
+            .case()
+            .when(new ExpressionWrapper(filter))
+            .then(eb.ref(field))
+            .else(null)
+            .end()
+            .as(field)
+            .toOperationNode();
+        return { hasPolicies: true, selection: SelectionNode.create(selection) };
     }
 
-    protected override transformUpdateQuery(node: UpdateQueryNode) {
-        const result = super.transformUpdateQuery(node);
-        const { mutationModel, alias } = this.getMutationModel(node);
-        let filter = this.buildPolicyFilter(mutationModel, alias, 'update');
-
-        if (node.from) {
-            // for update with from (join), we need to merge join tables' policy filters to the "where" clause
-            const joinFilter = this.createPolicyFilterForFrom(node.from);
-            if (joinFilter) {
-                filter = conjunction(this.dialect, [filter, joinFilter]);
-            }
+    private hasFieldLevelPolicies(model: string, operation: FieldLevelPolicyOperations) {
+        const modelDef = QueryUtils.getModel(this.client.$schema, model);
+        if (!modelDef) {
+            return false;
         }
-
-        let returning = result.returning;
-
-        // regarding returning:
-        // 1. if fields are to be returned, we only select id fields here which will be used for reading back
-        //    post-update
-        // 2. if there are post-update policies, we need to make sure id fields are selected for joining with
-        //    before-update rows
-
-        if (returning || this.hasPostUpdatePolicies(mutationModel)) {
-            const idFields = QueryUtils.requireIdFields(this.client.$schema, mutationModel);
-            returning = ReturningNode.create(idFields.map((f) => SelectionNode.create(ColumnNode.create(f))));
-        }
-
-        return {
-            ...result,
-            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
-            returning,
-        };
+        return Object.keys(modelDef.fields).some((field) => this.getFieldPolicies(model, field, operation).length > 0);
     }
 
-    protected override transformDeleteQuery(node: DeleteQueryNode) {
-        const result = super.transformDeleteQuery(node);
-        const { mutationModel, alias } = this.getMutationModel(node);
-        let filter = this.buildPolicyFilter(mutationModel, alias, 'delete');
+    private buildFieldPolicyFilter(model: string, field: string, operation: FieldLevelPolicyOperations) {
+        const policies = this.getFieldPolicies(model, field, operation);
 
-        if (node.using) {
-            // for delete with using (join), we need to merge join tables' policy filters to the "where" clause
-            const joinFilter = this.createPolicyFilterForTables(node.using.tables);
-            if (joinFilter) {
-                filter = conjunction(this.dialect, [filter, joinFilter]);
-            }
+        const allows = policies
+            .filter((policy) => policy.kind === 'allow')
+            .map((policy) => this.compilePolicyCondition(model, model, operation, policy));
+
+        const denies = policies
+            .filter((policy) => policy.kind === 'deny')
+            .map((policy) => this.compilePolicyCondition(model, model, operation, policy));
+
+        // 'post-update' is by default allowed, other operations are by default denied
+        let combinedPolicy: OperationNode;
+
+        if (allows.length === 0) {
+            // field access is allowed by default
+            combinedPolicy = trueNode(this.dialect);
+        } else {
+            // or(...allows)
+            combinedPolicy = disjunction(this.dialect, allows);
         }
 
-        return {
-            ...result,
-            where: WhereNode.create(result.where ? conjunction(this.dialect, [result.where.where, filter]) : filter),
-        };
+        // and(...!denies)
+        if (denies.length !== 0) {
+            const combinedDenies = conjunction(
+                this.dialect,
+                denies.map((d) => buildIsFalse(d, this.dialect)),
+            );
+            // or(...allows) && and(...!denies)
+            combinedPolicy = conjunction(this.dialect, [combinedPolicy, combinedDenies]);
+        }
+
+        return combinedPolicy;
     }
 
     // #endregion
@@ -876,7 +1098,6 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             const extractResult = this.extractTableName(table);
             if (extractResult) {
                 const { model, alias } = extractResult;
-                this.tryRejectNonexistentModel(model);
                 const filter = this.buildPolicyFilter(model, alias, 'read');
                 return acc ? conjunction(this.dialect, [acc, filter]) : filter;
             }
@@ -924,6 +1145,37 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                             (operation !== 'post-update' && policy.operations.includes('all')) ||
                             policy.operations.includes(operation),
                     ),
+            );
+        }
+        return result;
+    }
+
+    private getFieldPolicies(model: string, field: string, operation: FieldLevelPolicyOperations) {
+        const fieldDef = QueryUtils.requireField(this.client.$schema, model, field);
+        const result: Policy[] = [];
+
+        const extractOperations = (expr: Expression) => {
+            invariant(ExpressionUtils.isLiteral(expr), 'expecting a literal');
+            invariant(typeof expr.value === 'string', 'expecting a string literal');
+            return expr.value
+                .split(',')
+                .filter((v) => !!v)
+                .map((v) => v.trim()) as PolicyOperation[];
+        };
+
+        if (fieldDef.attributes) {
+            result.push(
+                ...fieldDef.attributes
+                    .filter((attr) => attr.name === '@allow' || attr.name === '@deny')
+                    .map(
+                        (attr) =>
+                            ({
+                                kind: attr.name === '@allow' ? 'allow' : 'deny',
+                                operations: extractOperations(attr.args![0]!.value),
+                                condition: attr.args![1]!.value,
+                            }) as const,
+                    )
+                    .filter((policy) => policy.operations.includes('all') || policy.operations.includes(operation)),
             );
         }
         return result;
@@ -1019,6 +1271,29 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     private tryRejectNonexistentModel(model: string) {
         if (!QueryUtils.hasModel(this.client.$schema, model) && !this.isManyToManyJoinTable(model)) {
             throw createRejectedByPolicyError(model, RejectedByPolicyReason.NO_ACCESS);
+        }
+    }
+
+    private tryRejectNonexistingTables(tables: readonly OperationNode[]) {
+        for (const table of tables) {
+            const extractResult = this.extractTableName(table);
+            if (extractResult) {
+                this.tryRejectNonexistentModel(extractResult.model);
+            }
+        }
+    }
+
+    // correction to kysely mutation result may be needed because we might have added
+    // returning clause to the query and caused changes to the result shape
+    private postProcessMutationResult(result: QueryResult<any>, node: MutationQueryNode) {
+        if (node.returning) {
+            return result;
+        } else {
+            return {
+                ...result,
+                rows: [],
+                numAffectedRows: result.numAffectedRows ?? BigInt(result.rows.length),
+            };
         }
     }
 

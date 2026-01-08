@@ -9,6 +9,7 @@ import {
     type BuiltinType,
     type EnumDef,
     type FieldDef,
+    type ProcedureDef,
     type GetModels,
     type ModelDef,
     type SchemaDef,
@@ -25,6 +26,7 @@ import {
     type CreateManyArgs,
     type DeleteArgs,
     type DeleteManyArgs,
+    type ExistsArgs,
     type FindArgs,
     type GroupByArgs,
     type UpdateArgs,
@@ -39,6 +41,8 @@ import {
     getEnum,
     getTypeDef,
     getUniqueFields,
+    isEnum,
+    isTypeDef,
     requireField,
     requireModel,
 } from '../../query-utils';
@@ -70,6 +74,120 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.client.$options.validateInput !== false;
     }
 
+    validateProcedureInput(proc: string, input: unknown): unknown {
+        const procDef = (this.schema.procedures ?? {})[proc] as ProcedureDef | undefined;
+        invariant(procDef, `Procedure "${proc}" not found in schema`);
+
+        const params = Object.values(procDef.params ?? {});
+
+        // For procedures where every parameter is optional, allow omitting the input entirely.
+        if (typeof input === 'undefined') {
+            if (params.length === 0) {
+                return undefined;
+            }
+            if (params.every((p) => p.optional)) {
+                return undefined;
+            }
+            throw createInvalidInputError('Missing procedure arguments', `$procs.${proc}`);
+        }
+
+        if (typeof input !== 'object') {
+            throw createInvalidInputError('Procedure input must be an object', `$procs.${proc}`);
+        }
+
+        const envelope = input as Record<string, unknown>;
+        const argsPayload = Object.prototype.hasOwnProperty.call(envelope, 'args') ? (envelope as any).args : undefined;
+
+        if (params.length === 0) {
+            if (typeof argsPayload === 'undefined') {
+                return input;
+            }
+            if (!argsPayload || typeof argsPayload !== 'object' || Array.isArray(argsPayload)) {
+                throw createInvalidInputError('Procedure `args` must be an object', `$procs.${proc}`);
+            }
+            if (Object.keys(argsPayload as any).length === 0) {
+                return input;
+            }
+            throw createInvalidInputError('Procedure does not accept arguments', `$procs.${proc}`);
+        }
+
+        if (typeof argsPayload === 'undefined') {
+            if (params.every((p) => p.optional)) {
+                return input;
+            }
+            throw createInvalidInputError('Missing procedure arguments', `$procs.${proc}`);
+        }
+
+        if (!argsPayload || typeof argsPayload !== 'object' || Array.isArray(argsPayload)) {
+            throw createInvalidInputError('Procedure `args` must be an object', `$procs.${proc}`);
+        }
+
+        const obj = argsPayload as Record<string, unknown>;
+
+        for (const param of params) {
+            const value = (obj as any)[param.name];
+
+            if (!Object.prototype.hasOwnProperty.call(obj, param.name)) {
+                if (param.optional) {
+                    continue;
+                }
+                throw createInvalidInputError(`Missing procedure argument: ${param.name}`, `$procs.${proc}`);
+            }
+
+            if (typeof value === 'undefined') {
+                if (param.optional) {
+                    continue;
+                }
+                throw createInvalidInputError(
+                    `Invalid procedure argument: ${param.name} is required`,
+                    `$procs.${proc}`,
+                );
+            }
+
+            const schema = this.makeProcedureParamSchema(param);
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                throw createInvalidInputError(
+                    `Invalid procedure argument: ${param.name}: ${formatError(parsed.error)}`,
+                    `$procs.${proc}`,
+                );
+            }
+        }
+
+        return input;
+    }
+
+    private makeProcedureParamSchema(param: { type: string; array?: boolean; optional?: boolean }): z.ZodType {
+        let schema: z.ZodType;
+
+        if (isTypeDef(this.schema, param.type)) {
+            schema = this.makeTypeDefSchema(param.type);
+        } else if (isEnum(this.schema, param.type)) {
+            schema = this.makeEnumSchema(param.type);
+        } else if (param.type in (this.schema.models ?? {})) {
+            // For model-typed values, accept any object (no deep shape validation).
+            schema = z.record(z.string(), z.unknown());
+        } else {
+            // Builtin scalar types.
+            schema = this.makeScalarSchema(param.type as BuiltinType);
+
+            // If a type isn't recognized by any of the above branches, `makeScalarSchema` returns `unknown`.
+            // Treat it as configuration/schema error.
+            if (schema instanceof z.ZodUnknown) {
+                throw createInternalError(`Unsupported procedure parameter type: ${param.type}`);
+            }
+        }
+
+        if (param.array) {
+            schema = schema.array();
+        }
+        if (param.optional) {
+            schema = schema.optional();
+        }
+
+        return schema;
+    }
+
     validateFindArgs(
         model: GetModels<Schema>,
         args: unknown,
@@ -79,6 +197,19 @@ export class InputValidator<Schema extends SchemaDef> {
             FindArgs<Schema, GetModels<Schema>, true> | undefined,
             Parameters<typeof this.makeFindSchema>[1]
         >(model, 'find', options, (model, options) => this.makeFindSchema(model, options), args);
+    }
+
+    validateExistsArgs(
+        model: GetModels<Schema>,
+        args: unknown,
+    ): ExistsArgs<Schema, GetModels<Schema>> | undefined {
+        return this.validate<ExistsArgs<Schema, GetModels<Schema>>>(
+            model,
+            'exists',
+            undefined,
+            (model) => this.makeExistsSchema(model),
+            args,
+        );
     }
 
     validateCreateArgs(model: GetModels<Schema>, args: unknown): CreateArgs<Schema, GetModels<Schema>> {
@@ -295,6 +426,12 @@ export class InputValidator<Schema extends SchemaDef> {
             result = result.optional();
         }
         return result;
+    }
+
+    private makeExistsSchema(model: string) {
+        return z.strictObject({
+            where: this.makeWhereSchema(model, false).optional(),
+        }).optional();
     }
 
     private makeScalarSchema(type: string, attributes?: readonly AttributeApplication[]) {

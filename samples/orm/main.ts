@@ -16,6 +16,18 @@ async function main() {
                         .select(({ fn }) => fn.countAll<number>().as('postCount')),
             },
         },
+        procedures: {
+            signUp: ({ client, args }) =>
+                client.user.create({
+                    data: { ...args },
+                }),
+            listPublicPosts: ({ client }) =>
+                client.post.findMany({
+                    where: {
+                        published: true,
+                    },
+                }),
+        },
     }).$use({
         id: 'cost-logger',
         onQuery: async ({ model, operation, args, proceed }) => {
@@ -101,6 +113,12 @@ async function main() {
 
     console.log('Posts readable to', user2.email);
     console.table(await user2Db.post.findMany({ select: { title: true, published: true } }));
+
+    const newUser = await authDb.$procs.signUp({ args: { email: 'new@zenstack.dev', name: 'New User' } });
+    console.log('New user signed up via procedure:', newUser);
+
+    const publicPosts = await authDb.$procs.listPublicPosts();
+    console.log('Public posts via procedure:', publicPosts);
 }
 
 main();

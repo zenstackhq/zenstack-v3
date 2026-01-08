@@ -1,6 +1,6 @@
 import type { Logger, OptimisticDataProvider } from '@zenstackhq/client-helpers';
 import type { FetchFn } from '@zenstackhq/client-helpers/fetch';
-import type { OperationsIneligibleForDelegateModels } from '@zenstackhq/orm';
+import type { GetProcedureNames, OperationsIneligibleForDelegateModels, ProcedureFunc } from '@zenstackhq/orm';
 import type { GetModels, IsDelegateModel, SchemaDef } from '@zenstackhq/schema';
 
 /**
@@ -76,3 +76,7 @@ type WithOptimisticFlag<T> = T extends object
     : T;
 
 export type WithOptimistic<T> = T extends Array<infer U> ? Array<WithOptimisticFlag<U>> : WithOptimisticFlag<T>;
+
+export type ProcedureReturn<Schema extends SchemaDef, Name extends GetProcedureNames<Schema>> = Awaited<
+    ReturnType<ProcedureFunc<Schema, Name>>
+>;

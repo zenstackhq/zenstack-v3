@@ -9,6 +9,13 @@ import UrlPattern from 'url-pattern';
 import z from 'zod';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
 import { getZodErrorMessage, log, registerCustomSerializers } from '../utils';
+import {
+    getProcedureDef,
+    mapProcedureArgs,
+} from '../common/procedures';
+import {
+    processSuperJsonRequestPayload,
+} from '../common/utils';
 
 /**
  * Options for {@link RestApiHandler}
@@ -336,6 +343,11 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         }
 
         try {
+            if (path.startsWith('/$procs/')) {
+                const proc = path.split('/')[2];
+                return await this.processProcedureRequest({ client, method, proc, query, requestBody });
+            }
+
             switch (method) {
                 case 'GET': {
                     let match = this.matchUrlPattern(path, UrlPatterns.SINGLE);
@@ -471,6 +483,89 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
 
     private handleGenericError(err: unknown): Response | PromiseLike<Response> {
         return this.makeError('unknownError', err instanceof Error ? `${err.message}\n${err.stack}` : 'Unknown error');
+    }
+
+    private async processProcedureRequest({
+        client,
+        method,
+        proc,
+        query,
+        requestBody,
+    }: {
+        client: ClientContract<Schema>;
+        method: string;
+        proc?: string;
+        query?: Record<string, string | string[]>;
+        requestBody?: unknown;
+    }): Promise<Response> {
+        if (!proc) {
+            return this.makeProcBadInputErrorResponse('missing procedure name');
+        }
+
+        const procDef = getProcedureDef(this.schema, proc);
+        if (!procDef) {
+            return this.makeProcBadInputErrorResponse(`unknown procedure: ${proc}`);
+        }
+
+        const isMutation = !!procDef.mutation;
+        if (isMutation) {
+            if (method !== 'POST') {
+                return this.makeProcBadInputErrorResponse('invalid request method, only POST is supported');
+            }
+        } else {
+            if (method !== 'GET') {
+                return this.makeProcBadInputErrorResponse('invalid request method, only GET is supported');
+            }
+        }
+
+        const argsPayload = method === 'POST' ? requestBody : query;
+
+        // support SuperJSON request payload format
+        const { result: processedArgsPayload, error } = await processSuperJsonRequestPayload(argsPayload);
+        if (error) {
+            return this.makeProcBadInputErrorResponse(error);
+        }
+
+        let procInput: unknown;
+        try {
+            procInput = mapProcedureArgs(procDef, processedArgsPayload);
+        } catch (err) {
+            return this.makeProcBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
+        }
+
+        try {
+            log(this.log, 'debug', () => `handling "$procs.${proc}" request`);
+
+            const clientResult = await (client as any).$procs?.[proc](procInput);
+            const toSerialize = this.toPlainObject(clientResult);
+
+            const { json, meta } = SuperJSON.serialize(toSerialize);
+            const responseBody: any = { data: json };
+            if (meta) {
+                responseBody.meta = { serialization: meta };
+            }
+
+            return { status: 200, body: responseBody };
+        } catch (err) {
+            log(this.log, 'error', `error occurred when handling "$procs.${proc}" request`, err);
+            if (err instanceof ORMError) {
+                throw err; // top-level handler will take care of it
+            }
+            return this.makeProcGenericErrorResponse(err);
+        }
+    }
+
+    private makeProcBadInputErrorResponse(message: string): Response {
+        const resp = this.makeError('invalidPayload', message, 400);
+        log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
+        return resp;
+    }
+
+    private makeProcGenericErrorResponse(err: unknown): Response {
+        const message = err instanceof Error ? err.message : 'unknown error';
+        const resp = this.makeError('unknownError', message, 500);
+        log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
+        return resp;
     }
 
     private async processSingleRead(
@@ -831,16 +926,16 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             prev:
                 offset - limit >= 0 && offset - limit <= total - 1
                     ? this.replaceURLSearchParams(baseUrl, {
-                          'page[offset]': offset - limit,
-                          'page[limit]': limit,
-                      })
+                        'page[offset]': offset - limit,
+                        'page[limit]': limit,
+                    })
                     : null,
             next:
                 offset + limit <= total - 1
                     ? this.replaceURLSearchParams(baseUrl, {
-                          'page[offset]': offset + limit,
-                          'page[limit]': limit,
-                      })
+                        'page[offset]': offset + limit,
+                        'page[limit]': limit,
+                    })
                     : null,
         }));
     }
@@ -1906,8 +2001,8 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
                     } else {
                         currPayload[relation] = select
                             ? {
-                                  select: { ...select },
-                              }
+                                select: { ...select },
+                            }
                             : true;
                     }
                 }

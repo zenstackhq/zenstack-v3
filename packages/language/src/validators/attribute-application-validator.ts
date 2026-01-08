@@ -33,6 +33,7 @@ import {
     isAuthOrAuthMemberAccess,
     isBeforeInvocation,
     isCollectionPredicate,
+    isComputedField,
     isDataFieldReference,
     isDelegateModel,
     isRelationshipField,
@@ -261,23 +262,22 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
             });
             return;
         }
-        const kindItems = this.validatePolicyKinds(kind, ['read', 'update', 'all'], attr, accept);
+        this.validatePolicyKinds(kind, ['read', 'update', 'all'], attr, accept);
 
         const expr = attr.args[1]?.value;
         if (expr && AstUtils.streamAst(expr).some((node) => isBeforeInvocation(node))) {
-            accept('error', `"before()" is not allowed in field-level policy rules`, { node: expr });
+            accept('error', `"before()" is not allowed in field-level policies`, { node: expr });
         }
 
-        // 'update' rules are not allowed for relation fields
-        if (kindItems.includes('update') || kindItems.includes('all')) {
-            const field = attr.$container as DataField;
-            if (isRelationshipField(field)) {
-                accept(
-                    'error',
-                    `Field-level policy rules with "update" or "all" kind are not allowed for relation fields. Put rules on foreign-key fields instead.`,
-                    { node: attr },
-                );
-            }
+        // relation fields are not allowed
+        const field = attr.$container as DataField;
+
+        if (isRelationshipField(field)) {
+            accept('error', `Field-level policies are not allowed for relation fields.`, { node: attr });
+        }
+
+        if (isComputedField(field)) {
+            accept('error', `Field-level policies are not allowed for computed fields.`, { node: attr });
         }
     }
 

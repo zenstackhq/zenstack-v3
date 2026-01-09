@@ -7,172 +7,123 @@
 
 import { type SchemaDef, ExpressionUtils } from "@zenstackhq/orm/schema";
 export class SchemaType implements SchemaDef {
-  provider = {
-    type: "sqlite",
-  } as const;
-  models = {
-    User: {
-      name: "User",
-      fields: {
-        id: {
-          name: "id",
-          type: "String",
-          id: true,
-          attributes: [
-            { name: "@id" },
-            {
-              name: "@default",
-              args: [{ name: "value", value: ExpressionUtils.call("cuid") }],
-            },
-          ],
-          default: ExpressionUtils.call("cuid"),
-        },
-        createdAt: {
-          name: "createdAt",
-          type: "DateTime",
-          attributes: [
-            {
-              name: "@default",
-              args: [{ name: "value", value: ExpressionUtils.call("now") }],
-            },
-          ],
-          default: ExpressionUtils.call("now"),
-        },
-        updatedAt: {
-          name: "updatedAt",
-          type: "DateTime",
-          updatedAt: true,
-          attributes: [{ name: "@updatedAt" }],
-        },
-        email: {
-          name: "email",
-          type: "String",
-          unique: true,
-          attributes: [{ name: "@unique" }],
-        },
-        name: {
-          name: "name",
-          type: "String",
-          optional: true,
-        },
-        posts: {
-          name: "posts",
-          type: "Post",
-          array: true,
-          relation: { opposite: "author" },
-        },
-      },
-      idFields: ["id"],
-      uniqueFields: {
-        id: { type: "String" },
-        email: { type: "String" },
-      },
-    },
-    Post: {
-      name: "Post",
-      fields: {
-        id: {
-          name: "id",
-          type: "String",
-          id: true,
-          attributes: [
-            { name: "@id" },
-            {
-              name: "@default",
-              args: [{ name: "value", value: ExpressionUtils.call("cuid") }],
-            },
-          ],
-          default: ExpressionUtils.call("cuid"),
-        },
-        createdAt: {
-          name: "createdAt",
-          type: "DateTime",
-          attributes: [
-            {
-              name: "@default",
-              args: [{ name: "value", value: ExpressionUtils.call("now") }],
-            },
-          ],
-          default: ExpressionUtils.call("now"),
-        },
-        updatedAt: {
-          name: "updatedAt",
-          type: "DateTime",
-          updatedAt: true,
-          attributes: [{ name: "@updatedAt" }],
-        },
-        title: {
-          name: "title",
-          type: "String",
-        },
-        published: {
-          name: "published",
-          type: "Boolean",
-          attributes: [
-            {
-              name: "@default",
-              args: [{ name: "value", value: ExpressionUtils.literal(false) }],
-            },
-          ],
-          default: false,
-        },
-        author: {
-          name: "author",
-          type: "User",
-          attributes: [
-            {
-              name: "@relation",
-              args: [
-                {
-                  name: "fields",
-                  value: ExpressionUtils.array([
-                    ExpressionUtils.field("authorId"),
-                  ]),
+    provider = {
+        type: "sqlite"
+    } as const;
+    models = {
+        User: {
+            name: "User",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
                 },
-                {
-                  name: "references",
-                  value: ExpressionUtils.array([ExpressionUtils.field("id")]),
+                createdAt: {
+                    name: "createdAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
                 },
-                { name: "onUpdate", value: ExpressionUtils.literal("Cascade") },
-                { name: "onDelete", value: ExpressionUtils.literal("Cascade") },
-              ],
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                },
+                email: {
+                    name: "email",
+                    type: "String",
+                    unique: true,
+                    attributes: [{ name: "@unique" }]
+                },
+                name: {
+                    name: "name",
+                    type: "String",
+                    optional: true
+                },
+                posts: {
+                    name: "posts",
+                    type: "Post",
+                    array: true,
+                    relation: { opposite: "author" }
+                }
             },
-          ],
-          relation: {
-            opposite: "posts",
-            fields: ["authorId"],
-            references: ["id"],
-            onUpdate: "Cascade",
-            onDelete: "Cascade",
-          },
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" },
+                email: { type: "String" }
+            }
         },
-        authorId: {
-          name: "authorId",
-          type: "String",
-          foreignKeyFor: ["author"],
+        Post: {
+            name: "Post",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "String",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("cuid") }] }],
+                    default: ExpressionUtils.call("cuid")
+                },
+                createdAt: {
+                    name: "createdAt",
+                    type: "DateTime",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.call("now") }] }],
+                    default: ExpressionUtils.call("now")
+                },
+                updatedAt: {
+                    name: "updatedAt",
+                    type: "DateTime",
+                    updatedAt: true,
+                    attributes: [{ name: "@updatedAt" }]
+                },
+                title: {
+                    name: "title",
+                    type: "String"
+                },
+                published: {
+                    name: "published",
+                    type: "Boolean",
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal(false) }] }],
+                    default: false
+                },
+                author: {
+                    name: "author",
+                    type: "User",
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    relation: { opposite: "posts", fields: ["authorId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
+                },
+                authorId: {
+                    name: "authorId",
+                    type: "String",
+                    foreignKeyFor: [
+                        "author"
+                    ]
+                }
+            },
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "String" }
+            }
+        }
+    } as const;
+    authType = "User" as const;
+    procedures = {
+        signUp: {
+            params: {
+                email: { name: "email", type: "String" }
+            },
+            returnType: "User",
+            mutation: true
         },
-      },
-      idFields: ["id"],
-      uniqueFields: {
-        id: { type: "String" },
-      },
-    },
-  } as const;
-  authType = "User" as const;
-  procedures = {
-    signUp: {
-      params: {
-        email: { name: "email", type: "String" },
-      },
-      returnType: "User",
-      mutation: true,
-    },
-    listPublicPosts: {
-      params: {},
-      returnType: "Post",
-      returnArray: true,
-    },
-  } as const;
-  plugins = {};
+        listPublicPosts: {
+            params: {},
+            returnType: "Post",
+            returnArray: true
+        }
+    } as const;
+    plugins = {};
 }
 export const schema = new SchemaType();

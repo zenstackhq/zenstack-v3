@@ -134,6 +134,8 @@ describe('Client update tests', () => {
             const user = await createUser(client, 'u1@test.com');
             const originalUpdatedAt = user.updatedAt;
 
+            globalThis.updatedattest = true;
+
             await client.user.update({
                 where: { id: user.id },
                 data: {
@@ -143,6 +145,8 @@ describe('Client update tests', () => {
 
             let updatedUser = await client.user.findUnique({ where: { id: user.id } });
             expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
+
+            globalThis.updatedattest = false;
 
             // const originalUpdatedAt = new Date();
             // const user = await createUser(client, 'u1@test.com', {

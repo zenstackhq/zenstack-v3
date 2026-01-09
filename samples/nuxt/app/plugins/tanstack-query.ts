@@ -11,8 +11,8 @@ export default defineNuxtPlugin((nuxtApp) => {
         setup() {
             provideQuerySettingsContext({
                 endpoint: '/api/model',
-                logging: true
+                logging: true,
             });
-        }
+        },
     });
 });

@@ -143,6 +143,217 @@ describe('RPC API Handler Tests', () => {
         expect(r.data.count).toBe(1);
     });
 
+    it('procedures', async () => {
+        const procSchema = `
+model User {
+    id String @id @default(cuid())
+    email String @unique @email
+
+    @@allow('all', true)
+}
+
+procedure echo(input: String): String
+mutation procedure createUser(email: String): User
+procedure getFalse(): Boolean
+procedure getUndefined(): Undefined
+`;
+
+        const procClient = await createPolicyTestClient(procSchema, {
+            procedures: {
+                echo: async ({ args }: any) => args.input,
+                createUser: async ({ client, args }: any) => {
+                    return client.user.create({ data: { email: args.email } });
+                },
+                getFalse: async () => false,
+                getUndefined: async () => undefined,
+            },
+        });
+
+        const handler = new RPCApiHandler({ schema: procClient.$schema });
+        const handleProcRequest = async (args: any) => {
+            const r = await handler.handleRequest({
+                ...args,
+                client: procClient,
+                url: new URL(`http://localhost/${args.path}`),
+            });
+            return {
+                status: r.status,
+                body: r.body as any,
+                data: (r.body as any).data,
+                error: (r.body as any).error,
+                meta: (r.body as any).meta,
+            };
+        };
+
+        // query procedure: GET only, args via q
+        let r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/echo',
+            query: { q: JSON.stringify({ args: { input: 'hello' } }) },
+        });
+        expect(r.status).toBe(200);
+        expect(r.data).toBe('hello');
+
+        r = await handleProcRequest({
+            method: 'post',
+            path: '/$procs/echo',
+            requestBody: { args: { input: 'hello' } },
+        });
+        expect(r.status).toBe(400);
+        expect(r.error?.message).toMatch(/only GET is supported/i);
+
+        // mutation procedure: POST only, args via body
+        r = await handleProcRequest({
+            method: 'post',
+            path: '/$procs/createUser',
+            requestBody: { args: { email: 'user1@abc.com' } },
+        });
+        expect(r.status).toBe(200);
+        expect(r.data).toEqual(expect.objectContaining({ email: 'user1@abc.com' }));
+
+        r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/createUser',
+            query: { q: JSON.stringify({ args: { email: 'user2@abc.com' } }) },
+        });
+        expect(r.status).toBe(400);
+        expect(r.error?.message).toMatch(/only POST is supported/i);
+
+        // falsy/undefined return serialization
+        r = await handleProcRequest({ method: 'get', path: '/$procs/getFalse' });
+        expect(r.status).toBe(200);
+        expect(r.data).toBe(false);
+
+        r = await handleProcRequest({ method: 'get', path: '/$procs/getUndefined' });
+        expect(r.status).toBe(200);
+        expect(r.data).toBeNull();
+        expect(r.meta?.serialization).toBeTruthy();
+    });
+
+    it('procedures - edge cases', async () => {
+        const procSchema = `
+model User {
+    id String @id @default(cuid())
+    email String @unique @email
+}
+
+enum Role {
+    ADMIN
+    USER
+}
+
+type Overview {
+    total Int
+}
+
+procedure echoInt(x: Int): Int
+procedure opt2(a: Int?, b: Int?): Int
+procedure sum3(a: Int, b: Int, c: Int): Int
+procedure sumIds(ids: Int[]): Int
+procedure echoRole(r: Role): Role
+procedure echoOverview(o: Overview): Overview
+`;
+
+        const procClient = await createPolicyTestClient(procSchema, {
+            procedures: {
+                echoInt: async ({ args }: any) => args.x,
+                opt2: async ({ args }: any) => {
+                    const a = args?.a as number | undefined;
+                    const b = args?.b as number | undefined;
+                    return (a ?? 0) + (b ?? 0);
+                },
+                sum3: async ({ args }: any) => args.a + args.b + args.c,
+                sumIds: async ({ args }: any) => (args.ids as number[]).reduce((acc: number, x: number) => acc + x, 0),
+                echoRole: async ({ args }: any) => args.r,
+                echoOverview: async ({ args }: any) => args.o,
+            },
+        });
+
+        const handler = new RPCApiHandler({ schema: procClient.$schema });
+        const handleProcRequest = async (args: any) => {
+            const r = await handler.handleRequest({
+                ...args,
+                client: procClient,
+                url: new URL(`http://localhost/${args.path}`),
+            });
+            return {
+                status: r.status,
+                body: r.body as any,
+                data: (r.body as any).data,
+                error: (r.body as any).error,
+                meta: (r.body as any).meta,
+            };
+        };
+
+        // > 2 params object mapping
+        let r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/sum3',
+            query: { q: JSON.stringify({ args: { a: 1, b: 2, c: 3 } }) },
+        });
+        expect(r.status).toBe(200);
+        expect(r.data).toBe(6);
+
+        // all optional params can omit payload
+        r = await handleProcRequest({ method: 'get', path: '/$procs/opt2' });
+        expect(r.status).toBe(200);
+        expect(r.data).toBe(0);
+
+        // array-typed single param via q JSON array
+        r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/sumIds',
+            query: { q: JSON.stringify({ args: { ids: [1, 2, 3] } }) },
+        });
+        expect(r.status).toBe(200);
+        expect(r.data).toBe(6);
+
+        // enum param validation
+        r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/echoRole',
+            query: { q: JSON.stringify({ args: { r: 'ADMIN' } }) },
+        });
+        expect(r.status).toBe(200);
+        expect(r.data).toBe('ADMIN');
+
+        // typedef param (object payload)
+        r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/echoOverview',
+            query: { q: JSON.stringify({ args: { o: { total: 123 } } }) },
+        });
+        expect(r.status).toBe(200);
+        expect(r.data).toMatchObject({ total: 123 });
+
+        // wrong type input
+        r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/echoInt',
+            query: { q: JSON.stringify({ args: { x: 'x' } }) },
+        });
+        expect(r.status).toBe(422);
+        expect(r.error?.message).toMatch(/invalid input/i);
+
+        // invalid args payload type
+        r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/sum3',
+            query: { q: JSON.stringify({ args: [1, 2, 3, 4] }) },
+        });
+        expect(r.status).toBe(400);
+        expect(r.error?.message).toMatch(/args/i);
+
+        // unknown keys
+        r = await handleProcRequest({
+            method: 'get',
+            path: '/$procs/sum3',
+            query: { q: JSON.stringify({ args: { a: 1, b: 2, c: 3, d: 4 } }) },
+        });
+        expect(r.status).toBe(400);
+        expect(r.error?.message).toMatch(/unknown procedure argument/i);
+    });
+
     it('pagination and ordering', async () => {
         const handleRequest = makeHandler();
 

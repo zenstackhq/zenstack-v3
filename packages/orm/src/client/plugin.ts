@@ -37,6 +37,11 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     onQuery?: OnQueryCallback<Schema>;
 
     /**
+     * Intercepts a procedure invocation.
+     */
+    onProcedure?: OnProcedureCallback<Schema>;
+
+    /**
      * Intercepts an entity mutation.
      */
     onEntityMutation?: EntityMutationHooksDef<Schema>;
@@ -55,6 +60,42 @@ export function definePlugin<Schema extends SchemaDef>(plugin: RuntimePlugin<Sch
 }
 
 export { type CoreCrudOperation as CrudOperation } from './crud/operations/base';
+
+// #region OnProcedure hooks
+
+type OnProcedureCallback<Schema extends SchemaDef> = (ctx: OnProcedureHookContext<Schema>) => Promise<unknown>;
+
+export type OnProcedureHookContext<Schema extends SchemaDef> = {
+    /**
+     * The procedure name.
+     */
+    name: string;
+
+    /**
+     * Whether the procedure is a mutation.
+     */
+    mutation: boolean;
+
+    /**
+     * Procedure invocation input (envelope).
+     *
+     * The canonical shape is `{ args?: Record<string, unknown> }`.
+     * When a procedure has required params, `args` is required.
+     */
+    input: unknown;
+
+    /**
+     * Continues the invocation. The input passed here is forwarded to the next handler.
+     */
+    proceed: (input: unknown) => Promise<unknown>;
+
+    /**
+     * The ZenStack client that is invoking the procedure.
+     */
+    client: ClientContract<Schema>;
+};
+
+// #endregion
 
 // #region OnQuery hooks
 

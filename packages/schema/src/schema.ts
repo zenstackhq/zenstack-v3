@@ -81,11 +81,12 @@ export type FieldDef = {
     isDiscriminator?: boolean;
 };
 
-export type ProcedureParam = { name: string; type: string; optional?: boolean };
+export type ProcedureParam = { name: string; type: string; array?: boolean; optional?: boolean };
 
 export type ProcedureDef = {
-    params: [...ProcedureParam[]];
+    params: Record<string, ProcedureParam>;
     returnType: string;
+    returnArray?: boolean;
     mutation?: boolean;
 };
 

@@ -1,4 +1,3 @@
-import type Decimal from 'decimal.js';
 import {
     type FieldIsArray,
     type GetModels,
@@ -10,7 +9,7 @@ import {
     type SchemaDef,
 } from '../schema';
 import type { AnyKysely } from '../utils/kysely-utils';
-import type { OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
+import type { Simplify, UnwrapTuplePromises } from '../utils/type-utils';
 import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
 import type {
     AggregateArgs,
@@ -28,9 +27,10 @@ import type {
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
+    GetProcedureNames,
     GroupByArgs,
     GroupByResult,
-    ModelResult,
+    ProcedureFunc,
     SelectSubset,
     SimplifiedPlainResult,
     Subset,
@@ -195,7 +195,7 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
     $pushSchema(): Promise<void>;
 } & {
     [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<Schema, Key, ToQueryOptions<Options>>;
-} & Procedures<Schema>;
+} & ProcedureOperations<Schema>;
 
 /**
  * The contract for a client in a transaction.
@@ -205,40 +205,17 @@ export type TransactionClientContract<Schema extends SchemaDef, Options extends 
     TransactionUnsupportedMethods
 >;
 
-type _TypeMap = {
-    String: string;
-    Int: number;
-    Float: number;
-    BigInt: bigint;
-    Decimal: Decimal;
-    Boolean: boolean;
-    DateTime: Date;
-};
-
-type MapType<Schema extends SchemaDef, T extends string> = T extends keyof _TypeMap
-    ? _TypeMap[T]
-    : T extends GetModels<Schema>
-      ? ModelResult<Schema, T>
-      : unknown;
-
-export type Procedures<Schema extends SchemaDef> =
+export type ProcedureOperations<Schema extends SchemaDef> =
     Schema['procedures'] extends Record<string, ProcedureDef>
         ? {
-              $procedures: {
-                  [Key in keyof Schema['procedures']]: ProcedureFunc<Schema, Schema['procedures'][Key]>;
+              /**
+               * Custom procedures.
+               */
+              $procs: {
+                  [Key in GetProcedureNames<Schema>]: ProcedureFunc<Schema, Key>;
               };
           }
         : {};
-
-export type ProcedureFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
-    ...args: MapProcedureParams<Schema, Proc['params']>
-) => Promise<MapType<Schema, Proc['returnType']>>;
-
-type MapProcedureParams<Schema extends SchemaDef, Params> = {
-    [P in keyof Params]: Params[P] extends { type: infer U }
-        ? OrUndefinedIf<MapType<Schema, U & string>, Params[P] extends { optional: true } ? true : false>
-        : never;
-};
 
 /**
  * Creates a new ZenStack client instance.

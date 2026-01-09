@@ -9,6 +9,7 @@ import type {
     GeneratorDecl,
     InvocationExpr,
     Model,
+    Procedure,
     TypeDef,
     ZModelAstType,
 } from './generated/ast';
@@ -20,6 +21,7 @@ import EnumValidator from './validators/enum-validator';
 import ExpressionValidator from './validators/expression-validator';
 import FunctionDeclValidator from './validators/function-decl-validator';
 import FunctionInvocationValidator from './validators/function-invocation-validator';
+import ProcedureValidator from './validators/procedure-validator';
 import SchemaValidator from './validators/schema-validator';
 import TypeDefValidator from './validators/typedef-validator';
 
@@ -40,6 +42,7 @@ export function registerValidationChecks(services: ZModelServices) {
         Expression: validator.checkExpression,
         InvocationExpr: validator.checkFunctionInvocation,
         FunctionDecl: validator.checkFunctionDecl,
+        Procedure: validator.checkProcedure,
     };
     registry.register(checks, validator);
 }
@@ -89,4 +92,9 @@ export class ZModelValidator {
     checkFunctionDecl(node: FunctionDecl, accept: ValidationAcceptor): void {
         new FunctionDeclValidator().validate(node, accept);
     }
+
+    checkProcedure(node: Procedure, accept: ValidationAcceptor): void {
+        new ProcedureValidator().validate(node, accept);
+    }
 }
+

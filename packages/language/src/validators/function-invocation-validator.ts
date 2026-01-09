@@ -20,6 +20,7 @@ import {
     getLiteral,
     isCheckInvocation,
     isDataFieldReference,
+    mapBuiltinTypeToExpressionType,
     typeAssignable,
 } from '../utils';
 import type { AstValidator } from './common';
@@ -173,7 +174,9 @@ export default class FunctionInvocationValidator implements AstValidator<Express
 
         if (typeof argResolvedType.decl === 'string') {
             // scalar type
-            if (!typeAssignable(dstType, argResolvedType.decl, arg.value) || dstIsArray !== argResolvedType.array) {
+            const dstScalarType = mapBuiltinTypeToExpressionType(dstType);
+            const srcScalarType = mapBuiltinTypeToExpressionType(argResolvedType.decl);
+            if (!typeAssignable(dstScalarType, srcScalarType, arg.value) || dstIsArray !== argResolvedType.array) {
                 accept('error', `argument is not assignable to parameter`, {
                     node: arg,
                 });

@@ -110,6 +110,20 @@ export class SchemaType implements SchemaDef {
         }
     } as const;
     authType = "User" as const;
+    procedures = {
+        signUp: {
+            params: {
+                email: { name: "email", type: "String" }
+            },
+            returnType: "User",
+            mutation: true
+        },
+        listPublicPosts: {
+            params: {},
+            returnType: "Post",
+            returnArray: true
+        }
+    } as const;
     plugins = {};
 }
 export const schema = new SchemaType();

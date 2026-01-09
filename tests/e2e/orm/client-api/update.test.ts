@@ -136,7 +136,9 @@ describe('Client update tests', () => {
 
             await client.user.update({
                 where: { id: user.id },
-                data: {},
+                data: {
+                    createdAt: new Date(originalUpdatedAt.getTime() + 5000),
+                },
             });
 
             let updatedUser = await client.user.findUnique({ where: { id: user.id } });

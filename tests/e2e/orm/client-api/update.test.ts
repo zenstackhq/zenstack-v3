@@ -134,57 +134,46 @@ describe('Client update tests', () => {
             const user = await createUser(client, 'u1@test.com');
             const originalUpdatedAt = user.updatedAt;
 
-            globalThis.updatedattest = true;
-
             await client.user.update({
-                where: { id: user.id },
-                data: {
-                    createdAt: new Date(originalUpdatedAt.getTime() + 5000),
+                where: {
+                    id: user.id,
                 },
-            });
+
+                data: {
+                    createdAt: new Date(),
+                },
+            })
 
             let updatedUser = await client.user.findUnique({ where: { id: user.id } });
             expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
 
-            globalThis.updatedattest = false;
+            await client.user.update({
+                where: {
+                    id: user.id,
+                },
 
-            // const originalUpdatedAt = new Date();
-            // const user = await createUser(client, 'u1@test.com', {
-            //     name: 'User1',
-            //     role: 'ADMIN',
-            //     updatedAt: originalUpdatedAt,
-            // });
+                data: {
+                    id: 'User2',
+                },
+            })
 
-            // await client.user.update({
-            //     where: { id: user.id },
-            //     data: {
-            //         // id: 'User2',
-            //     },
-            // });
+            updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
+            expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
 
-            // let updatedUser = await client.user.findUnique({ where: { id: user.id } });
-            // expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
+            // multiple ignored fields
+            await client.user.update({
+                where: {
+                    id: 'User2',
+                },
 
-            // await client.user.update({
-            //     where: { id: user.id },
-            //     data: {
-            //         createdAt: new Date(),
-            //     },
-            // });
+                data: {
+                    id: 'User3',
+                    createdAt: new Date(),
+                },
+            })
 
-            // updatedUser = await client.user.findUnique({ where: { id: user.id } });
-            // expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
-
-            // await client.user.update({
-            //     where: { id: user.id },
-            //     data: {
-            //         id: 'User1',
-            //         createdAt: new Date(),
-            //     },
-            // });
-
-            // updatedUser = await client.user.findUnique({ where: { id: 'User1' } });
-            // expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
+            updatedUser = await client.user.findUnique({ where: { id: 'User3' } });
+            expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
         });
 
         it('updates updatedAt if any non-ignored fields are present', async () => {

@@ -34,10 +34,7 @@ function getTestDbName(provider: string) {
     );
 }
 
-export function createProject(
-    zmodel: string,
-    options?: { customPrelude?: boolean; provider?: 'sqlite' | 'postgresql' },
-) {
+export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql' }) {
     const provider = (options?.provider || getTestDbProvider()) ?? 'sqlite';
     const dbName = getTestDbName(provider);
     const dbUrl =
@@ -46,18 +43,25 @@ export function createProject(
             : `postgres://${TEST_PG_CONFIG.user}:${TEST_PG_CONFIG.password}@${TEST_PG_CONFIG.host}:${TEST_PG_CONFIG.port}/${dbName}`;
 
     const ZMODEL_PRELUDE = `datasource db {
-    provider = "${provider}"
-    url      = "${dbUrl}"
+  provider = "${provider}"
+  url      = "${dbUrl}"
 }
 `;
+    return ZMODEL_PRELUDE;
+}
+
+export function createProject(
+    zmodel: string,
+    options?: { customPrelude?: boolean; provider?: 'sqlite' | 'postgresql' },
+) {
     const workDir = createTestProject();
     fs.mkdirSync(path.join(workDir, 'zenstack'), { recursive: true });
     const schemaPath = path.join(workDir, 'zenstack/schema.zmodel');
-    fs.writeFileSync(schemaPath, !options?.customPrelude ? `${ZMODEL_PRELUDE}\n${zmodel}` : zmodel);
+    fs.writeFileSync(schemaPath, !options?.customPrelude ? `${getDefaultPrelude()}\n${zmodel}` : zmodel);
     return workDir;
 }
 
 export function runCli(command: string, cwd: string) {
     const cli = path.join(__dirname, '../dist/index.js');
-    execSync(`node ${cli} ${command}`, { cwd });
+    execSync(`node ${cli} ${command}`, { cwd, stdio: 'inherit' });
 }

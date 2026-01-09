@@ -145,21 +145,21 @@ describe('Client update tests', () => {
                 },
             });
 
-            let updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
+            let updatedUser = await client.user.findUnique({ where: { id: user.id } });
             expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
 
             await client.user.update({
-                where: { id: 'User2' },
+                where: { id: user.id },
                 data: {
                     createdAt: new Date(),
                 },
             });
 
-            updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
+            updatedUser = await client.user.findUnique({ where: { id: user.id } });
             expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
 
             await client.user.update({
-                where: { id: 'User2' },
+                where: { id: user.id },
                 data: {
                     id: 'User1',
                     createdAt: new Date(),

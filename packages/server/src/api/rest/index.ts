@@ -292,7 +292,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             schema: z.object(),
             log: loggerSchema.optional(),
             endpoint: z.string().min(1),
-            pageSize: z.number().positive().optional(),
+            pageSize: z.union([z.number().positive(), z.literal(Infinity)]).optional(),
             idDivider: z.string().min(1).optional(),
             urlSegmentCharset: z.string().min(1).optional(),
             modelNameMapping: z.record(z.string(), z.string()).optional(),

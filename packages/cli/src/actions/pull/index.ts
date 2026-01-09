@@ -378,7 +378,8 @@ export function syncTable({
                         }
                         arrayExpr.addItem((itemBuilder) => {
                             const refExpr = itemBuilder.ReferenceExpr.setTarget(ref);
-                            if (c.order !== 'ASC') refExpr.addArg((ab) => ab.StringLiteral.setValue('DESC'), 'sort');
+                            if (c.order && c.order !== 'ASC')
+                                refExpr.addArg((ab) => ab.StringLiteral.setValue('DESC'), 'sort');
 
                             return refExpr;
                         });
@@ -402,6 +403,7 @@ export function syncRelation({
     model,
     relation,
     services,
+    options,
     selfRelation,
     simmilarRelations,
 }: {
@@ -444,10 +446,12 @@ export function syncRelation({
     const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : '';
 
     const relationName = `${relation.table}${simmilarRelations > 1 ? `_${relation.column}` : ''}To${relation.references.table}`;
-    let sourceFieldName =
+    let { name: sourceFieldName } = resolveNameCasing(
+        options.fieldCasing,
         simmilarRelations > 0
             ? `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
-            : targetModel.name;
+            : targetModel.name,
+    );
 
     if (sourceModel.fields.find((f) => f.name === sourceFieldName)) {
         sourceFieldName = `${sourceFieldName}To${targetModel.name.charAt(0).toLowerCase()}${targetModel.name.slice(1)}_${relation.references.column}`;
@@ -498,10 +502,12 @@ export function syncRelation({
     sourceModel.fields.push(sourceFieldFactory.node);
 
     const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : '';
-    const oppositeFieldName =
+    const { name: oppositeFieldName } = resolveNameCasing(
+        options.fieldCasing,
         simmilarRelations > 0
             ? `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
-            : sourceModel.name;
+            : sourceModel.name,
+    );
 
     const targetFieldFactory = new DataFieldFactory()
         .setContainer(targetModel)
@@ -519,8 +525,8 @@ export function syncRelation({
 
     targetModel.fields.push(targetFieldFactory.node);
 
-    targetModel.fields.sort((a, b) => {
-        if (a.type.reference && b.type.reference) return 0;
-        return a.name.localeCompare(b.name);
-    });
+    // targetModel.fields.sort((a, b) => {
+    //     if (a.type.reference || b.type.reference) return a.name.localeCompare(b.name);
+    //     return 0;
+    // });
 }

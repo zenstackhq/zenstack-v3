@@ -1,14 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createProject, runCli } from '../utils';
+import { createProject, getDefaultPrelude, runCli } from '../utils';
+import { loadSchemaDocument } from '../../src/actions/action-utils';
+import { ZModelCodeGenerator } from '@zenstackhq/language';
 
 const getSchema = (workDir: string) => fs.readFileSync(path.join(workDir, 'zenstack/schema.zmodel')).toString();
+const generator = new ZModelCodeGenerator({
+    quote: 'double',
+    indent: 4,
+});
 
 describe('DB pull', () => {
-    it('simple schema', () => {
+    it("simple schema - pull shouldn't modify the schema", () => {
         const workDir = createProject(
-`model User {
+            `model User {
     id             String   @id @default(cuid())
     email          String   @unique @map("email_address")
     name           String?  @default("Anonymous")
@@ -85,12 +91,98 @@ enum Role {
     USER
     ADMIN
     MODERATOR
-}`);
+}`,
+        );
         runCli('format', workDir);
         runCli('db push', workDir);
 
         const originalSchema = getSchema(workDir);
         runCli('db pull --indent 4', workDir);
+        expect(getSchema(workDir)).toEqual(originalSchema);
+    });
+
+    it('simple schema - pull shouldn recreate the schema.zmodel', async () => {
+        const workDir = createProject(
+            `model Post {
+    id        Int       @id @default(autoincrement())
+    authorId  String
+    title     String
+    content   String?
+    published Boolean   @default(false)
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    slug      String
+    score     Float     @default(0.0)
+    metadata  Json?
+    author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+    PostTag   PostTag[]
+
+    @@unique([authorId, slug])
+    @@index([authorId, published])
+}
+model PostTag {
+    post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+    postId     Int
+    tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+    tagId      Int
+    assignedAt DateTime @default(now())
+    note       String?  @default("initial")
+
+    @@id([postId, tagId])
+}
+model User {
+    id             String   @id @default(cuid())
+    email          String   @unique
+    name           String?  @default("Anonymous")
+    role           Role     @default(USER)
+    profile        Profile?
+    shared_profile Profile? @relation("shared")
+    posts          Post[]
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+    jsonData       Json?
+    balance        Decimal  @default(0.00)
+    isActive       Boolean  @default(true)
+    bigCounter     BigInt   @default(0)
+    bytes          Bytes?
+
+    @@index([role])
+}
+
+model Profile {
+    id            Int     @id @default(autoincrement())
+    user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    userId        String  @unique
+    user_shared   User    @relation("shared", fields: [shared_userId], references: [id], onDelete: Cascade)
+    shared_userId String  @unique
+    bio           String?
+    avatarUrl     String?
+}
+
+model Tag {
+    id        Int       @id @default(autoincrement())
+    name      String    @unique
+    posts     PostTag[]
+    createdAt DateTime  @default(now())
+
+    @@index([name], name: "tag_name_idx")
+}
+
+enum Role {
+    USER
+    ADMIN
+    MODERATOR
+}`,
+        );
+        console.log(workDir)
+        runCli('format', workDir);
+        runCli('db push', workDir);
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+        const { model } = await loadSchemaDocument(schemaFile, { returnServices: true });
+        const originalSchema = generator.generate(model);
+        fs.writeFileSync(path.join(workDir, 'zenstack/schema.zmodel'), getDefaultPrelude());
+
+        runCli('db pull --indent 4 --field-casing=camel', workDir);
         expect(getSchema(workDir)).toEqual(originalSchema);
     });
 });

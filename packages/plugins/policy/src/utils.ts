@@ -5,6 +5,7 @@ import {
     AliasNode,
     AndNode,
     BinaryOperationNode,
+    ColumnNode,
     FunctionNode,
     OperatorNode,
     OrNode,
@@ -151,6 +152,23 @@ export function getTableName(node: OperationNode | undefined) {
         return getTableName(node.node);
     } else if (ReferenceNode.is(node) && node.table) {
         return getTableName(node.table);
+    }
+    return undefined;
+}
+
+/**
+ * Gets the column name from a node.
+ */
+export function getColumnName(node: OperationNode | undefined) {
+    if (!node) {
+        return node;
+    }
+    if (AliasNode.is(node)) {
+        return getColumnName(node.node);
+    } else if (ReferenceNode.is(node)) {
+        return getColumnName(node.column);
+    } else if (ColumnNode.is(node)) {
+        return node.column.name;
     }
     return undefined;
 }

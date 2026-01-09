@@ -105,8 +105,8 @@ export function typeAssignable(destType: ExpressionType, sourceType: ExpressionT
  * Maps a ZModel builtin type to expression type
  */
 export function mapBuiltinTypeToExpressionType(
-    type: BuiltinType | 'Any' | 'Object' | 'Null' | 'Unsupported',
-): ExpressionType | 'Any' {
+    type: BuiltinType | ExpressionType,
+): ExpressionType {
     switch (type) {
         case 'Any':
         case 'Boolean':
@@ -115,6 +115,10 @@ export function mapBuiltinTypeToExpressionType(
         case 'Int':
         case 'Float':
         case 'Null':
+        case 'Object':
+        case 'Unsupported':
+        case 'Void':
+        case 'Undefined':
             return type;
         case 'BigInt':
             return 'Int';
@@ -123,10 +127,6 @@ export function mapBuiltinTypeToExpressionType(
         case 'Json':
         case 'Bytes':
             return 'Any';
-        case 'Object':
-            return 'Object';
-        case 'Unsupported':
-            return 'Unsupported';
     }
 }
 
@@ -147,6 +147,13 @@ export function isDataFieldReference(node: AstNode): node is ReferenceExpr {
  */
 export function isRelationshipField(field: DataField) {
     return isDataModel(field.type.reference?.ref);
+}
+
+/**
+ * Returns if the given field is a computed field.
+ */
+export function isComputedField(field: DataField) {
+    return hasAttribute(field, '@computed');
 }
 
 export function isDelegateModel(node: AstNode) {

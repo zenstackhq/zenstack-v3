@@ -6,11 +6,12 @@
 /* eslint-disable */
 
 import { type SchemaType as $Schema } from "./schema";
-import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
+import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, ExistsArgs as $ExistsArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
 import type { SimplifiedPlainResult as $Result, SelectIncludeOmit as $SelectIncludeOmit } from "@zenstackhq/orm";
 export type SpaceFindManyArgs = $FindManyArgs<$Schema, "Space">;
 export type SpaceFindUniqueArgs = $FindUniqueArgs<$Schema, "Space">;
 export type SpaceFindFirstArgs = $FindFirstArgs<$Schema, "Space">;
+export type SpaceExistsArgs = $ExistsArgs<$Schema, "Space">;
 export type SpaceCreateArgs = $CreateArgs<$Schema, "Space">;
 export type SpaceCreateManyArgs = $CreateManyArgs<$Schema, "Space">;
 export type SpaceCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Space">;
@@ -31,6 +32,7 @@ export type SpaceGetPayload<Args extends $SelectIncludeOmit<$Schema, "Space", tr
 export type SpaceUserFindManyArgs = $FindManyArgs<$Schema, "SpaceUser">;
 export type SpaceUserFindUniqueArgs = $FindUniqueArgs<$Schema, "SpaceUser">;
 export type SpaceUserFindFirstArgs = $FindFirstArgs<$Schema, "SpaceUser">;
+export type SpaceUserExistsArgs = $ExistsArgs<$Schema, "SpaceUser">;
 export type SpaceUserCreateArgs = $CreateArgs<$Schema, "SpaceUser">;
 export type SpaceUserCreateManyArgs = $CreateManyArgs<$Schema, "SpaceUser">;
 export type SpaceUserCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "SpaceUser">;
@@ -51,6 +53,7 @@ export type SpaceUserGetPayload<Args extends $SelectIncludeOmit<$Schema, "SpaceU
 export type UserFindManyArgs = $FindManyArgs<$Schema, "User">;
 export type UserFindUniqueArgs = $FindUniqueArgs<$Schema, "User">;
 export type UserFindFirstArgs = $FindFirstArgs<$Schema, "User">;
+export type UserExistsArgs = $ExistsArgs<$Schema, "User">;
 export type UserCreateArgs = $CreateArgs<$Schema, "User">;
 export type UserCreateManyArgs = $CreateManyArgs<$Schema, "User">;
 export type UserCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "User">;
@@ -71,6 +74,7 @@ export type UserGetPayload<Args extends $SelectIncludeOmit<$Schema, "User", true
 export type ListFindManyArgs = $FindManyArgs<$Schema, "List">;
 export type ListFindUniqueArgs = $FindUniqueArgs<$Schema, "List">;
 export type ListFindFirstArgs = $FindFirstArgs<$Schema, "List">;
+export type ListExistsArgs = $ExistsArgs<$Schema, "List">;
 export type ListCreateArgs = $CreateArgs<$Schema, "List">;
 export type ListCreateManyArgs = $CreateManyArgs<$Schema, "List">;
 export type ListCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "List">;
@@ -91,6 +95,7 @@ export type ListGetPayload<Args extends $SelectIncludeOmit<$Schema, "List", true
 export type TodoFindManyArgs = $FindManyArgs<$Schema, "Todo">;
 export type TodoFindUniqueArgs = $FindUniqueArgs<$Schema, "Todo">;
 export type TodoFindFirstArgs = $FindFirstArgs<$Schema, "Todo">;
+export type TodoExistsArgs = $ExistsArgs<$Schema, "Todo">;
 export type TodoCreateArgs = $CreateArgs<$Schema, "Todo">;
 export type TodoCreateManyArgs = $CreateManyArgs<$Schema, "Todo">;
 export type TodoCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Todo">;

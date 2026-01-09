@@ -6,11 +6,12 @@
 /* eslint-disable */
 
 import { type SchemaType as $Schema } from "./schema";
-import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
+import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, ExistsArgs as $ExistsArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
 import type { SimplifiedPlainResult as $Result, SelectIncludeOmit as $SelectIncludeOmit } from "@zenstackhq/orm";
 export type UserFindManyArgs = $FindManyArgs<$Schema, "User">;
 export type UserFindUniqueArgs = $FindUniqueArgs<$Schema, "User">;
 export type UserFindFirstArgs = $FindFirstArgs<$Schema, "User">;
+export type UserExistsArgs = $ExistsArgs<$Schema, "User">;
 export type UserCreateArgs = $CreateArgs<$Schema, "User">;
 export type UserCreateManyArgs = $CreateManyArgs<$Schema, "User">;
 export type UserCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "User">;
@@ -31,6 +32,7 @@ export type UserGetPayload<Args extends $SelectIncludeOmit<$Schema, "User", true
 export type ProfileFindManyArgs = $FindManyArgs<$Schema, "Profile">;
 export type ProfileFindUniqueArgs = $FindUniqueArgs<$Schema, "Profile">;
 export type ProfileFindFirstArgs = $FindFirstArgs<$Schema, "Profile">;
+export type ProfileExistsArgs = $ExistsArgs<$Schema, "Profile">;
 export type ProfileCreateArgs = $CreateArgs<$Schema, "Profile">;
 export type ProfileCreateManyArgs = $CreateManyArgs<$Schema, "Profile">;
 export type ProfileCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Profile">;
@@ -51,6 +53,7 @@ export type ProfileGetPayload<Args extends $SelectIncludeOmit<$Schema, "Profile"
 export type AddressFindManyArgs = $FindManyArgs<$Schema, "Address">;
 export type AddressFindUniqueArgs = $FindUniqueArgs<$Schema, "Address">;
 export type AddressFindFirstArgs = $FindFirstArgs<$Schema, "Address">;
+export type AddressExistsArgs = $ExistsArgs<$Schema, "Address">;
 export type AddressCreateArgs = $CreateArgs<$Schema, "Address">;
 export type AddressCreateManyArgs = $CreateManyArgs<$Schema, "Address">;
 export type AddressCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Address">;

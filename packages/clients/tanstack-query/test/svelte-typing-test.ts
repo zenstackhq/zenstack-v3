@@ -1,14 +1,21 @@
 import { useClientQueries } from '../src/svelte/index.svelte';
 import { schema } from './schemas/basic/schema-lite';
+import { schema as proceduresSchema } from './schemas/procedures/schema-lite';
 
 const client = useClientQueries(schema);
+const proceduresClient = useClientQueries(proceduresSchema);
 
 // @ts-expect-error missing args
 client.user.useFindUnique();
 
 check(client.user.useFindUnique(() => ({ where: { id: '1' } })).data?.email);
 check(client.user.useFindUnique(() => ({ where: { id: '1' } })).queryKey);
-check(client.user.useFindUnique(() => ({ where: { id: '1' } }), () => ({ optimisticUpdate: true, enabled: false })));
+check(
+    client.user.useFindUnique(
+        () => ({ where: { id: '1' } }),
+        () => ({ optimisticUpdate: true, enabled: false }),
+    ),
+);
 
 // @ts-expect-error unselected field
 check(client.user.useFindUnique(() => ({ select: { email: true }, where: { id: '1' } })).data?.name);
@@ -17,6 +24,9 @@ check(client.user.useFindUnique(() => ({ where: { id: '1' }, include: { posts: t
 
 check(client.user.useFindFirst().data?.email);
 check(client.user.useFindFirst().data?.$optimistic);
+
+check(client.user.useExists().data);
+check(client.user.useExists(() => ({ where: { id: '1' } })).data);
 
 check(client.user.useFindMany().data?.[0]?.email);
 check(client.user.useFindMany().data?.[0]?.$optimistic);
@@ -43,28 +53,34 @@ check(client.user.useGroupBy(() => ({ by: ['email'], _max: { name: true } })).da
 // @ts-expect-error missing args
 client.user.useCreate().mutate();
 client.user.useCreate().mutate({ data: { email: 'test@example.com' } });
-client.user.useCreate(() => ({ optimisticUpdate: true, invalidateQueries: false, retry: 3 })).mutate({
-    data: { email: 'test@example.com' },
-});
+client.user
+    .useCreate(() => ({ optimisticUpdate: true, invalidateQueries: false, retry: 3 }))
+    .mutate({
+        data: { email: 'test@example.com' },
+    });
 
-client.user.useCreate()
+client.user
+    .useCreate()
     .mutateAsync({ data: { email: 'test@example.com' }, include: { posts: true } })
     .then((d) => check(d.posts[0]?.title));
 
-client.user.useCreateMany()
+client.user
+    .useCreateMany()
     .mutateAsync({
         data: [{ email: 'test@example.com' }, { email: 'test2@example.com' }],
         skipDuplicates: true,
     })
     .then((d) => d.count);
 
-client.user.useCreateManyAndReturn()
+client.user
+    .useCreateManyAndReturn()
     .mutateAsync({
         data: [{ email: 'test@example.com' }],
     })
     .then((d) => check(d[0]?.name));
 
-client.user.useCreateManyAndReturn()
+client.user
+    .useCreateManyAndReturn()
     .mutateAsync({
         data: [{ email: 'test@example.com' }],
         select: { email: true },
@@ -83,7 +99,8 @@ client.user.useUpdate().mutate(
 
 client.user.useUpdateMany().mutate({ data: { email: 'updated@example.com' } });
 
-client.user.useUpdateManyAndReturn()
+client.user
+    .useUpdateManyAndReturn()
     .mutateAsync({ data: { email: 'updated@example.com' } })
     .then((d) => check(d[0]?.email));
 
@@ -106,3 +123,28 @@ client.foo.useCreate();
 
 client.foo.useUpdate();
 client.bar.useCreate();
+
+// procedures (query)
+check(proceduresClient.$procs.greet.useQuery().data?.toUpperCase());
+check(proceduresClient.$procs.greet.useQuery(() => ({ args: { name: 'bob' } })).data?.toUpperCase());
+check(proceduresClient.$procs.greet.useQuery(() => ({ args: { name: 'bob' } })).queryKey);
+
+//   Infinite queries for procedures are currently disabled, will add back later if needed
+// check(
+//     proceduresClient.$procs.greetMany
+//         .useInfiniteQuery(() => ({ args: { name: 'bob' } }))
+//         .data?.pages[0]?.[0]?.toUpperCase(),
+// );
+// check(proceduresClient.$procs.greetMany.useInfiniteQuery(() => ({ args: { name: 'bob' } })).queryKey);
+
+// @ts-expect-error greet is not a mutation procedure
+proceduresClient.$procs.greet.useMutation();
+
+// procedures (mutation)
+proceduresClient.$procs.sum.useMutation().mutate({ args: { a: 1, b: 2 } });
+// @ts-expect-error wrong arg shape for multi-param procedure
+proceduresClient.$procs.sum.useMutation().mutate([1, 2]);
+proceduresClient.$procs.sum
+    .useMutation()
+    .mutateAsync({ args: { a: 1, b: 2 } })
+    .then((d) => check(d.toFixed(2)));

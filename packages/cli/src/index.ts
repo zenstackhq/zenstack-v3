@@ -68,6 +68,7 @@ function createProgram() {
         .addOption(schemaOption)
         .addOption(noVersionCheckOption)
         .addOption(new Option('-o, --output <path>', 'default output directory for code generation'))
+        .addOption(new Option('-w, --watch', 'enable watch mode').default(false))
         .addOption(new Option('--lite', 'also generate a lite version of schema without attributes').default(false))
         .addOption(new Option('--lite-only', 'only generate lite version of schema without attributes').default(false))
         .addOption(new Option('--silent', 'suppress all output except errors').default(false))
@@ -218,6 +219,11 @@ async function main() {
             console.error(colors.red(`Unhandled error: ${e}`));
             exitCode = 1;
         }
+    }
+
+    if (program.args.includes('generate') && (program.args.includes('-w') || program.args.includes('--watch'))) {
+        // A "hack" way to prevent the process from terminating because we don't want to stop it.
+        return;
     }
 
     if (telemetry.isTracking) {

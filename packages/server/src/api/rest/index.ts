@@ -7,7 +7,11 @@ import tsjapi, { type Linker, type Paginator, type Relator, type Serializer, typ
 import { match } from 'ts-pattern';
 import UrlPattern from 'url-pattern';
 import z from 'zod';
+import { fromError } from 'zod-validation-error/v4';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
+import { getProcedureDef, mapProcedureArgs } from '../common/procedures';
+import { loggerSchema } from '../common/schemas';
+import { processSuperJsonRequestPayload } from '../common/utils';
 import { getZodErrorMessage, log, registerCustomSerializers } from '../utils';
 
 /**
@@ -51,8 +55,14 @@ export type RestApiHandlerOptions<Schema extends SchemaDef = SchemaDef> = {
      */
     urlSegmentCharset?: string;
 
+    /**
+     * Mapping from model names to URL segment names.
+     */
     modelNameMapping?: Record<string, string>;
 
+    /**
+     * Mapping from model names to unique field name to be used as resource's ID.
+     */
     externalIdMapping?: Record<string, string>;
 };
 
@@ -253,6 +263,8 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
     private externalIdMapping: Record<string, string>;
 
     constructor(private readonly options: RestApiHandlerOptions<Schema>) {
+        this.validateOptions(options);
+
         this.idDivider = options.idDivider ?? DEFAULT_ID_DIVIDER;
         const segmentCharset = options.urlSegmentCharset ?? 'a-zA-Z0-9-_~ %';
 
@@ -273,6 +285,23 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
 
         this.buildTypeMap();
         this.buildSerializers();
+    }
+
+    private validateOptions(options: RestApiHandlerOptions<Schema>) {
+        const schema = z.strictObject({
+            schema: z.object(),
+            log: loggerSchema.optional(),
+            endpoint: z.string().min(1),
+            pageSize: z.union([z.number().int().positive(), z.literal(Infinity)]).optional(),
+            idDivider: z.string().min(1).optional(),
+            urlSegmentCharset: z.string().min(1).optional(),
+            modelNameMapping: z.record(z.string(), z.string()).optional(),
+            externalIdMapping: z.record(z.string(), z.string()).optional(),
+        });
+        const parseResult = schema.safeParse(options);
+        if (!parseResult.success) {
+            throw new Error(`Invalid options: ${fromError(parseResult.error)}`);
+        }
     }
 
     get schema() {
@@ -336,6 +365,11 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
         }
 
         try {
+            if (path.startsWith('/$procs/')) {
+                const proc = path.split('/')[2];
+                return await this.processProcedureRequest({ client, method, proc, query, requestBody });
+            }
+
             switch (method) {
                 case 'GET': {
                     let match = this.matchUrlPattern(path, UrlPatterns.SINGLE);
@@ -471,6 +505,91 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
 
     private handleGenericError(err: unknown): Response | PromiseLike<Response> {
         return this.makeError('unknownError', err instanceof Error ? `${err.message}\n${err.stack}` : 'Unknown error');
+    }
+
+    private async processProcedureRequest({
+        client,
+        method,
+        proc,
+        query,
+        requestBody,
+    }: {
+        client: ClientContract<Schema>;
+        method: string;
+        proc?: string;
+        query?: Record<string, string | string[]>;
+        requestBody?: unknown;
+    }): Promise<Response> {
+        if (!proc) {
+            return this.makeProcBadInputErrorResponse('missing procedure name');
+        }
+
+        const procDef = getProcedureDef(this.schema, proc);
+        if (!procDef) {
+            return this.makeProcBadInputErrorResponse(`unknown procedure: ${proc}`);
+        }
+
+        const isMutation = !!procDef.mutation;
+        if (isMutation) {
+            if (method !== 'POST') {
+                return this.makeProcBadInputErrorResponse('invalid request method, only POST is supported');
+            }
+        } else {
+            if (method !== 'GET') {
+                return this.makeProcBadInputErrorResponse('invalid request method, only GET is supported');
+            }
+        }
+
+        const argsPayload = method === 'POST' ? requestBody : query;
+
+        // support SuperJSON request payload format
+        const { result: processedArgsPayload, error } = await processSuperJsonRequestPayload(argsPayload);
+        if (error) {
+            return this.makeProcBadInputErrorResponse(error);
+        }
+
+        let procInput: unknown;
+        try {
+            procInput = mapProcedureArgs(procDef, processedArgsPayload);
+        } catch (err) {
+            return this.makeProcBadInputErrorResponse(
+                err instanceof Error ? err.message : 'invalid procedure arguments',
+            );
+        }
+
+        try {
+            log(this.log, 'debug', () => `handling "$procs.${proc}" request`);
+
+            const clientResult = await (client as any).$procs?.[proc](procInput);
+            const toSerialize = this.toPlainObject(clientResult);
+
+            const { json, meta } = SuperJSON.serialize(toSerialize);
+            const responseBody: any = { data: json };
+            if (meta) {
+                responseBody.meta = { serialization: meta };
+            }
+
+            return { status: 200, body: responseBody };
+        } catch (err) {
+            log(this.log, 'error', `error occurred when handling "$procs.${proc}" request`, err);
+            if (err instanceof ORMError) {
+                throw err; // top-level handler will take care of it
+            }
+            return this.makeProcGenericErrorResponse(err);
+        }
+    }
+
+    private makeProcBadInputErrorResponse(message: string): Response {
+        const resp = this.makeError('invalidPayload', message, 400);
+        log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
+        return resp;
+    }
+
+    private makeProcGenericErrorResponse(err: unknown): Response {
+        const message = err instanceof Error ? err.message : 'unknown error';
+        const resp = this.makeError('unknownError', message, 500);
+        log(this.log, 'debug', () => `sending error response: ${JSON.stringify(resp)}`);
+        return resp;
     }
 
     private async processSingleRead(

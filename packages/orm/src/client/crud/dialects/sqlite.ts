@@ -67,7 +67,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         }
     }
 
-    override transformOutput(value: unknown, type: BuiltinType) {
+    override transformOutput(value: unknown, type: BuiltinType, array: boolean) {
         if (value === null || value === undefined) {
             return value;
         } else if (this.schema.typeDefs && type in this.schema.typeDefs) {
@@ -81,7 +81,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 .with('Decimal', () => this.transformOutputDecimal(value))
                 .with('BigInt', () => this.transformOutputBigInt(value))
                 .with('Json', () => this.transformOutputJson(value))
-                .otherwise(() => super.transformOutput(value, type));
+                .otherwise(() => super.transformOutput(value, type, array));
         }
     }
 

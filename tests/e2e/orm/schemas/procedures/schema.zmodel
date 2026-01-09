@@ -1,0 +1,29 @@
+datasource db {
+    provider = 'sqlite'
+    url = 'file:./test.db'
+}
+
+enum Role {
+    ADMIN
+    USER
+}
+
+type Overview {
+    userIds Int[]
+    total Int
+    roles Role[]
+    meta Json?
+}
+
+model User {
+    id Int @id @default(autoincrement())
+    name String @unique
+    role Role @default(USER)
+}
+
+procedure getUser(id: Int): User
+procedure listUsers(): User[]
+mutation procedure signUp(name: String, role: Role?): User
+mutation procedure setAdmin(userId: Int): Void
+procedure getOverview(): Overview
+mutation procedure createMultiple(names: String[]): User[]

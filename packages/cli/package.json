@@ -63,5 +63,8 @@
         "@zenstackhq/vitest-config": "workspace:*",
         "better-sqlite3": "catalog:",
         "tmp": "catalog:"
+    },
+    "engines": {
+        "node": ">=20"
     }
 }

@@ -260,6 +260,36 @@ describe('API Handler Options Validation', () => {
             }).not.toThrow();
         });
 
+        it('should accept Infinity as pageSize to disable pagination', () => {
+            expect(() => {
+                new RestApiHandler({
+                    schema: client.$schema,
+                    endpoint: 'http://localhost/api',
+                    pageSize: Infinity,
+                });
+            }).not.toThrow();
+        });
+
+        it('should throw error when pageSize is a decimal', () => {
+            expect(() => {
+                new RestApiHandler({
+                    schema: client.$schema,
+                    endpoint: 'http://localhost/api',
+                    pageSize: 10.5,
+                });
+            }).toThrow('Invalid options');
+        });
+
+        it('should throw error when pageSize is NaN', () => {
+            expect(() => {
+                new RestApiHandler({
+                    schema: client.$schema,
+                    endpoint: 'http://localhost/api',
+                    pageSize: NaN,
+                });
+            }).toThrow('Invalid options');
+        });
+
         it('should accept single character idDivider', () => {
             expect(() => {
                 new RestApiHandler({
@@ -555,13 +585,11 @@ describe('API Handler Options Validation', () => {
         });
 
         it('RestApiHandler with disabled pagination (Infinity pageSize)', () => {
-            // Note: According to the code, this would need to be set to Infinity
-            // after construction, not in options, as Zod validation requires positive number
             expect(() => {
                 new RestApiHandler({
                     schema: client.$schema,
                     endpoint: 'http://localhost/api',
-                    pageSize: 999999, // Large number as workaround
+                    pageSize: Infinity,
                 });
             }).not.toThrow();
         });

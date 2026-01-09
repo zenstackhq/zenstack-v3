@@ -1004,7 +1004,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
                 // @ts-expect-error
                 if (globalThis.updatedattest) {
-                    console.log({ hasUpdatedScalarFields, data, ignoredFields })
+                    console.log({ hasUpdatedScalarFields, data, ignoredFields, updatedat: fieldDef.updatedAt })
                 }
                 if (hasUpdatedScalarFields) {
                     finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);

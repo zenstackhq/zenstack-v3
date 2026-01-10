@@ -1,5 +1,5 @@
+import { createPolicyTestClient } from '@zenstackhq/testtools';
 import { describe, expect, it } from 'vitest';
-import { createPolicyTestClient, getTestDbProvider } from '@zenstackhq/testtools';
 
 describe('Update policy tests', () => {
     describe('Scalar condition tests', () => {

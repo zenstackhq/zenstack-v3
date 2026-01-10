@@ -319,6 +319,14 @@ export class TsSchemaGenerator {
         );
     }
 
+    private createUpdatedAtObject(ignoreArg: AttributeArg) {
+        return ts.factory.createObjectLiteralExpression([
+            ts.factory.createPropertyAssignment('ignore', ts.factory.createArrayLiteralExpression(
+                (ignoreArg.value as ArrayExpr).items.map((item) => ts.factory.createStringLiteral((item as ReferenceExpr).target.$refText))
+            ))
+        ]);
+    }
+
     private getAllDataModels(model: Model) {
         return model.declarations.filter((d): d is DataModel => isDataModel(d) && !hasAttribute(d, '@@ignore'));
     }
@@ -568,11 +576,7 @@ export class TsSchemaGenerator {
         if (updatedAtAttrib) {
             const ignoreArg = updatedAtAttrib.args.find(arg => arg.name === 'ignore');
             objectFields.push(ts.factory.createPropertyAssignment('updatedAt', ignoreArg
-                ? ts.factory.createObjectLiteralExpression([
-                    ts.factory.createPropertyAssignment('ignore', ts.factory.createArrayLiteralExpression(
-                        (ignoreArg.value as ArrayExpr).items.map((item) => ts.factory.createStringLiteral((item as ReferenceExpr).target.$refText))
-                    ))
-                ])
+                ? this.createUpdatedAtObject(ignoreArg)
                 : ts.factory.createTrue()
             ));
         }

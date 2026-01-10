@@ -573,7 +573,7 @@ export class TsSchemaGenerator {
 
         const updatedAtAttrib = getAttribute(field, '@updatedAt') as DataFieldAttribute | undefined;
         if (updatedAtAttrib) {
-            const ignoreArg = updatedAtAttrib.args.find(arg => arg.name === 'ignore');
+            const ignoreArg = getAttributeArg(updatedAtAttrib, 'ignore') as AttributeArg | undefined;
             objectFields.push(ts.factory.createPropertyAssignment('updatedAt',
                 ignoreArg
                     ? this.createUpdatedAtObject(ignoreArg)

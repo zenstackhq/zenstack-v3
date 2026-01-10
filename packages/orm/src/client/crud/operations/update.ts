@@ -43,6 +43,7 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             if (needReadBack) {
                 // updated can be undefined if there's nothing to update, in that case we'll use the original
                 // filter to read back the entity
+                // note that we trim filter to id fields only, just in case underlying executor returns more fields
                 const readFilter = updateResult ? getIdValues(this.schema, this.model, updateResult) : args.where;
                 let readBackResult: any = undefined;
                 readBackResult = await this.readUnique(tx, this.model, {

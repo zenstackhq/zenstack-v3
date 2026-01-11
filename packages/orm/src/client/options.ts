@@ -59,7 +59,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
     /**
      * Plugins.
      */
-    plugins?: RuntimePlugin<Schema>[];
+    plugins?: RuntimePlugin<any, Schema>[];
 
     /**
      * Logging configuration.

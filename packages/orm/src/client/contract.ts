@@ -61,7 +61,11 @@ export enum TransactionIsolationLevel {
 /**
  * ZenStack client interface.
  */
-export type ClientContract<Schema extends SchemaDef, Options extends ClientOptions<Schema> = ClientOptions<Schema>> = {
+export type ClientContract<
+    Schema extends SchemaDef,
+    Options extends ClientOptions<Schema> = ClientOptions<Schema>,
+    ExtOptions = {},
+> = {
     /**
      * The schema definition.
      */
@@ -166,7 +170,9 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
     /**
      * Returns a new client with the specified plugin installed.
      */
-    $use(plugin: RuntimePlugin<Schema>): ClientContract<Schema, Options>;
+    $use<PluginId extends string, PluginOptions>(
+        plugin: RuntimePlugin<PluginId, Schema, PluginOptions>,
+    ): ClientContract<Schema, Options, ExtOptions & { [K in PluginId]: PluginOptions }>;
 
     /**
      * Returns a new client with the specified plugin removed.
@@ -194,7 +200,7 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
      */
     $pushSchema(): Promise<void>;
 } & {
-    [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<Schema, Key, ToQueryOptions<Options>>;
+    [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<Schema, Key, ToQueryOptions<Options>, ExtOptions>;
 } & ProcedureOperations<Schema>;
 
 /**
@@ -253,6 +259,7 @@ export type AllModelOperations<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Options extends QueryOptions<Schema>,
+    ExtOptions,
 > = {
     /**
      * Returns a list of entities.
@@ -336,7 +343,9 @@ export type AllModelOperations<
      * ```
      */
     findMany<T extends FindManyArgs<Schema, Model>>(
-        args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
+        ...args: keyof ExtOptions extends never
+            ? [args?: SelectSubset<T, FindManyArgs<Schema, Model>>]
+            : [args?: SelectSubset<T, FindManyArgs<Schema, Model>>, options?: ExtOptions]
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
     /**
@@ -818,7 +827,7 @@ export type AllModelOperations<
      * await db.user.exists({
      *     where: { id: 1 },
      * }); // result: `boolean`
-     * 
+     *
      * // check with a relation
      * await db.user.exists({
      *     where: { posts: { some: { published: true } } },
@@ -835,8 +844,9 @@ export type ModelOperations<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Options extends QueryOptions<Schema> = QueryOptions<Schema>,
+    ExtOptions = never,
 > = Omit<
-    AllModelOperations<Schema, Model, Options>,
+    AllModelOperations<Schema, Model, Options, ExtOptions>,
     // exclude operations not applicable to delegate models
     IsDelegateModel<Schema, Model> extends true ? OperationsIneligibleForDelegateModels : never
 >;

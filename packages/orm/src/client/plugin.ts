@@ -8,11 +8,11 @@ import type { ZModelFunction } from './options';
 /**
  * ZenStack runtime plugin.
  */
-export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
+export interface RuntimePlugin<PluginId extends string, Schema extends SchemaDef = SchemaDef, Options = never> {
     /**
      * Plugin ID.
      */
-    id: string;
+    id: PluginId;
 
     /**
      * Plugin display name.
@@ -34,7 +34,7 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     /**
      * Intercepts an ORM query.
      */
-    onQuery?: OnQueryCallback<Schema>;
+    onQuery?: OnQueryCallback<Schema, Options>;
 
     /**
      * Intercepts a procedure invocation.
@@ -55,7 +55,9 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
 /**
  * Defines a ZenStack runtime plugin.
  */
-export function definePlugin<Schema extends SchemaDef>(plugin: RuntimePlugin<Schema>) {
+export function definePlugin<PluginId extends string, Schema extends SchemaDef = SchemaDef, Options = never>(
+    plugin: RuntimePlugin<PluginId, Schema, Options>,
+) {
     return plugin;
 }
 
@@ -99,9 +101,11 @@ export type OnProcedureHookContext<Schema extends SchemaDef> = {
 
 // #region OnQuery hooks
 
-type OnQueryCallback<Schema extends SchemaDef> = (ctx: OnQueryHookContext<Schema>) => Promise<unknown>;
+type OnQueryCallback<Schema extends SchemaDef, Options> = (
+    ctx: OnQueryHookContext<Schema, Options>,
+) => Promise<unknown>;
 
-type OnQueryHookContext<Schema extends SchemaDef> = {
+type OnQueryHookContext<Schema extends SchemaDef, Options = never> = {
     /**
      * The model that is being queried.
      */
@@ -129,7 +133,7 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
      * The ZenStack client that is performing the operation.
      */
     client: ClientContract<Schema>;
-};
+} & (Options extends never ? {} : { options: Options });
 
 // #endregion
 

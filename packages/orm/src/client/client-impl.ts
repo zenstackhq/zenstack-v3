@@ -292,9 +292,9 @@ export class ClientImpl {
         await new SchemaDbPusher(this.schema, this.kysely).push();
     }
 
-    $use(plugin: RuntimePlugin<SchemaDef>) {
+    $use<PluginId extends string>(plugin: RuntimePlugin<PluginId, SchemaDef>) {
         // tsc perf
-        const newPlugins: RuntimePlugin<SchemaDef>[] = [...(this.$options.plugins ?? []), plugin];
+        const newPlugins: RuntimePlugin<PluginId, SchemaDef>[] = [...(this.$options.plugins ?? []), plugin];
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
             plugins: newPlugins,
@@ -302,9 +302,9 @@ export class ClientImpl {
         return new ClientImpl(this.schema, newOptions, this);
     }
 
-    $unuse(pluginId: string) {
+    $unuse<PluginId extends string>(pluginId: PluginId) {
         // tsc perf
-        const newPlugins: RuntimePlugin<SchemaDef>[] = [];
+        const newPlugins: RuntimePlugin<PluginId, SchemaDef>[] = [];
         for (const plugin of this.options.plugins ?? []) {
             if (plugin.id !== pluginId) {
                 newPlugins.push(plugin);
@@ -321,7 +321,7 @@ export class ClientImpl {
         // tsc perf
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
-            plugins: [] as RuntimePlugin<SchemaDef>[],
+            plugins: [] as RuntimePlugin<any, SchemaDef>[],
         };
         return new ClientImpl(this.schema, newOptions, this);
     }
@@ -425,6 +425,7 @@ function createModelCrudHandler(
         handler: BaseOperationHandler<any>,
         postProcess = false,
         throwIfNoResult = false,
+        pluginOptions?: unknown,
     ) => {
         return createZenStackPromise(async (txClient?: ClientContract<any>) => {
             let proceed = async (_args: unknown) => {
@@ -448,8 +449,8 @@ function createModelCrudHandler(
                 const onQuery = plugin.onQuery;
                 if (onQuery) {
                     const _proceed = proceed;
-                    proceed = (_args: unknown) =>
-                        onQuery({
+                    proceed = (_args: unknown) => {
+                        const ctx: any = {
                             client,
                             model,
                             operation: nominalOperation,
@@ -457,7 +458,13 @@ function createModelCrudHandler(
                             args: _args,
                             // ensure inner overrides are propagated to the previous proceed
                             proceed: (nextArgs: unknown) => _proceed(nextArgs),
-                        }) as Promise<unknown>;
+                        };
+                        // Add plugin options to context if provided
+                        if (pluginOptions !== undefined) {
+                            ctx.options = pluginOptions;
+                        }
+                        return (onQuery as (ctx: any) => Promise<unknown>)(ctx);
+                    };
                 }
             }
 
@@ -509,13 +516,16 @@ function createModelCrudHandler(
             );
         },
 
-        findMany: (args: unknown) => {
+        findMany: (...allArgs: unknown[]) => {
+            const [args, pluginOptions] = allArgs;
             return createPromise(
                 'findMany',
                 'findMany',
                 args,
                 new FindOperationHandler<any>(client, model, inputValidator),
                 true,
+                false,
+                pluginOptions,
             );
         },
 

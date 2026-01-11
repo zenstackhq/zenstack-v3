@@ -1,10 +1,14 @@
-import { ZenStackClient } from '@zenstackhq/orm';
+import { definePlugin, ZenStackClient } from '@zenstackhq/orm';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import SQLite from 'better-sqlite3';
 import { sql, SqliteDialect } from 'kysely';
 import { schema } from './zenstack/schema';
 
 async function main() {
+    const myPlugin = definePlugin<'foo', typeof schema, { bar: string }>({
+        id: 'foo',
+    });
+
     const db = new ZenStackClient(schema, {
         dialect: new SqliteDialect({ database: new SQLite('./zenstack/dev.db') }),
         computedFields: {
@@ -21,27 +25,26 @@ async function main() {
                 client.user.create({
                     data: { ...args },
                 }),
-            listPublicPosts: ({ client }) =>
-                client.post.findMany({
-                    where: {
-                        published: true,
-                    },
-                }),
+            listPublicPosts: ({}) => [],
         },
-    }).$use({
-        id: 'cost-logger',
-        onQuery: async ({ model, operation, args, proceed }) => {
-            const start = Date.now();
-            const result = await proceed(args);
-            console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
-            return result;
-        },
-    });
+    }).$use(myPlugin);
+
+    // .$use({
+    //     id: 'cost-logger',
+    //     // onQuery: async ({ model, operation, args, proceed }) => {
+    //     //     const start = Date.now();
+    //     //     const result = await proceed(args as any);
+    //     //     console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
+    //     //     return result;
+    //     // },
+    // });
 
     // clean up existing data
     await db.post.deleteMany();
     await db.profile.deleteMany();
     await db.user.deleteMany();
+
+    db.user.findMany({ where: { id: '1' } }, { foo: { bar: 'abc' } });
 
     // create users and some posts
     const user1 = await db.user.create({

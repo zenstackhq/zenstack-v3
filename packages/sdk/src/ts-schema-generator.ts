@@ -607,12 +607,15 @@ export class TsSchemaGenerator {
 
         const defaultValue = this.getFieldMappedDefault(field);
         if (defaultValue !== undefined) {
-            if (typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
+            if (defaultValue === null) {
+                objectFields.push(
+                    ts.factory.createPropertyAssignment('default', this.createExpressionUtilsCall('_null')),
+                );
+            } else if (typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
                 if ('call' in defaultValue) {
                     objectFields.push(
                         ts.factory.createPropertyAssignment(
                             'default',
-
                             this.createExpressionUtilsCall('call', [
                                 ts.factory.createStringLiteral(defaultValue.call),
                                 ...(defaultValue.args.length > 0
@@ -725,7 +728,15 @@ export class TsSchemaGenerator {
 
     private getFieldMappedDefault(
         field: DataField,
-    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
+    ):
+        | string
+        | number
+        | boolean
+        | unknown[]
+        | { call: string; args: any[] }
+        | { authMember: string[] }
+        | null
+        | undefined {
         const defaultAttr = getAttribute(field, '@default');
         if (!defaultAttr) {
             return undefined;
@@ -738,7 +749,7 @@ export class TsSchemaGenerator {
     private getMappedValue(
         expr: Expression,
         fieldType: DataFieldType,
-    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
+    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | null {
         if (isLiteralExpr(expr)) {
             const lit = (expr as LiteralExpr).value;
             return fieldType.type === 'Boolean'
@@ -759,8 +770,10 @@ export class TsSchemaGenerator {
             return {
                 authMember: this.getMemberAccessChain(expr),
             };
+        } else if (isNullExpr(expr)) {
+            return null;
         } else {
-            throw new Error(`Unsupported default value type for ${expr.$type}`);
+            throw new Error(`Unsupported expression type: ${expr.$type}`);
         }
     }
 

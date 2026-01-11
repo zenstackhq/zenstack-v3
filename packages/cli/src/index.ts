@@ -139,6 +139,31 @@ function createProgram() {
         .action((options) => dbAction('push', options));
 
     dbCommand
+        .command('pull')
+        .description('Introspect your database.')
+        .addOption(schemaOption)
+        .addOption(noVersionCheckOption)
+        .addOption(new Option('-o, --out <path>', 'add custom output path for the introspected schema'))
+        .addOption(
+            new Option('--model-casing <pascal|camel|snake|kebab>', 'set the casing of generated models').default(
+                'none',
+            ),
+        )
+        .addOption(
+            new Option('--field-casing <pascal|camel|snake|kebab>', 'set the casing of generated fields').default(
+                'none',
+            ),
+        )
+        .addOption(
+            new Option('--always-map', 'always add @map and @@map attributes to models and fields').default(false),
+        )
+        .addOption(
+            new Option('--quote <double|single>', 'set the quote style of generated schema files').default('double'),
+        )
+        .addOption(new Option('--indent <number>', 'set the indentation of the generated schema files').default(4))
+        .action((options) => dbAction('pull', options));
+
+    dbCommand
         .command('seed')
         .description('Seed the database')
         .allowExcessArguments(true)

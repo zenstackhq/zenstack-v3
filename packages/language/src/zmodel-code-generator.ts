@@ -28,6 +28,7 @@ import {
     LiteralExpr,
     MemberAccessExpr,
     Model,
+    ModelImport,
     NullExpr,
     NumberLiteral,
     ObjectExpr,
@@ -70,7 +71,7 @@ function gen(name: string) {
  */
 export class ZModelCodeGenerator {
     private readonly options: ZModelCodeOptions;
-
+    private readonly quote: string;
     constructor(options?: Partial<ZModelCodeOptions>) {
         this.options = {
             binaryExprNumberOfSpaces: options?.binaryExprNumberOfSpaces ?? 1,
@@ -78,6 +79,7 @@ export class ZModelCodeGenerator {
             indent: options?.indent ?? 4,
             quote: options?.quote ?? 'single',
         };
+        this.quote = this.options.quote === 'double' ? '"' : "'";
     }
 
     /**
@@ -91,9 +93,17 @@ export class ZModelCodeGenerator {
         return handler.value.call(this, ast);
     }
 
+    private quotedStr(val: string): string {
+        const trimmedVal = val.replace(new RegExp(`${this.quote}`, 'g'), `\\${this.quote}`);
+        return `${this.quote}${trimmedVal}${this.quote}`;
+    }
+
     @gen(Model)
     private _generateModel(ast: Model) {
-        return ast.declarations.map((d) => this.generate(d)).join('\n\n');
+        return `${ast.imports.map((d) => this.generate(d)).join('\n')}${ast.imports.length > 0 ? '\n\n' : ''}${ast.declarations
+            .sort((d) => (d.$type === 'Enum' ? 1 : 0))
+            .map((d) => this.generate(d))
+            .join('\n\n')}`;
     }
 
     @gen(DataSource)
@@ -103,10 +113,19 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 }`;
     }
 
+    @gen(ModelImport)
+    private _generateModelImport(ast: ModelImport) {
+        return `import ${this.quotedStr(ast.path)}`;
+    }
+
     @gen(Enum)
     private _generateEnum(ast: Enum) {
         return `enum ${ast.name} {
-${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
+${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
+            ast.attributes.length > 0
+                ? '\n\n' + ast.attributes.map((x) => this.indent + this.generate(x)).join('\n')
+                : ''
+        }
 }`;
     }
 
@@ -126,7 +145,9 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 
     @gen(ConfigField)
     private _generateConfigField(ast: ConfigField) {
-        return `${ast.name} = ${this.generate(ast.value)}`;
+        const longestName = Math.max(...ast.$container.fields.map((x) => x.name.length));
+        const padding = ' '.repeat(longestName - ast.name.length + 1);
+        return `${ast.name}${padding}= ${this.generate(ast.value)}`;
     }
 
     @gen(ConfigArrayExpr)
@@ -154,15 +175,24 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 
     @gen(PluginField)
     private _generatePluginField(ast: PluginField) {
-        return `${ast.name} = ${this.generate(ast.value)}`;
+        const longestName = Math.max(...ast.$container.fields.map((x) => x.name.length));
+        const padding = ' '.repeat(longestName - ast.name.length + 1);
+        return `${ast.name}${padding}= ${this.generate(ast.value)}`;
     }
 
     @gen(DataModel)
     private _generateDataModel(ast: DataModel) {
-        return `${ast.isView ? 'view' : 'model'} ${ast.name}${
+        const comments = `${ast.comments.join('\n')}\n`;
+
+        return `${ast.comments.length > 0 ? comments : ''}${ast.isView ? 'view' : 'model'} ${ast.name}${
             ast.mixins.length > 0 ? ' mixes ' + ast.mixins.map((x) => x.$refText).join(', ') : ''
         } {
-${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
+${ast.fields
+    .map((x) => {
+        const comments = x.comments.map((c) => `${this.indent}${c}`).join('\n');
+        return (x.comments.length ? `${comments}\n` : '') + this.indent + this.generate(x);
+    })
+    .join('\n')}${
             ast.attributes.length > 0
                 ? '\n\n' + ast.attributes.map((x) => this.indent + this.generate(x)).join('\n')
                 : ''
@@ -172,7 +202,11 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(DataField)
     private _generateDataField(ast: DataField) {
-        return `${ast.name} ${this.fieldType(ast.type)}${
+        const longestFieldName = Math.max(...ast.$container.fields.map((f) => f.name.length));
+        const longestType = Math.max(...ast.$container.fields.map((f) => this.fieldType(f.type).length));
+        const paddingLeft = longestFieldName - ast.name.length;
+        const paddingRight = ast.attributes.length > 0 ? longestType - this.fieldType(ast.type).length : 0;
+        return `${ast.name}${' '.repeat(paddingLeft)} ${this.fieldType(ast.type)}${' '.repeat(paddingRight)}${
             ast.attributes.length > 0 ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ') : ''
         }`;
     }
@@ -226,7 +260,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(StringLiteral)
     private _generateLiteralExpr(ast: LiteralExpr) {
-        return this.options.quote === 'single' ? `'${ast.value}'` : `"${ast.value}"`;
+        return this.quotedStr(ast.value as string);
     }
 
     @gen(NumberLiteral)
@@ -269,7 +303,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(ReferenceArg)
     private _generateReferenceArg(ast: ReferenceArg) {
-        return `${ast.name}:${this.generate(ast.value)}`;
+        return `${ast.name}: ${this.generate(ast.value)}`;
     }
 
     @gen(MemberAccessExpr)

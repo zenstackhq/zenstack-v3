@@ -22,6 +22,7 @@ import {
     isLiteralExpr,
     isModel,
     isReferenceExpr,
+    isStringLiteral,
     isTypeDef,
 } from '../generated/ast';
 import {
@@ -419,13 +420,24 @@ function assignableToAttributeParam(
             // (design inherited from Prisma)
             const dstIsJson = attr.$container.type.type === 'Json' || hasAttribute(attr.$container, '@json');
             if (dstIsJson && attr.decl.ref?.name === '@default') {
-                if (isLiteralJsonString(arg.value)) {
-                    return success;
+                if (attr.$container.type.array) {
+                    if (isArrayExpr(arg.value) && arg.value.items.every((item) => isLiteralJsonString(item))) {
+                        return success;
+                    } else {
+                        return {
+                            result: false,
+                            error: 'expected an array of JSON string literals',
+                        };
+                    }
                 } else {
-                    return {
-                        result: false,
-                        error: 'expected a JSON string literal',
-                    };
+                    if (isLiteralJsonString(arg.value)) {
+                        return success;
+                    } else {
+                        return {
+                            result: false,
+                            error: 'expected a JSON string literal',
+                        };
+                    }
                 }
             }
             dstIsArray = attr.$container.type.array;
@@ -605,7 +617,7 @@ export function validateAttributeApplication(
 }
 
 function isLiteralJsonString(value: Expression) {
-    if (!isLiteralExpr(value) || typeof value.value !== 'string') {
+    if (!isStringLiteral(value)) {
         return false;
     }
     try {

@@ -63,4 +63,78 @@ model Foo {
             ),
         ).toResolveTruthy();
     });
+
+    it('correctly validates JSON array default values', async () => {
+        await expect(
+            createTestClient(
+                `
+model Foo {
+  id String @id @default(cuid())
+  data Json[] @default(null)
+}
+`,
+                { usePrismaPush: true, provider: 'postgresql' },
+            ),
+        ).rejects.toThrow('expected an array of JSON string literals');
+
+        await expect(
+            createTestClient(
+                `
+model Foo {
+  id String @id @default(cuid())
+  data Json[] @default([1, 2, 3])
+}
+`,
+                { usePrismaPush: true, provider: 'postgresql' },
+            ),
+        ).rejects.toThrow('expected an array of JSON string literals');
+
+        await expect(
+            createTestClient(
+                `
+model Foo {
+  id String @id @default(cuid())
+  data Json[] @default('[]')
+}
+`,
+                { usePrismaPush: true, provider: 'postgresql' },
+            ),
+        ).rejects.toThrow('expected an array of JSON string literals');
+
+        await expect(
+            createTestClient(
+                `
+model Foo {
+  id String @id @default(cuid())
+  data Json[] @default([])
+}
+`,
+                { usePrismaPush: true, provider: 'postgresql' },
+            ),
+        ).toResolveTruthy();
+
+        await expect(
+            createTestClient(
+                `
+model Foo {
+  id String @id @default(cuid())
+  data Json[] @default(['1', '2', '3'])
+}
+`,
+                { usePrismaPush: true, provider: 'postgresql' },
+            ),
+        ).toResolveTruthy();
+
+        await expect(
+            createTestClient(
+                `
+model Foo {
+  id String @id @default(cuid())
+  data Json[] @default(['"1"', '"2"', 'null'])
+}
+`,
+                { usePrismaPush: true, provider: 'postgresql' },
+            ),
+        ).toResolveTruthy();
+    });
 });

@@ -25,6 +25,7 @@ import {
     DataModel,
     Enum,
     EnumField,
+    isBinaryExpr,
     type ExpressionType,
     FunctionDecl,
     FunctionParam,
@@ -121,7 +122,13 @@ export class ZModelLinker extends DefaultLinker {
             const target = provider(reference.$refText);
             if (target) {
                 reference._ref = target;
-                reference._nodeDescription = this.descriptions.createDescription(target, target.name, document);
+                let targetName = reference.$refText;
+                if ('name' in target && typeof target.name === 'string') {
+                    targetName = target.name;
+                } else if ('binding' in target && typeof (target as { binding?: unknown }).binding === 'string') {
+                    targetName = (target as { binding: string }).binding;
+                }
+                reference._nodeDescription = this.descriptions.createDescription(target, targetName, document);
 
                 // Add the reference to the document's array of references
                 document.references.push(reference);
@@ -249,13 +256,24 @@ export class ZModelLinker extends DefaultLinker {
 
     private resolveReference(node: ReferenceExpr, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         this.resolveDefault(node, document, extraScopes);
+        const target = node.target.ref;
 
-        if (node.target.ref) {
-            // resolve type
-            if (node.target.ref.$type === EnumField) {
-                this.resolveToBuiltinTypeOrDecl(node, node.target.ref.$container);
-            } else {
-                this.resolveToDeclaredType(node, (node.target.ref as DataField | FunctionParam).type);
+        if (target) {
+            if (isBinaryExpr(target) && ['?', '!', '^'].includes(target.operator)) {
+                const collectionType = target.left.$resolvedType;
+                if (collectionType?.decl) {
+                    node.$resolvedType = {
+                        decl: collectionType.decl,
+                        array: false,
+                        nullable: collectionType.nullable,
+                    };
+                }
+            } else if (target.$type === EnumField) {
+                this.resolveToBuiltinTypeOrDecl(node, target.$container);
+            } else if (isDataField(target)) {
+                this.resolveToDeclaredType(node, target.type);
+            } else if (target.$type === FunctionParam && (target as FunctionParam).type) {
+                this.resolveToDeclaredType(node, (target as FunctionParam).type);
             }
         }
     }
@@ -506,6 +524,9 @@ export class ZModelLinker extends DefaultLinker {
     //#region Utils
 
     private resolveToDeclaredType(node: AstNode, type: FunctionParamType | DataFieldType) {
+        if (!type) {
+            return;
+        }
         let nullable = false;
         if (isDataFieldType(type)) {
             nullable = type.optional;

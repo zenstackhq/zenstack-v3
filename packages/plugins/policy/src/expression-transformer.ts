@@ -58,6 +58,8 @@ import {
     trueNode,
 } from './utils';
 
+type BindingScope = Record<string, { type: string; alias?: string; value?: any }>;
+
 /**
  * Context for transforming a policy expression
  */
@@ -91,6 +93,11 @@ export type ExpressionTransformerContext = {
      * The value object that fields should be evaluated against
      */
     contextValue?: Record<string, any>;
+
+    /**
+     * Additional named bindings available during transformation
+     */
+    scope?: BindingScope;
 
     /**
      * The model or type name that `this` keyword refers to
@@ -310,7 +317,11 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
             // LHS of the expression is evaluated as a value
             const evaluator = new ExpressionEvaluator();
-            const receiver = evaluator.evaluate(expr.left, { thisValue: context.contextValue, auth: this.auth });
+            const receiver = evaluator.evaluate(expr.left, {
+                thisValue: context.contextValue,
+                auth: this.auth,
+                scope: this.getEvaluationScope(context.scope),
+            });
 
             // get LHS's type
             const baseType = this.isAuthMember(expr.left) ? this.authType : context.modelOrType;
@@ -345,10 +356,18 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             }
         }
 
+        const bindingScope = expr.binding
+            ? {
+                  ...(context.scope ?? {}),
+                  [expr.binding]: { type: newContextModel, alias: context.alias ?? newContextModel },
+              }
+            : context.scope;
+
         let predicateFilter = this.transform(expr.right, {
             ...context,
             modelOrType: newContextModel,
             alias: undefined,
+            scope: bindingScope,
         });
 
         if (expr.op === '!') {
@@ -391,6 +410,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             const value = new ExpressionEvaluator().evaluate(expr, {
                 auth: this.auth,
                 thisValue: context.contextValue,
+                scope: this.getEvaluationScope(context.scope),
             });
             return this.transformValue(value, 'Boolean');
         } else {
@@ -402,15 +422,20 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             // e.g.: `auth().profiles[age == this.age]`, each `auth().profiles` element (which is a value)
             // is used to build an expression for the RHS `age == this.age`
             // the transformation happens recursively for nested collection predicates
-            const components = receiver.map((item) =>
-                this.transform(expr.right, {
+            const components = receiver.map((item) => {
+                const bindingScope = expr.binding
+                    ? { ...(context.scope ?? {}), [expr.binding]: { type: context.modelOrType, value: item } }
+                    : context.scope;
+
+                return this.transform(expr.right, {
                     operation: context.operation,
                     thisType: context.thisType,
                     thisAlias: context.thisAlias,
                     modelOrType: context.modelOrType,
                     contextValue: item,
-                }),
-            );
+                    scope: bindingScope,
+                });
+            });
 
             // compose the components based on the operator
             return (
@@ -600,6 +625,25 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     @expr('member')
     // @ts-ignore
     private _member(expr: MemberExpression, context: ExpressionTransformerContext) {
+        const bindingReceiver =
+            ExpressionUtils.isField(expr.receiver) && context.scope ? context.scope[expr.receiver.field] : undefined;
+
+        if (bindingReceiver) {
+            if (bindingReceiver.value !== undefined) {
+                return this.valueMemberAccess(bindingReceiver.value, expr, bindingReceiver.type);
+            }
+
+            const rewritten = ExpressionUtils.member(ExpressionUtils._this(), expr.members);
+            return this._member(rewritten, {
+                ...context,
+                modelOrType: bindingReceiver.type,
+                alias: bindingReceiver.alias ?? bindingReceiver.type,
+                thisType: bindingReceiver.type,
+                thisAlias: bindingReceiver.alias ?? bindingReceiver.type,
+                contextValue: bindingReceiver.value,
+            });
+        }
+
         // `auth()` member access
         if (this.isAuthCall(expr.receiver)) {
             return this.valueMemberAccess(this.auth, expr, this.authType);
@@ -831,6 +875,21 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         return this.buildDelegateBaseFieldSelect(context.modelOrType, tableName, column, fieldDef.originModel);
+    }
+
+    private getEvaluationScope(scope?: BindingScope) {
+        if (!scope) {
+            return undefined;
+        }
+
+        const result: Record<string, any> = {};
+        for (const [key, value] of Object.entries(scope)) {
+            if (value.value !== undefined) {
+                result[key] = value.value;
+            }
+        }
+
+        return Object.keys(result).length > 0 ? result : undefined;
     }
 
     private buildDelegateBaseFieldSelect(model: string, modelAlias: string, field: string, baseModel: string) {

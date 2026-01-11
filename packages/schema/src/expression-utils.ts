@@ -39,12 +39,13 @@ export const ExpressionUtils = {
         };
     },
 
-    binary: (left: Expression, op: BinaryOperator, right: Expression): BinaryExpression => {
+    binary: (left: Expression, op: BinaryOperator, right: Expression, binding?: string): BinaryExpression => {
         return {
             kind: 'binary',
             op,
             left,
             right,
+            binding,
         };
     },
 

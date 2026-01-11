@@ -41,6 +41,7 @@ export type BinaryExpression = {
     op: BinaryOperator;
     left: Expression;
     right: Expression;
+    binding?: string;
 };
 
 export type CallExpression = {

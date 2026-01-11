@@ -66,7 +66,7 @@ ConfigArrayExpr:
 ConfigExpr:
     LiteralExpr | InvocationExpr | ConfigArrayExpr;
 
-type ReferenceTarget = FunctionParam | DataField | EnumField;
+type ReferenceTarget = FunctionParam | DataField | EnumField | BinaryExpr;
 
 ThisExpr:
     value='this';
@@ -113,7 +113,7 @@ CollectionPredicateExpr infers Expression:
     MemberAccessExpr (
         {infer BinaryExpr.left=current}
         operator=('?'|'!'|'^')
-        '[' right=Expression ']'
+        '[' (binding=RegularID ',')? right=Expression ']'
     )*;
 
 InExpr infers Expression:

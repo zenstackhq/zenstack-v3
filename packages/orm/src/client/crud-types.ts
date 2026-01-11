@@ -214,7 +214,11 @@ export type ModelResult<
                     ModelFieldIsOptional<Schema, Model, Key>,
                     FieldIsArray<Schema, Model, Key>
                 >;
-            }
+            } & ('_count' extends keyof I
+                ? I['_count'] extends false | undefined
+                    ? {}
+                    : { _count: SelectCountResult<Schema, Model, I['_count']> }
+                : {})
           : Args extends { omit: infer O } & Record<string, unknown>
             ? DefaultModelResult<Schema, Model, O, Options, false, false>
             : DefaultModelResult<Schema, Model, undefined, Options, false, false>,

@@ -462,8 +462,7 @@ function assignableToAttributeParam(
             } else {
                 return {
                     result: false,
-                    error: `
-                    expected ${dstIsArray ? 'array' : 'non-array'}`,
+                    error: `expected ${dstIsArray ? 'array' : 'non-array'}`,
                 };
             }
         }

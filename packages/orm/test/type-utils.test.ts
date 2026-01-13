@@ -4,6 +4,8 @@ import type {
     FormatToTemplateLiteral,
     MapStringWithFormat,
 } from '../src/utils/type-utils';
+import type { CreateInput } from '../src/client/crud-types';
+import type { SchemaDef } from '../src/schema';
 
 describe('FormatToTemplateLiteral', () => {
     it('converts simple prefix format to template literal', () => {
@@ -137,5 +139,147 @@ describe('MapStringWithFormat', () => {
             args: readonly [{ kind: 'literal'; value: 4 }, { kind: 'literal'; value: '\\%s_%s' }];
         };
         expectTypeOf<MapStringWithFormat<UuidEscaped>>().toEqualTypeOf<`%s_${string}`>();
+    });
+});
+
+describe('CreateInput with prefixed ID', () => {
+    // Mock schema with a User model that has a prefixed ID
+    type TestSchema = SchemaDef & {
+        provider: { type: 'sqlite' };
+        models: {
+            User: {
+                name: 'User';
+                fields: {
+                    id: {
+                        name: 'id';
+                        type: 'String';
+                        id: true;
+                        default: {
+                            kind: 'call';
+                            function: 'uuid';
+                            args: readonly [
+                                { kind: 'literal'; value: 4 },
+                                { kind: 'literal'; value: 'user_%s' },
+                            ];
+                        };
+                    };
+                    name: {
+                        name: 'name';
+                        type: 'String';
+                    };
+                };
+                uniqueFields: { id: { type: 'String' } };
+                idFields: readonly ['id'];
+            };
+        };
+        enums: {};
+        plugins: {};
+    };
+
+    it('enforces template literal type for prefixed ID in create input', () => {
+        type UserCreateInput = CreateInput<TestSchema, 'User'>;
+
+        // The id field should accept template literal type
+        expectTypeOf<UserCreateInput['id']>().toEqualTypeOf<`user_${string}` | undefined>();
+    });
+
+    it('allows plain string for non-prefixed ID fields', () => {
+        // Schema with plain uuid (no format)
+        type PlainIdSchema = SchemaDef & {
+            provider: { type: 'sqlite' };
+            models: {
+                Post: {
+                    name: 'Post';
+                    fields: {
+                        id: {
+                            name: 'id';
+                            type: 'String';
+                            id: true;
+                            default: {
+                                kind: 'call';
+                                function: 'uuid';
+                                args: readonly [{ kind: 'literal'; value: 4 }];
+                            };
+                        };
+                        title: {
+                            name: 'title';
+                            type: 'String';
+                        };
+                    };
+                    uniqueFields: { id: { type: 'String' } };
+                    idFields: readonly ['id'];
+                };
+            };
+            enums: {};
+            plugins: {};
+        };
+
+        type PostCreateInput = CreateInput<PlainIdSchema, 'Post'>;
+
+        // The id field should accept plain string
+        expectTypeOf<PostCreateInput['id']>().toEqualTypeOf<string | undefined>();
+    });
+
+    it('enforces template literal for cuid with format', () => {
+        type CuidSchema = SchemaDef & {
+            provider: { type: 'sqlite' };
+            models: {
+                Comment: {
+                    name: 'Comment';
+                    fields: {
+                        id: {
+                            name: 'id';
+                            type: 'String';
+                            id: true;
+                            default: {
+                                kind: 'call';
+                                function: 'cuid';
+                                args: readonly [
+                                    { kind: 'literal'; value: 2 },
+                                    { kind: 'literal'; value: 'cmt_%s' },
+                                ];
+                            };
+                        };
+                    };
+                    uniqueFields: { id: { type: 'String' } };
+                    idFields: readonly ['id'];
+                };
+            };
+            enums: {};
+            plugins: {};
+        };
+
+        type CommentCreateInput = CreateInput<CuidSchema, 'Comment'>;
+        expectTypeOf<CommentCreateInput['id']>().toEqualTypeOf<`cmt_${string}` | undefined>();
+    });
+
+    it('enforces template literal for ulid with format (format is first arg)', () => {
+        type UlidSchema = SchemaDef & {
+            provider: { type: 'sqlite' };
+            models: {
+                Order: {
+                    name: 'Order';
+                    fields: {
+                        id: {
+                            name: 'id';
+                            type: 'String';
+                            id: true;
+                            default: {
+                                kind: 'call';
+                                function: 'ulid';
+                                args: readonly [{ kind: 'literal'; value: 'ord_%s' }];
+                            };
+                        };
+                    };
+                    uniqueFields: { id: { type: 'String' } };
+                    idFields: readonly ['id'];
+                };
+            };
+            enums: {};
+            plugins: {};
+        };
+
+        type OrderCreateInput = CreateInput<UlidSchema, 'Order'>;
+        expectTypeOf<OrderCreateInput['id']>().toEqualTypeOf<`ord_${string}` | undefined>();
     });
 });

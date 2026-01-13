@@ -95,9 +95,12 @@ export type UnwrapTuplePromises<T extends readonly unknown[]> = {
 /**
  * Converts a format string like "user_%s" to a template literal type like `user_${string}`.
  * Supports multiple %s placeholders: "pre_%s_mid_%s" -> `pre_${string}_mid_${string}`
+ * Handles escaped \%s which becomes literal %s: "\\%s_%s" -> `%s_${string}`
  */
 export type FormatToTemplateLiteral<F extends string> = F extends `${infer Prefix}%s${infer Suffix}`
-    ? `${Prefix}${string}${FormatToTemplateLiteral<Suffix>}`
+    ? Prefix extends `${infer P}\\`
+        ? `${P}%s${FormatToTemplateLiteral<Suffix>}` // Escaped \%s -> literal %s
+        : `${Prefix}${string}${FormatToTemplateLiteral<Suffix>}` // Unescaped %s -> ${string}
     : F;
 
 /**

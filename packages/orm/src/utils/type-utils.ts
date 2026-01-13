@@ -1,4 +1,5 @@
 import type Decimal from 'decimal.js';
+import type { IdGeneratorFunction } from '@zenstackhq/schema';
 import type { JsonObject, JsonValue } from '../common-types';
 
 export type Optional<T extends object, K extends keyof T = keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
@@ -88,3 +89,54 @@ export type OrUndefinedIf<T, Condition extends boolean> = Condition extends true
 export type UnwrapTuplePromises<T extends readonly unknown[]> = {
     [K in keyof T]: Awaited<T[K]>;
 };
+
+//#region Format string to template literal conversion
+
+/**
+ * Converts a format string like "user_%s" to a template literal type like `user_${string}`.
+ * Supports multiple %s placeholders: "pre_%s_mid_%s" -> `pre_${string}_mid_${string}`
+ */
+export type FormatToTemplateLiteral<F extends string> = F extends `${infer Prefix}%s${infer Suffix}`
+    ? `${Prefix}${string}${FormatToTemplateLiteral<Suffix>}`
+    : F;
+
+/**
+ * Extracts the format string from an ID generator call expression's args.
+ * For uuid/cuid/nanoid: format is in args[1]
+ * For ulid: format is in args[0]
+ */
+type ExtractFormatFromArgs<
+    Func extends string,
+    Args extends readonly unknown[],
+> = Func extends 'ulid'
+    ? Args extends readonly [{ kind: 'literal'; value: infer V }, ...unknown[]]
+        ? V extends string
+            ? V
+            : never
+        : never
+    : Args extends readonly [unknown, { kind: 'literal'; value: infer V }, ...unknown[]]
+      ? V extends string
+          ? V
+          : never
+      : never;
+
+/**
+ * Extracts the format string from a field's default expression if it's an ID generator call.
+ * Returns the format string if found, never otherwise.
+ */
+export type ExtractIdFormat<Default> = Default extends {
+    kind: 'call';
+    function: infer F extends IdGeneratorFunction;
+    args: infer A extends readonly unknown[];
+}
+    ? ExtractFormatFromArgs<F, A>
+    : never;
+
+/**
+ * Maps a String type to either a template literal (if format exists) or plain string.
+ */
+export type MapStringWithFormat<Default> = ExtractIdFormat<Default> extends never
+    ? string
+    : FormatToTemplateLiteral<ExtractIdFormat<Default>>;
+
+//#endregion

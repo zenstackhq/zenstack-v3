@@ -35,6 +35,7 @@ import type {
 import type {
     AtLeast,
     MapBaseType,
+    MapStringWithFormat,
     MaybePromise,
     NonEmptyArray,
     NullableIf,
@@ -970,14 +971,16 @@ type MapModelFieldType<
 
 type MapFieldDefType<
     Schema extends SchemaDef,
-    T extends Pick<FieldDef, 'type' | 'optional' | 'array'>,
+    T extends Pick<FieldDef, 'type' | 'optional' | 'array' | 'default'>,
     Partial extends boolean = false,
 > = WrapType<
     T['type'] extends GetEnums<Schema>
         ? keyof GetEnum<Schema, T['type']>
         : T['type'] extends GetTypeDefs<Schema>
           ? TypeDefResult<Schema, T['type'], Partial> & Record<string, unknown>
-          : MapBaseType<T['type']>,
+          : T['type'] extends 'String'
+            ? MapStringWithFormat<T['default']>
+            : MapBaseType<T['type']>,
     T['optional'],
     T['array']
 >;

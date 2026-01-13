@@ -1,3 +1,4 @@
+import { ID_GENERATOR_FUNCTIONS } from '@zenstackhq/schema';
 import { AstUtils, type AstNode, type ValidationAcceptor } from 'langium';
 import { match, P } from 'ts-pattern';
 import { ExpressionContext } from '../constants';
@@ -88,7 +89,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
             }
         }
 
-        if (['uuid', 'ulid', 'cuid', 'nanoid'].includes(funcDecl.name)) {
+        if (ID_GENERATOR_FUNCTIONS.includes(funcDecl.name as typeof ID_GENERATOR_FUNCTIONS[number])) {
             const formatParamIdx = funcDecl.params.findIndex((param) => param.name === 'format');
             const formatArg = getLiteral<string>(expr.args[formatParamIdx]?.value);
             if (

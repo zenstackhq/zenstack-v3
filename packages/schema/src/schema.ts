@@ -315,3 +315,13 @@ export type FieldIsDelegateDiscriminator<
 > = GetModelField<Schema, Model, Field>['isDiscriminator'] extends true ? true : false;
 
 //#endregion
+
+//#region Field defaults
+
+/**
+ * ID generator functions that support format strings (e.g., uuid(4, "user_%s"))
+ */
+export const ID_GENERATOR_FUNCTIONS = ['uuid', 'cuid', 'nanoid', 'ulid'] as const;
+export type IdGeneratorFunction = (typeof ID_GENERATOR_FUNCTIONS)[number];
+
+//#endregion

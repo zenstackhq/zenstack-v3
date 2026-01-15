@@ -12,7 +12,7 @@ import { watch } from 'chokidar';
 import ora, { type Ora } from 'ora';
 import { CliError } from '../cli-error';
 import * as corePlugins from '../plugins';
-import { getOutputPath, getPkgJsonConfig, getSchemaFile, loadSchemaDocument } from './action-utils';
+import { getOutputPath, getSchemaFile, loadSchemaDocument } from './action-utils';
 
 type Options = {
     schema?: string;

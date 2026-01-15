@@ -15,6 +15,7 @@ import express from 'express';
 import colors from 'colors';
 import { createJiti } from 'jiti';
 import { getVersion } from '../utils/version-utils';
+import cors from 'cors';
 
 type Options = {
     output?: string;
@@ -131,7 +132,9 @@ function createDialect(provider: string, databaseUrl: string, outputPath: string
 
 function startServer(client: ClientContract<any, any>, schema: any, options: Options) {
     const app = express();
-    app.use(express.json());
+    app.use(cors());
+    app.use(express.json({ limit: '5mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
     app.use(
         '/api/model',

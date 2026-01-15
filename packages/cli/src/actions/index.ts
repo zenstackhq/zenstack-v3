@@ -6,5 +6,6 @@ import { run as info } from './info';
 import { run as init } from './init';
 import { run as migrate } from './migrate';
 import { run as seed } from './seed';
+import { run as proxy } from './proxy';
 
-export { check, db, format, generate, info, init, migrate, seed };
+export { check, db, format, generate, info, init, migrate, seed, proxy };

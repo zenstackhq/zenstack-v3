@@ -12,7 +12,7 @@ import { watch } from 'chokidar';
 import ora, { type Ora } from 'ora';
 import { CliError } from '../cli-error';
 import * as corePlugins from '../plugins';
-import { getPkgJsonConfig, getSchemaFile, loadSchemaDocument } from './action-utils';
+import { getOutputPath, getPkgJsonConfig, getSchemaFile, loadSchemaDocument } from './action-utils';
 
 type Options = {
     schema?: string;
@@ -39,15 +39,16 @@ export async function run(options: Options) {
         const schemaExtensions = ZModelLanguageMetaData.fileExtensions;
 
         // Get real models file path (cuz its merged into single document -> we need use cst nodes)
-        const getRootModelWatchPaths = (model: Model) => new Set<string>(
-            (
-                model.declarations.filter(
-                    (v) =>
-                        v.$cstNode?.parent?.element.$type === 'Model' &&
-                        !!v.$cstNode.parent.element.$document?.uri?.fsPath,
-                ) as AbstractDeclaration[]
-            ).map((v) => v.$cstNode!.parent!.element.$document!.uri!.fsPath),
-        );
+        const getRootModelWatchPaths = (model: Model) =>
+            new Set<string>(
+                (
+                    model.declarations.filter(
+                        (v) =>
+                            v.$cstNode?.parent?.element.$type === 'Model' &&
+                            !!v.$cstNode.parent.element.$document?.uri?.fsPath,
+                    ) as AbstractDeclaration[]
+                ).map((v) => v.$cstNode!.parent!.element.$document!.uri!.fsPath),
+            );
 
         const watchedPaths = getRootModelWatchPaths(model);
 
@@ -64,40 +65,44 @@ export async function run(options: Options) {
         });
 
         // prevent save multiple files and run multiple times
-        const reGenerateSchema = singleDebounce(async () => {
-            if (logsEnabled) {
-                console.log('Got changes, run generation!');
-            }
-
-            try {
-                const newModel = await pureGenerate(options, true);
-                const allModelsPaths = getRootModelWatchPaths(newModel);
-                const newModelPaths = [...allModelsPaths].filter((at) => !watchedPaths.has(at));
-                const removeModelPaths = [...watchedPaths].filter((at) => !allModelsPaths.has(at));
-
-                if (newModelPaths.length) {
-                    if (logsEnabled) {
-                        const logPaths = newModelPaths.map((at) => `- ${at}`).join('\n');
-                        console.log(`Added file(s) to watch:\n${logPaths}`);
-                    }
-
-                    newModelPaths.forEach((at) => watchedPaths.add(at));
-                    watcher.add(newModelPaths);
+        const reGenerateSchema = singleDebounce(
+            async () => {
+                if (logsEnabled) {
+                    console.log('Got changes, run generation!');
                 }
 
-                if (removeModelPaths.length) {
-                    if (logsEnabled) {
-                        const logPaths = removeModelPaths.map((at) => `- ${at}`).join('\n');
-                        console.log(`Removed file(s) from watch:\n${logPaths}`);
+                try {
+                    const newModel = await pureGenerate(options, true);
+                    const allModelsPaths = getRootModelWatchPaths(newModel);
+                    const newModelPaths = [...allModelsPaths].filter((at) => !watchedPaths.has(at));
+                    const removeModelPaths = [...watchedPaths].filter((at) => !allModelsPaths.has(at));
+
+                    if (newModelPaths.length) {
+                        if (logsEnabled) {
+                            const logPaths = newModelPaths.map((at) => `- ${at}`).join('\n');
+                            console.log(`Added file(s) to watch:\n${logPaths}`);
+                        }
+
+                        newModelPaths.forEach((at) => watchedPaths.add(at));
+                        watcher.add(newModelPaths);
                     }
 
-                    removeModelPaths.forEach((at) => watchedPaths.delete(at));
-                    watcher.unwatch(removeModelPaths);
+                    if (removeModelPaths.length) {
+                        if (logsEnabled) {
+                            const logPaths = removeModelPaths.map((at) => `- ${at}`).join('\n');
+                            console.log(`Removed file(s) from watch:\n${logPaths}`);
+                        }
+
+                        removeModelPaths.forEach((at) => watchedPaths.delete(at));
+                        watcher.unwatch(removeModelPaths);
+                    }
+                } catch (e) {
+                    console.error(e);
                 }
-            } catch (e) {
-                console.error(e);
-            }
-        }, 500, true);
+            },
+            500,
+            true,
+        );
 
         watcher.on('unlink', (pathAt) => {
             if (logsEnabled) {
@@ -146,18 +151,6 @@ Check documentation: https://zenstack.dev/docs/`);
     }
 
     return model;
-}
-
-function getOutputPath(options: Options, schemaFile: string) {
-    if (options.output) {
-        return options.output;
-    }
-    const pkgJsonConfig = getPkgJsonConfig(process.cwd());
-    if (pkgJsonConfig.output) {
-        return pkgJsonConfig.output;
-    } else {
-        return path.dirname(schemaFile);
-    }
 }
 
 async function runPlugins(schemaFile: string, model: Model, outputPath: string, options: Options) {

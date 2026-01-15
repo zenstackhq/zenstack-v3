@@ -27,7 +27,7 @@ type Options = {
 
 export async function run(options: Options) {
     const schemaFile = getSchemaFile(options.schema);
-    console.log(colors.gray(`Loading ZModel schema from:: ${schemaFile}`));
+    console.log(colors.gray(`Loading ZModel schema from: ${schemaFile}`));
 
     let outputPath = getOutputPath(options, schemaFile);
 
@@ -75,7 +75,11 @@ export async function run(options: Options) {
     });
 
     // check whether the database is reachable
-    await db.$connect();
+    try {
+        await db.$connect();
+    } catch (err) {
+        throw new CliError(`Failed to connect to the database: ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     startServer(db, schemaModule.schema, options);
 }
@@ -83,11 +87,11 @@ export async function run(options: Options) {
 function evaluateUrl(value: string): string {
     // Create env helper function
     const env = (varName: string) => {
-        const value = process.env[varName];
-        if (!value) {
+        const envValue = process.env[varName];
+        if (!envValue) {
             throw new CliError(`Environment variable ${varName} is not set`);
         }
-        return value;
+        return envValue;
     };
 
     try {
@@ -161,7 +165,7 @@ function startServer(client: ClientContract<any, any>, schema: any, options: Opt
             console.log('\nZenStack proxy server closed');
         });
 
-        client.$disconnect();
+        await client.$disconnect();
         process.exit(0);
     });
 
@@ -169,7 +173,7 @@ function startServer(client: ClientContract<any, any>, schema: any, options: Opt
         server.close(() => {
             console.log('\nZenStack proxy server closed');
         });
-        client.$disconnect();
+        await client.$disconnect();
         process.exit(0);
     });
 }

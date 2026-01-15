@@ -63,7 +63,7 @@ describe('CLI migrate commands test', () => {
 
         // --applied
         runCli(`migrate resolve --applied ${migration}`, workDir);
-    });
+    },200000);
 
     it('should throw error when neither applied nor rolled-back is provided', () => {
         const workDir = createProject(model);

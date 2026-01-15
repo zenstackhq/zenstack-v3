@@ -4,8 +4,8 @@
     "scripts": {
         "generate": "zen generate --lite",
         "db:init": "pnpm generate && zen db push && npx tsx zenstack/seed.ts",
-        "dev": "next dev --port 3301",
-        "build": "pnpm generate && next build",
+        "dev": "next dev --webpack --port 3301",
+        "build": "pnpm generate && next build --webpack",
         "start": "next start",
         "lint": "eslint"
     },

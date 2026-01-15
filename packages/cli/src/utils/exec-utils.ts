@@ -7,9 +7,13 @@ import { fileURLToPath } from 'url';
 export function execSync(cmd: string, options?: Omit<ExecSyncOptions, 'env'> & { env?: Record<string, string> }): void {
     const { env, ...restOptions } = options ?? {};
     const mergedEnv = env ? { ...process.env, ...env } : undefined;
+
+    // In non-interactive environments (e.g. vitest, CI), some CLIs (including Prisma)
+    // may try to prompt and wait for stdin forever. Closing stdin avoids hangs.
+    const defaultStdio: ExecSyncOptions['stdio'] = process.stdin.isTTY ? 'inherit' : ['ignore', 'inherit', 'inherit'];
     _exec(cmd, {
         encoding: 'utf-8',
-        stdio: options?.stdio ?? 'inherit',
+        stdio: options?.stdio ?? defaultStdio,
         env: mergedEnv,
         ...restOptions,
     });

@@ -48,6 +48,13 @@
             "better-sqlite3",
             "esbuild",
             "vue-demi"
-        ]
+        ],
+        "packageExtensions": {
+            "@sveltejs/package@*": {
+                "dependencies": {
+                    "typescript": "^5.9.3"
+                }
+            }
+        }
     }
 }

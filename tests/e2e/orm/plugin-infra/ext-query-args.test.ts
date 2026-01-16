@@ -1,8 +1,8 @@
+import { CoreReadOperations, CoreWriteOperations, definePlugin, type ClientContract } from '@zenstackhq/orm';
 import { createTestClient } from '@zenstackhq/testtools';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { schema } from './ext-query-args/schema';
-import { CoreReadOperations, CoreWriteOperations, definePlugin, type ClientContract } from '@zenstackhq/orm';
 import z from 'zod';
+import { schema } from './ext-query-args/schema';
 
 describe('Plugin extended query args', () => {
     let db: ClientContract<typeof schema>;
@@ -32,9 +32,12 @@ describe('Plugin extended query args', () => {
         let gotTTL: number | undefined = undefined;
 
         const extDb = db.$use(
-            definePlugin<{
-                all: CacheOptions;
-            }>({
+            definePlugin<
+                typeof schema,
+                {
+                    all: CacheOptions;
+                }
+            >({
                 id: 'cache',
                 extQueryArgs: {
                     getValidationSchema: () => cacheSchema,
@@ -140,9 +143,12 @@ describe('Plugin extended query args', () => {
 
     it('should allow extending specific operations', async () => {
         const extDb = db.$use(
-            definePlugin<{
-                [Op in CoreReadOperations]: CacheOptions;
-            }>({
+            definePlugin<
+                typeof schema,
+                {
+                    [Op in CoreReadOperations]: CacheOptions;
+                }
+            >({
                 id: 'cache',
                 extQueryArgs: {
                     getValidationSchema: (operation) => {
@@ -171,6 +177,7 @@ describe('Plugin extended query args', () => {
 
         const extDb = db.$use(
             definePlugin<
+                typeof schema,
                 {
                     [Op in CoreReadOperations]: CacheOptions;
                 } & {

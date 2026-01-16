@@ -13,7 +13,7 @@ export type ExtQueryArgsBase = { [K in CoreCrudOperations | 'all']?: object };
 /**
  * ZenStack runtime plugin.
  */
-export type RuntimePlugin<ExtQueryArgs extends ExtQueryArgsBase = {}, Schema extends SchemaDef = SchemaDef> = {
+export type RuntimePlugin<Schema extends SchemaDef = SchemaDef, ExtQueryArgs extends ExtQueryArgsBase = {}> = {
     /**
      * Plugin ID.
      */
@@ -72,14 +72,10 @@ export type RuntimePlugin<ExtQueryArgs extends ExtQueryArgsBase = {}, Schema ext
 /**
  * Defines a ZenStack runtime plugin.
  */
-export function definePlugin<ExtQueryArgs extends ExtQueryArgsBase = {}, Schema extends SchemaDef = SchemaDef>(
-    plugin: RuntimePlugin<Exact<ExtQueryArgs, ExtQueryArgsBase>, Schema>,
-): RuntimePlugin<ExtQueryArgs, Schema>;
-
-export function definePlugin(pluginOrSchema: unknown, plugin?: unknown) {
-    // If plugin is provided, it's the second overload (schema, plugin)
-    // Otherwise, it's the first overload (plugin only)
-    return plugin ?? pluginOrSchema;
+export function definePlugin<Schema extends SchemaDef = SchemaDef, ExtQueryArgs extends ExtQueryArgsBase = {}>(
+    plugin: RuntimePlugin<Schema, Exact<ExtQueryArgs, ExtQueryArgsBase>>,
+): RuntimePlugin<Schema, ExtQueryArgs> {
+    return plugin;
 }
 
 // #region OnProcedure hooks

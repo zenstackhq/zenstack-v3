@@ -292,9 +292,9 @@ export class ClientImpl {
         await new SchemaDbPusher(this.schema, this.kysely).push();
     }
 
-    $use(plugin: RuntimePlugin<any>) {
+    $use(plugin: RuntimePlugin<any, any>) {
         // tsc perf
-        const newPlugins: RuntimePlugin<any>[] = [...(this.$options.plugins ?? []), plugin];
+        const newPlugins: RuntimePlugin<any, any>[] = [...(this.$options.plugins ?? []), plugin];
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
             plugins: newPlugins,
@@ -304,7 +304,7 @@ export class ClientImpl {
 
     $unuse(pluginId: string) {
         // tsc perf
-        const newPlugins: RuntimePlugin<any>[] = [];
+        const newPlugins: RuntimePlugin<any, any>[] = [];
         for (const plugin of this.options.plugins ?? []) {
             if (plugin.id !== pluginId) {
                 newPlugins.push(plugin);
@@ -321,7 +321,7 @@ export class ClientImpl {
         // tsc perf
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
-            plugins: [] as RuntimePlugin<any>[],
+            plugins: [] as RuntimePlugin<any, any>[],
         };
         return new ClientImpl(this.schema, newOptions, this);
     }

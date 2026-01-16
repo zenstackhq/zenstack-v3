@@ -42,7 +42,7 @@ import type {
 } from './crud-types';
 import type { CoreCrudOperations } from './crud/operations/base';
 import type { ClientOptions, QueryOptions, ToQueryOptions } from './options';
-import type { RuntimePlugin } from './plugin';
+import type { ExtQueryArgsBase, RuntimePlugin } from './plugin';
 import type { ZenStackPromise } from './promise';
 import type { ToKysely } from './query-builder';
 
@@ -178,8 +178,8 @@ export type ClientContract<
     /**
      * Returns a new client with the specified plugin installed.
      */
-    $use<PluginExtQueryArgs extends {}>(
-        plugin: RuntimePlugin<PluginExtQueryArgs>,
+    $use<PluginSchema extends SchemaDef = Schema, PluginExtQueryArgs extends ExtQueryArgsBase = {}>(
+        plugin: RuntimePlugin<PluginSchema, PluginExtQueryArgs>,
     ): ClientContract<Schema, Options, ExtQueryArgs & PluginExtQueryArgs>;
 
     /**

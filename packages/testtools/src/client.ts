@@ -5,7 +5,7 @@ import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import SQLite from 'better-sqlite3';
-import { glob } from 'glob';
+import { globSync } from 'glob';
 import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -177,7 +177,7 @@ export async function createTestClient(
             throw new Error('Unable to determine current test file path');
         }
         for (const { globPattern, destination } of options.copyFiles) {
-            const files = glob.sync(globPattern, { cwd: path.dirname(currentTestPath) });
+            const files = globSync(globPattern, { cwd: path.dirname(currentTestPath) });
             for (const file of files) {
                 const src = path.resolve(path.dirname(currentTestPath), file);
                 const dest = path.resolve(workDir, destination, path.basename(file));

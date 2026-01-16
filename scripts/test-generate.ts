@@ -1,4 +1,4 @@
-import { glob } from 'glob';
+import { globSync } from 'glob';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,7 @@ async function main() {
     const baseDir = process.argv[2] || '.';
     const options = process.argv.slice(3);
 
-    const zmodelFiles = [...glob.sync(path.resolve(baseDir, '**/schema.zmodel'), { ignore: '**/node_modules/**' })];
+    const zmodelFiles = [...globSync(path.resolve(baseDir, '**/schema.zmodel'), { ignore: '**/node_modules/**' })];
     for (const file of zmodelFiles) {
         console.log(
             `Generating TS schema for: ${file}${options.length > 0 ? ` with options: ${options.join(' ')}` : ''}`,

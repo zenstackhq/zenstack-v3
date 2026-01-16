@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import { glob } from 'glob';
+import { globSync } from 'glob';
 import * as path from 'node:path';
 import * as yaml from 'yaml';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +18,7 @@ function getWorkspacePackageJsonFiles(workspaceFile: string): string[] {
     // include all package.json files in the workspace
     const rootDir = path.dirname(workspaceFile);
     for (const pattern of workspace.packages) {
-        const matches = glob.sync(path.join(pattern, 'package.json'), {
+        const matches = globSync(path.join(pattern, 'package.json'), {
             cwd: rootDir,
             absolute: true,
         });

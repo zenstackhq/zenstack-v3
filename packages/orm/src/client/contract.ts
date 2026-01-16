@@ -146,6 +146,8 @@ export type ClientContract<
     /**
      * Returns a new client enabling/disabling input validations expressed with attributes like
      * `@email`, `@regex`, `@@validate`, etc.
+     *
+     * @deprecated Use {@link $setOptions} instead.
      */
     $setInputValidation(enable: boolean): ClientContract<Schema, Options, ExtQueryArgs>;
 

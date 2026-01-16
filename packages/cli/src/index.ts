@@ -196,7 +196,7 @@ Arguments following -- are passed to the seed script. E.g.: "zen db seed -- --us
         .description('Start the ZenStack proxy server')
         .addOption(schemaOption)
         .addOption(new Option('-p, --port <port>', 'port to run the proxy server on').default(8008))
-        .addOption(new Option('-o, --output <path>', 'output directory for generated client'))
+        .addOption(new Option('-o, --output <path>', 'output directory for `zen generate` command'))
         .addOption(new Option('-d, --databaseUrl <url>', 'database connection URL'))
         .addOption(new Option('-l, --logLevel <level>', 'Query log levels (e.g., query, error)'))
         .addOption(noVersionCheckOption)

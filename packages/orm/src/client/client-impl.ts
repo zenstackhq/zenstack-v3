@@ -13,7 +13,6 @@ import {
 import type { ProcedureDef, SchemaDef } from '../schema';
 import type { AnyKysely } from '../utils/kysely-utils';
 import type { UnwrapTuplePromises } from '../utils/type-utils';
-import type { ClientOptions, ProceduresOptions } from './options';
 import type {
     AuthType,
     ClientConstructor,
@@ -37,6 +36,7 @@ import { ZenStackDriver } from './executor/zenstack-driver';
 import { ZenStackQueryExecutor } from './executor/zenstack-query-executor';
 import * as BuiltinFunctions from './functions';
 import { SchemaDbPusher } from './helpers/schema-db-pusher';
+import type { ClientOptions, ProceduresOptions } from './options';
 import type { RuntimePlugin } from './plugin';
 import { createZenStackPromise, type ZenStackPromise } from './promise';
 import { ResultProcessor } from './result-processor';
@@ -59,6 +59,7 @@ export class ClientImpl {
     public readonly $schema: SchemaDef;
     readonly kyselyProps: KyselyProps;
     private auth: AuthType<SchemaDef> | undefined;
+    inputValidator: InputValidator<SchemaDef>;
 
     constructor(
         private readonly schema: SchemaDef,
@@ -114,6 +115,7 @@ export class ClientImpl {
         }
 
         this.kysely = new Kysely(this.kyselyProps);
+        this.inputValidator = baseClient?.inputValidator ?? new InputValidator(this as any);
 
         return createClientProxy(this);
     }
@@ -242,8 +244,7 @@ export class ClientImpl {
         }
 
         // Validate inputs using the same validator infrastructure as CRUD operations.
-        const inputValidator = new InputValidator(this as any);
-        const validatedInput = inputValidator.validateProcedureInput(name, input);
+        const validatedInput = this.inputValidator.validateProcedureInput(name, input);
 
         const handler = procOptions[name] as Function;
 
@@ -293,13 +294,16 @@ export class ClientImpl {
     }
 
     $use(plugin: RuntimePlugin<any, any>) {
-        // tsc perf
         const newPlugins: RuntimePlugin<any, any>[] = [...(this.$options.plugins ?? []), plugin];
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
             plugins: newPlugins,
         };
-        return new ClientImpl(this.schema, newOptions, this);
+        const newClient = new ClientImpl(this.schema, newOptions, this);
+        // create a new validator to have a fresh schema cache, because plugins may extend the
+        // query args schemas
+        newClient.inputValidator = new InputValidator(newClient as any);
+        return newClient;
     }
 
     $unuse(pluginId: string) {
@@ -314,7 +318,11 @@ export class ClientImpl {
             ...this.options,
             plugins: newPlugins,
         };
-        return new ClientImpl(this.schema, newOptions, this);
+        const newClient = new ClientImpl(this.schema, newOptions, this);
+        // create a new validator to have a fresh schema cache, because plugins may
+        // extend the query args schemas
+        newClient.inputValidator = new InputValidator(newClient as any);
+        return newClient;
     }
 
     $unuseAll() {
@@ -323,7 +331,11 @@ export class ClientImpl {
             ...this.options,
             plugins: [] as RuntimePlugin<any, any>[],
         };
-        return new ClientImpl(this.schema, newOptions, this);
+        const newClient = new ClientImpl(this.schema, newOptions, this);
+        // create a new validator to have a fresh schema cache, because plugins may
+        // extend the query args schemas
+        newClient.inputValidator = new InputValidator(newClient as any);
+        return newClient;
     }
 
     $setAuth(auth: AuthType<SchemaDef> | undefined) {
@@ -340,10 +352,10 @@ export class ClientImpl {
     }
 
     $setOptions<Options extends ClientOptions<SchemaDef>>(options: Options): ClientContract<SchemaDef, Options> {
-        return new ClientImpl(this.schema, options as ClientOptions<SchemaDef>, this) as unknown as ClientContract<
-            SchemaDef,
-            Options
-        >;
+        const newClient = new ClientImpl(this.schema, options as ClientOptions<SchemaDef>, this);
+        // create a new validator to have a fresh schema cache, because options may change validation settings
+        newClient.inputValidator = new InputValidator(newClient as any);
+        return newClient as unknown as ClientContract<SchemaDef, Options>;
     }
 
     $setInputValidation(enable: boolean) {
@@ -351,7 +363,7 @@ export class ClientImpl {
             ...this.options,
             validateInput: enable,
         };
-        return new ClientImpl(this.schema, newOptions, this);
+        return this.$setOptions(newOptions);
     }
 
     $executeRaw(query: TemplateStringsArray, ...values: any[]) {
@@ -391,7 +403,6 @@ export class ClientImpl {
 }
 
 function createClientProxy(client: ClientImpl): ClientImpl {
-    const inputValidator = new InputValidator(client as any);
     const resultProcessor = new ResultProcessor(client.$schema, client.$options);
 
     return new Proxy(client, {
@@ -403,7 +414,7 @@ function createClientProxy(client: ClientImpl): ClientImpl {
             if (typeof prop === 'string') {
                 const model = Object.keys(client.$schema.models).find((m) => m.toLowerCase() === prop.toLowerCase());
                 if (model) {
-                    return createModelCrudHandler(client as any, model, inputValidator, resultProcessor);
+                    return createModelCrudHandler(client as any, model, client.inputValidator, resultProcessor);
                 }
             }
 

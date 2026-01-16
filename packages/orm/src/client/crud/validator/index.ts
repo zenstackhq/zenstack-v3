@@ -56,11 +56,11 @@ import {
     addStringValidation,
 } from './utils';
 
-const schemaCache = new WeakMap<SchemaDef, Map<string, ZodType>>();
-
 type GetSchemaFunc<Schema extends SchemaDef> = (model: GetModels<Schema>) => ZodType;
 
 export class InputValidator<Schema extends SchemaDef> {
+    private readonly schemaCache = new Map<string, ZodType>();
+
     constructor(private readonly client: ClientContract<Schema>) {}
 
     private get schema() {
@@ -329,21 +329,11 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private getSchemaCache(cacheKey: string) {
-        let thisCache = schemaCache.get(this.schema);
-        if (!thisCache) {
-            thisCache = new Map<string, ZodType>();
-            schemaCache.set(this.schema, thisCache);
-        }
-        return thisCache.get(cacheKey);
+        return this.schemaCache.get(cacheKey);
     }
 
     private setSchemaCache(cacheKey: string, schema: ZodType) {
-        let thisCache = schemaCache.get(this.schema);
-        if (!thisCache) {
-            thisCache = new Map<string, ZodType>();
-            schemaCache.set(this.schema, thisCache);
-        }
-        return thisCache.set(cacheKey, schema);
+        return this.schemaCache.set(cacheKey, schema);
     }
 
     private validate<T>(model: GetModels<Schema>, operation: string, getSchema: GetSchemaFunc<Schema>, args: unknown) {

@@ -1,6 +1,6 @@
 import { CoreReadOperations, CoreWriteOperations, definePlugin, type ClientContract } from '@zenstackhq/orm';
 import { createTestClient } from '@zenstackhq/testtools';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import z from 'zod';
 import { schema } from './ext-query-args/schema';
 
@@ -26,6 +26,11 @@ describe('Plugin extended query args', () => {
 
     beforeEach(async () => {
         db = await createTestClient(schema);
+        await db.user.deleteMany();
+    });
+
+    afterEach(async () => {
+        await db?.$disconnect();
     });
 
     it('should allow extending all operations', async () => {
@@ -53,10 +58,10 @@ describe('Plugin extended query args', () => {
         );
 
         // cache is optional
-        await extDb.user.create({ data: { id: 1, name: 'Alice' } });
+        const alice = await extDb.user.create({ data: { name: 'Alice' } });
 
         // ttl is optional
-        await extDb.user.create({ data: { id: 2, name: 'Bob' }, cache: {} });
+        const bob = await extDb.user.create({ data: { name: 'Bob' }, cache: {} });
 
         gotTTL = undefined;
         await expect(extDb.user.findMany({ cache: { ttl: 5000 } })).toResolveWithLength(2);
@@ -113,7 +118,7 @@ describe('Plugin extended query args', () => {
 
         // update operations
         await expect(
-            extDb.user.update({ where: { id: 1 }, data: { name: 'Alice Updated' }, ...cacheOption }),
+            extDb.user.update({ where: { id: alice.id }, data: { name: 'Alice Updated' }, ...cacheOption }),
         ).toResolveTruthy();
         await expect(
             extDb.user.updateMany({ where: { name: 'Bob' }, data: { name: 'Bob Updated' }, ...cacheOption }),
@@ -135,7 +140,7 @@ describe('Plugin extended query args', () => {
         ).resolves.toMatchObject({ name: 'Eve' });
 
         // delete operations
-        await expect(extDb.user.delete({ where: { id: 2 }, ...cacheOption })).toResolveTruthy();
+        await expect(extDb.user.delete({ where: { id: bob.id }, ...cacheOption })).toResolveTruthy();
         await expect(extDb.user.deleteMany({ where: { name: 'David' }, ...cacheOption })).resolves.toHaveProperty(
             'count',
         );
@@ -223,5 +228,30 @@ describe('Plugin extended query args', () => {
         // bust extension is not applied to "findMany"
         // @ts-expect-error
         await expect(extDb.user.findMany({ cache: { bust: true } })).rejects.toThrow('Unrecognized key');
+    });
+
+    it('should isolate validation schemas between clients', async () => {
+        const extDb = db.$use(
+            definePlugin<
+                typeof schema,
+                {
+                    all: CacheOptions;
+                }
+            >({
+                id: 'cache',
+                extQueryArgs: {
+                    getValidationSchema: () => cacheSchema,
+                },
+            }),
+        );
+
+        // @ts-expect-error
+        await expect(db.user.findMany({ cache: { ttl: 1000 } })).rejects.toThrow('Unrecognized key');
+        await expect(extDb.user.findMany({ cache: { ttl: 1000 } })).toResolveWithLength(0);
+
+        // do it again to make sure cache is not shared
+        // @ts-expect-error
+        await expect(db.user.findMany({ cache: { ttl: 2000 } })).rejects.toThrow('Unrecognized key');
+        await expect(extDb.user.findMany({ cache: { ttl: 2000 } })).toResolveWithLength(0);
     });
 });

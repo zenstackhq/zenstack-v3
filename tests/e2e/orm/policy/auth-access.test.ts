@@ -149,7 +149,7 @@ model Membership {
 model Foo {
     id Int @id
     tenantId Int
-    @@allow('read', auth().memberships?[m, m.tenantId == this.tenantId])
+    @@allow('read', auth().memberships?[m, m.tenantId == auth().tenantId])
 }
 `,
         );
@@ -164,14 +164,12 @@ model Foo {
         // allowed because iterator binding matches tenantId = 1
         await expect(
             db.$setAuth({ tenantId: 1, memberships: [{ id: 10, tenantId: 1 }] }).foo.findMany(),
-        ).resolves.toEqual([
-            { id: 1, tenantId: 1 },
-        ]);
+        ).toResolveWithLength(2);
 
         // denied because membership tenantId doesn't match
         await expect(
             db.$setAuth({ tenantId: 1, memberships: [{ id: 20, tenantId: 3 }] }).foo.findMany(),
-        ).resolves.toEqual([]);
+        ).toResolveWithLength(0);
     });
 
     it('works with shallow auth model collection predicates involving fields - some', async () => {

@@ -24,11 +24,8 @@ import {
     DataFieldType,
     DataModel,
     Enum,
-    EnumField,
-    isBinaryExpr,
     type ExpressionType,
     FunctionDecl,
-    FunctionParam,
     FunctionParamType,
     InvocationExpr,
     LiteralExpr,
@@ -44,10 +41,13 @@ import {
     UnaryExpr,
     isArrayExpr,
     isBooleanLiteral,
+    isCollectionPredicateBinding,
     isDataField,
     isDataFieldType,
     isDataModel,
     isEnum,
+    isEnumField,
+    isFunctionParam,
     isNumberLiteral,
     isReferenceExpr,
     isStringLiteral,
@@ -122,13 +122,7 @@ export class ZModelLinker extends DefaultLinker {
             const target = provider(reference.$refText);
             if (target) {
                 reference._ref = target;
-                let targetName = reference.$refText;
-                if ('name' in target && typeof target.name === 'string') {
-                    targetName = target.name;
-                } else if ('binding' in target && typeof (target as { binding?: unknown }).binding === 'string') {
-                    targetName = (target as { binding: string }).binding;
-                }
-                reference._nodeDescription = this.descriptions.createDescription(target, targetName, document);
+                reference._nodeDescription = this.descriptions.createDescription(target, target.name, document);
 
                 // Add the reference to the document's array of references
                 document.references.push(reference);
@@ -259,21 +253,18 @@ export class ZModelLinker extends DefaultLinker {
         const target = node.target.ref;
 
         if (target) {
-            if (isBinaryExpr(target) && ['?', '!', '^'].includes(target.operator)) {
-                const collectionType = target.left.$resolvedType;
-                if (collectionType?.decl) {
-                    node.$resolvedType = {
-                        decl: collectionType.decl,
-                        array: false,
-                        nullable: collectionType.nullable,
-                    };
+            if (isCollectionPredicateBinding(target)) {
+                // collection predicate's binding is resolved to the element type of the collection
+                const collectionType = target.$container.left.$resolvedType;
+                if (collectionType) {
+                    node.$resolvedType = { ...collectionType, array: false };
                 }
-            } else if (target.$type === EnumField) {
+            } else if (isEnumField(target)) {
+                // enum field is resolved to its containing enum
                 this.resolveToBuiltinTypeOrDecl(node, target.$container);
-            } else if (isDataField(target)) {
+            } else if (isDataField(target) || isFunctionParam(target)) {
+                // other references are resolved to their declared type
                 this.resolveToDeclaredType(node, target.type);
-            } else if (target.$type === FunctionParam && (target as FunctionParam).type) {
-                this.resolveToDeclaredType(node, (target as FunctionParam).type);
             }
         }
     }

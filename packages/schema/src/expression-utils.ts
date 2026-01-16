@@ -2,6 +2,7 @@ import type {
     ArrayExpression,
     BinaryExpression,
     BinaryOperator,
+    BindingExpression,
     CallExpression,
     Expression,
     FieldExpression,
@@ -72,6 +73,13 @@ export const ExpressionUtils = {
         };
     },
 
+    binding: (name: string): BindingExpression => {
+        return {
+            kind: 'binding',
+            name,
+        };
+    },
+
     _this: (): ThisExpression => {
         return {
             kind: 'this',
@@ -117,6 +125,8 @@ export const ExpressionUtils = {
     isField: (value: unknown): value is FieldExpression => ExpressionUtils.is(value, 'field'),
 
     isMember: (value: unknown): value is MemberExpression => ExpressionUtils.is(value, 'member'),
+
+    isBinding: (value: unknown): value is BindingExpression => ExpressionUtils.is(value, 'binding'),
 
     getLiteralValue: (expr: Expression): string | number | boolean | undefined => {
         return ExpressionUtils.isLiteral(expr) ? expr.value : undefined;

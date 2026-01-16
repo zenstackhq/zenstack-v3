@@ -1,9 +1,9 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { match } from 'ts-pattern';
 import {
     ExpressionUtils,
     type ArrayExpression,
     type BinaryExpression,
+    type BindingExpression,
     type CallExpression,
     type Expression,
     type FieldExpression,
@@ -11,11 +11,13 @@ import {
     type MemberExpression,
     type UnaryExpression,
 } from '@zenstackhq/orm/schema';
+import { match } from 'ts-pattern';
 
 type ExpressionEvaluatorContext = {
     auth?: any;
     thisValue?: any;
-    scope?: Record<string, any>;
+    // scope for resolving references to collection predicate bindings
+    bindingScope?: Record<string, any>;
 };
 
 /**
@@ -31,6 +33,7 @@ export class ExpressionEvaluator {
             .when(ExpressionUtils.isMember, (expr) => this.evaluateMember(expr, context))
             .when(ExpressionUtils.isUnary, (expr) => this.evaluateUnary(expr, context))
             .when(ExpressionUtils.isCall, (expr) => this.evaluateCall(expr, context))
+            .when(ExpressionUtils.isBinding, (expr) => this.evaluateBinding(expr, context))
             .when(ExpressionUtils.isThis, () => context.thisValue)
             .when(ExpressionUtils.isNull, () => null)
             .exhaustive();
@@ -65,8 +68,8 @@ export class ExpressionEvaluator {
     }
 
     private evaluateField(expr: FieldExpression, context: ExpressionEvaluatorContext): any {
-        if (context.scope && expr.field in context.scope) {
-            return context.scope[expr.field];
+        if (context.bindingScope && expr.field in context.bindingScope) {
+            return context.bindingScope[expr.field];
         }
         return context.thisValue?.[expr.field];
     }
@@ -122,9 +125,9 @@ export class ExpressionEvaluator {
                     this.evaluate(expr.right, {
                         ...context,
                         thisValue: item,
-                        scope: expr.binding
-                            ? { ...(context.scope ?? {}), [expr.binding]: item }
-                            : context.scope,
+                        bindingScope: expr.binding
+                            ? { ...(context.bindingScope ?? {}), [expr.binding]: item }
+                            : context.bindingScope,
                     }),
                 ),
             )
@@ -133,9 +136,9 @@ export class ExpressionEvaluator {
                     this.evaluate(expr.right, {
                         ...context,
                         thisValue: item,
-                        scope: expr.binding
-                            ? { ...(context.scope ?? {}), [expr.binding]: item }
-                            : context.scope,
+                        bindingScope: expr.binding
+                            ? { ...(context.bindingScope ?? {}), [expr.binding]: item }
+                            : context.bindingScope,
                     }),
                 ),
             )
@@ -146,12 +149,19 @@ export class ExpressionEvaluator {
                         this.evaluate(expr.right, {
                             ...context,
                             thisValue: item,
-                            scope: expr.binding
-                                ? { ...(context.scope ?? {}), [expr.binding]: item }
-                                : context.scope,
+                            bindingScope: expr.binding
+                                ? { ...(context.bindingScope ?? {}), [expr.binding]: item }
+                                : context.bindingScope,
                         }),
                     ),
             )
             .exhaustive();
+    }
+
+    private evaluateBinding(expr: BindingExpression, context: ExpressionEvaluatorContext): any {
+        if (!context.bindingScope || !(expr.name in context.bindingScope)) {
+            throw new Error(`Unresolved binding: ${expr.name}`);
+        }
+        return context.bindingScope[expr.name];
     }
 }

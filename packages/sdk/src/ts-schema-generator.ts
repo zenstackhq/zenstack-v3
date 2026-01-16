@@ -13,6 +13,7 @@ import {
     InvocationExpr,
     isArrayExpr,
     isBinaryExpr,
+    isCollectionPredicateBinding,
     isDataField,
     isDataModel,
     isDataSource,
@@ -1278,7 +1279,7 @@ export class TsSchemaGenerator {
         ];
 
         if (expr.binding) {
-            args.push(this.createLiteralNode(expr.binding));
+            args.push(this.createLiteralNode(expr.binding.name));
         }
 
         return this.createExpressionUtilsCall('binary', args);
@@ -1299,27 +1300,17 @@ export class TsSchemaGenerator {
 
     private createRefExpression(expr: ReferenceExpr): any {
         const target = expr.target.ref;
-        if (isDataField(target)) {
-            return this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]);
-        }
-
-        if (isEnumField(target)) {
-            return this.createLiteralExpression('StringLiteral', expr.target.$refText);
-        }
-
-        const refName =
-            target && 'name' in target && typeof (target as { name?: unknown }).name === 'string'
-                ? (target as { name: string }).name
-                : isBinaryExpr(target) && typeof target.binding === 'string'
-                  ? target.binding
-                  : undefined;
-
-        if (refName) {
-            return this.createExpressionUtilsCall('field', [this.createLiteralNode(refName)]);
-        }
-
-        // Fallback: treat unknown reference targets (e.g. unresolved iterator bindings) as named fields
-        return this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]);
+        return match(target)
+            .when(isDataField, () =>
+                this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]),
+            )
+            .when(isEnumField, () => this.createLiteralExpression('StringLiteral', expr.target.$refText))
+            .when(isCollectionPredicateBinding, () =>
+                this.createExpressionUtilsCall('binding', [this.createLiteralNode(expr.target.$refText)]),
+            )
+            .otherwise(() => {
+                throw Error(`Unsupported reference type: ${expr.target.$refText}`);
+            });
     }
 
     private createCallExpression(expr: InvocationExpr) {

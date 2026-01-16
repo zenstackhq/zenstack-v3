@@ -353,20 +353,10 @@ export class PrismaSchemaGenerator {
                 new Array(...node.items.map((item) => this.makeAttributeArgValue(item))),
             );
         } else if (isReferenceExpr(node)) {
-            const ref = node.target.ref!;
-            const refName =
-                ('name' in ref && typeof (ref as { name?: unknown }).name === 'string')
-                    ? (ref as { name: string }).name
-                    : isBinaryExpr(ref) && typeof ref.binding === 'string'
-                      ? ref.binding
-                      : undefined;
-            if (!refName) {
-                throw Error(`Unsupported reference expression target: ${ref.$type}`);
-            }
             return new PrismaAttributeArgValue(
                 'FieldReference',
                 new PrismaFieldReference(
-                    refName,
+                    node.target.ref!.name,
                     node.args.map((arg) => new PrismaFieldReferenceArg(arg.name, this.exprToText(arg.value))),
                 ),
             );

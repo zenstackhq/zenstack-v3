@@ -310,6 +310,9 @@ function evalExpression(data: any, expr: Expression): unknown {
         .with({ kind: 'call' }, (e) => evalCall(data, e))
         .with({ kind: 'this' }, () => data ?? null)
         .with({ kind: 'null' }, () => null)
+        .with({ kind: 'binding' }, () => {
+            throw new Error('Binding expression is not supported in validation expressions');
+        })
         .exhaustive();
 }
 

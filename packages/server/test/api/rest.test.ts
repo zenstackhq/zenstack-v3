@@ -420,6 +420,8 @@ describe('REST server tests', () => {
                 });
 
                 it('toplevel filtering', async () => {
+                    const now = new Date();
+                    const past = new Date(now.getTime() - 1);
                     await client.user.create({
                         data: {
                             myId: 'user1',
@@ -436,7 +438,7 @@ describe('REST server tests', () => {
                             myId: 'user2',
                             email: 'user2@abc.com',
                             posts: {
-                                create: { id: 2, title: 'Post2', viewCount: 1, published: true },
+                                create: { id: 2, title: 'Post2', viewCount: 1, published: true, publishedAt: now },
                             },
                         },
                     });
@@ -523,6 +525,38 @@ describe('REST server tests', () => {
                     });
                     expect(r.body.data).toHaveLength(0);
 
+                    r = await handler({
+                        method: 'get',
+                        path: '/user',
+                        query: { ['filter[email$between]']: ',user1@abc.com' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(1);
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/user',
+                        query: { ['filter[email$between]']: 'user1@abc.com,' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(0);
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/user',
+                        query: { ['filter[email$between]']: ',user2@abc.com' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(2);
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/user',
+                        query: { ['filter[email$between]']: 'user1@abc.com,user2@abc.com' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(2);
+
                     // Int filter
                     r = await handler({
                         method: 'get',
@@ -567,6 +601,58 @@ describe('REST server tests', () => {
                     });
                     expect(r.body.data).toHaveLength(1);
                     expect(r.body.data[0]).toMatchObject({ id: 1 });
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[viewCount$between]']: '1,2' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(1);
+                    expect(r.body.data[0]).toMatchObject({ id: 2 });
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[viewCount$between]']: '2,1' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(0);
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[viewCount$between]']: '0,2' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(2);
+
+                    // DateTime filter
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[publishedAt$between]']: `${now.toISOString()},${now.toISOString()}` },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(1);
+                    expect(r.body.data[0]).toMatchObject({ id: 2 });
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[publishedAt$between]']: `${past.toISOString()},${now.toISOString()}` },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(1);
+                    expect(r.body.data[0]).toMatchObject({ id: 2 });
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[publishedAt$between]']: `${now.toISOString()},${past.toISOString()}` },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(0);
 
                     // Boolean filter
                     r = await handler({

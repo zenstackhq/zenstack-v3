@@ -144,8 +144,6 @@ function startServer(client: ClientContract<any, any>, schema: any, options: Opt
         '/api/model',
         ZenStackMiddleware({
             apiHandler: new RPCApiHandler({ schema }),
-            // getSessionUser extracts the current session user from the request, its
-            // implementation depends on your auth solution
             getClient: () => client,
         }),
     );
@@ -156,7 +154,7 @@ function startServer(client: ClientContract<any, any>, schema: any, options: Opt
 
     const server = app.listen(options.port, () => {
         console.log(`ZenStack proxy server is running on port: ${options.port}`);
-        console.log(`ZenStack Studio is running at: ${colors.blue('https://studio.zenstack.dev')}`);
+        console.log(`You can visit ZenStack Studio at: ${colors.blue('https://studio.zenstack.dev')}`);
     });
 
     // Graceful shutdown

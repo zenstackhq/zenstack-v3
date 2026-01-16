@@ -192,6 +192,7 @@ Arguments following -- are passed to the seed script. E.g.: "zen db seed -- --us
 
     program
         .command('proxy')
+        .alias('studio')
         .description('Start the ZenStack proxy server')
         .addOption(schemaOption)
         .addOption(new Option('-p, --port <port>', 'port to run the proxy server on').default(8008))
@@ -238,7 +239,7 @@ async function main() {
 
     if (
         (program.args.includes('generate') && (program.args.includes('-w') || program.args.includes('--watch'))) ||
-        program.args.includes('proxy')
+        ['proxy', 'studio'].some((cmd) => program.args.includes(cmd))
     ) {
         // A "hack" way to prevent the process from terminating because we don't want to stop it.
         return;

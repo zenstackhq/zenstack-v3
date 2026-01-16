@@ -6,6 +6,7 @@ import {
     type BaseCrudDialect,
     type ClientContract,
     type CRUD_EXT,
+    type ZModelFunction,
 } from '@zenstackhq/orm';
 import type {
     BinaryExpression,
@@ -560,7 +561,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             // check plugins
             for (const plugin of this.clientOptions.plugins ?? []) {
                 if (plugin.functions?.[functionName]) {
-                    func = plugin.functions[functionName];
+                    func = plugin.functions[functionName] as unknown as ZModelFunction<Schema>;
                     break;
                 }
             }

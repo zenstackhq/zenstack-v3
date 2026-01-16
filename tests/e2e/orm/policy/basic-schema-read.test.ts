@@ -23,7 +23,7 @@ describe('Read policy tests', () => {
         });
 
         // anonymous auth context by default
-        const anonClient = client.$use(new PolicyPlugin<typeof schema>());
+        const anonClient = client.$use(new PolicyPlugin());
         await expect(anonClient.user.findFirst()).toResolveNull();
 
         const authClient = anonClient.$setAuth({

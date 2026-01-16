@@ -18,7 +18,8 @@
         "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/plugin-policy": "workspace:*",
         "better-sqlite3": "catalog:",
-        "kysely": "catalog:"
+        "kysely": "catalog:",
+        "zod": "catalog:"
     },
     "devDependencies": {
         "@types/better-sqlite3": "catalog:",

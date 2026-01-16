@@ -21,18 +21,13 @@ async function main() {
                 client.user.create({
                     data: { ...args },
                 }),
-            listPublicPosts: ({ client }) =>
-                client.post.findMany({
-                    where: {
-                        published: true,
-                    },
-                }),
+            listPublicPosts: ({}) => [],
         },
     }).$use({
         id: 'cost-logger',
         onQuery: async ({ model, operation, args, proceed }) => {
             const start = Date.now();
-            const result = await proceed(args);
+            const result = await proceed(args as any);
             console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
             return result;
         },
@@ -42,6 +37,8 @@ async function main() {
     await db.post.deleteMany();
     await db.profile.deleteMany();
     await db.user.deleteMany();
+
+    db.user.findMany({ where: { id: '1' } });
 
     // create users and some posts
     const user1 = await db.user.create({

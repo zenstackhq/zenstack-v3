@@ -25,7 +25,8 @@
         "kysely": "catalog:",
         "ulid": "^3.0.0",
         "uuid": "^11.0.5",
-        "cuid": "^3.0.0"
+        "cuid": "^3.0.0",
+        "zod": "catalog:"
     },
     "devDependencies": {
         "@zenstackhq/cli": "workspace:*",

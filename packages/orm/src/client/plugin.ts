@@ -2,7 +2,7 @@ import type { OperationNode, QueryId, QueryResult, RootOperationNode, UnknownRow
 import type { ZodObject } from 'zod';
 import type { ClientContract, ZModelFunction } from '.';
 import type { GetModels, SchemaDef } from '../schema';
-import type { Exact, MaybePromise } from '../utils/type-utils';
+import type { MaybePromise } from '../utils/type-utils';
 import type { AllCrudOperations, CoreCrudOperations } from './crud/operations/base';
 
 /**
@@ -13,7 +13,7 @@ export type ExtQueryArgsBase = { [K in CoreCrudOperations | 'all']?: object };
 /**
  * ZenStack runtime plugin.
  */
-export type RuntimePlugin<Schema extends SchemaDef = SchemaDef, ExtQueryArgs extends ExtQueryArgsBase = {}> = {
+export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef, _ExtQueryArgs extends ExtQueryArgsBase = {}> {
     /**
      * Plugin ID.
      */
@@ -55,25 +55,22 @@ export type RuntimePlugin<Schema extends SchemaDef = SchemaDef, ExtQueryArgs ext
      * Intercepts a Kysely query.
      */
     onKyselyQuery?: OnKyselyQueryCallback<Schema>;
-} & (keyof ExtQueryArgs extends never
-    ? {}
-    : {
-          /**
-           * Extended query args configuration.
-           */
-          extQueryArgs: {
-              /**
-               * Callback for getting a Zod schema to validate the extended query args for the given operation.
-               */
-              getValidationSchema: (operation: CoreCrudOperations) => ZodObject | undefined;
-          };
-      });
 
+    /**
+     * Extended query args configuration.
+     */
+    extQueryArgs?: {
+        /**
+         * Callback for getting a Zod schema to validate the extended query args for the given operation.
+         */
+        getValidationSchema: (operation: CoreCrudOperations) => ZodObject | undefined;
+    };
+}
 /**
  * Defines a ZenStack runtime plugin.
  */
 export function definePlugin<Schema extends SchemaDef = SchemaDef, ExtQueryArgs extends ExtQueryArgsBase = {}>(
-    plugin: RuntimePlugin<Schema, Exact<ExtQueryArgs, ExtQueryArgsBase>>,
+    plugin: RuntimePlugin<Schema, ExtQueryArgs>,
 ): RuntimePlugin<Schema, ExtQueryArgs> {
     return plugin;
 }

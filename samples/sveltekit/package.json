@@ -24,7 +24,7 @@
   "devDependencies": {
     "@sveltejs/adapter-auto": "^7.0.0",
     "@sveltejs/kit": "catalog:",
-    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@tailwindcss/vite": "^4.1.17",
     "@types/better-sqlite3": "catalog:",
     "@types/node": "catalog:",
@@ -33,9 +33,9 @@
     "svelte": "catalog:",
     "svelte-check": "^4.3.4",
     "tailwindcss": "^4.1.17",
-    "tsx": "^4.19.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6"
+    "vite": "^7.3.1"
   },
   "zenstack": {
     "schema": "./src/zenstack/schema.zmodel"

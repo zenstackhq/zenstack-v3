@@ -4,32 +4,32 @@ packages:
     - tests/**
 
 catalog:
-    '@tanstack/query-core': 5.90.2
-    '@tanstack/react-query': 5.90.2
-    '@tanstack/vue-query': 5.90.2
-    '@tanstack/svelte-query': 6.0.10
+    '@tanstack/query-core': ^5.90.17
+    '@tanstack/react-query': ^5.90.17
+    '@tanstack/vue-query': ^5.92.6
+    '@tanstack/svelte-query': ^6.0.15
     '@types/better-sqlite3': ^7.6.13
-    '@types/node': ^20.19.0
-    '@types/react': 19.2.0
-    '@types/react-dom': 19.2.0
+    '@types/node': ^25.0.9
+    '@types/react': ^19.2.8
+    '@types/react-dom': ^19.2.3
     '@types/tmp': ^0.2.6
-    better-sqlite3: ^12.5.0
+    better-sqlite3: ^12.6.0
     decimal.js: ^10.4.3
-    kysely: ~0.28.8
-    langium: 3.5.0
-    langium-cli: 3.5.0
-    next: 16.0.10
-    nuxt: 4.2.2
-    '@sveltejs/kit': 2.49.1
-    pg: ^8.13.1
+    kysely: ~0.28.9
+    langium: ^3.5.0
+    langium-cli: ^3.5.0
+    next: ^16.1.2
+    nuxt: ^4.2.2
+    '@sveltejs/kit': ^2.49.5
+    pg: ^8.17.1
     prisma: ^6.19.0
-    react: 19.2.0
-    react-dom: 19.2.0
+    react: ^19.2.3
+    react-dom: ^19.2.3
     sql.js: ^1.13.0
-    svelte: 5.45.6
-    tmp: ^0.2.3
-    ts-pattern: ^5.7.1
+    svelte: ^5.46.4
+    tmp: ^0.2.5
+    ts-pattern: ^5.9.0
     typescript: ^5.9.3
-    vue: 3.5.22
-    zod: ^4.0.0
-    zod-validation-error: ^4.0.1
+    vue: ^3.5.26
+    zod: ^4.3.5
+    zod-validation-error: ^5.0.0

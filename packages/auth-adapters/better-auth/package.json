@@ -41,12 +41,12 @@
         "ts-pattern": "catalog:"
     },
     "peerDependencies": {
-        "@better-auth/core": "^1.3.0",
-        "better-auth": "^1.3.0"
+        "@better-auth/core": "^1.4.13",
+        "better-auth": "^1.4.13"
     },
     "devDependencies": {
-        "@better-auth/core": "^1.3.0",
-        "better-auth": "^1.3.0",
+        "@better-auth/core": "^1.4.13",
+        "better-auth": "^1.4.13",
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*"

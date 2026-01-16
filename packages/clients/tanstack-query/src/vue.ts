@@ -13,6 +13,7 @@ import {
     type UseQueryOptions,
     type UseQueryReturnType,
 } from '@tanstack/vue-query';
+import type { MutationObserverOptions } from '@tanstack/query-core';
 import {
     createInvalidator,
     createOptimisticUpdater,
@@ -116,7 +117,7 @@ export type ModelInfiniteQueryOptions<T> = MaybeRefOrGetter<
 export type ModelInfiniteQueryResult<T> = UseInfiniteQueryReturnType<T, DefaultError> & { queryKey: Ref<QueryKey> };
 
 export type ModelMutationOptions<T, TArgs> = MaybeRefOrGetter<
-    Omit<UnwrapRef<UseMutationOptions<T, DefaultError, TArgs>>, 'mutationFn'> & ExtraMutationOptions
+    Omit<MutationObserverOptions<T, DefaultError, TArgs, unknown>, 'mutationFn'> & ExtraMutationOptions
 >;
 
 export type ModelMutationResult<T, TArgs> = UseMutationReturnType<T, DefaultError, TArgs, unknown>;
@@ -136,6 +137,12 @@ export type ModelMutationModelResult<
         options?: ModelMutationOptions<SimplifiedResult<Schema, Model, T, Options, false, Array>, T>,
     ): Promise<SimplifiedResult<Schema, Model, T, Options, false, Array>>;
 };
+
+type MutationLifecycleOptions<R, TArgs> = MutationObserverOptions<R, DefaultError, TArgs, unknown>;
+type ResolvedMutationOptions<R, TArgs> = MutationLifecycleOptions<R, TArgs> & ExtraMutationOptions;
+type MutationCallbackParams<R, TArgs, K extends 'onSuccess' | 'onMutate' | 'onSettled'> = Parameters<
+    NonNullable<MutationLifecycleOptions<R, TArgs>[K]>
+>;
 
 export type ClientHooks<Schema extends SchemaDef, Options extends QueryOptions<Schema> = QueryOptions<Schema>> = {
     [Model in GetModels<Schema> as `${Uncapitalize<Model>}`]: ModelQueryHooks<Schema, Model, Options>;
@@ -536,7 +543,7 @@ export function useInternalMutation<TArgs, R = any>(
     method: 'POST' | 'PUT' | 'DELETE',
     operation: string,
     options?: MaybeRefOrGetter<
-        Omit<UnwrapRef<UseMutationOptions<R, DefaultError, TArgs>>, 'mutationFn'> & ExtraMutationOptions
+        Omit<MutationLifecycleOptions<R, TArgs>, 'mutationFn'> & ExtraMutationOptions
     >,
 ) {
     const queryClient = useQueryClient();
@@ -558,18 +565,19 @@ export function useInternalMutation<TArgs, R = any>(
     };
 
     // reactive mutation options
-    const finalOptions = computed(() => {
-        const optionsValue = toValue(options);
-        const result = {
-            ...optionsValue,
+    const finalOptions = computed<ResolvedMutationOptions<R, TArgs>>(() => {
+        const optionsValue = toValue(options) as Partial<ResolvedMutationOptions<R, TArgs>> | undefined;
+        const userOptions = optionsValue ?? {};
+        const result: ResolvedMutationOptions<R, TArgs> = {
+            ...userOptions,
             mutationFn,
-        } as UnwrapRef<UseMutationOptions<R, DefaultError, TArgs>> & ExtraMutationOptions;
+        };
 
         if (model !== CUSTOM_PROC_ROUTE_NAME) {
             // not a custom procedure, set up optimistic update and invalidation
 
-            const invalidateQueries = optionsValue?.invalidateQueries !== false;
-            const optimisticUpdate = !!optionsValue?.optimisticUpdate;
+            const invalidateQueries = userOptions.invalidateQueries !== false;
+            const optimisticUpdate = !!userOptions.optimisticUpdate;
 
             if (!optimisticUpdate) {
                 if (invalidateQueries) {
@@ -582,10 +590,12 @@ export function useInternalMutation<TArgs, R = any>(
                         logging,
                     );
                     // execute invalidator prior to user-provided onSuccess
-                    result.onSuccess = async (...args) => {
+                    const userOnSuccess = result.onSuccess;
+                    result.onSuccess = async (
+                        ...args: MutationCallbackParams<R, TArgs, 'onSuccess'>
+                    ) => {
                         await invalidator(...args);
-                        const origOnSuccess: any = toValue(optionsValue?.onSuccess);
-                        await origOnSuccess?.(...args);
+                        await unref(userOnSuccess)?.(...args);
                     };
                 }
             } else {
@@ -599,13 +609,15 @@ export function useInternalMutation<TArgs, R = any>(
                 );
 
                 // optimistic update on mutate
-                const origOnMutate = result.onMutate;
-                result.onMutate = async (...args) => {
+                const userOnMutate = result.onMutate;
+                result.onMutate = async (
+                    ...args: MutationCallbackParams<R, TArgs, 'onMutate'>
+                ) => {
                     // execute optimistic updater prior to user-provided onMutate
                     await optimisticUpdater(...args);
 
                     // call user-provided onMutate
-                    return unref(origOnMutate)?.(...args);
+                    return unref(userOnMutate)?.(...args);
                 };
 
                 if (invalidateQueries) {
@@ -617,13 +629,15 @@ export function useInternalMutation<TArgs, R = any>(
                             invalidateQueriesMatchingPredicate(queryClient, predicate),
                         logging,
                     );
-                    const origOnSettled = result.onSettled;
-                    result.onSettled = async (...args) => {
+                    const userOnSettled = result.onSettled;
+                    result.onSettled = async (
+                        ...args: MutationCallbackParams<R, TArgs, 'onSettled'>
+                    ) => {
                         // execute invalidator prior to user-provided onSettled
                         await invalidator(...args);
 
                         // call user-provided onSettled
-                        return unref(origOnSettled)?.(...args);
+                        return unref(userOnSettled)?.(...args);
                     };
                 }
             }
@@ -632,7 +646,7 @@ export function useInternalMutation<TArgs, R = any>(
         return result;
     });
 
-    return useMutation(finalOptions);
+    return useMutation(() => finalOptions.value);
 }
 
 function useFetchOptions(options: MaybeRefOrGetter<QueryContext | undefined>) {

@@ -30,7 +30,7 @@
         "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/schema": "workspace:*",
         "decimal.js": "catalog:",
-        "superjson": "^2.2.3"
+        "superjson": "^2.2.6"
     },
     "devDependencies": {
         "@zenstackhq/eslint-config": "workspace:*",

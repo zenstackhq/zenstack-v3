@@ -15,5 +15,6 @@
     },
 
     // Use 'postCreateCommand' to run commands after the container is created.
-    "postCreateCommand": "pnpm install"
+    // "postCreateCommand": "pnpm install",
+    "postCreateCommand": "bash -lc 'set -euo pipefail; sudo npm -g i n; sudo n lts; hash -r; npm -g i npm@latest; corepack enable; corepack prepare pnpm@latest --activate; npm -g i typescript npm-check-updates; pnpm install'"
 }

@@ -19,7 +19,7 @@
         "pg": "catalog:"
     },
     "devDependencies": {
-        "@types/pg": "^8.15.6",
+        "@types/pg": "^8.16.0",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*"
     }

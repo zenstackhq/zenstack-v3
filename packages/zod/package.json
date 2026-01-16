@@ -34,7 +34,7 @@
     "devDependencies": {
         "@zenstackhq/eslint-config": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
-        "zod": "^4.1.0"
+        "zod": "^4.3.5"
     },
     "peerDependencies": {
         "zod": "catalog:"

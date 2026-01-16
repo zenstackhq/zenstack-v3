@@ -29,7 +29,7 @@
         "@types/react-dom": "catalog:",
         "@zenstackhq/cli": "workspace:*",
         "eslint": "^9",
-        "eslint-config-next": "16.0.1",
+        "eslint-config-next": "16.1.2",
         "tailwindcss": "^4",
         "typescript": "catalog:"
     }

@@ -1,14 +1,18 @@
-import type { BetterAuthOptions } from '@better-auth/core';
-import type { DBAdapter, DBAdapterDebugLogOption, Where } from '@better-auth/core/db/adapter';
-import { BetterAuthError } from '@better-auth/core/error';
+//import type { BetterAuthOptions } from '@better-auth/core';
+//import type { DBAdapter, DBAdapterDebugLogOption, Where } from '@better-auth/core/db/adapter';
+//import { BetterAuthError } from '@better-auth/core/error';
 import type { ClientContract, ModelOperations, UpdateInput } from '@zenstackhq/orm';
 import type { GetModels, SchemaDef } from '@zenstackhq/orm/schema';
+import { BetterAuthError } from 'better-auth';
+import type { BetterAuthOptions, DBAdapter, Where } from 'better-auth';
 import {
     createAdapterFactory,
     type AdapterFactoryCustomizeAdapterCreator,
     type AdapterFactoryOptions,
 } from 'better-auth/adapters';
+import type { DBAdapterDebugLogOption } from '@better-auth/core/db/adapter';
 import { generateSchema } from './schema-generator';
+
 
 /**
  * Options for the ZenStack adapter factory.

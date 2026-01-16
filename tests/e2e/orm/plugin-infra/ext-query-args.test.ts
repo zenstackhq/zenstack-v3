@@ -49,7 +49,7 @@ describe('Plugin extended query args', () => {
                 },
 
                 onQuery: async ({ args, proceed }) => {
-                    if ('cache' in args) {
+                    if (args && 'cache' in args) {
                         gotTTL = (args as CacheOptions).cache?.ttl;
                     }
                     return proceed(args);
@@ -218,7 +218,7 @@ describe('Plugin extended query args', () => {
                 },
 
                 onQuery: async ({ args, proceed }) => {
-                    if ('cache' in args) {
+                    if (args && 'cache' in args) {
                         gotTTL = (args as CacheOptions).cache?.ttl;
                         gotBust = (args as CacheBustOptions).cache?.bust;
                     }

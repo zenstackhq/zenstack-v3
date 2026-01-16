@@ -129,7 +129,7 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
     /**
      * The query arguments.
      */
-    args: object;
+    args: Record<string, unknown> | undefined;
 
     /**
      * The function to proceed with the original query.
@@ -137,7 +137,7 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
      *
      * @param args The query arguments.
      */
-    proceed: (args: unknown) => Promise<unknown>;
+    proceed: (args: Record<string, unknown> | undefined) => Promise<unknown>;
 
     /**
      * The ZenStack client that is performing the operation.

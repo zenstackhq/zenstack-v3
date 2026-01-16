@@ -1456,12 +1456,12 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeUpdateManyAndReturnSchema(model: string) {
-        let baseSchema: ZodObject = this.makeUpdateManySchema(model);
-        baseSchema = baseSchema.extend({
+        // plugin extended args schema is merged in `makeUpdateManySchema`
+        const baseSchema: ZodObject = this.makeUpdateManySchema(model);
+        let schema: ZodType = baseSchema.extend({
             select: this.makeSelectSchema(model).optional().nullable(),
             omit: this.makeOmitSchema(model).optional().nullable(),
         });
-        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'updateManyAndReturn');
         schema = this.refineForSelectOmitMutuallyExclusive(schema);
         return schema;
     }

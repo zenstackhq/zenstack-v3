@@ -21,13 +21,13 @@ import type {
     TransactionIsolationLevel,
 } from './contract';
 import { AggregateOperationHandler } from './crud/operations/aggregate';
-import type { AllCrudOperation, CoreCrudOperation } from './crud/operations/base';
+import type { AllCrudOperations, CoreCrudOperations } from './crud/operations/base';
 import { BaseOperationHandler } from './crud/operations/base';
 import { CountOperationHandler } from './crud/operations/count';
 import { CreateOperationHandler } from './crud/operations/create';
 import { DeleteOperationHandler } from './crud/operations/delete';
-import { FindOperationHandler } from './crud/operations/find';
 import { ExistsOperationHandler } from './crud/operations/exists';
+import { FindOperationHandler } from './crud/operations/find';
 import { GroupByOperationHandler } from './crud/operations/group-by';
 import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/validator';
@@ -59,6 +59,7 @@ export class ClientImpl {
     public readonly $schema: SchemaDef;
     readonly kyselyProps: KyselyProps;
     private auth: AuthType<SchemaDef> | undefined;
+    inputValidator: InputValidator<SchemaDef>;
 
     constructor(
         private readonly schema: SchemaDef,
@@ -114,6 +115,7 @@ export class ClientImpl {
         }
 
         this.kysely = new Kysely(this.kyselyProps);
+        this.inputValidator = baseClient?.inputValidator ?? new InputValidator(this as any);
 
         return createClientProxy(this);
     }
@@ -242,8 +244,7 @@ export class ClientImpl {
         }
 
         // Validate inputs using the same validator infrastructure as CRUD operations.
-        const inputValidator = new InputValidator(this as any);
-        const validatedInput = inputValidator.validateProcedureInput(name, input);
+        const validatedInput = this.inputValidator.validateProcedureInput(name, input);
 
         const handler = procOptions[name] as Function;
 
@@ -292,19 +293,22 @@ export class ClientImpl {
         await new SchemaDbPusher(this.schema, this.kysely).push();
     }
 
-    $use(plugin: RuntimePlugin<SchemaDef>) {
-        // tsc perf
-        const newPlugins: RuntimePlugin<SchemaDef>[] = [...(this.$options.plugins ?? []), plugin];
+    $use(plugin: RuntimePlugin<any, any>) {
+        const newPlugins: RuntimePlugin<any, any>[] = [...(this.$options.plugins ?? []), plugin];
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
             plugins: newPlugins,
         };
-        return new ClientImpl(this.schema, newOptions, this);
+        const newClient = new ClientImpl(this.schema, newOptions, this);
+        // create a new validator to have a fresh schema cache, because plugins may extend the
+        // query args schemas
+        newClient.inputValidator = new InputValidator(newClient as any);
+        return newClient;
     }
 
     $unuse(pluginId: string) {
         // tsc perf
-        const newPlugins: RuntimePlugin<SchemaDef>[] = [];
+        const newPlugins: RuntimePlugin<any, any>[] = [];
         for (const plugin of this.options.plugins ?? []) {
             if (plugin.id !== pluginId) {
                 newPlugins.push(plugin);
@@ -314,16 +318,24 @@ export class ClientImpl {
             ...this.options,
             plugins: newPlugins,
         };
-        return new ClientImpl(this.schema, newOptions, this);
+        const newClient = new ClientImpl(this.schema, newOptions, this);
+        // create a new validator to have a fresh schema cache, because plugins may
+        // extend the query args schemas
+        newClient.inputValidator = new InputValidator(newClient as any);
+        return newClient;
     }
 
     $unuseAll() {
         // tsc perf
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
-            plugins: [] as RuntimePlugin<SchemaDef>[],
+            plugins: [] as RuntimePlugin<any, any>[],
         };
-        return new ClientImpl(this.schema, newOptions, this);
+        const newClient = new ClientImpl(this.schema, newOptions, this);
+        // create a new validator to have a fresh schema cache, because plugins may
+        // extend the query args schemas
+        newClient.inputValidator = new InputValidator(newClient as any);
+        return newClient;
     }
 
     $setAuth(auth: AuthType<SchemaDef> | undefined) {
@@ -340,10 +352,10 @@ export class ClientImpl {
     }
 
     $setOptions<Options extends ClientOptions<SchemaDef>>(options: Options): ClientContract<SchemaDef, Options> {
-        return new ClientImpl(this.schema, options as ClientOptions<SchemaDef>, this) as unknown as ClientContract<
-            SchemaDef,
-            Options
-        >;
+        const newClient = new ClientImpl(this.schema, options as ClientOptions<SchemaDef>, this);
+        // create a new validator to have a fresh schema cache, because options may change validation settings
+        newClient.inputValidator = new InputValidator(newClient as any);
+        return newClient as unknown as ClientContract<SchemaDef, Options>;
     }
 
     $setInputValidation(enable: boolean) {
@@ -351,7 +363,7 @@ export class ClientImpl {
             ...this.options,
             validateInput: enable,
         };
-        return new ClientImpl(this.schema, newOptions, this);
+        return this.$setOptions(newOptions);
     }
 
     $executeRaw(query: TemplateStringsArray, ...values: any[]) {
@@ -391,7 +403,6 @@ export class ClientImpl {
 }
 
 function createClientProxy(client: ClientImpl): ClientImpl {
-    const inputValidator = new InputValidator(client as any);
     const resultProcessor = new ResultProcessor(client.$schema, client.$options);
 
     return new Proxy(client, {
@@ -403,7 +414,7 @@ function createClientProxy(client: ClientImpl): ClientImpl {
             if (typeof prop === 'string') {
                 const model = Object.keys(client.$schema.models).find((m) => m.toLowerCase() === prop.toLowerCase());
                 if (model) {
-                    return createModelCrudHandler(client as any, model, inputValidator, resultProcessor);
+                    return createModelCrudHandler(client as any, model, client.inputValidator, resultProcessor);
                 }
             }
 
@@ -419,8 +430,8 @@ function createModelCrudHandler(
     resultProcessor: ResultProcessor<any>,
 ): ModelOperations<any, any> {
     const createPromise = (
-        operation: CoreCrudOperation,
-        nominalOperation: AllCrudOperation,
+        operation: CoreCrudOperations,
+        nominalOperation: AllCrudOperations,
         args: unknown,
         handler: BaseOperationHandler<any>,
         postProcess = false,
@@ -448,8 +459,8 @@ function createModelCrudHandler(
                 const onQuery = plugin.onQuery;
                 if (onQuery) {
                     const _proceed = proceed;
-                    proceed = (_args: unknown) =>
-                        onQuery({
+                    proceed = (_args: unknown) => {
+                        const ctx: any = {
                             client,
                             model,
                             operation: nominalOperation,
@@ -457,7 +468,9 @@ function createModelCrudHandler(
                             args: _args,
                             // ensure inner overrides are propagated to the previous proceed
                             proceed: (nextArgs: unknown) => _proceed(nextArgs),
-                        }) as Promise<unknown>;
+                        };
+                        return (onQuery as (ctx: any) => Promise<unknown>)(ctx);
+                    };
                 }
             }
 
@@ -516,6 +529,7 @@ function createModelCrudHandler(
                 args,
                 new FindOperationHandler<any>(client, model, inputValidator),
                 true,
+                false,
             );
         },
 

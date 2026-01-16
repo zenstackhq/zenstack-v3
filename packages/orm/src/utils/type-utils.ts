@@ -88,3 +88,5 @@ export type OrUndefinedIf<T, Condition extends boolean> = Condition extends true
 export type UnwrapTuplePromises<T extends readonly unknown[]> = {
     [K in keyof T]: Awaited<T[K]>;
 };
+
+export type Exact<T, Shape> = T extends Shape ? (Exclude<keyof T, keyof Shape> extends never ? T : never) : never;

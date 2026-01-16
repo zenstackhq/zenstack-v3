@@ -907,7 +907,7 @@ describe('Client find tests ', () => {
                 // @ts-expect-error
                 include: { author: { where: { email: user.email } } },
             }),
-        ).rejects.toThrow(`Invalid find args`);
+        ).rejects.toThrow(`Invalid findFirst args`);
 
         // sorting
         let u = await client.user.findUniqueOrThrow({

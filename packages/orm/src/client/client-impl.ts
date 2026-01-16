@@ -13,6 +13,7 @@ import {
 import type { ProcedureDef, SchemaDef } from '../schema';
 import type { AnyKysely } from '../utils/kysely-utils';
 import type { UnwrapTuplePromises } from '../utils/type-utils';
+import type { ClientOptions, ProceduresOptions } from './options';
 import type {
     AuthType,
     ClientConstructor,
@@ -21,13 +22,13 @@ import type {
     TransactionIsolationLevel,
 } from './contract';
 import { AggregateOperationHandler } from './crud/operations/aggregate';
-import type { AllCrudOperation, CoreCrudOperation } from './crud/operations/base';
+import type { AllCrudOperations, CoreCrudOperations } from './crud/operations/base';
 import { BaseOperationHandler } from './crud/operations/base';
 import { CountOperationHandler } from './crud/operations/count';
 import { CreateOperationHandler } from './crud/operations/create';
 import { DeleteOperationHandler } from './crud/operations/delete';
-import { FindOperationHandler } from './crud/operations/find';
 import { ExistsOperationHandler } from './crud/operations/exists';
+import { FindOperationHandler } from './crud/operations/find';
 import { GroupByOperationHandler } from './crud/operations/group-by';
 import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/validator';
@@ -36,7 +37,6 @@ import { ZenStackDriver } from './executor/zenstack-driver';
 import { ZenStackQueryExecutor } from './executor/zenstack-query-executor';
 import * as BuiltinFunctions from './functions';
 import { SchemaDbPusher } from './helpers/schema-db-pusher';
-import type { ClientOptions, ProceduresOptions } from './options';
 import type { RuntimePlugin } from './plugin';
 import { createZenStackPromise, type ZenStackPromise } from './promise';
 import { ResultProcessor } from './result-processor';
@@ -292,9 +292,9 @@ export class ClientImpl {
         await new SchemaDbPusher(this.schema, this.kysely).push();
     }
 
-    $use<PluginId extends string>(plugin: RuntimePlugin<PluginId, SchemaDef>) {
+    $use(plugin: RuntimePlugin<any>) {
         // tsc perf
-        const newPlugins: RuntimePlugin<PluginId, SchemaDef>[] = [...(this.$options.plugins ?? []), plugin];
+        const newPlugins: RuntimePlugin<any>[] = [...(this.$options.plugins ?? []), plugin];
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
             plugins: newPlugins,
@@ -302,9 +302,9 @@ export class ClientImpl {
         return new ClientImpl(this.schema, newOptions, this);
     }
 
-    $unuse<PluginId extends string>(pluginId: PluginId) {
+    $unuse(pluginId: string) {
         // tsc perf
-        const newPlugins: RuntimePlugin<PluginId, SchemaDef>[] = [];
+        const newPlugins: RuntimePlugin<any>[] = [];
         for (const plugin of this.options.plugins ?? []) {
             if (plugin.id !== pluginId) {
                 newPlugins.push(plugin);
@@ -321,7 +321,7 @@ export class ClientImpl {
         // tsc perf
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
-            plugins: [] as RuntimePlugin<any, SchemaDef>[],
+            plugins: [] as RuntimePlugin<any>[],
         };
         return new ClientImpl(this.schema, newOptions, this);
     }
@@ -419,8 +419,8 @@ function createModelCrudHandler(
     resultProcessor: ResultProcessor<any>,
 ): ModelOperations<any, any> {
     const createPromise = (
-        operation: CoreCrudOperation,
-        nominalOperation: AllCrudOperation,
+        operation: CoreCrudOperations,
+        nominalOperation: AllCrudOperations,
         args: unknown,
         handler: BaseOperationHandler<any>,
         postProcess = false,

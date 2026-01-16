@@ -3,7 +3,7 @@ import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { check } from './functions';
 import { PolicyHandler } from './policy-handler';
 
-export class PolicyPlugin<Schema extends SchemaDef> implements RuntimePlugin<'policy', Schema> {
+export class PolicyPlugin implements RuntimePlugin {
     get id() {
         return 'policy' as const;
     }
@@ -22,8 +22,8 @@ export class PolicyPlugin<Schema extends SchemaDef> implements RuntimePlugin<'po
         };
     }
 
-    onKyselyQuery({ query, client, proceed }: OnKyselyQueryArgs<Schema>) {
-        const handler = new PolicyHandler<Schema>(client);
+    onKyselyQuery({ query, client, proceed }: OnKyselyQueryArgs<SchemaDef>) {
+        const handler = new PolicyHandler<SchemaDef>(client);
         return handler.handle(query, proceed);
     }
 }

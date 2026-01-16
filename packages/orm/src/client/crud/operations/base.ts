@@ -54,25 +54,90 @@ import { getCrudDialect } from '../dialects';
 import type { BaseCrudDialect } from '../dialects/base-dialect';
 import { InputValidator } from '../validator';
 
-export type CoreCrudOperation =
-    | 'findMany'
-    | 'findUnique'
-    | 'findFirst'
-    | 'create'
-    | 'createMany'
-    | 'createManyAndReturn'
-    | 'update'
-    | 'updateMany'
-    | 'updateManyAndReturn'
-    | 'upsert'
-    | 'delete'
-    | 'deleteMany'
-    | 'count'
-    | 'aggregate'
-    | 'groupBy'
-    | 'exists';
+/**
+ * List of core CRUD operations. It excludes the 'orThrow' variants.
+ */
+export const CoreCrudOperations = [
+    'findMany',
+    'findUnique',
+    'findFirst',
+    'create',
+    'createMany',
+    'createManyAndReturn',
+    'update',
+    'updateMany',
+    'updateManyAndReturn',
+    'upsert',
+    'delete',
+    'deleteMany',
+    'count',
+    'aggregate',
+    'groupBy',
+    'exists',
+] as const;
 
-export type AllCrudOperation = CoreCrudOperation | 'findUniqueOrThrow' | 'findFirstOrThrow';
+/**
+ * List of core CRUD operations. It excludes the 'orThrow' variants.
+ */
+export type CoreCrudOperations = (typeof CoreCrudOperations)[number];
+
+/**
+ * List of core read operations. It excludes the 'orThrow' variants.
+ */
+export const CoreReadOperations = [
+    'findMany',
+    'findUnique',
+    'findFirst',
+    'count',
+    'aggregate',
+    'groupBy',
+    'exists',
+] as const;
+
+/**
+ * List of core read operations. It excludes the 'orThrow' variants.
+ */
+export type CoreReadOperations = (typeof CoreReadOperations)[number];
+
+/**
+ * List of core write operations.
+ */
+export const CoreWriteOperations = [
+    'create',
+    'createMany',
+    'createManyAndReturn',
+    'update',
+    'updateMany',
+    'updateManyAndReturn',
+    'upsert',
+    'delete',
+    'deleteMany',
+] as const;
+
+/**
+ * List of core write operations.
+ */
+export type CoreWriteOperations = (typeof CoreWriteOperations)[number];
+
+/**
+ * List of all CRUD operations, including 'orThrow' variants.
+ */
+export const AllCrudOperations = [...CoreCrudOperations, 'findUniqueOrThrow', 'findFirstOrThrow'] as const;
+
+/**
+ * List of all CRUD operations, including 'orThrow' variants.
+ */
+export type AllCrudOperations = (typeof AllCrudOperations)[number];
+
+/**
+ * List of all read operations, including 'orThrow' variants.
+ */
+export const AllReadOperations = [...CoreReadOperations, 'findUniqueOrThrow', 'findFirstOrThrow'] as const;
+
+/**
+ * List of all read operations, including 'orThrow' variants.
+ */
+export type AllReadOperations = (typeof AllReadOperations)[number];
 
 // context for nested relation operations
 export type FromRelationContext = {
@@ -109,7 +174,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         return this.client.$qb;
     }
 
-    abstract handle(operation: CoreCrudOperation, args: any): Promise<unknown>;
+    abstract handle(operation: CoreCrudOperations, args: any): Promise<unknown>;
 
     withClient(client: ClientContract<Schema>) {
         return new (this.constructor as new (...args: any[]) => this)(client, this.model, this.inputValidator);

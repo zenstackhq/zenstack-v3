@@ -1,18 +1,23 @@
 import type { OperationNode, QueryId, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
-import type { ClientContract } from '.';
+import type { ZodObject } from 'zod';
+import type { ClientContract, ZModelFunction } from '.';
 import type { GetModels, SchemaDef } from '../schema';
-import type { MaybePromise } from '../utils/type-utils';
-import type { AllCrudOperation } from './crud/operations/base';
-import type { ZModelFunction } from './options';
+import type { Exact, MaybePromise } from '../utils/type-utils';
+import type { AllCrudOperations, CoreCrudOperations } from './crud/operations/base';
+
+/**
+ * Base shape of plugin-extended query args.
+ */
+export type ExtQueryArgsBase = { [K in CoreCrudOperations | 'all']?: object };
 
 /**
  * ZenStack runtime plugin.
  */
-export interface RuntimePlugin<PluginId extends string, Schema extends SchemaDef = SchemaDef, Options = never> {
+export type RuntimePlugin<ExtQueryArgs extends ExtQueryArgsBase = {}, Schema extends SchemaDef = SchemaDef> = {
     /**
      * Plugin ID.
      */
-    id: PluginId;
+    id: string;
 
     /**
      * Plugin display name.
@@ -34,7 +39,7 @@ export interface RuntimePlugin<PluginId extends string, Schema extends SchemaDef
     /**
      * Intercepts an ORM query.
      */
-    onQuery?: OnQueryCallback<Schema, Options>;
+    onQuery?: OnQueryCallback<Schema>;
 
     /**
      * Intercepts a procedure invocation.
@@ -50,18 +55,32 @@ export interface RuntimePlugin<PluginId extends string, Schema extends SchemaDef
      * Intercepts a Kysely query.
      */
     onKyselyQuery?: OnKyselyQueryCallback<Schema>;
-}
+} & (keyof ExtQueryArgs extends never
+    ? {}
+    : {
+          /**
+           * Extended query args configuration.
+           */
+          extQueryArgs: {
+              /**
+               * Callback for getting a Zod schema to validate the extended query args for the given operation.
+               */
+              getValidationSchema: (operation: CoreCrudOperations) => ZodObject | undefined;
+          };
+      });
 
 /**
  * Defines a ZenStack runtime plugin.
  */
-export function definePlugin<PluginId extends string, Schema extends SchemaDef = SchemaDef, Options = never>(
-    plugin: RuntimePlugin<PluginId, Schema, Options>,
-) {
-    return plugin;
-}
+export function definePlugin<ExtQueryArgs extends ExtQueryArgsBase = {}, Schema extends SchemaDef = SchemaDef>(
+    plugin: RuntimePlugin<Exact<ExtQueryArgs, ExtQueryArgsBase>, Schema>,
+): RuntimePlugin<ExtQueryArgs, Schema>;
 
-export { type CoreCrudOperation as CrudOperation } from './crud/operations/base';
+export function definePlugin(pluginOrSchema: unknown, plugin?: unknown) {
+    // If plugin is provided, it's the second overload (schema, plugin)
+    // Otherwise, it's the first overload (plugin only)
+    return plugin ?? pluginOrSchema;
+}
 
 // #region OnProcedure hooks
 
@@ -101,11 +120,9 @@ export type OnProcedureHookContext<Schema extends SchemaDef> = {
 
 // #region OnQuery hooks
 
-type OnQueryCallback<Schema extends SchemaDef, Options> = (
-    ctx: OnQueryHookContext<Schema, Options>,
-) => Promise<unknown>;
+type OnQueryCallback<Schema extends SchemaDef> = (ctx: OnQueryHookContext<Schema>) => Promise<unknown>;
 
-type OnQueryHookContext<Schema extends SchemaDef, Options = never> = {
+type OnQueryHookContext<Schema extends SchemaDef> = {
     /**
      * The model that is being queried.
      */
@@ -114,12 +131,12 @@ type OnQueryHookContext<Schema extends SchemaDef, Options = never> = {
     /**
      * The operation that is being performed.
      */
-    operation: AllCrudOperation;
+    operation: AllCrudOperations;
 
     /**
      * The query arguments.
      */
-    args: unknown;
+    args: object;
 
     /**
      * The function to proceed with the original query.
@@ -133,7 +150,7 @@ type OnQueryHookContext<Schema extends SchemaDef, Options = never> = {
      * The ZenStack client that is performing the operation.
      */
     client: ClientContract<Schema>;
-} & (Options extends never ? {} : { options: Options });
+};
 
 // #endregion
 

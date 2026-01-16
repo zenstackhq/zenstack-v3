@@ -425,7 +425,6 @@ function createModelCrudHandler(
         handler: BaseOperationHandler<any>,
         postProcess = false,
         throwIfNoResult = false,
-        pluginOptions?: unknown,
     ) => {
         return createZenStackPromise(async (txClient?: ClientContract<any>) => {
             let proceed = async (_args: unknown) => {
@@ -459,10 +458,6 @@ function createModelCrudHandler(
                             // ensure inner overrides are propagated to the previous proceed
                             proceed: (nextArgs: unknown) => _proceed(nextArgs),
                         };
-                        // Add plugin options to context if provided
-                        if (pluginOptions !== undefined) {
-                            ctx.options = pluginOptions;
-                        }
                         return (onQuery as (ctx: any) => Promise<unknown>)(ctx);
                     };
                 }
@@ -516,8 +511,7 @@ function createModelCrudHandler(
             );
         },
 
-        findMany: (...allArgs: unknown[]) => {
-            const [args, pluginOptions] = allArgs;
+        findMany: (args: unknown) => {
             return createPromise(
                 'findMany',
                 'findMany',
@@ -525,7 +519,6 @@ function createModelCrudHandler(
                 new FindOperationHandler<any>(client, model, inputValidator),
                 true,
                 false,
-                pluginOptions,
             );
         },
 

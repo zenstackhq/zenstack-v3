@@ -74,7 +74,7 @@ export enum TransactionIsolationLevel {
 export type ClientContract<
     Schema extends SchemaDef,
     Options extends ClientOptions<Schema> = ClientOptions<Schema>,
-    ExtQueryArgs = {},
+    ExtQueryArgs extends ExtQueryArgsBase = {},
 > = {
     /**
      * The schema definition.
@@ -132,7 +132,7 @@ export type ClientContract<
     /**
      * Sets the current user identity.
      */
-    $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema, Options>;
+    $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema, Options, ExtQueryArgs>;
 
     /**
      * Returns a new client with new options applied.
@@ -141,13 +141,13 @@ export type ClientContract<
      * const dbNoValidation = db.$setOptions({ ...db.$options, validateInput: false });
      * ```
      */
-    $setOptions<Options extends ClientOptions<Schema>>(options: Options): ClientContract<Schema, Options>;
+    $setOptions<Options extends ClientOptions<Schema>>(options: Options): ClientContract<Schema, Options, ExtQueryArgs>;
 
     /**
      * Returns a new client enabling/disabling input validations expressed with attributes like
      * `@email`, `@regex`, `@@validate`, etc.
      */
-    $setInputValidation(enable: boolean): ClientContract<Schema, Options>;
+    $setInputValidation(enable: boolean): ClientContract<Schema, Options, ExtQueryArgs>;
 
     /**
      * The Kysely query builder instance.
@@ -163,7 +163,7 @@ export type ClientContract<
      * Starts an interactive transaction.
      */
     $transaction<T>(
-        callback: (tx: Omit<ClientContract<Schema, Options>, TransactionUnsupportedMethods>) => Promise<T>,
+        callback: (tx: TransactionClientContract<Schema, Options, ExtQueryArgs>) => Promise<T>,
         options?: { isolationLevel?: TransactionIsolationLevel },
     ): Promise<T>;
 
@@ -185,7 +185,7 @@ export type ClientContract<
     /**
      * Returns a new client with the specified plugin removed.
      */
-    $unuse(pluginId: string): ClientContract<Schema, Options>;
+    $unuse(pluginId: string): ClientContract<Schema, Options, ExtQueryArgs>;
 
     /**
      * Returns a new client with all plugins removed.
@@ -219,10 +219,11 @@ export type ClientContract<
 /**
  * The contract for a client in a transaction.
  */
-export type TransactionClientContract<Schema extends SchemaDef, Options extends ClientOptions<Schema>> = Omit<
-    ClientContract<Schema, Options>,
-    TransactionUnsupportedMethods
->;
+export type TransactionClientContract<
+    Schema extends SchemaDef,
+    Options extends ClientOptions<Schema>,
+    ExtQueryArgs extends ExtQueryArgsBase,
+> = Omit<ClientContract<Schema, Options, ExtQueryArgs>, TransactionUnsupportedMethods>;
 
 export type ProcedureOperations<Schema extends SchemaDef> =
     Schema['procedures'] extends Record<string, ProcedureDef>

@@ -144,6 +144,22 @@ describe('Plugin extended query args', () => {
         await expect(extDb.user.deleteMany({ where: { name: 'David' }, ...cacheOption })).resolves.toHaveProperty(
             'count',
         );
+
+        // validate transaction
+        await extDb.$transaction(async (tx) => {
+            await expect(tx.user.findMany(cacheOption)).toResolveTruthy();
+        });
+
+        // validate $use
+        await expect(extDb.$use({ id: 'foo' }).user.findMany(cacheOption)).toResolveTruthy();
+
+        // validate $setOptions
+        await expect(
+            extDb.$setOptions({ ...extDb.$options, validateInput: false }).user.findMany(cacheOption),
+        ).toResolveTruthy();
+
+        // validate $setAuth
+        await expect(extDb.$setAuth({ id: 1 }).user.findMany(cacheOption)).toResolveTruthy();
     });
 
     it('should allow extending specific operations', async () => {

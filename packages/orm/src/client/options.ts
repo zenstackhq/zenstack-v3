@@ -4,7 +4,7 @@ import type { PrependParameter } from '../utils/type-utils';
 import type { ClientContract, CRUD_EXT } from './contract';
 import type { GetProcedureNames, ProcedureHandlerFunc } from './crud-types';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
-import type { RuntimePlugin } from './plugin';
+import type { AnyPlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
 
 export type ZModelFunctionContext<Schema extends SchemaDef> = {
@@ -59,7 +59,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
     /**
      * Plugins.
      */
-    plugins?: RuntimePlugin<any, any>[];
+    plugins?: AnyPlugin[];
 
     /**
      * Logging configuration.

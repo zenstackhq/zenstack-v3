@@ -3,7 +3,7 @@ import type { SchemaDef } from '@zenstackhq/orm/schema';
 import { check } from './functions';
 import { PolicyHandler } from './policy-handler';
 
-export class PolicyPlugin implements RuntimePlugin {
+export class PolicyPlugin implements RuntimePlugin<SchemaDef, {}, {}> {
     get id() {
         return 'policy' as const;
     }

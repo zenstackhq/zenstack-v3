@@ -35,6 +35,7 @@ import {
     type UpsertArgs,
 } from '../../crud-types';
 import { createInternalError, createInvalidInputError } from '../../errors';
+import type { AnyPlugin } from '../../plugin';
 import {
     fieldHasDefaultValue,
     getDiscriminatorField,
@@ -46,7 +47,13 @@ import {
     requireField,
     requireModel,
 } from '../../query-utils';
-import type { CoreCrudOperations } from '../operations/base';
+import {
+    CoreCreateOperations,
+    CoreDeleteOperations,
+    CoreReadOperations,
+    CoreUpdateOperations,
+    type CoreCrudOperations,
+} from '../operations/base';
 import {
     addBigIntValidation,
     addCustomValidation,
@@ -365,14 +372,61 @@ export class InputValidator<Schema extends SchemaDef> {
     private mergePluginArgsSchema(schema: ZodObject, operation: CoreCrudOperations) {
         let result = schema;
         for (const plugin of this.options.plugins ?? []) {
-            if (plugin.extQueryArgs) {
-                const pluginSchema = plugin.extQueryArgs.getValidationSchema(operation);
+            if (plugin.queryArgs) {
+                const pluginSchema = this.getPluginExtQueryArgsSchema(plugin, operation);
                 if (pluginSchema) {
                     result = result.extend(pluginSchema.shape);
                 }
             }
         }
         return result.strict();
+    }
+
+    private getPluginExtQueryArgsSchema(plugin: AnyPlugin, operation: string): ZodObject | undefined {
+        if (!plugin.queryArgs) {
+            return undefined;
+        }
+
+        let result: ZodType | undefined;
+
+        if (operation in plugin.queryArgs && plugin.queryArgs[operation]) {
+            // most specific operation takes highest precedence
+            result = plugin.queryArgs[operation];
+        } else if (
+            // then comes grouped operations: $create, $read, $update, $delete
+            CoreCreateOperations.includes(operation as CoreCreateOperations) &&
+            '$create' in plugin.queryArgs &&
+            plugin.queryArgs['$create']
+        ) {
+            result = plugin.queryArgs['$create'];
+        } else if (
+            CoreReadOperations.includes(operation as CoreReadOperations) &&
+            '$read' in plugin.queryArgs &&
+            plugin.queryArgs['$read']
+        ) {
+            result = plugin.queryArgs['$read'];
+        } else if (
+            CoreUpdateOperations.includes(operation as CoreUpdateOperations) &&
+            '$update' in plugin.queryArgs &&
+            plugin.queryArgs['$update']
+        ) {
+            result = plugin.queryArgs['$update'];
+        } else if (
+            CoreDeleteOperations.includes(operation as CoreDeleteOperations) &&
+            '$delete' in plugin.queryArgs &&
+            plugin.queryArgs['$delete']
+        ) {
+            result = plugin.queryArgs['$delete'];
+        } else if ('$all' in plugin.queryArgs && plugin.queryArgs['$all']) {
+            // finally comes $all
+            result = plugin.queryArgs['$all'];
+        }
+
+        invariant(
+            result === undefined || result instanceof z.ZodObject,
+            'Plugin extended query args schema must be a Zod object',
+        );
+        return result;
     }
 
     // #region Find

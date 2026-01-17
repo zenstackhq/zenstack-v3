@@ -6,8 +6,11 @@ export { BaseCrudDialect } from './crud/dialects/base-dialect';
 export {
     AllCrudOperations,
     AllReadOperations,
+    CoreCreateOperations,
     CoreCrudOperations,
+    CoreDeleteOperations,
     CoreReadOperations,
+    CoreUpdateOperations,
     CoreWriteOperations,
 } from './crud/operations/base';
 export { InputValidator } from './crud/validator';

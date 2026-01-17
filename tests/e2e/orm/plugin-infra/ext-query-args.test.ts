@@ -1,4 +1,4 @@
-import { CoreReadOperations, CoreWriteOperations, definePlugin, type ClientContract } from '@zenstackhq/orm';
+import { definePlugin, type ClientContract } from '@zenstackhq/orm';
 import { createTestClient } from '@zenstackhq/testtools';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import z from 'zod';
@@ -16,13 +16,15 @@ describe('Plugin extended query args', () => {
     });
 
     const cacheBustSchema = z.object({
-        cache: z.strictObject({
-            bust: z.boolean().optional(),
-        }),
+        cache: z
+            .strictObject({
+                bust: z.boolean().optional(),
+            })
+            .optional(),
     });
+    ``;
 
     type CacheOptions = z.infer<typeof cacheSchema>;
-    type CacheBustOptions = z.infer<typeof cacheBustSchema>;
 
     beforeEach(async () => {
         db = await createTestClient(schema);
@@ -33,34 +35,32 @@ describe('Plugin extended query args', () => {
         await db?.$disconnect();
     });
 
-    it('should allow extending all operations', async () => {
+    it('should allow extending grouped operations', async () => {
         let gotTTL: number | undefined = undefined;
 
-        const extDb = db.$use(
-            definePlugin<
-                typeof schema,
-                {
-                    all: CacheOptions;
-                }
-            >({
-                id: 'cache',
-                extQueryArgs: {
-                    getValidationSchema: () => cacheSchema,
-                },
+        const cachePlugin = definePlugin({
+            id: 'cache',
+            queryArgs: {
+                $read: cacheSchema,
+                $create: cacheBustSchema,
+                $update: cacheBustSchema,
+                $delete: cacheBustSchema,
+            },
 
-                onQuery: async ({ args, proceed }) => {
-                    if (args && 'cache' in args) {
-                        gotTTL = (args as CacheOptions).cache?.ttl;
-                    }
-                    return proceed(args);
-                },
-            }),
-        );
+            onQuery: async ({ args, proceed }) => {
+                if (args && 'cache' in args) {
+                    gotTTL = (args as CacheOptions).cache?.ttl;
+                }
+                return proceed(args);
+            },
+        });
+
+        const extDb = db.$use(cachePlugin);
 
         // cache is optional
         const alice = await extDb.user.create({ data: { name: 'Alice' } });
 
-        // ttl is optional
+        // bust is optional
         const bob = await extDb.user.create({ data: { name: 'Bob' }, cache: {} });
 
         gotTTL = undefined;
@@ -81,9 +81,20 @@ describe('Plugin extended query args', () => {
         // @ts-expect-error
         await expect(extDb.user.findMany({ where: { id: 'abc' } })).rejects.toThrow('expected number');
 
+        // read args are not allowed in create
+        // @ts-expect-error
+        await expect(extDb.user.create({ data: { name: 'Charlie' }, cache: { ttl: 1000 } })).rejects.toThrow(
+            'Unrecognized key',
+        );
+
+        // create args are not allowed in read
+        // @ts-expect-error
+        await expect(extDb.user.findMany({ cache: { bust: true } })).rejects.toThrow('Unrecognized key');
+
         // validate all other operations
 
         const cacheOption = { cache: { ttl: 1000 } } as const;
+        const cacheBustOption = { cache: { bust: true } } as const;
 
         // read operations
         await expect(extDb.user.findUnique({ where: { id: 1 }, ...cacheOption })).toResolveTruthy();
@@ -109,25 +120,25 @@ describe('Plugin extended query args', () => {
         ).resolves.toHaveLength(2);
 
         // create operations
-        await expect(extDb.user.createMany({ data: [{ name: 'Charlie' }], ...cacheOption })).resolves.toHaveProperty(
-            'count',
-        );
-        await expect(extDb.user.createManyAndReturn({ data: [{ name: 'David' }], ...cacheOption })).toResolveWithLength(
-            1,
-        );
+        await expect(
+            extDb.user.createMany({ data: [{ name: 'Charlie' }], ...cacheBustOption }),
+        ).resolves.toHaveProperty('count');
+        await expect(
+            extDb.user.createManyAndReturn({ data: [{ name: 'David' }], ...cacheBustOption }),
+        ).toResolveWithLength(1);
 
         // update operations
         await expect(
-            extDb.user.update({ where: { id: alice.id }, data: { name: 'Alice Updated' }, ...cacheOption }),
+            extDb.user.update({ where: { id: alice.id }, data: { name: 'Alice Updated' }, ...cacheBustOption }),
         ).toResolveTruthy();
         await expect(
-            extDb.user.updateMany({ where: { name: 'Bob' }, data: { name: 'Bob Updated' }, ...cacheOption }),
+            extDb.user.updateMany({ where: { name: 'Bob' }, data: { name: 'Bob Updated' }, ...cacheBustOption }),
         ).resolves.toHaveProperty('count');
         await expect(
             extDb.user.updateManyAndReturn({
                 where: { name: 'Charlie' },
                 data: { name: 'Charlie Updated' },
-                ...cacheOption,
+                ...cacheBustOption,
             }),
         ).toResolveTruthy();
         await expect(
@@ -135,13 +146,13 @@ describe('Plugin extended query args', () => {
                 where: { id: 999 },
                 create: { name: 'Eve' },
                 update: { name: 'Eve Updated' },
-                ...cacheOption,
+                ...cacheBustOption,
             }),
         ).resolves.toMatchObject({ name: 'Eve' });
 
         // delete operations
-        await expect(extDb.user.delete({ where: { id: bob.id }, ...cacheOption })).toResolveTruthy();
-        await expect(extDb.user.deleteMany({ where: { name: 'David' }, ...cacheOption })).resolves.toHaveProperty(
+        await expect(extDb.user.delete({ where: { id: bob.id }, ...cacheBustOption })).toResolveTruthy();
+        await expect(extDb.user.deleteMany({ where: { name: 'David' }, ...cacheBustOption })).resolves.toHaveProperty(
             'count',
         );
 
@@ -162,22 +173,31 @@ describe('Plugin extended query args', () => {
         await expect(extDb.$setAuth({ id: 1 }).user.findMany(cacheOption)).toResolveTruthy();
     });
 
+    it('should allow extending all operations', async () => {
+        const extDb = db.$use(
+            definePlugin({
+                id: 'cache',
+                queryArgs: {
+                    $all: cacheSchema,
+                },
+            }),
+        );
+
+        const alice = await extDb.user.create({ data: { name: 'Alice' }, cache: {} });
+        await expect(extDb.user.findMany({ cache: { ttl: 100 } })).toResolveWithLength(1);
+        await expect(extDb.user.count({ where: { name: 'Alice' }, cache: { ttl: 200 } })).resolves.toBe(1);
+        await expect(
+            extDb.user.update({ where: { id: alice.id }, data: { name: 'Alice Updated' }, cache: { ttl: 300 } }),
+        ).toResolveTruthy();
+        await expect(extDb.user.delete({ where: { id: alice.id }, cache: { ttl: 400 } })).toResolveTruthy();
+    });
+
     it('should allow extending specific operations', async () => {
         const extDb = db.$use(
-            definePlugin<
-                typeof schema,
-                {
-                    [Op in CoreReadOperations]: CacheOptions;
-                }
-            >({
+            definePlugin({
                 id: 'cache',
-                extQueryArgs: {
-                    getValidationSchema: (operation) => {
-                        if (!(CoreReadOperations as readonly string[]).includes(operation)) {
-                            return undefined;
-                        }
-                        return cacheSchema;
-                    },
+                queryArgs: {
+                    $read: cacheSchema,
                 },
             }),
         );
@@ -192,71 +212,12 @@ describe('Plugin extended query args', () => {
         await expect(extDb.user.count({ where: { name: 'Alice' }, cache: { ttl: 200 } })).resolves.toBe(1);
     });
 
-    it('should allow different extensions for different operations', async () => {
-        let gotTTL: number | undefined = undefined;
-        let gotBust: boolean | undefined = undefined;
-
-        const extDb = db.$use(
-            definePlugin<
-                typeof schema,
-                {
-                    [Op in CoreReadOperations]: CacheOptions;
-                } & {
-                    [Op in CoreWriteOperations]: CacheBustOptions;
-                }
-            >({
-                id: 'cache',
-                extQueryArgs: {
-                    getValidationSchema: (operation) => {
-                        if ((CoreReadOperations as readonly string[]).includes(operation)) {
-                            return cacheSchema;
-                        } else if ((CoreWriteOperations as readonly string[]).includes(operation)) {
-                            return cacheBustSchema;
-                        }
-                        return undefined;
-                    },
-                },
-
-                onQuery: async ({ args, proceed }) => {
-                    if (args && 'cache' in args) {
-                        gotTTL = (args as CacheOptions).cache?.ttl;
-                        gotBust = (args as CacheBustOptions).cache?.bust;
-                    }
-                    return proceed(args);
-                },
-            }),
-        );
-
-        gotBust = undefined;
-        await extDb.user.create({ data: { name: 'Alice' }, cache: { bust: true } });
-        expect(gotBust).toBe(true);
-
-        // ttl extension is not applied to "create"
-        // @ts-expect-error
-        await expect(extDb.user.create({ data: { name: 'Bob' }, cache: { ttl: 100 } })).rejects.toThrow(
-            'Unrecognized key',
-        );
-
-        gotTTL = undefined;
-        await expect(extDb.user.findMany({ cache: { ttl: 5000 } })).toResolveWithLength(1);
-        expect(gotTTL).toBe(5000);
-
-        // bust extension is not applied to "findMany"
-        // @ts-expect-error
-        await expect(extDb.user.findMany({ cache: { bust: true } })).rejects.toThrow('Unrecognized key');
-    });
-
     it('should isolate validation schemas between clients', async () => {
         const extDb = db.$use(
-            definePlugin<
-                typeof schema,
-                {
-                    all: CacheOptions;
-                }
-            >({
+            definePlugin({
                 id: 'cache',
-                extQueryArgs: {
-                    getValidationSchema: () => cacheSchema,
+                queryArgs: {
+                    $all: cacheSchema,
                 },
             }),
         );

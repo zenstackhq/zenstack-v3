@@ -15,7 +15,6 @@ import {
     Enum,
     EnumField,
     Expression,
-    isBinaryExpr,
     GeneratorDecl,
     InvocationExpr,
     isArrayExpr,

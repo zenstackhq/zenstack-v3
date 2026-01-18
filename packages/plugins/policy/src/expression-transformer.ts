@@ -370,7 +370,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         const bindingScope = expr.binding
             ? {
                   ...(context.bindingScope ?? {}),
-                  [expr.binding]: { type: newContextModel, alias: context.alias ?? newContextModel },
+                  [expr.binding]: { type: newContextModel, alias: newContextModel },
               }
             : context.bindingScope;
 

@@ -413,7 +413,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     updateSchema instanceof z.ZodObject,
                     'Plugin extended query args schema must be a Zod object',
                 );
-                // merge both schemas using intersection
+                // merge both schemas (combines their properties)
                 result = createSchema.merge(updateSchema);
             } else if (createSchema) {
                 result = createSchema;

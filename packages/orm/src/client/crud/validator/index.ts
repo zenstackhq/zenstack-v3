@@ -396,13 +396,9 @@ export class InputValidator<Schema extends SchemaDef> {
             // upsert is special: it's in both CoreCreateOperations and CoreUpdateOperations
             // so we need to merge both $create and $update schemas to match the type system
             const createSchema =
-                '$create' in plugin.queryArgs && plugin.queryArgs['$create']
-                    ? plugin.queryArgs['$create']
-                    : undefined;
+                '$create' in plugin.queryArgs && plugin.queryArgs['$create'] ? plugin.queryArgs['$create'] : undefined;
             const updateSchema =
-                '$update' in plugin.queryArgs && plugin.queryArgs['$update']
-                    ? plugin.queryArgs['$update']
-                    : undefined;
+                '$update' in plugin.queryArgs && plugin.queryArgs['$update'] ? plugin.queryArgs['$update'] : undefined;
 
             if (createSchema && updateSchema) {
                 invariant(
@@ -414,7 +410,7 @@ export class InputValidator<Schema extends SchemaDef> {
                     'Plugin extended query args schema must be a Zod object',
                 );
                 // merge both schemas (combines their properties)
-                result = createSchema.merge(updateSchema);
+                result = createSchema.extend(updateSchema.shape);
             } else if (createSchema) {
                 result = createSchema;
             } else if (updateSchema) {

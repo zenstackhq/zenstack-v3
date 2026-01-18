@@ -317,5 +317,16 @@ describe('Plugin extended query args', () => {
                 audit: { reason: 'testing' },
             }),
         ).resolves.toMatchObject({ name: 'Eve' });
+
+        // verify that upsert with both is fine
+        await expect(
+            extDb.user.upsert({
+                where: { id: 555 },
+                create: { name: 'Frank' },
+                update: { name: 'Frank Updated' },
+                tracking: { source: 'test' },
+                audit: { reason: 'testing both' },
+            }),
+        ).resolves.toMatchObject({ name: 'Frank' });
     });
 });

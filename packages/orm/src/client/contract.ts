@@ -40,9 +40,15 @@ import type {
     UpdateManyArgs,
     UpsertArgs,
 } from './crud-types';
-import type { CoreCrudOperations } from './crud/operations/base';
+import type {
+    CoreCreateOperations,
+    CoreCrudOperations,
+    CoreDeleteOperations,
+    CoreReadOperations,
+    CoreUpdateOperations,
+} from './crud/operations/base';
 import type { ClientOptions, QueryOptions, ToQueryOptions } from './options';
-import type { ExtQueryArgsBase, RuntimePlugin } from './plugin';
+import type { ExtClientMembersBase, ExtQueryArgsBase, RuntimePlugin } from './plugin';
 import type { ZenStackPromise } from './promise';
 import type { ToKysely } from './query-builder';
 
@@ -51,11 +57,26 @@ type TransactionUnsupportedMethods = (typeof TRANSACTION_UNSUPPORTED_METHODS)[nu
 /**
  * Extracts extended query args for a specific operation.
  */
-type ExtractExtQueryArgs<ExtQueryArgs, Operation extends CoreCrudOperations> = Operation extends keyof ExtQueryArgs
-    ? NonNullable<ExtQueryArgs[Operation]>
-    : 'all' extends keyof ExtQueryArgs
-      ? NonNullable<ExtQueryArgs['all']>
-      : {};
+type ExtractExtQueryArgs<ExtQueryArgs, Operation extends CoreCrudOperations> = (Operation extends keyof ExtQueryArgs
+    ? ExtQueryArgs[Operation]
+    : {}) &
+    ('$create' extends keyof ExtQueryArgs
+        ? Operation extends CoreCreateOperations
+            ? ExtQueryArgs['$create']
+            : {}
+        : {}) &
+    ('$read' extends keyof ExtQueryArgs ? (Operation extends CoreReadOperations ? ExtQueryArgs['$read'] : {}) : {}) &
+    ('$update' extends keyof ExtQueryArgs
+        ? Operation extends CoreUpdateOperations
+            ? ExtQueryArgs['$update']
+            : {}
+        : {}) &
+    ('$delete' extends keyof ExtQueryArgs
+        ? Operation extends CoreDeleteOperations
+            ? ExtQueryArgs['$delete']
+            : {}
+        : {}) &
+    ('$all' extends keyof ExtQueryArgs ? ExtQueryArgs['$all'] : {});
 
 /**
  * Transaction isolation levels.
@@ -75,6 +96,7 @@ export type ClientContract<
     Schema extends SchemaDef,
     Options extends ClientOptions<Schema> = ClientOptions<Schema>,
     ExtQueryArgs extends ExtQueryArgsBase = {},
+    ExtClientMembers extends ExtClientMembersBase = {},
 > = {
     /**
      * The schema definition.
@@ -132,7 +154,7 @@ export type ClientContract<
     /**
      * Sets the current user identity.
      */
-    $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema, Options, ExtQueryArgs>;
+    $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema, Options, ExtQueryArgs, ExtClientMembers>;
 
     /**
      * Returns a new client with new options applied.
@@ -141,7 +163,9 @@ export type ClientContract<
      * const dbNoValidation = db.$setOptions({ ...db.$options, validateInput: false });
      * ```
      */
-    $setOptions<Options extends ClientOptions<Schema>>(options: Options): ClientContract<Schema, Options, ExtQueryArgs>;
+    $setOptions<NewOptions extends ClientOptions<Schema>>(
+        options: NewOptions,
+    ): ClientContract<Schema, NewOptions, ExtQueryArgs, ExtClientMembers>;
 
     /**
      * Returns a new client enabling/disabling input validations expressed with attributes like
@@ -149,7 +173,7 @@ export type ClientContract<
      *
      * @deprecated Use {@link $setOptions} instead.
      */
-    $setInputValidation(enable: boolean): ClientContract<Schema, Options, ExtQueryArgs>;
+    $setInputValidation(enable: boolean): ClientContract<Schema, Options, ExtQueryArgs, ExtClientMembers>;
 
     /**
      * The Kysely query builder instance.
@@ -165,7 +189,7 @@ export type ClientContract<
      * Starts an interactive transaction.
      */
     $transaction<T>(
-        callback: (tx: TransactionClientContract<Schema, Options, ExtQueryArgs>) => Promise<T>,
+        callback: (tx: TransactionClientContract<Schema, Options, ExtQueryArgs, ExtClientMembers>) => Promise<T>,
         options?: { isolationLevel?: TransactionIsolationLevel },
     ): Promise<T>;
 
@@ -180,14 +204,18 @@ export type ClientContract<
     /**
      * Returns a new client with the specified plugin installed.
      */
-    $use<PluginSchema extends SchemaDef = Schema, PluginExtQueryArgs extends ExtQueryArgsBase = {}>(
-        plugin: RuntimePlugin<PluginSchema, PluginExtQueryArgs>,
-    ): ClientContract<Schema, Options, ExtQueryArgs & PluginExtQueryArgs>;
+    $use<
+        PluginSchema extends SchemaDef = Schema,
+        PluginExtQueryArgs extends ExtQueryArgsBase = {},
+        PluginExtClientMembers extends ExtClientMembersBase = {},
+    >(
+        plugin: RuntimePlugin<PluginSchema, PluginExtQueryArgs, PluginExtClientMembers>,
+    ): ClientContract<Schema, Options, ExtQueryArgs & PluginExtQueryArgs, ExtClientMembers & PluginExtClientMembers>;
 
     /**
      * Returns a new client with the specified plugin removed.
      */
-    $unuse(pluginId: string): ClientContract<Schema, Options, ExtQueryArgs>;
+    $unuse(pluginId: string): ClientContract<Schema, Options, ExtQueryArgs, ExtClientMembers>;
 
     /**
      * Returns a new client with all plugins removed.
@@ -216,7 +244,8 @@ export type ClientContract<
         ToQueryOptions<Options>,
         ExtQueryArgs
     >;
-} & ProcedureOperations<Schema>;
+} & ProcedureOperations<Schema> &
+    ExtClientMembers;
 
 /**
  * The contract for a client in a transaction.
@@ -225,7 +254,8 @@ export type TransactionClientContract<
     Schema extends SchemaDef,
     Options extends ClientOptions<Schema>,
     ExtQueryArgs extends ExtQueryArgsBase,
-> = Omit<ClientContract<Schema, Options, ExtQueryArgs>, TransactionUnsupportedMethods>;
+    ExtClientMembers extends ExtClientMembersBase,
+> = Omit<ClientContract<Schema, Options, ExtQueryArgs, ExtClientMembers>, TransactionUnsupportedMethods>;
 
 export type ProcedureOperations<Schema extends SchemaDef> =
     Schema['procedures'] extends Record<string, ProcedureDef>

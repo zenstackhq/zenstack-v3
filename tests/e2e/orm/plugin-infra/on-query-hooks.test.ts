@@ -190,7 +190,7 @@ describe('On query hooks tests', () => {
 
         let findHookCalled = false;
 
-        const plugin = definePlugin<typeof schema>({
+        const plugin = definePlugin({
             id: 'test-plugin',
             onQuery: (ctx) => {
                 findHookCalled = true;

@@ -392,6 +392,34 @@ export class InputValidator<Schema extends SchemaDef> {
         if (operation in plugin.queryArgs && plugin.queryArgs[operation]) {
             // most specific operation takes highest precedence
             result = plugin.queryArgs[operation];
+        } else if (operation === 'upsert') {
+            // upsert is special: it's in both CoreCreateOperations and CoreUpdateOperations
+            // so we need to merge both $create and $update schemas to match the type system
+            const createSchema =
+                '$create' in plugin.queryArgs && plugin.queryArgs['$create']
+                    ? plugin.queryArgs['$create']
+                    : undefined;
+            const updateSchema =
+                '$update' in plugin.queryArgs && plugin.queryArgs['$update']
+                    ? plugin.queryArgs['$update']
+                    : undefined;
+
+            if (createSchema && updateSchema) {
+                invariant(
+                    createSchema instanceof z.ZodObject,
+                    'Plugin extended query args schema must be a Zod object',
+                );
+                invariant(
+                    updateSchema instanceof z.ZodObject,
+                    'Plugin extended query args schema must be a Zod object',
+                );
+                // merge both schemas using intersection
+                result = createSchema.merge(updateSchema);
+            } else if (createSchema) {
+                result = createSchema;
+            } else if (updateSchema) {
+                result = updateSchema;
+            }
         } else if (
             // then comes grouped operations: $create, $read, $update, $delete
             CoreCreateOperations.includes(operation as CoreCreateOperations) &&

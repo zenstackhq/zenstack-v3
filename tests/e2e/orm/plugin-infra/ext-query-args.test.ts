@@ -230,4 +230,92 @@ describe('Plugin extended query args', () => {
         await expect(db.user.findMany({ cache: { ttl: 2000 } })).rejects.toThrow('Unrecognized key');
         await expect(extDb.user.findMany({ cache: { ttl: 2000 } })).toResolveWithLength(0);
     });
+
+    it('should merge $create and $update schemas for upsert operation', async () => {
+        // Define different schemas for $create and $update
+        const createOnlySchema = z.object({
+            tracking: z
+                .strictObject({
+                    source: z.string().optional(),
+                })
+                .optional(),
+        });
+
+        const updateOnlySchema = z.object({
+            audit: z
+                .strictObject({
+                    reason: z.string().optional(),
+                })
+                .optional(),
+        });
+
+        const extDb = db.$use(
+            definePlugin({
+                id: 'test',
+                queryArgs: {
+                    $create: createOnlySchema,
+                    $update: updateOnlySchema,
+                },
+            }),
+        );
+
+        // upsert should accept both tracking (from $create) and audit (from $update)
+        await expect(
+            extDb.user.upsert({
+                where: { id: 999 },
+                create: { name: 'Alice' },
+                update: { name: 'Alice Updated' },
+                tracking: { source: 'test' },
+                audit: { reason: 'testing merge' },
+            }),
+        ).resolves.toMatchObject({ name: 'Alice' });
+
+        // upsert should reject tracking-only in update operations
+        await expect(
+            extDb.user.update({
+                where: { id: 1 },
+                data: { name: 'Test' },
+                // @ts-expect-error - tracking is only for $create
+                tracking: { source: 'test' },
+            }),
+        ).rejects.toThrow('Unrecognized key');
+
+        // upsert should reject audit-only in create operations
+        await expect(
+            extDb.user.create({
+                data: { name: 'Bob' },
+                // @ts-expect-error - audit is only for $update
+                audit: { reason: 'test' },
+            }),
+        ).rejects.toThrow('Unrecognized key');
+
+        // verify that upsert without both is fine
+        await expect(
+            extDb.user.upsert({
+                where: { id: 888 },
+                create: { name: 'Charlie' },
+                update: { name: 'Charlie Updated' },
+            }),
+        ).resolves.toMatchObject({ name: 'Charlie' });
+
+        // verify that upsert with only tracking is fine
+        await expect(
+            extDb.user.upsert({
+                where: { id: 777 },
+                create: { name: 'David' },
+                update: { name: 'David Updated' },
+                tracking: { source: 'test' },
+            }),
+        ).resolves.toMatchObject({ name: 'David' });
+
+        // verify that upsert with only audit is fine
+        await expect(
+            extDb.user.upsert({
+                where: { id: 666 },
+                create: { name: 'Eve' },
+                update: { name: 'Eve Updated' },
+                audit: { reason: 'testing' },
+            }),
+        ).resolves.toMatchObject({ name: 'Eve' });
+    });
 });

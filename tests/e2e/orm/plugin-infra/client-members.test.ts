@@ -52,11 +52,11 @@ describe('Plugin client members', () => {
         // @ts-expect-error
         extDb.$invalidateCache(1);
 
-        await expect(extDb.$cacheStats.hits).toBe(10);
-        await expect(extDb.$cacheStats.misses).toBe(5);
+        expect(extDb.$cacheStats.hits).toBe(10);
+        expect(extDb.$cacheStats.misses).toBe(5);
 
-        await expect(extDb.$cacheStats1.hits).toBe(20);
-        await expect(extDb.$cacheStats1.misses).toBe(10);
+        expect(extDb.$cacheStats1.hits).toBe(20);
+        expect(extDb.$cacheStats1.misses).toBe(10);
     });
 
     it('should support multiple plugins with different members', async () => {

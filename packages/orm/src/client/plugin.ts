@@ -77,6 +77,9 @@ export interface RuntimePlugin<
         [K in keyof ExtQueryArgs]: ZodType<ExtQueryArgs[K]>;
     };
 
+    /**
+     * Extended client members (methods and properties).
+     */
     client?: ExtClientMembers;
 }
 

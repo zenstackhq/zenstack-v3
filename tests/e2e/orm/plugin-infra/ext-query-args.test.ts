@@ -22,7 +22,6 @@ describe('Plugin extended query args', () => {
             })
             .optional(),
     });
-    ``;
 
     type CacheOptions = z.infer<typeof cacheSchema>;
 

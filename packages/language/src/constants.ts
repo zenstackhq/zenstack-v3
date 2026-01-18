@@ -1,14 +1,7 @@
 /**
  * Supported db providers
  */
-export const SUPPORTED_PROVIDERS = [
-    'sqlite',
-    'postgresql',
-    // TODO: other providers
-    // 'mysql',
-    // 'sqlserver',
-    // 'cockroachdb',
-];
+export const SUPPORTED_PROVIDERS = ['sqlite', 'postgresql', 'mysql'];
 
 /**
  * All scalar types

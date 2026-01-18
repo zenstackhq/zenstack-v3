@@ -1,4 +1,4 @@
-import { invariant } from '@zenstackhq/common-helpers';
+import { enumerate, invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import {
     sql,
@@ -9,19 +9,18 @@ import {
     type SelectQueryBuilder,
     type SqlBool,
 } from 'kysely';
-import { parse as parsePostgresArray } from 'postgres-array';
 import { match } from 'ts-pattern';
-import z from 'zod';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
-import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
-import type { FindArgs } from '../../crud-types';
-import { createInternalError } from '../../errors';
+import type { OrArray } from '../../../utils/type-utils';
+import { AGGREGATE_OPERATORS, DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
+import type { FindArgs, OrderBy, SortOrder } from '../../crud-types';
+import { createInternalError, createInvalidInputError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
+    aggregate,
     buildJoinPairs,
     getDelegateDescendantModels,
-    getEnum,
     getManyToManyRelation,
     isEnum,
     isRelationField,
@@ -32,15 +31,13 @@ import {
 } from '../../query-utils';
 import { BaseCrudDialect } from './base-dialect';
 
-export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
-    private isoDateSchema = z.iso.datetime({ local: true, offset: true });
-
+export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
     constructor(schema: Schema, options: ClientOptions<Schema>) {
         super(schema, options);
     }
 
     override get provider() {
-        return 'postgresql' as const;
+        return 'mysql' as const;
     }
 
     override transformPrimitive(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
@@ -57,10 +54,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             invariant(false, 'should not reach here: AnyNull is not a valid input value');
         }
 
-        // node-pg incorrectly handles array values passed to non-array JSON fields,
-        // the workaround is to JSON stringify the value
-        // https://github.com/brianc/node-postgres/issues/374
-
+        // MySQL doesn't have native array types, arrays are stored as JSON
         if (isTypeDef(this.schema, type)) {
             // type-def fields (regardless array or scalar) are stored as scalar `Json` and
             // their input values need to be stringified if not already (i.e., provided in
@@ -71,36 +65,31 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 return value;
             }
         } else if (Array.isArray(value)) {
+            // MySQL stores arrays as JSON, so stringify them
             if (type === 'Json' && !forArrayField) {
                 // scalar `Json` fields need their input stringified
                 return JSON.stringify(value);
             }
-            if (isEnum(this.schema, type)) {
-                // cast to enum array `CAST(ARRAY[...] AS "enum_type"[])`
-                return this.eb.cast(
-                    sql`ARRAY[${sql.join(
-                        value.map((v) => this.transformPrimitive(v, type, false)),
-                        sql.raw(','),
-                    )}]`,
-                    this.createSchemaQualifiedEnumType(type, true),
-                );
-            } else {
-                // `Json[]` fields need their input as array (not stringified)
-                return value.map((v) => this.transformPrimitive(v, type, false));
-            }
+            // `Json[]` fields stored as JSON arrays
+            return JSON.stringify(value.map((v) => this.transformPrimitive(v, type, false)));
         } else {
             return match(type)
-                .with('DateTime', () =>
-                    value instanceof Date
-                        ? value.toISOString()
-                        : typeof value === 'string'
-                          ? new Date(value).toISOString()
-                          : value,
-                )
+                .with('Boolean', () => (value ? 1 : 0)) // MySQL uses 1/0 for boolean like SQLite
+                .with('DateTime', () => {
+                    // MySQL DATETIME format: 'YYYY-MM-DD HH:MM:SS.mmm'
+                    // Convert ISO string to MySQL format by removing 'Z' and replacing 'T' with space
+                    if (value instanceof Date) {
+                        return value.toISOString().replace('T', ' ').replace('Z', '');
+                    } else if (typeof value === 'string') {
+                        return new Date(value).toISOString().replace('T', ' ').replace('Z', '');
+                    } else {
+                        return value;
+                    }
+                })
                 .with('Decimal', () => (value !== null ? value.toString() : value))
                 .with('Json', () => {
                     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-                        // postgres requires simple JSON values to be stringified
+                        // MySQL requires simple JSON values to be stringified
                         return JSON.stringify(value);
                     } else {
                         return value;
@@ -110,37 +99,12 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
     }
 
-    private createSchemaQualifiedEnumType(type: string, array: boolean) {
-        // determines the postgres schema name for the enum type, and returns the
-        // qualified name
-
-        let qualified = type;
-
-        const enumDef = getEnum(this.schema, type);
-        if (enumDef) {
-            // check if the enum has a custom "@@schema" attribute
-            const schemaAttr = enumDef.attributes?.find((attr) => attr.name === '@@schema');
-            if (schemaAttr) {
-                const mapArg = schemaAttr.args?.find((arg) => arg.name === 'map');
-                if (mapArg && mapArg.value.kind === 'literal') {
-                    const schemaName = mapArg.value.value as string;
-                    qualified = `"${schemaName}"."${type}"`;
-                }
-            } else {
-                // no custom schema, use default from datasource or 'public'
-                const defaultSchema = this.schema.provider.defaultSchema ?? 'public';
-                qualified = `"${defaultSchema}"."${type}"`;
-            }
-        }
-
-        return array ? sql.raw(`${qualified}[]`) : sql.raw(qualified);
-    }
-
     override transformOutput(value: unknown, type: BuiltinType, array: boolean) {
         if (value === null || value === undefined) {
             return value;
         }
         return match(type)
+            .with('Boolean', () => this.transformOutputBoolean(value))
             .with('DateTime', () => this.transformOutputDate(value))
             .with('Bytes', () => this.transformOutputBytes(value))
             .with('BigInt', () => this.transformOutputBigInt(value))
@@ -150,6 +114,11 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 () => this.transformOutputEnum(value, array),
             )
             .otherwise(() => super.transformOutput(value, type, array));
+    }
+
+    private transformOutputBoolean(value: unknown) {
+        // MySQL returns boolean as 1/0
+        return !!value;
     }
 
     private transformOutputBigInt(value: unknown) {
@@ -176,42 +145,24 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
     private transformOutputDate(value: unknown) {
         if (typeof value === 'string') {
-            // PostgreSQL's jsonb_build_object serializes timestamp as ISO 8601 strings
-            // without timezone, (e.g., "2023-01-01T12:00:00.123456"). Since Date is always
-            // stored as UTC `timestamp` type, we add 'Z' to explicitly mark them as UTC for
-            // correct Date object creation.
-            if (this.isoDateSchema.safeParse(value).success) {
-                const hasOffset = value.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(value);
-                return new Date(hasOffset ? value : `${value}Z`);
-            } else {
-                return value;
-            }
-        } else if (value instanceof Date && this.options.fixPostgresTimezone !== false) {
-            // SPECIAL NOTES:
-            // node-pg has a terrible quirk that it returns the date value in local timezone
-            // as a `Date` object although for `DateTime` field the data in DB is stored in UTC
-            // see: https://github.com/brianc/node-postgres/issues/429
-            return new Date(value.getTime() - value.getTimezoneOffset() * 60 * 1000);
+            // MySQL DateTime columns are returned as strings (non-ISO but parsable as JS Date)
+            return new Date(value);
+        } else if (value instanceof Date) {
+            return value;
         } else {
             return value;
         }
     }
 
     private transformOutputBytes(value: unknown) {
-        return Buffer.isBuffer(value)
-            ? Uint8Array.from(value)
-            : // node-pg encode bytea as hex string prefixed with \x when embedded in JSON
-              typeof value === 'string' && value.startsWith('\\x')
-              ? Uint8Array.from(Buffer.from(value.slice(2), 'hex'))
-              : value;
+        return Buffer.isBuffer(value) ? Uint8Array.from(value) : value;
     }
 
     private transformOutputEnum(value: unknown, array: boolean) {
         if (array && typeof value === 'string') {
             try {
-                // postgres returns enum arrays as `{"val 1",val2}` strings, parse them back
-                // to string arrays here
-                return parsePostgresArray(value);
+                // MySQL returns enum arrays as JSON strings, parse them back
+                return JSON.parse(value);
             } catch {
                 // fall through - return as-is if parsing fails
             }
@@ -249,6 +200,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         const relationFieldDef = requireField(this.schema, model, relationField);
         const relationModel = relationFieldDef.type as GetModels<Schema>;
 
+        // MySQL 8.0.14+ supports LATERAL joins
         return qb.leftJoinLateral(
             (eb) => {
                 const relationSelectName = `${resultName}$sub`;
@@ -360,11 +312,13 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             );
 
             if (relationFieldDef.array) {
+                // MySQL uses JSON_ARRAYAGG instead of jsonb_agg
                 return eb.fn
-                    .coalesce(sql`jsonb_agg(jsonb_build_object(${sql.join(objArgs)}))`, sql`'[]'::jsonb`)
+                    .coalesce(sql`JSON_ARRAYAGG(JSON_OBJECT(${sql.join(objArgs)}))`, sql`JSON_ARRAY()`)
                     .as('$data');
             } else {
-                return sql`jsonb_build_object(${sql.join(objArgs)})`.as('$data');
+                // MySQL uses JSON_OBJECT instead of jsonb_build_object
+                return sql`JSON_OBJECT(${sql.join(objArgs)})`.as('$data');
             }
         });
 
@@ -489,48 +443,57 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
         if (skip !== undefined) {
             query = query.offset(skip);
+            if (take === undefined) {
+                // MySQL requires offset to be used with limit
+                query = query.limit(Number.MAX_SAFE_INTEGER);
+            }
         }
         return query;
     }
 
     override buildJsonObject(value: Record<string, Expression<unknown>>) {
+        // MySQL uses JSON_OBJECT instead of jsonb_build_object
         return this.eb.fn(
-            'jsonb_build_object',
+            'JSON_OBJECT',
             Object.entries(value).flatMap(([key, value]) => [sql.lit(key), value]),
         );
     }
 
     override get supportsUpdateWithLimit(): boolean {
-        return false;
+        // MySQL supports UPDATE with LIMIT
+        return true;
     }
 
     override get supportsDeleteWithLimit(): boolean {
-        return false;
+        // MySQL supports DELETE with LIMIT
+        return true;
     }
 
     override get supportsDistinctOn(): boolean {
-        return true;
+        // MySQL doesn't support DISTINCT ON
+        return false;
     }
 
     override get supportsReturning(): boolean {
-        return true;
+        // MySQL doesn't have reliable RETURNING support until 8.0.21+
+        // and even then it's limited compared to PostgreSQL
+        return false;
     }
 
     override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
-        return this.eb.fn('array_length', [array]);
+        // MySQL uses JSON_LENGTH instead of array_length
+        return this.eb.fn('JSON_LENGTH', [array]);
     }
 
     override buildArrayLiteralSQL(values: unknown[]): string {
-        if (values.length === 0) {
-            return '{}';
-        } else {
-            return `ARRAY[${values.map((v) => (typeof v === 'string' ? `'${v}'` : v))}]`;
-        }
+        // MySQL uses JSON arrays since it doesn't have native arrays
+        return `JSON_ARRAY(${values.map((v) => (typeof v === 'string' ? `'${v}'` : v)).join(',')})`;
     }
 
     protected override buildJsonPathSelection(receiver: Expression<any>, path: string | undefined) {
         if (path) {
-            return this.eb.fn('jsonb_path_query_first', [receiver, this.eb.val(path)]);
+            // MySQL uses JSON_EXTRACT with JSONPath syntax
+            return this.eb.fn('JSON_EXTRACT', [receiver, this.eb.val(path)]);
         } else {
             return receiver;
         }
@@ -543,19 +506,20 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
     ) {
         return match(operation)
             .with('array_contains', () => {
+                // MySQL uses JSON_CONTAINS
                 const v = Array.isArray(value) ? value : [value];
-                return sql<SqlBool>`${lhs} @> ${sql.val(JSON.stringify(v))}::jsonb`;
+                return sql<SqlBool>`JSON_CONTAINS(${lhs}, ${sql.val(JSON.stringify(v))})`;
             })
             .with('array_starts_with', () =>
                 this.eb(
-                    this.eb.fn('jsonb_extract_path', [lhs, this.eb.val('0')]),
+                    this.eb.fn('JSON_EXTRACT', [lhs, this.eb.val('$[0]')]),
                     '=',
                     this.transformPrimitive(value, 'Json', false),
                 ),
             )
             .with('array_ends_with', () =>
                 this.eb(
-                    this.eb.fn('jsonb_extract_path', [lhs, sql`(jsonb_array_length(${lhs}) - 1)::text`]),
+                    sql`JSON_EXTRACT(${lhs}, CONCAT('$[', JSON_LENGTH(${lhs}) - 1, ']'))`,
                     '=',
                     this.transformPrimitive(value, 'Json', false),
                 ),
@@ -567,15 +531,18 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         receiver: Expression<any>,
         buildFilter: (elem: Expression<any>) => Expression<SqlBool>,
     ) {
+        // MySQL doesn't have a direct json_array_elements, we need to use JSON_TABLE or a different approach
+        // For simplicity, we'll use EXISTS with a subquery that unnests the JSON array
         return this.eb.exists(
             this.eb
-                .selectFrom(this.eb.fn('jsonb_array_elements', [receiver]).as('$items'))
+                .selectFrom(sql`JSON_TABLE(${receiver}, '$[*]' COLUMNS(value JSON PATH '$')) AS $items`.as('$items'))
                 .select(this.eb.lit(1).as('$t'))
                 .where(buildFilter(this.eb.ref('$items.value'))),
         );
     }
 
     override get supportInsertWithDefault() {
+        // MySQL supports INSERT with DEFAULT VALUES
         return true;
     }
 
@@ -588,32 +555,171 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         let result: string;
 
         if (this.schema.enums?.[fieldDef.type]) {
-            // enums are treated as text
-            result = 'text';
+            // enums are treated as text/varchar
+            result = 'varchar(255)';
         } else {
             result = match(fieldDef.type)
-                .with('String', () => 'text')
-                .with('Boolean', () => 'boolean')
-                .with('Int', () => 'integer')
+                .with('String', () => 'varchar(255)')
+                .with('Boolean', () => 'tinyint(1)') // MySQL uses tinyint(1) for boolean
+                .with('Int', () => 'int')
                 .with('BigInt', () => 'bigint')
-                .with('Float', () => 'double precision')
+                .with('Float', () => 'double')
                 .with('Decimal', () => 'decimal')
-                .with('DateTime', () => 'timestamp')
-                .with('Bytes', () => 'bytea')
-                .with('Json', () => 'jsonb')
+                .with('DateTime', () => 'datetime')
+                .with('Bytes', () => 'blob')
+                .with('Json', () => 'json')
                 // fallback to text
                 .otherwise(() => 'text');
         }
 
         if (fieldDef.array) {
-            result += '[]';
+            // MySQL stores arrays as JSON
+            result = 'json';
         }
 
         return result;
     }
 
     override getStringCasingBehavior() {
-        // Postgres `LIKE` is case-sensitive, `ILIKE` is case-insensitive
-        return { supportsILike: true, likeCaseSensitive: true };
+        // MySQL LIKE is case-insensitive by default (depends on collation), no ILIKE support
+        return { supportsILike: false, likeCaseSensitive: false };
+    }
+
+    override buildOrderBy(
+        query: SelectQueryBuilder<any, any, any>,
+        model: string,
+        modelAlias: string,
+        orderBy: OrArray<OrderBy<Schema, GetModels<Schema>, boolean, boolean>> | undefined,
+        negated: boolean,
+        take: number | undefined,
+    ) {
+        if (!orderBy) {
+            return query;
+        }
+
+        let result = query;
+
+        const buildFieldRef = (model: string, field: string, modelAlias: string) => {
+            const fieldDef = requireField(this.schema, model, field);
+            return fieldDef.originModel
+                ? this.fieldRef(fieldDef.originModel, field, fieldDef.originModel)
+                : this.fieldRef(model, field, modelAlias);
+        };
+
+        enumerate(orderBy).forEach((orderBy, index) => {
+            for (const [field, value] of Object.entries<any>(orderBy)) {
+                if (!value) {
+                    continue;
+                }
+
+                // aggregations
+                if (['_count', '_avg', '_sum', '_min', '_max'].includes(field)) {
+                    invariant(value && typeof value === 'object', `invalid orderBy value for field "${field}"`);
+                    for (const [k, v] of Object.entries<SortOrder>(value)) {
+                        invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
+                        result = result.orderBy(
+                            (eb) => aggregate(eb, buildFieldRef(model, k, modelAlias), field as AGGREGATE_OPERATORS),
+                            this.negateSort(v, negated),
+                        );
+                    }
+                    continue;
+                }
+
+                switch (field) {
+                    case '_count': {
+                        invariant(value && typeof value === 'object', 'invalid orderBy value for field "_count"');
+                        for (const [k, v] of Object.entries<string>(value)) {
+                            invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
+                            result = result.orderBy(
+                                (eb) => eb.fn.count(buildFieldRef(model, k, modelAlias)),
+                                this.negateSort(v, negated),
+                            );
+                        }
+                        continue;
+                    }
+                    default:
+                        break;
+                }
+
+                const fieldDef = requireField(this.schema, model, field);
+
+                if (!fieldDef.relation) {
+                    const fieldRef = buildFieldRef(model, field, modelAlias);
+                    if (value === 'asc' || value === 'desc') {
+                        result = result.orderBy(fieldRef, this.negateSort(value, negated));
+                    } else if (
+                        value &&
+                        typeof value === 'object' &&
+                        'nulls' in value &&
+                        'sort' in value &&
+                        (value.sort === 'asc' || value.sort === 'desc') &&
+                        (value.nulls === 'first' || value.nulls === 'last')
+                    ) {
+                        // MySQL doesn't support NULLS FIRST/LAST natively
+                        // We simulate it with an extra IS NULL/IS NOT NULL order by clause
+                        const dir = this.negateSort(value.sort, negated);
+
+                        if (value.nulls === 'first') {
+                            // NULLS FIRST: order by IS NULL DESC (nulls=1 first), then the actual field
+                            result = result.orderBy(sql`${fieldRef} IS NULL`, 'desc');
+                            result = result.orderBy(fieldRef, dir);
+                        } else {
+                            // NULLS LAST: order by IS NULL ASC (nulls=0 last), then the actual field
+                            result = result.orderBy(sql`${fieldRef} IS NULL`, 'asc');
+                            result = result.orderBy(fieldRef, dir);
+                        }
+                    }
+                } else {
+                    // order by relation
+                    const relationModel = fieldDef.type;
+
+                    if (fieldDef.array) {
+                        // order by to-many relation
+                        if (typeof value !== 'object') {
+                            throw createInvalidInputError(`invalid orderBy value for field "${field}"`);
+                        }
+                        if ('_count' in value) {
+                            invariant(
+                                value._count === 'asc' || value._count === 'desc',
+                                'invalid orderBy value for field "_count"',
+                            );
+                            const sort = this.negateSort(value._count, negated);
+                            result = result.orderBy((eb) => {
+                                const subQueryAlias = `${modelAlias}$orderBy$${field}$count`;
+                                let subQuery = this.buildSelectModel(relationModel, subQueryAlias);
+                                const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, subQueryAlias);
+                                subQuery = subQuery.where(() =>
+                                    this.and(
+                                        ...joinPairs.map(([left, right]) =>
+                                            eb(this.eb.ref(left), '=', this.eb.ref(right)),
+                                        ),
+                                    ),
+                                );
+                                subQuery = subQuery.select(() => eb.fn.count(eb.lit(1)).as('_count'));
+                                return subQuery;
+                            }, sort);
+                        }
+                    } else {
+                        // order by to-one relation
+                        const joinAlias = `${modelAlias}$orderBy$${index}`;
+                        result = result.leftJoin(`${relationModel} as ${joinAlias}`, (join) => {
+                            const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, joinAlias);
+                            return join.on((eb) =>
+                                this.and(
+                                    ...joinPairs.map(([left, right]) => eb(this.eb.ref(left), '=', this.eb.ref(right))),
+                                ),
+                            );
+                        });
+                        result = this.buildOrderBy(result, relationModel, joinAlias, value, negated, take);
+                    }
+                }
+            }
+        });
+
+        if (take === undefined) {
+            result = result.limit(Number.MAX_SAFE_INTEGER);
+        }
+
+        return result;
     }
 }

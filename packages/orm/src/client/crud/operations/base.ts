@@ -469,19 +469,68 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // return id fields if no returnFields specified
         returnFields = returnFields ?? requireIdFields(this.schema, model);
 
-        const query = kysely
-            .insertInto(model)
-            .$if(Object.keys(updatedData).length === 0, (qb) => qb.defaultValues())
-            .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
-            .returning(returnFields as any)
-            .modifyEnd(
-                this.makeContextComment({
-                    model,
-                    operation: 'create',
-                }),
-            );
+        let createdEntity: any;
 
-        const createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
+        if (this.dialect.supportsReturning) {
+            const query = kysely
+                .insertInto(model)
+                .$if(Object.keys(updatedData).length === 0, (qb) => qb.defaultValues())
+                .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
+                .returning(returnFields as any)
+                .modifyEnd(
+                    this.makeContextComment({
+                        model,
+                        operation: 'create',
+                    }),
+                );
+
+            createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
+        } else {
+            // Fallback for databases that don't support RETURNING (e.g., MySQL)
+            const insertQuery = kysely
+                .insertInto(model)
+                .$if(Object.keys(updatedData).length === 0, (qb) => qb.defaultValues())
+                .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
+                .modifyEnd(
+                    this.makeContextComment({
+                        model,
+                        operation: 'create',
+                    }),
+                );
+
+            const insertResult = await this.executeQuery(kysely, insertQuery, 'create');
+
+            // Build WHERE clause to find the inserted record
+            const idFields = requireIdFields(this.schema, model);
+            const whereConditions: Record<string, any> = {};
+
+            for (const idField of idFields) {
+                if (updatedData[idField] !== undefined) {
+                    // ID was provided in the insert
+                    whereConditions[idField] = updatedData[idField];
+                } else {
+                    // ID was auto-generated, use insertId
+                    if (insertResult.insertId !== undefined && insertResult.insertId !== null) {
+                        whereConditions[idField] = insertResult.insertId;
+                    } else {
+                        throw createInternalError(`Failed to retrieve auto-generated ID for model ${model}`);
+                    }
+                }
+            }
+
+            // Select the inserted record
+            const selectQuery = kysely
+                .selectFrom(model)
+                .selectAll()
+                .where((eb) => {
+                    const conditions = Object.entries(whereConditions).map(([field, value]) =>
+                        eb.eb(field, '=', value),
+                    );
+                    return eb.and(conditions);
+                });
+
+            createdEntity = await this.executeQueryTakeFirst(kysely, selectQuery, 'create');
+        }
 
         if (Object.keys(postCreateRelations).length > 0) {
             // process nested creates that need to happen after the current entity is created
@@ -889,8 +938,21 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return { count: Number(result.numAffectedRows) } as Result;
         } else {
             fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
-            const result = await query.returning(fieldsToReturn as any).execute();
-            return result as Result;
+
+            if (this.dialect.supportsReturning) {
+                const result = await query.returning(fieldsToReturn as any).execute();
+                return result as Result;
+            } else {
+                // Fallback for databases that don't support RETURNING (e.g., MySQL)
+                // For createMany without RETURNING, we can't reliably get all inserted records
+                // especially with auto-increment IDs. The best we can do is return the count.
+                // If users need the created records, they should use multiple create() calls
+                // or the application should query after insertion.
+                throw createInternalError(
+                    `\`createManyAndReturn\` is not supported for ${this.dialect.provider}. ` +
+                        `Use multiple \`create\` calls or query the records after insertion.`,
+                );
+            }
         }
     }
 
@@ -1192,19 +1254,47 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return thisEntity;
         } else {
             fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
-            const query = kysely
-                .updateTable(model)
-                .where(() => this.dialect.buildFilter(model, model, combinedWhere))
-                .set(updateFields)
-                .returning(fieldsToReturn as any)
-                .modifyEnd(
-                    this.makeContextComment({
-                        model,
-                        operation: 'update',
-                    }),
-                );
 
-            const updatedEntity = await this.executeQueryTakeFirst(kysely, query, 'update');
+            let updatedEntity: any;
+
+            if (this.dialect.supportsReturning) {
+                const query = kysely
+                    .updateTable(model)
+                    .where(() => this.dialect.buildFilter(model, model, combinedWhere))
+                    .set(updateFields)
+                    .returning(fieldsToReturn as any)
+                    .modifyEnd(
+                        this.makeContextComment({
+                            model,
+                            operation: 'update',
+                        }),
+                    );
+
+                updatedEntity = await this.executeQueryTakeFirst(kysely, query, 'update');
+            } else {
+                // Fallback for databases that don't support RETURNING (e.g., MySQL)
+                const updateQuery = kysely
+                    .updateTable(model)
+                    .where(() => this.dialect.buildFilter(model, model, combinedWhere))
+                    .set(updateFields)
+                    .modifyEnd(
+                        this.makeContextComment({
+                            model,
+                            operation: 'update',
+                        }),
+                    );
+
+                await this.executeQuery(kysely, updateQuery, 'update');
+
+                // Select the updated record
+                const selectQuery = kysely
+                    .selectFrom(model)
+                    .selectAll()
+                    .where(() => this.dialect.buildFilter(model, model, combinedWhere));
+
+                updatedEntity = await this.executeQueryTakeFirst(kysely, selectQuery, 'update');
+            }
+
             if (!updatedEntity) {
                 if (throwIfNotFound) {
                     throw createNotFoundError(model);
@@ -1441,9 +1531,71 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return { count: Number(result.numAffectedRows) } as Result;
         } else {
             fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
-            const finalQuery = query.returning(fieldsToReturn as any);
-            const result = await this.executeQuery(kysely, finalQuery, 'update');
-            return result.rows as Result;
+
+            if (this.dialect.supportsReturning) {
+                const finalQuery = query.returning(fieldsToReturn as any);
+                const result = await this.executeQuery(kysely, finalQuery, 'update');
+                return result.rows as Result;
+            } else {
+                // Fallback for databases that don't support RETURNING (e.g., MySQL)
+                // First, select the records to be updated
+                let selectQuery = kysely.selectFrom(model).selectAll();
+
+                if (!shouldFallbackToIdFilter) {
+                    selectQuery = selectQuery
+                        .where(() => this.dialect.buildFilter(model, model, where))
+                        .$if(limit !== undefined, (qb) => qb.limit(limit!));
+                } else {
+                    selectQuery = selectQuery.where((eb) =>
+                        eb(
+                            eb.refTuple(
+                                // @ts-expect-error
+                                ...this.buildIdFieldRefs(kysely, model),
+                            ),
+                            'in',
+                            this.dialect
+                                .buildSelectModel(filterModel, filterModel)
+                                .where(this.dialect.buildFilter(filterModel, filterModel, where))
+                                .select(this.buildIdFieldRefs(kysely, filterModel))
+                                .$if(limit !== undefined, (qb) => qb.limit(limit!)),
+                        ),
+                    );
+                }
+
+                const recordsToUpdate = await this.executeQuery(kysely, selectQuery, 'update');
+
+                // Execute the update
+                await this.executeQuery(kysely, query, 'update');
+
+                // Return the IDs of updated records, then query them back with updated values
+                if (recordsToUpdate.rows.length === 0) {
+                    return [] as Result;
+                }
+
+                const idFields = requireIdFields(this.schema, model);
+                const updatedIds = recordsToUpdate.rows.map((row: any) => {
+                    const id: Record<string, any> = {};
+                    for (const idField of idFields) {
+                        id[idField] = row[idField];
+                    }
+                    return id;
+                });
+
+                // Query back the updated records
+                const resultQuery = kysely
+                    .selectFrom(model)
+                    .selectAll()
+                    .where((eb) => {
+                        const conditions = updatedIds.map((id) => {
+                            const idConditions = Object.entries(id).map(([field, value]) => eb.eb(field, '=', value));
+                            return eb.and(idConditions);
+                        });
+                        return eb.or(conditions);
+                    });
+
+                const result = await this.executeQuery(kysely, resultQuery, 'update');
+                return result.rows as Result;
+            }
         }
     }
 
@@ -2085,7 +2237,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
-        let query = kysely.deleteFrom(model).returning(fieldsToReturn as any);
 
         let needIdFilter = false;
 
@@ -2102,33 +2253,95 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             needIdFilter = true;
         }
 
-        if (!needIdFilter) {
-            query = query.where(() => this.dialect.buildFilter(model, model, where));
-        } else {
-            query = query.where((eb) =>
-                eb(
-                    eb.refTuple(
-                        // @ts-expect-error
-                        ...this.buildIdFieldRefs(kysely, model),
+        if (this.dialect.supportsReturning) {
+            let query = kysely.deleteFrom(model).returning(fieldsToReturn as any);
+
+            if (!needIdFilter) {
+                query = query.where(() => this.dialect.buildFilter(model, model, where));
+            } else {
+                query = query.where((eb) =>
+                    eb(
+                        eb.refTuple(
+                            // @ts-expect-error
+                            ...this.buildIdFieldRefs(kysely, model),
+                        ),
+                        'in',
+                        this.dialect
+                            .buildSelectModel(filterModel, filterModel)
+                            .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
+                            .select(this.buildIdFieldRefs(kysely, filterModel))
+                            .$if(limit !== undefined, (qb) => qb.limit(limit!)),
                     ),
-                    'in',
-                    this.dialect
-                        .buildSelectModel(filterModel, filterModel)
-                        .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
-                        .select(this.buildIdFieldRefs(kysely, filterModel))
-                        .$if(limit !== undefined, (qb) => qb.limit(limit!)),
-                ),
-            );
+                );
+            }
+
+            // if the model being deleted has a relation to a model that extends a delegate model, and if that
+            // relation is set to trigger a cascade delete from this model, the deletion will not automatically
+            // clean up the base hierarchy of the relation side (because polymorphic model's cascade deletion
+            // works downward not upward). We need to take care of the base deletions manually here.
+            await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
+
+            query = query.modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
+            return this.executeQuery(kysely, query, 'delete');
+        } else {
+            // Fallback for databases that don't support RETURNING (e.g., MySQL)
+            // First, select the records to be deleted
+            let selectQuery = kysely.selectFrom(model).selectAll();
+
+            if (!needIdFilter) {
+                selectQuery = selectQuery.where(() => this.dialect.buildFilter(model, model, where));
+            } else {
+                selectQuery = selectQuery.where((eb) =>
+                    eb(
+                        eb.refTuple(
+                            // @ts-expect-error
+                            ...this.buildIdFieldRefs(kysely, model),
+                        ),
+                        'in',
+                        this.dialect
+                            .buildSelectModel(filterModel, filterModel)
+                            .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
+                            .select(this.buildIdFieldRefs(kysely, filterModel))
+                            .$if(limit !== undefined, (qb) => qb.limit(limit!)),
+                    ),
+                );
+            }
+
+            const recordsToDelete = await this.executeQuery(kysely, selectQuery, 'delete');
+
+            // Now execute the delete
+            let deleteQuery = kysely.deleteFrom(model);
+
+            if (!needIdFilter) {
+                deleteQuery = deleteQuery.where(() => this.dialect.buildFilter(model, model, where));
+            } else {
+                deleteQuery = deleteQuery.where((eb) =>
+                    eb(
+                        eb.refTuple(
+                            // @ts-expect-error
+                            ...this.buildIdFieldRefs(kysely, model),
+                        ),
+                        'in',
+                        this.dialect
+                            .buildSelectModel(filterModel, filterModel)
+                            .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
+                            .select(this.buildIdFieldRefs(kysely, filterModel))
+                            .$if(limit !== undefined, (qb) => qb.limit(limit!)),
+                    ),
+                );
+            }
+
+            await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
+
+            deleteQuery = deleteQuery.modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
+            await this.executeQuery(kysely, deleteQuery, 'delete');
+
+            // Return the records that were deleted
+            return {
+                rows: recordsToDelete.rows,
+                numAffectedRows: BigInt(recordsToDelete.rows.length),
+            };
         }
-
-        // if the model being deleted has a relation to a model that extends a delegate model, and if that
-        // relation is set to trigger a cascade delete from this model, the deletion will not automatically
-        // clean up the base hierarchy of the relation side (because polymorphic model's cascade deletion
-        // works downward not upward). We need to take care of the base deletions manually here.
-        await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
-
-        query = query.modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
-        return this.executeQuery(kysely, query, 'delete');
     }
 
     private async processDelegateRelationDelete(

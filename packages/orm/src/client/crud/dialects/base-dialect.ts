@@ -90,7 +90,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         result = this.buildSkipTake(result, skip, take);
 
         // orderBy
-        result = this.buildOrderBy(result, model, modelAlias, args.orderBy, negateOrderBy);
+        result = this.buildOrderBy(result, model, modelAlias, args.orderBy, negateOrderBy, take);
 
         // distinct
         if ('distinct' in args && (args as any).distinct) {
@@ -160,8 +160,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildCursorFilter(
         model: string,
         query: SelectQueryBuilder<any, any, any>,
-        cursor: FindArgs<Schema, GetModels<Schema>, true>['cursor'],
-        orderBy: FindArgs<Schema, GetModels<Schema>, true>['orderBy'],
+        cursor: object,
+        orderBy: OrArray<Record<string, SortOrder>> | undefined,
         negateOrderBy: boolean,
         modelAlias: string,
     ) {
@@ -958,6 +958,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         modelAlias: string,
         orderBy: OrArray<OrderBy<Schema, GetModels<Schema>, boolean, boolean>> | undefined,
         negated: boolean,
+        take: number | undefined,
     ) {
         if (!orderBy) {
             return query;
@@ -1069,7 +1070,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                 ),
                             );
                         });
-                        result = this.buildOrderBy(result, relationModel, joinAlias, value, negated);
+                        result = this.buildOrderBy(result, relationModel, joinAlias, value, negated, take);
                     }
                 }
             }
@@ -1253,7 +1254,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     // #region utils
 
-    private negateSort(sort: SortOrder, negated: boolean) {
+    protected negateSort(sort: SortOrder, negated: boolean) {
         return negated ? (sort === 'asc' ? 'desc' : 'asc') : sort;
     }
 
@@ -1419,6 +1420,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Whether the dialect support inserting with `DEFAULT` as field value.
      */
     abstract get supportInsertWithDefault(): boolean;
+
+    /**
+     * Whether the dialect supports the RETURNING clause in INSERT/UPDATE/DELETE statements.
+     */
+    abstract get supportsReturning(): boolean;
 
     /**
      * Gets the SQL column type for the given field definition.

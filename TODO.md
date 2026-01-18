@@ -18,7 +18,6 @@
 - [ ] ZModel
     - [x] Import
     - [ ] View support
-    - [ ] Datasource provider-scoped attributes
 - [ ] ORM
     - [x] Create
         - [x] Input validation
@@ -72,7 +71,7 @@
         - [x] Query builder API
         - [x] Computed fields
         - [x] Plugin
-        - [ ] Custom procedures
+        - [x] Custom procedures
     - [ ] Misc
         - [x] JSDoc for CRUD methods
         - [x] Cache validation schemas
@@ -110,4 +109,4 @@
     - [x] SQLite
     - [x] PostgreSQL
         - [x] Multi-schema
-    - [ ] MySQL
+    - [x] MySQL

@@ -1079,12 +1079,15 @@ export type FindArgs<
     Collection extends boolean,
     AllowFilter extends boolean = true,
 > = (Collection extends true
-    ? SortAndTakeArgs<Schema, Model> & {
-          /**
-           * Distinct fields
-           */
-          distinct?: OrArray<NonRelationFields<Schema, Model>>;
-      }
+    ? SortAndTakeArgs<Schema, Model> &
+          (ProviderSupportsDistinct<Schema> extends true
+              ? {
+                    /**
+                     * Distinct fields. Only supported by providers that natively support SQL "DISTINCT ON".
+                     */
+                    distinct?: OrArray<NonRelationFields<Schema, Model>>;
+                }
+              : {})
     : {}) &
     (AllowFilter extends true ? FilterArgs<Schema, Model> : {}) &
     SelectIncludeOmit<Schema, Model, Collection>;
@@ -2108,8 +2111,8 @@ type MapType<Schema extends SchemaDef, T extends string> = T extends keyof TypeM
           ? EnumValue<Schema, T>
           : unknown;
 
-// type ProviderSupportsDistinct<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
-//     ? true
-//     : false;
+type ProviderSupportsDistinct<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
+    ? true
+    : false;
 
 // #endregion

@@ -416,6 +416,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return false;
     }
 
+    override get supportsReturning() {
+        return true; // SQLite 3.35.0+ supports RETURNING
+    }
+
     override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
         return this.eb.fn('json_array_length', [array]);
     }

@@ -1,14 +1,19 @@
 import type { OperationNode, QueryId, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
-import type { ClientContract } from '.';
+import type { ZodObject } from 'zod';
+import type { ClientContract, ZModelFunction } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
-import type { AllCrudOperation } from './crud/operations/base';
-import type { ZModelFunction } from './options';
+import type { AllCrudOperations, CoreCrudOperations } from './crud/operations/base';
+
+/**
+ * Base shape of plugin-extended query args.
+ */
+export type ExtQueryArgsBase = { [K in CoreCrudOperations | 'all']?: object };
 
 /**
  * ZenStack runtime plugin.
  */
-export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
+export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef, _ExtQueryArgs extends ExtQueryArgsBase = {}> {
     /**
      * Plugin ID.
      */
@@ -37,6 +42,11 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
     onQuery?: OnQueryCallback<Schema>;
 
     /**
+     * Intercepts a procedure invocation.
+     */
+    onProcedure?: OnProcedureCallback<Schema>;
+
+    /**
      * Intercepts an entity mutation.
      */
     onEntityMutation?: EntityMutationHooksDef<Schema>;
@@ -45,16 +55,61 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
      * Intercepts a Kysely query.
      */
     onKyselyQuery?: OnKyselyQueryCallback<Schema>;
-}
 
+    /**
+     * Extended query args configuration.
+     */
+    extQueryArgs?: {
+        /**
+         * Callback for getting a Zod schema to validate the extended query args for the given operation.
+         */
+        getValidationSchema: (operation: CoreCrudOperations) => ZodObject | undefined;
+    };
+}
 /**
  * Defines a ZenStack runtime plugin.
  */
-export function definePlugin<Schema extends SchemaDef>(plugin: RuntimePlugin<Schema>) {
+export function definePlugin<Schema extends SchemaDef = SchemaDef, ExtQueryArgs extends ExtQueryArgsBase = {}>(
+    plugin: RuntimePlugin<Schema, ExtQueryArgs>,
+): RuntimePlugin<Schema, ExtQueryArgs> {
     return plugin;
 }
 
-export { type CoreCrudOperation as CrudOperation } from './crud/operations/base';
+// #region OnProcedure hooks
+
+type OnProcedureCallback<Schema extends SchemaDef> = (ctx: OnProcedureHookContext<Schema>) => Promise<unknown>;
+
+export type OnProcedureHookContext<Schema extends SchemaDef> = {
+    /**
+     * The procedure name.
+     */
+    name: string;
+
+    /**
+     * Whether the procedure is a mutation.
+     */
+    mutation: boolean;
+
+    /**
+     * Procedure invocation input (envelope).
+     *
+     * The canonical shape is `{ args?: Record<string, unknown> }`.
+     * When a procedure has required params, `args` is required.
+     */
+    input: unknown;
+
+    /**
+     * Continues the invocation. The input passed here is forwarded to the next handler.
+     */
+    proceed: (input: unknown) => Promise<unknown>;
+
+    /**
+     * The ZenStack client that is invoking the procedure.
+     */
+    client: ClientContract<Schema>;
+};
+
+// #endregion
 
 // #region OnQuery hooks
 
@@ -69,12 +124,12 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
     /**
      * The operation that is being performed.
      */
-    operation: AllCrudOperation;
+    operation: AllCrudOperations;
 
     /**
      * The query arguments.
      */
-    args: unknown;
+    args: Record<string, unknown> | undefined;
 
     /**
      * The function to proceed with the original query.
@@ -82,7 +137,7 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
      *
      * @param args The query arguments.
      */
-    proceed: (args: unknown) => Promise<unknown>;
+    proceed: (args: Record<string, unknown> | undefined) => Promise<unknown>;
 
     /**
      * The ZenStack client that is performing the operation.

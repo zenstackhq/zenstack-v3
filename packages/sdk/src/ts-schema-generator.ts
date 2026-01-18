@@ -608,12 +608,15 @@ export class TsSchemaGenerator {
 
         const defaultValue = this.getFieldMappedDefault(field);
         if (defaultValue !== undefined) {
-            if (typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
+            if (defaultValue === null) {
+                objectFields.push(
+                    ts.factory.createPropertyAssignment('default', this.createExpressionUtilsCall('_null')),
+                );
+            } else if (typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
                 if ('call' in defaultValue) {
                     objectFields.push(
                         ts.factory.createPropertyAssignment(
                             'default',
-
                             this.createExpressionUtilsCall('call', [
                                 ts.factory.createStringLiteral(defaultValue.call),
                                 ...(defaultValue.args.length > 0
@@ -726,7 +729,15 @@ export class TsSchemaGenerator {
 
     private getFieldMappedDefault(
         field: DataField,
-    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
+    ):
+        | string
+        | number
+        | boolean
+        | unknown[]
+        | { call: string; args: any[] }
+        | { authMember: string[] }
+        | null
+        | undefined {
         const defaultAttr = getAttribute(field, '@default');
         if (!defaultAttr) {
             return undefined;
@@ -739,7 +750,7 @@ export class TsSchemaGenerator {
     private getMappedValue(
         expr: Expression,
         fieldType: DataFieldType,
-    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
+    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | null {
         if (isLiteralExpr(expr)) {
             const lit = (expr as LiteralExpr).value;
             return fieldType.type === 'Boolean'
@@ -760,8 +771,10 @@ export class TsSchemaGenerator {
             return {
                 authMember: this.getMemberAccessChain(expr),
             };
+        } else if (isNullExpr(expr)) {
+            return null;
         } else {
-            throw new Error(`Unsupported default value type for ${expr.$type}`);
+            throw new Error(`Unsupported expression type: ${expr.$type}`);
         }
     }
 
@@ -1125,65 +1138,38 @@ export class TsSchemaGenerator {
     }
 
     private createProcedureObject(proc: Procedure) {
-        const params = ts.factory.createArrayLiteralExpression(
+        const params = ts.factory.createObjectLiteralExpression(
             proc.params.map((param) =>
-                ts.factory.createObjectLiteralExpression([
-                    ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(param.name)),
-                    ...(param.optional
-                        ? [ts.factory.createPropertyAssignment('optional', ts.factory.createTrue())]
-                        : []),
-                    ts.factory.createPropertyAssignment(
-                        'type',
-                        ts.factory.createStringLiteral(param.type.type ?? param.type.reference!.$refText),
-                    ),
-                ]),
+                ts.factory.createPropertyAssignment(
+                    param.name,
+                    ts.factory.createObjectLiteralExpression([
+                        ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(param.name)),
+                        ...(param.optional
+                            ? [ts.factory.createPropertyAssignment('optional', ts.factory.createTrue())]
+                            : []),
+                        ...(param.type.array
+                            ? [ts.factory.createPropertyAssignment('array', ts.factory.createTrue())]
+                            : []),
+                        ts.factory.createPropertyAssignment(
+                            'type',
+                            ts.factory.createStringLiteral(param.type.type ?? param.type.reference!.$refText),
+                        ),
+                    ]),
+                ),
             ),
             true,
         );
 
-        const paramsType = ts.factory.createTupleTypeNode([
-            ...proc.params.map((param) =>
-                ts.factory.createNamedTupleMember(
-                    undefined,
-                    ts.factory.createIdentifier(param.name),
-                    undefined,
-                    ts.factory.createTypeLiteralNode([
-                        ts.factory.createPropertySignature(
-                            undefined,
-                            ts.factory.createStringLiteral('name'),
-                            undefined,
-                            ts.factory.createLiteralTypeNode(ts.factory.createStringLiteral(param.name)),
-                        ),
-                        ts.factory.createPropertySignature(
-                            undefined,
-                            ts.factory.createStringLiteral('type'),
-                            undefined,
-                            ts.factory.createLiteralTypeNode(
-                                ts.factory.createStringLiteral(param.type.type ?? param.type.reference!.$refText),
-                            ),
-                        ),
-                        ...(param.optional
-                            ? [
-                                  ts.factory.createPropertySignature(
-                                      undefined,
-                                      ts.factory.createStringLiteral('optional'),
-                                      undefined,
-                                      ts.factory.createLiteralTypeNode(ts.factory.createTrue()),
-                                  ),
-                              ]
-                            : []),
-                    ]),
-                ),
-            ),
-        ]);
-
         return ts.factory.createObjectLiteralExpression(
             [
-                ts.factory.createPropertyAssignment('params', ts.factory.createAsExpression(params, paramsType)),
+                ts.factory.createPropertyAssignment('params', params),
                 ts.factory.createPropertyAssignment(
                     'returnType',
                     ts.factory.createStringLiteral(proc.returnType.type ?? proc.returnType.reference!.$refText),
                 ),
+                ...(proc.returnType.array
+                    ? [ts.factory.createPropertyAssignment('returnArray', ts.factory.createTrue())]
+                    : []),
                 ...(proc.mutation ? [ts.factory.createPropertyAssignment('mutation', ts.factory.createTrue())] : []),
             ],
             true,
@@ -1551,6 +1537,7 @@ export class TsSchemaGenerator {
             'FindManyArgs',
             'FindUniqueArgs',
             'FindFirstArgs',
+            'ExistsArgs',
             'CreateArgs',
             'CreateManyArgs',
             'CreateManyAndReturnArgs',

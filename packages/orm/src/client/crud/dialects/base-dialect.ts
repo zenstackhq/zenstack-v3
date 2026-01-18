@@ -48,7 +48,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return value;
     }
 
-    transformOutput(value: unknown, _type: BuiltinType) {
+    transformOutput(value: unknown, _type: BuiltinType, _array: boolean) {
         return value;
     }
 
@@ -765,6 +765,12 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 .with('lte', () => this.eb(lhs, '<=', rhs))
                 .with('gt', () => this.eb(lhs, '>', rhs))
                 .with('gte', () => this.eb(lhs, '>=', rhs))
+                .with('between', () => {
+                    invariant(Array.isArray(rhs), 'right hand side must be an array');
+                    invariant(rhs.length === 2, 'right hand side must have a length of 2');
+                    const [start, end] = rhs;
+                    return this.eb.and([this.eb(lhs, '>=', start), this.eb(lhs, '<=', end)]);
+                })
                 .with('not', () => this.eb.not(recurse(value)))
                 // aggregations
                 .with(P.union(...AGGREGATE_OPERATORS), (op) => {

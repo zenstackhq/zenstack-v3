@@ -230,7 +230,7 @@ ProcedureParam:
     TRIPLE_SLASH_COMMENT* name=RegularID ':' type=FunctionParamType (optional?='?')?;
 
 Procedure:
-    TRIPLE_SLASH_COMMENT* (mutation?='mutation') 'procedure' name=RegularID '(' (params+=ProcedureParam (',' params+=FunctionParam)*)? ')' ':' returnType=FunctionParamType (attributes+=InternalAttribute)*;
+    TRIPLE_SLASH_COMMENT* (mutation?='mutation')? 'procedure' name=RegularID '(' (params+=ProcedureParam (',' params+=ProcedureParam)*)? ')' ':' returnType=FunctionParamType (attributes+=InternalAttribute)*;
 
 // https://github.com/langium/langium/discussions/1012
 RegularID returns string:
@@ -238,7 +238,7 @@ RegularID returns string:
     ID | 'model' | 'enum' | 'attribute' | 'datasource' | 'plugin' | 'abstract' | 'in' | 'view' | 'import' | 'type';
 
 RegularIDWithTypeNames returns string:
-    RegularID | 'String' | 'Boolean' | 'Int' | 'BigInt' | 'Float' | 'Decimal' | 'DateTime' | 'Json' | 'Bytes' | 'Null' | 'Object' | 'Any' | 'Unsupported';
+    RegularID | 'String' | 'Boolean' | 'Int' | 'BigInt' | 'Float' | 'Decimal' | 'DateTime' | 'Json' | 'Bytes' | 'Null' | 'Object' | 'Any' | 'Void' | 'Unsupported';
 
 // attribute
 Attribute:
@@ -270,7 +270,7 @@ AttributeArg:
     (name=RegularID ':')? value=Expression;
 
 ExpressionType returns string:
-    'String' | 'Int' | 'Float' | 'Boolean' | 'DateTime' | 'Null' | 'Object' | 'Any' | 'Unsupported';
+    'String' | 'Int' | 'Float' | 'Boolean' | 'BigInt' | 'Decimal' | 'DateTime' | 'Json' | 'Bytes' | 'Null' | 'Object' | 'Any' | 'Void' | 'Undefined' | 'Unsupported';
 
 BuiltinType returns string:
     'String' | 'Boolean' | 'Int' | 'BigInt' | 'Float' | 'Decimal' | 'DateTime' | 'Json' | 'Bytes';

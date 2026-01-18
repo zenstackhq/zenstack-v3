@@ -1,5 +1,6 @@
-import { invariant } from '@zenstackhq/common-helpers';
-import { isPlugin, LiteralExpr, Plugin, type Model } from '@zenstackhq/language/ast';
+import { invariant, singleDebounce } from '@zenstackhq/common-helpers';
+import { ZModelLanguageMetaData } from '@zenstackhq/language';
+import { type AbstractDeclaration, isPlugin, LiteralExpr, Plugin, type Model } from '@zenstackhq/language/ast';
 import { getLiteral, getLiteralArray } from '@zenstackhq/language/utils';
 import { type CliPlugin } from '@zenstackhq/sdk';
 import colors from 'colors';
@@ -7,6 +8,7 @@ import { createJiti } from 'jiti';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { watch } from 'chokidar';
 import ora, { type Ora } from 'ora';
 import { CliError } from '../cli-error';
 import * as corePlugins from '../plugins';
@@ -16,6 +18,7 @@ type Options = {
     schema?: string;
     output?: string;
     silent: boolean;
+    watch: boolean;
     lite: boolean;
     liteOnly: boolean;
 };
@@ -24,6 +27,96 @@ type Options = {
  * CLI action for generating code from schema
  */
 export async function run(options: Options) {
+    const model = await pureGenerate(options, false);
+
+    if (options.watch) {
+        const logsEnabled = !options.silent;
+
+        if (logsEnabled) {
+            console.log(colors.green(`\nEnabled watch mode!`));
+        }
+
+        const schemaExtensions = ZModelLanguageMetaData.fileExtensions;
+
+        // Get real models file path (cuz its merged into single document -> we need use cst nodes)
+        const getRootModelWatchPaths = (model: Model) => new Set<string>(
+            (
+                model.declarations.filter(
+                    (v) =>
+                        v.$cstNode?.parent?.element.$type === 'Model' &&
+                        !!v.$cstNode.parent.element.$document?.uri?.fsPath,
+                ) as AbstractDeclaration[]
+            ).map((v) => v.$cstNode!.parent!.element.$document!.uri!.fsPath),
+        );
+
+        const watchedPaths = getRootModelWatchPaths(model);
+
+        if (logsEnabled) {
+            const logPaths = [...watchedPaths].map((at) => `- ${at}`).join('\n');
+            console.log(`Watched file paths:\n${logPaths}`);
+        }
+
+        const watcher = watch([...watchedPaths], {
+            alwaysStat: false,
+            ignoreInitial: true,
+            ignorePermissionErrors: true,
+            ignored: (at) => !schemaExtensions.some((ext) => at.endsWith(ext)),
+        });
+
+        // prevent save multiple files and run multiple times
+        const reGenerateSchema = singleDebounce(async () => {
+            if (logsEnabled) {
+                console.log('Got changes, run generation!');
+            }
+
+            try {
+                const newModel = await pureGenerate(options, true);
+                const allModelsPaths = getRootModelWatchPaths(newModel);
+                const newModelPaths = [...allModelsPaths].filter((at) => !watchedPaths.has(at));
+                const removeModelPaths = [...watchedPaths].filter((at) => !allModelsPaths.has(at));
+
+                if (newModelPaths.length) {
+                    if (logsEnabled) {
+                        const logPaths = newModelPaths.map((at) => `- ${at}`).join('\n');
+                        console.log(`Added file(s) to watch:\n${logPaths}`);
+                    }
+
+                    newModelPaths.forEach((at) => watchedPaths.add(at));
+                    watcher.add(newModelPaths);
+                }
+
+                if (removeModelPaths.length) {
+                    if (logsEnabled) {
+                        const logPaths = removeModelPaths.map((at) => `- ${at}`).join('\n');
+                        console.log(`Removed file(s) from watch:\n${logPaths}`);
+                    }
+
+                    removeModelPaths.forEach((at) => watchedPaths.delete(at));
+                    watcher.unwatch(removeModelPaths);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }, 500, true);
+
+        watcher.on('unlink', (pathAt) => {
+            if (logsEnabled) {
+                console.log(`Removed file from watch: ${pathAt}`);
+            }
+
+            watchedPaths.delete(pathAt);
+            watcher.unwatch(pathAt);
+
+            reGenerateSchema();
+        });
+
+        watcher.on('change', () => {
+            reGenerateSchema();
+        });
+    }
+}
+
+async function pureGenerate(options: Options, fromWatch: boolean) {
     const start = Date.now();
 
     const schemaFile = getSchemaFile(options.schema);
@@ -35,7 +128,9 @@ export async function run(options: Options) {
 
     if (!options.silent) {
         console.log(colors.green(`Generation completed successfully in ${Date.now() - start}ms.\n`));
-        console.log(`You can now create a ZenStack client with it.
+
+        if (!fromWatch) {
+            console.log(`You can now create a ZenStack client with it.
 
 \`\`\`ts
 import { ZenStackClient } from '@zenstackhq/orm';
@@ -47,7 +142,10 @@ const client = new ZenStackClient(schema, {
 \`\`\`
 
 Check documentation: https://zenstack.dev/docs/`);
+        }
     }
+
+    return model;
 }
 
 function getOutputPath(options: Options, schemaFile: string) {

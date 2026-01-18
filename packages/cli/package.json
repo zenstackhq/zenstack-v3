@@ -3,7 +3,7 @@
     "publisher": "zenstack",
     "displayName": "ZenStack CLI",
     "description": "FullStack database toolkit with built-in access control and automatic API generation.",
-    "version": "3.1.0",
+    "version": "3.2.1",
     "type": "module",
     "author": {
         "name": "ZenStack Team"
@@ -21,6 +21,10 @@
         "zen": "bin/cli",
         "zenstack": "bin/cli"
     },
+    "files": [
+        "dist",
+        "bin"
+    ],
     "scripts": {
         "build": "tsc --noEmit && tsup-node",
         "watch": "tsup-node --watch",
@@ -35,6 +39,7 @@
         "@zenstackhq/common-helpers": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
+        "chokidar": "^5.0.0",
         "colors": "1.4.0",
         "commander": "^8.3.0",
         "execa": "^9.6.0",
@@ -58,5 +63,8 @@
         "@zenstackhq/vitest-config": "workspace:*",
         "better-sqlite3": "catalog:",
         "tmp": "catalog:"
+    },
+    "engines": {
+        "node": ">=20"
     }
 }

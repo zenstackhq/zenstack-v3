@@ -121,7 +121,7 @@ model User {
                     },
                 },
             }),
-        ).rejects.toThrow(/invalid/i);
+        ).rejects.toThrow('data.identity.providers[0].id');
     });
 
     it('works with find', async () => {

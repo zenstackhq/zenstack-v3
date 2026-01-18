@@ -5,6 +5,8 @@ import { schema } from "../../../../zenstack/schema";
 
 const handler = SvelteKitRouteHandler({
   apiHandler: new RPCApiHandler({ schema }),
+  // fully open ZenStackClient is used here for demo purposes only, in a real application,
+  // you should use one with access policies enabled
   getClient: () => db,
 });
 

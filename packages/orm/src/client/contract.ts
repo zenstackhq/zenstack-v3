@@ -1,4 +1,3 @@
-import type Decimal from 'decimal.js';
 import {
     type FieldIsArray,
     type GetModels,
@@ -10,7 +9,7 @@ import {
     type SchemaDef,
 } from '../schema';
 import type { AnyKysely } from '../utils/kysely-utils';
-import type { OrUndefinedIf, Simplify, UnwrapTuplePromises } from '../utils/type-utils';
+import type { Simplify, UnwrapTuplePromises } from '../utils/type-utils';
 import type { TRANSACTION_UNSUPPORTED_METHODS } from './constants';
 import type {
     AggregateArgs,
@@ -24,12 +23,14 @@ import type {
     DefaultModelResult,
     DeleteArgs,
     DeleteManyArgs,
+    ExistsArgs,
     FindFirstArgs,
     FindManyArgs,
     FindUniqueArgs,
+    GetProcedureNames,
     GroupByArgs,
     GroupByResult,
-    ModelResult,
+    ProcedureFunc,
     SelectSubset,
     SimplifiedPlainResult,
     Subset,
@@ -39,12 +40,22 @@ import type {
     UpdateManyArgs,
     UpsertArgs,
 } from './crud-types';
+import type { CoreCrudOperations } from './crud/operations/base';
 import type { ClientOptions, QueryOptions, ToQueryOptions } from './options';
-import type { RuntimePlugin } from './plugin';
+import type { ExtQueryArgsBase, RuntimePlugin } from './plugin';
 import type { ZenStackPromise } from './promise';
 import type { ToKysely } from './query-builder';
 
 type TransactionUnsupportedMethods = (typeof TRANSACTION_UNSUPPORTED_METHODS)[number];
+
+/**
+ * Extracts extended query args for a specific operation.
+ */
+type ExtractExtQueryArgs<ExtQueryArgs, Operation extends CoreCrudOperations> = Operation extends keyof ExtQueryArgs
+    ? NonNullable<ExtQueryArgs[Operation]>
+    : 'all' extends keyof ExtQueryArgs
+      ? NonNullable<ExtQueryArgs['all']>
+      : {};
 
 /**
  * Transaction isolation levels.
@@ -60,7 +71,11 @@ export enum TransactionIsolationLevel {
 /**
  * ZenStack client interface.
  */
-export type ClientContract<Schema extends SchemaDef, Options extends ClientOptions<Schema> = ClientOptions<Schema>> = {
+export type ClientContract<
+    Schema extends SchemaDef,
+    Options extends ClientOptions<Schema> = ClientOptions<Schema>,
+    ExtQueryArgs extends ExtQueryArgsBase = {},
+> = {
     /**
      * The schema definition.
      */
@@ -117,7 +132,7 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
     /**
      * Sets the current user identity.
      */
-    $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema, Options>;
+    $setAuth(auth: AuthType<Schema> | undefined): ClientContract<Schema, Options, ExtQueryArgs>;
 
     /**
      * Returns a new client with new options applied.
@@ -126,15 +141,15 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
      * const dbNoValidation = db.$setOptions({ ...db.$options, validateInput: false });
      * ```
      */
-    $setOptions<Options extends ClientOptions<Schema>>(options: Options): ClientContract<Schema, Options>;
+    $setOptions<Options extends ClientOptions<Schema>>(options: Options): ClientContract<Schema, Options, ExtQueryArgs>;
 
     /**
      * Returns a new client enabling/disabling input validations expressed with attributes like
      * `@email`, `@regex`, `@@validate`, etc.
      *
-     * @deprecated Use `$setOptions` instead.
+     * @deprecated Use {@link $setOptions} instead.
      */
-    $setInputValidation(enable: boolean): ClientContract<Schema, Options>;
+    $setInputValidation(enable: boolean): ClientContract<Schema, Options, ExtQueryArgs>;
 
     /**
      * The Kysely query builder instance.
@@ -150,7 +165,7 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
      * Starts an interactive transaction.
      */
     $transaction<T>(
-        callback: (tx: Omit<ClientContract<Schema, Options>, TransactionUnsupportedMethods>) => Promise<T>,
+        callback: (tx: TransactionClientContract<Schema, Options, ExtQueryArgs>) => Promise<T>,
         options?: { isolationLevel?: TransactionIsolationLevel },
     ): Promise<T>;
 
@@ -165,12 +180,14 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
     /**
      * Returns a new client with the specified plugin installed.
      */
-    $use(plugin: RuntimePlugin<Schema>): ClientContract<Schema, Options>;
+    $use<PluginSchema extends SchemaDef = Schema, PluginExtQueryArgs extends ExtQueryArgsBase = {}>(
+        plugin: RuntimePlugin<PluginSchema, PluginExtQueryArgs>,
+    ): ClientContract<Schema, Options, ExtQueryArgs & PluginExtQueryArgs>;
 
     /**
      * Returns a new client with the specified plugin removed.
      */
-    $unuse(pluginId: string): ClientContract<Schema, Options>;
+    $unuse(pluginId: string): ClientContract<Schema, Options, ExtQueryArgs>;
 
     /**
      * Returns a new client with all plugins removed.
@@ -193,51 +210,34 @@ export type ClientContract<Schema extends SchemaDef, Options extends ClientOptio
      */
     $pushSchema(): Promise<void>;
 } & {
-    [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<Schema, Key, ToQueryOptions<Options>>;
-} & Procedures<Schema>;
+    [Key in GetModels<Schema> as Uncapitalize<Key>]: ModelOperations<
+        Schema,
+        Key,
+        ToQueryOptions<Options>,
+        ExtQueryArgs
+    >;
+} & ProcedureOperations<Schema>;
 
 /**
  * The contract for a client in a transaction.
  */
-export type TransactionClientContract<Schema extends SchemaDef, Options extends ClientOptions<Schema>> = Omit<
-    ClientContract<Schema, Options>,
-    TransactionUnsupportedMethods
->;
+export type TransactionClientContract<
+    Schema extends SchemaDef,
+    Options extends ClientOptions<Schema>,
+    ExtQueryArgs extends ExtQueryArgsBase,
+> = Omit<ClientContract<Schema, Options, ExtQueryArgs>, TransactionUnsupportedMethods>;
 
-type _TypeMap = {
-    String: string;
-    Int: number;
-    Float: number;
-    BigInt: bigint;
-    Decimal: Decimal;
-    Boolean: boolean;
-    DateTime: Date;
-};
-
-type MapType<Schema extends SchemaDef, T extends string> = T extends keyof _TypeMap
-    ? _TypeMap[T]
-    : T extends GetModels<Schema>
-      ? ModelResult<Schema, T>
-      : unknown;
-
-export type Procedures<Schema extends SchemaDef> =
+export type ProcedureOperations<Schema extends SchemaDef> =
     Schema['procedures'] extends Record<string, ProcedureDef>
         ? {
-              $procedures: {
-                  [Key in keyof Schema['procedures']]: ProcedureFunc<Schema, Schema['procedures'][Key]>;
+              /**
+               * Custom procedures.
+               */
+              $procs: {
+                  [Key in GetProcedureNames<Schema>]: ProcedureFunc<Schema, Key>;
               };
           }
         : {};
-
-export type ProcedureFunc<Schema extends SchemaDef, Proc extends ProcedureDef> = (
-    ...args: MapProcedureParams<Schema, Proc['params']>
-) => Promise<MapType<Schema, Proc['returnType']>>;
-
-type MapProcedureParams<Schema extends SchemaDef, Params> = {
-    [P in keyof Params]: Params[P] extends { type: infer U }
-        ? OrUndefinedIf<MapType<Schema, U & string>, Params[P] extends { optional: true } ? true : false>
-        : never;
-};
 
 /**
  * Creates a new ZenStack client instance.
@@ -275,6 +275,7 @@ export type AllModelOperations<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Options extends QueryOptions<Schema>,
+    ExtQueryArgs,
 > = {
     /**
      * Returns a list of entities.
@@ -357,8 +358,8 @@ export type AllModelOperations<
      * }); // result: `{ _count: { posts: number } }`
      * ```
      */
-    findMany<T extends FindManyArgs<Schema, Model>>(
-        args?: SelectSubset<T, FindManyArgs<Schema, Model>>,
+    findMany<T extends FindManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findMany'>>(
+        args?: SelectSubset<T, FindManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findMany'>>,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
     /**
@@ -367,8 +368,8 @@ export type AllModelOperations<
      * @returns a single entity or null if not found
      * @see {@link findMany}
      */
-    findUnique<T extends FindUniqueArgs<Schema, Model>>(
-        args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
+    findUnique<T extends FindUniqueArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findUnique'>>(
+        args: SelectSubset<T, FindUniqueArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findUnique'>>,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options> | null>;
 
     /**
@@ -377,8 +378,8 @@ export type AllModelOperations<
      * @returns a single entity
      * @see {@link findMany}
      */
-    findUniqueOrThrow<T extends FindUniqueArgs<Schema, Model>>(
-        args: SelectSubset<T, FindUniqueArgs<Schema, Model>>,
+    findUniqueOrThrow<T extends FindUniqueArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findUnique'>>(
+        args: SelectSubset<T, FindUniqueArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findUnique'>>,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
@@ -387,8 +388,8 @@ export type AllModelOperations<
      * @returns a single entity or null if not found
      * @see {@link findMany}
      */
-    findFirst<T extends FindFirstArgs<Schema, Model>>(
-        args?: SelectSubset<T, FindFirstArgs<Schema, Model>>,
+    findFirst<T extends FindFirstArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findFirst'>>(
+        args?: SelectSubset<T, FindFirstArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findFirst'>>,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options> | null>;
 
     /**
@@ -397,8 +398,8 @@ export type AllModelOperations<
      * @returns a single entity
      * @see {@link findMany}
      */
-    findFirstOrThrow<T extends FindFirstArgs<Schema, Model>>(
-        args?: SelectSubset<T, FindFirstArgs<Schema, Model>>,
+    findFirstOrThrow<T extends FindFirstArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findFirst'>>(
+        args?: SelectSubset<T, FindFirstArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'findFirst'>>,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
@@ -453,8 +454,8 @@ export type AllModelOperations<
      * });
      * ```
      */
-    create<T extends CreateArgs<Schema, Model>>(
-        args: SelectSubset<T, CreateArgs<Schema, Model>>,
+    create<T extends CreateArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'create'>>(
+        args: SelectSubset<T, CreateArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'create'>>,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
@@ -482,8 +483,8 @@ export type AllModelOperations<
      * });
      * ```
      */
-    createMany<T extends CreateManyArgs<Schema, Model>>(
-        args?: SelectSubset<T, CreateManyArgs<Schema, Model>>,
+    createMany<T extends CreateManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'createMany'>>(
+        args?: SelectSubset<T, CreateManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'createMany'>>,
     ): ZenStackPromise<Schema, BatchResult>;
 
     /**
@@ -504,8 +505,13 @@ export type AllModelOperations<
      * });
      * ```
      */
-    createManyAndReturn<T extends CreateManyAndReturnArgs<Schema, Model>>(
-        args?: SelectSubset<T, CreateManyAndReturnArgs<Schema, Model>>,
+    createManyAndReturn<
+        T extends CreateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'createManyAndReturn'>,
+    >(
+        args?: SelectSubset<
+            T,
+            CreateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'createManyAndReturn'>
+        >,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
     /**
@@ -625,8 +631,8 @@ export type AllModelOperations<
      * });
      * ```
      */
-    update<T extends UpdateArgs<Schema, Model>>(
-        args: SelectSubset<T, UpdateArgs<Schema, Model>>,
+    update<T extends UpdateArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'update'>>(
+        args: SelectSubset<T, UpdateArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'update'>>,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
@@ -649,8 +655,8 @@ export type AllModelOperations<
      *     limit: 10
      * });
      */
-    updateMany<T extends UpdateManyArgs<Schema, Model>>(
-        args: Subset<T, UpdateManyArgs<Schema, Model>>,
+    updateMany<T extends UpdateManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'updateMany'>>(
+        args: Subset<T, UpdateManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'updateMany'>>,
     ): ZenStackPromise<Schema, BatchResult>;
 
     /**
@@ -675,8 +681,13 @@ export type AllModelOperations<
      * });
      * ```
      */
-    updateManyAndReturn<T extends UpdateManyAndReturnArgs<Schema, Model>>(
-        args: Subset<T, UpdateManyAndReturnArgs<Schema, Model>>,
+    updateManyAndReturn<
+        T extends UpdateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'updateManyAndReturn'>,
+    >(
+        args: Subset<
+            T,
+            UpdateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'updateManyAndReturn'>
+        >,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
     /**
@@ -699,8 +710,8 @@ export type AllModelOperations<
      * });
      * ```
      */
-    upsert<T extends UpsertArgs<Schema, Model>>(
-        args: SelectSubset<T, UpsertArgs<Schema, Model>>,
+    upsert<T extends UpsertArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'upsert'>>(
+        args: SelectSubset<T, UpsertArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'upsert'>>,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
@@ -722,8 +733,8 @@ export type AllModelOperations<
      * }); // result: `{ id: string; email: string }`
      * ```
      */
-    delete<T extends DeleteArgs<Schema, Model>>(
-        args: SelectSubset<T, DeleteArgs<Schema, Model>>,
+    delete<T extends DeleteArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'delete'>>(
+        args: SelectSubset<T, DeleteArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'delete'>>,
     ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>>;
 
     /**
@@ -745,8 +756,8 @@ export type AllModelOperations<
      * });
      * ```
      */
-    deleteMany<T extends DeleteManyArgs<Schema, Model>>(
-        args?: Subset<T, DeleteManyArgs<Schema, Model>>,
+    deleteMany<T extends DeleteManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'deleteMany'>>(
+        args?: Subset<T, DeleteManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'deleteMany'>>,
     ): ZenStackPromise<Schema, BatchResult>;
 
     /**
@@ -767,8 +778,8 @@ export type AllModelOperations<
      *     select: { _all: true, email: true }
      * }); // result: `{ _all: number, email: number }`
      */
-    count<T extends CountArgs<Schema, Model>>(
-        args?: Subset<T, CountArgs<Schema, Model>>,
+    count<T extends CountArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'count'>>(
+        args?: Subset<T, CountArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'count'>>,
     ): ZenStackPromise<Schema, Simplify<CountResult<Schema, Model, T>>>;
 
     /**
@@ -788,8 +799,8 @@ export type AllModelOperations<
      *     _max: { age: true }
      * }); // result: `{ _count: number, _avg: { age: number }, ... }`
      */
-    aggregate<T extends AggregateArgs<Schema, Model>>(
-        args: Subset<T, AggregateArgs<Schema, Model>>,
+    aggregate<T extends AggregateArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'aggregate'>>(
+        args: Subset<T, AggregateArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'aggregate'>>,
     ): ZenStackPromise<Schema, Simplify<AggregateResult<Schema, Model, T>>>;
 
     /**
@@ -825,9 +836,30 @@ export type AllModelOperations<
      *     having: { country: 'US', age: { _avg: { gte: 18 } } }
      * });
      */
-    groupBy<T extends GroupByArgs<Schema, Model>>(
-        args: Subset<T, GroupByArgs<Schema, Model>>,
+    groupBy<T extends GroupByArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'groupBy'>>(
+        args: Subset<T, GroupByArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'groupBy'>>,
     ): ZenStackPromise<Schema, Simplify<GroupByResult<Schema, Model, T>>>;
+
+    /**
+     * Checks if an entity exists.
+     * @param args - exists args
+     * @returns whether a matching entity was found
+     *
+     * @example
+     * ```ts
+     * // check if a user exists
+     * await db.user.exists({
+     *     where: { id: 1 },
+     * }); // result: `boolean`
+     *
+     * // check with a relation
+     * await db.user.exists({
+     *     where: { posts: { some: { published: true } } },
+     * }); // result: `boolean`
+     */
+    exists<T extends ExistsArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'exists'>>(
+        args?: Subset<T, ExistsArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'exists'>>,
+    ): ZenStackPromise<Schema, boolean>;
 };
 
 export type OperationsIneligibleForDelegateModels = 'create' | 'createMany' | 'createManyAndReturn' | 'upsert';
@@ -836,8 +868,9 @@ export type ModelOperations<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Options extends QueryOptions<Schema> = QueryOptions<Schema>,
+    ExtQueryArgs = {},
 > = Omit<
-    AllModelOperations<Schema, Model, Options>,
+    AllModelOperations<Schema, Model, Options, ExtQueryArgs>,
     // exclude operations not applicable to delegate models
     IsDelegateModel<Schema, Model> extends true ? OperationsIneligibleForDelegateModels : never
 >;

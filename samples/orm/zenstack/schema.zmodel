@@ -47,10 +47,13 @@ model Profile with CommonFields {
 model Post with CommonFields {
     title     String
     content   String
-    published Boolean  @default(false)
-    author    User     @relation(fields: [authorId], references: [id])
+    published Boolean @default(false)
+    author    User    @relation(fields: [authorId], references: [id])
     authorId  String
 
     @@allow('read', published)
     @@allow('all', author == auth())
 }
+
+mutation procedure signUp(email: String, name: String?, role: Role?): User
+procedure listPublicPosts(): Post[]

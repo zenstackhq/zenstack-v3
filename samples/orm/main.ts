@@ -16,11 +16,18 @@ async function main() {
                         .select(({ fn }) => fn.countAll<number>().as('postCount')),
             },
         },
+        procedures: {
+            signUp: ({ client, args }) =>
+                client.user.create({
+                    data: { ...args },
+                }),
+            listPublicPosts: ({}) => [],
+        },
     }).$use({
         id: 'cost-logger',
         onQuery: async ({ model, operation, args, proceed }) => {
             const start = Date.now();
-            const result = await proceed(args);
+            const result = await proceed(args as any);
             console.log(`[cost] ${model} ${operation} took ${Date.now() - start}ms`);
             return result;
         },
@@ -30,6 +37,8 @@ async function main() {
     await db.post.deleteMany();
     await db.profile.deleteMany();
     await db.user.deleteMany();
+
+    db.user.findMany({ where: { id: '1' } });
 
     // create users and some posts
     const user1 = await db.user.create({
@@ -101,6 +110,12 @@ async function main() {
 
     console.log('Posts readable to', user2.email);
     console.table(await user2Db.post.findMany({ select: { title: true, published: true } }));
+
+    const newUser = await authDb.$procs.signUp({ args: { email: 'new@zenstack.dev', name: 'New User' } });
+    console.log('New user signed up via procedure:', newUser);
+
+    const publicPosts = await authDb.$procs.listPublicPosts();
+    console.log('Public posts via procedure:', publicPosts);
 }
 
 main();

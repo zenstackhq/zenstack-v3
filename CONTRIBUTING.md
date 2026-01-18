@@ -2,7 +2,7 @@
 
 I want to thank you first for considering contributing to ZenStack 🙏🏻. It's people like you who make ZenStack a better toolkit that benefits more developers!
 
-Before you start working on anything major, please make sure to open an issue or discuss with us in our [Discord](https://discord.gg/Ykhr738dUe) first. This will help ensure your work aligns with the project's goals and avoid duplication of effort.
+Before you start working on anything major, please make sure to create a topic in the [feature-work](https://discord.com/channels/1035538056146595961/1458658287015952498) discord channel (preferred) or create a GitHub issue to discuss it first. This will help ensure your work aligns with the project's goals and avoid duplication of effort.
 
 ## Prerequisites
 

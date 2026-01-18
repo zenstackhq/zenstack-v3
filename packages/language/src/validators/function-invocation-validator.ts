@@ -20,6 +20,7 @@ import {
     getLiteral,
     isCheckInvocation,
     isDataFieldReference,
+    mapBuiltinTypeToExpressionType,
     typeAssignable,
 } from '../utils';
 import type { AstValidator } from './common';
@@ -173,7 +174,9 @@ export default class FunctionInvocationValidator implements AstValidator<Express
 
         if (typeof argResolvedType.decl === 'string') {
             // scalar type
-            if (!typeAssignable(dstType, argResolvedType.decl, arg.value) || dstIsArray !== argResolvedType.array) {
+            const dstScalarType = mapBuiltinTypeToExpressionType(dstType);
+            const srcScalarType = mapBuiltinTypeToExpressionType(argResolvedType.decl);
+            if (!typeAssignable(dstScalarType, srcScalarType, arg.value) || dstIsArray !== argResolvedType.array) {
                 accept('error', `argument is not assignable to parameter`, {
                     node: arg,
                 });
@@ -198,7 +201,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         const versionArg = expr.args[0]?.value;
         if (versionArg) {
             const version = getLiteral<number>(versionArg);
-            if (version !== 4 && version !== 7) {
+            if (version !== undefined && version !== 4 && version !== 7) {
                 accept('error', 'first argument must be 4 or 7', {
                     node: expr.args[0]!,
                 });
@@ -212,7 +215,7 @@ export default class FunctionInvocationValidator implements AstValidator<Express
         const versionArg = expr.args[0]?.value;
         if (versionArg) {
             const version = getLiteral<number>(versionArg);
-            if (version !== 1 && version !== 2) {
+            if (version !== undefined && version !== 1 && version !== 2) {
                 accept('error', 'first argument must be 1 or 2', {
                     node: expr.args[0]!,
                 });

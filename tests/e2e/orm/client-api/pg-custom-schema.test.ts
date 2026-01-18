@@ -159,7 +159,7 @@ model Foo {
 enum BarRole {
     ADMIN
     USER
-    @@schema('public')
+    @@schema('mySchema')
 }
 
 model Bar {

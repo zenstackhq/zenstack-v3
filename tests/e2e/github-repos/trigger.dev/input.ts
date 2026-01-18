@@ -6,11 +6,12 @@
 /* eslint-disable */
 
 import { type SchemaType as $Schema } from "./schema";
-import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
+import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, ExistsArgs as $ExistsArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
 import type { SimplifiedPlainResult as $Result, SelectIncludeOmit as $SelectIncludeOmit } from "@zenstackhq/orm";
 export type UserFindManyArgs = $FindManyArgs<$Schema, "User">;
 export type UserFindUniqueArgs = $FindUniqueArgs<$Schema, "User">;
 export type UserFindFirstArgs = $FindFirstArgs<$Schema, "User">;
+export type UserExistsArgs = $ExistsArgs<$Schema, "User">;
 export type UserCreateArgs = $CreateArgs<$Schema, "User">;
 export type UserCreateManyArgs = $CreateManyArgs<$Schema, "User">;
 export type UserCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "User">;
@@ -31,6 +32,7 @@ export type UserGetPayload<Args extends $SelectIncludeOmit<$Schema, "User", true
 export type InvitationCodeFindManyArgs = $FindManyArgs<$Schema, "InvitationCode">;
 export type InvitationCodeFindUniqueArgs = $FindUniqueArgs<$Schema, "InvitationCode">;
 export type InvitationCodeFindFirstArgs = $FindFirstArgs<$Schema, "InvitationCode">;
+export type InvitationCodeExistsArgs = $ExistsArgs<$Schema, "InvitationCode">;
 export type InvitationCodeCreateArgs = $CreateArgs<$Schema, "InvitationCode">;
 export type InvitationCodeCreateManyArgs = $CreateManyArgs<$Schema, "InvitationCode">;
 export type InvitationCodeCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "InvitationCode">;
@@ -51,6 +53,7 @@ export type InvitationCodeGetPayload<Args extends $SelectIncludeOmit<$Schema, "I
 export type AuthorizationCodeFindManyArgs = $FindManyArgs<$Schema, "AuthorizationCode">;
 export type AuthorizationCodeFindUniqueArgs = $FindUniqueArgs<$Schema, "AuthorizationCode">;
 export type AuthorizationCodeFindFirstArgs = $FindFirstArgs<$Schema, "AuthorizationCode">;
+export type AuthorizationCodeExistsArgs = $ExistsArgs<$Schema, "AuthorizationCode">;
 export type AuthorizationCodeCreateArgs = $CreateArgs<$Schema, "AuthorizationCode">;
 export type AuthorizationCodeCreateManyArgs = $CreateManyArgs<$Schema, "AuthorizationCode">;
 export type AuthorizationCodeCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "AuthorizationCode">;
@@ -71,6 +74,7 @@ export type AuthorizationCodeGetPayload<Args extends $SelectIncludeOmit<$Schema,
 export type PersonalAccessTokenFindManyArgs = $FindManyArgs<$Schema, "PersonalAccessToken">;
 export type PersonalAccessTokenFindUniqueArgs = $FindUniqueArgs<$Schema, "PersonalAccessToken">;
 export type PersonalAccessTokenFindFirstArgs = $FindFirstArgs<$Schema, "PersonalAccessToken">;
+export type PersonalAccessTokenExistsArgs = $ExistsArgs<$Schema, "PersonalAccessToken">;
 export type PersonalAccessTokenCreateArgs = $CreateArgs<$Schema, "PersonalAccessToken">;
 export type PersonalAccessTokenCreateManyArgs = $CreateManyArgs<$Schema, "PersonalAccessToken">;
 export type PersonalAccessTokenCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "PersonalAccessToken">;
@@ -91,6 +95,7 @@ export type PersonalAccessTokenGetPayload<Args extends $SelectIncludeOmit<$Schem
 export type OrganizationFindManyArgs = $FindManyArgs<$Schema, "Organization">;
 export type OrganizationFindUniqueArgs = $FindUniqueArgs<$Schema, "Organization">;
 export type OrganizationFindFirstArgs = $FindFirstArgs<$Schema, "Organization">;
+export type OrganizationExistsArgs = $ExistsArgs<$Schema, "Organization">;
 export type OrganizationCreateArgs = $CreateArgs<$Schema, "Organization">;
 export type OrganizationCreateManyArgs = $CreateManyArgs<$Schema, "Organization">;
 export type OrganizationCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Organization">;
@@ -111,6 +116,7 @@ export type OrganizationGetPayload<Args extends $SelectIncludeOmit<$Schema, "Org
 export type OrgMemberFindManyArgs = $FindManyArgs<$Schema, "OrgMember">;
 export type OrgMemberFindUniqueArgs = $FindUniqueArgs<$Schema, "OrgMember">;
 export type OrgMemberFindFirstArgs = $FindFirstArgs<$Schema, "OrgMember">;
+export type OrgMemberExistsArgs = $ExistsArgs<$Schema, "OrgMember">;
 export type OrgMemberCreateArgs = $CreateArgs<$Schema, "OrgMember">;
 export type OrgMemberCreateManyArgs = $CreateManyArgs<$Schema, "OrgMember">;
 export type OrgMemberCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "OrgMember">;
@@ -131,6 +137,7 @@ export type OrgMemberGetPayload<Args extends $SelectIncludeOmit<$Schema, "OrgMem
 export type OrgMemberInviteFindManyArgs = $FindManyArgs<$Schema, "OrgMemberInvite">;
 export type OrgMemberInviteFindUniqueArgs = $FindUniqueArgs<$Schema, "OrgMemberInvite">;
 export type OrgMemberInviteFindFirstArgs = $FindFirstArgs<$Schema, "OrgMemberInvite">;
+export type OrgMemberInviteExistsArgs = $ExistsArgs<$Schema, "OrgMemberInvite">;
 export type OrgMemberInviteCreateArgs = $CreateArgs<$Schema, "OrgMemberInvite">;
 export type OrgMemberInviteCreateManyArgs = $CreateManyArgs<$Schema, "OrgMemberInvite">;
 export type OrgMemberInviteCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "OrgMemberInvite">;
@@ -151,6 +158,7 @@ export type OrgMemberInviteGetPayload<Args extends $SelectIncludeOmit<$Schema, "
 export type RuntimeEnvironmentFindManyArgs = $FindManyArgs<$Schema, "RuntimeEnvironment">;
 export type RuntimeEnvironmentFindUniqueArgs = $FindUniqueArgs<$Schema, "RuntimeEnvironment">;
 export type RuntimeEnvironmentFindFirstArgs = $FindFirstArgs<$Schema, "RuntimeEnvironment">;
+export type RuntimeEnvironmentExistsArgs = $ExistsArgs<$Schema, "RuntimeEnvironment">;
 export type RuntimeEnvironmentCreateArgs = $CreateArgs<$Schema, "RuntimeEnvironment">;
 export type RuntimeEnvironmentCreateManyArgs = $CreateManyArgs<$Schema, "RuntimeEnvironment">;
 export type RuntimeEnvironmentCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "RuntimeEnvironment">;
@@ -171,6 +179,7 @@ export type RuntimeEnvironmentGetPayload<Args extends $SelectIncludeOmit<$Schema
 export type ProjectFindManyArgs = $FindManyArgs<$Schema, "Project">;
 export type ProjectFindUniqueArgs = $FindUniqueArgs<$Schema, "Project">;
 export type ProjectFindFirstArgs = $FindFirstArgs<$Schema, "Project">;
+export type ProjectExistsArgs = $ExistsArgs<$Schema, "Project">;
 export type ProjectCreateArgs = $CreateArgs<$Schema, "Project">;
 export type ProjectCreateManyArgs = $CreateManyArgs<$Schema, "Project">;
 export type ProjectCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Project">;
@@ -191,6 +200,7 @@ export type ProjectGetPayload<Args extends $SelectIncludeOmit<$Schema, "Project"
 export type SecretReferenceFindManyArgs = $FindManyArgs<$Schema, "SecretReference">;
 export type SecretReferenceFindUniqueArgs = $FindUniqueArgs<$Schema, "SecretReference">;
 export type SecretReferenceFindFirstArgs = $FindFirstArgs<$Schema, "SecretReference">;
+export type SecretReferenceExistsArgs = $ExistsArgs<$Schema, "SecretReference">;
 export type SecretReferenceCreateArgs = $CreateArgs<$Schema, "SecretReference">;
 export type SecretReferenceCreateManyArgs = $CreateManyArgs<$Schema, "SecretReference">;
 export type SecretReferenceCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "SecretReference">;
@@ -211,6 +221,7 @@ export type SecretReferenceGetPayload<Args extends $SelectIncludeOmit<$Schema, "
 export type SecretStoreFindManyArgs = $FindManyArgs<$Schema, "SecretStore">;
 export type SecretStoreFindUniqueArgs = $FindUniqueArgs<$Schema, "SecretStore">;
 export type SecretStoreFindFirstArgs = $FindFirstArgs<$Schema, "SecretStore">;
+export type SecretStoreExistsArgs = $ExistsArgs<$Schema, "SecretStore">;
 export type SecretStoreCreateArgs = $CreateArgs<$Schema, "SecretStore">;
 export type SecretStoreCreateManyArgs = $CreateManyArgs<$Schema, "SecretStore">;
 export type SecretStoreCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "SecretStore">;
@@ -231,6 +242,7 @@ export type SecretStoreGetPayload<Args extends $SelectIncludeOmit<$Schema, "Secr
 export type DataMigrationFindManyArgs = $FindManyArgs<$Schema, "DataMigration">;
 export type DataMigrationFindUniqueArgs = $FindUniqueArgs<$Schema, "DataMigration">;
 export type DataMigrationFindFirstArgs = $FindFirstArgs<$Schema, "DataMigration">;
+export type DataMigrationExistsArgs = $ExistsArgs<$Schema, "DataMigration">;
 export type DataMigrationCreateArgs = $CreateArgs<$Schema, "DataMigration">;
 export type DataMigrationCreateManyArgs = $CreateManyArgs<$Schema, "DataMigration">;
 export type DataMigrationCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "DataMigration">;
@@ -251,6 +263,7 @@ export type DataMigrationGetPayload<Args extends $SelectIncludeOmit<$Schema, "Da
 export type BackgroundWorkerFindManyArgs = $FindManyArgs<$Schema, "BackgroundWorker">;
 export type BackgroundWorkerFindUniqueArgs = $FindUniqueArgs<$Schema, "BackgroundWorker">;
 export type BackgroundWorkerFindFirstArgs = $FindFirstArgs<$Schema, "BackgroundWorker">;
+export type BackgroundWorkerExistsArgs = $ExistsArgs<$Schema, "BackgroundWorker">;
 export type BackgroundWorkerCreateArgs = $CreateArgs<$Schema, "BackgroundWorker">;
 export type BackgroundWorkerCreateManyArgs = $CreateManyArgs<$Schema, "BackgroundWorker">;
 export type BackgroundWorkerCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "BackgroundWorker">;
@@ -271,6 +284,7 @@ export type BackgroundWorkerGetPayload<Args extends $SelectIncludeOmit<$Schema, 
 export type BackgroundWorkerFileFindManyArgs = $FindManyArgs<$Schema, "BackgroundWorkerFile">;
 export type BackgroundWorkerFileFindUniqueArgs = $FindUniqueArgs<$Schema, "BackgroundWorkerFile">;
 export type BackgroundWorkerFileFindFirstArgs = $FindFirstArgs<$Schema, "BackgroundWorkerFile">;
+export type BackgroundWorkerFileExistsArgs = $ExistsArgs<$Schema, "BackgroundWorkerFile">;
 export type BackgroundWorkerFileCreateArgs = $CreateArgs<$Schema, "BackgroundWorkerFile">;
 export type BackgroundWorkerFileCreateManyArgs = $CreateManyArgs<$Schema, "BackgroundWorkerFile">;
 export type BackgroundWorkerFileCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "BackgroundWorkerFile">;
@@ -291,6 +305,7 @@ export type BackgroundWorkerFileGetPayload<Args extends $SelectIncludeOmit<$Sche
 export type BackgroundWorkerTaskFindManyArgs = $FindManyArgs<$Schema, "BackgroundWorkerTask">;
 export type BackgroundWorkerTaskFindUniqueArgs = $FindUniqueArgs<$Schema, "BackgroundWorkerTask">;
 export type BackgroundWorkerTaskFindFirstArgs = $FindFirstArgs<$Schema, "BackgroundWorkerTask">;
+export type BackgroundWorkerTaskExistsArgs = $ExistsArgs<$Schema, "BackgroundWorkerTask">;
 export type BackgroundWorkerTaskCreateArgs = $CreateArgs<$Schema, "BackgroundWorkerTask">;
 export type BackgroundWorkerTaskCreateManyArgs = $CreateManyArgs<$Schema, "BackgroundWorkerTask">;
 export type BackgroundWorkerTaskCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "BackgroundWorkerTask">;
@@ -311,6 +326,7 @@ export type BackgroundWorkerTaskGetPayload<Args extends $SelectIncludeOmit<$Sche
 export type TaskRunFindManyArgs = $FindManyArgs<$Schema, "TaskRun">;
 export type TaskRunFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskRun">;
 export type TaskRunFindFirstArgs = $FindFirstArgs<$Schema, "TaskRun">;
+export type TaskRunExistsArgs = $ExistsArgs<$Schema, "TaskRun">;
 export type TaskRunCreateArgs = $CreateArgs<$Schema, "TaskRun">;
 export type TaskRunCreateManyArgs = $CreateManyArgs<$Schema, "TaskRun">;
 export type TaskRunCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskRun">;
@@ -331,6 +347,7 @@ export type TaskRunGetPayload<Args extends $SelectIncludeOmit<$Schema, "TaskRun"
 export type TaskRunExecutionSnapshotFindManyArgs = $FindManyArgs<$Schema, "TaskRunExecutionSnapshot">;
 export type TaskRunExecutionSnapshotFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskRunExecutionSnapshot">;
 export type TaskRunExecutionSnapshotFindFirstArgs = $FindFirstArgs<$Schema, "TaskRunExecutionSnapshot">;
+export type TaskRunExecutionSnapshotExistsArgs = $ExistsArgs<$Schema, "TaskRunExecutionSnapshot">;
 export type TaskRunExecutionSnapshotCreateArgs = $CreateArgs<$Schema, "TaskRunExecutionSnapshot">;
 export type TaskRunExecutionSnapshotCreateManyArgs = $CreateManyArgs<$Schema, "TaskRunExecutionSnapshot">;
 export type TaskRunExecutionSnapshotCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskRunExecutionSnapshot">;
@@ -351,6 +368,7 @@ export type TaskRunExecutionSnapshotGetPayload<Args extends $SelectIncludeOmit<$
 export type TaskRunCheckpointFindManyArgs = $FindManyArgs<$Schema, "TaskRunCheckpoint">;
 export type TaskRunCheckpointFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskRunCheckpoint">;
 export type TaskRunCheckpointFindFirstArgs = $FindFirstArgs<$Schema, "TaskRunCheckpoint">;
+export type TaskRunCheckpointExistsArgs = $ExistsArgs<$Schema, "TaskRunCheckpoint">;
 export type TaskRunCheckpointCreateArgs = $CreateArgs<$Schema, "TaskRunCheckpoint">;
 export type TaskRunCheckpointCreateManyArgs = $CreateManyArgs<$Schema, "TaskRunCheckpoint">;
 export type TaskRunCheckpointCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskRunCheckpoint">;
@@ -371,6 +389,7 @@ export type TaskRunCheckpointGetPayload<Args extends $SelectIncludeOmit<$Schema,
 export type WaitpointFindManyArgs = $FindManyArgs<$Schema, "Waitpoint">;
 export type WaitpointFindUniqueArgs = $FindUniqueArgs<$Schema, "Waitpoint">;
 export type WaitpointFindFirstArgs = $FindFirstArgs<$Schema, "Waitpoint">;
+export type WaitpointExistsArgs = $ExistsArgs<$Schema, "Waitpoint">;
 export type WaitpointCreateArgs = $CreateArgs<$Schema, "Waitpoint">;
 export type WaitpointCreateManyArgs = $CreateManyArgs<$Schema, "Waitpoint">;
 export type WaitpointCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Waitpoint">;
@@ -391,6 +410,7 @@ export type WaitpointGetPayload<Args extends $SelectIncludeOmit<$Schema, "Waitpo
 export type TaskRunWaitpointFindManyArgs = $FindManyArgs<$Schema, "TaskRunWaitpoint">;
 export type TaskRunWaitpointFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskRunWaitpoint">;
 export type TaskRunWaitpointFindFirstArgs = $FindFirstArgs<$Schema, "TaskRunWaitpoint">;
+export type TaskRunWaitpointExistsArgs = $ExistsArgs<$Schema, "TaskRunWaitpoint">;
 export type TaskRunWaitpointCreateArgs = $CreateArgs<$Schema, "TaskRunWaitpoint">;
 export type TaskRunWaitpointCreateManyArgs = $CreateManyArgs<$Schema, "TaskRunWaitpoint">;
 export type TaskRunWaitpointCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskRunWaitpoint">;
@@ -411,6 +431,7 @@ export type TaskRunWaitpointGetPayload<Args extends $SelectIncludeOmit<$Schema, 
 export type WaitpointTagFindManyArgs = $FindManyArgs<$Schema, "WaitpointTag">;
 export type WaitpointTagFindUniqueArgs = $FindUniqueArgs<$Schema, "WaitpointTag">;
 export type WaitpointTagFindFirstArgs = $FindFirstArgs<$Schema, "WaitpointTag">;
+export type WaitpointTagExistsArgs = $ExistsArgs<$Schema, "WaitpointTag">;
 export type WaitpointTagCreateArgs = $CreateArgs<$Schema, "WaitpointTag">;
 export type WaitpointTagCreateManyArgs = $CreateManyArgs<$Schema, "WaitpointTag">;
 export type WaitpointTagCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "WaitpointTag">;
@@ -431,6 +452,7 @@ export type WaitpointTagGetPayload<Args extends $SelectIncludeOmit<$Schema, "Wai
 export type FeatureFlagFindManyArgs = $FindManyArgs<$Schema, "FeatureFlag">;
 export type FeatureFlagFindUniqueArgs = $FindUniqueArgs<$Schema, "FeatureFlag">;
 export type FeatureFlagFindFirstArgs = $FindFirstArgs<$Schema, "FeatureFlag">;
+export type FeatureFlagExistsArgs = $ExistsArgs<$Schema, "FeatureFlag">;
 export type FeatureFlagCreateArgs = $CreateArgs<$Schema, "FeatureFlag">;
 export type FeatureFlagCreateManyArgs = $CreateManyArgs<$Schema, "FeatureFlag">;
 export type FeatureFlagCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "FeatureFlag">;
@@ -451,6 +473,7 @@ export type FeatureFlagGetPayload<Args extends $SelectIncludeOmit<$Schema, "Feat
 export type WorkerInstanceFindManyArgs = $FindManyArgs<$Schema, "WorkerInstance">;
 export type WorkerInstanceFindUniqueArgs = $FindUniqueArgs<$Schema, "WorkerInstance">;
 export type WorkerInstanceFindFirstArgs = $FindFirstArgs<$Schema, "WorkerInstance">;
+export type WorkerInstanceExistsArgs = $ExistsArgs<$Schema, "WorkerInstance">;
 export type WorkerInstanceCreateArgs = $CreateArgs<$Schema, "WorkerInstance">;
 export type WorkerInstanceCreateManyArgs = $CreateManyArgs<$Schema, "WorkerInstance">;
 export type WorkerInstanceCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "WorkerInstance">;
@@ -471,6 +494,7 @@ export type WorkerInstanceGetPayload<Args extends $SelectIncludeOmit<$Schema, "W
 export type WorkerInstanceGroupFindManyArgs = $FindManyArgs<$Schema, "WorkerInstanceGroup">;
 export type WorkerInstanceGroupFindUniqueArgs = $FindUniqueArgs<$Schema, "WorkerInstanceGroup">;
 export type WorkerInstanceGroupFindFirstArgs = $FindFirstArgs<$Schema, "WorkerInstanceGroup">;
+export type WorkerInstanceGroupExistsArgs = $ExistsArgs<$Schema, "WorkerInstanceGroup">;
 export type WorkerInstanceGroupCreateArgs = $CreateArgs<$Schema, "WorkerInstanceGroup">;
 export type WorkerInstanceGroupCreateManyArgs = $CreateManyArgs<$Schema, "WorkerInstanceGroup">;
 export type WorkerInstanceGroupCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "WorkerInstanceGroup">;
@@ -491,6 +515,7 @@ export type WorkerInstanceGroupGetPayload<Args extends $SelectIncludeOmit<$Schem
 export type WorkerGroupTokenFindManyArgs = $FindManyArgs<$Schema, "WorkerGroupToken">;
 export type WorkerGroupTokenFindUniqueArgs = $FindUniqueArgs<$Schema, "WorkerGroupToken">;
 export type WorkerGroupTokenFindFirstArgs = $FindFirstArgs<$Schema, "WorkerGroupToken">;
+export type WorkerGroupTokenExistsArgs = $ExistsArgs<$Schema, "WorkerGroupToken">;
 export type WorkerGroupTokenCreateArgs = $CreateArgs<$Schema, "WorkerGroupToken">;
 export type WorkerGroupTokenCreateManyArgs = $CreateManyArgs<$Schema, "WorkerGroupToken">;
 export type WorkerGroupTokenCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "WorkerGroupToken">;
@@ -511,6 +536,7 @@ export type WorkerGroupTokenGetPayload<Args extends $SelectIncludeOmit<$Schema, 
 export type TaskRunTagFindManyArgs = $FindManyArgs<$Schema, "TaskRunTag">;
 export type TaskRunTagFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskRunTag">;
 export type TaskRunTagFindFirstArgs = $FindFirstArgs<$Schema, "TaskRunTag">;
+export type TaskRunTagExistsArgs = $ExistsArgs<$Schema, "TaskRunTag">;
 export type TaskRunTagCreateArgs = $CreateArgs<$Schema, "TaskRunTag">;
 export type TaskRunTagCreateManyArgs = $CreateManyArgs<$Schema, "TaskRunTag">;
 export type TaskRunTagCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskRunTag">;
@@ -531,6 +557,7 @@ export type TaskRunTagGetPayload<Args extends $SelectIncludeOmit<$Schema, "TaskR
 export type TaskRunDependencyFindManyArgs = $FindManyArgs<$Schema, "TaskRunDependency">;
 export type TaskRunDependencyFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskRunDependency">;
 export type TaskRunDependencyFindFirstArgs = $FindFirstArgs<$Schema, "TaskRunDependency">;
+export type TaskRunDependencyExistsArgs = $ExistsArgs<$Schema, "TaskRunDependency">;
 export type TaskRunDependencyCreateArgs = $CreateArgs<$Schema, "TaskRunDependency">;
 export type TaskRunDependencyCreateManyArgs = $CreateManyArgs<$Schema, "TaskRunDependency">;
 export type TaskRunDependencyCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskRunDependency">;
@@ -551,6 +578,7 @@ export type TaskRunDependencyGetPayload<Args extends $SelectIncludeOmit<$Schema,
 export type TaskRunCounterFindManyArgs = $FindManyArgs<$Schema, "TaskRunCounter">;
 export type TaskRunCounterFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskRunCounter">;
 export type TaskRunCounterFindFirstArgs = $FindFirstArgs<$Schema, "TaskRunCounter">;
+export type TaskRunCounterExistsArgs = $ExistsArgs<$Schema, "TaskRunCounter">;
 export type TaskRunCounterCreateArgs = $CreateArgs<$Schema, "TaskRunCounter">;
 export type TaskRunCounterCreateManyArgs = $CreateManyArgs<$Schema, "TaskRunCounter">;
 export type TaskRunCounterCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskRunCounter">;
@@ -571,6 +599,7 @@ export type TaskRunCounterGetPayload<Args extends $SelectIncludeOmit<$Schema, "T
 export type TaskRunNumberCounterFindManyArgs = $FindManyArgs<$Schema, "TaskRunNumberCounter">;
 export type TaskRunNumberCounterFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskRunNumberCounter">;
 export type TaskRunNumberCounterFindFirstArgs = $FindFirstArgs<$Schema, "TaskRunNumberCounter">;
+export type TaskRunNumberCounterExistsArgs = $ExistsArgs<$Schema, "TaskRunNumberCounter">;
 export type TaskRunNumberCounterCreateArgs = $CreateArgs<$Schema, "TaskRunNumberCounter">;
 export type TaskRunNumberCounterCreateManyArgs = $CreateManyArgs<$Schema, "TaskRunNumberCounter">;
 export type TaskRunNumberCounterCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskRunNumberCounter">;
@@ -591,6 +620,7 @@ export type TaskRunNumberCounterGetPayload<Args extends $SelectIncludeOmit<$Sche
 export type TaskRunAttemptFindManyArgs = $FindManyArgs<$Schema, "TaskRunAttempt">;
 export type TaskRunAttemptFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskRunAttempt">;
 export type TaskRunAttemptFindFirstArgs = $FindFirstArgs<$Schema, "TaskRunAttempt">;
+export type TaskRunAttemptExistsArgs = $ExistsArgs<$Schema, "TaskRunAttempt">;
 export type TaskRunAttemptCreateArgs = $CreateArgs<$Schema, "TaskRunAttempt">;
 export type TaskRunAttemptCreateManyArgs = $CreateManyArgs<$Schema, "TaskRunAttempt">;
 export type TaskRunAttemptCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskRunAttempt">;
@@ -611,6 +641,7 @@ export type TaskRunAttemptGetPayload<Args extends $SelectIncludeOmit<$Schema, "T
 export type TaskEventFindManyArgs = $FindManyArgs<$Schema, "TaskEvent">;
 export type TaskEventFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskEvent">;
 export type TaskEventFindFirstArgs = $FindFirstArgs<$Schema, "TaskEvent">;
+export type TaskEventExistsArgs = $ExistsArgs<$Schema, "TaskEvent">;
 export type TaskEventCreateArgs = $CreateArgs<$Schema, "TaskEvent">;
 export type TaskEventCreateManyArgs = $CreateManyArgs<$Schema, "TaskEvent">;
 export type TaskEventCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskEvent">;
@@ -631,6 +662,7 @@ export type TaskEventGetPayload<Args extends $SelectIncludeOmit<$Schema, "TaskEv
 export type TaskQueueFindManyArgs = $FindManyArgs<$Schema, "TaskQueue">;
 export type TaskQueueFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskQueue">;
 export type TaskQueueFindFirstArgs = $FindFirstArgs<$Schema, "TaskQueue">;
+export type TaskQueueExistsArgs = $ExistsArgs<$Schema, "TaskQueue">;
 export type TaskQueueCreateArgs = $CreateArgs<$Schema, "TaskQueue">;
 export type TaskQueueCreateManyArgs = $CreateManyArgs<$Schema, "TaskQueue">;
 export type TaskQueueCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskQueue">;
@@ -651,6 +683,7 @@ export type TaskQueueGetPayload<Args extends $SelectIncludeOmit<$Schema, "TaskQu
 export type BatchTaskRunFindManyArgs = $FindManyArgs<$Schema, "BatchTaskRun">;
 export type BatchTaskRunFindUniqueArgs = $FindUniqueArgs<$Schema, "BatchTaskRun">;
 export type BatchTaskRunFindFirstArgs = $FindFirstArgs<$Schema, "BatchTaskRun">;
+export type BatchTaskRunExistsArgs = $ExistsArgs<$Schema, "BatchTaskRun">;
 export type BatchTaskRunCreateArgs = $CreateArgs<$Schema, "BatchTaskRun">;
 export type BatchTaskRunCreateManyArgs = $CreateManyArgs<$Schema, "BatchTaskRun">;
 export type BatchTaskRunCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "BatchTaskRun">;
@@ -671,6 +704,7 @@ export type BatchTaskRunGetPayload<Args extends $SelectIncludeOmit<$Schema, "Bat
 export type BatchTaskRunItemFindManyArgs = $FindManyArgs<$Schema, "BatchTaskRunItem">;
 export type BatchTaskRunItemFindUniqueArgs = $FindUniqueArgs<$Schema, "BatchTaskRunItem">;
 export type BatchTaskRunItemFindFirstArgs = $FindFirstArgs<$Schema, "BatchTaskRunItem">;
+export type BatchTaskRunItemExistsArgs = $ExistsArgs<$Schema, "BatchTaskRunItem">;
 export type BatchTaskRunItemCreateArgs = $CreateArgs<$Schema, "BatchTaskRunItem">;
 export type BatchTaskRunItemCreateManyArgs = $CreateManyArgs<$Schema, "BatchTaskRunItem">;
 export type BatchTaskRunItemCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "BatchTaskRunItem">;
@@ -691,6 +725,7 @@ export type BatchTaskRunItemGetPayload<Args extends $SelectIncludeOmit<$Schema, 
 export type EnvironmentVariableFindManyArgs = $FindManyArgs<$Schema, "EnvironmentVariable">;
 export type EnvironmentVariableFindUniqueArgs = $FindUniqueArgs<$Schema, "EnvironmentVariable">;
 export type EnvironmentVariableFindFirstArgs = $FindFirstArgs<$Schema, "EnvironmentVariable">;
+export type EnvironmentVariableExistsArgs = $ExistsArgs<$Schema, "EnvironmentVariable">;
 export type EnvironmentVariableCreateArgs = $CreateArgs<$Schema, "EnvironmentVariable">;
 export type EnvironmentVariableCreateManyArgs = $CreateManyArgs<$Schema, "EnvironmentVariable">;
 export type EnvironmentVariableCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "EnvironmentVariable">;
@@ -711,6 +746,7 @@ export type EnvironmentVariableGetPayload<Args extends $SelectIncludeOmit<$Schem
 export type EnvironmentVariableValueFindManyArgs = $FindManyArgs<$Schema, "EnvironmentVariableValue">;
 export type EnvironmentVariableValueFindUniqueArgs = $FindUniqueArgs<$Schema, "EnvironmentVariableValue">;
 export type EnvironmentVariableValueFindFirstArgs = $FindFirstArgs<$Schema, "EnvironmentVariableValue">;
+export type EnvironmentVariableValueExistsArgs = $ExistsArgs<$Schema, "EnvironmentVariableValue">;
 export type EnvironmentVariableValueCreateArgs = $CreateArgs<$Schema, "EnvironmentVariableValue">;
 export type EnvironmentVariableValueCreateManyArgs = $CreateManyArgs<$Schema, "EnvironmentVariableValue">;
 export type EnvironmentVariableValueCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "EnvironmentVariableValue">;
@@ -731,6 +767,7 @@ export type EnvironmentVariableValueGetPayload<Args extends $SelectIncludeOmit<$
 export type CheckpointFindManyArgs = $FindManyArgs<$Schema, "Checkpoint">;
 export type CheckpointFindUniqueArgs = $FindUniqueArgs<$Schema, "Checkpoint">;
 export type CheckpointFindFirstArgs = $FindFirstArgs<$Schema, "Checkpoint">;
+export type CheckpointExistsArgs = $ExistsArgs<$Schema, "Checkpoint">;
 export type CheckpointCreateArgs = $CreateArgs<$Schema, "Checkpoint">;
 export type CheckpointCreateManyArgs = $CreateManyArgs<$Schema, "Checkpoint">;
 export type CheckpointCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Checkpoint">;
@@ -751,6 +788,7 @@ export type CheckpointGetPayload<Args extends $SelectIncludeOmit<$Schema, "Check
 export type CheckpointRestoreEventFindManyArgs = $FindManyArgs<$Schema, "CheckpointRestoreEvent">;
 export type CheckpointRestoreEventFindUniqueArgs = $FindUniqueArgs<$Schema, "CheckpointRestoreEvent">;
 export type CheckpointRestoreEventFindFirstArgs = $FindFirstArgs<$Schema, "CheckpointRestoreEvent">;
+export type CheckpointRestoreEventExistsArgs = $ExistsArgs<$Schema, "CheckpointRestoreEvent">;
 export type CheckpointRestoreEventCreateArgs = $CreateArgs<$Schema, "CheckpointRestoreEvent">;
 export type CheckpointRestoreEventCreateManyArgs = $CreateManyArgs<$Schema, "CheckpointRestoreEvent">;
 export type CheckpointRestoreEventCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "CheckpointRestoreEvent">;
@@ -771,6 +809,7 @@ export type CheckpointRestoreEventGetPayload<Args extends $SelectIncludeOmit<$Sc
 export type WorkerDeploymentFindManyArgs = $FindManyArgs<$Schema, "WorkerDeployment">;
 export type WorkerDeploymentFindUniqueArgs = $FindUniqueArgs<$Schema, "WorkerDeployment">;
 export type WorkerDeploymentFindFirstArgs = $FindFirstArgs<$Schema, "WorkerDeployment">;
+export type WorkerDeploymentExistsArgs = $ExistsArgs<$Schema, "WorkerDeployment">;
 export type WorkerDeploymentCreateArgs = $CreateArgs<$Schema, "WorkerDeployment">;
 export type WorkerDeploymentCreateManyArgs = $CreateManyArgs<$Schema, "WorkerDeployment">;
 export type WorkerDeploymentCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "WorkerDeployment">;
@@ -791,6 +830,7 @@ export type WorkerDeploymentGetPayload<Args extends $SelectIncludeOmit<$Schema, 
 export type WorkerDeploymentPromotionFindManyArgs = $FindManyArgs<$Schema, "WorkerDeploymentPromotion">;
 export type WorkerDeploymentPromotionFindUniqueArgs = $FindUniqueArgs<$Schema, "WorkerDeploymentPromotion">;
 export type WorkerDeploymentPromotionFindFirstArgs = $FindFirstArgs<$Schema, "WorkerDeploymentPromotion">;
+export type WorkerDeploymentPromotionExistsArgs = $ExistsArgs<$Schema, "WorkerDeploymentPromotion">;
 export type WorkerDeploymentPromotionCreateArgs = $CreateArgs<$Schema, "WorkerDeploymentPromotion">;
 export type WorkerDeploymentPromotionCreateManyArgs = $CreateManyArgs<$Schema, "WorkerDeploymentPromotion">;
 export type WorkerDeploymentPromotionCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "WorkerDeploymentPromotion">;
@@ -811,6 +851,7 @@ export type WorkerDeploymentPromotionGetPayload<Args extends $SelectIncludeOmit<
 export type TaskScheduleFindManyArgs = $FindManyArgs<$Schema, "TaskSchedule">;
 export type TaskScheduleFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskSchedule">;
 export type TaskScheduleFindFirstArgs = $FindFirstArgs<$Schema, "TaskSchedule">;
+export type TaskScheduleExistsArgs = $ExistsArgs<$Schema, "TaskSchedule">;
 export type TaskScheduleCreateArgs = $CreateArgs<$Schema, "TaskSchedule">;
 export type TaskScheduleCreateManyArgs = $CreateManyArgs<$Schema, "TaskSchedule">;
 export type TaskScheduleCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskSchedule">;
@@ -831,6 +872,7 @@ export type TaskScheduleGetPayload<Args extends $SelectIncludeOmit<$Schema, "Tas
 export type TaskScheduleInstanceFindManyArgs = $FindManyArgs<$Schema, "TaskScheduleInstance">;
 export type TaskScheduleInstanceFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskScheduleInstance">;
 export type TaskScheduleInstanceFindFirstArgs = $FindFirstArgs<$Schema, "TaskScheduleInstance">;
+export type TaskScheduleInstanceExistsArgs = $ExistsArgs<$Schema, "TaskScheduleInstance">;
 export type TaskScheduleInstanceCreateArgs = $CreateArgs<$Schema, "TaskScheduleInstance">;
 export type TaskScheduleInstanceCreateManyArgs = $CreateManyArgs<$Schema, "TaskScheduleInstance">;
 export type TaskScheduleInstanceCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskScheduleInstance">;
@@ -851,6 +893,7 @@ export type TaskScheduleInstanceGetPayload<Args extends $SelectIncludeOmit<$Sche
 export type RuntimeEnvironmentSessionFindManyArgs = $FindManyArgs<$Schema, "RuntimeEnvironmentSession">;
 export type RuntimeEnvironmentSessionFindUniqueArgs = $FindUniqueArgs<$Schema, "RuntimeEnvironmentSession">;
 export type RuntimeEnvironmentSessionFindFirstArgs = $FindFirstArgs<$Schema, "RuntimeEnvironmentSession">;
+export type RuntimeEnvironmentSessionExistsArgs = $ExistsArgs<$Schema, "RuntimeEnvironmentSession">;
 export type RuntimeEnvironmentSessionCreateArgs = $CreateArgs<$Schema, "RuntimeEnvironmentSession">;
 export type RuntimeEnvironmentSessionCreateManyArgs = $CreateManyArgs<$Schema, "RuntimeEnvironmentSession">;
 export type RuntimeEnvironmentSessionCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "RuntimeEnvironmentSession">;
@@ -871,6 +914,7 @@ export type RuntimeEnvironmentSessionGetPayload<Args extends $SelectIncludeOmit<
 export type ProjectAlertChannelFindManyArgs = $FindManyArgs<$Schema, "ProjectAlertChannel">;
 export type ProjectAlertChannelFindUniqueArgs = $FindUniqueArgs<$Schema, "ProjectAlertChannel">;
 export type ProjectAlertChannelFindFirstArgs = $FindFirstArgs<$Schema, "ProjectAlertChannel">;
+export type ProjectAlertChannelExistsArgs = $ExistsArgs<$Schema, "ProjectAlertChannel">;
 export type ProjectAlertChannelCreateArgs = $CreateArgs<$Schema, "ProjectAlertChannel">;
 export type ProjectAlertChannelCreateManyArgs = $CreateManyArgs<$Schema, "ProjectAlertChannel">;
 export type ProjectAlertChannelCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "ProjectAlertChannel">;
@@ -891,6 +935,7 @@ export type ProjectAlertChannelGetPayload<Args extends $SelectIncludeOmit<$Schem
 export type ProjectAlertFindManyArgs = $FindManyArgs<$Schema, "ProjectAlert">;
 export type ProjectAlertFindUniqueArgs = $FindUniqueArgs<$Schema, "ProjectAlert">;
 export type ProjectAlertFindFirstArgs = $FindFirstArgs<$Schema, "ProjectAlert">;
+export type ProjectAlertExistsArgs = $ExistsArgs<$Schema, "ProjectAlert">;
 export type ProjectAlertCreateArgs = $CreateArgs<$Schema, "ProjectAlert">;
 export type ProjectAlertCreateManyArgs = $CreateManyArgs<$Schema, "ProjectAlert">;
 export type ProjectAlertCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "ProjectAlert">;
@@ -911,6 +956,7 @@ export type ProjectAlertGetPayload<Args extends $SelectIncludeOmit<$Schema, "Pro
 export type ProjectAlertStorageFindManyArgs = $FindManyArgs<$Schema, "ProjectAlertStorage">;
 export type ProjectAlertStorageFindUniqueArgs = $FindUniqueArgs<$Schema, "ProjectAlertStorage">;
 export type ProjectAlertStorageFindFirstArgs = $FindFirstArgs<$Schema, "ProjectAlertStorage">;
+export type ProjectAlertStorageExistsArgs = $ExistsArgs<$Schema, "ProjectAlertStorage">;
 export type ProjectAlertStorageCreateArgs = $CreateArgs<$Schema, "ProjectAlertStorage">;
 export type ProjectAlertStorageCreateManyArgs = $CreateManyArgs<$Schema, "ProjectAlertStorage">;
 export type ProjectAlertStorageCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "ProjectAlertStorage">;
@@ -931,6 +977,7 @@ export type ProjectAlertStorageGetPayload<Args extends $SelectIncludeOmit<$Schem
 export type OrganizationIntegrationFindManyArgs = $FindManyArgs<$Schema, "OrganizationIntegration">;
 export type OrganizationIntegrationFindUniqueArgs = $FindUniqueArgs<$Schema, "OrganizationIntegration">;
 export type OrganizationIntegrationFindFirstArgs = $FindFirstArgs<$Schema, "OrganizationIntegration">;
+export type OrganizationIntegrationExistsArgs = $ExistsArgs<$Schema, "OrganizationIntegration">;
 export type OrganizationIntegrationCreateArgs = $CreateArgs<$Schema, "OrganizationIntegration">;
 export type OrganizationIntegrationCreateManyArgs = $CreateManyArgs<$Schema, "OrganizationIntegration">;
 export type OrganizationIntegrationCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "OrganizationIntegration">;
@@ -951,6 +998,7 @@ export type OrganizationIntegrationGetPayload<Args extends $SelectIncludeOmit<$S
 export type BulkActionGroupFindManyArgs = $FindManyArgs<$Schema, "BulkActionGroup">;
 export type BulkActionGroupFindUniqueArgs = $FindUniqueArgs<$Schema, "BulkActionGroup">;
 export type BulkActionGroupFindFirstArgs = $FindFirstArgs<$Schema, "BulkActionGroup">;
+export type BulkActionGroupExistsArgs = $ExistsArgs<$Schema, "BulkActionGroup">;
 export type BulkActionGroupCreateArgs = $CreateArgs<$Schema, "BulkActionGroup">;
 export type BulkActionGroupCreateManyArgs = $CreateManyArgs<$Schema, "BulkActionGroup">;
 export type BulkActionGroupCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "BulkActionGroup">;
@@ -971,6 +1019,7 @@ export type BulkActionGroupGetPayload<Args extends $SelectIncludeOmit<$Schema, "
 export type BulkActionItemFindManyArgs = $FindManyArgs<$Schema, "BulkActionItem">;
 export type BulkActionItemFindUniqueArgs = $FindUniqueArgs<$Schema, "BulkActionItem">;
 export type BulkActionItemFindFirstArgs = $FindFirstArgs<$Schema, "BulkActionItem">;
+export type BulkActionItemExistsArgs = $ExistsArgs<$Schema, "BulkActionItem">;
 export type BulkActionItemCreateArgs = $CreateArgs<$Schema, "BulkActionItem">;
 export type BulkActionItemCreateManyArgs = $CreateManyArgs<$Schema, "BulkActionItem">;
 export type BulkActionItemCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "BulkActionItem">;
@@ -991,6 +1040,7 @@ export type BulkActionItemGetPayload<Args extends $SelectIncludeOmit<$Schema, "B
 export type RealtimeStreamChunkFindManyArgs = $FindManyArgs<$Schema, "RealtimeStreamChunk">;
 export type RealtimeStreamChunkFindUniqueArgs = $FindUniqueArgs<$Schema, "RealtimeStreamChunk">;
 export type RealtimeStreamChunkFindFirstArgs = $FindFirstArgs<$Schema, "RealtimeStreamChunk">;
+export type RealtimeStreamChunkExistsArgs = $ExistsArgs<$Schema, "RealtimeStreamChunk">;
 export type RealtimeStreamChunkCreateArgs = $CreateArgs<$Schema, "RealtimeStreamChunk">;
 export type RealtimeStreamChunkCreateManyArgs = $CreateManyArgs<$Schema, "RealtimeStreamChunk">;
 export type RealtimeStreamChunkCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "RealtimeStreamChunk">;
@@ -1011,6 +1061,7 @@ export type RealtimeStreamChunkGetPayload<Args extends $SelectIncludeOmit<$Schem
 export type TaskEventPartitionedFindManyArgs = $FindManyArgs<$Schema, "TaskEventPartitioned">;
 export type TaskEventPartitionedFindUniqueArgs = $FindUniqueArgs<$Schema, "TaskEventPartitioned">;
 export type TaskEventPartitionedFindFirstArgs = $FindFirstArgs<$Schema, "TaskEventPartitioned">;
+export type TaskEventPartitionedExistsArgs = $ExistsArgs<$Schema, "TaskEventPartitioned">;
 export type TaskEventPartitionedCreateArgs = $CreateArgs<$Schema, "TaskEventPartitioned">;
 export type TaskEventPartitionedCreateManyArgs = $CreateManyArgs<$Schema, "TaskEventPartitioned">;
 export type TaskEventPartitionedCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "TaskEventPartitioned">;

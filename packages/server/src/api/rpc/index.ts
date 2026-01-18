@@ -3,7 +3,12 @@ import { ORMError, ORMErrorReason, type ClientContract } from '@zenstackhq/orm';
 import type { SchemaDef } from '@zenstackhq/orm/schema';
 import SuperJSON from 'superjson';
 import { match } from 'ts-pattern';
+import z from 'zod';
+import { fromError } from 'zod-validation-error/v4';
 import type { ApiHandler, LogConfig, RequestContext, Response } from '../../types';
+import { getProcedureDef, mapProcedureArgs, PROCEDURE_ROUTE_PREFIXES } from '../common/procedures';
+import { loggerSchema } from '../common/schemas';
+import { processSuperJsonRequestPayload, unmarshalQ } from '../common/utils';
 import { log, registerCustomSerializers } from '../utils';
 
 registerCustomSerializers();
@@ -27,7 +32,17 @@ export type RPCApiHandlerOptions<Schema extends SchemaDef = SchemaDef> = {
  * RPC style API request handler that mirrors the ZenStackClient API
  */
 export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiHandler<Schema> {
-    constructor(private readonly options: RPCApiHandlerOptions<Schema>) {}
+    constructor(private readonly options: RPCApiHandlerOptions<Schema>) {
+        this.validateOptions(options);
+    }
+
+    private validateOptions(options: RPCApiHandlerOptions<Schema>) {
+        const schema = z.strictObject({ schema: z.object(), log: loggerSchema.optional() });
+        const parseResult = schema.safeParse(options);
+        if (!parseResult.success) {
+            throw new Error(`Invalid options: ${fromError(parseResult.error)}`);
+        }
+    }
 
     get schema(): Schema {
         return this.options.schema;
@@ -44,6 +59,16 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
 
         if (parts.length !== 0 || !op || !model) {
             return this.makeBadInputErrorResponse('invalid request path');
+        }
+
+        if (model === PROCEDURE_ROUTE_PREFIXES) {
+            return this.handleProcedureRequest({
+                client,
+                method: method.toUpperCase(),
+                proc: op,
+                query,
+                requestBody,
+            });
         }
 
         model = lowerCaseFirst(model);
@@ -73,13 +98,12 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             case 'aggregate':
             case 'groupBy':
             case 'count':
+            case 'exists':
                 if (method !== 'GET') {
                     return this.makeBadInputErrorResponse('invalid request method, only GET is supported');
                 }
                 try {
-                    args = query?.['q']
-                        ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
-                        : {};
+                    args = query?.['q'] ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined) : {};
                 } catch {
                     return this.makeBadInputErrorResponse('invalid "q" query parameter');
                 }
@@ -104,9 +128,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
                     return this.makeBadInputErrorResponse('invalid request method, only DELETE is supported');
                 }
                 try {
-                    args = query?.['q']
-                        ? this.unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
-                        : {};
+                    args = query?.['q'] ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined) : {};
                 } catch (err) {
                     return this.makeBadInputErrorResponse(
                         err instanceof Error ? err.message : 'invalid "q" query parameter',
@@ -163,6 +185,92 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
         }
     }
 
+    private async handleProcedureRequest({
+        client,
+        method,
+        proc,
+        query,
+        requestBody,
+    }: {
+        client: ClientContract<Schema>;
+        method: string;
+        proc?: string;
+        query?: Record<string, string | string[]>;
+        requestBody?: unknown;
+    }): Promise<Response> {
+        if (!proc) {
+            return this.makeBadInputErrorResponse('missing procedure name');
+        }
+
+        const procDef = getProcedureDef(this.options.schema, proc);
+        if (!procDef) {
+            return this.makeBadInputErrorResponse(`unknown procedure: ${proc}`);
+        }
+
+        const isMutation = !!procDef.mutation;
+
+        if (isMutation) {
+            if (method !== 'POST') {
+                return this.makeBadInputErrorResponse('invalid request method, only POST is supported');
+            }
+        } else {
+            if (method !== 'GET') {
+                return this.makeBadInputErrorResponse('invalid request method, only GET is supported');
+            }
+        }
+
+        let argsPayload = method === 'POST' ? requestBody : undefined;
+        if (method === 'GET') {
+            try {
+                argsPayload = query?.['q']
+                    ? unmarshalQ(query['q'] as string, query['meta'] as string | undefined)
+                    : undefined;
+            } catch (err) {
+                return this.makeBadInputErrorResponse(
+                    err instanceof Error ? err.message : 'invalid "q" query parameter',
+                );
+            }
+        }
+
+        const { result: processedArgsPayload, error } = await processSuperJsonRequestPayload(argsPayload);
+        if (error) {
+            return this.makeBadInputErrorResponse(error);
+        }
+
+        let procInput: unknown;
+        try {
+            procInput = mapProcedureArgs(procDef, processedArgsPayload);
+        } catch (err) {
+            return this.makeBadInputErrorResponse(err instanceof Error ? err.message : 'invalid procedure arguments');
+        }
+
+        try {
+            log(this.options.log, 'debug', () => `handling "$procs.${proc}" request`);
+
+            const clientResult = await (client as any).$procs?.[proc](procInput);
+
+            const { json, meta } = SuperJSON.serialize(clientResult);
+            const responseBody: any = { data: json };
+            if (meta) {
+                responseBody.meta = { serialization: meta };
+            }
+
+            const response = { status: 200, body: responseBody };
+            log(
+                this.options.log,
+                'debug',
+                () => `sending response for "$procs.${proc}" request: ${safeJSONStringify(response)}`,
+            );
+            return response;
+        } catch (err) {
+            log(this.options.log, 'error', `error occurred when handling "$procs.${proc}" request`, err);
+            if (err instanceof ORMError) {
+                return this.makeORMErrorResponse(err);
+            }
+            return this.makeGenericErrorResponse(err);
+        }
+    }
+
     private isValidModel(client: ClientContract<Schema>, model: string) {
         return Object.keys(client.$schema.models).some((m) => lowerCaseFirst(m) === lowerCaseFirst(model));
     }
@@ -206,8 +314,8 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             .with(ORMErrorReason.REJECTED_BY_POLICY, () => {
                 status = 403;
                 error.rejectedByPolicy = true;
-                error.rejectReason = err.rejectedByPolicyReason;
                 error.model = err.model;
+                error.rejectReason = err.rejectedByPolicyReason;
             })
             .with(ORMErrorReason.DB_QUERY_ERROR, () => {
                 status = 400;
@@ -221,7 +329,7 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
     }
 
     private async processRequestPayload(args: any) {
-        const { meta, ...rest } = args;
+        const { meta, ...rest } = args ?? {};
         if (meta?.serialization) {
             try {
                 // superjson deserialization
@@ -229,31 +337,10 @@ export class RPCApiHandler<Schema extends SchemaDef = SchemaDef> implements ApiH
             } catch (err) {
                 return { result: undefined, error: `failed to deserialize request payload: ${(err as Error).message}` };
             }
+        } else {
+            // drop meta when no serialization info is present
+            args = rest;
         }
         return { result: args, error: undefined };
-    }
-
-    private unmarshalQ(value: string, meta: string | undefined) {
-        let parsedValue: any;
-        try {
-            parsedValue = JSON.parse(value);
-        } catch {
-            throw new Error('invalid "q" query parameter');
-        }
-
-        if (meta) {
-            let parsedMeta: any;
-            try {
-                parsedMeta = JSON.parse(meta);
-            } catch {
-                throw new Error('invalid "meta" query parameter');
-            }
-
-            if (parsedMeta.serialization) {
-                return SuperJSON.deserialize({ json: parsedValue, meta: parsedMeta.serialization });
-            }
-        }
-
-        return parsedValue;
     }
 }

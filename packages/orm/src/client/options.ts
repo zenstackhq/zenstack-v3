@@ -1,7 +1,8 @@
 import type { Dialect, Expression, ExpressionBuilder, KyselyConfig } from 'kysely';
 import type { GetModel, GetModelFields, GetModels, ProcedureDef, ScalarFields, SchemaDef } from '../schema';
 import type { PrependParameter } from '../utils/type-utils';
-import type { ClientContract, CRUD_EXT, ProcedureFunc } from './contract';
+import type { ClientContract, CRUD_EXT } from './contract';
+import type { GetProcedureNames, ProcedureHandlerFunc } from './crud-types';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
 import type { RuntimePlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
@@ -58,7 +59,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
     /**
      * Plugins.
      */
-    plugins?: RuntimePlugin<Schema>[];
+    plugins?: RuntimePlugin<any, any>[];
 
     /**
      * Logging configuration.
@@ -84,7 +85,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
     /**
      * Options for omitting fields in ORM query results.
      */
-    omit?: OmitOptions<Schema>;
+    omit?: OmitConfig<Schema>;
 
     /**
      * Whether to allow overriding omit settings at query time. Defaults to `true`. When set to
@@ -110,9 +111,9 @@ export type ClientOptions<Schema extends SchemaDef> = {
         : {});
 
 /**
- * Options for omitting fields in ORM query results.
+ * Config for omitting fields in ORM query results.
  */
-export type OmitOptions<Schema extends SchemaDef> = {
+export type OmitConfig<Schema extends SchemaDef> = {
     [Model in GetModels<Schema>]?: {
         [Field in GetModelFields<Schema, Model> as Field extends ScalarFields<Schema, Model> ? Field : never]?: boolean;
     };
@@ -134,10 +135,7 @@ export type ProceduresOptions<Schema extends SchemaDef> = Schema extends {
     procedures: Record<string, ProcedureDef>;
 }
     ? {
-          [Key in keyof Schema['procedures']]: PrependParameter<
-              ClientContract<Schema>,
-              ProcedureFunc<Schema, Schema['procedures'][Key]>
-          >;
+          [Key in GetProcedureNames<Schema>]: ProcedureHandlerFunc<Schema, Key>;
       }
     : {};
 

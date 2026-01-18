@@ -21,6 +21,7 @@ import {
     isLiteralExpr,
     isModel,
     isReferenceExpr,
+    isStringLiteral,
     isTypeDef,
 } from '../generated/ast';
 import {
@@ -32,6 +33,7 @@ import {
     isAuthOrAuthMemberAccess,
     isBeforeInvocation,
     isCollectionPredicate,
+    isComputedField,
     isDataFieldReference,
     isDelegateModel,
     isRelationshipField,
@@ -101,10 +103,9 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
                 }
             }
 
-            if (!assignableToAttributeParam(arg, paramDecl, attr)) {
-                accept('error', `Value is not assignable to parameter`, {
-                    node: arg,
-                });
+            const argAssignable = assignableToAttributeParam(arg, paramDecl, attr);
+            if (!argAssignable.result) {
+                accept('error', argAssignable.error, { node: arg });
                 return;
             }
 
@@ -260,23 +261,22 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
             });
             return;
         }
-        const kindItems = this.validatePolicyKinds(kind, ['read', 'update', 'all'], attr, accept);
+        this.validatePolicyKinds(kind, ['read', 'update', 'all'], attr, accept);
 
         const expr = attr.args[1]?.value;
         if (expr && AstUtils.streamAst(expr).some((node) => isBeforeInvocation(node))) {
-            accept('error', `"before()" is not allowed in field-level policy rules`, { node: expr });
+            accept('error', `"before()" is not allowed in field-level policies`, { node: expr });
         }
 
-        // 'update' rules are not allowed for relation fields
-        if (kindItems.includes('update') || kindItems.includes('all')) {
-            const field = attr.$container as DataField;
-            if (isRelationshipField(field)) {
-                accept(
-                    'error',
-                    `Field-level policy rules with "update" or "all" kind are not allowed for relation fields. Put rules on foreign-key fields instead.`,
-                    { node: attr },
-                );
-            }
+        // relation fields are not allowed
+        const field = attr.$container as DataField;
+
+        if (isRelationshipField(field)) {
+            accept('error', `Field-level policies are not allowed for relation fields.`, { node: attr });
+        }
+
+        if (isComputedField(field)) {
+            accept('error', `Field-level policies are not allowed for computed fields.`, { node: attr });
         }
     }
 
@@ -392,10 +392,21 @@ export default class AttributeApplicationValidator implements AstValidator<Attri
     }
 }
 
-function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, attr: AttributeApplication): boolean {
+function assignableToAttributeParam(
+    arg: AttributeArg,
+    param: AttributeParam,
+    attr: AttributeApplication,
+):
+    | {
+          result: true;
+      }
+    | { result: false; error: string } {
+    const genericError = { result: false, error: 'invalid argument type' } as const;
+    const success = { result: true } as const;
+
     const argResolvedType = arg.$resolvedType;
     if (!argResolvedType) {
-        return false;
+        return { result: false, error: 'unable to resolve argument type' };
     }
 
     let dstType = param.type.type;
@@ -404,10 +415,30 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
     if (dstType === 'ContextType') {
         // ContextType is inferred from the attribute's container's type
         if (isDataField(attr.$container)) {
-            // If the field is Typed JSON, and the attribute is @default, the argument must be a string
-            const dstIsTypedJson = hasAttribute(attr.$container, '@json');
-            if (dstIsTypedJson && attr.decl.ref?.name === '@default') {
-                return argResolvedType.decl === 'String';
+            // If the field is JSON, and the attribute is @default, the argument must be a JSON string
+            // (design inherited from Prisma)
+            const dstIsJson = attr.$container.type.type === 'Json' || hasAttribute(attr.$container, '@json');
+            if (dstIsJson && attr.decl.ref?.name === '@default') {
+                if (attr.$container.type.array && attr.$container.type.type === 'Json') {
+                    // Json[] default value, must be array of JSON strings
+                    if (isArrayExpr(arg.value) && arg.value.items.every((item) => isLiteralJsonString(item))) {
+                        return success;
+                    } else {
+                        return {
+                            result: false,
+                            error: 'expected an array of JSON string literals',
+                        };
+                    }
+                } else {
+                    if (isLiteralJsonString(arg.value)) {
+                        return success;
+                    } else {
+                        return {
+                            result: false,
+                            error: 'expected a JSON string literal',
+                        };
+                    }
+                }
             }
             dstIsArray = attr.$container.type.array;
         }
@@ -416,17 +447,24 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
     const dstRef = param.type.reference;
 
     if (dstType === 'Any' && !dstIsArray) {
-        return true;
+        return success;
     }
 
     if (argResolvedType.decl === 'Any') {
         // arg is any type
         if (!argResolvedType.array) {
             // if it's not an array, it's assignable to any type
-            return true;
+            return success;
         } else {
             // otherwise it's assignable to any array type
-            return argResolvedType.array === dstIsArray;
+            if (argResolvedType.array === dstIsArray) {
+                return success;
+            } else {
+                return {
+                    result: false,
+                    error: `expected ${dstIsArray ? 'array' : 'non-array'}`,
+                };
+            }
         }
     }
 
@@ -434,12 +472,20 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
     // argument is reference or array or reference
     if (dstType === 'FieldReference' || dstType === 'TransitiveFieldReference') {
         if (dstIsArray) {
-            return (
+            if (
                 isArrayExpr(arg.value) &&
-                !arg.value.items.find((item) => !isReferenceExpr(item) || !isDataField(item.target.ref))
-            );
+                !arg.value.items.some((item) => !isReferenceExpr(item) || !isDataField(item.target.ref))
+            ) {
+                return success;
+            } else {
+                return { result: false, error: 'expected an array of field references' };
+            }
         } else {
-            return isReferenceExpr(arg.value) && isDataField(arg.value.target.ref);
+            if (isReferenceExpr(arg.value) && isDataField(arg.value.target.ref)) {
+                return success;
+            } else {
+                return { result: false, error: 'expected a field reference' };
+            }
         }
     }
 
@@ -453,13 +499,22 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
             attrArgDeclType = resolved(attr.$container.type.reference);
             dstIsArray = attr.$container.type.array;
         }
-        return attrArgDeclType === argResolvedType.decl && dstIsArray === argResolvedType.array;
+
+        if (attrArgDeclType !== argResolvedType.decl) {
+            return genericError;
+        }
+
+        if (dstIsArray !== argResolvedType.array) {
+            return { result: false, error: `expected ${dstIsArray ? 'array' : 'non-array'}` };
+        }
+
+        return success;
     } else if (dstType) {
         // scalar type
 
         if (typeof argResolvedType?.decl !== 'string') {
             // destination type is not a reference, so argument type must be a plain expression
-            return false;
+            return genericError;
         }
 
         if (dstType === 'ContextType') {
@@ -467,7 +522,7 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
             // the attribute's container
             if (isDataField(attr.$container)) {
                 if (!attr.$container?.type?.type) {
-                    return false;
+                    return genericError;
                 }
                 dstType = mapBuiltinTypeToExpressionType(attr.$container.type.type);
                 dstIsArray = attr.$container.type.array;
@@ -476,10 +531,18 @@ function assignableToAttributeParam(arg: AttributeArg, param: AttributeParam, at
             }
         }
 
-        return typeAssignable(dstType, argResolvedType.decl, arg.value) && dstIsArray === argResolvedType.array;
+        if (typeAssignable(dstType, argResolvedType.decl, arg.value) && dstIsArray === argResolvedType.array) {
+            return success;
+        } else {
+            return genericError;
+        }
     } else {
         // reference type
-        return (dstRef?.ref === argResolvedType.decl || dstType === 'Any') && dstIsArray === argResolvedType.array;
+        if ((dstRef?.ref === argResolvedType.decl || dstType === 'Any') && dstIsArray === argResolvedType.array) {
+            return success;
+        } else {
+            return genericError;
+        }
     }
 }
 
@@ -557,4 +620,16 @@ export function validateAttributeApplication(
     contextDataModel?: DataModel,
 ) {
     new AttributeApplicationValidator().validate(attr, accept, contextDataModel);
+}
+
+function isLiteralJsonString(value: Expression) {
+    if (!isStringLiteral(value)) {
+        return false;
+    }
+    try {
+        JSON.parse(value.value);
+        return true;
+    } catch {
+        return false;
+    }
 }

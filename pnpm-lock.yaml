@@ -87,6 +87,9 @@ catalogs:
     vue:
       specifier: 3.5.22
       version: 3.5.22
+    zod:
+      specifier: ^4.0.0
+      version: 4.1.12
     zod-validation-error:
       specifier: ^4.0.1
       version: 4.0.1
@@ -183,6 +186,9 @@ importers:
       '@zenstackhq/sdk':
         specifier: workspace:*
         version: link:../sdk
+      chokidar:
+        specifier: ^5.0.0
+        version: 5.0.0
       colors:
         specifier: 1.4.0
         version: 1.4.0
@@ -495,6 +501,9 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.16.3
+      postgres-array:
+        specifier: ^3.0.4
+        version: 3.0.4
       sql.js:
         specifier: 'catalog:'
         version: 1.13.0
@@ -906,6 +915,9 @@ importers:
       kysely:
         specifier: 'catalog:'
         version: 0.28.8
+      zod:
+        specifier: 'catalog:'
+        version: 4.1.12
     devDependencies:
       '@types/better-sqlite3':
         specifier: 'catalog:'
@@ -1031,6 +1043,9 @@ importers:
       uuid:
         specifier: ^11.0.5
         version: 11.0.5
+      zod:
+        specifier: 'catalog:'
+        version: 4.1.12
     devDependencies:
       '@zenstackhq/typescript-config':
         specifier: workspace:*
@@ -6886,8 +6901,8 @@ packages:
     resolution: {integrity: sha512-VpZrUqU5A69eQyW2c5CA1jtLecCsN2U/bD6VilrFDWq5+5UIEVO7nazS3TEcHf1zuPYO/sqGvUvW62g86RXZuA==}
     engines: {node: '>=4'}
 
-  postgres-array@3.0.2:
-    resolution: {integrity: sha512-6faShkdFugNQCLwucjPcY5ARoW1SlbnrZjmGl0IrrqewpvxvhSLHimCVzqeuULCbG0fQv7Dtk1yDbG3xv7Veog==}
+  postgres-array@3.0.4:
+    resolution: {integrity: sha512-nAUSGfSDGOaOAEGwqsRY27GPOea7CNipJPOA7lPbdEpx5Kg3qzdP0AaWC5MlhTWV9s4hFX39nomVZ+C4tnGOJQ==}
     engines: {node: '>=12'}
 
   postgres-bytea@1.0.0:
@@ -14507,7 +14522,7 @@ snapshots:
     dependencies:
       pg-int8: 1.0.1
       pg-numeric: 1.0.2
-      postgres-array: 3.0.2
+      postgres-array: 3.0.4
       postgres-bytea: 3.0.0
       postgres-date: 2.1.0
       postgres-interval: 3.0.0
@@ -14756,7 +14771,7 @@ snapshots:
 
   postgres-array@2.0.0: {}
 
-  postgres-array@3.0.2: {}
+  postgres-array@3.0.4: {}
 
   postgres-bytea@1.0.0: {}
 

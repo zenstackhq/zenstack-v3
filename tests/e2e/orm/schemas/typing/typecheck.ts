@@ -162,6 +162,25 @@ async function find() {
         })
     ).profile?.region?.city;
 
+    // _count inside include should be properly typed
+    const includeWithCount = await client.user.findFirst({
+        include: {
+            posts: { select: { title: true } },
+            _count: { select: { posts: true } },
+        },
+    });
+    console.log(includeWithCount?.posts[0]?.title);
+    console.log(includeWithCount?._count.posts);
+
+    const includeWithCountTrue = await client.user.findFirst({
+        include: {
+            posts: true,
+            _count: true,
+        },
+    });
+    console.log(includeWithCountTrue?.posts[0]?.title);
+    console.log(includeWithCountTrue?._count.posts);
+
     (
         await client.user.findFirstOrThrow({
             select: {

@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as yaml from 'yaml';
 import { fileURLToPath } from 'node:url';
 
-const excludes = ['packages/ide/vscode/package.json'];
+const excludes: string[] = [];
 
 const _dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,7 +36,7 @@ function incrementVersion(version: string, type: 'patch' | 'minor' = 'patch'): s
     const parts = version.split('.');
     if (parts.length !== 3) throw new Error(`Invalid version format: ${version}`);
 
-    const [major, minor, patch] = parts.map(p => parseInt(p, 10));
+    const [major, minor, patch] = parts.map((p) => parseInt(p, 10));
     if (isNaN(major) || isNaN(minor) || isNaN(patch)) {
         throw new Error(`Invalid version: ${version}`);
     }

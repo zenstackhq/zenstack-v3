@@ -2,7 +2,7 @@ import { enumerate, invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
-import { z, ZodType } from 'zod';
+import { z, ZodObject, ZodType } from 'zod';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import {
     type AttributeApplication,
@@ -11,6 +11,7 @@ import {
     type FieldDef,
     type GetModels,
     type ModelDef,
+    type ProcedureDef,
     type SchemaDef,
 } from '../../../schema';
 import { extractFields } from '../../../utils/object-utils';
@@ -25,6 +26,7 @@ import {
     type CreateManyArgs,
     type DeleteArgs,
     type DeleteManyArgs,
+    type ExistsArgs,
     type FindArgs,
     type GroupByArgs,
     type UpdateArgs,
@@ -39,9 +41,12 @@ import {
     getEnum,
     getTypeDef,
     getUniqueFields,
+    isEnum,
+    isTypeDef,
     requireField,
     requireModel,
 } from '../../query-utils';
+import type { CoreCrudOperations } from '../operations/base';
 import {
     addBigIntValidation,
     addCustomValidation,
@@ -51,11 +56,11 @@ import {
     addStringValidation,
 } from './utils';
 
-const schemaCache = new WeakMap<SchemaDef, Map<string, ZodType>>();
-
-type GetSchemaFunc<Schema extends SchemaDef, Options> = (model: GetModels<Schema>, options: Options) => ZodType;
+type GetSchemaFunc<Schema extends SchemaDef> = (model: GetModels<Schema>) => ZodType;
 
 export class InputValidator<Schema extends SchemaDef> {
+    private readonly schemaCache = new Map<string, ZodType>();
+
     constructor(private readonly client: ClientContract<Schema>) {}
 
     private get schema() {
@@ -70,22 +75,146 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.client.$options.validateInput !== false;
     }
 
+    validateProcedureInput(proc: string, input: unknown): unknown {
+        const procDef = (this.schema.procedures ?? {})[proc] as ProcedureDef | undefined;
+        invariant(procDef, `Procedure "${proc}" not found in schema`);
+
+        const params = Object.values(procDef.params ?? {});
+
+        // For procedures where every parameter is optional, allow omitting the input entirely.
+        if (typeof input === 'undefined') {
+            if (params.length === 0) {
+                return undefined;
+            }
+            if (params.every((p) => p.optional)) {
+                return undefined;
+            }
+            throw createInvalidInputError('Missing procedure arguments', `$procs.${proc}`);
+        }
+
+        if (typeof input !== 'object') {
+            throw createInvalidInputError('Procedure input must be an object', `$procs.${proc}`);
+        }
+
+        const envelope = input as Record<string, unknown>;
+        const argsPayload = Object.prototype.hasOwnProperty.call(envelope, 'args') ? (envelope as any).args : undefined;
+
+        if (params.length === 0) {
+            if (typeof argsPayload === 'undefined') {
+                return input;
+            }
+            if (!argsPayload || typeof argsPayload !== 'object' || Array.isArray(argsPayload)) {
+                throw createInvalidInputError('Procedure `args` must be an object', `$procs.${proc}`);
+            }
+            if (Object.keys(argsPayload as any).length === 0) {
+                return input;
+            }
+            throw createInvalidInputError('Procedure does not accept arguments', `$procs.${proc}`);
+        }
+
+        if (typeof argsPayload === 'undefined') {
+            if (params.every((p) => p.optional)) {
+                return input;
+            }
+            throw createInvalidInputError('Missing procedure arguments', `$procs.${proc}`);
+        }
+
+        if (!argsPayload || typeof argsPayload !== 'object' || Array.isArray(argsPayload)) {
+            throw createInvalidInputError('Procedure `args` must be an object', `$procs.${proc}`);
+        }
+
+        const obj = argsPayload as Record<string, unknown>;
+
+        for (const param of params) {
+            const value = (obj as any)[param.name];
+
+            if (!Object.prototype.hasOwnProperty.call(obj, param.name)) {
+                if (param.optional) {
+                    continue;
+                }
+                throw createInvalidInputError(`Missing procedure argument: ${param.name}`, `$procs.${proc}`);
+            }
+
+            if (typeof value === 'undefined') {
+                if (param.optional) {
+                    continue;
+                }
+                throw createInvalidInputError(
+                    `Invalid procedure argument: ${param.name} is required`,
+                    `$procs.${proc}`,
+                );
+            }
+
+            const schema = this.makeProcedureParamSchema(param);
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                throw createInvalidInputError(
+                    `Invalid procedure argument: ${param.name}: ${formatError(parsed.error)}`,
+                    `$procs.${proc}`,
+                );
+            }
+        }
+
+        return input;
+    }
+
+    private makeProcedureParamSchema(param: { type: string; array?: boolean; optional?: boolean }): z.ZodType {
+        let schema: z.ZodType;
+
+        if (isTypeDef(this.schema, param.type)) {
+            schema = this.makeTypeDefSchema(param.type);
+        } else if (isEnum(this.schema, param.type)) {
+            schema = this.makeEnumSchema(param.type);
+        } else if (param.type in (this.schema.models ?? {})) {
+            // For model-typed values, accept any object (no deep shape validation).
+            schema = z.record(z.string(), z.unknown());
+        } else {
+            // Builtin scalar types.
+            schema = this.makeScalarSchema(param.type as BuiltinType);
+
+            // If a type isn't recognized by any of the above branches, `makeScalarSchema` returns `unknown`.
+            // Treat it as configuration/schema error.
+            if (schema instanceof z.ZodUnknown) {
+                throw createInternalError(`Unsupported procedure parameter type: ${param.type}`);
+            }
+        }
+
+        if (param.array) {
+            schema = schema.array();
+        }
+        if (param.optional) {
+            schema = schema.optional();
+        }
+
+        return schema;
+    }
+
     validateFindArgs(
         model: GetModels<Schema>,
         args: unknown,
-        options: { unique: boolean; findOne: boolean },
+        operation: CoreCrudOperations,
     ): FindArgs<Schema, GetModels<Schema>, true> | undefined {
-        return this.validate<
-            FindArgs<Schema, GetModels<Schema>, true> | undefined,
-            Parameters<typeof this.makeFindSchema>[1]
-        >(model, 'find', options, (model, options) => this.makeFindSchema(model, options), args);
+        return this.validate<FindArgs<Schema, GetModels<Schema>, true> | undefined>(
+            model,
+            operation,
+            (model) => this.makeFindSchema(model, operation),
+            args,
+        );
+    }
+
+    validateExistsArgs(model: GetModels<Schema>, args: unknown): ExistsArgs<Schema, GetModels<Schema>> | undefined {
+        return this.validate<ExistsArgs<Schema, GetModels<Schema>>>(
+            model,
+            'exists',
+            (model) => this.makeExistsSchema(model),
+            args,
+        );
     }
 
     validateCreateArgs(model: GetModels<Schema>, args: unknown): CreateArgs<Schema, GetModels<Schema>> {
         return this.validate<CreateArgs<Schema, GetModels<Schema>>>(
             model,
             'create',
-            undefined,
             (model) => this.makeCreateSchema(model),
             args,
         );
@@ -95,7 +224,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<CreateManyArgs<Schema, GetModels<Schema>>>(
             model,
             'createMany',
-            undefined,
             (model) => this.makeCreateManySchema(model),
             args,
         );
@@ -108,7 +236,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<CreateManyAndReturnArgs<Schema, GetModels<Schema>> | undefined>(
             model,
             'createManyAndReturn',
-            undefined,
             (model) => this.makeCreateManyAndReturnSchema(model),
             args,
         );
@@ -118,7 +245,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<UpdateArgs<Schema, GetModels<Schema>>>(
             model,
             'update',
-            undefined,
             (model) => this.makeUpdateSchema(model),
             args,
         );
@@ -128,7 +254,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<UpdateManyArgs<Schema, GetModels<Schema>>>(
             model,
             'updateMany',
-            undefined,
             (model) => this.makeUpdateManySchema(model),
             args,
         );
@@ -141,7 +266,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<UpdateManyAndReturnArgs<Schema, GetModels<Schema>>>(
             model,
             'updateManyAndReturn',
-            undefined,
             (model) => this.makeUpdateManyAndReturnSchema(model),
             args,
         );
@@ -151,7 +275,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<UpsertArgs<Schema, GetModels<Schema>>>(
             model,
             'upsert',
-            undefined,
             (model) => this.makeUpsertSchema(model),
             args,
         );
@@ -161,7 +284,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<DeleteArgs<Schema, GetModels<Schema>>>(
             model,
             'delete',
-            undefined,
             (model) => this.makeDeleteSchema(model),
             args,
         );
@@ -174,7 +296,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<DeleteManyArgs<Schema, GetModels<Schema>> | undefined>(
             model,
             'deleteMany',
-            undefined,
             (model) => this.makeDeleteManySchema(model),
             args,
         );
@@ -184,7 +305,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<CountArgs<Schema, GetModels<Schema>> | undefined>(
             model,
             'count',
-            undefined,
             (model) => this.makeCountSchema(model),
             args,
         );
@@ -194,7 +314,6 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<AggregateArgs<Schema, GetModels<Schema>>>(
             model,
             'aggregate',
-            undefined,
             (model) => this.makeAggregateSchema(model),
             args,
         );
@@ -204,49 +323,32 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.validate<GroupByArgs<Schema, GetModels<Schema>>>(
             model,
             'groupBy',
-            undefined,
             (model) => this.makeGroupBySchema(model),
             args,
         );
     }
 
     private getSchemaCache(cacheKey: string) {
-        let thisCache = schemaCache.get(this.schema);
-        if (!thisCache) {
-            thisCache = new Map<string, ZodType>();
-            schemaCache.set(this.schema, thisCache);
-        }
-        return thisCache.get(cacheKey);
+        return this.schemaCache.get(cacheKey);
     }
 
     private setSchemaCache(cacheKey: string, schema: ZodType) {
-        let thisCache = schemaCache.get(this.schema);
-        if (!thisCache) {
-            thisCache = new Map<string, ZodType>();
-            schemaCache.set(this.schema, thisCache);
-        }
-        return thisCache.set(cacheKey, schema);
+        return this.schemaCache.set(cacheKey, schema);
     }
 
-    private validate<T, Options = undefined>(
-        model: GetModels<Schema>,
-        operation: string,
-        options: Options,
-        getSchema: GetSchemaFunc<Schema, Options>,
-        args: unknown,
-    ) {
+    private validate<T>(model: GetModels<Schema>, operation: string, getSchema: GetSchemaFunc<Schema>, args: unknown) {
         const cacheKey = stableStringify({
             type: 'model',
             model,
             operation,
-            options,
             extraValidationsEnabled: this.extraValidationsEnabled,
         });
         let schema = this.getSchemaCache(cacheKey!);
         if (!schema) {
-            schema = getSchema(model, options);
+            schema = getSchema(model);
             this.setSchemaCache(cacheKey!, schema);
         }
+
         const { error, data } = schema.safeParse(args);
         if (error) {
             throw createInvalidInputError(
@@ -260,12 +362,27 @@ export class InputValidator<Schema extends SchemaDef> {
         return data as T;
     }
 
+    private mergePluginArgsSchema(schema: ZodObject, operation: CoreCrudOperations) {
+        let result = schema;
+        for (const plugin of this.options.plugins ?? []) {
+            if (plugin.extQueryArgs) {
+                const pluginSchema = plugin.extQueryArgs.getValidationSchema(operation);
+                if (pluginSchema) {
+                    result = result.extend(pluginSchema.shape);
+                }
+            }
+        }
+        return result.strict();
+    }
+
     // #region Find
 
-    private makeFindSchema(model: string, options: { unique: boolean; findOne: boolean }) {
+    private makeFindSchema(model: string, operation: CoreCrudOperations) {
         const fields: Record<string, z.ZodSchema> = {};
-        const where = this.makeWhereSchema(model, options.unique);
-        if (options.unique) {
+        const unique = operation === 'findUnique';
+        const findOne = operation === 'findUnique' || operation === 'findFirst';
+        const where = this.makeWhereSchema(model, unique);
+        if (unique) {
             fields['where'] = where;
         } else {
             fields['where'] = where.optional();
@@ -275,9 +392,9 @@ export class InputValidator<Schema extends SchemaDef> {
         fields['include'] = this.makeIncludeSchema(model).optional().nullable();
         fields['omit'] = this.makeOmitSchema(model).optional().nullable();
 
-        if (!options.unique) {
+        if (!unique) {
             fields['skip'] = this.makeSkipSchema().optional();
-            if (options.findOne) {
+            if (findOne) {
                 fields['take'] = z.literal(1).optional();
             } else {
                 fields['take'] = this.makeTakeSchema().optional();
@@ -287,14 +404,22 @@ export class InputValidator<Schema extends SchemaDef> {
             fields['distinct'] = this.makeDistinctSchema(model).optional();
         }
 
-        let result: ZodType = z.strictObject(fields);
+        const baseSchema = z.strictObject(fields);
+        let result: ZodType = this.mergePluginArgsSchema(baseSchema, operation);
         result = this.refineForSelectIncludeMutuallyExclusive(result);
         result = this.refineForSelectOmitMutuallyExclusive(result);
 
-        if (!options.unique) {
+        if (!unique) {
             result = result.optional();
         }
         return result;
+    }
+
+    private makeExistsSchema(model: string) {
+        const baseSchema = z.strictObject({
+            where: this.makeWhereSchema(model, false).optional(),
+        });
+        return this.mergePluginArgsSchema(baseSchema, 'exists').optional();
     }
 
     private makeScalarSchema(type: string, attributes?: readonly AttributeApplication[]) {
@@ -382,9 +507,13 @@ export class InputValidator<Schema extends SchemaDef> {
         // zod doesn't preserve object field order after parsing, here we use a
         // validation-only custom schema and use the original data if parsing
         // is successful
-        const finalSchema = z.custom((v) => {
-            return schema.safeParse(v).success;
+        const finalSchema = z.any().superRefine((value, ctx) => {
+            const parseResult = schema.safeParse(value);
+            if (!parseResult.success) {
+                parseResult.error.issues.forEach((issue) => ctx.addIssue(issue as any));
+            }
         });
+
         this.setSchemaCache(key!, finalSchema);
         return finalSchema;
     }
@@ -436,7 +565,12 @@ export class InputValidator<Schema extends SchemaDef> {
                 if (enumDef) {
                     // enum
                     if (Object.keys(enumDef.values).length > 0) {
-                        fieldSchema = this.makeEnumFilterSchema(enumDef, !!fieldDef.optional, withAggregations);
+                        fieldSchema = this.makeEnumFilterSchema(
+                            enumDef,
+                            !!fieldDef.optional,
+                            withAggregations,
+                            !!fieldDef.array,
+                        );
                     }
                 } else if (fieldDef.array) {
                     // array field
@@ -473,7 +607,12 @@ export class InputValidator<Schema extends SchemaDef> {
                                     if (enumDef) {
                                         // enum
                                         if (Object.keys(enumDef.values).length > 0) {
-                                            fieldSchema = this.makeEnumFilterSchema(enumDef, !!def.optional, false);
+                                            fieldSchema = this.makeEnumFilterSchema(
+                                                enumDef,
+                                                !!def.optional,
+                                                false,
+                                                false,
+                                            );
                                         } else {
                                             fieldSchema = z.never();
                                         }
@@ -495,7 +634,7 @@ export class InputValidator<Schema extends SchemaDef> {
         }
 
         // expression builder
-        fields['$expr'] = z.custom((v) => typeof v === 'function').optional();
+        fields['$expr'] = z.custom((v) => typeof v === 'function', { error: '"$expr" must be a function' }).optional();
 
         // logical operators
         fields['AND'] = this.orArray(
@@ -555,24 +694,23 @@ export class InputValidator<Schema extends SchemaDef> {
                         !!fieldDef.array,
                     ).optional();
                 } else {
-                    // array, enum, primitives
-                    if (fieldDef.array) {
+                    // enum, array, primitives
+                    const enumDef = getEnum(this.schema, fieldDef.type);
+                    if (enumDef) {
+                        fieldSchemas[fieldName] = this.makeEnumFilterSchema(
+                            enumDef,
+                            !!fieldDef.optional,
+                            false,
+                            !!fieldDef.array,
+                        ).optional();
+                    } else if (fieldDef.array) {
                         fieldSchemas[fieldName] = this.makeArrayFilterSchema(fieldDef.type as BuiltinType).optional();
                     } else {
-                        const enumDef = getEnum(this.schema, fieldDef.type);
-                        if (enumDef) {
-                            fieldSchemas[fieldName] = this.makeEnumFilterSchema(
-                                enumDef,
-                                !!fieldDef.optional,
-                                false,
-                            ).optional();
-                        } else {
-                            fieldSchemas[fieldName] = this.makePrimitiveFilterSchema(
-                                fieldDef.type as BuiltinType,
-                                !!fieldDef.optional,
-                                false,
-                            ).optional();
-                        }
+                        fieldSchemas[fieldName] = this.makePrimitiveFilterSchema(
+                            fieldDef.type as BuiltinType,
+                            !!fieldDef.optional,
+                            false,
+                        ).optional();
                     }
                 }
             }
@@ -616,12 +754,15 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.schema.typeDefs && type in this.schema.typeDefs;
     }
 
-    private makeEnumFilterSchema(enumDef: EnumDef, optional: boolean, withAggregations: boolean) {
+    private makeEnumFilterSchema(enumDef: EnumDef, optional: boolean, withAggregations: boolean, array: boolean) {
         const baseSchema = z.enum(Object.keys(enumDef.values) as [string, ...string[]]);
+        if (array) {
+            return this.internalMakeArrayFilterSchema(baseSchema);
+        }
         const components = this.makeCommonPrimitiveFilterComponents(
             baseSchema,
             optional,
-            () => z.lazy(() => this.makeEnumFilterSchema(enumDef, optional, withAggregations)),
+            () => z.lazy(() => this.makeEnumFilterSchema(enumDef, optional, withAggregations, array)),
             ['equals', 'in', 'notIn', 'not'],
             withAggregations ? ['_count', '_min', '_max'] : undefined,
         );
@@ -629,11 +770,15 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeArrayFilterSchema(type: BuiltinType) {
+        return this.internalMakeArrayFilterSchema(this.makeScalarSchema(type));
+    }
+
+    private internalMakeArrayFilterSchema(elementSchema: ZodType) {
         return z.strictObject({
-            equals: this.makeScalarSchema(type).array().optional(),
-            has: this.makeScalarSchema(type).optional(),
-            hasEvery: this.makeScalarSchema(type).array().optional(),
-            hasSome: this.makeScalarSchema(type).array().optional(),
+            equals: elementSchema.array().optional(),
+            has: elementSchema.optional(),
+            hasEvery: elementSchema.array().optional(),
+            hasSome: elementSchema.array().optional(),
             isEmpty: z.boolean().optional(),
         });
     }
@@ -745,6 +890,7 @@ export class InputValidator<Schema extends SchemaDef> {
             lte: baseSchema.optional(),
             gt: baseSchema.optional(),
             gte: baseSchema.optional(),
+            between: baseSchema.array().length(2).optional(),
             not: makeThis().optional(),
             ...(withAggregations?.includes('_count')
                 ? { _count: this.makeNumberFilterSchema(z.number().int(), false, false).optional() }
@@ -1002,27 +1148,29 @@ export class InputValidator<Schema extends SchemaDef> {
 
     private makeCreateSchema(model: string) {
         const dataSchema = this.makeCreateDataSchema(model, false);
-        let schema: ZodType = z.strictObject({
+        const baseSchema = z.strictObject({
             data: dataSchema,
             select: this.makeSelectSchema(model).optional().nullable(),
             include: this.makeIncludeSchema(model).optional().nullable(),
             omit: this.makeOmitSchema(model).optional().nullable(),
         });
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'create');
         schema = this.refineForSelectIncludeMutuallyExclusive(schema);
         schema = this.refineForSelectOmitMutuallyExclusive(schema);
         return schema;
     }
 
     private makeCreateManySchema(model: string) {
-        return this.makeCreateManyDataSchema(model, []).optional();
+        return this.mergePluginArgsSchema(this.makeCreateManyDataSchema(model, []), 'createMany').optional();
     }
 
     private makeCreateManyAndReturnSchema(model: string) {
         const base = this.makeCreateManyDataSchema(model, []);
-        const result = base.extend({
+        let result: ZodObject = base.extend({
             select: this.makeSelectSchema(model).optional().nullable(),
             omit: this.makeOmitSchema(model).optional().nullable(),
         });
+        result = this.mergePluginArgsSchema(result, 'createManyAndReturn');
         return this.refineForSelectOmitMutuallyExclusive(result).optional();
     }
 
@@ -1284,29 +1432,34 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Update
 
     private makeUpdateSchema(model: string) {
-        let schema: ZodType = z.strictObject({
+        const baseSchema = z.strictObject({
             where: this.makeWhereSchema(model, true),
             data: this.makeUpdateDataSchema(model),
             select: this.makeSelectSchema(model).optional().nullable(),
             include: this.makeIncludeSchema(model).optional().nullable(),
             omit: this.makeOmitSchema(model).optional().nullable(),
         });
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'update');
         schema = this.refineForSelectIncludeMutuallyExclusive(schema);
         schema = this.refineForSelectOmitMutuallyExclusive(schema);
         return schema;
     }
 
     private makeUpdateManySchema(model: string) {
-        return z.strictObject({
-            where: this.makeWhereSchema(model, false).optional(),
-            data: this.makeUpdateDataSchema(model, [], true),
-            limit: z.number().int().nonnegative().optional(),
-        });
+        return this.mergePluginArgsSchema(
+            z.strictObject({
+                where: this.makeWhereSchema(model, false).optional(),
+                data: this.makeUpdateDataSchema(model, [], true),
+                limit: z.number().int().nonnegative().optional(),
+            }),
+            'updateMany',
+        );
     }
 
     private makeUpdateManyAndReturnSchema(model: string) {
-        const base = this.makeUpdateManySchema(model);
-        let schema: ZodType = base.extend({
+        // plugin extended args schema is merged in `makeUpdateManySchema`
+        const baseSchema: ZodObject = this.makeUpdateManySchema(model);
+        let schema: ZodType = baseSchema.extend({
             select: this.makeSelectSchema(model).optional().nullable(),
             omit: this.makeOmitSchema(model).optional().nullable(),
         });
@@ -1315,7 +1468,7 @@ export class InputValidator<Schema extends SchemaDef> {
     }
 
     private makeUpsertSchema(model: string) {
-        let schema: ZodType = z.strictObject({
+        const baseSchema = z.strictObject({
             where: this.makeWhereSchema(model, true),
             create: this.makeCreateDataSchema(model, false),
             update: this.makeUpdateDataSchema(model),
@@ -1323,6 +1476,7 @@ export class InputValidator<Schema extends SchemaDef> {
             include: this.makeIncludeSchema(model).optional().nullable(),
             omit: this.makeOmitSchema(model).optional().nullable(),
         });
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'upsert');
         schema = this.refineForSelectIncludeMutuallyExclusive(schema);
         schema = this.refineForSelectOmitMutuallyExclusive(schema);
         return schema;
@@ -1439,25 +1593,26 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Delete
 
     private makeDeleteSchema(model: GetModels<Schema>) {
-        let schema: ZodType = z.strictObject({
+        const baseSchema = z.strictObject({
             where: this.makeWhereSchema(model, true),
             select: this.makeSelectSchema(model).optional().nullable(),
             include: this.makeIncludeSchema(model).optional().nullable(),
             omit: this.makeOmitSchema(model).optional().nullable(),
         });
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'delete');
         schema = this.refineForSelectIncludeMutuallyExclusive(schema);
         schema = this.refineForSelectOmitMutuallyExclusive(schema);
         return schema;
     }
 
     private makeDeleteManySchema(model: GetModels<Schema>) {
-        return z
-            .object({
+        return this.mergePluginArgsSchema(
+            z.strictObject({
                 where: this.makeWhereSchema(model, false).optional(),
                 limit: z.number().int().nonnegative().optional(),
-            })
-
-            .optional();
+            }),
+            'deleteMany',
+        ).optional();
     }
 
     // #endregion
@@ -1465,16 +1620,16 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Count
 
     makeCountSchema(model: GetModels<Schema>) {
-        return z
-            .object({
+        return this.mergePluginArgsSchema(
+            z.strictObject({
                 where: this.makeWhereSchema(model, false).optional(),
                 skip: this.makeSkipSchema().optional(),
                 take: this.makeTakeSchema().optional(),
                 orderBy: this.orArray(this.makeOrderBySchema(model, true, false), true).optional(),
                 select: this.makeCountAggregateInputSchema(model).optional(),
-            })
-
-            .optional();
+            }),
+            'count',
+        ).optional();
     }
 
     private makeCountAggregateInputSchema(model: GetModels<Schema>) {
@@ -1499,8 +1654,8 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Aggregate
 
     makeAggregateSchema(model: GetModels<Schema>) {
-        return z
-            .object({
+        return this.mergePluginArgsSchema(
+            z.strictObject({
                 where: this.makeWhereSchema(model, false).optional(),
                 skip: this.makeSkipSchema().optional(),
                 take: this.makeTakeSchema().optional(),
@@ -1510,9 +1665,9 @@ export class InputValidator<Schema extends SchemaDef> {
                 _sum: this.makeSumAvgInputSchema(model).optional(),
                 _min: this.makeMinMaxInputSchema(model).optional(),
                 _max: this.makeMinMaxInputSchema(model).optional(),
-            })
-
-            .optional();
+            }),
+            'aggregate',
+        ).optional();
     }
 
     makeSumAvgInputSchema(model: GetModels<Schema>) {
@@ -1555,7 +1710,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 ? this.orArray(z.enum(nonRelationFields as [string, ...string[]]), true)
                 : z.never();
 
-        let schema: z.ZodSchema = z.strictObject({
+        const baseSchema = z.strictObject({
             where: this.makeWhereSchema(model, false).optional(),
             orderBy: this.orArray(this.makeOrderBySchema(model, false, true), true).optional(),
             by: bySchema,
@@ -1568,6 +1723,8 @@ export class InputValidator<Schema extends SchemaDef> {
             _min: this.makeMinMaxInputSchema(model).optional(),
             _max: this.makeMinMaxInputSchema(model).optional(),
         });
+
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'groupBy');
 
         // fields used in `having` must be either in the `by` list, or aggregations
         schema = schema.refine((value: any) => {

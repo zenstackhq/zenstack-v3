@@ -252,13 +252,15 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
         const { left: isLeftParenthesis, right: isRightParenthesis } = this.isParenthesesNeededForBinaryExpr(ast);
 
+        const collectionPredicate = isCollectionPredicate
+            ? `[${ast.binding ? `${ast.binding}, ${rightExpr}` : rightExpr}]`
+            : rightExpr;
+
         return `${isLeftParenthesis ? '(' : ''}${this.generate(ast.left)}${
             isLeftParenthesis ? ')' : ''
         }${isCollectionPredicate ? '' : this.binaryExprSpace}${operator}${
             isCollectionPredicate ? '' : this.binaryExprSpace
-        }${isRightParenthesis ? '(' : ''}${
-            isCollectionPredicate ? `[${rightExpr}]` : rightExpr
-        }${isRightParenthesis ? ')' : ''}`;
+        }${isRightParenthesis ? '(' : ''}${collectionPredicate}${isRightParenthesis ? ')' : ''}`;
     }
 
     @gen(ReferenceExpr)

@@ -2,6 +2,7 @@ import type {
     ArrayExpression,
     BinaryExpression,
     BinaryOperator,
+    BindingExpression,
     CallExpression,
     Expression,
     FieldExpression,
@@ -39,12 +40,13 @@ export const ExpressionUtils = {
         };
     },
 
-    binary: (left: Expression, op: BinaryOperator, right: Expression): BinaryExpression => {
+    binary: (left: Expression, op: BinaryOperator, right: Expression, binding?: string): BinaryExpression => {
         return {
             kind: 'binary',
             op,
             left,
             right,
+            binding,
         };
     },
 
@@ -68,6 +70,13 @@ export const ExpressionUtils = {
             kind: 'member',
             receiver: receiver,
             members,
+        };
+    },
+
+    binding: (name: string): BindingExpression => {
+        return {
+            kind: 'binding',
+            name,
         };
     },
 
@@ -116,6 +125,8 @@ export const ExpressionUtils = {
     isField: (value: unknown): value is FieldExpression => ExpressionUtils.is(value, 'field'),
 
     isMember: (value: unknown): value is MemberExpression => ExpressionUtils.is(value, 'member'),
+
+    isBinding: (value: unknown): value is BindingExpression => ExpressionUtils.is(value, 'binding'),
 
     getLiteralValue: (expr: Expression): string | number | boolean | undefined => {
         return ExpressionUtils.isLiteral(expr) ? expr.value : undefined;

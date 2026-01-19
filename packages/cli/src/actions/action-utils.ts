@@ -144,3 +144,15 @@ export async function requireDataSourceUrl(schemaFile: string) {
         throw new CliError('The schema\'s "datasource" must have a "url" field to use this command.');
     }
 }
+
+export function getOutputPath(options: { output?: string }, schemaFile: string) {
+    if (options.output) {
+        return options.output;
+    }
+    const pkgJsonConfig = getPkgJsonConfig(process.cwd());
+    if (pkgJsonConfig.output) {
+        return pkgJsonConfig.output;
+    } else {
+        return path.dirname(schemaFile);
+    }
+}

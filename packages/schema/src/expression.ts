@@ -6,6 +6,7 @@ export type Expression =
     | CallExpression
     | UnaryExpression
     | BinaryExpression
+    | BindingExpression
     | ThisExpression
     | NullExpression;
 
@@ -30,6 +31,11 @@ export type MemberExpression = {
     members: string[];
 };
 
+export type BindingExpression = {
+    kind: 'binding';
+    name: string;
+};
+
 export type UnaryExpression = {
     kind: 'unary';
     op: UnaryOperator;
@@ -41,6 +47,7 @@ export type BinaryExpression = {
     op: BinaryOperator;
     left: Expression;
     right: Expression;
+    binding?: string;
 };
 
 export type CallExpression = {

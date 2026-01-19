@@ -1,19 +1,33 @@
 import type { OperationNode, QueryId, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
-import type { ZodObject } from 'zod';
+import type { ZodType } from 'zod';
 import type { ClientContract, ZModelFunction } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
 import type { AllCrudOperations, CoreCrudOperations } from './crud/operations/base';
 
+type AllowedExtQueryArgKeys = CoreCrudOperations | '$create' | '$read' | '$update' | '$delete' | '$all';
+
 /**
  * Base shape of plugin-extended query args.
  */
-export type ExtQueryArgsBase = { [K in CoreCrudOperations | 'all']?: object };
+export type ExtQueryArgsBase = {
+    [K in AllowedExtQueryArgKeys]?: object;
+};
+
+/**
+ * Base type for plugin-extended client members (methods and properties).
+ * Member names should start with '$' to avoid model name conflicts.
+ */
+export type ExtClientMembersBase = Record<string, unknown>;
 
 /**
  * ZenStack runtime plugin.
  */
-export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef, _ExtQueryArgs extends ExtQueryArgsBase = {}> {
+export interface RuntimePlugin<
+    Schema extends SchemaDef,
+    ExtQueryArgs extends ExtQueryArgsBase,
+    ExtClientMembers extends Record<string, unknown>,
+> {
     /**
      * Plugin ID.
      */
@@ -59,19 +73,26 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef, _ExtQueryAr
     /**
      * Extended query args configuration.
      */
-    extQueryArgs?: {
-        /**
-         * Callback for getting a Zod schema to validate the extended query args for the given operation.
-         */
-        getValidationSchema: (operation: CoreCrudOperations) => ZodObject | undefined;
+    queryArgs?: {
+        [K in keyof ExtQueryArgs]: ZodType<ExtQueryArgs[K]>;
     };
+
+    /**
+     * Extended client members (methods and properties).
+     */
+    client?: ExtClientMembers;
 }
+
+export type AnyPlugin = RuntimePlugin<any, any, any>;
+
 /**
  * Defines a ZenStack runtime plugin.
  */
-export function definePlugin<Schema extends SchemaDef = SchemaDef, ExtQueryArgs extends ExtQueryArgsBase = {}>(
-    plugin: RuntimePlugin<Schema, ExtQueryArgs>,
-): RuntimePlugin<Schema, ExtQueryArgs> {
+export function definePlugin<
+    Schema extends SchemaDef,
+    const ExtQueryArgs extends ExtQueryArgsBase = {},
+    const ExtClientMembers extends Record<string, unknown> = {},
+>(plugin: RuntimePlugin<Schema, ExtQueryArgs, ExtClientMembers>): RuntimePlugin<any, ExtQueryArgs, ExtClientMembers> {
     return plugin;
 }
 

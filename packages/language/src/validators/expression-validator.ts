@@ -3,6 +3,7 @@ import {
     BinaryExpr,
     Expression,
     isArrayExpr,
+    isCollectionPredicateBinding,
     isDataModel,
     isDataModelAttribute,
     isEnum,
@@ -12,6 +13,7 @@ import {
     isReferenceExpr,
     isThisExpr,
     MemberAccessExpr,
+    ReferenceExpr,
     UnaryExpr,
     type ExpressionType,
 } from '../generated/ast';
@@ -51,7 +53,7 @@ export default class ExpressionValidator implements AstValidator<Expression> {
                     }
                     return false;
                 });
-                if (!hasReferenceResolutionError) {
+                if (hasReferenceResolutionError) {
                     // report silent errors not involving linker errors
                     accept('error', 'Expression cannot be resolved', {
                         node: expr,
@@ -62,6 +64,9 @@ export default class ExpressionValidator implements AstValidator<Expression> {
 
         // extra validations by expression type
         switch (expr.$type) {
+            case 'ReferenceExpr':
+                this.validateReferenceExpr(expr, accept);
+                break;
             case 'MemberAccessExpr':
                 this.validateMemberAccessExpr(expr, accept);
                 break;
@@ -71,6 +76,16 @@ export default class ExpressionValidator implements AstValidator<Expression> {
             case 'UnaryExpr':
                 this.validateUnaryExpr(expr, accept);
                 break;
+        }
+    }
+
+    private validateReferenceExpr(expr: ReferenceExpr, accept: ValidationAcceptor) {
+        // reference to collection predicate's binding can't be used standalone like:
+        //   `items?[e, e]`, `items?[e, e != null]`, etc.
+        if (isCollectionPredicateBinding(expr.target.ref) && !isMemberAccessExpr(expr.$container)) {
+            accept('error', 'Collection predicate binding cannot be used without a member access', {
+                node: expr,
+            });
         }
     }
 

@@ -24,10 +24,8 @@ import {
     DataFieldType,
     DataModel,
     Enum,
-    EnumField,
     type ExpressionType,
     FunctionDecl,
-    FunctionParam,
     FunctionParamType,
     InvocationExpr,
     LiteralExpr,
@@ -43,10 +41,13 @@ import {
     UnaryExpr,
     isArrayExpr,
     isBooleanLiteral,
+    isCollectionPredicateBinding,
     isDataField,
     isDataFieldType,
     isDataModel,
     isEnum,
+    isEnumField,
+    isFunctionParam,
     isNumberLiteral,
     isReferenceExpr,
     isStringLiteral,
@@ -249,13 +250,21 @@ export class ZModelLinker extends DefaultLinker {
 
     private resolveReference(node: ReferenceExpr, document: LangiumDocument<AstNode>, extraScopes: ScopeProvider[]) {
         this.resolveDefault(node, document, extraScopes);
+        const target = node.target.ref;
 
-        if (node.target.ref) {
-            // resolve type
-            if (node.target.ref.$type === EnumField) {
-                this.resolveToBuiltinTypeOrDecl(node, node.target.ref.$container);
-            } else {
-                this.resolveToDeclaredType(node, (node.target.ref as DataField | FunctionParam).type);
+        if (target) {
+            if (isCollectionPredicateBinding(target)) {
+                // collection predicate's binding is resolved to the element type of the collection
+                const collectionType = target.$container.left.$resolvedType;
+                if (collectionType) {
+                    node.$resolvedType = { ...collectionType, array: false };
+                }
+            } else if (isEnumField(target)) {
+                // enum field is resolved to its containing enum
+                this.resolveToBuiltinTypeOrDecl(node, target.$container);
+            } else if (isDataField(target) || isFunctionParam(target)) {
+                // other references are resolved to their declared type
+                this.resolveToDeclaredType(node, target.type);
             }
         }
     }
@@ -506,6 +515,9 @@ export class ZModelLinker extends DefaultLinker {
     //#region Utils
 
     private resolveToDeclaredType(node: AstNode, type: FunctionParamType | DataFieldType) {
+        if (!type) {
+            return;
+        }
         let nullable = false;
         if (isDataFieldType(type)) {
             nullable = type.optional;

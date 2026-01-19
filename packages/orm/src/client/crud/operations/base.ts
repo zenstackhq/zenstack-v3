@@ -120,6 +120,36 @@ export const CoreWriteOperations = [
 export type CoreWriteOperations = (typeof CoreWriteOperations)[number];
 
 /**
+ * List of core create operations.
+ */
+export const CoreCreateOperations = ['create', 'createMany', 'createManyAndReturn', 'upsert'] as const;
+
+/**
+ * List of core create operations.
+ */
+export type CoreCreateOperations = (typeof CoreCreateOperations)[number];
+
+/**
+ * List of core update operations.
+ */
+export const CoreUpdateOperations = ['update', 'updateMany', 'updateManyAndReturn', 'upsert'] as const;
+
+/**
+ * List of core update operations.
+ */
+export type CoreUpdateOperations = (typeof CoreUpdateOperations)[number];
+
+/**
+ * List of core delete operations.
+ */
+export const CoreDeleteOperations = ['delete', 'deleteMany'] as const;
+
+/**
+ * List of core delete operations.
+ */
+export type CoreDeleteOperations = (typeof CoreDeleteOperations)[number];
+
+/**
  * List of all CRUD operations, including 'orThrow' variants.
  */
 export const AllCrudOperations = [...CoreCrudOperations, 'findUniqueOrThrow', 'findFirstOrThrow'] as const;

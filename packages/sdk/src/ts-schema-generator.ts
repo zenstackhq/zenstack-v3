@@ -13,6 +13,7 @@ import {
     InvocationExpr,
     isArrayExpr,
     isBinaryExpr,
+    isCollectionPredicateBinding,
     isDataField,
     isDataModel,
     isDataSource,
@@ -1257,11 +1258,17 @@ export class TsSchemaGenerator {
     }
 
     private createBinaryExpression(expr: BinaryExpr) {
-        return this.createExpressionUtilsCall('binary', [
+        const args = [
             this.createExpression(expr.left),
             this.createLiteralNode(expr.operator),
             this.createExpression(expr.right),
-        ]);
+        ];
+
+        if (expr.binding) {
+            args.push(this.createLiteralNode(expr.binding.name));
+        }
+
+        return this.createExpressionUtilsCall('binary', args);
     }
 
     private createUnaryExpression(expr: UnaryExpr) {
@@ -1278,13 +1285,18 @@ export class TsSchemaGenerator {
     }
 
     private createRefExpression(expr: ReferenceExpr): any {
-        if (isDataField(expr.target.ref)) {
-            return this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]);
-        } else if (isEnumField(expr.target.ref)) {
-            return this.createLiteralExpression('StringLiteral', expr.target.$refText);
-        } else {
-            throw new Error(`Unsupported reference type: ${expr.target.$refText}`);
-        }
+        const target = expr.target.ref;
+        return match(target)
+            .when(isDataField, () =>
+                this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]),
+            )
+            .when(isEnumField, () => this.createLiteralExpression('StringLiteral', expr.target.$refText))
+            .when(isCollectionPredicateBinding, () =>
+                this.createExpressionUtilsCall('binding', [this.createLiteralNode(expr.target.$refText)]),
+            )
+            .otherwise(() => {
+                throw Error(`Unsupported reference type: ${expr.target.$refText}`);
+            });
     }
 
     private createCallExpression(expr: InvocationExpr) {

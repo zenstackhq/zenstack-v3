@@ -37,7 +37,7 @@ import { ZenStackQueryExecutor } from './executor/zenstack-query-executor';
 import * as BuiltinFunctions from './functions';
 import { SchemaDbPusher } from './helpers/schema-db-pusher';
 import type { ClientOptions, ProceduresOptions } from './options';
-import type { RuntimePlugin } from './plugin';
+import type { AnyPlugin } from './plugin';
 import { createZenStackPromise, type ZenStackPromise } from './promise';
 import { ResultProcessor } from './result-processor';
 
@@ -293,8 +293,8 @@ export class ClientImpl {
         await new SchemaDbPusher(this.schema, this.kysely).push();
     }
 
-    $use(plugin: RuntimePlugin<any, any>) {
-        const newPlugins: RuntimePlugin<any, any>[] = [...(this.$options.plugins ?? []), plugin];
+    $use(plugin: AnyPlugin) {
+        const newPlugins: AnyPlugin[] = [...(this.$options.plugins ?? []), plugin];
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
             plugins: newPlugins,
@@ -308,7 +308,7 @@ export class ClientImpl {
 
     $unuse(pluginId: string) {
         // tsc perf
-        const newPlugins: RuntimePlugin<any, any>[] = [];
+        const newPlugins: AnyPlugin[] = [];
         for (const plugin of this.options.plugins ?? []) {
             if (plugin.id !== pluginId) {
                 newPlugins.push(plugin);
@@ -329,7 +329,7 @@ export class ClientImpl {
         // tsc perf
         const newOptions: ClientOptions<SchemaDef> = {
             ...this.options,
-            plugins: [] as RuntimePlugin<any, any>[],
+            plugins: [] as AnyPlugin[],
         };
         const newClient = new ClientImpl(this.schema, newOptions, this);
         // create a new validator to have a fresh schema cache, because plugins may
@@ -408,6 +408,16 @@ function createClientProxy(client: ClientImpl): ClientImpl {
     return new Proxy(client, {
         get: (target, prop, receiver) => {
             if (typeof prop === 'string' && prop.startsWith('$')) {
+                // Check for plugin-provided members (search in reverse order so later plugins win)
+                const plugins = target.$options.plugins ?? [];
+                for (let i = plugins.length - 1; i >= 0; i--) {
+                    const plugin = plugins[i];
+                    const clientMembers = plugin?.client as Record<string, unknown> | undefined;
+                    if (clientMembers && prop in clientMembers) {
+                        return clientMembers[prop];
+                    }
+                }
+                // Fall through to built-in $ methods
                 return Reflect.get(target, prop, receiver);
             }
 

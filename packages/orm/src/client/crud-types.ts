@@ -451,6 +451,11 @@ type CommonPrimitiveFilter<
     gte?: DataType;
 
     /**
+     * Checks if the value is between the specified values (inclusive).
+     */
+    between?: [start: DataType, end: DataType];
+
+    /**
      * Builds a negated filter.
      */
     not?: PrimitiveFilter<T, Nullable, WithAggregations>;

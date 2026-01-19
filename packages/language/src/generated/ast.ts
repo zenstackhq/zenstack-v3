@@ -144,7 +144,7 @@ export function isMemberAccessTarget(item: unknown): item is MemberAccessTarget 
     return reflection.isInstance(item, MemberAccessTarget);
 }
 
-export type ReferenceTarget = DataField | EnumField | FunctionParam;
+export type ReferenceTarget = CollectionPredicateBinding | DataField | EnumField | FunctionParam;
 
 export const ReferenceTarget = 'ReferenceTarget';
 
@@ -258,6 +258,7 @@ export function isAttributeParamType(item: unknown): item is AttributeParamType 
 export interface BinaryExpr extends langium.AstNode {
     readonly $container: Argument | ArrayExpr | AttributeArg | BinaryExpr | FieldInitializer | FunctionDecl | MemberAccessExpr | ReferenceArg | UnaryExpr;
     readonly $type: 'BinaryExpr';
+    binding?: CollectionPredicateBinding;
     left: Expression;
     operator: '!' | '!=' | '&&' | '<' | '<=' | '==' | '>' | '>=' | '?' | '^' | 'in' | '||';
     right: Expression;
@@ -279,6 +280,18 @@ export const BooleanLiteral = 'BooleanLiteral';
 
 export function isBooleanLiteral(item: unknown): item is BooleanLiteral {
     return reflection.isInstance(item, BooleanLiteral);
+}
+
+export interface CollectionPredicateBinding extends langium.AstNode {
+    readonly $container: BinaryExpr;
+    readonly $type: 'CollectionPredicateBinding';
+    name: RegularID;
+}
+
+export const CollectionPredicateBinding = 'CollectionPredicateBinding';
+
+export function isCollectionPredicateBinding(item: unknown): item is CollectionPredicateBinding {
+    return reflection.isInstance(item, CollectionPredicateBinding);
 }
 
 export interface ConfigArrayExpr extends langium.AstNode {
@@ -775,6 +788,7 @@ export type ZModelAstType = {
     AttributeParamType: AttributeParamType
     BinaryExpr: BinaryExpr
     BooleanLiteral: BooleanLiteral
+    CollectionPredicateBinding: CollectionPredicateBinding
     ConfigArrayExpr: ConfigArrayExpr
     ConfigExpr: ConfigExpr
     ConfigField: ConfigField
@@ -822,7 +836,7 @@ export type ZModelAstType = {
 export class ZModelAstReflection extends langium.AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return [AbstractDeclaration, Argument, ArrayExpr, Attribute, AttributeArg, AttributeParam, AttributeParamType, BinaryExpr, BooleanLiteral, ConfigArrayExpr, ConfigExpr, ConfigField, ConfigInvocationArg, ConfigInvocationExpr, DataField, DataFieldAttribute, DataFieldType, DataModel, DataModelAttribute, DataSource, Enum, EnumField, Expression, FieldInitializer, FunctionDecl, FunctionParam, FunctionParamType, GeneratorDecl, InternalAttribute, InvocationExpr, LiteralExpr, MemberAccessExpr, MemberAccessTarget, Model, ModelImport, NullExpr, NumberLiteral, ObjectExpr, Plugin, PluginField, Procedure, ProcedureParam, ReferenceArg, ReferenceExpr, ReferenceTarget, StringLiteral, ThisExpr, TypeDeclaration, TypeDef, UnaryExpr, UnsupportedFieldType];
+        return [AbstractDeclaration, Argument, ArrayExpr, Attribute, AttributeArg, AttributeParam, AttributeParamType, BinaryExpr, BooleanLiteral, CollectionPredicateBinding, ConfigArrayExpr, ConfigExpr, ConfigField, ConfigInvocationArg, ConfigInvocationExpr, DataField, DataFieldAttribute, DataFieldType, DataModel, DataModelAttribute, DataSource, Enum, EnumField, Expression, FieldInitializer, FunctionDecl, FunctionParam, FunctionParamType, GeneratorDecl, InternalAttribute, InvocationExpr, LiteralExpr, MemberAccessExpr, MemberAccessTarget, Model, ModelImport, NullExpr, NumberLiteral, ObjectExpr, Plugin, PluginField, Procedure, ProcedureParam, ReferenceArg, ReferenceExpr, ReferenceTarget, StringLiteral, ThisExpr, TypeDeclaration, TypeDef, UnaryExpr, UnsupportedFieldType];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -850,6 +864,11 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
             case StringLiteral: {
                 return this.isSubtype(LiteralExpr, supertype);
             }
+            case CollectionPredicateBinding:
+            case EnumField:
+            case FunctionParam: {
+                return this.isSubtype(ReferenceTarget, supertype);
+            }
             case ConfigArrayExpr: {
                 return this.isSubtype(ConfigExpr, supertype);
             }
@@ -860,10 +879,6 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
             case Enum:
             case TypeDef: {
                 return this.isSubtype(AbstractDeclaration, supertype) || this.isSubtype(TypeDeclaration, supertype);
-            }
-            case EnumField:
-            case FunctionParam: {
-                return this.isSubtype(ReferenceTarget, supertype);
             }
             case InvocationExpr:
             case LiteralExpr: {
@@ -975,6 +990,7 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
                 return {
                     name: BinaryExpr,
                     properties: [
+                        { name: 'binding' },
                         { name: 'left' },
                         { name: 'operator' },
                         { name: 'right' }
@@ -986,6 +1002,14 @@ export class ZModelAstReflection extends langium.AbstractAstReflection {
                     name: BooleanLiteral,
                     properties: [
                         { name: 'value' }
+                    ]
+                };
+            }
+            case CollectionPredicateBinding: {
+                return {
+                    name: CollectionPredicateBinding,
+                    properties: [
+                        { name: 'name' }
                     ]
                 };
             }

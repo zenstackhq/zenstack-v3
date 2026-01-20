@@ -129,7 +129,7 @@ describe('Cache plugin (memory)', () => {
                     email: 'test3@email.com',
                 },
             }),
-        ])
+        ]);
 
         await expect(extDb.user.findFirst({
             where: {
@@ -290,5 +290,191 @@ describe('Cache plugin (memory)', () => {
                 ttl: 60,
             },
         })).resolves.toHaveLength(2);
-    })
+    });
+
+    test('supports invalidating all entries', async () => {
+        const extDb = db.$use(defineCachePlugin({
+            provider: new MemoryCache(),
+        }));
+
+        const user = await extDb.user.create({
+            data: {
+                email: 'test@email.com',
+            },
+        });
+
+        await Promise.all([
+            extDb.user.findFirst({
+                where: {
+                    id: user.id,
+                },
+
+                cache: {
+                    ttl: 60,
+                },
+            }),
+
+            extDb.user.findUnique({
+                where: {
+                    id: user.id,
+                },
+
+                cache: {
+                    ttl: 60,
+                },
+            }),
+
+            extDb.user.findMany({
+                cache: {
+                    ttl: 60,
+                },
+            }),
+
+            extDb.user.findFirstOrThrow({
+                where: {
+                    id: user.id,
+                },
+
+                cache: {
+                    ttl: 60,
+                },
+            }),
+
+            extDb.user.findUniqueOrThrow({
+                where: {
+                    id: user.id,
+                },
+
+                cache: {
+                    ttl: 60,
+                },
+            }),
+
+            extDb.user.exists({
+                where: {
+                    id: user.id,
+                },
+
+                cache: {
+                    ttl: 60,
+                },
+            }),
+
+            extDb.user.count({
+                cache: {
+                    ttl: 60,
+                },
+            }),
+
+            // extDb.user.aggregate({
+            //     where: {
+            //         id: user.id,
+            //     },
+
+            //     cache: {
+            //         ttl: 60,
+            //     },
+            // }),
+
+            extDb.user.groupBy({
+                by: 'id',
+
+                cache: {
+                    ttl: 60,
+                },
+            }),
+        ]);
+
+        await Promise.all([
+            extDb.user.delete({
+                where: {
+                    id: user.id,
+                },
+            }),
+
+            extDb.user.create({
+                data: {
+                    email: 'test2@email.com',
+                },
+            }),
+
+            extDb.user.create({
+                data: {
+                    email: 'test3@email.com',
+                },
+            }),
+        ]);
+
+        extDb.$cache.invalidateAll();
+
+        await expect(extDb.user.findFirst({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                ttl: 60,
+            },
+        })).resolves.toBeNull();
+
+        await expect(extDb.user.findUnique({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                ttl: 60,
+            },
+        })).resolves.toBeNull();
+
+        await expect(extDb.user.findMany({
+            cache: {
+                ttl: 60,
+            },
+        })).resolves.toHaveLength(2);
+
+        await expect(extDb.user.findFirstOrThrow({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                ttl: 60,
+            },
+        })).rejects.toThrow('Record not found');
+
+        await expect(extDb.user.findUniqueOrThrow({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                ttl: 60,
+            },
+        })).rejects.toThrow('Record not found');
+
+        await expect(extDb.user.exists({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                ttl: 60,
+            },
+        })).resolves.toBe(false);
+
+        await expect(extDb.user.count({
+            cache: {
+                ttl: 60,
+            },
+        })).resolves.toBe(2);
+
+        await expect(extDb.user.groupBy({
+            by: 'id',
+
+            cache: {
+                ttl: 60,
+            },
+        })).resolves.toHaveLength(2);
+    });
 });

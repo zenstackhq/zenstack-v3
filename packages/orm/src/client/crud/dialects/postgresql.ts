@@ -2,6 +2,7 @@ import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import {
     sql,
+    type AliasableExpression,
     type Expression,
     type ExpressionBuilder,
     type ExpressionWrapper,
@@ -43,7 +44,41 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         return 'postgresql' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
+    // #region capabilities
+
+    override get supportsUpdateWithLimit(): boolean {
+        return false;
+    }
+
+    override get supportsDeleteWithLimit(): boolean {
+        return false;
+    }
+
+    override get supportsDistinctOn(): boolean {
+        return true;
+    }
+
+    override get supportsReturning(): boolean {
+        return true;
+    }
+
+    override get supportDefaultAsFieldValue() {
+        return true;
+    }
+
+    override get supportsInsertDefaultValues(): boolean {
+        return true;
+    }
+
+    override get insertIgnoreMethod() {
+        return 'onConflict' as const;
+    }
+
+    // #endregion
+
+    // #region value transformation
+
+    override transformInput(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
         if (value === undefined) {
             return value;
         }
@@ -79,14 +114,14 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 // cast to enum array `CAST(ARRAY[...] AS "enum_type"[])`
                 return this.eb.cast(
                     sql`ARRAY[${sql.join(
-                        value.map((v) => this.transformPrimitive(v, type, false)),
+                        value.map((v) => this.transformInput(v, type, false)),
                         sql.raw(','),
                     )}]`,
                     this.createSchemaQualifiedEnumType(type, true),
                 );
             } else {
                 // `Json[]` fields need their input as array (not stringified)
-                return value.map((v) => this.transformPrimitive(v, type, false));
+                return value.map((v) => this.transformInput(v, type, false));
             }
         } else {
             return match(type)
@@ -218,6 +253,10 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         }
         return value;
     }
+
+    // #endregion
+
+    // #region other overrides
 
     override buildRelationSelection(
         query: SelectQueryBuilder<any, any, any>,
@@ -500,20 +539,8 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         );
     }
 
-    override get supportsUpdateWithLimit(): boolean {
-        return false;
-    }
-
-    override get supportsDeleteWithLimit(): boolean {
-        return false;
-    }
-
-    override get supportsDistinctOn(): boolean {
-        return true;
-    }
-
-    override get supportsReturning(): boolean {
-        return true;
+    override castInt(expression: AliasableExpression<any>): AliasableExpression<any> {
+        return this.eb.cast(expression, 'integer');
     }
 
     override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
@@ -550,14 +577,14 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 this.eb(
                     this.eb.fn('jsonb_extract_path', [lhs, this.eb.val('0')]),
                     '=',
-                    this.transformPrimitive(value, 'Json', false),
+                    this.transformInput(value, 'Json', false),
                 ),
             )
             .with('array_ends_with', () =>
                 this.eb(
                     this.eb.fn('jsonb_extract_path', [lhs, sql`(jsonb_array_length(${lhs}) - 1)::text`]),
                     '=',
-                    this.transformPrimitive(value, 'Json', false),
+                    this.transformInput(value, 'Json', false),
                 ),
             )
             .exhaustive();
@@ -573,10 +600,6 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 .select(this.eb.lit(1).as('$t'))
                 .where(buildFilter(this.eb.ref('$items.value'))),
         );
-    }
-
-    override get supportInsertWithDefault() {
-        return true;
     }
 
     override getFieldSqlType(fieldDef: FieldDef) {
@@ -616,4 +639,6 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         // Postgres `LIKE` is case-sensitive, `ILIKE` is case-insensitive
         return { supportsILike: true, likeCaseSensitive: true };
     }
+
+    // #endregion
 }

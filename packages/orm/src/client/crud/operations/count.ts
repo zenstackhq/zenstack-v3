@@ -38,15 +38,15 @@ export class CountOperationHandler<Schema extends SchemaDef> extends BaseOperati
             query = query.select((eb) =>
                 Object.keys(parsedArgs.select!).map((key) =>
                     key === '_all'
-                        ? eb.cast(eb.fn.countAll(), 'integer').as('_all')
-                        : eb.cast(eb.fn.count(eb.ref(`${subQueryName}.${key}` as any)), 'integer').as(key),
+                        ? this.dialect.castInt(eb.fn.countAll()).as('_all')
+                        : this.dialect.castInt(eb.fn.count(eb.ref(`${subQueryName}.${key}`))).as(key),
                 ),
             );
             const result = await this.executeQuery(this.kysely, query, 'count');
             return result.rows[0];
         } else {
             // simple count all
-            query = query.select((eb) => eb.cast(eb.fn.countAll(), 'integer').as('count'));
+            query = query.select((eb) => this.dialect.castInt(eb.fn.countAll()).as('count'));
             const result = await this.executeQuery(this.kysely, query, 'count');
             return (result.rows[0] as any).count as number;
         }

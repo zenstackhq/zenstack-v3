@@ -189,6 +189,11 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             return baseResult;
         }
 
+        if (!this.dialect.supportsReturning) {
+            // if dialect doesn't support "returning", we always need to read back
+            return { needReadBack: true, selectedFields: undefined };
+        }
+
         // further check if we're not updating any non-relation fields, because if so,
         // SQL "returning" is not effective, we need to always read back
 

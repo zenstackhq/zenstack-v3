@@ -242,7 +242,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 col = col.notNull();
             }
 
-            if (this.isAutoIncrement(fieldDef) && this.schema.provider.type === 'sqlite') {
+            if (this.isAutoIncrement(fieldDef) && this.columnSupportsAutoIncrement()) {
                 col = col.autoIncrement();
             }
 
@@ -375,7 +375,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             .exhaustive();
     }
 
-    // #region Type mappings
+    // #region Type mappings and capabilities
 
     private get jsonType(): ColumnDataType {
         return match<string, ColumnDataType>(this.schema.provider.type)
@@ -426,6 +426,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         return match<string, ColumnDataType | RawBuilder<unknown>>(this.schema.provider.type)
             .with('mysql', () => sql.raw('datetime'))
             .otherwise(() => 'timestamp');
+    }
+
+    private columnSupportsAutoIncrement() {
+        return ['sqlite', 'mysql'].includes(this.schema.provider.type);
     }
 
     // #endregion

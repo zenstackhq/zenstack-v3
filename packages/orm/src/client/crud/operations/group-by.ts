@@ -32,7 +32,7 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
         query = this.dialect.buildSkipTake(query, skip, take);
 
         // orderBy
-        query = this.dialect.buildOrderBy(query, this.model, this.model, parsedArgs.orderBy, negateOrderBy);
+        query = this.dialect.buildOrderBy(query, this.model, this.model, parsedArgs.orderBy, negateOrderBy, take);
 
         // having
         if (parsedArgs.having) {
@@ -49,17 +49,17 @@ export class GroupByOperationHandler<Schema extends SchemaDef> extends BaseOpera
             switch (key) {
                 case '_count': {
                     if (value === true) {
-                        query = query.select((eb) => eb.cast(eb.fn.countAll(), 'integer').as('_count'));
+                        query = query.select((eb) => this.dialect.castInt(eb.fn.countAll()).as('_count'));
                     } else {
                         Object.entries(value).forEach(([field, val]) => {
                             if (val === true) {
                                 if (field === '_all') {
                                     query = query.select((eb) =>
-                                        eb.cast(eb.fn.countAll(), 'integer').as(`_count._all`),
+                                        this.dialect.castInt(eb.fn.countAll()).as(`_count._all`),
                                     );
                                 } else {
                                     query = query.select((eb) =>
-                                        eb.cast(eb.fn.count(fieldRef(field)), 'integer').as(`${key}.${field}`),
+                                        this.dialect.castInt(eb.fn.count(fieldRef(field))).as(`${key}.${field}`),
                                     );
                                 }
                             }

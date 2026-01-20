@@ -1,5 +1,5 @@
 import { enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers';
-import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
+import type { AliasableExpression, Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { expressionBuilder, sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
@@ -44,13 +44,62 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         protected readonly options: ClientOptions<Schema>,
     ) {}
 
-    transformPrimitive(value: unknown, _type: BuiltinType, _forArrayField: boolean) {
+    // #region capability flags
+
+    /**
+     * Whether the dialect supports updating with a limit on the number of updated rows.
+     */
+    abstract get supportsUpdateWithLimit(): boolean;
+
+    /**
+     * Whether the dialect supports deleting with a limit on the number of deleted rows.
+     */
+    abstract get supportsDeleteWithLimit(): boolean;
+
+    /**
+     * Whether the dialect supports DISTINCT ON.
+     */
+    abstract get supportsDistinctOn(): boolean;
+
+    /**
+     * Whether the dialect support inserting with `DEFAULT` as field value.
+     */
+    abstract get supportDefaultAsFieldValue(): boolean;
+
+    /**
+     * Whether the dialect supports the RETURNING clause in INSERT/UPDATE/DELETE statements.
+     */
+    abstract get supportsReturning(): boolean;
+
+    /**
+     * Whether the dialect supports `INSERT INTO ... DEFAULT VALUES` syntax.
+     */
+    abstract get supportsInsertDefaultValues(): boolean;
+
+    /**
+     * How to perform insert ignore operation.
+     */
+    abstract get insertIgnoreMethod(): 'onConflict' | 'ignore';
+
+    // #endregion
+
+    // #region value transformation
+
+    /**
+     * Transforms input value before sending to database.
+     */
+    transformInput(value: unknown, _type: BuiltinType, _forArrayField: boolean) {
         return value;
     }
 
+    /**
+     * Transforms output value received from database.
+     */
     transformOutput(value: unknown, _type: BuiltinType, _array: boolean) {
         return value;
     }
+
+    // #endregion
 
     // #region common query builders
 
@@ -456,7 +505,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 continue;
             }
 
-            const value = this.transformPrimitive(_value, fieldType, !!fieldDef.array);
+            const value = this.transformInput(_value, fieldType, !!fieldDef.array);
 
             switch (key) {
                 case 'equals': {
@@ -712,7 +761,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     private buildLiteralFilter(lhs: Expression<any>, type: BuiltinType, rhs: unknown) {
-        return this.eb(lhs, '=', rhs !== null && rhs !== undefined ? this.transformPrimitive(rhs, type, false) : rhs);
+        return this.eb(lhs, '=', rhs !== null && rhs !== undefined ? this.transformInput(rhs, type, false) : rhs);
     }
 
     private buildStandardFilter(
@@ -869,7 +918,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildStringLike(receiver: Expression<any>, pattern: string, insensitive: boolean) {
         const { supportsILike } = this.getStringCasingBehavior();
         const op = insensitive && supportsILike ? 'ilike' : 'like';
-        return sql<SqlBool>`${receiver} ${sql.raw(op)} ${sql.val(pattern)} escape '\\'`;
+        return sql<SqlBool>`${receiver} ${sql.raw(op)} ${sql.val(pattern)} escape ${sql.val('\\')}`;
     }
 
     private prepStringCasing(
@@ -895,7 +944,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             type,
             payload,
             fieldRef,
-            (value) => this.transformPrimitive(value, type, false),
+            (value) => this.transformInput(value, type, false),
             (value) => this.buildNumberFilter(fieldRef, type, value),
         );
         return this.and(...conditions);
@@ -906,7 +955,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             'Boolean',
             payload,
             fieldRef,
-            (value) => this.transformPrimitive(value, 'Boolean', false),
+            (value) => this.transformInput(value, 'Boolean', false),
             (value) => this.buildBooleanFilter(fieldRef, value as BooleanFilter<boolean, boolean>),
             true,
             ['equals', 'not'],
@@ -919,7 +968,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             'DateTime',
             payload,
             fieldRef,
-            (value) => this.transformPrimitive(value, 'DateTime', false),
+            (value) => this.transformInput(value, 'DateTime', false),
             (value) => this.buildDateTimeFilter(fieldRef, value as DateTimeFilter<boolean, boolean>),
             true,
         );
@@ -931,7 +980,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             'Bytes',
             payload,
             fieldRef,
-            (value) => this.transformPrimitive(value, 'Bytes', false),
+            (value) => this.transformInput(value, 'Bytes', false),
             (value) => this.buildBytesFilter(fieldRef, value as BytesFilter<boolean, boolean>),
             true,
             ['equals', 'in', 'notIn', 'not'],
@@ -1259,11 +1308,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     }
 
     public true(): Expression<SqlBool> {
-        return this.eb.lit<SqlBool>(this.transformPrimitive(true, 'Boolean', false) as boolean);
+        return this.eb.lit<SqlBool>(this.transformInput(true, 'Boolean', false) as boolean);
     }
 
     public false(): Expression<SqlBool> {
-        return this.eb.lit<SqlBool>(this.transformPrimitive(false, 'Boolean', false) as boolean);
+        return this.eb.lit<SqlBool>(this.transformInput(false, 'Boolean', false) as boolean);
     }
 
     public isTrue(expression: Expression<SqlBool>) {
@@ -1402,29 +1451,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     abstract buildArrayLiteralSQL(values: unknown[]): string;
 
     /**
-     * Whether the dialect supports updating with a limit on the number of updated rows.
+     * Casts the given expression to an integer type.
      */
-    abstract get supportsUpdateWithLimit(): boolean;
-
-    /**
-     * Whether the dialect supports deleting with a limit on the number of deleted rows.
-     */
-    abstract get supportsDeleteWithLimit(): boolean;
-
-    /**
-     * Whether the dialect supports DISTINCT ON.
-     */
-    abstract get supportsDistinctOn(): boolean;
-
-    /**
-     * Whether the dialect support inserting with `DEFAULT` as field value.
-     */
-    abstract get supportInsertWithDefault(): boolean;
-
-    /**
-     * Whether the dialect supports the RETURNING clause in INSERT/UPDATE/DELETE statements.
-     */
-    abstract get supportsReturning(): boolean;
+    abstract castInt(expression: AliasableExpression<any>): AliasableExpression<any>;
 
     /**
      * Gets the SQL column type for the given field definition.

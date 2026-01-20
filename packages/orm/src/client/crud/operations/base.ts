@@ -430,13 +430,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     Array.isArray(value.set)
                 ) {
                     // deal with nested "set" for scalar lists
-                    createFields[field] = this.dialect.transformPrimitive(
-                        value.set,
-                        fieldDef.type as BuiltinType,
-                        true,
-                    );
+                    createFields[field] = this.dialect.transformInput(value.set, fieldDef.type as BuiltinType, true);
                 } else {
-                    createFields[field] = this.dialect.transformPrimitive(
+                    createFields[field] = this.dialect.transformInput(
                         value,
                         fieldDef.type as BuiltinType,
                         !!fieldDef.array,
@@ -474,7 +470,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (this.dialect.supportsReturning) {
             const query = kysely
                 .insertInto(model)
-                .$if(Object.keys(updatedData).length === 0, (qb) => qb.defaultValues())
+                .$if(Object.keys(updatedData).length === 0, (qb) =>
+                    qb
+                        // case for `INSERT INTO ... DEFAULT VALUES` syntax
+                        .$if(this.dialect.supportsInsertDefaultValues, () => qb.defaultValues())
+                        // case for `INSERT INTO ... VALUES ({})` syntax
+                        .$if(!this.dialect.supportsInsertDefaultValues, () => qb.values({})),
+                )
                 .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
                 .returning(returnFields as any)
                 .modifyEnd(
@@ -489,7 +491,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             // Fallback for databases that don't support RETURNING (e.g., MySQL)
             const insertQuery = kysely
                 .insertInto(model)
-                .$if(Object.keys(updatedData).length === 0, (qb) => qb.defaultValues())
+                .$if(Object.keys(updatedData).length === 0, (qb) =>
+                    qb
+                        // case for `INSERT INTO ... DEFAULT VALUES` syntax
+                        .$if(this.dialect.supportsInsertDefaultValues, () => qb.defaultValues())
+                        // case for `INSERT INTO ... VALUES ({})` syntax
+                        .$if(!this.dialect.supportsInsertDefaultValues, () => qb.values({})),
+                )
                 .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
                 .modifyEnd(
                     this.makeContextComment({
@@ -502,34 +510,25 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             // Build WHERE clause to find the inserted record
             const idFields = requireIdFields(this.schema, model);
-            const whereConditions: Record<string, any> = {};
+            const idValues: Record<string, any> = {};
 
             for (const idField of idFields) {
                 if (updatedData[idField] !== undefined) {
                     // ID was provided in the insert
-                    whereConditions[idField] = updatedData[idField];
+                    idValues[idField] = updatedData[idField];
                 } else {
                     // ID was auto-generated, use insertId
                     if (insertResult.insertId !== undefined && insertResult.insertId !== null) {
-                        whereConditions[idField] = insertResult.insertId;
+                        idValues[idField] = insertResult.insertId;
                     } else {
                         throw createInternalError(`Failed to retrieve auto-generated ID for model ${model}`);
                     }
                 }
             }
 
-            // Select the inserted record
-            const selectQuery = kysely
-                .selectFrom(model)
-                .selectAll()
-                .where((eb) => {
-                    const conditions = Object.entries(whereConditions).map(([field, value]) =>
-                        eb.eb(field, '=', value),
-                    );
-                    return eb.and(conditions);
-                });
-
-            createdEntity = await this.executeQueryTakeFirst(kysely, selectQuery, 'create');
+            // for dialects that don't support RETURNING, the outside logic will always
+            // read back the created record, we just return the id fields here
+            createdEntity = idValues;
         }
 
         if (Object.keys(postCreateRelations).length > 0) {
@@ -667,7 +666,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     A: sortedRecords[0]!.entity[firstIds[0]!],
                     B: sortedRecords[1]!.entity[secondIds[0]!],
                 } as any)
-                .onConflict((oc) => oc.columns(['A', 'B'] as any).doNothing())
+                // case for `INSERT IGNORE` or `ON CONFLICT DO NOTHING` syntax
+                .$if(this.dialect.insertIgnoreMethod === 'onConflict', (qb) =>
+                    qb.onConflict((oc) => oc.columns(['A', 'B'] as any).doNothing()),
+                )
+                // case for `INSERT IGNORE` syntax
+                .$if(this.dialect.insertIgnoreMethod === 'ignore', (qb) => qb.ignore())
                 .execute();
             return result[0] as any;
         } else {
@@ -861,7 +865,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             for (const [name, value] of Object.entries(item)) {
                 const fieldDef = this.requireField(model, name);
                 invariant(!fieldDef.relation, 'createMany does not support relations');
-                newItem[name] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType, !!fieldDef.array);
+                newItem[name] = this.dialect.transformInput(value, fieldDef.type as BuiltinType, !!fieldDef.array);
             }
             if (fromRelation) {
                 for (const { fk, pk } of relationKeyPairs) {
@@ -871,7 +875,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return this.fillGeneratedAndDefaultValues(modelDef, newItem);
         });
 
-        if (!this.dialect.supportInsertWithDefault) {
+        if (!this.dialect.supportDefaultAsFieldValue) {
             // if the dialect doesn't support `DEFAULT` as insert field values,
             // we need to double check if data rows have mismatching fields, and
             // if so, make sure all fields have default value filled if not provided
@@ -895,7 +899,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             fieldDef.default !== null &&
                             typeof fieldDef.default !== 'object'
                         ) {
-                            item[field] = this.dialect.transformPrimitive(
+                            item[field] = this.dialect.transformInput(
                                 fieldDef.default,
                                 fieldDef.type as BuiltinType,
                                 !!fieldDef.array,
@@ -925,7 +929,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const query = kysely
             .insertInto(model)
             .values(createData)
-            .$if(!!input.skipDuplicates, (qb) => qb.onConflict((oc) => oc.doNothing()))
+            .$if(!!input.skipDuplicates, (qb) =>
+                qb
+                    // case for `INSERT ... ON CONFLICT DO NOTHING` syntax
+                    .$if(this.dialect.insertIgnoreMethod === 'onConflict', () => qb.onConflict((oc) => oc.doNothing()))
+                    // case for `INSERT IGNORE` syntax
+                    .$if(this.dialect.insertIgnoreMethod === 'ignore', () => qb.ignore()),
+            )
             .modifyEnd(
                 this.makeContextComment({
                     model,
@@ -985,12 +995,20 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // create base model entity
-        const baseEntities = await this.createMany(
-            kysely,
-            model as GetModels<Schema>,
-            { data: thisCreateRows, skipDuplicates },
-            true,
-        );
+        let baseEntities: unknown[];
+        if (this.dialect.supportsReturning) {
+            baseEntities = await this.createMany(
+                kysely,
+                model as GetModels<Schema>,
+                { data: thisCreateRows, skipDuplicates },
+                true,
+            );
+        } else {
+            // fall back to multiple creates if RETURNING is not supported
+            baseEntities = await Promise.all(
+                thisCreateRows.map((row) => this.create(kysely, model as GetModels<Schema>, row, undefined, true)),
+            );
+        }
 
         // copy over id fields from base model
         for (let i = 0; i < baseEntities.length; i++) {
@@ -1012,7 +1030,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (typeof fieldDef?.default === 'object' && 'kind' in fieldDef.default) {
                     const generated = this.evalGenerator(fieldDef.default);
                     if (generated !== undefined) {
-                        values[field] = this.dialect.transformPrimitive(
+                        values[field] = this.dialect.transformInput(
                             generated,
                             fieldDef.type as BuiltinType,
                             !!fieldDef.array,
@@ -1020,7 +1038,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     }
                 } else if (fieldDef?.updatedAt) {
                     // TODO: should this work at kysely level instead?
-                    values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                    values[field] = this.dialect.transformInput(new Date(), 'DateTime', false);
                 } else if (fieldDef?.default !== undefined) {
                     let value = fieldDef.default;
                     if (fieldDef.type === 'Json') {
@@ -1031,11 +1049,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             value = JSON.parse(value);
                         }
                     }
-                    values[field] = this.dialect.transformPrimitive(
-                        value,
-                        fieldDef.type as BuiltinType,
-                        !!fieldDef.array,
-                    );
+                    values[field] = this.dialect.transformInput(value, fieldDef.type as BuiltinType, !!fieldDef.array);
                 }
             }
         }
@@ -1154,7 +1168,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (finalData === data) {
                     finalData = clone(data);
                 }
-                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                finalData[fieldName] = this.dialect.transformInput(new Date(), 'DateTime', false);
                 autoUpdatedFields.push(fieldName);
             }
         }
@@ -1286,13 +1300,39 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
                 await this.executeQuery(kysely, updateQuery, 'update');
 
-                // Select the updated record
-                const selectQuery = kysely
-                    .selectFrom(model)
-                    .selectAll()
-                    .where(() => this.dialect.buildFilter(model, model, combinedWhere));
+                // collect id field/values from the original filter
+                const idFields = requireIdFields(this.schema, model);
+                const filterIdValues: any = {};
+                for (const key of idFields) {
+                    if (where[key] !== undefined && typeof where[key] !== 'object') {
+                        filterIdValues[key] = where[key];
+                    }
+                }
 
-                updatedEntity = await this.executeQueryTakeFirst(kysely, selectQuery, 'update');
+                // check if we are updating any id fields
+                const updatingIdFields = idFields.some((idField) => idField in updateFields);
+
+                if (Object.keys(filterIdValues).length === idFields.length && !updatingIdFields) {
+                    // if we have all id fields in the original filter and ids are not being updated,
+                    // we can simply return the id values as the update result
+                    updatedEntity = filterIdValues;
+                } else {
+                    // otherwise we need to re-query the updated entity
+
+                    // replace id fields in the filter with updated values if they are being updated
+                    const readFilter: any = { ...combinedWhere };
+                    for (const idField of idFields) {
+                        if (idField in updateFields && updateFields[idField] !== undefined) {
+                            // if id fields are being updated, use the new values
+                            readFilter[idField] = updateFields[idField];
+                        }
+                    }
+                    const selectQuery = kysely
+                        .selectFrom(model)
+                        .select(fieldsToReturn as any)
+                        .where(() => this.dialect.buildFilter(model, model, readFilter));
+                    updatedEntity = await this.executeQueryTakeFirst(kysely, selectQuery, 'update');
+                }
             }
 
             if (!updatedEntity) {
@@ -1319,7 +1359,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return this.transformScalarListUpdate(model, field, fieldDef, data[field]);
         }
 
-        return this.dialect.transformPrimitive(data[field], fieldDef.type as BuiltinType, !!fieldDef.array);
+        return this.dialect.transformInput(data[field], fieldDef.type as BuiltinType, !!fieldDef.array);
     }
 
     private isNumericIncrementalUpdate(fieldDef: FieldDef, value: any) {
@@ -1384,7 +1424,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         );
 
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, false);
+        const value = this.dialect.transformInput(payload[key!], fieldDef.type as BuiltinType, false);
         const eb = expressionBuilder<any, any>();
         const fieldRef = this.dialect.fieldRef(model, field);
 
@@ -1407,7 +1447,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     ) {
         invariant(Object.keys(payload).length === 1, 'Only one of "set", "push" can be provided');
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, true);
+        const value = this.dialect.transformInput(payload[key!], fieldDef.type as BuiltinType, true);
         const eb = expressionBuilder<any, any>();
         const fieldRef = this.dialect.fieldRef(model, field);
 
@@ -1832,9 +1872,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (!relationFieldDef.array) {
                     const query = kysely
                         .updateTable(model)
-                        .where((eb) =>
-                            eb.and(keyPairs.map(({ fk, pk }) => eb(eb.ref(fk as any), '=', fromRelation.ids[pk]))),
-                        )
+                        .where((eb) => eb.and(keyPairs.map(({ fk, pk }) => eb(eb.ref(fk), '=', fromRelation.ids[pk]))))
                         .set(keyPairs.reduce((acc, { fk }) => ({ ...acc, [fk]: null }), {} as any))
                         .modifyEnd(
                             this.makeContextComment({
@@ -2484,6 +2522,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         if (args.include && typeof args.include === 'object' && Object.keys(args.include).length > 0) {
             // includes present, need read back to fetch relations
+            return { needReadBack: true, selectedFields: undefined };
+        }
+
+        if (!this.dialect.supportsReturning) {
+            // if the dialect doesn't support RETURNING, we always need read back
             return { needReadBack: true, selectedFields: undefined };
         }
 

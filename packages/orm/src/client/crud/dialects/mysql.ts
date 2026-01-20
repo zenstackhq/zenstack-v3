@@ -2,6 +2,7 @@ import { enumerate, invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import {
     sql,
+    type AliasableExpression,
     type Expression,
     type ExpressionBuilder,
     type ExpressionWrapper,
@@ -40,7 +41,42 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
         return 'mysql' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
+    // #region capabilities
+
+    override get supportsUpdateWithLimit(): boolean {
+        // MySQL supports UPDATE with LIMIT
+        return true;
+    }
+
+    override get supportsDeleteWithLimit(): boolean {
+        // MySQL supports DELETE with LIMIT
+        return true;
+    }
+
+    override get supportsDistinctOn(): boolean {
+        // MySQL doesn't support DISTINCT ON
+        return false;
+    }
+
+    override get supportsReturning(): boolean {
+        // MySQL doesn't have reliable RETURNING support until 8.0.21+
+        // and even then it's limited compared to PostgreSQL
+        return false;
+    }
+
+    override get supportsInsertDefaultValues(): boolean {
+        return false;
+    }
+
+    override get insertIgnoreMethod() {
+        return 'ignore' as const;
+    }
+
+    // #endregion
+
+    // #region value transformation
+
+    override transformInput(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
         if (value === undefined) {
             return value;
         }
@@ -71,7 +107,7 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
                 return JSON.stringify(value);
             }
             // `Json[]` fields stored as JSON arrays
-            return JSON.stringify(value.map((v) => this.transformPrimitive(v, type, false)));
+            return JSON.stringify(value.map((v) => this.transformInput(v, type, false)));
         } else {
             return match(type)
                 .with('Boolean', () => (value ? 1 : 0)) // MySQL uses 1/0 for boolean like SQLite
@@ -169,6 +205,10 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
         }
         return value;
     }
+
+    // #endregion
+
+    // #region other overrides
 
     override buildRelationSelection(
         query: SelectQueryBuilder<any, any, any>,
@@ -459,25 +499,8 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
         );
     }
 
-    override get supportsUpdateWithLimit(): boolean {
-        // MySQL supports UPDATE with LIMIT
-        return true;
-    }
-
-    override get supportsDeleteWithLimit(): boolean {
-        // MySQL supports DELETE with LIMIT
-        return true;
-    }
-
-    override get supportsDistinctOn(): boolean {
-        // MySQL doesn't support DISTINCT ON
-        return false;
-    }
-
-    override get supportsReturning(): boolean {
-        // MySQL doesn't have reliable RETURNING support until 8.0.21+
-        // and even then it's limited compared to PostgreSQL
-        return false;
+    override castInt(expression: AliasableExpression<any>): AliasableExpression<any> {
+        return this.eb.cast(expression, sql.raw('unsigned'));
     }
 
     override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
@@ -514,14 +537,14 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
                 this.eb(
                     this.eb.fn('JSON_EXTRACT', [lhs, this.eb.val('$[0]')]),
                     '=',
-                    this.transformPrimitive(value, 'Json', false),
+                    this.transformInput(value, 'Json', false),
                 ),
             )
             .with('array_ends_with', () =>
                 this.eb(
                     sql`JSON_EXTRACT(${lhs}, CONCAT('$[', JSON_LENGTH(${lhs}) - 1, ']'))`,
                     '=',
-                    this.transformPrimitive(value, 'Json', false),
+                    this.transformInput(value, 'Json', false),
                 ),
             )
             .exhaustive();
@@ -541,7 +564,7 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
         );
     }
 
-    override get supportInsertWithDefault() {
+    override get supportDefaultAsFieldValue() {
         // MySQL supports INSERT with DEFAULT VALUES
         return true;
     }
@@ -716,10 +739,8 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
             }
         });
 
-        if (take === undefined) {
-            result = result.limit(Number.MAX_SAFE_INTEGER);
-        }
-
         return result;
     }
+
+    // #endregion
 }

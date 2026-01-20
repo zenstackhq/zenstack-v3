@@ -3,6 +3,7 @@ import Decimal from 'decimal.js';
 import {
     ExpressionWrapper,
     sql,
+    type AliasableExpression,
     type Expression,
     type ExpressionBuilder,
     type RawBuilder,
@@ -30,7 +31,41 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return 'sqlite' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType, _forArrayField: boolean): unknown {
+    // #region capabilities
+
+    override get supportsUpdateWithLimit() {
+        return false;
+    }
+
+    override get supportsDeleteWithLimit() {
+        return false;
+    }
+
+    override get supportsDistinctOn() {
+        return false;
+    }
+
+    override get supportsReturning() {
+        return true; // SQLite 3.35.0+ supports RETURNING
+    }
+
+    override get supportDefaultAsFieldValue() {
+        return false;
+    }
+
+    override get supportsInsertDefaultValues(): boolean {
+        return true;
+    }
+
+    override get insertIgnoreMethod() {
+        return 'onConflict' as const;
+    }
+
+    // #endregion
+
+    // #region value transformation
+
+    override transformInput(value: unknown, type: BuiltinType, _forArrayField: boolean): unknown {
         if (value === undefined) {
             return value;
         }
@@ -50,7 +85,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         }
 
         if (Array.isArray(value)) {
-            return value.map((v) => this.transformPrimitive(v, type, false));
+            return value.map((v) => this.transformInput(v, type, false));
         } else {
             return match(type)
                 .with('Boolean', () => (value ? 1 : 0))
@@ -136,6 +171,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         }
         return value;
     }
+
+    // #endregion
+
+    // #region other overrides
 
     override buildRelationSelection(
         query: SelectQueryBuilder<any, any, any>,
@@ -404,22 +443,6 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         );
     }
 
-    override get supportsUpdateWithLimit() {
-        return false;
-    }
-
-    override get supportsDeleteWithLimit() {
-        return false;
-    }
-
-    override get supportsDistinctOn() {
-        return false;
-    }
-
-    override get supportsReturning() {
-        return true; // SQLite 3.35.0+ supports RETURNING
-    }
-
     override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
         return this.eb.fn('json_array_length', [array]);
     }
@@ -428,8 +451,8 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         throw new Error('SQLite does not support array literals');
     }
 
-    override get supportInsertWithDefault() {
-        return false;
+    override castInt(expression: AliasableExpression<any>): AliasableExpression<any> {
+        return expression;
     }
 
     override getFieldSqlType(fieldDef: FieldDef) {
@@ -466,4 +489,6 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         // SQLite `LIKE` is case-insensitive, and there is no `ILIKE`
         return { supportsILike: false, likeCaseSensitive: false };
     }
+
+    // #endregion
 }

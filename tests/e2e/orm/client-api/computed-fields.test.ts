@@ -8,13 +8,13 @@ describe('Computed fields tests', () => {
 model User {
     id Int @id @default(autoincrement())
     name String
-    upperName String @computed
+    otherName String @computed
 }
 `,
             {
                 computedFields: {
                     User: {
-                        upperName: (eb: any) => eb.fn('upper', ['name']),
+                        otherName: (eb: any) => eb.fn('concat', [eb.ref('name'), eb.val('!')]),
                     },
                 },
             } as any,
@@ -25,67 +25,67 @@ model User {
                 data: { id: 1, name: 'Alex' },
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            otherName: 'Alex!',
         });
 
         await expect(
             db.user.findUnique({
                 where: { id: 1 },
-                select: { upperName: true },
+                select: { otherName: true },
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            otherName: 'Alex!',
         });
 
         await expect(
             db.user.findFirst({
-                where: { upperName: 'ALEX' },
+                where: { otherName: 'Alex!' },
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            otherName: 'Alex!',
         });
 
         await expect(
             db.user.findFirst({
-                where: { upperName: 'Alex' },
+                where: { otherName: 'Alex' },
             }),
         ).toResolveNull();
 
         await expect(
             db.user.findFirst({
-                orderBy: { upperName: 'desc' },
+                orderBy: { otherName: 'desc' },
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            otherName: 'Alex!',
         });
 
         await expect(
             db.user.findFirst({
-                orderBy: { upperName: 'desc' },
+                orderBy: { otherName: 'desc' },
                 take: 1,
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            otherName: 'Alex!',
         });
 
         await expect(
             db.user.aggregate({
-                _count: { upperName: true },
+                _count: { otherName: true },
             }),
         ).resolves.toMatchObject({
-            _count: { upperName: 1 },
+            _count: { otherName: 1 },
         });
 
         await expect(
             db.user.groupBy({
-                by: ['upperName'],
-                _count: { upperName: true },
-                _max: { upperName: true },
+                by: ['otherName'],
+                _count: { otherName: true },
+                _max: { otherName: true },
             }),
         ).resolves.toEqual([
             expect.objectContaining({
-                _count: { upperName: 1 },
-                _max: { upperName: 'ALEX' },
+                _count: { otherName: 1 },
+                _max: { otherName: 'Alex!' },
             }),
         ]);
     });
@@ -259,17 +259,19 @@ model Post extends Content {
             } as any,
         );
 
-        const posts = await db.post.createManyAndReturn({
-            data: [
-                { id: 1, title: 'latest news', body: 'some news content' },
-                { id: 2, title: 'random post', body: 'some other content' },
-            ],
-        });
-        expect(posts).toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({ id: 1, isNews: true }),
-                expect.objectContaining({ id: 2, isNews: false }),
-            ]),
-        );
+        if (db.$schema.provider.type !== 'mysql') {
+            const posts = await db.post.createManyAndReturn({
+                data: [
+                    { id: 1, title: 'latest news', body: 'some news content' },
+                    { id: 2, title: 'random post', body: 'some other content' },
+                ],
+            });
+            expect(posts).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ id: 1, isNews: true }),
+                    expect.objectContaining({ id: 2, isNews: false }),
+                ]),
+            );
+        }
     });
 });

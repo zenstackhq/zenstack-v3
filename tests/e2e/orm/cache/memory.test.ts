@@ -1,6 +1,6 @@
 import { type ClientContract } from '@zenstackhq/orm';
 import { createTestClient } from '@zenstackhq/testtools';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineCachePlugin } from '@zenstackhq/plugin-cache';
 import { MemoryCache } from '@zenstackhq/plugin-cache/providers/memory';
 import { schema } from '../schemas/basic';
@@ -18,7 +18,7 @@ describe('Cache plugin (memory)', () => {
         await db?.$disconnect();
     });
 
-    test('respects ttl', async () => {
+    it('respects ttl', async () => {
         const extDb = db.$use(defineCachePlugin({
             provider: new MemoryCache(),
         }));
@@ -292,7 +292,7 @@ describe('Cache plugin (memory)', () => {
         })).resolves.toHaveLength(2);
     });
 
-    test('supports invalidating all entries', async () => {
+    it('supports invalidating all entries', async () => {
         const extDb = db.$use(defineCachePlugin({
             provider: new MemoryCache(),
         }));
@@ -476,5 +476,258 @@ describe('Cache plugin (memory)', () => {
                 ttl: 60,
             },
         })).resolves.toHaveLength(2);
+    });
+
+    it('supports invalidating by tags', async () => {
+        const extDb = db.$use(defineCachePlugin({
+            provider: new MemoryCache(),
+        }));
+
+        const user1 = await extDb.user.create({
+            data: {
+                email: 'test@email.com',
+            },
+        });
+
+        const user2 = await extDb.user.create({
+            data: {
+                email: 'test2@email.com',
+            },
+        });
+
+        const post1 = await extDb.post.create({
+            data: {
+                title: 'title',
+                authorId: user1.id,
+            },
+        });
+
+        const post2 = await extDb.post.create({
+            data: {
+                title: 'title',
+                authorId: user2.id,
+            },
+        });
+
+        await Promise.all([
+            extDb.user.findUnique({
+                where: {
+                    id: user1.id,
+                },
+
+                cache: {
+                    ttl: 60,
+                    tags: ['user1'],
+                },
+            }),
+
+            extDb.user.findUnique({
+                where: {
+                    id: user2.id,
+                },
+
+                cache: {
+                    ttl: 60,
+                    tags: ['user2'],
+                },
+            }),
+
+            extDb.post.findUnique({
+                where: {
+                    id: post1.id,
+                },
+
+                cache: {
+                    ttl: 60,
+                    tags: ['post', 'user1'],
+                },
+            }),
+
+            extDb.post.findUnique({
+                where: {
+                    id: post2.id,
+                },
+
+                cache: {
+                    ttl: 60,
+                },
+            }),
+        ]);
+
+        await Promise.all([
+            extDb.user.update({
+                data: {
+                    name: 'newname',
+                },
+
+                where: {
+                    id: user1.id,
+                },
+            }),
+
+            extDb.user.update({
+                data: {
+                    name: 'newname',
+                },
+
+                where: {
+                    id: user2.id,
+                },
+            }),
+
+            extDb.post.update({
+                data: {
+                    title: 'newtitle',
+                },
+
+                where: {
+                    id: post1.id,
+                },
+            }),
+        ]);
+
+        await extDb.$cache.invalidate({
+            tags: [],
+        });
+
+        // everything should still be the same as when we started
+        await expect(extDb.user.findUnique({
+            where: {
+                id: user1.id,
+            },
+
+            cache: {
+                ttl: 60,
+                tags: ['user1'],
+            },
+        })).resolves.toMatchObject({
+            name: null,
+        });
+
+        await expect(extDb.user.findUnique({
+            where: {
+                id: user2.id,
+            },
+
+            cache: {
+                ttl: 60,
+                tags: ['user2'],
+            },
+        })).resolves.toMatchObject({
+            name: null,
+        });
+
+        await expect(extDb.post.findUnique({
+            where: {
+                id: post1.id,
+            },
+
+            cache: {
+                ttl: 60,
+                tags: ['post', 'user1'],
+            },
+        })).resolves.toMatchObject({
+            title: 'title',
+        });
+
+        await extDb.$cache.invalidate({
+            tags: ['these', 'tags', 'do', 'not', 'exist'],
+        });
+
+        // everything should still be the same as when we started
+        await expect(extDb.user.findUnique({
+            where: {
+                id: user1.id,
+            },
+
+            cache: {
+                ttl: 60,
+                tags: ['user1'],
+            },
+        })).resolves.toMatchObject({
+            name: null,
+        });
+
+        await expect(extDb.user.findUnique({
+            where: {
+                id: user2.id,
+            },
+
+            cache: {
+                ttl: 60,
+                tags: ['user2'],
+            },
+        })).resolves.toMatchObject({
+            name: null,
+        });
+
+        await expect(extDb.post.findUnique({
+            where: {
+                id: post1.id,
+            },
+
+            cache: {
+                ttl: 60,
+                tags: ['post', 'user1'],
+            },
+        })).resolves.toMatchObject({
+            title: 'title',
+        });
+
+        await extDb.$cache.invalidate({
+            tags: ['user1'],
+        });
+
+        // only user2 and post2 stays the same
+        await expect(extDb.user.findUnique({
+            where: {
+                id: user1.id,
+            },
+
+            cache: {
+                ttl: 60,
+                tags: ['user1'],
+            },
+        })).resolves.toMatchObject({
+            name: 'newname',
+        });
+
+        await expect(extDb.user.findUnique({
+            where: {
+                id: user2.id,
+            },
+
+            cache: {
+                ttl: 60,
+                tags: ['user2'],
+            },
+        })).resolves.toMatchObject({
+            name: null,
+        });
+
+        await expect(extDb.post.findUnique({
+            where: {
+                id: post1.id,
+            },
+
+            cache: {
+                ttl: 60,
+                tags: ['post', 'user1'],
+            },
+        })).resolves.toMatchObject({
+            title: 'newtitle',
+        });
+
+        await expect(extDb.post.findUnique({
+            where: {
+                id: post2.id,
+            },
+
+            cache: {
+                ttl: 60,
+            },
+        })).resolves.toMatchObject({
+            title: 'title',
+        });
     });
 });

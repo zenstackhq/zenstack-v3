@@ -58,7 +58,7 @@ export function defineCachePlugin(pluginOptions: CachePluginOptions) {
                     createdAt: Date.now(),
                     options,
                     result,
-                }).catch(err => console.error(err));
+                }).catch((err) => console.error(`Failed to cache query result: ${err}`));
 
                 return result;
             }

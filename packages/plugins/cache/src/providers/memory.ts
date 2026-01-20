@@ -6,12 +6,12 @@ export class MemoryCache implements CacheProvider {
     
     // TODO: tags store
 
-    constructor() {
+    constructor(private readonly options?: MemoryCacheOptions) {
         this.queryResultStore = new Map<string, CacheQueryResultEntry>();
         
         setInterval(() => {
             this.checkExpiration();
-        }, 60000).unref();
+        }, this.options?.checkInterval ?? 60000).unref();
     }
 
     private checkExpiration() {
@@ -44,3 +44,7 @@ export class MemoryCache implements CacheProvider {
         return Promise.resolve();
     }
 }
+
+export type MemoryCacheOptions = {
+    checkInterval?: number;
+};

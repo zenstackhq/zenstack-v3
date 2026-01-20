@@ -13,7 +13,7 @@ export interface CacheProvider {
 };
 
 export type CacheInvalidationOptions = {
-    tags?: [];
+    tags?: string[];
 };
 
 export type CachePluginQueryOptions = {

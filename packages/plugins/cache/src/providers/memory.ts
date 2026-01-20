@@ -17,7 +17,7 @@ export class MemoryCache implements CacheProvider {
     private checkExpiration() {
         for (const [key, entry] of this.queryResultStore.entries()) {
             if (entryIsExpired(entry)) {
-                this.delete(key);
+                this.queryResultStore.delete(key);
             }
         }
 
@@ -55,10 +55,6 @@ export class MemoryCache implements CacheProvider {
         }
 
         return Promise.resolve();
-    }
-
-    delete(key: string) {
-        return Promise.resolve(this.queryResultStore.delete(key));
     }
 
     invalidate(options: CacheInvalidationOptions) {

@@ -1,5 +1,7 @@
+import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import { definePlugin } from '@zenstackhq/orm';
 import stableStringify from 'json-stable-stringify';
+import murmurhash from 'murmurhash';
 import { cacheEnvelopeSchema } from './schemas';
 import type { CacheEnvelope, CacheInvalidationOptions, CachePluginOptions } from './types';
 
@@ -27,25 +29,19 @@ export function defineCachePlugin(pluginOptions: CachePluginOptions) {
 
         onQuery: async ({ args, model, operation, proceed }) => {
             if (args && 'cache' in args) {
-                const argsWithoutCache: Record<string, unknown> = {};
+                const json = stableStringify({
+                    args,
+                    model,
+                    operation,
+                });
 
-                for (const [key, value] of Object.entries(args)) {
-                    if (key !== 'cache') {
-                        argsWithoutCache[key] = value;
-                    }
+                if (!json) {
+                    throw new Error(`Failed to serialize cache entry for ${lowerCaseFirst(model)}.${operation}`);
                 }
 
                 const cache = pluginOptions.provider;
                 const options = (args as CacheEnvelope).cache!;
-
-                // TODO: hash
-                const key = stableStringify({
-                    ...argsWithoutCache,
-                    options,
-                    model,
-                    operation,
-                })!;
-
+                const key = murmurhash.v3(json).toString();
                 const queryResultEntry = await cache.getQueryResult(key);
 
                 if (queryResultEntry) {

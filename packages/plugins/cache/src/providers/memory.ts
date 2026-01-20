@@ -11,7 +11,7 @@ export class MemoryCache implements CacheProvider {
 
         setInterval(() => {
             this.checkExpiration();
-        }, this.options?.checkInterval ?? 60000).unref();
+        }, (this.options?.checkInterval ?? 60) * 1000).unref();
     }
 
     private checkExpiration() {
@@ -85,5 +85,10 @@ export class MemoryCache implements CacheProvider {
 }
 
 export type MemoryCacheOptions = {
+    /**
+     * How often, in seconds, entries will be checked for expiration.
+     * 
+     * @default 60
+     */
     checkInterval?: number;
 };

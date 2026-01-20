@@ -32,3 +32,5 @@ export type CacheQueryResultEntry = CacheEntry & {
 export type CachePluginOptions = {
     provider: CacheProvider;
 };
+
+export type CacheStatus = 'hit' | 'miss' | 'stale';

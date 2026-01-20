@@ -12,7 +12,7 @@ export function entryIsFresh(entry: CacheEntry) {
 
 export function entryIsStale(entry: CacheEntry) {
     return entry.options.swr
-        ? Date.now() <= getTotalTTL(entry)
+        ? Date.now() <= entry.createdAt + getTotalTTL(entry)
         : false;
 }
 

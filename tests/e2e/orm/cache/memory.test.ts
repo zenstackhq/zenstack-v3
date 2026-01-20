@@ -292,6 +292,77 @@ describe('Cache plugin (memory)', () => {
         })).resolves.toHaveLength(2);
     });
 
+    it('respects swr', async () => {
+        const extDb = db.$use(defineCachePlugin({
+            provider: new MemoryCache(),
+        }));
+
+        const user = await extDb.user.create({
+            data: {
+                email: 'test@email.com',
+            },
+        });
+
+        await extDb.user.findFirst({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                swr: 60,
+            },
+        });
+
+        await extDb.user.update({
+            data: {
+                name: 'newname',
+            },
+
+            where: {
+                id: user.id,
+            },
+        });
+
+        await expect(extDb.user.findFirst({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                swr: 60,
+            },
+        })).resolves.toMatchObject({
+            name: null,
+        });
+
+        await expect(extDb.user.findFirst({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                swr: 60,
+            },
+        })).resolves.toMatchObject({
+            name: null,
+        });
+
+        expect(extDb.$cache.status).toBe('stale');
+        await extDb.$cache.revalidation;
+
+        await expect(extDb.user.findFirst({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                swr: 60,
+            },
+        })).resolves.toMatchObject({
+            name: 'newname',
+        });
+    });
+
     it('supports invalidating all entries', async () => {
         const extDb = db.$use(defineCachePlugin({
             provider: new MemoryCache(),

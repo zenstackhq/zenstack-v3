@@ -177,9 +177,19 @@ export class PrismaSchemaGenerator {
     private generateDefaultGenerator(prisma: PrismaModel) {
         const gen = prisma.addGenerator('client', [{ name: 'provider', text: '"prisma-client-js"' }]);
         const dataSource = this.zmodel.declarations.find(isDataSource);
-        if (dataSource?.fields.some((f) => f.name === 'extensions')) {
-            // enable "postgresqlExtensions" preview feature
-            gen.fields.push({ name: 'previewFeatures', text: '["postgresqlExtensions"]' });
+        const hasSchemas = dataSource?.fields.some((f) => f.name === 'schemas');
+        const hasExtensions = dataSource?.fields.some((f) => f.name === 'extensions');
+        if (hasSchemas || hasExtensions) {
+            const features = [];
+            if (hasSchemas) {
+                // enable multi-schema preview feature
+                features.push('"multiSchema"');
+            }
+            if (hasExtensions) {
+                // enable extensions preview feature
+                features.push('"postgresqlExtensions"');
+            }
+            gen.fields.push({ name: 'previewFeatures', text: `[${features.join(', ')}]` });
         }
     }
 

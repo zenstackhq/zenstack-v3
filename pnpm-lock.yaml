@@ -1046,6 +1046,9 @@ importers:
       kysely:
         specifier: 'catalog:'
         version: 0.28.8
+      ts-pattern:
+        specifier: 'catalog:'
+        version: 5.7.1
       ulid:
         specifier: ^3.0.0
         version: 3.0.0

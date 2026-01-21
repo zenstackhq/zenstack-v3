@@ -1,6 +1,6 @@
 import { type ClientContract } from '@zenstackhq/orm';
 import { createTestClient } from '@zenstackhq/testtools';
-import { InsertQueryNode, Kysely, PrimitiveValueListNode, ValuesNode, type QueryResult } from 'kysely';
+import { InsertQueryNode, PrimitiveValueListNode, ValuesNode } from 'kysely';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { schema } from '../schemas/basic';
 
@@ -93,7 +93,14 @@ describe('On kysely query tests', () => {
                 const result = await proceed(query);
 
                 // create a post for the user
-                await proceed(createPost(client.$qb, result));
+                const now = new Date().toISOString().replace('Z', '+00:00'); // for mysql compatibility
+                const createPost = client.$qb.insertInto('Post').values({
+                    id: '1',
+                    title: 'Post1',
+                    authorId: '1',
+                    updatedAt: now,
+                });
+                await proceed(createPost.toOperationNode());
 
                 return result;
             },
@@ -218,14 +225,3 @@ describe('On kysely query tests', () => {
         await expect(client.user.findFirst()).toResolveNull();
     });
 });
-
-function createPost(kysely: Kysely<any>, userRows: QueryResult<any>) {
-    const now = new Date().toISOString();
-    const createPost = kysely.insertInto('Post').values({
-        id: '1',
-        title: 'Post1',
-        authorId: (userRows.rows[0] as any).id,
-        updatedAt: now,
-    });
-    return createPost.toOperationNode();
-}

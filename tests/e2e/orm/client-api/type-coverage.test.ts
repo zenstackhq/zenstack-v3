@@ -35,6 +35,7 @@ describe('Zmodel type coverage tests', () => {
                 Json Json
             }
             `,
+                { usePrismaPush: true },
             );
 
             await db.foo.create({ data });
@@ -61,6 +62,7 @@ describe('Zmodel type coverage tests', () => {
                 Json Json @default("{\\"foo\\":\\"bar\\"}")
             }
             `,
+                { usePrismaPush: true },
             );
 
             await db.foo.create({ data: { id: '1' } });

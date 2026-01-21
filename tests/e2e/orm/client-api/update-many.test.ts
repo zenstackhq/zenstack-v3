@@ -80,6 +80,11 @@ describe('Client updateMany tests', () => {
     });
 
     it('works with updateManyAndReturn', async () => {
+        if (client.$schema.provider.type === ('mysql' as any)) {
+            // skip for mysql as it does not support returning
+            return;
+        }
+
         await client.user.create({
             data: { id: '1', email: 'u1@test.com', name: 'User1' },
         });

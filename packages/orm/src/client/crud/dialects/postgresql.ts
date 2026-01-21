@@ -62,7 +62,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         return true;
     }
 
-    override get supportDefaultAsFieldValue() {
+    override get supportsDefaultAsFieldValue() {
         return true;
     }
 
@@ -539,8 +539,16 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         );
     }
 
-    override castInt(expression: AliasableExpression<any>): AliasableExpression<any> {
-        return this.eb.cast(expression, 'integer');
+    override castInt<T extends Expression<any>>(expression: T): T {
+        return this.eb.cast(expression, 'integer') as unknown as T;
+    }
+
+    override castText<T extends Expression<any>>(expression: T): T {
+        return this.eb.cast(expression, 'text') as unknown as T;
+    }
+
+    override trimTextQuotes<T extends Expression<string>>(expression: T): T {
+        return this.eb.fn('trim', [expression, sql.lit('"')]) as unknown as T;
     }
 
     override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {

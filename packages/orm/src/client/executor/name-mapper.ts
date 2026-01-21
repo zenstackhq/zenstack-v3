@@ -27,6 +27,9 @@ import {
     ValuesNode,
 } from 'kysely';
 import type { EnumDef, EnumField, FieldDef, ModelDef, SchemaDef } from '../../schema';
+import type { ClientContract } from '../contract';
+import { getCrudDialect } from '../crud/dialects';
+import type { BaseCrudDialect } from '../crud/dialects/base-dialect';
 import {
     extractFieldName,
     extractModelName,
@@ -50,10 +53,12 @@ export class QueryNameMapper extends OperationNodeTransformer {
     private readonly modelToTableMap = new Map<string, string>();
     private readonly fieldToColumnMap = new Map<string, string>();
     private readonly scopes: Scope[] = [];
+    private readonly dialect: BaseCrudDialect<SchemaDef>;
 
-    constructor(private readonly schema: SchemaDef) {
+    constructor(private readonly client: ClientContract<SchemaDef>) {
         super();
-        for (const [modelName, modelDef] of Object.entries(schema.models)) {
+        this.dialect = getCrudDialect(client.$schema, client.$options);
+        for (const [modelName, modelDef] of Object.entries(client.$schema.models)) {
             const mappedName = this.getMappedName(modelDef);
             if (mappedName) {
                 this.modelToTableMap.set(modelName, mappedName);
@@ -66,6 +71,10 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 }
             }
         }
+    }
+
+    private get schema() {
+        return this.client.$schema;
     }
 
     // #region overrides
@@ -761,7 +770,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
 
         // the explicit cast to "text" is needed to address postgres's case-when type inference issue
-        const finalExpr = caseWhen!.else(eb.cast(new ExpressionWrapper(node), 'text')).end();
+        const finalExpr = caseWhen!.else(this.dialect.castText(new ExpressionWrapper(node))).end();
         if (aliasName) {
             return finalExpr.as(aliasName).toOperationNode() as SelectionNodeChild;
         } else {

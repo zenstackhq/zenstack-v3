@@ -8,6 +8,7 @@ import {
     sql,
     UpdateResult,
     type Compilable,
+    type ExpressionBuilder,
     type IsolationLevel,
     type QueryResult,
     type SelectQueryBuilder,
@@ -847,7 +848,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         const modelDef = this.requireModel(model);
 
-        let relationKeyPairs: { fk: string; pk: string }[] = [];
+        const relationKeyPairs: { fk: string; pk: string }[] = [];
         if (fromRelation) {
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
                 this.schema,
@@ -857,7 +858,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             if (ownedByModel) {
                 throw createInvalidInputError('incorrect relation hierarchy for createMany', model);
             }
-            relationKeyPairs = keyPairs;
+            relationKeyPairs.push(...keyPairs);
         }
 
         let createData = enumerate(input.data).map((item) => {
@@ -875,7 +876,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return this.fillGeneratedAndDefaultValues(modelDef, newItem);
         });
 
-        if (!this.dialect.supportDefaultAsFieldValue) {
+        if (!this.dialect.supportsDefaultAsFieldValue) {
             // if the dialect doesn't support `DEFAULT` as insert field values,
             // we need to double check if data rows have mismatching fields, and
             // if so, make sure all fields have default value filled if not provided
@@ -1119,39 +1120,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             throw createInvalidInputError('data must be an object');
         }
 
-        const parentWhere: any = {};
-        let m2m: ReturnType<typeof getManyToManyRelation> = undefined;
-
-        if (fromRelation) {
-            m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
-            if (!m2m) {
-                // merge foreign key conditions from the relation
-                const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
-                    this.schema,
-                    fromRelation.model,
-                    fromRelation.field,
-                );
-                if (ownedByModel) {
-                    const fromEntity = await this.readUnique(kysely, fromRelation.model as GetModels<Schema>, {
-                        where: fromRelation.ids,
-                    });
-                    for (const { fk, pk } of keyPairs) {
-                        parentWhere[pk] = fromEntity[fk];
-                    }
-                } else {
-                    for (const { fk, pk } of keyPairs) {
-                        parentWhere[fk] = fromRelation.ids[pk];
-                    }
-                }
-            } else {
-                // many-to-many relation, filter for parent with "some"
-                const fromRelationFieldDef = this.requireField(fromRelation.model, fromRelation.field);
-                invariant(fromRelationFieldDef.relation?.opposite);
-                parentWhere[fromRelationFieldDef.relation.opposite] = {
-                    some: fromRelation.ids,
-                };
-            }
-        }
+        const parentWhere = await this.buildUpdateParentRelationFilter(kysely, fromRelation);
 
         let combinedWhere: WhereInput<Schema, GetModels<Schema>, false> = where ?? {};
         if (Object.keys(parentWhere).length > 0) {
@@ -1190,11 +1159,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         let needIdRead = false;
-        if (modelDef.baseModel && !this.isIdFilter(model, combinedWhere)) {
-            // when updating a model with delegate base, base fields may be referenced in the filter,
-            // so we read the id out if the filter is not ready an id filter, and and use it as the
-            // update filter instead
-            needIdRead = true;
+        if (!this.isIdFilter(model, combinedWhere)) {
+            if (modelDef.baseModel) {
+                // when updating a model with delegate base, base fields may be referenced in the filter,
+                // so we read the id out if the filter is not ready an id filter, and and use it as the
+                // update filter instead
+                needIdRead = true;
+            }
+            if (!this.dialect.supportsReturning) {
+                // for dialects that don't support RETURNING, we need to read the id fields
+                // to identify the updated entity
+                needIdRead = true;
+            }
         }
 
         if (needIdRead) {
@@ -1304,8 +1280,8 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 const idFields = requireIdFields(this.schema, model);
                 const filterIdValues: any = {};
                 for (const key of idFields) {
-                    if (where[key] !== undefined && typeof where[key] !== 'object') {
-                        filterIdValues[key] = where[key];
+                    if (combinedWhere[key] !== undefined && typeof combinedWhere[key] !== 'object') {
+                        filterIdValues[key] = combinedWhere[key];
                     }
                 }
 
@@ -1345,6 +1321,42 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             return updatedEntity;
         }
+    }
+
+    private async buildUpdateParentRelationFilter(kysely: AnyKysely, fromRelation: FromRelationContext | undefined) {
+        const parentWhere: any = {};
+        let m2m: ReturnType<typeof getManyToManyRelation> = undefined;
+        if (fromRelation) {
+            m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
+            if (!m2m) {
+                // merge foreign key conditions from the relation
+                const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                    this.schema,
+                    fromRelation.model,
+                    fromRelation.field,
+                );
+                if (ownedByModel) {
+                    const fromEntity = await this.readUnique(kysely, fromRelation.model, {
+                        where: fromRelation.ids,
+                    });
+                    for (const { fk, pk } of keyPairs) {
+                        parentWhere[pk] = fromEntity[fk];
+                    }
+                } else {
+                    for (const { fk, pk } of keyPairs) {
+                        parentWhere[fk] = fromRelation.ids[pk];
+                    }
+                }
+            } else {
+                // many-to-many relation, filter for parent with "some"
+                const fromRelationFieldDef = this.requireField(fromRelation.model, fromRelation.field);
+                invariant(fromRelationFieldDef.relation?.opposite);
+                parentWhere[fromRelationFieldDef.relation.opposite] = {
+                    some: fromRelation.ids,
+                };
+            }
+        }
+        return parentWhere;
     }
 
     private processScalarFieldUpdateData(model: string, field: string, data: any): any {
@@ -1481,6 +1493,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         limit: number | undefined,
         returnData: ReturnData,
         filterModel?: string,
+        fromRelation?: FromRelationContext,
         fieldsToReturn?: readonly string[],
     ): Promise<Result> {
         if (typeof data !== 'object') {
@@ -1496,6 +1509,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             throw createNotSupportedError('Updating with a limit is not supported for polymorphic models');
         }
 
+        const parentWhere = await this.buildUpdateParentRelationFilter(kysely, fromRelation);
+        let combinedWhere: WhereInput<Schema, GetModels<Schema>, false> = where ?? {};
+        if (Object.keys(parentWhere).length > 0) {
+            combinedWhere = Object.keys(combinedWhere).length > 0 ? { AND: [parentWhere, combinedWhere] } : parentWhere;
+        }
+
         filterModel ??= model;
         let updateFields: any = {};
 
@@ -1504,6 +1523,25 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 continue;
             }
             updateFields[field] = this.processScalarFieldUpdateData(model, field, data);
+        }
+
+        let resultFromBaseModel: any = undefined;
+        if (modelDef.baseModel) {
+            const baseResult = await this.processBaseModelUpdateMany(
+                kysely,
+                modelDef.baseModel,
+                combinedWhere,
+                updateFields,
+                filterModel,
+            );
+            updateFields = baseResult.remainingFields;
+            resultFromBaseModel = baseResult.baseResult;
+        }
+
+        // check again if we don't have anything to update for this model
+        if (Object.keys(updateFields).length === 0) {
+            // return result from base model if it exists, otherwise return empty result
+            return resultFromBaseModel ?? ((returnData ? [] : { count: 0 }) as Result);
         }
 
         let shouldFallbackToIdFilter = false;
@@ -1521,31 +1559,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             shouldFallbackToIdFilter = true;
         }
 
-        let resultFromBaseModel: any = undefined;
-        if (modelDef.baseModel) {
-            const baseResult = await this.processBaseModelUpdateMany(
-                kysely,
-                modelDef.baseModel,
-                where,
-                updateFields,
-                filterModel,
-            );
-            updateFields = baseResult.remainingFields;
-            resultFromBaseModel = baseResult.baseResult;
-        }
-
-        // check again if we don't have anything to update for this model
-        if (Object.keys(updateFields).length === 0) {
-            // return result from base model if it exists, otherwise return empty result
-            return resultFromBaseModel ?? ((returnData ? [] : { count: 0 }) as Result);
-        }
-
         let query = kysely.updateTable(model).set(updateFields);
 
         if (!shouldFallbackToIdFilter) {
             // simple filter
             query = query
-                .where(() => this.dialect.buildFilter(model, model, where))
+                .where(() => this.dialect.buildFilter(model, model, combinedWhere))
                 .$if(limit !== undefined, (qb) => qb.limit(limit!));
         } else {
             query = query.where((eb) =>
@@ -1555,11 +1574,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ...this.buildIdFieldRefs(kysely, model),
                     ),
                     'in',
-                    this.dialect
-                        .buildSelectModel(filterModel, filterModel)
-                        .where(this.dialect.buildFilter(filterModel, filterModel, where))
-                        .select(this.buildIdFieldRefs(kysely, filterModel))
-                        .$if(limit !== undefined, (qb) => qb.limit(limit!)),
+                    // the outer "select *" is needed to isolate the sub query (as needed for dialects like mysql)
+                    eb
+                        .selectFrom(
+                            this.dialect
+                                .buildSelectModel(filterModel, filterModel)
+                                .where(this.dialect.buildFilter(filterModel, filterModel, combinedWhere))
+                                .select(this.buildIdFieldRefs(kysely, filterModel))
+                                .$if(limit !== undefined, (qb) => qb.limit(limit!))
+                                .as('$sub'),
+                        )
+                        .selectAll(),
                 ),
             );
         }
@@ -1583,7 +1608,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
                 if (!shouldFallbackToIdFilter) {
                     selectQuery = selectQuery
-                        .where(() => this.dialect.buildFilter(model, model, where))
+                        .where(() => this.dialect.buildFilter(model, model, combinedWhere))
                         .$if(limit !== undefined, (qb) => qb.limit(limit!));
                 } else {
                     selectQuery = selectQuery.where((eb) =>
@@ -1595,7 +1620,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             'in',
                             this.dialect
                                 .buildSelectModel(filterModel, filterModel)
-                                .where(this.dialect.buildFilter(filterModel, filterModel, where))
+                                .where(this.dialect.buildFilter(filterModel, filterModel, combinedWhere))
                                 .select(this.buildIdFieldRefs(kysely, filterModel))
                                 .$if(limit !== undefined, (qb) => qb.limit(limit!)),
                         ),
@@ -1785,8 +1810,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
                 case 'updateMany': {
                     for (const _item of enumerate(value)) {
-                        const item = _item as { where: any; data: any };
-                        await this.update(kysely, fieldModel, item.where, item.data, fromRelationContext, false, false);
+                        const item = _item as { where: any; data: any; limit: number | undefined };
+                        await this.updateMany(
+                            kysely,
+                            fieldModel,
+                            item.where,
+                            item.data,
+                            item.limit,
+                            false,
+                            fieldModel,
+                            fromRelationContext,
+                        );
                     }
                     break;
                 }
@@ -2177,7 +2211,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             expectedDeleteCount = deleteConditions.length;
         }
 
-        let deleteResult: QueryResult<unknown>;
+        let deleteResult: Awaited<ReturnType<typeof this.delete>>;
         let deleteFromModel: string;
         const m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
 
@@ -2242,7 +2276,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // validate result
-        if (throwForNotFound && expectedDeleteCount > deleteResult.rows.length) {
+        if (throwForNotFound && expectedDeleteCount > (deleteResult.numAffectedRows ?? 0)) {
             // some entities were not deleted
             throw createNotFoundError(deleteFromModel);
         }
@@ -2291,95 +2325,43 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             needIdFilter = true;
         }
 
-        if (this.dialect.supportsReturning) {
-            let query = kysely.deleteFrom(model).returning(fieldsToReturn as any);
+        const deleteFilter = needIdFilter
+            ? (eb: ExpressionBuilder<any, any>) =>
+                  eb(
+                      eb.refTuple(
+                          // @ts-expect-error
+                          ...this.buildIdFieldRefs(kysely, model),
+                      ),
+                      'in',
+                      // the outer "select *" is needed to isolate the sub query (as needed for dialects like mysql)
+                      eb
+                          .selectFrom(
+                              this.dialect
+                                  .buildSelectModel(filterModel, filterModel)
+                                  .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
+                                  .select(this.buildIdFieldRefs(kysely, filterModel))
+                                  .$if(limit !== undefined, (qb) => qb.limit(limit!))
+                                  .as('$sub'),
+                          )
+                          .selectAll(),
+                  )
+            : () => this.dialect.buildFilter(model, model, where);
 
-            if (!needIdFilter) {
-                query = query.where(() => this.dialect.buildFilter(model, model, where));
-            } else {
-                query = query.where((eb) =>
-                    eb(
-                        eb.refTuple(
-                            // @ts-expect-error
-                            ...this.buildIdFieldRefs(kysely, model),
-                        ),
-                        'in',
-                        this.dialect
-                            .buildSelectModel(filterModel, filterModel)
-                            .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
-                            .select(this.buildIdFieldRefs(kysely, filterModel))
-                            .$if(limit !== undefined, (qb) => qb.limit(limit!)),
-                    ),
-                );
-            }
+        // if the model being deleted has a relation to a model that extends a delegate model, and if that
+        // relation is set to trigger a cascade delete from this model, the deletion will not automatically
+        // clean up the base hierarchy of the relation side (because polymorphic model's cascade deletion
+        // works downward not upward). We need to take care of the base deletions manually here.
 
-            // if the model being deleted has a relation to a model that extends a delegate model, and if that
-            // relation is set to trigger a cascade delete from this model, the deletion will not automatically
-            // clean up the base hierarchy of the relation side (because polymorphic model's cascade deletion
-            // works downward not upward). We need to take care of the base deletions manually here.
-            await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
+        await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
 
-            query = query.modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
-            return this.executeQuery(kysely, query, 'delete');
-        } else {
-            // Fallback for databases that don't support RETURNING (e.g., MySQL)
-            // First, select the records to be deleted
-            let selectQuery = kysely.selectFrom(model).selectAll();
+        const query = kysely
+            .deleteFrom(model)
+            .where(deleteFilter)
+            .$if(this.dialect.supportsReturning, (qb) => qb.returning(fieldsToReturn))
+            .$if(limit !== undefined && this.dialect.supportsDeleteWithLimit, (qb) => qb.limit(limit!))
+            .modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
 
-            if (!needIdFilter) {
-                selectQuery = selectQuery.where(() => this.dialect.buildFilter(model, model, where));
-            } else {
-                selectQuery = selectQuery.where((eb) =>
-                    eb(
-                        eb.refTuple(
-                            // @ts-expect-error
-                            ...this.buildIdFieldRefs(kysely, model),
-                        ),
-                        'in',
-                        this.dialect
-                            .buildSelectModel(filterModel, filterModel)
-                            .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
-                            .select(this.buildIdFieldRefs(kysely, filterModel))
-                            .$if(limit !== undefined, (qb) => qb.limit(limit!)),
-                    ),
-                );
-            }
-
-            const recordsToDelete = await this.executeQuery(kysely, selectQuery, 'delete');
-
-            // Now execute the delete
-            let deleteQuery = kysely.deleteFrom(model);
-
-            if (!needIdFilter) {
-                deleteQuery = deleteQuery.where(() => this.dialect.buildFilter(model, model, where));
-            } else {
-                deleteQuery = deleteQuery.where((eb) =>
-                    eb(
-                        eb.refTuple(
-                            // @ts-expect-error
-                            ...this.buildIdFieldRefs(kysely, model),
-                        ),
-                        'in',
-                        this.dialect
-                            .buildSelectModel(filterModel, filterModel)
-                            .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
-                            .select(this.buildIdFieldRefs(kysely, filterModel))
-                            .$if(limit !== undefined, (qb) => qb.limit(limit!)),
-                    ),
-                );
-            }
-
-            await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
-
-            deleteQuery = deleteQuery.modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
-            await this.executeQuery(kysely, deleteQuery, 'delete');
-
-            // Return the records that were deleted
-            return {
-                rows: recordsToDelete.rows,
-                numAffectedRows: BigInt(recordsToDelete.rows.length),
-            };
-        }
+        return this.executeQuery(kysely, query, 'delete');
     }
 
     private async processDelegateRelationDelete(
@@ -2517,6 +2499,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (this.hasPolicyEnabled) {
             // TODO: refactor this check
             // policy enforcement always requires read back
+            return { needReadBack: true, selectedFields: undefined };
+        }
+
+        if (!this.dialect.supportsReturning) {
+            // if the dialect doesn't support RETURNING, we always need read back
             return { needReadBack: true, selectedFields: undefined };
         }
 

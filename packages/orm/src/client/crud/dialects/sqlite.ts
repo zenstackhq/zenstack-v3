@@ -49,7 +49,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return true; // SQLite 3.35.0+ supports RETURNING
     }
 
-    override get supportDefaultAsFieldValue() {
+    override get supportsDefaultAsFieldValue() {
         return false;
     }
 
@@ -451,8 +451,16 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         throw new Error('SQLite does not support array literals');
     }
 
-    override castInt(expression: AliasableExpression<any>): AliasableExpression<any> {
+    override castInt<T extends Expression<any>>(expression: T): T {
         return expression;
+    }
+
+    override castText<T extends Expression<any>>(expression: T): T {
+        return this.eb.cast(expression, 'text') as unknown as T;
+    }
+
+    override trimTextQuotes<T extends Expression<string>>(expression: T): T {
+        return this.eb.fn('trim', [expression, sql.lit('"')]) as unknown as T;
     }
 
     override getFieldSqlType(fieldDef: FieldDef) {

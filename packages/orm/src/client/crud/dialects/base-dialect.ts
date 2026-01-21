@@ -1,5 +1,5 @@
 import { enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers';
-import type { AliasableExpression, Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
+import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { expressionBuilder, sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
@@ -64,7 +64,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     /**
      * Whether the dialect support inserting with `DEFAULT` as field value.
      */
-    abstract get supportDefaultAsFieldValue(): boolean;
+    abstract get supportsDefaultAsFieldValue(): boolean;
 
     /**
      * Whether the dialect supports the RETURNING clause in INSERT/UPDATE/DELETE statements.
@@ -443,51 +443,35 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 continue;
             }
 
-            switch (key) {
-                case 'some': {
-                    result = this.and(
-                        result,
-                        this.eb(
+            const countSelect = (negate: boolean) => {
+                const filter = this.buildFilter(relationModel, relationFilterSelectAlias, subPayload);
+                return (
+                    this.eb
+                        // the outer select is needed to avoid mysql's scope issue
+                        .selectFrom(
                             this.buildSelectModel(relationModel, relationFilterSelectAlias)
                                 .select(() => this.eb.fn.count(this.eb.lit(1)).as('$count'))
                                 .where(buildPkFkWhereRefs(this.eb))
-                                .where(() => this.buildFilter(relationModel, relationFilterSelectAlias, subPayload)),
-                            '>',
-                            0,
-                        ),
-                    );
+                                .where(() => (negate ? this.eb.not(filter) : filter))
+                                .as('$sub'),
+                        )
+                        .select('$count')
+                );
+            };
+
+            switch (key) {
+                case 'some': {
+                    result = this.and(result, this.eb(countSelect(false), '>', 0));
                     break;
                 }
 
                 case 'every': {
-                    result = this.and(
-                        result,
-                        this.eb(
-                            this.buildSelectModel(relationModel, relationFilterSelectAlias)
-                                .select((eb1) => eb1.fn.count(eb1.lit(1)).as('$count'))
-                                .where(buildPkFkWhereRefs(this.eb))
-                                .where(() =>
-                                    this.eb.not(this.buildFilter(relationModel, relationFilterSelectAlias, subPayload)),
-                                ),
-                            '=',
-                            0,
-                        ),
-                    );
+                    result = this.and(result, this.eb(countSelect(true), '=', 0));
                     break;
                 }
 
                 case 'none': {
-                    result = this.and(
-                        result,
-                        this.eb(
-                            this.buildSelectModel(relationModel, relationFilterSelectAlias)
-                                .select(() => this.eb.fn.count(this.eb.lit(1)).as('$count'))
-                                .where(buildPkFkWhereRefs(this.eb))
-                                .where(() => this.buildFilter(relationModel, relationFilterSelectAlias, subPayload)),
-                            '=',
-                            0,
-                        ),
-                    );
+                    result = this.and(result, this.eb(countSelect(false), '=', 0));
                     break;
                 }
             }
@@ -599,7 +583,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
         const path = filter.path;
         const jsonReceiver = this.buildJsonPathSelection(receiver, path);
-        const stringReceiver = this.eb.cast(jsonReceiver, 'text');
+        const stringReceiver = this.castText(jsonReceiver);
 
         const mode = filter.mode ?? 'default';
         invariant(mode === 'default' || mode === 'insensitive', 'Invalid JSON filter mode');
@@ -707,7 +691,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         const clauses: Expression<SqlBool>[] = [];
 
         if (filter === null) {
-            return this.eb(receiver, '=', 'null');
+            return this.eb(receiver, '=', this.transformInput(null, 'Json', false));
         }
 
         invariant(filter && typeof filter === 'object', 'Typed JSON filter payload must be an object');
@@ -737,7 +721,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         let _receiver = fieldReceiver;
                         if (fieldDef.type === 'String') {
                             // trim quotes for string fields
-                            _receiver = this.eb.fn('trim', [this.eb.cast(fieldReceiver, 'text'), sql.lit('"')]);
+                            _receiver = this.trimTextQuotes(this.castText(fieldReceiver));
                         }
                         clauses.push(this.buildPrimitiveFilter(_receiver, fieldDef, value));
                     }
@@ -751,13 +735,20 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         if (value instanceof DbNullClass) {
             return this.eb(lhs, 'is', null);
         } else if (value instanceof JsonNullClass) {
-            return this.eb.and([this.eb(lhs, '=', 'null'), this.eb(lhs, 'is not', null)]);
+            return this.eb.and([
+                this.eb(lhs, '=', this.transformInput(null, 'Json', false)),
+                this.eb(lhs, 'is not', null),
+            ]);
         } else if (value instanceof AnyNullClass) {
             // AnyNull matches both DB NULL and JSON null
-            return this.eb.or([this.eb(lhs, 'is', null), this.eb(lhs, '=', 'null')]);
+            return this.eb.or([this.eb(lhs, 'is', null), this.eb(lhs, '=', this.transformInput(null, 'Json', false))]);
         } else {
-            return this.buildLiteralFilter(lhs, 'Json', value);
+            return this.buildJsonEqualityFilter(lhs, value);
         }
+    }
+
+    protected buildJsonEqualityFilter(lhs: Expression<any>, rhs: unknown) {
+        return this.buildLiteralFilter(lhs, 'Json', rhs);
     }
 
     private buildLiteralFilter(lhs: Expression<any>, type: BuiltinType, rhs: unknown) {
@@ -1453,7 +1444,17 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     /**
      * Casts the given expression to an integer type.
      */
-    abstract castInt(expression: AliasableExpression<any>): AliasableExpression<any>;
+    abstract castInt<T extends Expression<any>>(expression: T): T;
+
+    /**
+     * Casts the given expression to a text type.
+     */
+    abstract castText<T extends Expression<any>>(expression: T): T;
+
+    /**
+     * Trims double quotes from the start and end of a text expression.
+     */
+    abstract trimTextQuotes<T extends Expression<string>>(expression: T): T;
 
     /**
      * Gets the SQL column type for the given field definition.

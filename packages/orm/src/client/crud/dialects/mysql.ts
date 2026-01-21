@@ -83,7 +83,7 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
 
         // Handle special null classes for JSON fields
         if (value instanceof JsonNullClass) {
-            return 'null';
+            return this.eb.cast(sql.lit('null'), 'json');
         } else if (value instanceof DbNullClass) {
             return null;
         } else if (value instanceof AnyNullClass) {
@@ -96,7 +96,7 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
             // their input values need to be stringified if not already (i.e., provided in
             // default values)
             if (typeof value !== 'string') {
-                return JSON.stringify(value);
+                return this.transformInput(value, 'Json', forArrayField);
             } else {
                 return value;
             }
@@ -106,31 +106,30 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
                 // scalar `Json` fields need their input stringified
                 return JSON.stringify(value);
             }
-            // `Json[]` fields stored as JSON arrays
+            // TODO: check me, `Json[]` fields stored as JSON arrays
             return JSON.stringify(value.map((v) => this.transformInput(v, type, false)));
         } else {
             return match(type)
                 .with('Boolean', () => (value ? 1 : 0)) // MySQL uses 1/0 for boolean like SQLite
                 .with('DateTime', () => {
                     // MySQL DATETIME format: 'YYYY-MM-DD HH:MM:SS.mmm'
-                    // Convert ISO string to MySQL format by removing 'Z' and replacing 'T' with space
                     if (value instanceof Date) {
-                        return value.toISOString().replace('T', ' ').replace('Z', '');
+                        // return value.toISOString().replace('T', ' ').replace('Z', '');
+                        return value.toISOString().replace('Z', '+00:00');
                     } else if (typeof value === 'string') {
-                        return new Date(value).toISOString().replace('T', ' ').replace('Z', '');
+                        // return new Date(value).toISOString().replace('T', ' ').replace('Z', '');
+                        return new Date(value).toISOString().replace('Z', '+00:00');
                     } else {
                         return value;
                     }
                 })
                 .with('Decimal', () => (value !== null ? value.toString() : value))
                 .with('Json', () => {
-                    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-                        // MySQL requires simple JSON values to be stringified
-                        return JSON.stringify(value);
-                    } else {
-                        return value;
-                    }
+                    return this.eb.cast(this.eb.val(JSON.stringify(value)), 'json');
                 })
+                .with('Bytes', () =>
+                    Buffer.isBuffer(value) ? value : value instanceof Uint8Array ? Buffer.from(value) : value,
+                )
                 .otherwise(() => value);
         }
     }
@@ -275,6 +274,12 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
                             `${relationSelectName}$t`,
                             parentAlias,
                         );
+
+                        if (typeof payload !== 'object' || payload.take === undefined) {
+                            // force adding a limit otherwise the ordering is ignored by mysql
+                            // during JSON_ARRAYAGG
+                            subQuery = subQuery.limit(Number.MAX_SAFE_INTEGER);
+                        }
 
                         return subQuery.as(relationSelectName);
                     });
@@ -499,8 +504,16 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
         );
     }
 
-    override castInt(expression: AliasableExpression<any>): AliasableExpression<any> {
-        return this.eb.cast(expression, sql.raw('unsigned'));
+    override castInt<T extends Expression<any>>(expression: T): T {
+        return this.eb.cast(expression, sql.raw('unsigned')) as unknown as T;
+    }
+
+    override castText<T extends Expression<any>>(expression: T): T {
+        return this.eb.cast(expression, sql.raw('char')) as unknown as T;
+    }
+
+    override trimTextQuotes<T extends Expression<string>>(expression: T): T {
+        return sql`TRIM(BOTH ${sql.lit('"')} FROM ${expression})` as unknown as T;
     }
 
     override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
@@ -511,6 +524,18 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
     override buildArrayLiteralSQL(values: unknown[]): string {
         // MySQL uses JSON arrays since it doesn't have native arrays
         return `JSON_ARRAY(${values.map((v) => (typeof v === 'string' ? `'${v}'` : v)).join(',')})`;
+    }
+
+    protected override buildJsonEqualityFilter(
+        lhs: Expression<any>,
+        rhs: unknown,
+    ): ExpressionWrapper<any, any, SqlBool> {
+        // MySQL's JSON equality comparison is key-order sensitive, use bi-directional JSON_CONTAINS
+        // instead to achieve key-order insensitive comparison
+        return this.eb.and([
+            this.eb.fn('JSON_CONTAINS', [lhs, this.eb.val(JSON.stringify(rhs))]),
+            this.eb.fn('JSON_CONTAINS', [this.eb.val(JSON.stringify(rhs)), lhs]),
+        ]);
     }
 
     protected override buildJsonPathSelection(receiver: Expression<any>, path: string | undefined) {
@@ -558,13 +583,13 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
         // For simplicity, we'll use EXISTS with a subquery that unnests the JSON array
         return this.eb.exists(
             this.eb
-                .selectFrom(sql`JSON_TABLE(${receiver}, '$[*]' COLUMNS(value JSON PATH '$')) AS $items`.as('$items'))
+                .selectFrom(sql`JSON_TABLE(${receiver}, '$[*]' COLUMNS(value JSON PATH '$'))`.as('$items'))
                 .select(this.eb.lit(1).as('$t'))
                 .where(buildFilter(this.eb.ref('$items.value'))),
         );
     }
 
-    override get supportDefaultAsFieldValue() {
+    override get supportsDefaultAsFieldValue() {
         // MySQL supports INSERT with DEFAULT VALUES
         return true;
     }

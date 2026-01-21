@@ -135,6 +135,10 @@ describe('Delegate model tests ', () => {
         });
 
         it('works with createManyAndReturn', async () => {
+            if (client.$schema.provider.type === ('mysql' as any)) {
+                return;
+            }
+
             await expect(
                 client.ratedVideo.createManyAndReturn({
                     data: [
@@ -179,7 +183,7 @@ describe('Delegate model tests ', () => {
                         rating: 3,
                     },
                 }),
-            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
+            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().match(/(constraint)|(duplicate)/i));
 
             await expect(client.ratedVideo.findMany()).toResolveWithLength(1);
             await expect(client.video.findMany()).toResolveWithLength(1);
@@ -790,6 +794,10 @@ describe('Delegate model tests ', () => {
         });
 
         it('works with updateManyAndReturn', async () => {
+            if (client.$schema.provider.type === ('mysql' as any)) {
+                return;
+            }
+
             await client.ratedVideo.create({
                 data: { id: 2, viewCount: 1, duration: 200, url: 'abc', rating: 5 },
             });

@@ -251,6 +251,12 @@ export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHo
     loadAfterMutationEntities(): Promise<Record<string, unknown>[] | undefined>;
 
     /**
+     * The entities before mutation. Only available if `beforeEntityMutation` hook is provided and
+     * the `loadBeforeMutationEntities` function is called in that hook.
+     */
+    beforeMutationEntities?: Record<string, unknown>[];
+
+    /**
      * The ZenStack client you can use to perform additional operations.
      * See {@link EntityMutationHooksDef.runAfterMutationWithinTransaction} for detailed transaction behavior.
      *

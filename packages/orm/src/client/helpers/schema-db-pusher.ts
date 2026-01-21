@@ -222,13 +222,25 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             }
 
             // @default
-            if (fieldDef.default !== undefined) {
+            if (fieldDef.default !== undefined && this.isDefaultValueSupportedForType(fieldDef.type)) {
                 if (typeof fieldDef.default === 'object' && 'kind' in fieldDef.default) {
                     if (ExpressionUtils.isCall(fieldDef.default) && fieldDef.default.function === 'now') {
-                        col = col.defaultTo(sql`CURRENT_TIMESTAMP`);
+                        col =
+                            this.schema.provider.type === 'mysql'
+                                ? col.defaultTo(sql`CURRENT_TIMESTAMP(3)`)
+                                : col.defaultTo(sql`CURRENT_TIMESTAMP`);
                     }
                 } else {
-                    col = col.defaultTo(fieldDef.default);
+                    if (
+                        this.schema.provider.type === 'mysql' &&
+                        fieldDef.type === 'DateTime' &&
+                        typeof fieldDef.default === 'string'
+                    ) {
+                        const defaultValue = new Date(fieldDef.default).toISOString().replace('Z', '+00:00');
+                        col = col.defaultTo(defaultValue);
+                    } else {
+                        col = col.defaultTo(fieldDef.default);
+                    }
                 }
             }
 
@@ -248,6 +260,14 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
             return col;
         });
+    }
+
+    private isDefaultValueSupportedForType(type: string) {
+        return match(this.schema.provider.type)
+            .with('postgresql', () => true)
+            .with('sqlite', () => true)
+            .with('mysql', () => !['Json', 'Bytes'].includes(type))
+            .exhaustive();
     }
 
     private mapFieldType(fieldDef: FieldDef) {
@@ -424,7 +444,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
     private get dateTimeType() {
         return match<string, ColumnDataType | RawBuilder<unknown>>(this.schema.provider.type)
-            .with('mysql', () => sql.raw('datetime'))
+            .with('mysql', () => sql.raw('datetime(3)'))
             .otherwise(() => 'timestamp');
     }
 

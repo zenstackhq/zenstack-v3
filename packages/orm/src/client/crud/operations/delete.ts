@@ -33,10 +33,11 @@ export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperat
                 });
             }
             const deleteResult = await this.delete(tx, this.model, args.where, undefined, undefined, selectedFields);
-            if (deleteResult.rows.length === 0) {
+            if (!deleteResult.numAffectedRows) {
                 throw createNotFoundError(this.model);
             }
-            return needReadBack ? preDeleteRead : deleteResult.rows[0];
+
+            return preDeleteRead ?? deleteResult.rows[0];
         });
 
         if (!result && this.hasPolicyEnabled) {
@@ -53,7 +54,7 @@ export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperat
     async runDeleteMany(args: DeleteManyArgs<Schema, Extract<keyof Schema['models'], string>> | undefined) {
         return await this.safeTransaction(async (tx) => {
             const result = await this.delete(tx, this.model, args?.where, args?.limit);
-            return { count: result.rows.length };
+            return { count: Number(result.numAffectedRows ?? 0) };
         });
     }
 }

@@ -2,7 +2,7 @@ import { type ClientContract } from '@zenstackhq/orm';
 import { createTestClient } from '@zenstackhq/testtools';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineCachePlugin } from '@zenstackhq/plugin-cache';
-import { MemoryCache } from '@zenstackhq/plugin-cache/providers/memory';
+import { MemoryCacheProvider } from '@zenstackhq/plugin-cache/providers/memory';
 import { schema } from '../schemas/basic';
 
 describe('Cache plugin (memory)', () => {
@@ -20,7 +20,7 @@ describe('Cache plugin (memory)', () => {
 
     it('respects ttl', async () => {
         const extDb = db.$use(defineCachePlugin({
-            provider: new MemoryCache(),
+            provider: new MemoryCacheProvider(),
         }));
 
         const user = await extDb.user.create({
@@ -294,7 +294,7 @@ describe('Cache plugin (memory)', () => {
 
     it('respects swr', async () => {
         const extDb = db.$use(defineCachePlugin({
-            provider: new MemoryCache(),
+            provider: new MemoryCacheProvider(),
         }));
 
         const user = await extDb.user.create({
@@ -353,7 +353,7 @@ describe('Cache plugin (memory)', () => {
 
     it('respects ttl and swr simultaneously', async () => {
         const extDb = db.$use(defineCachePlugin({
-            provider: new MemoryCache(),
+            provider: new MemoryCacheProvider(),
         }));
 
         const user = await extDb.user.create({
@@ -431,7 +431,7 @@ describe('Cache plugin (memory)', () => {
 
     it('supports invalidating all entries', async () => {
         const extDb = db.$use(defineCachePlugin({
-            provider: new MemoryCache(),
+            provider: new MemoryCacheProvider(),
         }));
 
         const user = await extDb.user.create({
@@ -617,7 +617,7 @@ describe('Cache plugin (memory)', () => {
 
     it('supports invalidating by tags', async () => {
         const extDb = db.$use(defineCachePlugin({
-            provider: new MemoryCache(),
+            provider: new MemoryCacheProvider(),
         }));
 
         const user1 = await extDb.user.create({
@@ -870,7 +870,7 @@ describe('Cache plugin (memory)', () => {
 
     it('handles edge cases', async () => {
         const extDb = db.$use(defineCachePlugin({
-            provider: new MemoryCache(),
+            provider: new MemoryCacheProvider(),
         }));
 
         await expect(extDb.user.findMany({

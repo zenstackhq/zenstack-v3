@@ -8,7 +8,7 @@ import { entryIsFresh, entryIsStale } from './utils'
 
 export function defineCachePlugin(pluginOptions: CachePluginOptions) {
     let status: CacheStatus | null = null;
-    let revalidation: Promise<void> | null = null;
+    let revalidation: Promise<unknown> | null = null;
 
     return definePlugin({
         id: 'cache',
@@ -63,7 +63,7 @@ export function defineCachePlugin(pluginOptions: CachePluginOptions) {
                 const cache = pluginOptions.provider;
                 const options = (args as CacheEnvelope).cache!;
                 const key = murmurhash.v3(json).toString();
-                const queryResultEntry = await cache.getQueryResult(key);
+                const queryResultEntry = await cache.get(key);
 
                 if (queryResultEntry) {
                     if (entryIsFresh(queryResultEntry)) {
@@ -72,14 +72,17 @@ export function defineCachePlugin(pluginOptions: CachePluginOptions) {
                     } else if (entryIsStale(queryResultEntry)) {
                         revalidation = proceed(args).then(async (result) => {
                             try {
-                                await cache.setQueryResult(key, {
+                                await cache.set(key, {
                                     createdAt: Date.now(),
                                     options,
                                     result,
-                                })
+                                });
+
+                                return result;
                             }
                             catch (err) {
-                                console.error(`Failed to cache query result: ${err}`)
+                                console.error(`Failed to cache query result: ${err}`);
+                                return null;
                             }
                         });
 
@@ -90,7 +93,7 @@ export function defineCachePlugin(pluginOptions: CachePluginOptions) {
 
                 const result = await proceed(args);
 
-                cache.setQueryResult(key, {
+                cache.set(key, {
                     createdAt: Date.now(),
                     options,
                     result,

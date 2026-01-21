@@ -1,12 +1,12 @@
-import type { CacheInvalidationOptions, CacheProvider, CacheQueryResultEntry } from '../types';
+import type { CacheInvalidationOptions, CacheProvider, CacheEntry } from '../types';
 import { entryIsExpired } from '../utils';
 
-export class MemoryCache implements CacheProvider {
-    private readonly queryResultStore: Map<string, CacheQueryResultEntry>;
+export class MemoryCacheProvider implements CacheProvider {
+    private readonly entryStore: Map<string, CacheEntry>;
     private readonly tagStore: Map<string, Set<string>>;
 
     constructor(private readonly options?: MemoryCacheOptions) {
-        this.queryResultStore = new Map<string, CacheQueryResultEntry>();
+        this.entryStore = new Map<string, CacheEntry>();
         this.tagStore = new Map<string, Set<string>>;
 
         setInterval(() => {
@@ -15,42 +15,42 @@ export class MemoryCache implements CacheProvider {
     }
 
     private checkExpiration() {
-        for (const [key, entry] of this.queryResultStore.entries()) {
+        for (const [key, entry] of this.entryStore) {
             if (entryIsExpired(entry)) {
-                this.queryResultStore.delete(key);
+                this.entryStore.delete(key);
             }
         }
 
-        for (const [tag, queryKeys] of this.tagStore.entries()) {
-            for (const queryKey of queryKeys) {
-                if (!this.queryResultStore.has(queryKey)) {
-                    queryKeys.delete(queryKey);
+        for (const [tag, keys] of this.tagStore) {
+            for (const key of keys) {
+                if (!this.entryStore.has(key)) {
+                    keys.delete(key);
                 }
             }
 
-            if (queryKeys.size === 0) {
+            if (keys.size === 0) {
                 this.tagStore.delete(tag);
             }
         }
     }
 
-    getQueryResult(key: string) {
-        return Promise.resolve(this.queryResultStore.get(key));
+    get(key: string) {
+        return Promise.resolve(this.entryStore.get(key));
     }
 
-    setQueryResult(key: string, entry: CacheQueryResultEntry) {
-        this.queryResultStore.set(key, entry);
+    set(key: string, entry: CacheEntry) {
+        this.entryStore.set(key, entry);
 
         if (entry.options.tags) {
             for (const tag of entry.options.tags) {
-                let queryKeys = this.tagStore.get(tag);
+                let keys = this.tagStore.get(tag);
 
-                if (!queryKeys) {
-                    queryKeys = new Set<string>();
-                    this.tagStore.set(tag, queryKeys);
+                if (!keys) {
+                    keys = new Set<string>();
+                    this.tagStore.set(tag, keys);
                 }
 
-                queryKeys.add(key);
+                keys.add(key);
             }
         }
 
@@ -60,11 +60,11 @@ export class MemoryCache implements CacheProvider {
     invalidate(options: CacheInvalidationOptions) {
         if (options.tags) {
             for (const tag of options.tags) {
-                const queryKeys = this.tagStore.get(tag);
+                const keys = this.tagStore.get(tag);
 
-                if (queryKeys) {
-                    for (const queryKey of queryKeys) {
-                        this.queryResultStore.delete(queryKey);
+                if (keys) {
+                    for (const key of keys) {
+                        this.entryStore.delete(key);
                     }
                 }
             }
@@ -74,7 +74,7 @@ export class MemoryCache implements CacheProvider {
     }
 
     invalidateAll() {
-        this.queryResultStore.clear();
+        this.entryStore.clear();
         this.tagStore.clear();
         return Promise.resolve();
     }

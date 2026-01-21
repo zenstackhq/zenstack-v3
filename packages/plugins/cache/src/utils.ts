@@ -6,16 +6,16 @@ export function getTotalTTL(entry: CacheEntry) {
 
 export function entryIsFresh(entry: CacheEntry) {
     return entry.options.ttl
-        ? Date.now() <= (entry.createdAt + (entry.options.ttl ?? 0))
-        : false;
+        ? Date.now() <= (entry.createdAt + ((entry.options.ttl ?? 0) * 1000))
+        : false
 }
 
 export function entryIsStale(entry: CacheEntry) {
     return entry.options.swr
-        ? Date.now() <= entry.createdAt + getTotalTTL(entry)
+        ? Date.now() <= entry.createdAt + (getTotalTTL(entry) * 1000)
         : false;
 }
 
 export function entryIsExpired(entry: CacheEntry) {
-    return Date.now() > getTotalTTL(entry);
+    return Date.now() > entry.createdAt + (getTotalTTL(entry) * 1000);
 }

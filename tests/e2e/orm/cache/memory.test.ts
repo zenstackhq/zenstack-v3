@@ -219,7 +219,7 @@ describe('Cache plugin (memory)', () => {
             },
         })).resolves.toHaveLength(1);
 
-        vi.advanceTimersByTime(60000);
+        vi.advanceTimersByTime(61000);
 
         await expect(extDb.user.findFirst({
             where: {
@@ -335,12 +335,77 @@ describe('Cache plugin (memory)', () => {
             name: null,
         });
 
+        expect(extDb.$cache.status).toBe('stale');
+        await extDb.$cache.revalidation;
+
         await expect(extDb.user.findFirst({
             where: {
                 id: user.id,
             },
 
             cache: {
+                swr: 60,
+            },
+        })).resolves.toMatchObject({
+            name: 'newname',
+        });
+    });
+
+    it('respects ttl and swr simultaneously', async () => {
+        const extDb = db.$use(defineCachePlugin({
+            provider: new MemoryCache(),
+        }));
+
+        const user = await extDb.user.create({
+            data: {
+                email: 'test@email.com',
+            },
+        });
+
+        await extDb.user.findFirst({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                ttl: 60,
+                swr: 60,
+            },
+        });
+
+        await extDb.user.update({
+            data: {
+                name: 'newname',
+            },
+
+            where: {
+                id: user.id,
+            },
+        });
+
+        await expect(extDb.user.findFirst({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                ttl: 60,
+                swr: 60,
+            },
+        })).resolves.toMatchObject({
+            name: null,
+        });
+
+        expect(extDb.$cache.status).toBe('hit');
+        vi.advanceTimersByTime(65000);
+
+        await expect(extDb.user.findFirst({
+            where: {
+                id: user.id,
+            },
+
+            cache: {
+                ttl: 60,
                 swr: 60,
             },
         })).resolves.toMatchObject({
@@ -356,6 +421,7 @@ describe('Cache plugin (memory)', () => {
             },
 
             cache: {
+                ttl: 60,
                 swr: 60,
             },
         })).resolves.toMatchObject({
@@ -800,5 +866,30 @@ describe('Cache plugin (memory)', () => {
         })).resolves.toMatchObject({
             title: 'title',
         });
+    });
+
+    it('handles edge cases', async () => {
+        const extDb = db.$use(defineCachePlugin({
+            provider: new MemoryCache(),
+        }));
+
+        await expect(extDb.user.findMany({
+            cache: {
+                ttl: 0,
+            },
+        })).rejects.toThrow('Invalid findMany');
+
+        await expect(extDb.user.findMany({
+            cache: {
+                swr: 0,
+            },
+        })).rejects.toThrow('Invalid findMany');
+
+        await expect(extDb.user.findMany({
+            cache: {
+                ttl: 0,
+                swr: 0,
+            },
+        })).rejects.toThrow('Invalid findMany');
     });
 });

@@ -23,6 +23,9 @@ describe('Cache plugin (memory)', () => {
             provider: new MemoryCacheProvider(),
         }));
 
+        expect(extDb.$cache.status).toBe(null);
+        expect(extDb.$cache.revalidation).toBe(null);
+
         const user = await extDb.user.create({
             data: {
                 email: 'test@email.com',
@@ -111,6 +114,8 @@ describe('Cache plugin (memory)', () => {
             }),
         ]);
 
+        expect(extDb.$cache.status).toBe('miss');
+
         await Promise.all([
             extDb.user.delete({
                 where: {
@@ -142,6 +147,8 @@ describe('Cache plugin (memory)', () => {
         })).resolves.toMatchObject({
             email: 'test@email.com',
         });
+
+        expect(extDb.$cache.status).toBe('hit');
 
         await expect(extDb.user.findUnique({
             where: {
@@ -336,7 +343,11 @@ describe('Cache plugin (memory)', () => {
         });
 
         expect(extDb.$cache.status).toBe('stale');
-        await extDb.$cache.revalidation;
+        const revalidatedUser = await extDb.$cache.revalidation;
+
+        expect(revalidatedUser).toMatchObject({
+            name: 'newname',
+        });
 
         await expect(extDb.user.findFirst({
             where: {
@@ -413,6 +424,7 @@ describe('Cache plugin (memory)', () => {
         });
 
         expect(extDb.$cache.status).toBe('stale');
+        expect(extDb.$cache.revalidation).not.toBe(null);
         await extDb.$cache.revalidation;
 
         await expect(extDb.user.findFirst({

@@ -18,6 +18,7 @@ export class MemoryCacheProvider implements CacheProvider {
         for (const [key, entry] of this.entryStore) {
             if (entryIsExpired(entry)) {
                 this.entryStore.delete(key);
+                this.options?.onIntervalExpiration?.(entry);
             }
         }
 
@@ -87,4 +88,9 @@ export type MemoryCacheOptions = {
      * @default 60
      */
     checkInterval?: number;
+
+    /**
+     * Called when an entry has expired via the interval check.
+     */
+    onIntervalExpiration?: (entry: CacheEntry) => void,
 };

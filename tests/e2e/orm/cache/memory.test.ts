@@ -868,6 +868,37 @@ describe('Cache plugin (memory)', () => {
         });
     });
 
+    it('supports custom options', async () => {
+        const onIntervalExpiration = vi.fn(() => {});
+        const extDb = db.$use(defineCachePlugin({
+            provider: new MemoryCacheProvider({
+                checkInterval: 10,
+                onIntervalExpiration,
+            }),
+        }));
+
+        await extDb.user.exists({
+            cache: {
+                ttl: 5,
+            },
+        });
+
+        vi.advanceTimersByTime(5100);
+        expect(onIntervalExpiration).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(10000);
+        expect(onIntervalExpiration).toHaveBeenCalledOnce();
+        
+        // @ts-expect-error
+        const arg = onIntervalExpiration.mock.lastCall[0];
+
+        expect(arg).toMatchObject({
+            result: false,
+            options: {
+                ttl: 5,
+            },
+        })
+    });
+
     it('handles edge cases', async () => {
         const extDb = db.$use(defineCachePlugin({
             provider: new MemoryCacheProvider(),

@@ -243,17 +243,32 @@ describe('With Policy:nested to-one', () => {
             }),
         ).toBeRejectedByPolicy();
 
-        await expect(
-            db.m1.update({
-                where: { id: '1' },
-                data: {
-                    m2: {
-                        update: { id: '2', value: 3 },
+        if (db.$schema.provider.type !== 'mysql') {
+            await expect(
+                db.m1.update({
+                    where: { id: '1' },
+                    data: {
+                        m2: {
+                            update: { id: '2', value: 3 },
+                        },
                     },
-                },
-                include: { m2: true },
-            }),
-        ).resolves.toMatchObject({ m2: expect.objectContaining({ id: '2', value: 3 }) });
+                    include: { m2: true },
+                }),
+            ).resolves.toMatchObject({ m2: expect.objectContaining({ id: '2', value: 3 }) });
+        } else {
+            // mysql does not support post-update with id updates
+            await expect(
+                db.m1.update({
+                    where: { id: '1' },
+                    data: {
+                        m2: {
+                            update: { id: '2', value: 3 },
+                        },
+                    },
+                    include: { m2: true },
+                }),
+            ).toBeRejectedByPolicy();
+        }
     });
 
     it('nested create', async () => {

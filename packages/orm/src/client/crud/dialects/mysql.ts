@@ -1,8 +1,9 @@
 import { enumerate, invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
+import type { TableExpression } from 'kysely';
 import {
+    expressionBuilder,
     sql,
-    type AliasableExpression,
     type Expression,
     type ExpressionBuilder,
     type ExpressionWrapper,
@@ -180,8 +181,9 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
 
     private transformOutputDate(value: unknown) {
         if (typeof value === 'string') {
-            // MySQL DateTime columns are returned as strings (non-ISO but parsable as JS Date)
-            return new Date(value);
+            // MySQL DateTime columns are returned as strings (non-ISO but parsable as JS Date),
+            // convert to ISO Date by appending 'Z' if not present
+            return new Date(!value.endsWith('Z') ? value + 'Z' : value);
         } else if (value instanceof Date) {
             return value;
         } else {
@@ -509,7 +511,9 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
     }
 
     override castText<T extends Expression<any>>(expression: T): T {
-        return this.eb.cast(expression, sql.raw('char')) as unknown as T;
+        // Use utf8mb4 character set collation to match MySQL 8.0+ default and avoid
+        // collation conflicts when comparing with VALUES ROW columns
+        return sql`CAST(${expression} AS CHAR CHARACTER SET utf8mb4)` as unknown as T;
     }
 
     override trimTextQuotes<T extends Expression<string>>(expression: T): T {
@@ -765,6 +769,35 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
         });
 
         return result;
+    }
+
+    override buildValuesTableSelect(fields: FieldDef[], rows: unknown[][]) {
+        const cols = rows[0]?.length ?? 0;
+
+        if (fields.length !== cols) {
+            throw createInvalidInputError('Number of fields must match number of columns in each row');
+        }
+
+        // check all rows have the same length
+        for (const row of rows) {
+            if (row.length !== cols) {
+                throw createInvalidInputError('All rows must have the same number of columns');
+            }
+        }
+
+        // build final alias name as `$values(f1, f2, ...)`
+        const aliasWithColumns = `$values(${fields.map((f) => f.name).join(', ')})`;
+
+        const eb = expressionBuilder<any, any>();
+
+        return eb
+            .selectFrom(
+                sql`(VALUES ${sql.join(
+                    rows.map((row) => sql`ROW(${sql.join(row.map((v) => sql.val(v)))})`),
+                    sql.raw(', '),
+                )}) as ${sql.raw(aliasWithColumns)}` as unknown as TableExpression<any, any>,
+            )
+            .selectAll();
     }
 
     // #endregion

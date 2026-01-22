@@ -514,16 +514,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             const idValues: Record<string, any> = {};
 
             for (const idField of idFields) {
+                if (insertResult.insertId !== undefined && insertResult.insertId !== null) {
+                    const fieldDef = this.requireField(model, idField);
+                    if (this.isAutoIncrementField(fieldDef)) {
+                        // auto-generated id value
+                        idValues[idField] = insertResult.insertId;
+                        continue;
+                    }
+                }
+
                 if (updatedData[idField] !== undefined) {
                     // ID was provided in the insert
                     idValues[idField] = updatedData[idField];
                 } else {
-                    // ID was auto-generated, use insertId
-                    if (insertResult.insertId !== undefined && insertResult.insertId !== null) {
-                        idValues[idField] = insertResult.insertId;
-                    } else {
-                        throw createInternalError(`Failed to retrieve auto-generated ID for model ${model}`);
-                    }
+                    throw createInternalError(
+                        `Cannot determine ID field "${idField}" value for created model "${model}"`,
+                    );
                 }
             }
 
@@ -560,6 +566,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         return createdEntity;
+    }
+
+    private isAutoIncrementField(fieldDef: FieldDef) {
+        return (
+            fieldDef.default &&
+            ExpressionUtils.isCall(fieldDef.default) &&
+            fieldDef.default.function === 'autoincrement'
+        );
     }
 
     private async processBaseModelCreate(kysely: ToKysely<Schema>, model: string, createFields: any, forModel: string) {
@@ -1006,9 +1020,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
         } else {
             // fall back to multiple creates if RETURNING is not supported
-            baseEntities = await Promise.all(
-                thisCreateRows.map((row) => this.create(kysely, model as GetModels<Schema>, row, undefined, true)),
-            );
+            baseEntities = [];
+            for (const row of thisCreateRows) {
+                baseEntities.push(await this.create(kysely, model, row, undefined, true));
+            }
         }
 
         // copy over id fields from base model
@@ -1274,40 +1289,44 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         }),
                     );
 
-                await this.executeQuery(kysely, updateQuery, 'update');
-
-                // collect id field/values from the original filter
-                const idFields = requireIdFields(this.schema, model);
-                const filterIdValues: any = {};
-                for (const key of idFields) {
-                    if (combinedWhere[key] !== undefined && typeof combinedWhere[key] !== 'object') {
-                        filterIdValues[key] = combinedWhere[key];
-                    }
-                }
-
-                // check if we are updating any id fields
-                const updatingIdFields = idFields.some((idField) => idField in updateFields);
-
-                if (Object.keys(filterIdValues).length === idFields.length && !updatingIdFields) {
-                    // if we have all id fields in the original filter and ids are not being updated,
-                    // we can simply return the id values as the update result
-                    updatedEntity = filterIdValues;
+                const updateResult = await this.executeQuery(kysely, updateQuery, 'update');
+                if (!updateResult.numAffectedRows) {
+                    // no rows updated
+                    updatedEntity = null;
                 } else {
-                    // otherwise we need to re-query the updated entity
-
-                    // replace id fields in the filter with updated values if they are being updated
-                    const readFilter: any = { ...combinedWhere };
-                    for (const idField of idFields) {
-                        if (idField in updateFields && updateFields[idField] !== undefined) {
-                            // if id fields are being updated, use the new values
-                            readFilter[idField] = updateFields[idField];
+                    // collect id field/values from the original filter
+                    const idFields = requireIdFields(this.schema, model);
+                    const filterIdValues: any = {};
+                    for (const key of idFields) {
+                        if (combinedWhere[key] !== undefined && typeof combinedWhere[key] !== 'object') {
+                            filterIdValues[key] = combinedWhere[key];
                         }
                     }
-                    const selectQuery = kysely
-                        .selectFrom(model)
-                        .select(fieldsToReturn as any)
-                        .where(() => this.dialect.buildFilter(model, model, readFilter));
-                    updatedEntity = await this.executeQueryTakeFirst(kysely, selectQuery, 'update');
+
+                    // check if we are updating any id fields
+                    const updatingIdFields = idFields.some((idField) => idField in updateFields);
+
+                    if (Object.keys(filterIdValues).length === idFields.length && !updatingIdFields) {
+                        // if we have all id fields in the original filter and ids are not being updated,
+                        // we can simply return the id values as the update result
+                        updatedEntity = filterIdValues;
+                    } else {
+                        // otherwise we need to re-query the updated entity
+
+                        // replace id fields in the filter with updated values if they are being updated
+                        const readFilter: any = { ...combinedWhere };
+                        for (const idField of idFields) {
+                            if (idField in updateFields && updateFields[idField] !== undefined) {
+                                // if id fields are being updated, use the new values
+                                readFilter[idField] = updateFields[idField];
+                            }
+                        }
+                        const selectQuery = kysely
+                            .selectFrom(model)
+                            .select(fieldsToReturn as any)
+                            .where(() => this.dialect.buildFilter(model, model, readFilter));
+                        updatedEntity = await this.executeQueryTakeFirst(kysely, selectQuery, 'update');
+                    }
                 }
             }
 

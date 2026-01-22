@@ -1416,8 +1416,8 @@ describe('REST server tests', () => {
                             email: `user1@abc.com`,
                             posts: {
                                 create: [...Array(10).keys()].map((i) => ({
-                                    id: i,
-                                    title: `Post${i}`,
+                                    id: i + 1,
+                                    title: `Post${i + 1}`,
                                 })),
                             },
                         },
@@ -1478,8 +1478,8 @@ describe('REST server tests', () => {
                             email: `user1@abc.com`,
                             posts: {
                                 create: [...Array(10).keys()].map((i) => ({
-                                    id: i,
-                                    title: `Post${i}`,
+                                    id: i + 1,
+                                    title: `Post${i + 1}`,
                                 })),
                             },
                         },
@@ -3352,7 +3352,8 @@ mutation procedure sum(a: Int, b: Int): Int
                         const b = args?.b as number | undefined;
                         return (a ?? 0) + (b ?? 0);
                     },
-                    sumIds: async ({ args }: ProcCtx<SumIdsArgs>) => (args.ids as number[]).reduce((acc, x) => acc + x, 0),
+                    sumIds: async ({ args }: ProcCtx<SumIdsArgs>) =>
+                        (args.ids as number[]).reduce((acc, x) => acc + x, 0),
                     echoRole: async ({ args }: ProcCtx<EchoRoleArgs>) => args.r,
                     echoOverview: async ({ args }: ProcCtx<EchoOverviewArgs>) => args.o,
                     sum: async ({ args }: ProcCtx<SumArgs>) => args.a + args.b,
@@ -3373,7 +3374,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoDecimal',
-                query: { ...json as object, meta: { serialization: meta } } as any,
+                query: { ...(json as object), meta: { serialization: meta } } as any,
                 client,
             });
 
@@ -3486,7 +3487,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
-                requestBody: { ...json as object, meta: { serialization: meta } } as any,
+                requestBody: { ...(json as object), meta: { serialization: meta } } as any,
                 client,
             });
 

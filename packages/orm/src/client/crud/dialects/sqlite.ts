@@ -1,9 +1,9 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import {
+    expressionBuilder,
     ExpressionWrapper,
     sql,
-    type AliasableExpression,
     type Expression,
     type ExpressionBuilder,
     type RawBuilder,
@@ -15,7 +15,7 @@ import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types'
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
-import { createInternalError, createNotSupportedError } from '../../errors';
+import { createInternalError, createInvalidInputError, createNotSupportedError } from '../../errors';
 import {
     getDelegateDescendantModels,
     getManyToManyRelation,
@@ -498,5 +498,34 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return { supportsILike: false, likeCaseSensitive: false };
     }
 
+    override buildValuesTableSelect(fields: FieldDef[], rows: unknown[][]) {
+        if (rows.length === 0) {
+            throw createInvalidInputError('At least one row is required to build values table');
+        }
+
+        // check all rows have the same length
+        const rowLength = rows[0]!.length;
+
+        if (fields.length !== rowLength) {
+            throw createInvalidInputError('Number of fields must match number of columns in each row');
+        }
+
+        for (const row of rows) {
+            if (row.length !== rowLength) {
+                throw createInvalidInputError('All rows must have the same number of columns');
+            }
+        }
+
+        const eb = expressionBuilder<any, any>();
+
+        return eb
+            .selectFrom(
+                sql`VALUES ${sql.join(
+                    rows.map((row) => sql`ROW(${sql.join(row.map((v) => sql.val(v)))})`),
+                    sql.raw(', '),
+                )}`.as('$values'),
+            )
+            .select(fields.map((f, i) => eb.ref(`$values.column${i + 1}`).as(f.name)));
+    }
     // #endregion
 }

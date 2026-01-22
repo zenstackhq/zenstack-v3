@@ -41,6 +41,7 @@ export const TEST_MYSQL_CONFIG = {
     port: process.env['TEST_MYSQL_PORT'] ? parseInt(process.env['TEST_MYSQL_PORT']) : 3306,
     user: process.env['TEST_MYSQL_USER'] ?? 'root',
     password: process.env['TEST_MYSQL_PASSWORD'] ?? 'mysql',
+    timezone: 'Z',
 };
 
 export const TEST_MYSQL_URL = `mysql://${TEST_MYSQL_CONFIG.user}:${TEST_MYSQL_CONFIG.password}@${TEST_MYSQL_CONFIG.host}:${TEST_MYSQL_CONFIG.port}`;
@@ -172,7 +173,7 @@ export async function createTestClient(
     if (options?.debug) {
         console.log(`Work directory: ${workDir}`);
         console.log(`Database name: ${dbName}`);
-        _options.log = testLogger;
+        _options.log ??= testLogger;
     }
 
     // copy db file to workDir if specified

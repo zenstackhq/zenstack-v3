@@ -1467,6 +1467,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     abstract getStringCasingBehavior(): { supportsILike: boolean; likeCaseSensitive: boolean };
 
     /**
+     * Builds a VALUES table and select all fields from it.
+     */
+    abstract buildValuesTableSelect(fields: FieldDef[], rows: unknown[][]): SelectQueryBuilder<any, any, any>;
+
+    /**
      * Builds a JSON path selection expression.
      */
     protected abstract buildJsonPathSelection(receiver: Expression<any>, path: string | undefined): Expression<any>;

@@ -82,7 +82,7 @@ describe('Zmodel type coverage tests', () => {
     });
 
     it('supports all types - array', async () => {
-        if (getTestDbProvider() === 'sqlite') {
+        if (getTestDbProvider() !== 'postgresql') {
             return;
         }
 

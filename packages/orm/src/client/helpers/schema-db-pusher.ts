@@ -123,7 +123,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             // create fk constraint
             const baseModelDef = requireModel(this.schema, modelDef.baseModel);
             table = table.addForeignKeyConstraint(
-                `fk_${modelDef.baseModel}_delegate`,
+                `fk_${modelDef.baseModel}_${modelDef.name}_delegate`,
                 baseModelDef.idFields as string[],
                 modelDef.baseModel,
                 baseModelDef.idFields as string[],

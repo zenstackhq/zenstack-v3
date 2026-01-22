@@ -25,6 +25,12 @@ describe('createManyAndReturn tests', () => {
         }
         `,
         );
+
+        if (db.$schema.provider.type === 'mysql') {
+            // MySQL does not support createManyAndReturn
+            return;
+        }
+
         const rawDb = db.$unuseAll();
 
         await rawDb.user.createMany({
@@ -60,8 +66,7 @@ describe('createManyAndReturn tests', () => {
         await expect(rawDb.post.findMany()).resolves.toHaveLength(3);
     });
 
-    // TODO: field-level policies support
-    it.skip('field-level policies', async () => {
+    it('field-level policies', async () => {
         const db = await createPolicyTestClient(
             `
         model Post {
@@ -73,6 +78,12 @@ describe('createManyAndReturn tests', () => {
         }
         `,
         );
+
+        if (db.$schema.provider.type === 'mysql') {
+            // MySQL does not support createManyAndReturn
+            return;
+        }
+
         const rawDb = db.$unuseAll();
         // create should succeed but one result's title field can't be read back
         const r = await db.post.createManyAndReturn({

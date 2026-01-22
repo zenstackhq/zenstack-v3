@@ -40,24 +40,48 @@ describe('Regression for issue #1576', () => {
             },
         });
 
-        await expect(
-            db.goldItem.createManyAndReturn({
-                data: [
-                    {
-                        profileId: profile.id,
-                        inventory: true,
-                    },
-                    {
-                        profileId: profile.id,
-                        inventory: true,
-                    },
-                ],
-            }),
-        ).resolves.toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({ profileId: profile.id, type: 'GoldItem', inventory: true }),
-                expect.objectContaining({ profileId: profile.id, type: 'GoldItem', inventory: true }),
-            ]),
-        );
+        if (db.$schema.provider.type !== 'mysql') {
+            await expect(
+                db.goldItem.createManyAndReturn({
+                    data: [
+                        {
+                            profileId: profile.id,
+                            inventory: true,
+                        },
+                        {
+                            profileId: profile.id,
+                            inventory: true,
+                        },
+                    ],
+                }),
+            ).resolves.toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ profileId: profile.id, type: 'GoldItem', inventory: true }),
+                    expect.objectContaining({ profileId: profile.id, type: 'GoldItem', inventory: true }),
+                ]),
+            );
+        } else {
+            // mysql doesn't support createManyAndReturn
+            await expect(
+                db.goldItem.createMany({
+                    data: [
+                        {
+                            profileId: profile.id,
+                            inventory: true,
+                        },
+                        {
+                            profileId: profile.id,
+                            inventory: true,
+                        },
+                    ],
+                }),
+            ).toResolveTruthy();
+            await expect(db.goldItem.findMany()).resolves.toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ profileId: profile.id, type: 'GoldItem', inventory: true }),
+                    expect.objectContaining({ profileId: profile.id, type: 'GoldItem', inventory: true }),
+                ]),
+            );
+        }
     });
 });

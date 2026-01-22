@@ -325,15 +325,18 @@ model Post {
         await expect(userDb.post.count({ where: { authorName: 'user1', score: 10 } })).resolves.toBe(1);
 
         await expect(userDb.post.createMany({ data: [{ title: 'def' }] })).resolves.toMatchObject({ count: 1 });
-        const r = await userDb.post.createManyAndReturn({
-            data: [{ title: 'xxx' }, { title: 'yyy' }],
-        });
-        expect(r).toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({ title: 'xxx', score: 10 }),
-                expect.objectContaining({ title: 'yyy', score: 10 }),
-            ]),
-        );
+
+        if (userDb.$schema.provider.type !== 'mysql') {
+            const r = await userDb.post.createManyAndReturn({
+                data: [{ title: 'xxx' }, { title: 'yyy' }],
+            });
+            expect(r).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ title: 'xxx', score: 10 }),
+                    expect.objectContaining({ title: 'yyy', score: 10 }),
+                ]),
+            );
+        }
     });
 
     it('respects explicitly passed field values even when default is set', async () => {
@@ -363,10 +366,12 @@ model Post {
         await expect(userDb.post.createMany({ data: [{ authorName: overrideName }] })).toResolveTruthy();
         await expect(userDb.post.count({ where: { authorName: overrideName } })).resolves.toBe(2);
 
-        const r = await userDb.post.createManyAndReturn({
-            data: [{ authorName: overrideName }],
-        });
-        expect(r[0]).toMatchObject({ authorName: overrideName });
+        if (userDb.$schema.provider.type !== 'mysql') {
+            const r = await userDb.post.createManyAndReturn({
+                data: [{ authorName: overrideName }],
+            });
+            expect(r[0]).toMatchObject({ authorName: overrideName });
+        }
     });
 
     it('works with using auth value as default for foreign key', async () => {
@@ -439,11 +444,13 @@ model Post {
         const r = await db.post.findFirst({ where: { title: 'post5' } });
         expect(r).toMatchObject({ authorId: 'userId-1' });
 
-        // default auth effective for createManyAndReturn
-        const r1 = await db.post.createManyAndReturn({
-            data: { title: 'post6' },
-        });
-        expect(r1[0]).toMatchObject({ authorId: 'userId-1' });
+        if (db.$schema.provider.type !== 'mysql') {
+            // default auth effective for createManyAndReturn
+            const r1 = await db.post.createManyAndReturn({
+                data: { title: 'post6' },
+            });
+            expect(r1[0]).toMatchObject({ authorId: 'userId-1' });
+        }
     });
 
     it('works with using nested auth value as default', async () => {
@@ -537,7 +544,7 @@ model Post {
 
         await expect(db.user.create({ data: { id: 'userId-1' } })).toResolveTruthy();
         await expect(db.post.create({ data: { title: 'title' } })).rejects.toSatisfy((e) =>
-            e.cause.message.toLowerCase().includes('constraint'),
+            e.cause.message.toLowerCase().match(/(constraint)|(cannot be null)/),
         );
         await expect(db.post.findMany({})).toResolveTruthy();
     });
@@ -591,10 +598,13 @@ model Post {
         });
 
         await db.stats.create({ data: { id: 'stats-3', viewCount: 10 } });
-        const r = await db.post.createManyAndReturn({
-            data: [{ title: 'title3', statsId: 'stats-3' }],
-        });
-        expect(r[0]).toMatchObject({ statsId: 'stats-3' });
+
+        if (db.$schema.provider.type !== 'mysql') {
+            const r = await db.post.createManyAndReturn({
+                data: [{ title: 'title3', statsId: 'stats-3' }],
+            });
+            expect(r[0]).toMatchObject({ statsId: 'stats-3' });
+        }
 
         // checked context
         await db.stats.create({ data: { id: 'stats-4', viewCount: 10 } });

@@ -101,6 +101,7 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
                 args.limit,
                 true,
                 undefined,
+                undefined,
                 selectedFields,
             );
 

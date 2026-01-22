@@ -34,3 +34,8 @@ export enum ExpressionContext {
     ValidationRule = 'ValidationRule',
     Index = 'Index',
 }
+
+/**
+ * Database providers that support list field types.
+ */
+export const DB_PROVIDERS_SUPPORTING_LIST_TYPE = ['postgresql'];

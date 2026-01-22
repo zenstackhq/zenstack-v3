@@ -53,8 +53,11 @@ const textMatch = (
         op = 'like';
     }
 
+    // coalesce to empty string to consistently handle nulls across databases
+    searchExpr = eb.fn.coalesce(searchExpr, sql.lit(''));
+
     // escape special characters in search string
-    const escapedSearch = sql`REPLACE(REPLACE(REPLACE(CAST(${searchExpr} as text), '\\', '\\\\'), '%', '\\%'), '_', '\\_')`;
+    const escapedSearch = sql`REPLACE(REPLACE(REPLACE(${dialect.castText(searchExpr)}, ${sql.val('\\')}, ${sql.val('\\\\')}), ${sql.val('%')}, ${sql.val('\\%')}), ${sql.val('_')}, ${sql.val('\\_')})`;
 
     searchExpr = match(method)
         .with('contains', () => eb.fn('CONCAT', [sql.lit('%'), escapedSearch, sql.lit('%')]))
@@ -62,7 +65,7 @@ const textMatch = (
         .with('endsWith', () => eb.fn('CONCAT', [sql.lit('%'), escapedSearch]))
         .exhaustive();
 
-    return sql<SqlBool>`${fieldExpr} ${sql.raw(op)} ${searchExpr} escape '\\'`;
+    return sql<SqlBool>`${fieldExpr} ${sql.raw(op)} ${searchExpr} escape ${sql.val('\\')}`;
 };
 
 export const has: ZModelFunction<any> = (eb, args) => {

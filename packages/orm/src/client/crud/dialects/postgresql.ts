@@ -1,8 +1,8 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import {
+    expressionBuilder,
     sql,
-    type AliasableExpression,
     type Expression,
     type ExpressionBuilder,
     type ExpressionWrapper,
@@ -17,7 +17,7 @@ import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types'
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
-import { createInternalError } from '../../errors';
+import { createInternalError, createInvalidInputError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import {
     buildJoinPairs,
@@ -646,6 +646,40 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
     override getStringCasingBehavior() {
         // Postgres `LIKE` is case-sensitive, `ILIKE` is case-insensitive
         return { supportsILike: true, likeCaseSensitive: true };
+    }
+
+    override buildValuesTableSelect(fields: FieldDef[], rows: unknown[][]) {
+        if (rows.length === 0) {
+            throw createInvalidInputError('At least one row is required to build values table');
+        }
+
+        // check all rows have the same length
+        const rowLength = rows[0]!.length;
+
+        if (fields.length !== rowLength) {
+            throw createInvalidInputError('Number of fields must match number of columns in each row');
+        }
+
+        for (const row of rows) {
+            if (row.length !== rowLength) {
+                throw createInvalidInputError('All rows must have the same number of columns');
+            }
+        }
+
+        const eb = expressionBuilder<any, any>();
+
+        return eb
+            .selectFrom(
+                sql`(VALUES ${sql.join(
+                    rows.map((row) => sql`(${sql.join(row.map((v) => sql.val(v)))})`),
+                    sql.raw(', '),
+                )})`.as('$values'),
+            )
+            .select(
+                fields.map((f, i) =>
+                    sql`CAST(${sql.ref(`$values.column${i + 1}`)} AS ${sql.raw(this.getFieldSqlType(f))})`.as(f.name),
+                ),
+            );
     }
 
     // #endregion

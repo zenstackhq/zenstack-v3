@@ -121,7 +121,7 @@ describe('Policy updateManyAndReturn tests', () => {
 
         expect(r.length).toBe(2);
         expect(r[0].title).toBeTruthy();
-        expect(r[1].title).toBeUndefined();
+        expect(r[1].title).toBeNull();
 
         // check posts are updated
         await expect(rawDb.post.findMany({ where: { title: 'foo' } })).resolves.toHaveLength(2);

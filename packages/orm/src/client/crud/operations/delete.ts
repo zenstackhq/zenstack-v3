@@ -37,7 +37,7 @@ export class DeleteOperationHandler<Schema extends SchemaDef> extends BaseOperat
                 throw createNotFoundError(this.model);
             }
 
-            return preDeleteRead ?? deleteResult.rows[0];
+            return needReadBack ? preDeleteRead : deleteResult.rows[0];
         });
 
         if (!result && this.hasPolicyEnabled) {

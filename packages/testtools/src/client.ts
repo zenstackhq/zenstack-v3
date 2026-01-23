@@ -119,7 +119,7 @@ export async function createTestClient(
     const provider = options?.provider ?? getTestDbProvider() ?? 'sqlite';
     const dbName = options?.dbName ?? getTestDbName(provider);
     const dbUrl = match(provider)
-        .with('sqlite', () => (options?.dbFile ? `file:${dbName}` : undefined))
+        .with('sqlite', () => `file:${dbName}`)
         .with('mysql', () => `${TEST_MYSQL_URL}/${dbName}`)
         .with('postgresql', () => `${TEST_PG_URL}/${dbName}`)
         .exhaustive();

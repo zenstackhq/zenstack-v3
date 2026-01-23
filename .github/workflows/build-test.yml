@@ -94,5 +94,9 @@ jobs:
             - name: Lint
               run: pnpm run lint
 
+            - name: Set MySQL max_connections
+              run: |
+                  mysql -h 127.0.0.1 -uroot -pmysql -e "SET GLOBAL max_connections=500;"
+
             - name: Test
               run: TEST_DB_PROVIDER=${{ matrix.provider }} pnpm run test

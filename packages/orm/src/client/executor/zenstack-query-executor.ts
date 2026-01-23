@@ -127,12 +127,12 @@ export class ZenStackQueryExecutor extends DefaultQueryExecutor {
 
     // #region main entry point
 
-    override executeQuery(compiledQuery: CompiledQuery) {
+    override async executeQuery(compiledQuery: CompiledQuery) {
         // proceed with the query with kysely interceptors
         // if the query is a raw query, we need to carry over the parameters
         const queryParams = (compiledQuery as any).$raw ? compiledQuery.parameters : undefined;
 
-        return this.provideConnection(async (connection) => {
+        const result = await this.provideConnection(async (connection) => {
             let startedTx = false;
             try {
                 // mutations are wrapped in tx if not already in one
@@ -169,6 +169,8 @@ export class ZenStackQueryExecutor extends DefaultQueryExecutor {
                 }
             }
         });
+
+        return this.ensureProperQueryResult(compiledQuery.query, result);
     }
 
     private async proceedQueryWithKyselyInterceptors(
@@ -655,7 +657,8 @@ In such cases, ZenStack cannot reliably determine the IDs of the mutated entitie
         }
 
         try {
-            return await connection.executeQuery<any>(compiledQuery);
+            const result = await connection.executeQuery<any>(compiledQuery);
+            return this.ensureProperQueryResult(compiledQuery.query, result);
         } catch (err) {
             throw createDBQueryError(
                 `Failed to execute query: ${err}`,
@@ -664,6 +667,21 @@ In such cases, ZenStack cannot reliably determine the IDs of the mutated entitie
                 compiledQuery.parameters,
             );
         }
+    }
+
+    private ensureProperQueryResult(query: RootOperationNode, result: QueryResult<any>) {
+        let finalResult = result;
+
+        if (this.isMutationNode(query)) {
+            // Kysely dialects don't consistently set numAffectedRows, so we fix it here
+            // to simplify the consumer's code
+            finalResult = {
+                ...result,
+                numAffectedRows: result.numAffectedRows ?? BigInt(result.rows.length),
+            };
+        }
+
+        return finalResult;
     }
 
     // #endregion

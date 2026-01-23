@@ -520,10 +520,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
 
         return eb
             .selectFrom(
-                sql`VALUES ${sql.join(
-                    rows.map((row) => sql`ROW(${sql.join(row.map((v) => sql.val(v)))})`),
+                sql`(VALUES ${sql.join(
+                    rows.map((row) => sql`(${sql.join(row.map((v) => sql.val(v)))})`),
                     sql.raw(', '),
-                )}`.as('$values'),
+                )})`.as('$values'),
             )
             .select(fields.map((f, i) => eb.ref(`$values.column${i + 1}`).as(f.name)));
     }

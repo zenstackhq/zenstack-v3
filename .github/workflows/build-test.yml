@@ -31,10 +31,23 @@ jobs:
                 ports:
                     - 5432:5432
 
+            mysql:
+                image: mysql:8.4
+                env:
+                    MYSQL_ROOT_PASSWORD: mysql
+                ports:
+                    - 3306:3306
+                # Set health checks to wait until mysql has started
+                options: >-
+                    --health-cmd="mysqladmin ping --silent"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=3
+
         strategy:
             matrix:
                 node-version: [22.x]
-                provider: [sqlite, postgresql]
+                provider: [sqlite, postgresql, mysql]
 
         steps:
             - name: Checkout

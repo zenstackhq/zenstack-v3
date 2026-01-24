@@ -235,6 +235,9 @@ export class ZenStackQueryExecutor extends DefaultQueryExecutor {
                 };
             } else {
                 if (UpdateQueryNode.is(query)) {
+                    // if we're updating and the dialect doesn't support RETURNING, need to load
+                    // entity IDs before the update in so we can use them to load the entities
+                    // after the update
                     preUpdateIds = await this.getPreUpdateIds(mutationModel, query, connection);
                 }
             }

@@ -49,6 +49,10 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
         return false;
     }
 
+    override get supportsDefaultAsFieldValue() {
+        return true;
+    }
+
     override get insertIgnoreMethod() {
         return 'ignore' as const;
     }
@@ -282,11 +286,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
                 .select(this.eb.lit(1).as('$t'))
                 .where(buildFilter(this.eb.ref('$items.value'))),
         );
-    }
-
-    override get supportsDefaultAsFieldValue() {
-        // MySQL supports INSERT with DEFAULT VALUES
-        return true;
     }
 
     override getFieldSqlType(fieldDef: FieldDef) {

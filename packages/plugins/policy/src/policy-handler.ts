@@ -1343,44 +1343,21 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
     // strips table references from an OperationNode
     private stripTableReferences(node: OperationNode): OperationNode {
-        if (ReferenceNode.is(node)) {
-            // If it's a reference node, keep only the column, remove the table
-            if (ColumnNode.is(node.column)) {
-                return ColumnNode.create(node.column.column.name);
-            }
-            return node.column;
-        }
+        return new TableReferenceStripper().strip(node);
+    }
+}
 
-        if (BinaryOperationNode.is(node)) {
-            return BinaryOperationNode.create(
-                this.stripTableReferences(node.leftOperand),
-                node.operator,
-                this.stripTableReferences(node.rightOperand),
-            );
-        }
+class TableReferenceStripper extends OperationNodeTransformer {
+    strip(node: OperationNode) {
+        return this.transformNode(node);
+    }
 
-        if (ParensNode.is(node)) {
-            return ParensNode.create(this.stripTableReferences(node.node));
+    protected override transformReference(node: ReferenceNode) {
+        if (ColumnNode.is(node.column)) {
+            // strip the table part
+            return ReferenceNode.create(this.transformNode(node.column));
         }
-
-        // For other node types, recursively process their children if they have any
-        if ('kind' in node && typeof node === 'object') {
-            const result = { ...node };
-            for (const [key, value] of Object.entries(node)) {
-                if (value && typeof value === 'object' && 'kind' in value) {
-                    (result as any)[key] = this.stripTableReferences(value as OperationNode);
-                } else if (Array.isArray(value)) {
-                    (result as any)[key] = value.map((item) =>
-                        item && typeof item === 'object' && 'kind' in item
-                            ? this.stripTableReferences(item as OperationNode)
-                            : item,
-                    );
-                }
-            }
-            return result as OperationNode;
-        }
-
-        return node;
+        return super.transformReference(node);
     }
 
     // #endregion

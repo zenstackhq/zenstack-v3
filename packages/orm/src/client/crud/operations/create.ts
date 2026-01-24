@@ -63,7 +63,7 @@ export class CreateOperationHandler<Schema extends SchemaDef> extends BaseOperat
             return { count: 0 };
         }
 
-        return this.safeTransaction(async (tx) => this.createMany(tx, this.model, args, false));
+        return this.safeTransaction((tx) => this.createMany(tx, this.model, args, false));
     }
 
     private async runCreateManyAndReturn(args?: CreateManyAndReturnArgs<Schema, GetModels<Schema>>) {

@@ -1148,7 +1148,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // fill in automatically updated fields
         const autoUpdatedFields: string[] = [];
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
-            if (fieldDef.updatedAt) {
+            if (fieldDef.updatedAt && finalData[fieldName] === undefined) {
                 if (finalData === data) {
                     finalData = clone(data);
                 }
@@ -2528,11 +2528,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         if (args.include && typeof args.include === 'object' && Object.keys(args.include).length > 0) {
             // includes present, need read back to fetch relations
-            return { needReadBack: true, selectedFields: undefined };
-        }
-
-        if (!this.dialect.supportsReturning) {
-            // if the dialect doesn't support RETURNING, we always need read back
             return { needReadBack: true, selectedFields: undefined };
         }
 

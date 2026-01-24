@@ -23,7 +23,6 @@ import {
     OperatorNode,
     ParensNode,
     PrimitiveValueListNode,
-    RawNode,
     ReferenceNode,
     ReturningNode,
     SelectAllNode,
@@ -945,9 +944,11 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                     const fieldDef = QueryUtils.requireField(this.client.$schema, model, fields[i]!);
                     value = this.dialect.transformInput(item, fieldDef.type as BuiltinType, !!fieldDef.array);
                 }
+
+                // handle the case for list column
                 if (Array.isArray(value)) {
                     result.push({
-                        node: RawNode.createWithSql(this.dialect.buildArrayLiteralSQL(value)),
+                        node: this.dialect.buildArrayLiteralSQL(value).toOperationNode(),
                         raw: value,
                     });
                 } else {

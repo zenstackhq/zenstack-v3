@@ -291,7 +291,7 @@ async function prepareDatabase(provider: string, dbName: string) {
         const mysqlPool = createMysqlPool(TEST_MYSQL_CONFIG);
         await mysqlPool.promise().query(`DROP DATABASE IF EXISTS \`${dbName}\``);
         await mysqlPool.promise().query(`CREATE DATABASE \`${dbName}\``);
-        await mysqlPool.end();
+        await mysqlPool.promise().end();
     }
 }
 

@@ -2,8 +2,8 @@ import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import {
     expressionBuilder,
-    ExpressionWrapper,
     sql,
+    type AliasableExpression,
     type Expression,
     type ExpressionBuilder,
     type RawBuilder,
@@ -46,7 +46,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
     }
 
     override get supportsReturning() {
-        return true; // SQLite 3.35.0+ supports RETURNING
+        return true;
     }
 
     override get supportsDefaultAsFieldValue() {
@@ -443,11 +443,11 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         );
     }
 
-    override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
+    override buildArrayLength(array: Expression<unknown>): AliasableExpression<number> {
         return this.eb.fn('json_array_length', [array]);
     }
 
-    override buildArrayLiteralSQL(_values: unknown[]): string {
+    override buildArrayLiteralSQL(_values: unknown[]): AliasableExpression<unknown> {
         throw new Error('SQLite does not support array literals');
     }
 

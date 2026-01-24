@@ -1,13 +1,11 @@
 import { enumerate, invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
-import type { TableExpression } from 'kysely';
+import type { AliasableExpression, TableExpression } from 'kysely';
 import {
     expressionBuilder,
     sql,
     type Expression,
-    type ExpressionBuilder,
     type ExpressionWrapper,
-    type RawBuilder,
     type SelectQueryBuilder,
     type SqlBool,
 } from 'kysely';
@@ -15,25 +13,14 @@ import { match } from 'ts-pattern';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import type { OrArray } from '../../../utils/type-utils';
-import { AGGREGATE_OPERATORS, DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
-import type { FindArgs, OrderBy, SortOrder } from '../../crud-types';
-import { createInternalError, createInvalidInputError } from '../../errors';
+import { AGGREGATE_OPERATORS } from '../../constants';
+import type { OrderBy, SortOrder } from '../../crud-types';
+import { createInternalError, createInvalidInputError, createNotSupportedError } from '../../errors';
 import type { ClientOptions } from '../../options';
-import {
-    aggregate,
-    buildJoinPairs,
-    getDelegateDescendantModels,
-    getManyToManyRelation,
-    isEnum,
-    isRelationField,
-    isTypeDef,
-    requireField,
-    requireIdFields,
-    requireModel,
-} from '../../query-utils';
-import { BaseCrudDialect } from './base-dialect';
+import { aggregate, buildJoinPairs, isTypeDef, requireField } from '../../query-utils';
+import { LateralJoinDialectBase } from './lateral-join-dialect-base';
 
-export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
+export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDialectBase<Schema> {
     constructor(schema: Schema, options: ClientOptions<Schema>) {
         super(schema, options);
     }
@@ -45,23 +32,18 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
     // #region capabilities
 
     override get supportsUpdateWithLimit(): boolean {
-        // MySQL supports UPDATE with LIMIT
         return true;
     }
 
     override get supportsDeleteWithLimit(): boolean {
-        // MySQL supports DELETE with LIMIT
         return true;
     }
 
     override get supportsDistinctOn(): boolean {
-        // MySQL doesn't support DISTINCT ON
         return false;
     }
 
     override get supportsReturning(): boolean {
-        // MySQL doesn't have reliable RETURNING support until 8.0.21+
-        // and even then it's limited compared to PostgreSQL
         return false;
     }
 
@@ -91,7 +73,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
             invariant(false, 'should not reach here: AnyNull is not a valid input value');
         }
 
-        // MySQL doesn't have native array types, arrays are stored as JSON
         if (isTypeDef(this.schema, type)) {
             // type-def fields (regardless array or scalar) are stored as scalar `Json` and
             // their input values need to be stringified if not already (i.e., provided in
@@ -102,23 +83,22 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
                 return value;
             }
         } else if (Array.isArray(value)) {
-            // MySQL stores arrays as JSON, so stringify them
             if (type === 'Json' && !forArrayField) {
-                // scalar `Json` fields need their input stringified
+                // array stored as JSON, stringify it
                 return JSON.stringify(value);
+            } else {
+                throw createNotSupportedError(`MySQL does not support array literals`);
             }
-            // TODO: check me, `Json[]` fields stored as JSON arrays
-            return JSON.stringify(value.map((v) => this.transformInput(v, type, false)));
         } else {
             return match(type)
                 .with('Boolean', () => (value ? 1 : 0)) // MySQL uses 1/0 for boolean like SQLite
                 .with('DateTime', () => {
                     // MySQL DATETIME format: 'YYYY-MM-DD HH:MM:SS.mmm'
                     if (value instanceof Date) {
-                        // return value.toISOString().replace('T', ' ').replace('Z', '');
+                        // force UTC
                         return value.toISOString().replace('Z', '+00:00');
                     } else if (typeof value === 'string') {
-                        // return new Date(value).toISOString().replace('T', ' ').replace('Z', '');
+                        // parse and force UTC
                         return new Date(value).toISOString().replace('Z', '+00:00');
                     } else {
                         return value;
@@ -145,15 +125,10 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
             .with('Bytes', () => this.transformOutputBytes(value))
             .with('BigInt', () => this.transformOutputBigInt(value))
             .with('Decimal', () => this.transformDecimal(value))
-            .when(
-                (type) => isEnum(this.schema, type),
-                () => this.transformOutputEnum(value, array),
-            )
             .otherwise(() => super.transformOutput(value, type, array));
     }
 
     private transformOutputBoolean(value: unknown) {
-        // MySQL returns boolean as 1/0
         return !!value;
     }
 
@@ -195,289 +170,12 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
         return Buffer.isBuffer(value) ? Uint8Array.from(value) : value;
     }
 
-    private transformOutputEnum(value: unknown, array: boolean) {
-        if (array && typeof value === 'string') {
-            try {
-                // MySQL returns enum arrays as JSON strings, parse them back
-                return JSON.parse(value);
-            } catch {
-                // fall through - return as-is if parsing fails
-            }
-        }
-        return value;
-    }
-
     // #endregion
 
     // #region other overrides
 
-    override buildRelationSelection(
-        query: SelectQueryBuilder<any, any, any>,
-        model: string,
-        relationField: string,
-        parentAlias: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-    ): SelectQueryBuilder<any, any, any> {
-        const relationResultName = `${parentAlias}$${relationField}`;
-        const joinedQuery = this.buildRelationJSON(
-            model,
-            query,
-            relationField,
-            parentAlias,
-            payload,
-            relationResultName,
-        );
-        return joinedQuery.select(`${relationResultName}.$data as ${relationField}`);
-    }
-
-    private buildRelationJSON(
-        model: string,
-        qb: SelectQueryBuilder<any, any, any>,
-        relationField: string,
-        parentAlias: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-        resultName: string,
-    ) {
-        const relationFieldDef = requireField(this.schema, model, relationField);
-        const relationModel = relationFieldDef.type as GetModels<Schema>;
-
-        // MySQL 8.0.14+ supports LATERAL joins
-        return qb.leftJoinLateral(
-            (eb) => {
-                const relationSelectName = `${resultName}$sub`;
-                const relationModelDef = requireModel(this.schema, relationModel);
-
-                let tbl: SelectQueryBuilder<any, any, any>;
-
-                if (this.canJoinWithoutNestedSelect(relationModelDef, payload)) {
-                    // build join directly
-                    tbl = this.buildModelSelect(relationModel, relationSelectName, payload, false);
-
-                    // parent join filter
-                    tbl = this.buildRelationJoinFilter(
-                        tbl,
-                        model,
-                        relationField,
-                        relationModel,
-                        relationSelectName,
-                        parentAlias,
-                    );
-                } else {
-                    // join with a nested query
-                    tbl = eb.selectFrom(() => {
-                        let subQuery = this.buildModelSelect(relationModel, `${relationSelectName}$t`, payload, true);
-
-                        // parent join filter
-                        subQuery = this.buildRelationJoinFilter(
-                            subQuery,
-                            model,
-                            relationField,
-                            relationModel,
-                            `${relationSelectName}$t`,
-                            parentAlias,
-                        );
-
-                        if (typeof payload !== 'object' || payload.take === undefined) {
-                            // force adding a limit otherwise the ordering is ignored by mysql
-                            // during JSON_ARRAYAGG
-                            subQuery = subQuery.limit(Number.MAX_SAFE_INTEGER);
-                        }
-
-                        return subQuery.as(relationSelectName);
-                    });
-                }
-
-                // select relation result
-                tbl = this.buildRelationObjectSelect(
-                    relationModel,
-                    relationSelectName,
-                    relationFieldDef,
-                    tbl,
-                    payload,
-                    resultName,
-                );
-
-                // add nested joins for each relation
-                tbl = this.buildRelationJoins(tbl, relationModel, relationSelectName, payload, resultName);
-
-                // alias the join table
-                return tbl.as(resultName);
-            },
-            (join) => join.onTrue(),
-        );
-    }
-
-    private buildRelationJoinFilter(
-        query: SelectQueryBuilder<any, any, {}>,
-        model: string,
-        relationField: string,
-        relationModel: GetModels<Schema>,
-        relationModelAlias: string,
-        parentAlias: string,
-    ) {
-        const m2m = getManyToManyRelation(this.schema, model, relationField);
-        if (m2m) {
-            // many-to-many relation
-            const parentIds = requireIdFields(this.schema, model);
-            const relationIds = requireIdFields(this.schema, relationModel);
-            invariant(parentIds.length === 1, 'many-to-many relation must have exactly one id field');
-            invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
-            query = query.where((eb) =>
-                eb(
-                    eb.ref(`${relationModelAlias}.${relationIds[0]}`),
-                    'in',
-                    eb
-                        .selectFrom(m2m.joinTable)
-                        .select(`${m2m.joinTable}.${m2m.otherFkName}`)
-                        .whereRef(`${parentAlias}.${parentIds[0]}`, '=', `${m2m.joinTable}.${m2m.parentFkName}`),
-                ),
-            );
-        } else {
-            const joinPairs = buildJoinPairs(this.schema, model, parentAlias, relationField, relationModelAlias);
-            query = query.where((eb) =>
-                this.and(...joinPairs.map(([left, right]) => eb(this.eb.ref(left), '=', this.eb.ref(right)))),
-            );
-        }
-        return query;
-    }
-
-    private buildRelationObjectSelect(
-        relationModel: string,
-        relationModelAlias: string,
-        relationFieldDef: FieldDef,
-        qb: SelectQueryBuilder<any, any, any>,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-        parentResultName: string,
-    ) {
-        qb = qb.select((eb) => {
-            const objArgs = this.buildRelationObjectArgs(
-                relationModel,
-                relationModelAlias,
-                eb,
-                payload,
-                parentResultName,
-            );
-
-            if (relationFieldDef.array) {
-                // MySQL uses JSON_ARRAYAGG instead of jsonb_agg
-                return eb.fn
-                    .coalesce(sql`JSON_ARRAYAGG(JSON_OBJECT(${sql.join(objArgs)}))`, sql`JSON_ARRAY()`)
-                    .as('$data');
-            } else {
-                // MySQL uses JSON_OBJECT instead of jsonb_build_object
-                return sql`JSON_OBJECT(${sql.join(objArgs)})`.as('$data');
-            }
-        });
-
-        return qb;
-    }
-
-    private buildRelationObjectArgs(
-        relationModel: string,
-        relationModelAlias: string,
-        eb: ExpressionBuilder<any, any>,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-        parentResultName: string,
-    ) {
-        const relationModelDef = requireModel(this.schema, relationModel);
-        const objArgs: Array<
-            string | ExpressionWrapper<any, any, any> | SelectQueryBuilder<any, any, any> | RawBuilder<any>
-        > = [];
-
-        const descendantModels = getDelegateDescendantModels(this.schema, relationModel);
-        if (descendantModels.length > 0) {
-            // select all JSONs built from delegate descendants
-            objArgs.push(
-                ...descendantModels
-                    .map((subModel) => [
-                        sql.lit(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`),
-                        eb.ref(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`),
-                    ])
-                    .flatMap((v) => v),
-            );
-        }
-
-        if (payload === true || !payload.select) {
-            // select all scalar fields except for omitted
-            const omit = typeof payload === 'object' ? payload.omit : undefined;
-            objArgs.push(
-                ...Object.entries(relationModelDef.fields)
-                    .filter(([, value]) => !value.relation)
-                    .filter(([name]) => !this.shouldOmitField(omit, relationModel, name))
-                    .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, relationModelAlias, false)])
-                    .flatMap((v) => v),
-            );
-        } else if (payload.select) {
-            // select specific fields
-            objArgs.push(
-                ...Object.entries<any>(payload.select)
-                    .filter(([, value]) => value)
-                    .map(([field, value]) => {
-                        if (field === '_count') {
-                            const subJson = this.buildCountJson(
-                                relationModel as GetModels<Schema>,
-                                eb,
-                                relationModelAlias,
-                                value,
-                            );
-                            return [sql.lit(field), subJson];
-                        } else {
-                            const fieldDef = requireField(this.schema, relationModel, field);
-                            const fieldValue = fieldDef.relation
-                                ? // reference the synthesized JSON field
-                                  eb.ref(`${parentResultName}$${field}.$data`)
-                                : // reference a plain field
-                                  this.fieldRef(relationModel, field, relationModelAlias, false);
-                            return [sql.lit(field), fieldValue];
-                        }
-                    })
-                    .flatMap((v) => v),
-            );
-        }
-
-        if (typeof payload === 'object' && payload.include && typeof payload.include === 'object') {
-            // include relation fields
-            objArgs.push(
-                ...Object.entries<any>(payload.include)
-                    .filter(([, value]) => value)
-                    .map(([field]) => [
-                        sql.lit(field),
-                        // reference the synthesized JSON field
-                        eb.ref(`${parentResultName}$${field}.$data`),
-                    ])
-                    .flatMap((v) => v),
-            );
-        }
-        return objArgs;
-    }
-
-    private buildRelationJoins(
-        query: SelectQueryBuilder<any, any, any>,
-        relationModel: string,
-        relationModelAlias: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-        parentResultName: string,
-    ) {
-        let result = query;
-        if (typeof payload === 'object') {
-            const selectInclude = payload.include ?? payload.select;
-            if (selectInclude && typeof selectInclude === 'object') {
-                Object.entries<any>(selectInclude)
-                    .filter(([, value]) => value)
-                    .filter(([field]) => isRelationField(this.schema, relationModel, field))
-                    .forEach(([field, value]) => {
-                        result = this.buildRelationJSON(
-                            relationModel,
-                            result,
-                            field,
-                            relationModelAlias,
-                            value,
-                            `${parentResultName}$${field}`,
-                        );
-                    });
-            }
-        }
-        return result;
+    protected buildArrayAgg(arg: Expression<any>): AliasableExpression<any> {
+        return this.eb.fn.coalesce(sql`JSON_ARRAYAGG(${arg})`, sql`JSON_ARRAY()`);
     }
 
     override buildSkipTake(
@@ -499,7 +197,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
     }
 
     override buildJsonObject(value: Record<string, Expression<unknown>>) {
-        // MySQL uses JSON_OBJECT instead of jsonb_build_object
         return this.eb.fn(
             'JSON_OBJECT',
             Object.entries(value).flatMap(([key, value]) => [sql.lit(key), value]),
@@ -520,14 +217,13 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
         return sql`TRIM(BOTH ${sql.lit('"')} FROM ${expression})` as unknown as T;
     }
 
-    override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
+    override buildArrayLength(array: Expression<unknown>): AliasableExpression<number> {
         // MySQL uses JSON_LENGTH instead of array_length
         return this.eb.fn('JSON_LENGTH', [array]);
     }
 
-    override buildArrayLiteralSQL(values: unknown[]): string {
-        // MySQL uses JSON arrays since it doesn't have native arrays
-        return `JSON_ARRAY(${values.map((v) => (typeof v === 'string' ? `'${v}'` : v)).join(',')})`;
+    override buildArrayLiteralSQL(_values: unknown[]): AliasableExpression<number> {
+        throw new Error('MySQL does not support array literals');
     }
 
     protected override buildJsonEqualityFilter(
@@ -544,7 +240,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
 
     protected override buildJsonPathSelection(receiver: Expression<any>, path: string | undefined) {
         if (path) {
-            // MySQL uses JSON_EXTRACT with JSONPath syntax
             return this.eb.fn('JSON_EXTRACT', [receiver, this.eb.val(path)]);
         } else {
             return receiver;
@@ -558,7 +253,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
     ) {
         return match(operation)
             .with('array_contains', () => {
-                // MySQL uses JSON_CONTAINS
                 const v = Array.isArray(value) ? value : [value];
                 return sql<SqlBool>`JSON_CONTAINS(${lhs}, ${sql.val(JSON.stringify(v))})`;
             })
@@ -666,7 +360,7 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
 
                 // aggregations
                 if (['_count', '_avg', '_sum', '_min', '_max'].includes(field)) {
-                    invariant(value && typeof value === 'object', `invalid orderBy value for field "${field}"`);
+                    invariant(typeof value === 'object', `invalid orderBy value for field "${field}"`);
                     for (const [k, v] of Object.entries<SortOrder>(value)) {
                         invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                         result = result.orderBy(
@@ -677,22 +371,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
                     continue;
                 }
 
-                switch (field) {
-                    case '_count': {
-                        invariant(value && typeof value === 'object', 'invalid orderBy value for field "_count"');
-                        for (const [k, v] of Object.entries<string>(value)) {
-                            invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
-                            result = result.orderBy(
-                                (eb) => eb.fn.count(buildFieldRef(model, k, modelAlias)),
-                                this.negateSort(v, negated),
-                            );
-                        }
-                        continue;
-                    }
-                    default:
-                        break;
-                }
-
                 const fieldDef = requireField(this.schema, model, field);
 
                 if (!fieldDef.relation) {
@@ -700,7 +378,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<
                     if (value === 'asc' || value === 'desc') {
                         result = result.orderBy(fieldRef, this.negateSort(value, negated));
                     } else if (
-                        value &&
                         typeof value === 'object' &&
                         'nulls' in value &&
                         'sort' in value &&

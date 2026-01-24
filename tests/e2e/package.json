@@ -9,7 +9,8 @@
         "test:typecheck": "tsc --noEmit",
         "test": "vitest run",
         "test:sqlite": "TEST_DB_PROVIDER=sqlite vitest run",
-        "test:postgresql": "TEST_DB_PROVIDER=postgresql vitest run"
+        "test:postgresql": "TEST_DB_PROVIDER=postgresql vitest run",
+        "test:mysql": "TEST_DB_PROVIDER=mysql vitest run"
     },
     "dependencies": {
         "@paralleldrive/cuid2": "^2.2.2",

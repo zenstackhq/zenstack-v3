@@ -1,5 +1,5 @@
 import { enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers';
-import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
+import type { AliasableExpression, Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { expressionBuilder, sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
@@ -1021,7 +1021,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
                 // aggregations
                 if (['_count', '_avg', '_sum', '_min', '_max'].includes(field)) {
-                    invariant(value && typeof value === 'object', `invalid orderBy value for field "${field}"`);
+                    invariant(typeof value === 'object', `invalid orderBy value for field "${field}"`);
                     for (const [k, v] of Object.entries<SortOrder>(value)) {
                         invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                         result = result.orderBy(
@@ -1030,22 +1030,6 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         );
                     }
                     continue;
-                }
-
-                switch (field) {
-                    case '_count': {
-                        invariant(value && typeof value === 'object', 'invalid orderBy value for field "_count"');
-                        for (const [k, v] of Object.entries<string>(value)) {
-                            invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
-                            result = result.orderBy(
-                                (eb) => eb.fn.count(buildFieldRef(model, k, modelAlias)),
-                                this.negateSort(v, negated),
-                            );
-                        }
-                        continue;
-                    }
-                    default:
-                        break;
                 }
 
                 const fieldDef = requireField(this.schema, model, field);
@@ -1429,17 +1413,17 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     /**
      * Builds an Kysely expression that returns a JSON object for the given key-value pairs.
      */
-    abstract buildJsonObject(value: Record<string, Expression<unknown>>): ExpressionWrapper<any, any, unknown>;
+    abstract buildJsonObject(value: Record<string, Expression<unknown>>): AliasableExpression<unknown>;
 
     /**
      * Builds an Kysely expression that returns the length of an array.
      */
-    abstract buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number>;
+    abstract buildArrayLength(array: Expression<unknown>): AliasableExpression<number>;
 
     /**
      * Builds an array literal SQL string for the given values.
      */
-    abstract buildArrayLiteralSQL(values: unknown[]): string;
+    abstract buildArrayLiteralSQL(values: unknown[]): AliasableExpression<unknown>;
 
     /**
      * Casts the given expression to an integer type.

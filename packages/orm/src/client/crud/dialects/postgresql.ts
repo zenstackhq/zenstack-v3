@@ -13,6 +13,7 @@ import { match } from 'ts-pattern';
 import z from 'zod';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, SchemaDef } from '../../../schema';
+import type { SortOrder } from '../../crud-types';
 import { createInternalError, createInvalidInputError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import { getEnum, isEnum, isTypeDef } from '../../query-utils';
@@ -417,6 +418,19 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
                     sql`CAST(${sql.ref(`$values.column${i + 1}`)} AS ${sql.raw(this.getFieldSqlType(f))})`.as(f.name),
                 ),
             );
+    }
+
+    protected override buildOrderByField(
+        query: SelectQueryBuilder<any, any, any>,
+        field: Expression<unknown>,
+        sort: SortOrder,
+        nulls: 'first' | 'last',
+    ) {
+        return query.orderBy(field, (ob) => {
+            ob = sort === 'asc' ? ob.asc() : ob.desc();
+            ob = nulls === 'first' ? ob.nullsFirst() : ob.nullsLast();
+            return ob;
+        });
     }
 
     // #endregion

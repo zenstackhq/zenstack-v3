@@ -1039,19 +1039,18 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     if (value === 'asc' || value === 'desc') {
                         result = result.orderBy(fieldRef, this.negateSort(value, negated));
                     } else if (
-                        value &&
                         typeof value === 'object' &&
                         'nulls' in value &&
                         'sort' in value &&
                         (value.sort === 'asc' || value.sort === 'desc') &&
                         (value.nulls === 'first' || value.nulls === 'last')
                     ) {
-                        result = result.orderBy(fieldRef, (ob) => {
-                            const dir = this.negateSort(value.sort, negated);
-                            ob = dir === 'asc' ? ob.asc() : ob.desc();
-                            ob = value.nulls === 'first' ? ob.nullsFirst() : ob.nullsLast();
-                            return ob;
-                        });
+                        result = this.buildOrderByField(
+                            result,
+                            fieldRef,
+                            this.negateSort(value.sort, negated),
+                            value.nulls,
+                        );
                     }
                 } else {
                     // order by relation
@@ -1476,6 +1475,16 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         receiver: Expression<any>,
         buildFilter: (elem: Expression<any>) => Expression<SqlBool>,
     ): Expression<SqlBool>;
+
+    /**
+     * Builds an ORDER BY clause for a field with NULLS FIRST/LAST support.
+     */
+    protected abstract buildOrderByField(
+        query: SelectQueryBuilder<any, any, any>,
+        field: Expression<unknown>,
+        sort: SortOrder,
+        nulls: 'first' | 'last',
+    ): SelectQueryBuilder<any, any, any>;
 
     // #endregion
 }

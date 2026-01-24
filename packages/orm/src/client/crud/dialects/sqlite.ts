@@ -14,7 +14,7 @@ import { match } from 'ts-pattern';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
-import type { FindArgs } from '../../crud-types';
+import type { FindArgs, SortOrder } from '../../crud-types';
 import { createInternalError, createInvalidInputError, createNotSupportedError } from '../../errors';
 import {
     getDelegateDescendantModels,
@@ -526,6 +526,19 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 )})`.as('$values'),
             )
             .select(fields.map((f, i) => eb.ref(`$values.column${i + 1}`).as(f.name)));
+    }
+
+    protected override buildOrderByField(
+        query: SelectQueryBuilder<any, any, any>,
+        field: Expression<unknown>,
+        sort: SortOrder,
+        nulls: 'first' | 'last',
+    ) {
+        return query.orderBy(field, (ob) => {
+            ob = sort === 'asc' ? ob.asc() : ob.desc();
+            ob = nulls === 'first' ? ob.nullsFirst() : ob.nullsLast();
+            return ob;
+        });
     }
     // #endregion
 }

@@ -1,4 +1,4 @@
-import { enumerate, invariant } from '@zenstackhq/common-helpers';
+import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import type { AliasableExpression, TableExpression } from 'kysely';
 import {
@@ -11,13 +11,11 @@ import {
 } from 'kysely';
 import { match } from 'ts-pattern';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
-import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
-import type { OrArray } from '../../../utils/type-utils';
-import { AGGREGATE_OPERATORS } from '../../constants';
-import type { OrderBy, SortOrder } from '../../crud-types';
+import type { BuiltinType, FieldDef, SchemaDef } from '../../../schema';
+import type { SortOrder } from '../../crud-types';
 import { createInternalError, createInvalidInputError, createNotSupportedError } from '../../errors';
 import type { ClientOptions } from '../../options';
-import { aggregate, buildJoinPairs, isTypeDef, requireField } from '../../query-utils';
+import { isTypeDef } from '../../query-utils';
 import { LateralJoinDialectBase } from './lateral-join-dialect-base';
 
 export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDialectBase<Schema> {
@@ -218,7 +216,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
     }
 
     override buildArrayLength(array: Expression<unknown>): AliasableExpression<number> {
-        // MySQL uses JSON_LENGTH instead of array_length
         return this.eb.fn('JSON_LENGTH', [array]);
     }
 
@@ -331,123 +328,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
         return { supportsILike: false, likeCaseSensitive: false };
     }
 
-    override buildOrderBy(
-        query: SelectQueryBuilder<any, any, any>,
-        model: string,
-        modelAlias: string,
-        orderBy: OrArray<OrderBy<Schema, GetModels<Schema>, boolean, boolean>> | undefined,
-        negated: boolean,
-        take: number | undefined,
-    ) {
-        if (!orderBy) {
-            return query;
-        }
-
-        let result = query;
-
-        const buildFieldRef = (model: string, field: string, modelAlias: string) => {
-            const fieldDef = requireField(this.schema, model, field);
-            return fieldDef.originModel
-                ? this.fieldRef(fieldDef.originModel, field, fieldDef.originModel)
-                : this.fieldRef(model, field, modelAlias);
-        };
-
-        enumerate(orderBy).forEach((orderBy, index) => {
-            for (const [field, value] of Object.entries<any>(orderBy)) {
-                if (!value) {
-                    continue;
-                }
-
-                // aggregations
-                if (['_count', '_avg', '_sum', '_min', '_max'].includes(field)) {
-                    invariant(typeof value === 'object', `invalid orderBy value for field "${field}"`);
-                    for (const [k, v] of Object.entries<SortOrder>(value)) {
-                        invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
-                        result = result.orderBy(
-                            (eb) => aggregate(eb, buildFieldRef(model, k, modelAlias), field as AGGREGATE_OPERATORS),
-                            this.negateSort(v, negated),
-                        );
-                    }
-                    continue;
-                }
-
-                const fieldDef = requireField(this.schema, model, field);
-
-                if (!fieldDef.relation) {
-                    const fieldRef = buildFieldRef(model, field, modelAlias);
-                    if (value === 'asc' || value === 'desc') {
-                        result = result.orderBy(fieldRef, this.negateSort(value, negated));
-                    } else if (
-                        typeof value === 'object' &&
-                        'nulls' in value &&
-                        'sort' in value &&
-                        (value.sort === 'asc' || value.sort === 'desc') &&
-                        (value.nulls === 'first' || value.nulls === 'last')
-                    ) {
-                        // MySQL doesn't support NULLS FIRST/LAST natively
-                        // We simulate it with an extra IS NULL/IS NOT NULL order by clause
-                        const dir = this.negateSort(value.sort, negated);
-
-                        if (value.nulls === 'first') {
-                            // NULLS FIRST: order by IS NULL DESC (nulls=1 first), then the actual field
-                            result = result.orderBy(sql`${fieldRef} IS NULL`, 'desc');
-                            result = result.orderBy(fieldRef, dir);
-                        } else {
-                            // NULLS LAST: order by IS NULL ASC (nulls=0 last), then the actual field
-                            result = result.orderBy(sql`${fieldRef} IS NULL`, 'asc');
-                            result = result.orderBy(fieldRef, dir);
-                        }
-                    }
-                } else {
-                    // order by relation
-                    const relationModel = fieldDef.type;
-
-                    if (fieldDef.array) {
-                        // order by to-many relation
-                        if (typeof value !== 'object') {
-                            throw createInvalidInputError(`invalid orderBy value for field "${field}"`);
-                        }
-                        if ('_count' in value) {
-                            invariant(
-                                value._count === 'asc' || value._count === 'desc',
-                                'invalid orderBy value for field "_count"',
-                            );
-                            const sort = this.negateSort(value._count, negated);
-                            result = result.orderBy((eb) => {
-                                const subQueryAlias = `${modelAlias}$orderBy$${field}$count`;
-                                let subQuery = this.buildSelectModel(relationModel, subQueryAlias);
-                                const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, subQueryAlias);
-                                subQuery = subQuery.where(() =>
-                                    this.and(
-                                        ...joinPairs.map(([left, right]) =>
-                                            eb(this.eb.ref(left), '=', this.eb.ref(right)),
-                                        ),
-                                    ),
-                                );
-                                subQuery = subQuery.select(() => eb.fn.count(eb.lit(1)).as('_count'));
-                                return subQuery;
-                            }, sort);
-                        }
-                    } else {
-                        // order by to-one relation
-                        const joinAlias = `${modelAlias}$orderBy$${index}`;
-                        result = result.leftJoin(`${relationModel} as ${joinAlias}`, (join) => {
-                            const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field, joinAlias);
-                            return join.on((eb) =>
-                                this.and(
-                                    ...joinPairs.map(([left, right]) => eb(this.eb.ref(left), '=', this.eb.ref(right))),
-                                ),
-                            );
-                        });
-                        result = this.buildOrderBy(result, relationModel, joinAlias, value, negated, take);
-                    }
-                }
-            }
-        });
-
-        return result;
-    }
-
     override buildValuesTableSelect(fields: FieldDef[], rows: unknown[][]) {
         const cols = rows[0]?.length ?? 0;
 
@@ -475,6 +355,25 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
                 )}) as ${sql.raw(aliasWithColumns)}` as unknown as TableExpression<any, any>,
             )
             .selectAll();
+    }
+
+    protected override buildOrderByField(
+        query: SelectQueryBuilder<any, any, any>,
+        field: Expression<unknown>,
+        sort: SortOrder,
+        nulls: 'first' | 'last',
+    ) {
+        let result = query;
+        if (nulls === 'first') {
+            // NULLS FIRST: order by IS NULL DESC (nulls=1 first), then the actual field
+            result = result.orderBy(sql`${field} IS NULL`, 'desc');
+            result = result.orderBy(field, sort);
+        } else {
+            // NULLS LAST: order by IS NULL ASC (nulls=0 last), then the actual field
+            result = result.orderBy(sql`${field} IS NULL`, 'asc');
+            result = result.orderBy(field, sort);
+        }
+        return result;
     }
 
     // #endregion

@@ -1,4 +1,5 @@
 import { createTestClient } from '@zenstackhq/testtools';
+import { sql } from 'kysely';
 import { describe, expect, it } from 'vitest';
 
 describe('Computed fields tests', () => {
@@ -7,20 +8,15 @@ describe('Computed fields tests', () => {
             `
 model User {
     id Int @id @default(autoincrement())
-    name String
-    otherName String @computed
+    firstName String
+    lastName String
+    fullName String @computed
 }
 `,
             {
                 computedFields: {
                     User: {
-                        otherName: (eb: any) =>
-                            eb.fn('concat', [
-                                eb.ref('name'),
-                                // type casting is needed because some db (e.g. postgres) cannot
-                                // automatically infer parameter types
-                                eb.cast(eb.val('!'), 'text'),
-                            ]),
+                        fullName: (eb: any) => eb.fn('concat', [eb.ref('firstName'), sql.lit(' '), eb.ref('lastName')]),
                     },
                 },
             } as any,
@@ -28,70 +24,70 @@ model User {
 
         await expect(
             db.user.create({
-                data: { id: 1, name: 'Alex' },
+                data: { id: 1, firstName: 'Alex', lastName: 'Smith' },
             }),
         ).resolves.toMatchObject({
-            otherName: 'Alex!',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.findUnique({
                 where: { id: 1 },
-                select: { otherName: true },
+                select: { fullName: true },
             }),
         ).resolves.toMatchObject({
-            otherName: 'Alex!',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.findFirst({
-                where: { otherName: 'Alex!' },
+                where: { fullName: 'Alex Smith' },
             }),
         ).resolves.toMatchObject({
-            otherName: 'Alex!',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.findFirst({
-                where: { otherName: 'Alex' },
+                where: { fullName: 'Alex' },
             }),
         ).toResolveNull();
 
         await expect(
             db.user.findFirst({
-                orderBy: { otherName: 'desc' },
+                orderBy: { fullName: 'desc' },
             }),
         ).resolves.toMatchObject({
-            otherName: 'Alex!',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.findFirst({
-                orderBy: { otherName: 'desc' },
+                orderBy: { fullName: 'desc' },
                 take: 1,
             }),
         ).resolves.toMatchObject({
-            otherName: 'Alex!',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.aggregate({
-                _count: { otherName: true },
+                _count: { fullName: true },
             }),
         ).resolves.toMatchObject({
-            _count: { otherName: 1 },
+            _count: { fullName: 1 },
         });
 
         await expect(
             db.user.groupBy({
-                by: ['name', 'otherName'],
-                _count: { otherName: true },
-                _max: { otherName: true },
+                by: ['fullName'],
+                _count: { fullName: true },
+                _max: { fullName: true },
             }),
         ).resolves.toEqual([
             expect.objectContaining({
-                _count: { otherName: 1 },
-                _max: { otherName: 'Alex!' },
+                _count: { fullName: 1 },
+                _max: { fullName: 'Alex Smith' },
             }),
         ]);
     });

@@ -1622,8 +1622,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 return result.rows as Result;
             } else {
                 // Fallback for databases that don't support RETURNING (e.g., MySQL)
-                // First, select the records to be updated
-                let selectQuery = kysely.selectFrom(model).selectAll();
+                // First, select the IDs of records to be updated
+                const idFields = requireIdFields(this.schema, model);
+                let selectQuery = kysely.selectFrom(model).select(idFields as any);
 
                 if (!shouldFallbackToIdFilter) {
                     selectQuery = selectQuery
@@ -1656,7 +1657,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     return [] as Result;
                 }
 
-                const idFields = requireIdFields(this.schema, model);
                 const updatedIds = recordsToUpdate.rows.map((row: any) => {
                     const id: Record<string, any> = {};
                     for (const idField of idFields) {
@@ -1665,10 +1665,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     return id;
                 });
 
-                // Query back the updated records
+                // Query back the updated records with only requested fields
                 const resultQuery = kysely
                     .selectFrom(model)
-                    .selectAll()
+                    .select(fieldsToReturn as any)
                     .where((eb) => {
                         const conditions = updatedIds.map((id) => {
                             const idConditions = Object.entries(id).map(([field, value]) => eb.eb(field, '=', value));

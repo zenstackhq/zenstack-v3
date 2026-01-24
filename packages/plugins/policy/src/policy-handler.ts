@@ -865,7 +865,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         values: OperationNode[],
         proceed: ProceedKyselyQueryFunction,
     ) {
-        const allFields = QueryUtils.getOwnedPlainFields(this.client.$schema, model);
+        const allFields = QueryUtils.getModelFields(this.client.$schema, model, { inherited: true });
         const allValues: KyselyExpression<any>[] = [];
 
         for (const def of allFields) {
@@ -1341,7 +1341,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
     // strips table references from an OperationNode
     private stripTableReferences(node: OperationNode, modelName: string): OperationNode {
-        return new TableReferenceStripper().strip(node, tableName);
+        return new TableReferenceStripper().strip(node, modelName);
     }
 }
 

@@ -70,11 +70,26 @@ export function requireField(schema: SchemaDef, modelOrType: string, field: stri
 }
 
 /**
- * Gets all non-relation, non-computed, non-inherited fields of a model.
+ * Gets all model fields, by default non-relation, non-computed, non-inherited fields only.
  */
-export function getOwnedPlainFields(schema: SchemaDef, model: string) {
+export function getModelFields(
+    schema: SchemaDef,
+    model: string,
+    options?: { relations?: boolean; computed?: boolean; inherited?: boolean },
+) {
     const modelDef = requireModel(schema, model);
-    return Object.values(modelDef.fields).filter((f) => !f.relation && !f.computed && !f.originModel);
+    return Object.values(modelDef.fields).filter((f) => {
+        if (f.relation && !options?.relations) {
+            return false;
+        }
+        if (f.computed && !options?.computed) {
+            return false;
+        }
+        if (f.originModel && !options?.inherited) {
+            return false;
+        }
+        return true;
+    });
 }
 
 export function getIdFields<Schema extends SchemaDef>(schema: SchemaDef, model: GetModels<Schema>) {

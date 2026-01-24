@@ -14,7 +14,13 @@ model User {
             {
                 computedFields: {
                     User: {
-                        otherName: (eb: any) => eb.fn('concat', [eb.ref('name'), eb.val('!')]),
+                        otherName: (eb: any) =>
+                            eb.fn('concat', [
+                                eb.ref('name'),
+                                // type casting is needed because some db (e.g. postgres) cannot
+                                // automatically infer parameter types
+                                eb.cast(eb.val('!'), 'text'),
+                            ]),
                     },
                 },
             } as any,
@@ -78,7 +84,7 @@ model User {
 
         await expect(
             db.user.groupBy({
-                by: ['otherName'],
+                by: ['name', 'otherName'],
                 _count: { otherName: true },
                 _max: { otherName: true },
             }),

@@ -134,7 +134,12 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 )
                 .with('Decimal', () => (value !== null ? value.toString() : value))
                 .with('Json', () => {
-                    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                    if (
+                        value === null ||
+                        typeof value === 'string' ||
+                        typeof value === 'number' ||
+                        typeof value === 'boolean'
+                    ) {
                         // postgres requires simple JSON values to be stringified
                         return JSON.stringify(value);
                     } else {

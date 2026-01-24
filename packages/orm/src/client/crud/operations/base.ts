@@ -973,7 +973,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 // especially with auto-increment IDs. The best we can do is return the count.
                 // If users need the created records, they should use multiple create() calls
                 // or the application should query after insertion.
-                throw createInternalError(
+                throw createNotSupportedError(
                     `\`createManyAndReturn\` is not supported for ${this.dialect.provider}. ` +
                         `Use multiple \`create\` calls or query the records after insertion.`,
                 );

@@ -83,8 +83,8 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
                 return value;
             }
         } else if (Array.isArray(value)) {
-            if (type === 'Json' && !forArrayField) {
-                // array stored as JSON, stringify it
+            if (type === 'Json') {
+                // type-def arrays reach here
                 return JSON.stringify(value);
             } else {
                 throw createNotSupportedError(`MySQL does not support array literals`);

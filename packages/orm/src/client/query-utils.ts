@@ -69,6 +69,14 @@ export function requireField(schema: SchemaDef, modelOrType: string, field: stri
     throw createInternalError(`Model or type "${modelOrType}" not found in schema`, modelOrType);
 }
 
+/**
+ * Gets all non-relation, non-computed, non-inherited fields of a model.
+ */
+export function getOwnedPlainFields(schema: SchemaDef, model: string) {
+    const modelDef = requireModel(schema, model);
+    return Object.values(modelDef.fields).filter((f) => !f.relation && !f.computed && !f.originModel);
+}
+
 export function getIdFields<Schema extends SchemaDef>(schema: SchemaDef, model: GetModels<Schema>) {
     const modelDef = getModel(schema, model);
     return modelDef?.idFields;

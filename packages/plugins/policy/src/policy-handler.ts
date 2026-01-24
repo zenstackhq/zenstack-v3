@@ -456,7 +456,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
             const filterWithTableRef = this.buildPolicyFilter(mutationModel, undefined, 'update');
 
             // Strip table references from the filter since ON DUPLICATE KEY UPDATE doesn't support them
-            const filter = this.stripTableReferences(filterWithTableRef);
+            const filter = this.stripTableReferences(filterWithTableRef, mutationModel);
 
             // transform each update to: IF(filter, newValue, oldValue)
             const wrappedUpdates = onDuplicateKey.updates.map((update) => {
@@ -865,9 +865,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         values: OperationNode[],
         proceed: ProceedKyselyQueryFunction,
     ) {
-        const allFields = Object.values(QueryUtils.requireModel(this.client.$schema, model).fields).filter(
-            (def) => !def.relation,
-        );
+        const allFields = QueryUtils.getOwnedPlainFields(this.client.$schema, model);
         const allValues: KyselyExpression<any>[] = [];
 
         for (const def of allFields) {
@@ -1342,18 +1340,21 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
     }
 
     // strips table references from an OperationNode
-    private stripTableReferences(node: OperationNode): OperationNode {
-        return new TableReferenceStripper().strip(node);
+    private stripTableReferences(node: OperationNode, modelName: string): OperationNode {
+        return new TableReferenceStripper().strip(node, tableName);
     }
 }
 
 class TableReferenceStripper extends OperationNodeTransformer {
-    strip(node: OperationNode) {
+    private tableName: string = '';
+
+    strip(node: OperationNode, tableName: string) {
+        this.tableName = tableName;
         return this.transformNode(node);
     }
 
     protected override transformReference(node: ReferenceNode) {
-        if (ColumnNode.is(node.column)) {
+        if (ColumnNode.is(node.column) && node.table?.table.identifier.name === this.tableName) {
             // strip the table part
             return ReferenceNode.create(this.transformNode(node.column));
         }

@@ -122,9 +122,14 @@ describe('Plugin extended query args', () => {
         await expect(
             extDb.user.createMany({ data: [{ name: 'Charlie' }], ...cacheBustOption }),
         ).resolves.toHaveProperty('count');
-        await expect(
-            extDb.user.createManyAndReturn({ data: [{ name: 'David' }], ...cacheBustOption }),
-        ).toResolveWithLength(1);
+
+        const isMySql = db.$schema.provider.type === ('mysql' as any);
+
+        if (!isMySql) {
+            await expect(
+                extDb.user.createManyAndReturn({ data: [{ name: 'David' }], ...cacheBustOption }),
+            ).toResolveWithLength(1);
+        }
 
         // update operations
         await expect(
@@ -133,13 +138,17 @@ describe('Plugin extended query args', () => {
         await expect(
             extDb.user.updateMany({ where: { name: 'Bob' }, data: { name: 'Bob Updated' }, ...cacheBustOption }),
         ).resolves.toHaveProperty('count');
-        await expect(
-            extDb.user.updateManyAndReturn({
-                where: { name: 'Charlie' },
-                data: { name: 'Charlie Updated' },
-                ...cacheBustOption,
-            }),
-        ).toResolveTruthy();
+
+        if (!isMySql) {
+            await expect(
+                extDb.user.updateManyAndReturn({
+                    where: { name: 'Charlie' },
+                    data: { name: 'Charlie Updated' },
+                    ...cacheBustOption,
+                }),
+            ).toResolveTruthy();
+        }
+
         await expect(
             extDb.user.upsert({
                 where: { id: 999 },

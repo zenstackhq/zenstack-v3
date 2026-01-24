@@ -1,7 +1,7 @@
 import type Decimal from 'decimal.js';
 import type { Expression } from './expression';
 
-export type DataSourceProviderType = 'sqlite' | 'postgresql';
+export type DataSourceProviderType = 'sqlite' | 'postgresql' | 'mysql';
 
 export type DataSourceProvider = {
     type: DataSourceProviderType;

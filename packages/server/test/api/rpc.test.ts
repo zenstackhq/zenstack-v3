@@ -30,7 +30,7 @@ describe('RPC API Handler Tests', () => {
         r = await handleRequest({
             method: 'get',
             path: '/user/exists',
-            query: { q: JSON.stringify({ where: { id: 'user1' }})},
+            query: { q: JSON.stringify({ where: { id: 'user1' } }) },
             client: rawClient,
         });
         expect(r.status).toBe(200);
@@ -69,7 +69,7 @@ describe('RPC API Handler Tests', () => {
         r = await handleRequest({
             method: 'get',
             path: '/user/exists',
-            query: { q: JSON.stringify({ where: { id: 'user1' }})},
+            query: { q: JSON.stringify({ where: { id: 'user1' } }) },
             client: rawClient,
         });
         expect(r.status).toBe(200);
@@ -167,7 +167,7 @@ procedure getUndefined(): Undefined
                 getFalse: async () => false,
                 getUndefined: async () => undefined,
             },
-        });
+        } as any);
 
         const handler = new RPCApiHandler({ schema: procClient.$schema });
         const handleProcRequest = async (args: any) => {
@@ -267,7 +267,7 @@ procedure echoOverview(o: Overview): Overview
                 echoRole: async ({ args }: any) => args.r,
                 echoOverview: async ({ args }: any) => args.o,
             },
-        });
+        } as any);
 
         const handler = new RPCApiHandler({ schema: procClient.$schema });
         const handleProcRequest = async (args: any) => {

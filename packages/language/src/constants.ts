@@ -1,14 +1,7 @@
 /**
  * Supported db providers
  */
-export const SUPPORTED_PROVIDERS = [
-    'sqlite',
-    'postgresql',
-    // TODO: other providers
-    // 'mysql',
-    // 'sqlserver',
-    // 'cockroachdb',
-];
+export const SUPPORTED_PROVIDERS = ['sqlite', 'postgresql', 'mysql'];
 
 /**
  * All scalar types
@@ -41,3 +34,8 @@ export enum ExpressionContext {
     ValidationRule = 'ValidationRule',
     Index = 'Index',
 }
+
+/**
+ * Database providers that support list field types.
+ */
+export const DB_PROVIDERS_SUPPORTING_LIST_TYPE = ['postgresql'];

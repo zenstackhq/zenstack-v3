@@ -7,6 +7,7 @@ export default defineConfig({
         helpers: 'src/helpers.ts',
         'dialects/sqlite': 'src/dialects/sqlite.ts',
         'dialects/postgres': 'src/dialects/postgres.ts',
+        'dialects/mysql': 'src/dialects/mysql.ts',
         'dialects/sql.js': 'src/dialects/sql.js/index.ts',
     },
     outDir: 'dist',

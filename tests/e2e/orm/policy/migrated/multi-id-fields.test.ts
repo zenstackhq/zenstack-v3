@@ -96,13 +96,25 @@ describe('Policy tests multiple id fields', () => {
             db.a.update({ where: { x_y: { x: '1', y: 2 } }, data: { x: '2', y: 3, value: 0 } }),
         ).toBeRejectedByPolicy();
 
-        await expect(
-            db.a.update({ where: { x_y: { x: '1', y: 2 } }, data: { x: '2', y: 3, value: 2 } }),
-        ).resolves.toMatchObject({
-            x: '2',
-            y: 3,
-            value: 2,
-        });
+        const mysql = db.$schema.provider.type === 'mysql';
+
+        if (!mysql) {
+            await expect(
+                db.a.update({ where: { x_y: { x: '1', y: 2 } }, data: { x: '2', y: 3, value: 2 } }),
+            ).resolves.toMatchObject({
+                x: '2',
+                y: 3,
+                value: 2,
+            });
+        } else {
+            // mysql doesn't support post-update policies with id updates
+            await expect(
+                db.a.update({ where: { x_y: { x: '1', y: 2 } }, data: { x: '2', y: 3, value: 2 } }),
+            ).toBeRejectedByPolicy();
+
+            // force update
+            await db.$unuseAll().a.update({ where: { x_y: { x: '1', y: 2 } }, data: { x: '2', y: 3, value: 2 } });
+        }
 
         await expect(
             db.a.upsert({
@@ -112,17 +124,28 @@ describe('Policy tests multiple id fields', () => {
             }),
         ).toBeRejectedByPolicy();
 
-        await expect(
-            db.a.upsert({
-                where: { x_y: { x: '2', y: 3 } },
-                update: { x: '3', y: 4, value: 3 },
-                create: { x: '4', y: 5, value: 5 },
-            }),
-        ).resolves.toMatchObject({
-            x: '3',
-            y: 4,
-            value: 3,
-        });
+        if (!mysql) {
+            await expect(
+                db.a.upsert({
+                    where: { x_y: { x: '2', y: 3 } },
+                    update: { x: '3', y: 4, value: 3 },
+                    create: { x: '4', y: 5, value: 5 },
+                }),
+            ).resolves.toMatchObject({
+                x: '3',
+                y: 4,
+                value: 3,
+            });
+        } else {
+            // mysql doesn't support post-update policies with id updates
+            await expect(
+                db.a.upsert({
+                    where: { x_y: { x: '2', y: 3 } },
+                    update: { x: '3', y: 4, value: 3 },
+                    create: { x: '4', y: 5, value: 5 },
+                }),
+            ).toBeRejectedByPolicy();
+        }
     });
 
     it('multi-id auth', async () => {
@@ -353,13 +376,34 @@ describe('Policy tests multiple id fields', () => {
             }),
         ).toBeRejectedByPolicy();
 
-        await expect(
-            db.b.update({
+        const mysql = db.$schema.provider.type === 'mysql';
+
+        if (!mysql) {
+            await expect(
+                db.b.update({
+                    where: { id: 1 },
+                    data: { a: { update: { where: { x_y: { x: '1', y: 1 } }, data: { x: '2', y: 2, value: 2 } } } },
+                    include: { a: true },
+                }),
+            ).resolves.toMatchObject({
+                a: expect.arrayContaining([expect.objectContaining({ x: '2', y: 2, value: 2 })]),
+            });
+        } else {
+            // mysql doesn't support post-update policies with id updates
+            await expect(
+                db.b.update({
+                    where: { id: 1 },
+                    data: { a: { update: { where: { x_y: { x: '1', y: 1 } }, data: { x: '2', y: 2, value: 2 } } } },
+                    include: { a: true },
+                }),
+            ).toBeRejectedByPolicy();
+
+            // force update
+            await db.$unuseAll().b.update({
                 where: { id: 1 },
                 data: { a: { update: { where: { x_y: { x: '1', y: 1 } }, data: { x: '2', y: 2, value: 2 } } } },
-                include: { a: true },
-            }),
-        ).resolves.toMatchObject({ a: expect.arrayContaining([expect.objectContaining({ x: '2', y: 2, value: 2 })]) });
+            });
+        }
 
         await expect(
             db.b.update({
@@ -376,20 +420,24 @@ describe('Policy tests multiple id fields', () => {
             }),
         ).toBeRejectedByPolicy();
 
-        await expect(
-            db.b.update({
-                where: { id: 1 },
-                data: {
-                    a: {
-                        upsert: {
-                            where: { x_y: { x: '2', y: 2 } },
-                            update: { x: '3', y: 3, value: 3 },
-                            create: { x: '4', y: 4, value: 4 },
+        if (!mysql) {
+            await expect(
+                db.b.update({
+                    where: { id: 1 },
+                    data: {
+                        a: {
+                            upsert: {
+                                where: { x_y: { x: '2', y: 2 } },
+                                update: { x: '3', y: 3, value: 3 },
+                                create: { x: '4', y: 4, value: 4 },
+                            },
                         },
                     },
-                },
-                include: { a: true },
-            }),
-        ).resolves.toMatchObject({ a: expect.arrayContaining([expect.objectContaining({ x: '3', y: 3, value: 3 })]) });
+                    include: { a: true },
+                }),
+            ).resolves.toMatchObject({
+                a: expect.arrayContaining([expect.objectContaining({ x: '3', y: 3, value: 3 })]),
+            });
+        }
     });
 });

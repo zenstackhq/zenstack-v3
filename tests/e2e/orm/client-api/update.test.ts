@@ -115,6 +115,30 @@ describe('Client update tests', () => {
             ).resolves.toMatchObject({ id: 'user2' });
         });
 
+        it('works with update with unchanged data or no data', async () => {
+            const user = await createUser(client, 'u1@test.com');
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        email: user.email,
+                        // force a no-op update
+                        updatedAt: user.updatedAt,
+                    },
+                }),
+            ).resolves.toEqual(user);
+
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {},
+                }),
+            ).resolves.toEqual(user);
+
+            const plain = await client.plain.create({ data: { value: 42 } });
+            await expect(client.plain.update({ where: { id: plain.id }, data: { value: 42 } })).resolves.toEqual(plain);
+        });
+
         it('does not update updatedAt if no other scalar fields are updated', async () => {
             const user = await createUser(client, 'u1@test.com');
             const originalUpdatedAt = user.updatedAt;
@@ -1050,7 +1074,7 @@ describe('Client update tests', () => {
                         },
                     },
                 }),
-            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
+            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().match(/(constraint)|(duplicate)/i));
             //  transaction fails as a whole
             await expect(client.comment.findUnique({ where: { id: '3' } })).resolves.toMatchObject({
                 content: 'Comment3',

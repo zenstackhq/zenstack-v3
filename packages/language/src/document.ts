@@ -1,3 +1,4 @@
+import { invariant } from '@zenstackhq/common-helpers';
 import {
     isAstNode,
     TextDocument,
@@ -10,10 +11,18 @@ import {
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isDataSource, type Model } from './ast';
-import { STD_LIB_MODULE_NAME } from './constants';
+import { isDataModel, isDataSource, type Model } from './ast';
+import { DB_PROVIDERS_SUPPORTING_LIST_TYPE, STD_LIB_MODULE_NAME } from './constants';
 import { createZModelServices } from './module';
-import { getDataModelAndTypeDefs, getDocument, hasAttribute, resolveImport, resolveTransitiveImports } from './utils';
+import {
+    getAllFields,
+    getDataModelAndTypeDefs,
+    getDocument,
+    getLiteral,
+    hasAttribute,
+    resolveImport,
+    resolveTransitiveImports,
+} from './utils';
 import type { ZModelFormatter } from './zmodel-formatter';
 
 /**
@@ -207,6 +216,24 @@ function validationAfterImportMerge(model: Model) {
     if (authDecls.length > 1) {
         errors.push('Validation error: Multiple `@@auth` declarations are not allowed');
     }
+
+    // check for usages incompatible with the datasource provider
+    const provider = getDataSourceProvider(model);
+    invariant(provider !== undefined, 'Datasource provider should be defined at this point');
+
+    for (const decl of model.declarations.filter(isDataModel)) {
+        const fields = getAllFields(decl, true);
+        for (const field of fields) {
+            if (field.type.array && !isDataModel(field.type.reference?.ref)) {
+                if (!DB_PROVIDERS_SUPPORTING_LIST_TYPE.includes(provider)) {
+                    errors.push(
+                        `Validation error: List type is not supported for "${provider}" provider (model: "${decl.name}", field: "${field.name}")`,
+                    );
+                }
+            }
+        }
+    }
+
     return errors;
 }
 
@@ -225,4 +252,16 @@ export async function formatDocument(content: string) {
     };
     const edits = await formatter.formatDocument(document, { options, textDocument: identifier });
     return TextDocument.applyEdits(document.textDocument, edits);
+}
+
+function getDataSourceProvider(model: Model) {
+    const dataSource = model.declarations.find(isDataSource);
+    if (!dataSource) {
+        return undefined;
+    }
+    const provider = dataSource?.fields.find((f) => f.name === 'provider');
+    if (!provider) {
+        return undefined;
+    }
+    return getLiteral<string>(provider.value);
 }

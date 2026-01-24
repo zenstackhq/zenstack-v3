@@ -1,5 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { CreateTableBuilder, sql, type ColumnDataType, type OnModifyForeignAction } from 'kysely';
+import { CreateTableBuilder, sql, type ColumnDataType, type OnModifyForeignAction, type RawBuilder } from 'kysely';
 import toposort from 'toposort';
 import { match } from 'ts-pattern';
 import {
@@ -13,6 +13,11 @@ import {
 import type { ToKysely } from '../query-builder';
 import { requireModel } from '../query-utils';
 
+/**
+ * This class is for testing purposes only. It should never be used in production.
+ *
+ * @private
+ */
 export class SchemaDbPusher<Schema extends SchemaDef> {
     constructor(
         private readonly schema: Schema,
@@ -21,7 +26,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
     async push() {
         await this.kysely.transaction().execute(async (tx) => {
-            if (this.schema.enums && this.schema.provider.type === 'postgresql') {
+            if (this.schema.enums && this.providerSupportsNativeEnum) {
                 for (const [name, enumDef] of Object.entries(this.schema.enums)) {
                     let enumValues: string[];
                     if (enumDef.fields) {
@@ -55,6 +60,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 await createTable.execute();
             }
         });
+    }
+
+    private get providerSupportsNativeEnum() {
+        return ['postgresql'].includes(this.schema.provider.type);
     }
 
     private sortModels(models: ModelDef[]): ModelDef[] {
@@ -114,7 +123,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             // create fk constraint
             const baseModelDef = requireModel(this.schema, modelDef.baseModel);
             table = table.addForeignKeyConstraint(
-                `fk_${modelDef.baseModel}_delegate`,
+                `fk_${modelDef.baseModel}_${modelDef.name}_delegate`,
                 baseModelDef.idFields as string[],
                 modelDef.baseModel,
                 baseModelDef.idFields as string[],
@@ -213,13 +222,25 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             }
 
             // @default
-            if (fieldDef.default !== undefined) {
+            if (fieldDef.default !== undefined && this.isDefaultValueSupportedForType(fieldDef.type)) {
                 if (typeof fieldDef.default === 'object' && 'kind' in fieldDef.default) {
                     if (ExpressionUtils.isCall(fieldDef.default) && fieldDef.default.function === 'now') {
-                        col = col.defaultTo(sql`CURRENT_TIMESTAMP`);
+                        col =
+                            this.schema.provider.type === 'mysql'
+                                ? col.defaultTo(sql`CURRENT_TIMESTAMP(3)`)
+                                : col.defaultTo(sql`CURRENT_TIMESTAMP`);
                     }
                 } else {
-                    col = col.defaultTo(fieldDef.default);
+                    if (
+                        this.schema.provider.type === 'mysql' &&
+                        fieldDef.type === 'DateTime' &&
+                        typeof fieldDef.default === 'string'
+                    ) {
+                        const defaultValue = new Date(fieldDef.default).toISOString().replace('Z', '+00:00');
+                        col = col.defaultTo(defaultValue);
+                    } else {
+                        col = col.defaultTo(fieldDef.default);
+                    }
                 }
             }
 
@@ -233,7 +254,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                 col = col.notNull();
             }
 
-            if (this.isAutoIncrement(fieldDef) && this.schema.provider.type === 'sqlite') {
+            if (this.isAutoIncrement(fieldDef) && this.columnSupportsAutoIncrement()) {
                 col = col.autoIncrement();
             }
 
@@ -241,9 +262,43 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         });
     }
 
+    private isDefaultValueSupportedForType(type: string) {
+        return match(this.schema.provider.type)
+            .with('postgresql', () => true)
+            .with('sqlite', () => true)
+            .with('mysql', () => !['Json', 'Bytes'].includes(type))
+            .exhaustive();
+    }
+
     private mapFieldType(fieldDef: FieldDef) {
         if (this.schema.enums?.[fieldDef.type]) {
-            return this.schema.provider.type === 'postgresql' ? sql.ref(fieldDef.type) : 'text';
+            if (this.schema.provider.type === 'postgresql') {
+                return sql.ref(fieldDef.type);
+            } else if (this.schema.provider.type === 'mysql') {
+                // MySQL requires inline ENUM definition
+                const enumDef = this.schema.enums[fieldDef.type]!;
+                let enumValues: string[];
+                if (enumDef.fields) {
+                    enumValues = Object.values(enumDef.fields).map((f) => {
+                        const mapAttr = f.attributes?.find((a) => a.name === '@map');
+                        if (!mapAttr || !mapAttr.args?.[0]) {
+                            return f.name;
+                        } else {
+                            const mappedName = ExpressionUtils.getLiteralValue(mapAttr.args[0].value);
+                            invariant(
+                                mappedName && typeof mappedName === 'string',
+                                `Invalid @map attribute for enum field ${f.name}`,
+                            );
+                            return mappedName;
+                        }
+                    });
+                } else {
+                    enumValues = Object.values(enumDef.values);
+                }
+                return sql.raw(`enum(${enumValues.map((v) => `'${v}'`).join(', ')})`);
+            } else {
+                return 'text';
+            }
         }
 
         if (this.isAutoIncrement(fieldDef) && this.schema.provider.type === 'postgresql') {
@@ -251,20 +306,20 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
         }
 
         if (this.isCustomType(fieldDef.type)) {
-            return 'jsonb';
+            return this.jsonType;
         }
 
         const type = fieldDef.type as BuiltinType;
-        const result = match<BuiltinType, ColumnDataType>(type)
-            .with('String', () => 'text')
-            .with('Boolean', () => 'boolean')
-            .with('Int', () => 'integer')
-            .with('Float', () => 'real')
-            .with('BigInt', () => 'bigint')
-            .with('Decimal', () => 'decimal')
-            .with('DateTime', () => 'timestamp')
-            .with('Bytes', () => (this.schema.provider.type === 'postgresql' ? 'bytea' : 'blob'))
-            .with('Json', () => 'jsonb')
+        const result = match<BuiltinType, ColumnDataType | RawBuilder<unknown>>(type)
+            .with('String', () => this.stringType)
+            .with('Boolean', () => this.booleanType)
+            .with('Int', () => this.intType)
+            .with('Float', () => this.floatType)
+            .with('BigInt', () => this.bigIntType)
+            .with('Decimal', () => this.decimalType)
+            .with('DateTime', () => this.dateTimeType)
+            .with('Bytes', () => this.bytesType)
+            .with('Json', () => this.jsonType)
             .otherwise(() => {
                 throw new Error(`Unsupported field type: ${type}`);
             });
@@ -339,4 +394,63 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             .with('SetDefault', () => 'set default')
             .exhaustive();
     }
+
+    // #region Type mappings and capabilities
+
+    private get jsonType(): ColumnDataType {
+        return match<string, ColumnDataType>(this.schema.provider.type)
+            .with('mysql', () => 'json')
+            .otherwise(() => 'jsonb');
+    }
+
+    private get bytesType(): ColumnDataType {
+        return match<string, ColumnDataType>(this.schema.provider.type)
+            .with('postgresql', () => 'bytea')
+            .with('mysql', () => 'blob')
+            .otherwise(() => 'blob');
+    }
+
+    private get stringType() {
+        return match<string, ColumnDataType | RawBuilder<unknown>>(this.schema.provider.type)
+            .with('mysql', () => sql.raw('varchar(255)'))
+            .otherwise(() => 'text');
+    }
+
+    private get booleanType() {
+        return match<string, ColumnDataType | RawBuilder<unknown>>(this.schema.provider.type)
+            .with('mysql', () => sql.raw('tinyint(1)'))
+            .otherwise(() => 'boolean');
+    }
+
+    private get intType(): ColumnDataType {
+        return 'integer';
+    }
+
+    private get floatType() {
+        return match<string, ColumnDataType | RawBuilder<unknown>>(this.schema.provider.type)
+            .with('mysql', () => sql.raw('double'))
+            .otherwise(() => 'real');
+    }
+
+    private get bigIntType(): ColumnDataType {
+        return 'bigint';
+    }
+
+    private get decimalType() {
+        return match<string, ColumnDataType | RawBuilder<unknown>>(this.schema.provider.type)
+            .with('mysql', () => sql.raw('decimal(65, 30)'))
+            .otherwise(() => 'decimal');
+    }
+
+    private get dateTimeType() {
+        return match<string, ColumnDataType | RawBuilder<unknown>>(this.schema.provider.type)
+            .with('mysql', () => sql.raw('datetime(3)'))
+            .otherwise(() => 'timestamp');
+    }
+
+    private columnSupportsAutoIncrement() {
+        return ['sqlite', 'mysql'].includes(this.schema.provider.type);
+    }
+
+    // #endregion
 }

@@ -7,7 +7,9 @@ import { schema as typedJsonSchema } from '../schemas/typed-json/schema';
 describe('Json filter tests', () => {
     it('works with simple equality filter', async () => {
         const db = await createTestClient(schema);
-        await db.foo.create({ data: { data: { hello: 'world' } } });
+        await expect(db.foo.create({ data: { data: { hello: 'world' } } })).resolves.toMatchObject({
+            data: { hello: 'world' },
+        });
 
         await expect(db.foo.findFirst({ where: { data: { equals: { hello: 'world' } } } })).resolves.toMatchObject({
             data: { hello: 'world' },

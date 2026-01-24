@@ -1,8 +1,9 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import {
-    ExpressionWrapper,
+    expressionBuilder,
     sql,
+    type AliasableExpression,
     type Expression,
     type ExpressionBuilder,
     type RawBuilder,
@@ -13,8 +14,8 @@ import { match } from 'ts-pattern';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
-import type { FindArgs } from '../../crud-types';
-import { createInternalError, createNotSupportedError } from '../../errors';
+import type { FindArgs, SortOrder } from '../../crud-types';
+import { createInternalError, createInvalidInputError, createNotSupportedError } from '../../errors';
 import {
     getDelegateDescendantModels,
     getManyToManyRelation,
@@ -30,7 +31,41 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return 'sqlite' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType, _forArrayField: boolean): unknown {
+    // #region capabilities
+
+    override get supportsUpdateWithLimit() {
+        return false;
+    }
+
+    override get supportsDeleteWithLimit() {
+        return false;
+    }
+
+    override get supportsDistinctOn() {
+        return false;
+    }
+
+    override get supportsReturning() {
+        return true;
+    }
+
+    override get supportsDefaultAsFieldValue() {
+        return false;
+    }
+
+    override get supportsInsertDefaultValues(): boolean {
+        return true;
+    }
+
+    override get insertIgnoreMethod() {
+        return 'onConflict' as const;
+    }
+
+    // #endregion
+
+    // #region value transformation
+
+    override transformInput(value: unknown, type: BuiltinType, _forArrayField: boolean): unknown {
         if (value === undefined) {
             return value;
         }
@@ -50,7 +85,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         }
 
         if (Array.isArray(value)) {
-            return value.map((v) => this.transformPrimitive(v, type, false));
+            return value.map((v) => this.transformInput(v, type, false));
         } else {
             return match(type)
                 .with('Boolean', () => (value ? 1 : 0))
@@ -136,6 +171,10 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         }
         return value;
     }
+
+    // #endregion
+
+    // #region other overrides
 
     override buildRelationSelection(
         query: SelectQueryBuilder<any, any, any>,
@@ -404,28 +443,24 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         );
     }
 
-    override get supportsUpdateWithLimit() {
-        return false;
-    }
-
-    override get supportsDeleteWithLimit() {
-        return false;
-    }
-
-    override get supportsDistinctOn() {
-        return false;
-    }
-
-    override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
+    override buildArrayLength(array: Expression<unknown>): AliasableExpression<number> {
         return this.eb.fn('json_array_length', [array]);
     }
 
-    override buildArrayLiteralSQL(_values: unknown[]): string {
+    override buildArrayLiteralSQL(_values: unknown[]): AliasableExpression<unknown> {
         throw new Error('SQLite does not support array literals');
     }
 
-    override get supportInsertWithDefault() {
-        return false;
+    override castInt<T extends Expression<any>>(expression: T): T {
+        return expression;
+    }
+
+    override castText<T extends Expression<any>>(expression: T): T {
+        return this.eb.cast(expression, 'text') as unknown as T;
+    }
+
+    override trimTextQuotes<T extends Expression<string>>(expression: T): T {
+        return this.eb.fn('trim', [expression, sql.lit('"')]) as unknown as T;
     }
 
     override getFieldSqlType(fieldDef: FieldDef) {
@@ -462,4 +497,48 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         // SQLite `LIKE` is case-insensitive, and there is no `ILIKE`
         return { supportsILike: false, likeCaseSensitive: false };
     }
+
+    override buildValuesTableSelect(fields: FieldDef[], rows: unknown[][]) {
+        if (rows.length === 0) {
+            throw createInvalidInputError('At least one row is required to build values table');
+        }
+
+        // check all rows have the same length
+        const rowLength = rows[0]!.length;
+
+        if (fields.length !== rowLength) {
+            throw createInvalidInputError('Number of fields must match number of columns in each row');
+        }
+
+        for (const row of rows) {
+            if (row.length !== rowLength) {
+                throw createInvalidInputError('All rows must have the same number of columns');
+            }
+        }
+
+        const eb = expressionBuilder<any, any>();
+
+        return eb
+            .selectFrom(
+                sql`(VALUES ${sql.join(
+                    rows.map((row) => sql`(${sql.join(row.map((v) => sql.val(v)))})`),
+                    sql.raw(', '),
+                )})`.as('$values'),
+            )
+            .select(fields.map((f, i) => eb.ref(`$values.column${i + 1}`).as(f.name)));
+    }
+
+    protected override buildOrderByField(
+        query: SelectQueryBuilder<any, any, any>,
+        field: Expression<unknown>,
+        sort: SortOrder,
+        nulls: 'first' | 'last',
+    ) {
+        return query.orderBy(field, (ob) => {
+            ob = sort === 'asc' ? ob.asc() : ob.desc();
+            ob = nulls === 'first' ? ob.nullsFirst() : ob.nullsLast();
+            return ob;
+        });
+    }
+    // #endregion
 }

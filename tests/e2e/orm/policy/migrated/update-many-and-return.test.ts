@@ -26,6 +26,11 @@ describe('Policy updateManyAndReturn tests', () => {
         `,
         );
 
+        if (db.$schema.provider.type === 'mysql') {
+            // skip mysql as it doesn't support updateManyAndReturn
+            return;
+        }
+
         const rawDb = db.$unuseAll();
 
         await rawDb.user.createMany({
@@ -82,8 +87,7 @@ describe('Policy updateManyAndReturn tests', () => {
         await expect(db.$unuseAll().post.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ published: false });
     });
 
-    // TODO: field-level policy support
-    it.skip('field-level policies', async () => {
+    it('field-level policies', async () => {
         const db = await createPolicyTestClient(
             `
         model Post {
@@ -95,6 +99,11 @@ describe('Policy updateManyAndReturn tests', () => {
         }
         `,
         );
+
+        if (db.$schema.provider.type === 'mysql') {
+            // skip mysql as it doesn't support updateManyAndReturn
+            return;
+        }
 
         const rawDb = db.$unuseAll();
 
@@ -112,7 +121,7 @@ describe('Policy updateManyAndReturn tests', () => {
 
         expect(r.length).toBe(2);
         expect(r[0].title).toBeTruthy();
-        expect(r[1].title).toBeUndefined();
+        expect(r[1].title).toBeNull();
 
         // check posts are updated
         await expect(rawDb.post.findMany({ where: { title: 'foo' } })).resolves.toHaveLength(2);

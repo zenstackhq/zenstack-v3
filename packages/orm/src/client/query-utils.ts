@@ -12,7 +12,6 @@ import { match } from 'ts-pattern';
 import { ExpressionUtils, type FieldDef, type GetModels, type ModelDef, type SchemaDef } from '../schema';
 import { extractFields } from '../utils/object-utils';
 import type { AGGREGATE_OPERATORS } from './constants';
-import type { OrderBy } from './crud-types';
 import { createInternalError } from './errors';
 
 export function hasModel(schema: SchemaDef, model: string) {
@@ -68,6 +67,29 @@ export function requireField(schema: SchemaDef, modelOrType: string, field: stri
         }
     }
     throw createInternalError(`Model or type "${modelOrType}" not found in schema`, modelOrType);
+}
+
+/**
+ * Gets all model fields, by default non-relation, non-computed, non-inherited fields only.
+ */
+export function getModelFields(
+    schema: SchemaDef,
+    model: string,
+    options?: { relations?: boolean; computed?: boolean; inherited?: boolean },
+) {
+    const modelDef = requireModel(schema, model);
+    return Object.values(modelDef.fields).filter((f) => {
+        if (f.relation && !options?.relations) {
+            return false;
+        }
+        if (f.computed && !options?.computed) {
+            return false;
+        }
+        if (f.originModel && !options?.inherited) {
+            return false;
+        }
+        return true;
+    });
 }
 
 export function getIdFields<Schema extends SchemaDef>(schema: SchemaDef, model: GetModels<Schema>) {
@@ -222,9 +244,9 @@ export function buildJoinPairs(
     });
 }
 
-export function makeDefaultOrderBy<Schema extends SchemaDef>(schema: SchemaDef, model: string) {
+export function makeDefaultOrderBy(schema: SchemaDef, model: string) {
     const idFields = requireIdFields(schema, model);
-    return idFields.map((f) => ({ [f]: 'asc' }) as OrderBy<Schema, GetModels<Schema>, true, false>);
+    return idFields.map((f) => ({ [f]: 'asc' }) as const);
 }
 
 export function getManyToManyRelation(schema: SchemaDef, model: string, field: string) {

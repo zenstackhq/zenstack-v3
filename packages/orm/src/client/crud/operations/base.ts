@@ -8,6 +8,7 @@ import {
     sql,
     UpdateResult,
     type Compilable,
+    type ExpressionBuilder,
     type IsolationLevel,
     type QueryResult,
     type SelectQueryBuilder,
@@ -430,13 +431,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     Array.isArray(value.set)
                 ) {
                     // deal with nested "set" for scalar lists
-                    createFields[field] = this.dialect.transformPrimitive(
-                        value.set,
-                        fieldDef.type as BuiltinType,
-                        true,
-                    );
+                    createFields[field] = this.dialect.transformInput(value.set, fieldDef.type as BuiltinType, true);
                 } else {
-                    createFields[field] = this.dialect.transformPrimitive(
+                    createFields[field] = this.dialect.transformInput(
                         value,
                         fieldDef.type as BuiltinType,
                         !!fieldDef.array,
@@ -469,19 +466,77 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // return id fields if no returnFields specified
         returnFields = returnFields ?? requireIdFields(this.schema, model);
 
-        const query = kysely
-            .insertInto(model)
-            .$if(Object.keys(updatedData).length === 0, (qb) => qb.defaultValues())
-            .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
-            .returning(returnFields as any)
-            .modifyEnd(
-                this.makeContextComment({
-                    model,
-                    operation: 'create',
-                }),
-            );
+        let createdEntity: any;
 
-        const createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
+        if (this.dialect.supportsReturning) {
+            const query = kysely
+                .insertInto(model)
+                .$if(Object.keys(updatedData).length === 0, (qb) =>
+                    qb
+                        // case for `INSERT INTO ... DEFAULT VALUES` syntax
+                        .$if(this.dialect.supportsInsertDefaultValues, () => qb.defaultValues())
+                        // case for `INSERT INTO ... VALUES ({})` syntax
+                        .$if(!this.dialect.supportsInsertDefaultValues, () => qb.values({})),
+                )
+                .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
+                .returning(returnFields as any)
+                .modifyEnd(
+                    this.makeContextComment({
+                        model,
+                        operation: 'create',
+                    }),
+                );
+
+            createdEntity = await this.executeQueryTakeFirst(kysely, query, 'create');
+        } else {
+            // Fallback for databases that don't support RETURNING (e.g., MySQL)
+            const insertQuery = kysely
+                .insertInto(model)
+                .$if(Object.keys(updatedData).length === 0, (qb) =>
+                    qb
+                        // case for `INSERT INTO ... DEFAULT VALUES` syntax
+                        .$if(this.dialect.supportsInsertDefaultValues, () => qb.defaultValues())
+                        // case for `INSERT INTO ... VALUES ({})` syntax
+                        .$if(!this.dialect.supportsInsertDefaultValues, () => qb.values({})),
+                )
+                .$if(Object.keys(updatedData).length > 0, (qb) => qb.values(updatedData))
+                .modifyEnd(
+                    this.makeContextComment({
+                        model,
+                        operation: 'create',
+                    }),
+                );
+
+            const insertResult = await this.executeQuery(kysely, insertQuery, 'create');
+
+            // Build WHERE clause to find the inserted record
+            const idFields = requireIdFields(this.schema, model);
+            const idValues: Record<string, any> = {};
+
+            for (const idField of idFields) {
+                if (insertResult.insertId !== undefined && insertResult.insertId !== null) {
+                    const fieldDef = this.requireField(model, idField);
+                    if (this.isAutoIncrementField(fieldDef)) {
+                        // auto-generated id value
+                        idValues[idField] = insertResult.insertId;
+                        continue;
+                    }
+                }
+
+                if (updatedData[idField] !== undefined) {
+                    // ID was provided in the insert
+                    idValues[idField] = updatedData[idField];
+                } else {
+                    throw createInternalError(
+                        `Cannot determine ID field "${idField}" value for created model "${model}"`,
+                    );
+                }
+            }
+
+            // for dialects that don't support RETURNING, the outside logic will always
+            // read back the created record, we just return the id fields here
+            createdEntity = idValues;
+        }
 
         if (Object.keys(postCreateRelations).length > 0) {
             // process nested creates that need to happen after the current entity is created
@@ -511,6 +566,14 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         return createdEntity;
+    }
+
+    private isAutoIncrementField(fieldDef: FieldDef) {
+        return (
+            fieldDef.default &&
+            ExpressionUtils.isCall(fieldDef.default) &&
+            fieldDef.default.function === 'autoincrement'
+        );
     }
 
     private async processBaseModelCreate(kysely: ToKysely<Schema>, model: string, createFields: any, forModel: string) {
@@ -618,7 +681,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     A: sortedRecords[0]!.entity[firstIds[0]!],
                     B: sortedRecords[1]!.entity[secondIds[0]!],
                 } as any)
-                .onConflict((oc) => oc.columns(['A', 'B'] as any).doNothing())
+                // case for `INSERT IGNORE` or `ON CONFLICT DO NOTHING` syntax
+                .$if(this.dialect.insertIgnoreMethod === 'onConflict', (qb) =>
+                    qb.onConflict((oc) => oc.columns(['A', 'B'] as any).doNothing()),
+                )
+                // case for `INSERT IGNORE` syntax
+                .$if(this.dialect.insertIgnoreMethod === 'ignore', (qb) => qb.ignore())
                 .execute();
             return result[0] as any;
         } else {
@@ -794,7 +862,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         const modelDef = this.requireModel(model);
 
-        let relationKeyPairs: { fk: string; pk: string }[] = [];
+        const relationKeyPairs: { fk: string; pk: string }[] = [];
         if (fromRelation) {
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
                 this.schema,
@@ -804,7 +872,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             if (ownedByModel) {
                 throw createInvalidInputError('incorrect relation hierarchy for createMany', model);
             }
-            relationKeyPairs = keyPairs;
+            relationKeyPairs.push(...keyPairs);
         }
 
         let createData = enumerate(input.data).map((item) => {
@@ -812,7 +880,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             for (const [name, value] of Object.entries(item)) {
                 const fieldDef = this.requireField(model, name);
                 invariant(!fieldDef.relation, 'createMany does not support relations');
-                newItem[name] = this.dialect.transformPrimitive(value, fieldDef.type as BuiltinType, !!fieldDef.array);
+                newItem[name] = this.dialect.transformInput(value, fieldDef.type as BuiltinType, !!fieldDef.array);
             }
             if (fromRelation) {
                 for (const { fk, pk } of relationKeyPairs) {
@@ -822,7 +890,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return this.fillGeneratedAndDefaultValues(modelDef, newItem);
         });
 
-        if (!this.dialect.supportInsertWithDefault) {
+        if (!this.dialect.supportsDefaultAsFieldValue) {
             // if the dialect doesn't support `DEFAULT` as insert field values,
             // we need to double check if data rows have mismatching fields, and
             // if so, make sure all fields have default value filled if not provided
@@ -846,7 +914,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             fieldDef.default !== null &&
                             typeof fieldDef.default !== 'object'
                         ) {
-                            item[field] = this.dialect.transformPrimitive(
+                            item[field] = this.dialect.transformInput(
                                 fieldDef.default,
                                 fieldDef.type as BuiltinType,
                                 !!fieldDef.array,
@@ -876,7 +944,13 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const query = kysely
             .insertInto(model)
             .values(createData)
-            .$if(!!input.skipDuplicates, (qb) => qb.onConflict((oc) => oc.doNothing()))
+            .$if(!!input.skipDuplicates, (qb) =>
+                qb
+                    // case for `INSERT ... ON CONFLICT DO NOTHING` syntax
+                    .$if(this.dialect.insertIgnoreMethod === 'onConflict', () => qb.onConflict((oc) => oc.doNothing()))
+                    // case for `INSERT IGNORE` syntax
+                    .$if(this.dialect.insertIgnoreMethod === 'ignore', () => qb.ignore()),
+            )
             .modifyEnd(
                 this.makeContextComment({
                     model,
@@ -889,8 +963,21 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return { count: Number(result.numAffectedRows) } as Result;
         } else {
             fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
-            const result = await query.returning(fieldsToReturn as any).execute();
-            return result as Result;
+
+            if (this.dialect.supportsReturning) {
+                const result = await query.returning(fieldsToReturn as any).execute();
+                return result as Result;
+            } else {
+                // Fallback for databases that don't support RETURNING (e.g., MySQL)
+                // For createMany without RETURNING, we can't reliably get all inserted records
+                // especially with auto-increment IDs. The best we can do is return the count.
+                // If users need the created records, they should use multiple create() calls
+                // or the application should query after insertion.
+                throw createNotSupportedError(
+                    `\`createManyAndReturn\` is not supported for ${this.dialect.provider}. ` +
+                        `Use multiple \`create\` calls or query the records after insertion.`,
+                );
+            }
         }
     }
 
@@ -923,12 +1010,21 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // create base model entity
-        const baseEntities = await this.createMany(
-            kysely,
-            model as GetModels<Schema>,
-            { data: thisCreateRows, skipDuplicates },
-            true,
-        );
+        let baseEntities: unknown[];
+        if (this.dialect.supportsReturning) {
+            baseEntities = await this.createMany(
+                kysely,
+                model as GetModels<Schema>,
+                { data: thisCreateRows, skipDuplicates },
+                true,
+            );
+        } else {
+            // fall back to multiple creates if RETURNING is not supported
+            baseEntities = [];
+            for (const row of thisCreateRows) {
+                baseEntities.push(await this.create(kysely, model, row, undefined, true));
+            }
+        }
 
         // copy over id fields from base model
         for (let i = 0; i < baseEntities.length; i++) {
@@ -950,7 +1046,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (typeof fieldDef?.default === 'object' && 'kind' in fieldDef.default) {
                     const generated = this.evalGenerator(fieldDef.default);
                     if (generated !== undefined) {
-                        values[field] = this.dialect.transformPrimitive(
+                        values[field] = this.dialect.transformInput(
                             generated,
                             fieldDef.type as BuiltinType,
                             !!fieldDef.array,
@@ -958,7 +1054,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     }
                 } else if (fieldDef?.updatedAt) {
                     // TODO: should this work at kysely level instead?
-                    values[field] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                    values[field] = this.dialect.transformInput(new Date(), 'DateTime', false);
                 } else if (fieldDef?.default !== undefined) {
                     let value = fieldDef.default;
                     if (fieldDef.type === 'Json') {
@@ -969,11 +1065,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             value = JSON.parse(value);
                         }
                     }
-                    values[field] = this.dialect.transformPrimitive(
-                        value,
-                        fieldDef.type as BuiltinType,
-                        !!fieldDef.array,
-                    );
+                    values[field] = this.dialect.transformInput(value, fieldDef.type as BuiltinType, !!fieldDef.array);
                 }
             }
         }
@@ -1043,39 +1135,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             throw createInvalidInputError('data must be an object');
         }
 
-        const parentWhere: any = {};
-        let m2m: ReturnType<typeof getManyToManyRelation> = undefined;
-
-        if (fromRelation) {
-            m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
-            if (!m2m) {
-                // merge foreign key conditions from the relation
-                const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
-                    this.schema,
-                    fromRelation.model,
-                    fromRelation.field,
-                );
-                if (ownedByModel) {
-                    const fromEntity = await this.readUnique(kysely, fromRelation.model as GetModels<Schema>, {
-                        where: fromRelation.ids,
-                    });
-                    for (const { fk, pk } of keyPairs) {
-                        parentWhere[pk] = fromEntity[fk];
-                    }
-                } else {
-                    for (const { fk, pk } of keyPairs) {
-                        parentWhere[fk] = fromRelation.ids[pk];
-                    }
-                }
-            } else {
-                // many-to-many relation, filter for parent with "some"
-                const fromRelationFieldDef = this.requireField(fromRelation.model, fromRelation.field);
-                invariant(fromRelationFieldDef.relation?.opposite);
-                parentWhere[fromRelationFieldDef.relation.opposite] = {
-                    some: fromRelation.ids,
-                };
-            }
-        }
+        const parentWhere = await this.buildUpdateParentRelationFilter(kysely, fromRelation);
 
         let combinedWhere: WhereInput<Schema, GetModels<Schema>, false> = where ?? {};
         if (Object.keys(parentWhere).length > 0) {
@@ -1088,11 +1148,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // fill in automatically updated fields
         const autoUpdatedFields: string[] = [];
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
-            if (fieldDef.updatedAt) {
+            if (fieldDef.updatedAt && finalData[fieldName] === undefined) {
                 if (finalData === data) {
                     finalData = clone(data);
                 }
-                finalData[fieldName] = this.dialect.transformPrimitive(new Date(), 'DateTime', false);
+                finalData[fieldName] = this.dialect.transformInput(new Date(), 'DateTime', false);
                 autoUpdatedFields.push(fieldName);
             }
         }
@@ -1114,11 +1174,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         let needIdRead = false;
-        if (modelDef.baseModel && !this.isIdFilter(model, combinedWhere)) {
-            // when updating a model with delegate base, base fields may be referenced in the filter,
-            // so we read the id out if the filter is not ready an id filter, and and use it as the
-            // update filter instead
-            needIdRead = true;
+        if (!this.isIdFilter(model, combinedWhere)) {
+            if (modelDef.baseModel) {
+                // when updating a model with delegate base, base fields may be referenced in the filter,
+                // so we read the id out if the filter is not ready an id filter, and and use it as the
+                // update filter instead
+                needIdRead = true;
+            }
+            if (!this.dialect.supportsReturning) {
+                // for dialects that don't support RETURNING, we need to read the id fields
+                // to identify the updated entity
+                needIdRead = true;
+            }
         }
 
         if (needIdRead) {
@@ -1192,19 +1259,77 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return thisEntity;
         } else {
             fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
-            const query = kysely
-                .updateTable(model)
-                .where(() => this.dialect.buildFilter(model, model, combinedWhere))
-                .set(updateFields)
-                .returning(fieldsToReturn as any)
-                .modifyEnd(
-                    this.makeContextComment({
-                        model,
-                        operation: 'update',
-                    }),
-                );
 
-            const updatedEntity = await this.executeQueryTakeFirst(kysely, query, 'update');
+            let updatedEntity: any;
+
+            if (this.dialect.supportsReturning) {
+                const query = kysely
+                    .updateTable(model)
+                    .where(() => this.dialect.buildFilter(model, model, combinedWhere))
+                    .set(updateFields)
+                    .returning(fieldsToReturn as any)
+                    .modifyEnd(
+                        this.makeContextComment({
+                            model,
+                            operation: 'update',
+                        }),
+                    );
+
+                updatedEntity = await this.executeQueryTakeFirst(kysely, query, 'update');
+            } else {
+                // Fallback for databases that don't support RETURNING (e.g., MySQL)
+                const updateQuery = kysely
+                    .updateTable(model)
+                    .where(() => this.dialect.buildFilter(model, model, combinedWhere))
+                    .set(updateFields)
+                    .modifyEnd(
+                        this.makeContextComment({
+                            model,
+                            operation: 'update',
+                        }),
+                    );
+
+                const updateResult = await this.executeQuery(kysely, updateQuery, 'update');
+                if (!updateResult.numAffectedRows) {
+                    // no rows updated
+                    updatedEntity = null;
+                } else {
+                    // collect id field/values from the original filter
+                    const idFields = requireIdFields(this.schema, model);
+                    const filterIdValues: any = {};
+                    for (const key of idFields) {
+                        if (combinedWhere[key] !== undefined && typeof combinedWhere[key] !== 'object') {
+                            filterIdValues[key] = combinedWhere[key];
+                        }
+                    }
+
+                    // check if we are updating any id fields
+                    const updatingIdFields = idFields.some((idField) => idField in updateFields);
+
+                    if (Object.keys(filterIdValues).length === idFields.length && !updatingIdFields) {
+                        // if we have all id fields in the original filter and ids are not being updated,
+                        // we can simply return the id values as the update result
+                        updatedEntity = filterIdValues;
+                    } else {
+                        // otherwise we need to re-query the updated entity
+
+                        // replace id fields in the filter with updated values if they are being updated
+                        const readFilter: any = { ...combinedWhere };
+                        for (const idField of idFields) {
+                            if (idField in updateFields && updateFields[idField] !== undefined) {
+                                // if id fields are being updated, use the new values
+                                readFilter[idField] = updateFields[idField];
+                            }
+                        }
+                        const selectQuery = kysely
+                            .selectFrom(model)
+                            .select(fieldsToReturn as any)
+                            .where(() => this.dialect.buildFilter(model, model, readFilter));
+                        updatedEntity = await this.executeQueryTakeFirst(kysely, selectQuery, 'update');
+                    }
+                }
+            }
+
             if (!updatedEntity) {
                 if (throwIfNotFound) {
                     throw createNotFoundError(model);
@@ -1215,6 +1340,42 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             return updatedEntity;
         }
+    }
+
+    private async buildUpdateParentRelationFilter(kysely: AnyKysely, fromRelation: FromRelationContext | undefined) {
+        const parentWhere: any = {};
+        let m2m: ReturnType<typeof getManyToManyRelation> = undefined;
+        if (fromRelation) {
+            m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
+            if (!m2m) {
+                // merge foreign key conditions from the relation
+                const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(
+                    this.schema,
+                    fromRelation.model,
+                    fromRelation.field,
+                );
+                if (ownedByModel) {
+                    const fromEntity = await this.readUnique(kysely, fromRelation.model, {
+                        where: fromRelation.ids,
+                    });
+                    for (const { fk, pk } of keyPairs) {
+                        parentWhere[pk] = fromEntity[fk];
+                    }
+                } else {
+                    for (const { fk, pk } of keyPairs) {
+                        parentWhere[fk] = fromRelation.ids[pk];
+                    }
+                }
+            } else {
+                // many-to-many relation, filter for parent with "some"
+                const fromRelationFieldDef = this.requireField(fromRelation.model, fromRelation.field);
+                invariant(fromRelationFieldDef.relation?.opposite);
+                parentWhere[fromRelationFieldDef.relation.opposite] = {
+                    some: fromRelation.ids,
+                };
+            }
+        }
+        return parentWhere;
     }
 
     private processScalarFieldUpdateData(model: string, field: string, data: any): any {
@@ -1229,7 +1390,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return this.transformScalarListUpdate(model, field, fieldDef, data[field]);
         }
 
-        return this.dialect.transformPrimitive(data[field], fieldDef.type as BuiltinType, !!fieldDef.array);
+        return this.dialect.transformInput(data[field], fieldDef.type as BuiltinType, !!fieldDef.array);
     }
 
     private isNumericIncrementalUpdate(fieldDef: FieldDef, value: any) {
@@ -1294,7 +1455,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         );
 
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, false);
+        const value = this.dialect.transformInput(payload[key!], fieldDef.type as BuiltinType, false);
         const eb = expressionBuilder<any, any>();
         const fieldRef = this.dialect.fieldRef(model, field);
 
@@ -1317,7 +1478,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
     ) {
         invariant(Object.keys(payload).length === 1, 'Only one of "set", "push" can be provided');
         const key = Object.keys(payload)[0];
-        const value = this.dialect.transformPrimitive(payload[key!], fieldDef.type as BuiltinType, true);
+        const value = this.dialect.transformInput(payload[key!], fieldDef.type as BuiltinType, true);
         const eb = expressionBuilder<any, any>();
         const fieldRef = this.dialect.fieldRef(model, field);
 
@@ -1351,6 +1512,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         limit: number | undefined,
         returnData: ReturnData,
         filterModel?: string,
+        fromRelation?: FromRelationContext,
         fieldsToReturn?: readonly string[],
     ): Promise<Result> {
         if (typeof data !== 'object') {
@@ -1366,6 +1528,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             throw createNotSupportedError('Updating with a limit is not supported for polymorphic models');
         }
 
+        const parentWhere = await this.buildUpdateParentRelationFilter(kysely, fromRelation);
+        let combinedWhere: WhereInput<Schema, GetModels<Schema>, false> = where ?? {};
+        if (Object.keys(parentWhere).length > 0) {
+            combinedWhere = Object.keys(combinedWhere).length > 0 ? { AND: [parentWhere, combinedWhere] } : parentWhere;
+        }
+
         filterModel ??= model;
         let updateFields: any = {};
 
@@ -1374,6 +1542,25 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 continue;
             }
             updateFields[field] = this.processScalarFieldUpdateData(model, field, data);
+        }
+
+        let resultFromBaseModel: any = undefined;
+        if (modelDef.baseModel) {
+            const baseResult = await this.processBaseModelUpdateMany(
+                kysely,
+                modelDef.baseModel,
+                combinedWhere,
+                updateFields,
+                filterModel,
+            );
+            updateFields = baseResult.remainingFields;
+            resultFromBaseModel = baseResult.baseResult;
+        }
+
+        // check again if we don't have anything to update for this model
+        if (Object.keys(updateFields).length === 0) {
+            // return result from base model if it exists, otherwise return empty result
+            return resultFromBaseModel ?? ((returnData ? [] : { count: 0 }) as Result);
         }
 
         let shouldFallbackToIdFilter = false;
@@ -1391,31 +1578,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             shouldFallbackToIdFilter = true;
         }
 
-        let resultFromBaseModel: any = undefined;
-        if (modelDef.baseModel) {
-            const baseResult = await this.processBaseModelUpdateMany(
-                kysely,
-                modelDef.baseModel,
-                where,
-                updateFields,
-                filterModel,
-            );
-            updateFields = baseResult.remainingFields;
-            resultFromBaseModel = baseResult.baseResult;
-        }
-
-        // check again if we don't have anything to update for this model
-        if (Object.keys(updateFields).length === 0) {
-            // return result from base model if it exists, otherwise return empty result
-            return resultFromBaseModel ?? ((returnData ? [] : { count: 0 }) as Result);
-        }
-
         let query = kysely.updateTable(model).set(updateFields);
 
         if (!shouldFallbackToIdFilter) {
             // simple filter
             query = query
-                .where(() => this.dialect.buildFilter(model, model, where))
+                .where(() => this.dialect.buildFilter(model, model, combinedWhere))
                 .$if(limit !== undefined, (qb) => qb.limit(limit!));
         } else {
             query = query.where((eb) =>
@@ -1425,11 +1593,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                         ...this.buildIdFieldRefs(kysely, model),
                     ),
                     'in',
-                    this.dialect
-                        .buildSelectModel(filterModel, filterModel)
-                        .where(this.dialect.buildFilter(filterModel, filterModel, where))
-                        .select(this.buildIdFieldRefs(kysely, filterModel))
-                        .$if(limit !== undefined, (qb) => qb.limit(limit!)),
+                    // the outer "select *" is needed to isolate the sub query (as needed for dialects like mysql)
+                    eb
+                        .selectFrom(
+                            this.dialect
+                                .buildSelectModel(filterModel, filterModel)
+                                .where(this.dialect.buildFilter(filterModel, filterModel, combinedWhere))
+                                .select(this.buildIdFieldRefs(kysely, filterModel))
+                                .$if(limit !== undefined, (qb) => qb.limit(limit!))
+                                .as('$sub'),
+                        )
+                        .selectAll(),
                 ),
             );
         }
@@ -1441,9 +1615,71 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             return { count: Number(result.numAffectedRows) } as Result;
         } else {
             fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
-            const finalQuery = query.returning(fieldsToReturn as any);
-            const result = await this.executeQuery(kysely, finalQuery, 'update');
-            return result.rows as Result;
+
+            if (this.dialect.supportsReturning) {
+                const finalQuery = query.returning(fieldsToReturn as any);
+                const result = await this.executeQuery(kysely, finalQuery, 'update');
+                return result.rows as Result;
+            } else {
+                // Fallback for databases that don't support RETURNING (e.g., MySQL)
+                // First, select the records to be updated
+                let selectQuery = kysely.selectFrom(model).selectAll();
+
+                if (!shouldFallbackToIdFilter) {
+                    selectQuery = selectQuery
+                        .where(() => this.dialect.buildFilter(model, model, combinedWhere))
+                        .$if(limit !== undefined, (qb) => qb.limit(limit!));
+                } else {
+                    selectQuery = selectQuery.where((eb) =>
+                        eb(
+                            eb.refTuple(
+                                // @ts-expect-error
+                                ...this.buildIdFieldRefs(kysely, model),
+                            ),
+                            'in',
+                            this.dialect
+                                .buildSelectModel(filterModel, filterModel)
+                                .where(this.dialect.buildFilter(filterModel, filterModel, combinedWhere))
+                                .select(this.buildIdFieldRefs(kysely, filterModel))
+                                .$if(limit !== undefined, (qb) => qb.limit(limit!)),
+                        ),
+                    );
+                }
+
+                const recordsToUpdate = await this.executeQuery(kysely, selectQuery, 'update');
+
+                // Execute the update
+                await this.executeQuery(kysely, query, 'update');
+
+                // Return the IDs of updated records, then query them back with updated values
+                if (recordsToUpdate.rows.length === 0) {
+                    return [] as Result;
+                }
+
+                const idFields = requireIdFields(this.schema, model);
+                const updatedIds = recordsToUpdate.rows.map((row: any) => {
+                    const id: Record<string, any> = {};
+                    for (const idField of idFields) {
+                        id[idField] = row[idField];
+                    }
+                    return id;
+                });
+
+                // Query back the updated records
+                const resultQuery = kysely
+                    .selectFrom(model)
+                    .selectAll()
+                    .where((eb) => {
+                        const conditions = updatedIds.map((id) => {
+                            const idConditions = Object.entries(id).map(([field, value]) => eb.eb(field, '=', value));
+                            return eb.and(idConditions);
+                        });
+                        return eb.or(conditions);
+                    });
+
+                const result = await this.executeQuery(kysely, resultQuery, 'update');
+                return result.rows as Result;
+            }
         }
     }
 
@@ -1593,8 +1829,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
                 case 'updateMany': {
                     for (const _item of enumerate(value)) {
-                        const item = _item as { where: any; data: any };
-                        await this.update(kysely, fieldModel, item.where, item.data, fromRelationContext, false, false);
+                        const item = _item as { where: any; data: any; limit: number | undefined };
+                        await this.updateMany(
+                            kysely,
+                            fieldModel,
+                            item.where,
+                            item.data,
+                            item.limit,
+                            false,
+                            fieldModel,
+                            fromRelationContext,
+                        );
                     }
                     break;
                 }
@@ -1680,9 +1925,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 if (!relationFieldDef.array) {
                     const query = kysely
                         .updateTable(model)
-                        .where((eb) =>
-                            eb.and(keyPairs.map(({ fk, pk }) => eb(eb.ref(fk as any), '=', fromRelation.ids[pk]))),
-                        )
+                        .where((eb) => eb.and(keyPairs.map(({ fk, pk }) => eb(eb.ref(fk), '=', fromRelation.ids[pk]))))
                         .set(keyPairs.reduce((acc, { fk }) => ({ ...acc, [fk]: null }), {} as any))
                         .modifyEnd(
                             this.makeContextComment({
@@ -1987,7 +2230,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             expectedDeleteCount = deleteConditions.length;
         }
 
-        let deleteResult: QueryResult<unknown>;
+        let deleteResult: Awaited<ReturnType<typeof this.delete>>;
         let deleteFromModel: string;
         const m2m = getManyToManyRelation(this.schema, fromRelation.model, fromRelation.field);
 
@@ -2052,7 +2295,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         // validate result
-        if (throwForNotFound && expectedDeleteCount > deleteResult.rows.length) {
+        if (throwForNotFound && expectedDeleteCount > (deleteResult.numAffectedRows ?? 0)) {
             // some entities were not deleted
             throw createNotFoundError(deleteFromModel);
         }
@@ -2085,7 +2328,6 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         fieldsToReturn = fieldsToReturn ?? requireIdFields(this.schema, model);
-        let query = kysely.deleteFrom(model).returning(fieldsToReturn as any);
 
         let needIdFilter = false;
 
@@ -2102,32 +2344,42 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             needIdFilter = true;
         }
 
-        if (!needIdFilter) {
-            query = query.where(() => this.dialect.buildFilter(model, model, where));
-        } else {
-            query = query.where((eb) =>
-                eb(
-                    eb.refTuple(
-                        // @ts-expect-error
-                        ...this.buildIdFieldRefs(kysely, model),
-                    ),
-                    'in',
-                    this.dialect
-                        .buildSelectModel(filterModel, filterModel)
-                        .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
-                        .select(this.buildIdFieldRefs(kysely, filterModel))
-                        .$if(limit !== undefined, (qb) => qb.limit(limit!)),
-                ),
-            );
-        }
+        const deleteFilter = needIdFilter
+            ? (eb: ExpressionBuilder<any, any>) =>
+                  eb(
+                      eb.refTuple(
+                          // @ts-expect-error
+                          ...this.buildIdFieldRefs(kysely, model),
+                      ),
+                      'in',
+                      // the outer "select *" is needed to isolate the sub query (as needed for dialects like mysql)
+                      eb
+                          .selectFrom(
+                              this.dialect
+                                  .buildSelectModel(filterModel, filterModel)
+                                  .where(() => this.dialect.buildFilter(filterModel, filterModel, where))
+                                  .select(this.buildIdFieldRefs(kysely, filterModel))
+                                  .$if(limit !== undefined, (qb) => qb.limit(limit!))
+                                  .as('$sub'),
+                          )
+                          .selectAll(),
+                  )
+            : () => this.dialect.buildFilter(model, model, where);
 
         // if the model being deleted has a relation to a model that extends a delegate model, and if that
         // relation is set to trigger a cascade delete from this model, the deletion will not automatically
         // clean up the base hierarchy of the relation side (because polymorphic model's cascade deletion
         // works downward not upward). We need to take care of the base deletions manually here.
+
         await this.processDelegateRelationDelete(kysely, modelDef, where, limit);
 
-        query = query.modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
+        const query = kysely
+            .deleteFrom(model)
+            .where(deleteFilter)
+            .$if(this.dialect.supportsReturning, (qb) => qb.returning(fieldsToReturn))
+            .$if(limit !== undefined && this.dialect.supportsDeleteWithLimit, (qb) => qb.limit(limit!))
+            .modifyEnd(this.makeContextComment({ model, operation: 'delete' }));
+
         return this.executeQuery(kysely, query, 'delete');
     }
 
@@ -2266,6 +2518,11 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         if (this.hasPolicyEnabled) {
             // TODO: refactor this check
             // policy enforcement always requires read back
+            return { needReadBack: true, selectedFields: undefined };
+        }
+
+        if (!this.dialect.supportsReturning) {
+            // if the dialect doesn't support RETURNING, we always need read back
             return { needReadBack: true, selectedFields: undefined };
         }
 

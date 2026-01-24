@@ -31,7 +31,7 @@ import { FindOperationHandler } from './crud/operations/find';
 import { GroupByOperationHandler } from './crud/operations/group-by';
 import { UpdateOperationHandler } from './crud/operations/update';
 import { InputValidator } from './crud/validator';
-import { createConfigError, createNotFoundError } from './errors';
+import { createConfigError, createNotFoundError, createNotSupportedError } from './errors';
 import { ZenStackDriver } from './executor/zenstack-driver';
 import { ZenStackQueryExecutor } from './executor/zenstack-query-executor';
 import * as BuiltinFunctions from './functions';
@@ -564,6 +564,11 @@ function createModelCrudHandler(
         },
 
         createManyAndReturn: (args: unknown) => {
+            if (client.$schema.provider.type === 'mysql') {
+                throw createNotSupportedError(
+                    '"createManyAndReturn" is not supported by "mysql" provider. Use "createMany" or multiple "create" calls instead.',
+                );
+            }
             return createPromise(
                 'createManyAndReturn',
                 'createManyAndReturn',
@@ -594,6 +599,11 @@ function createModelCrudHandler(
         },
 
         updateManyAndReturn: (args: unknown) => {
+            if (client.$schema.provider.type === 'mysql') {
+                throw createNotSupportedError(
+                    '"updateManyAndReturn" is not supported by "mysql" provider. Use "updateMany" or multiple "update" calls instead.',
+                );
+            }
             return createPromise(
                 'updateManyAndReturn',
                 'updateManyAndReturn',

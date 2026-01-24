@@ -545,7 +545,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         } else if (value === false) {
             return falseNode(this.dialect);
         } else {
-            const transformed = this.dialect.transformPrimitive(value, type, false) ?? null;
+            const transformed = this.dialect.transformInput(value, type, false) ?? null;
             if (!Array.isArray(transformed)) {
                 // simple primitives can be immediate values
                 return ValueNode.createImmediate(transformed);

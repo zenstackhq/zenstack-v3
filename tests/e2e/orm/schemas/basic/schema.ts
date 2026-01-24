@@ -246,6 +246,26 @@ export class SchemaType implements SchemaDef {
                 id: { type: "String" },
                 userId: { type: "String" }
             }
+        },
+        Plain: {
+            name: "Plain",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "Int",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
+                    default: ExpressionUtils.call("autoincrement")
+                },
+                value: {
+                    name: "value",
+                    type: "Int"
+                }
+            },
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "Int" }
+            }
         }
     } as const;
     typeDefs = {

@@ -1,5 +1,5 @@
 import { enumerate, invariant, isPlainObject } from '@zenstackhq/common-helpers';
-import type { Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
+import type { AliasableExpression, Expression, ExpressionBuilder, ExpressionWrapper, SqlBool, ValueNode } from 'kysely';
 import { expressionBuilder, sql, type SelectQueryBuilder } from 'kysely';
 import { match, P } from 'ts-pattern';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
@@ -44,13 +44,62 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         protected readonly options: ClientOptions<Schema>,
     ) {}
 
-    transformPrimitive(value: unknown, _type: BuiltinType, _forArrayField: boolean) {
+    // #region capability flags
+
+    /**
+     * Whether the dialect supports updating with a limit on the number of updated rows.
+     */
+    abstract get supportsUpdateWithLimit(): boolean;
+
+    /**
+     * Whether the dialect supports deleting with a limit on the number of deleted rows.
+     */
+    abstract get supportsDeleteWithLimit(): boolean;
+
+    /**
+     * Whether the dialect supports DISTINCT ON.
+     */
+    abstract get supportsDistinctOn(): boolean;
+
+    /**
+     * Whether the dialect support inserting with `DEFAULT` as field value.
+     */
+    abstract get supportsDefaultAsFieldValue(): boolean;
+
+    /**
+     * Whether the dialect supports the RETURNING clause in INSERT/UPDATE/DELETE statements.
+     */
+    abstract get supportsReturning(): boolean;
+
+    /**
+     * Whether the dialect supports `INSERT INTO ... DEFAULT VALUES` syntax.
+     */
+    abstract get supportsInsertDefaultValues(): boolean;
+
+    /**
+     * How to perform insert ignore operation.
+     */
+    abstract get insertIgnoreMethod(): 'onConflict' | 'ignore';
+
+    // #endregion
+
+    // #region value transformation
+
+    /**
+     * Transforms input value before sending to database.
+     */
+    transformInput(value: unknown, _type: BuiltinType, _forArrayField: boolean) {
         return value;
     }
 
+    /**
+     * Transforms output value received from database.
+     */
     transformOutput(value: unknown, _type: BuiltinType, _array: boolean) {
         return value;
     }
+
+    // #endregion
 
     // #region common query builders
 
@@ -90,7 +139,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         result = this.buildSkipTake(result, skip, take);
 
         // orderBy
-        result = this.buildOrderBy(result, model, modelAlias, args.orderBy, negateOrderBy);
+        result = this.buildOrderBy(result, model, modelAlias, args.orderBy, negateOrderBy, take);
 
         // distinct
         if ('distinct' in args && (args as any).distinct) {
@@ -160,8 +209,8 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildCursorFilter(
         model: string,
         query: SelectQueryBuilder<any, any, any>,
-        cursor: FindArgs<Schema, GetModels<Schema>, true>['cursor'],
-        orderBy: FindArgs<Schema, GetModels<Schema>, true>['orderBy'],
+        cursor: object,
+        orderBy: OrArray<Record<string, SortOrder>> | undefined,
         negateOrderBy: boolean,
         modelAlias: string,
     ) {
@@ -394,51 +443,35 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 continue;
             }
 
-            switch (key) {
-                case 'some': {
-                    result = this.and(
-                        result,
-                        this.eb(
+            const countSelect = (negate: boolean) => {
+                const filter = this.buildFilter(relationModel, relationFilterSelectAlias, subPayload);
+                return (
+                    this.eb
+                        // the outer select is needed to avoid mysql's scope issue
+                        .selectFrom(
                             this.buildSelectModel(relationModel, relationFilterSelectAlias)
                                 .select(() => this.eb.fn.count(this.eb.lit(1)).as('$count'))
                                 .where(buildPkFkWhereRefs(this.eb))
-                                .where(() => this.buildFilter(relationModel, relationFilterSelectAlias, subPayload)),
-                            '>',
-                            0,
-                        ),
-                    );
+                                .where(() => (negate ? this.eb.not(filter) : filter))
+                                .as('$sub'),
+                        )
+                        .select('$count')
+                );
+            };
+
+            switch (key) {
+                case 'some': {
+                    result = this.and(result, this.eb(countSelect(false), '>', 0));
                     break;
                 }
 
                 case 'every': {
-                    result = this.and(
-                        result,
-                        this.eb(
-                            this.buildSelectModel(relationModel, relationFilterSelectAlias)
-                                .select((eb1) => eb1.fn.count(eb1.lit(1)).as('$count'))
-                                .where(buildPkFkWhereRefs(this.eb))
-                                .where(() =>
-                                    this.eb.not(this.buildFilter(relationModel, relationFilterSelectAlias, subPayload)),
-                                ),
-                            '=',
-                            0,
-                        ),
-                    );
+                    result = this.and(result, this.eb(countSelect(true), '=', 0));
                     break;
                 }
 
                 case 'none': {
-                    result = this.and(
-                        result,
-                        this.eb(
-                            this.buildSelectModel(relationModel, relationFilterSelectAlias)
-                                .select(() => this.eb.fn.count(this.eb.lit(1)).as('$count'))
-                                .where(buildPkFkWhereRefs(this.eb))
-                                .where(() => this.buildFilter(relationModel, relationFilterSelectAlias, subPayload)),
-                            '=',
-                            0,
-                        ),
-                    );
+                    result = this.and(result, this.eb(countSelect(false), '=', 0));
                     break;
                 }
             }
@@ -456,7 +489,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 continue;
             }
 
-            const value = this.transformPrimitive(_value, fieldType, !!fieldDef.array);
+            const value = this.transformInput(_value, fieldType, !!fieldDef.array);
 
             switch (key) {
                 case 'equals': {
@@ -550,7 +583,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
         const path = filter.path;
         const jsonReceiver = this.buildJsonPathSelection(receiver, path);
-        const stringReceiver = this.eb.cast(jsonReceiver, 'text');
+        const stringReceiver = this.castText(jsonReceiver);
 
         const mode = filter.mode ?? 'default';
         invariant(mode === 'default' || mode === 'insensitive', 'Invalid JSON filter mode');
@@ -658,7 +691,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         const clauses: Expression<SqlBool>[] = [];
 
         if (filter === null) {
-            return this.eb(receiver, '=', 'null');
+            return this.eb(receiver, '=', this.transformInput(null, 'Json', false));
         }
 
         invariant(filter && typeof filter === 'object', 'Typed JSON filter payload must be an object');
@@ -688,7 +721,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                         let _receiver = fieldReceiver;
                         if (fieldDef.type === 'String') {
                             // trim quotes for string fields
-                            _receiver = this.eb.fn('trim', [this.eb.cast(fieldReceiver, 'text'), sql.lit('"')]);
+                            _receiver = this.trimTextQuotes(this.castText(fieldReceiver));
                         }
                         clauses.push(this.buildPrimitiveFilter(_receiver, fieldDef, value));
                     }
@@ -702,17 +735,24 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         if (value instanceof DbNullClass) {
             return this.eb(lhs, 'is', null);
         } else if (value instanceof JsonNullClass) {
-            return this.eb.and([this.eb(lhs, '=', 'null'), this.eb(lhs, 'is not', null)]);
+            return this.eb.and([
+                this.eb(lhs, '=', this.transformInput(null, 'Json', false)),
+                this.eb(lhs, 'is not', null),
+            ]);
         } else if (value instanceof AnyNullClass) {
             // AnyNull matches both DB NULL and JSON null
-            return this.eb.or([this.eb(lhs, 'is', null), this.eb(lhs, '=', 'null')]);
+            return this.eb.or([this.eb(lhs, 'is', null), this.eb(lhs, '=', this.transformInput(null, 'Json', false))]);
         } else {
-            return this.buildLiteralFilter(lhs, 'Json', value);
+            return this.buildJsonEqualityFilter(lhs, value);
         }
     }
 
+    protected buildJsonEqualityFilter(lhs: Expression<any>, rhs: unknown) {
+        return this.buildLiteralFilter(lhs, 'Json', rhs);
+    }
+
     private buildLiteralFilter(lhs: Expression<any>, type: BuiltinType, rhs: unknown) {
-        return this.eb(lhs, '=', rhs !== null && rhs !== undefined ? this.transformPrimitive(rhs, type, false) : rhs);
+        return this.eb(lhs, '=', rhs !== null && rhs !== undefined ? this.transformInput(rhs, type, false) : rhs);
     }
 
     private buildStandardFilter(
@@ -869,7 +909,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     private buildStringLike(receiver: Expression<any>, pattern: string, insensitive: boolean) {
         const { supportsILike } = this.getStringCasingBehavior();
         const op = insensitive && supportsILike ? 'ilike' : 'like';
-        return sql<SqlBool>`${receiver} ${sql.raw(op)} ${sql.val(pattern)} escape '\\'`;
+        return sql<SqlBool>`${receiver} ${sql.raw(op)} ${sql.val(pattern)} escape ${sql.val('\\')}`;
     }
 
     private prepStringCasing(
@@ -895,7 +935,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             type,
             payload,
             fieldRef,
-            (value) => this.transformPrimitive(value, type, false),
+            (value) => this.transformInput(value, type, false),
             (value) => this.buildNumberFilter(fieldRef, type, value),
         );
         return this.and(...conditions);
@@ -906,7 +946,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             'Boolean',
             payload,
             fieldRef,
-            (value) => this.transformPrimitive(value, 'Boolean', false),
+            (value) => this.transformInput(value, 'Boolean', false),
             (value) => this.buildBooleanFilter(fieldRef, value as BooleanFilter<boolean, boolean>),
             true,
             ['equals', 'not'],
@@ -919,7 +959,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             'DateTime',
             payload,
             fieldRef,
-            (value) => this.transformPrimitive(value, 'DateTime', false),
+            (value) => this.transformInput(value, 'DateTime', false),
             (value) => this.buildDateTimeFilter(fieldRef, value as DateTimeFilter<boolean, boolean>),
             true,
         );
@@ -931,7 +971,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             'Bytes',
             payload,
             fieldRef,
-            (value) => this.transformPrimitive(value, 'Bytes', false),
+            (value) => this.transformInput(value, 'Bytes', false),
             (value) => this.buildBytesFilter(fieldRef, value as BytesFilter<boolean, boolean>),
             true,
             ['equals', 'in', 'notIn', 'not'],
@@ -958,6 +998,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         modelAlias: string,
         orderBy: OrArray<OrderBy<Schema, GetModels<Schema>, boolean, boolean>> | undefined,
         negated: boolean,
+        take: number | undefined,
     ) {
         if (!orderBy) {
             return query;
@@ -980,7 +1021,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
                 // aggregations
                 if (['_count', '_avg', '_sum', '_min', '_max'].includes(field)) {
-                    invariant(value && typeof value === 'object', `invalid orderBy value for field "${field}"`);
+                    invariant(typeof value === 'object', `invalid orderBy value for field "${field}"`);
                     for (const [k, v] of Object.entries<SortOrder>(value)) {
                         invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
                         result = result.orderBy(
@@ -991,22 +1032,6 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     continue;
                 }
 
-                switch (field) {
-                    case '_count': {
-                        invariant(value && typeof value === 'object', 'invalid orderBy value for field "_count"');
-                        for (const [k, v] of Object.entries<string>(value)) {
-                            invariant(v === 'asc' || v === 'desc', `invalid orderBy value for field "${field}"`);
-                            result = result.orderBy(
-                                (eb) => eb.fn.count(buildFieldRef(model, k, modelAlias)),
-                                this.negateSort(v, negated),
-                            );
-                        }
-                        continue;
-                    }
-                    default:
-                        break;
-                }
-
                 const fieldDef = requireField(this.schema, model, field);
 
                 if (!fieldDef.relation) {
@@ -1014,19 +1039,18 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                     if (value === 'asc' || value === 'desc') {
                         result = result.orderBy(fieldRef, this.negateSort(value, negated));
                     } else if (
-                        value &&
                         typeof value === 'object' &&
                         'nulls' in value &&
                         'sort' in value &&
                         (value.sort === 'asc' || value.sort === 'desc') &&
                         (value.nulls === 'first' || value.nulls === 'last')
                     ) {
-                        result = result.orderBy(fieldRef, (ob) => {
-                            const dir = this.negateSort(value.sort, negated);
-                            ob = dir === 'asc' ? ob.asc() : ob.desc();
-                            ob = value.nulls === 'first' ? ob.nullsFirst() : ob.nullsLast();
-                            return ob;
-                        });
+                        result = this.buildOrderByField(
+                            result,
+                            fieldRef,
+                            this.negateSort(value.sort, negated),
+                            value.nulls,
+                        );
                     }
                 } else {
                     // order by relation
@@ -1069,7 +1093,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                                 ),
                             );
                         });
-                        result = this.buildOrderBy(result, relationModel, joinAlias, value, negated);
+                        result = this.buildOrderBy(result, relationModel, joinAlias, value, negated, take);
                     }
                 }
             }
@@ -1253,16 +1277,16 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     // #region utils
 
-    private negateSort(sort: SortOrder, negated: boolean) {
+    protected negateSort(sort: SortOrder, negated: boolean) {
         return negated ? (sort === 'asc' ? 'desc' : 'asc') : sort;
     }
 
     public true(): Expression<SqlBool> {
-        return this.eb.lit<SqlBool>(this.transformPrimitive(true, 'Boolean', false) as boolean);
+        return this.eb.lit<SqlBool>(this.transformInput(true, 'Boolean', false) as boolean);
     }
 
     public false(): Expression<SqlBool> {
-        return this.eb.lit<SqlBool>(this.transformPrimitive(false, 'Boolean', false) as boolean);
+        return this.eb.lit<SqlBool>(this.transformInput(false, 'Boolean', false) as boolean);
     }
 
     public isTrue(expression: Expression<SqlBool>) {
@@ -1388,37 +1412,32 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     /**
      * Builds an Kysely expression that returns a JSON object for the given key-value pairs.
      */
-    abstract buildJsonObject(value: Record<string, Expression<unknown>>): ExpressionWrapper<any, any, unknown>;
+    abstract buildJsonObject(value: Record<string, Expression<unknown>>): AliasableExpression<unknown>;
 
     /**
      * Builds an Kysely expression that returns the length of an array.
      */
-    abstract buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number>;
+    abstract buildArrayLength(array: Expression<unknown>): AliasableExpression<number>;
 
     /**
      * Builds an array literal SQL string for the given values.
      */
-    abstract buildArrayLiteralSQL(values: unknown[]): string;
+    abstract buildArrayLiteralSQL(values: unknown[]): AliasableExpression<unknown>;
 
     /**
-     * Whether the dialect supports updating with a limit on the number of updated rows.
+     * Casts the given expression to an integer type.
      */
-    abstract get supportsUpdateWithLimit(): boolean;
+    abstract castInt<T extends Expression<any>>(expression: T): T;
 
     /**
-     * Whether the dialect supports deleting with a limit on the number of deleted rows.
+     * Casts the given expression to a text type.
      */
-    abstract get supportsDeleteWithLimit(): boolean;
+    abstract castText<T extends Expression<any>>(expression: T): T;
 
     /**
-     * Whether the dialect supports DISTINCT ON.
+     * Trims double quotes from the start and end of a text expression.
      */
-    abstract get supportsDistinctOn(): boolean;
-
-    /**
-     * Whether the dialect support inserting with `DEFAULT` as field value.
-     */
-    abstract get supportInsertWithDefault(): boolean;
+    abstract trimTextQuotes<T extends Expression<string>>(expression: T): T;
 
     /**
      * Gets the SQL column type for the given field definition.
@@ -1429,6 +1448,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Gets the string casing behavior for the dialect.
      */
     abstract getStringCasingBehavior(): { supportsILike: boolean; likeCaseSensitive: boolean };
+
+    /**
+     * Builds a VALUES table and select all fields from it.
+     */
+    abstract buildValuesTableSelect(fields: FieldDef[], rows: unknown[][]): SelectQueryBuilder<any, any, any>;
 
     /**
      * Builds a JSON path selection expression.
@@ -1451,6 +1475,16 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         receiver: Expression<any>,
         buildFilter: (elem: Expression<any>) => Expression<SqlBool>,
     ): Expression<SqlBool>;
+
+    /**
+     * Builds an ORDER BY clause for a field with NULLS FIRST/LAST support.
+     */
+    protected abstract buildOrderByField(
+        query: SelectQueryBuilder<any, any, any>,
+        field: Expression<unknown>,
+        sort: SortOrder,
+        nulls: 'first' | 'last',
+    ): SelectQueryBuilder<any, any, any>;
 
     // #endregion
 }

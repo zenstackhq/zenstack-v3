@@ -101,6 +101,7 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
                 args.limit,
                 true,
                 undefined,
+                undefined,
                 selectedFields,
             );
 
@@ -187,6 +188,11 @@ export class UpdateOperationHandler<Schema extends SchemaDef> extends BaseOperat
         const baseResult = this.mutationNeedsReadBack(this.model, args);
         if (baseResult.needReadBack) {
             return baseResult;
+        }
+
+        if (!this.dialect.supportsReturning) {
+            // if dialect doesn't support "returning", we always need to read back
+            return { needReadBack: true, selectedFields: undefined };
         }
 
         // further check if we're not updating any non-relation fields, because if so,

@@ -1,4 +1,5 @@
 import { createTestClient } from '@zenstackhq/testtools';
+import { sql } from 'kysely';
 import { describe, expect, it } from 'vitest';
 
 describe('Computed fields tests', () => {
@@ -7,14 +8,15 @@ describe('Computed fields tests', () => {
             `
 model User {
     id Int @id @default(autoincrement())
-    name String
-    upperName String @computed
+    firstName String
+    lastName String
+    fullName String @computed
 }
 `,
             {
                 computedFields: {
                     User: {
-                        upperName: (eb: any) => eb.fn('upper', ['name']),
+                        fullName: (eb: any) => eb.fn('concat', [eb.ref('firstName'), sql.lit(' '), eb.ref('lastName')]),
                     },
                 },
             } as any,
@@ -22,70 +24,70 @@ model User {
 
         await expect(
             db.user.create({
-                data: { id: 1, name: 'Alex' },
+                data: { id: 1, firstName: 'Alex', lastName: 'Smith' },
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.findUnique({
                 where: { id: 1 },
-                select: { upperName: true },
+                select: { fullName: true },
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.findFirst({
-                where: { upperName: 'ALEX' },
+                where: { fullName: 'Alex Smith' },
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.findFirst({
-                where: { upperName: 'Alex' },
+                where: { fullName: 'Alex' },
             }),
         ).toResolveNull();
 
         await expect(
             db.user.findFirst({
-                orderBy: { upperName: 'desc' },
+                orderBy: { fullName: 'desc' },
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.findFirst({
-                orderBy: { upperName: 'desc' },
+                orderBy: { fullName: 'desc' },
                 take: 1,
             }),
         ).resolves.toMatchObject({
-            upperName: 'ALEX',
+            fullName: 'Alex Smith',
         });
 
         await expect(
             db.user.aggregate({
-                _count: { upperName: true },
+                _count: { fullName: true },
             }),
         ).resolves.toMatchObject({
-            _count: { upperName: 1 },
+            _count: { fullName: 1 },
         });
 
         await expect(
             db.user.groupBy({
-                by: ['upperName'],
-                _count: { upperName: true },
-                _max: { upperName: true },
+                by: ['fullName'],
+                _count: { fullName: true },
+                _max: { fullName: true },
             }),
         ).resolves.toEqual([
             expect.objectContaining({
-                _count: { upperName: 1 },
-                _max: { upperName: 'ALEX' },
+                _count: { fullName: 1 },
+                _max: { fullName: 'Alex Smith' },
             }),
         ]);
     });
@@ -259,17 +261,19 @@ model Post extends Content {
             } as any,
         );
 
-        const posts = await db.post.createManyAndReturn({
-            data: [
-                { id: 1, title: 'latest news', body: 'some news content' },
-                { id: 2, title: 'random post', body: 'some other content' },
-            ],
-        });
-        expect(posts).toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({ id: 1, isNews: true }),
-                expect.objectContaining({ id: 2, isNews: false }),
-            ]),
-        );
+        if (db.$schema.provider.type !== 'mysql') {
+            const posts = await db.post.createManyAndReturn({
+                data: [
+                    { id: 1, title: 'latest news', body: 'some news content' },
+                    { id: 2, title: 'random post', body: 'some other content' },
+                ],
+            });
+            expect(posts).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ id: 1, isNews: true }),
+                    expect.objectContaining({ id: 2, isNews: false }),
+                ]),
+            );
+        }
     });
 });

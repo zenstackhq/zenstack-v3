@@ -8,7 +8,7 @@ describe('Entity mutation hooks tests', () => {
     let _client: ClientContract<typeof schema>;
 
     beforeEach(async () => {
-        _client = (await createTestClient(schema, {})) as any;
+        _client = await createTestClient(schema);
     });
 
     afterEach(async () => {
@@ -67,6 +67,8 @@ describe('Entity mutation hooks tests', () => {
             delete: { before: '', after: '' },
         };
 
+        let beforeMutationEntitiesInAfterHooks: Record<string, unknown>[] | undefined;
+
         const client = _client.$use({
             id: 'test',
             onEntityMutation: {
@@ -84,6 +86,10 @@ describe('Entity mutation hooks tests', () => {
                     if (args.action === 'update' || args.action === 'delete') {
                         queryIds[args.action].after = args.queryId.queryId;
                     }
+
+                    if (args.action === 'update') {
+                        beforeMutationEntitiesInAfterHooks = args.beforeMutationEntities;
+                    }
                 },
             },
         });
@@ -94,10 +100,14 @@ describe('Entity mutation hooks tests', () => {
         await client.user.create({
             data: { email: 'u2@test.com' },
         });
+
         await client.user.update({
             where: { id: user.id },
             data: { email: 'u3@test.com' },
         });
+        // beforeMutationEntities in after hooks is available because we called loadBeforeMutationEntities in before hook
+        expect(beforeMutationEntitiesInAfterHooks).toEqual([expect.objectContaining({ email: 'u1@test.com' })]);
+
         await client.user.delete({ where: { id: user.id } });
 
         expect(queryIds.update.before).toBeTruthy();

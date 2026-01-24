@@ -5,20 +5,16 @@ import {
     ArrayExpr,
     DataField,
     DataModel,
-    Model,
     ReferenceExpr,
     TypeDef,
     isDataModel,
-    isDataSource,
     isEnum,
-    isModel,
     isStringLiteral,
     isTypeDef,
 } from '../generated/ast';
 import {
     getAllAttributes,
     getAllFields,
-    getLiteral,
     getModelIdFields,
     getModelUniqueFields,
     getUniqueFields,
@@ -105,13 +101,6 @@ export default class DataModelValidator implements AstValidator<DataModel> {
             accept('error', 'Unsupported type argument must be a string literal', { node: field.type.unsupported });
         }
 
-        if (field.type.array && !isDataModel(field.type.reference?.ref)) {
-            const provider = this.getDataSourceProvider(AstUtils.getContainerOfType(field, isModel)!);
-            if (provider === 'sqlite') {
-                accept('error', `List type is not supported for "${provider}" provider.`, { node: field.type });
-            }
-        }
-
         field.attributes.forEach((attr) => validateAttributeApplication(attr, accept));
 
         if (isTypeDef(field.type.reference?.ref)) {
@@ -119,18 +108,6 @@ export default class DataModelValidator implements AstValidator<DataModel> {
                 accept('error', 'Custom-typed field must have @json attribute', { node: field });
             }
         }
-    }
-
-    private getDataSourceProvider(model: Model) {
-        const dataSource = model.declarations.find(isDataSource);
-        if (!dataSource) {
-            return undefined;
-        }
-        const provider = dataSource?.fields.find((f) => f.name === 'provider');
-        if (!provider) {
-            return undefined;
-        }
-        return getLiteral<string>(provider.value);
     }
 
     private validateAttributes(dm: DataModel, accept: ValidationAcceptor) {

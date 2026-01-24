@@ -306,6 +306,77 @@ export type AllModelOperations<
     Model extends GetModels<Schema>,
     Options extends QueryOptions<Schema>,
     ExtQueryArgs,
+> = CommonModelOperations<Schema, Model, Options, ExtQueryArgs> &
+    // provider-specific operations
+    (Schema['provider']['type'] extends 'mysql'
+        ? {}
+        : {
+              /**
+               * Creates multiple entities and returns them.
+               * @param args - create args. See {@link createMany} for input. Use
+               * `select` and `omit` to control the fields returned.
+               * @returns the created entities
+               *
+               * @example
+               * ```ts
+               * // create multiple entities and return selected fields
+               * await db.user.createManyAndReturn({
+               *     data: [
+               *         { name: 'Alex', email: 'alex@zenstack.dev' },
+               *         { name: 'John', email: 'john@zenstack.dev' }
+               *     ],
+               *     select: { id: true, email: true }
+               * });
+               * ```
+               */
+              createManyAndReturn<
+                  T extends CreateManyAndReturnArgs<Schema, Model> &
+                      ExtractExtQueryArgs<ExtQueryArgs, 'createManyAndReturn'>,
+              >(
+                  args?: SelectSubset<
+                      T,
+                      CreateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'createManyAndReturn'>
+                  >,
+              ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
+
+              /**
+               * Updates multiple entities and returns them.
+               * @param args - update args. Only scalar fields are allowed for data.
+               * @returns the updated entities
+               *
+               * @example
+               * ```ts
+               * // update many entities and return selected fields
+               * await db.user.updateManyAndReturn({
+               *     where: { email: { endsWith: '@zenstack.dev' } },
+               *     data: { role: 'ADMIN' },
+               *     select: { id: true, email: true }
+               * }); // result: `Array<{ id: string; email: string }>`
+               *
+               * // limit the number of updated entities
+               * await db.user.updateManyAndReturn({
+               *     where: { email: { endsWith: '@zenstack.dev' } },
+               *     data: { role: 'ADMIN' },
+               *     limit: 10
+               * });
+               * ```
+               */
+              updateManyAndReturn<
+                  T extends UpdateManyAndReturnArgs<Schema, Model> &
+                      ExtractExtQueryArgs<ExtQueryArgs, 'updateManyAndReturn'>,
+              >(
+                  args: Subset<
+                      T,
+                      UpdateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'updateManyAndReturn'>
+                  >,
+              ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
+          });
+
+type CommonModelOperations<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Options extends QueryOptions<Schema>,
+    ExtQueryArgs,
 > = {
     /**
      * Returns a list of entities.
@@ -518,33 +589,6 @@ export type AllModelOperations<
     ): ZenStackPromise<Schema, BatchResult>;
 
     /**
-     * Creates multiple entities and returns them.
-     * @param args - create args. See {@link createMany} for input. Use
-     * `select` and `omit` to control the fields returned.
-     * @returns the created entities
-     *
-     * @example
-     * ```ts
-     * // create multiple entities and return selected fields
-     * await db.user.createManyAndReturn({
-     *     data: [
-     *         { name: 'Alex', email: 'alex@zenstack.dev' },
-     *         { name: 'John', email: 'john@zenstack.dev' }
-     *     ],
-     *     select: { id: true, email: true }
-     * });
-     * ```
-     */
-    createManyAndReturn<
-        T extends CreateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'createManyAndReturn'>,
-    >(
-        args?: SelectSubset<
-            T,
-            CreateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'createManyAndReturn'>
-        >,
-    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
-
-    /**
      * Updates a uniquely identified entity.
      * @param args - update args. See {@link findMany} for how to control
      * fields and relations returned.
@@ -688,37 +732,6 @@ export type AllModelOperations<
     updateMany<T extends UpdateManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'updateMany'>>(
         args: Subset<T, UpdateManyArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'updateMany'>>,
     ): ZenStackPromise<Schema, BatchResult>;
-
-    /**
-     * Updates multiple entities and returns them.
-     * @param args - update args. Only scalar fields are allowed for data.
-     * @returns the updated entities
-     *
-     * @example
-     * ```ts
-     * // update many entities and return selected fields
-     * await db.user.updateManyAndReturn({
-     *     where: { email: { endsWith: '@zenstack.dev' } },
-     *     data: { role: 'ADMIN' },
-     *     select: { id: true, email: true }
-     * }); // result: `Array<{ id: string; email: string }>`
-     *
-     * // limit the number of updated entities
-     * await db.user.updateManyAndReturn({
-     *     where: { email: { endsWith: '@zenstack.dev' } },
-     *     data: { role: 'ADMIN' },
-     *     limit: 10
-     * });
-     * ```
-     */
-    updateManyAndReturn<
-        T extends UpdateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'updateManyAndReturn'>,
-    >(
-        args: Subset<
-            T,
-            UpdateManyAndReturnArgs<Schema, Model> & ExtractExtQueryArgs<ExtQueryArgs, 'updateManyAndReturn'>
-        >,
-    ): ZenStackPromise<Schema, SimplifiedPlainResult<Schema, Model, T, Options>[]>;
 
     /**
      * Creates or updates an entity.

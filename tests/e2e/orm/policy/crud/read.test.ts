@@ -632,7 +632,13 @@ model Bar {
     @@allow('read', y > 0)
 }
 `,
+                { provider: 'postgresql' },
             );
+
+            if (db.$schema.provider.type !== 'postgresql') {
+                // skip for non-postgresql as from is only supported there
+                return;
+            }
 
             await db.$unuseAll().foo.create({ data: { id: 1, x: 1 } });
             await db.$unuseAll().bar.create({ data: { id: 1, y: 0 } });

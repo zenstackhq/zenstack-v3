@@ -39,7 +39,7 @@ describe('Postgres multi-schema with computed fields', () => {
                             .limit(1)
                     },
                 },
-            }
+            } as any
         );
 
         // Create author and book

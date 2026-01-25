@@ -3183,6 +3183,7 @@ describe('REST server tests', () => {
     model Post {
         id Int @id @default(autoincrement())
         title String
+        short_title String @unique()
         author User? @relation(fields: [authorId], references: [id])
         authorId Int?
     }
@@ -3195,6 +3196,7 @@ describe('REST server tests', () => {
                 endpoint: 'http://localhost/api',
                 externalIdMapping: {
                     User: 'name_source',
+                    Post: 'short_title',
                 },
             });
             handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
@@ -3229,13 +3231,13 @@ describe('REST server tests', () => {
             expect(r.body.data.attributes.name).toBe('User1');
 
             await client.post.create({
-                data: { id: 1, title: 'Title1', authorId: 1 },
+                data: { id: 1, title: 'Title1', short_title: 'post-title-1', authorId: 1 },
             });
 
             // post is exposed using the `id` field
             r = await handler({
                 method: 'get',
-                path: '/post/1',
+                path: '/post/post-title-1',
                 query: { include: 'author' },
                 client,
             });

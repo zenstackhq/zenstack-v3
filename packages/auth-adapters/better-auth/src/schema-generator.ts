@@ -260,12 +260,14 @@ function getMappedFieldType({ bigint, type }: DBFieldAttribute) {
         .with('json', () => ({ type: 'Json' }))
         .with('string[]', () => ({ type: 'String', array: true }))
         .with('number[]', () => ({ type: 'Int', array: true }))
-        .otherwise(() => {
-            // Handle enum types (e.g., ['user', 'admin'] or "user,admin")
-            // Map them to String type for now
-            if (Array.isArray(type) || (typeof type === 'string' && type.includes(','))) {
+        .when(
+            (v) => Array.isArray(v) && v.every((e) => typeof e === 'string'),
+            () => {
+                // Handle enum types (e.g., ['user', 'admin']), map them to String type for now
                 return { type: 'String' };
-            }
+            },
+        )
+        .otherwise(() => {
             throw new Error(`Unsupported field type: ${type}`);
         });
 }

@@ -16,6 +16,7 @@ import {
     InvocationExpr,
     isDataModel,
     Model,
+    NumberLiteral,
     ReferenceExpr,
     StringLiteral,
 } from '@zenstackhq/language/ast';
@@ -260,6 +261,11 @@ function getMappedFieldType({ bigint, type }: DBFieldAttribute) {
         .with('string[]', () => ({ type: 'String', array: true }))
         .with('number[]', () => ({ type: 'Int', array: true }))
         .otherwise(() => {
+            // Handle enum types (e.g., ['user', 'admin'] or "user,admin")
+            // Map them to String type for now
+            if (Array.isArray(type) || (typeof type === 'string' && type.includes(','))) {
+                return { type: 'String' };
+            }
             throw new Error(`Unsupported field type: ${type}`);
         });
 }
@@ -332,6 +338,10 @@ function addOrUpdateModel(
                     addDefaultNow(df);
                 } else if (typeof field.defaultValue === 'boolean') {
                     addFieldAttribute(df, '@default', [createBooleanAttributeArg(field.defaultValue)]);
+                } else if (typeof field.defaultValue === 'string') {
+                    addFieldAttribute(df, '@default', [createStringAttributeArg(field.defaultValue)]);
+                } else if (typeof field.defaultValue === 'number') {
+                    addFieldAttribute(df, '@default', [createNumberAttributeArg(field.defaultValue)]);
                 } else if (typeof field.defaultValue === 'function') {
                     // For other function-based defaults, we'll need to check what they return
                     const defaultVal = field.defaultValue();
@@ -531,6 +541,19 @@ function createBooleanAttributeArg(value: boolean) {
     const expr: BooleanLiteral = {
         $type: 'BooleanLiteral',
         value,
+        $container: arg,
+    };
+    arg.value = expr;
+    return arg;
+}
+
+function createNumberAttributeArg(value: number) {
+    const arg: AttributeArg = {
+        $type: 'AttributeArg',
+    } as any;
+    const expr: NumberLiteral = {
+        $type: 'NumberLiteral',
+        value: value.toString(),
         $container: arg,
     };
     arg.value = expr;

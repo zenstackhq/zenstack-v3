@@ -90,6 +90,7 @@ export class SchemaType implements SchemaDef {
     } as const;
     enums = {
         Role: {
+            name: "Role",
             values: {
                 USER: "USER",
                 ADMIN: "ADMIN",

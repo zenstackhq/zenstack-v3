@@ -2834,6 +2834,7 @@ export class SchemaType implements SchemaDef {
     } as const;
     enums = {
         PipelineTriggers: {
+            name: "PipelineTriggers",
             values: {
                 responseCreated: "responseCreated",
                 responseUpdated: "responseUpdated",
@@ -2841,6 +2842,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         WebhookSource: {
+            name: "WebhookSource",
             values: {
                 user: "user",
                 zapier: "zapier",
@@ -2850,12 +2852,14 @@ export class SchemaType implements SchemaDef {
             }
         },
         ContactAttributeType: {
+            name: "ContactAttributeType",
             values: {
                 default: "default",
                 custom: "custom"
             }
         },
         SurveyStatus: {
+            name: "SurveyStatus",
             values: {
                 draft: "draft",
                 scheduled: "scheduled",
@@ -2865,18 +2869,21 @@ export class SchemaType implements SchemaDef {
             }
         },
         DisplayStatus: {
+            name: "DisplayStatus",
             values: {
                 seen: "seen",
                 responded: "responded"
             }
         },
         SurveyAttributeFilterCondition: {
+            name: "SurveyAttributeFilterCondition",
             values: {
                 equals: "equals",
                 notEquals: "notEquals"
             }
         },
         SurveyType: {
+            name: "SurveyType",
             values: {
                 link: "link",
                 web: "web",
@@ -2885,6 +2892,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         displayOptions: {
+            name: "displayOptions",
             values: {
                 displayOnce: "displayOnce",
                 displayMultiple: "displayMultiple",
@@ -2893,18 +2901,21 @@ export class SchemaType implements SchemaDef {
             }
         },
         ActionType: {
+            name: "ActionType",
             values: {
                 code: "code",
                 noCode: "noCode"
             }
         },
         EnvironmentType: {
+            name: "EnvironmentType",
             values: {
                 production: "production",
                 development: "development"
             }
         },
         IntegrationType: {
+            name: "IntegrationType",
             values: {
                 googleSheets: "googleSheets",
                 notion: "notion",
@@ -2913,6 +2924,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         DataMigrationStatus: {
+            name: "DataMigrationStatus",
             values: {
                 pending: "pending",
                 applied: "applied",
@@ -2920,6 +2932,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         WidgetPlacement: {
+            name: "WidgetPlacement",
             values: {
                 bottomLeft: "bottomLeft",
                 bottomRight: "bottomRight",
@@ -2929,6 +2942,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         OrganizationRole: {
+            name: "OrganizationRole",
             values: {
                 owner: "owner",
                 manager: "manager",
@@ -2937,6 +2951,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         MembershipRole: {
+            name: "MembershipRole",
             values: {
                 owner: "owner",
                 admin: "admin",
@@ -2946,6 +2961,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         ApiKeyPermission: {
+            name: "ApiKeyPermission",
             values: {
                 read: "read",
                 write: "write",
@@ -2953,6 +2969,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         IdentityProvider: {
+            name: "IdentityProvider",
             values: {
                 email: "email",
                 github: "github",
@@ -2963,6 +2980,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         Role: {
+            name: "Role",
             values: {
                 project_manager: "project_manager",
                 engineer: "engineer",
@@ -2972,6 +2990,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         Objective: {
+            name: "Objective",
             values: {
                 increase_conversion: "increase_conversion",
                 improve_user_retention: "improve_user_retention",
@@ -2982,6 +3001,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         Intention: {
+            name: "Intention",
             values: {
                 survey_user_segments: "survey_user_segments",
                 survey_at_specific_point_in_user_journey: "survey_at_specific_point_in_user_journey",
@@ -2991,6 +3011,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         InsightCategory: {
+            name: "InsightCategory",
             values: {
                 featureRequest: "featureRequest",
                 complaint: "complaint",
@@ -2999,6 +3020,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         Sentiment: {
+            name: "Sentiment",
             values: {
                 positive: "positive",
                 negative: "negative",
@@ -3006,12 +3028,14 @@ export class SchemaType implements SchemaDef {
             }
         },
         TeamUserRole: {
+            name: "TeamUserRole",
             values: {
                 admin: "admin",
                 contributor: "contributor"
             }
         },
         ProjectTeamPermission: {
+            name: "ProjectTeamPermission",
             values: {
                 read: "read",
                 readWrite: "readWrite",

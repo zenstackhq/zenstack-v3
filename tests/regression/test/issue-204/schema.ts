@@ -47,6 +47,7 @@ export class SchemaType implements SchemaDef {
     } as const;
     enums = {
         ShirtColor: {
+            name: "ShirtColor",
             values: {
                 Black: "Black",
                 White: "White",

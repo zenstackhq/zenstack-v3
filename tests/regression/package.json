@@ -20,6 +20,7 @@
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
+        "@zenstackhq/plugin-policy": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "@types/node": "catalog:"

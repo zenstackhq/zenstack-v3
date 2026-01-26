@@ -1030,6 +1030,8 @@ export class TsSchemaGenerator {
     private createEnumObject(e: Enum) {
         return ts.factory.createObjectLiteralExpression(
             [
+                ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(e.name)),
+
                 ts.factory.createPropertyAssignment(
                     'values',
                     ts.factory.createObjectLiteralExpression(

@@ -1,13 +1,5 @@
 import stableStringify from 'json-stable-stringify';
 
-interface CacheOptions {
-    /**
-     * Instance property names to include in the cache key.
-     * Useful when cache should be invalidated based on instance state.
-     */
-    includeProperties?: string[];
-}
-
 /**
  * Method decorator that caches the return value based on method name and arguments.
  *
@@ -15,7 +7,7 @@ interface CacheOptions {
  * - Class must have a `getCache(key: string)` method
  * - Class must have a `setCache(key: string, value: any)` method
  */
-export function cache(options: CacheOptions = {}) {
+export function cache() {
     return function (_target: any, propertyKey: string, descriptor: PropertyDescriptor) {
         const originalMethod = descriptor.value;
 
@@ -31,13 +23,6 @@ export function cache(options: CacheOptions = {}) {
                 $call: propertyKey,
                 ...args,
             };
-
-            // Include specified instance properties
-            if (options.includeProperties) {
-                for (const prop of options.includeProperties) {
-                    cacheKeyObj['$' + prop] = this[prop];
-                }
-            }
 
             // Generate stable string key
             const cacheKey = stableStringify(cacheKeyObj)!;

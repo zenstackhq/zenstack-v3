@@ -1231,9 +1231,6 @@ export class InputValidator<Schema extends SchemaDef> {
         withoutFields: string[] = [],
         withoutRelationFields = false,
     ) {
-        // Normalize array argument for consistent cache keys
-        withoutFields = [...withoutFields].sort();
-
         const uncheckedVariantFields: Record<string, ZodType> = {};
         const checkedVariantFields: Record<string, ZodType> = {};
         const modelDef = requireModel(this.schema, model);
@@ -1365,9 +1362,6 @@ export class InputValidator<Schema extends SchemaDef> {
 
     @cache()
     private makeRelationManipulationSchema(fieldDef: FieldDef, withoutFields: string[], mode: 'create' | 'update') {
-        // Normalize array argument for consistent cache keys
-        withoutFields = [...withoutFields].sort();
-
         const fieldType = fieldDef.type;
         const array = !!fieldDef.array;
         const fields: Record<string, ZodType> = {
@@ -1472,9 +1466,6 @@ export class InputValidator<Schema extends SchemaDef> {
 
     @cache()
     private makeConnectOrCreateDataSchema(model: string, canBeArray: boolean, withoutFields: string[]) {
-        // Normalize array argument for consistent cache keys
-        withoutFields = [...withoutFields].sort();
-
         const whereSchema = this.makeWhereSchema(model, true);
         const createSchema = this.makeCreateDataSchema(model, false, withoutFields);
         return this.orArray(
@@ -1488,9 +1479,6 @@ export class InputValidator<Schema extends SchemaDef> {
 
     @cache()
     private makeCreateManyDataSchema(model: string, withoutFields: string[]) {
-        // Normalize array argument for consistent cache keys
-        withoutFields = [...withoutFields].sort();
-
         return z.strictObject({
             data: this.makeCreateDataSchema(model, true, withoutFields, true),
             skipDuplicates: z.boolean().optional(),
@@ -1558,9 +1546,6 @@ export class InputValidator<Schema extends SchemaDef> {
 
     @cache()
     private makeUpdateDataSchema(model: string, withoutFields: string[] = [], withoutRelationFields = false) {
-        // Normalize array argument for consistent cache keys
-        withoutFields = [...withoutFields].sort();
-
         const uncheckedVariantFields: Record<string, ZodType> = {};
         const checkedVariantFields: Record<string, ZodType> = {};
         const modelDef = requireModel(this.schema, model);

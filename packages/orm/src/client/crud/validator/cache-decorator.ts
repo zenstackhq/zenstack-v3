@@ -21,7 +21,14 @@ export function cache() {
             // Build cache key object
             const cacheKeyObj: Record<string, unknown> = {
                 $call: propertyKey,
-                ...args,
+                ...args.map((arg) => {
+                    if (Array.isArray(arg)) {
+                        // sort array arguments for consistent cache keys
+                        return [...arg].sort();
+                    } else {
+                        return arg;
+                    }
+                }),
             };
 
             // Generate stable string key

@@ -1,6 +1,5 @@
 import { enumerate, invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
-import stableStringify from 'json-stable-stringify';
 import { match, P } from 'ts-pattern';
 import { z, ZodObject, ZodType } from 'zod';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
@@ -54,6 +53,7 @@ import {
     CoreUpdateOperations,
     type CoreCrudOperations,
 } from '../operations/base';
+import { cache } from './cache-decorator';
 import {
     addBigIntValidation,
     addCustomValidation,
@@ -431,66 +431,51 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Find
 
+    @cache()
     private makeFindSchema(model: string, operation: CoreCrudOperations) {
-        return this.cached(
-            {
-                type: 'findArgs',
-                model,
-                operation,
-            },
-            () => {
-                const fields: Record<string, z.ZodSchema> = {};
-                const unique = operation === 'findUnique';
-                const findOne = operation === 'findUnique' || operation === 'findFirst';
-                const where = this.makeWhereSchema(model, unique);
-                if (unique) {
-                    fields['where'] = where;
-                } else {
-                    fields['where'] = where.optional();
-                }
+        const fields: Record<string, z.ZodSchema> = {};
+        const unique = operation === 'findUnique';
+        const findOne = operation === 'findUnique' || operation === 'findFirst';
+        const where = this.makeWhereSchema(model, unique);
+        if (unique) {
+            fields['where'] = where;
+        } else {
+            fields['where'] = where.optional();
+        }
 
-                fields['select'] = this.makeSelectSchema(model).optional().nullable();
-                fields['include'] = this.makeIncludeSchema(model).optional().nullable();
-                fields['omit'] = this.makeOmitSchema(model).optional().nullable();
+        fields['select'] = this.makeSelectSchema(model).optional().nullable();
+        fields['include'] = this.makeIncludeSchema(model).optional().nullable();
+        fields['omit'] = this.makeOmitSchema(model).optional().nullable();
 
-                if (!unique) {
-                    fields['skip'] = this.makeSkipSchema().optional();
-                    if (findOne) {
-                        fields['take'] = z.literal(1).optional();
-                    } else {
-                        fields['take'] = this.makeTakeSchema().optional();
-                    }
-                    fields['orderBy'] = this.orArray(this.makeOrderBySchema(model, true, false), true).optional();
-                    fields['cursor'] = this.makeCursorSchema(model).optional();
-                    fields['distinct'] = this.makeDistinctSchema(model).optional();
-                }
+        if (!unique) {
+            fields['skip'] = this.makeSkipSchema().optional();
+            if (findOne) {
+                fields['take'] = z.literal(1).optional();
+            } else {
+                fields['take'] = this.makeTakeSchema().optional();
+            }
+            fields['orderBy'] = this.orArray(this.makeOrderBySchema(model, true, false), true).optional();
+            fields['cursor'] = this.makeCursorSchema(model).optional();
+            fields['distinct'] = this.makeDistinctSchema(model).optional();
+        }
 
-                const baseSchema = z.strictObject(fields);
-                let result: ZodType = this.mergePluginArgsSchema(baseSchema, operation);
-                result = this.refineForSelectIncludeMutuallyExclusive(result);
-                result = this.refineForSelectOmitMutuallyExclusive(result);
+        const baseSchema = z.strictObject(fields);
+        let result: ZodType = this.mergePluginArgsSchema(baseSchema, operation);
+        result = this.refineForSelectIncludeMutuallyExclusive(result);
+        result = this.refineForSelectOmitMutuallyExclusive(result);
 
-                if (!unique) {
-                    result = result.optional();
-                }
-                return result;
-            },
-        );
+        if (!unique) {
+            result = result.optional();
+        }
+        return result;
     }
 
+    @cache()
     private makeExistsSchema(model: string) {
-        return this.cached(
-            {
-                type: 'existsArgs',
-                model,
-            },
-            () => {
-                const baseSchema = z.strictObject({
-                    where: this.makeWhereSchema(model, false).optional(),
-                });
-                return this.mergePluginArgsSchema(baseSchema, 'exists').optional();
-            },
-        );
+        const baseSchema = z.strictObject({
+            where: this.makeWhereSchema(model, false).optional(),
+        });
+        return this.mergePluginArgsSchema(baseSchema, 'exists').optional();
     }
 
     private makeScalarSchema(type: string, attributes?: readonly AttributeApplication[]) {
@@ -532,322 +517,287 @@ export class InputValidator<Schema extends SchemaDef> {
         }
     }
 
+    @cache()
     private makeEnumSchema(type: string) {
-        return this.cached({ type: 'enum', name: type }, () => {
-            const enumDef = getEnum(this.schema, type);
-            invariant(enumDef, `Enum "${type}" not found in schema`);
-            return z.enum(Object.keys(enumDef.values) as [string, ...string[]]);
-        });
+        const enumDef = getEnum(this.schema, type);
+        invariant(enumDef, `Enum "${type}" not found in schema`);
+        return z.enum(Object.keys(enumDef.values) as [string, ...string[]]);
     }
 
+    @cache({ includeProperties: ['extraValidationsEnabled'] })
     private makeTypeDefSchema(type: string): z.ZodType {
-        return this.cached(
-            {
-                type: 'typedef',
-                name: type,
-                extraValidationsEnabled: this.extraValidationsEnabled,
-            },
-            () => {
-                const typeDef = getTypeDef(this.schema, type);
-                invariant(typeDef, `Type definition "${type}" not found in schema`);
-                const schema = z.looseObject(
-                    Object.fromEntries(
-                        Object.entries(typeDef.fields).map(([field, def]) => {
-                            let fieldSchema = this.makeScalarSchema(def.type);
-                            if (def.array) {
-                                fieldSchema = fieldSchema.array();
-                            }
-                            if (def.optional) {
-                                fieldSchema = fieldSchema.nullish();
-                            }
-                            return [field, fieldSchema];
-                        }),
-                    ),
-                );
-
-                // zod doesn't preserve object field order after parsing, here we use a
-                // validation-only custom schema and use the original data if parsing
-                // is successful
-                const finalSchema = z.any().superRefine((value, ctx) => {
-                    const parseResult = schema.safeParse(value);
-                    if (!parseResult.success) {
-                        parseResult.error.issues.forEach((issue) => ctx.addIssue(issue as any));
+        const typeDef = getTypeDef(this.schema, type);
+        invariant(typeDef, `Type definition "${type}" not found in schema`);
+        const schema = z.looseObject(
+            Object.fromEntries(
+                Object.entries(typeDef.fields).map(([field, def]) => {
+                    let fieldSchema = this.makeScalarSchema(def.type);
+                    if (def.array) {
+                        fieldSchema = fieldSchema.array();
                     }
-                });
-
-                return finalSchema;
-            },
+                    if (def.optional) {
+                        fieldSchema = fieldSchema.nullish();
+                    }
+                    return [field, fieldSchema];
+                }),
+            ),
         );
+
+        // zod doesn't preserve object field order after parsing, here we use a
+        // validation-only custom schema and use the original data if parsing
+        // is successful
+        const finalSchema = z.any().superRefine((value, ctx) => {
+            const parseResult = schema.safeParse(value);
+            if (!parseResult.success) {
+                parseResult.error.issues.forEach((issue) => ctx.addIssue(issue as any));
+            }
+        });
+
+        return finalSchema;
     }
 
+    @cache()
     private makeWhereSchema(
         model: string,
         unique: boolean,
         withoutRelationFields = false,
         withAggregations = false,
     ): ZodType {
-        return this.cached(
-            {
-                type: 'where',
-                model,
-                unique,
-                withoutRelationFields,
-                withAggregations,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
+        const modelDef = requireModel(this.schema, model);
 
-                const fields: Record<string, any> = {};
-                for (const field of Object.keys(modelDef.fields)) {
-                    const fieldDef = requireField(this.schema, model, field);
-                    let fieldSchema: ZodType | undefined;
+        const fields: Record<string, any> = {};
+        for (const field of Object.keys(modelDef.fields)) {
+            const fieldDef = requireField(this.schema, model, field);
+            let fieldSchema: ZodType | undefined;
 
-                    if (fieldDef.relation) {
-                        if (withoutRelationFields) {
-                            continue;
-                        }
-                        fieldSchema = z.lazy(() => this.makeWhereSchema(fieldDef.type, false).optional());
+            if (fieldDef.relation) {
+                if (withoutRelationFields) {
+                    continue;
+                }
+                fieldSchema = z.lazy(() => this.makeWhereSchema(fieldDef.type, false).optional());
 
-                        // optional to-one relation allows null
-                        fieldSchema = this.nullableIf(fieldSchema, !fieldDef.array && !!fieldDef.optional);
+                // optional to-one relation allows null
+                fieldSchema = this.nullableIf(fieldSchema, !fieldDef.array && !!fieldDef.optional);
 
-                        if (fieldDef.array) {
-                            // to-many relation
-                            fieldSchema = z.union([
-                                fieldSchema,
-                                z.strictObject({
-                                    some: fieldSchema.optional(),
-                                    every: fieldSchema.optional(),
-                                    none: fieldSchema.optional(),
+                if (fieldDef.array) {
+                    // to-many relation
+                    fieldSchema = z.union([
+                        fieldSchema,
+                        z.strictObject({
+                            some: fieldSchema.optional(),
+                            every: fieldSchema.optional(),
+                            none: fieldSchema.optional(),
+                        }),
+                    ]);
+                } else {
+                    // to-one relation
+                    fieldSchema = z.union([
+                        fieldSchema,
+                        z.strictObject({
+                            is: fieldSchema.optional(),
+                            isNot: fieldSchema.optional(),
+                        }),
+                    ]);
+                }
+            } else {
+                const enumDef = getEnum(this.schema, fieldDef.type);
+                if (enumDef) {
+                    // enum
+                    if (Object.keys(enumDef.values).length > 0) {
+                        fieldSchema = this.makeEnumFilterSchema(
+                            fieldDef.type,
+                            enumDef,
+                            !!fieldDef.optional,
+                            withAggregations,
+                            !!fieldDef.array,
+                        );
+                    }
+                } else if (fieldDef.array) {
+                    // array field
+                    fieldSchema = this.makeArrayFilterSchema(fieldDef.type as BuiltinType);
+                } else if (this.isTypeDefType(fieldDef.type)) {
+                    fieldSchema = this.makeTypedJsonFilterSchema(fieldDef.type, !!fieldDef.optional, !!fieldDef.array);
+                } else {
+                    // primitive field
+                    fieldSchema = this.makePrimitiveFilterSchema(
+                        fieldDef.type as BuiltinType,
+                        !!fieldDef.optional,
+                        withAggregations,
+                    );
+                }
+            }
+
+            if (fieldSchema) {
+                fields[field] = fieldSchema.optional();
+            }
+        }
+
+        if (unique) {
+            // add compound unique fields, e.g. `{ id1_id2: { id1: 1, id2: 1 } }`
+            const uniqueFields = getUniqueFields(this.schema, model);
+            for (const uniqueField of uniqueFields) {
+                if ('defs' in uniqueField) {
+                    fields[uniqueField.name] = z
+                        .object(
+                            Object.fromEntries(
+                                Object.entries(uniqueField.defs).map(([key, def]) => {
+                                    invariant(!def.relation, 'unique field cannot be a relation');
+                                    let fieldSchema: ZodType;
+                                    const enumDef = getEnum(this.schema, def.type);
+                                    if (enumDef) {
+                                        // enum
+                                        if (Object.keys(enumDef.values).length > 0) {
+                                            fieldSchema = this.makeEnumFilterSchema(
+                                                def.type,
+                                                enumDef,
+                                                !!def.optional,
+                                                false,
+                                                false,
+                                            );
+                                        } else {
+                                            fieldSchema = z.never();
+                                        }
+                                    } else {
+                                        // regular field
+                                        fieldSchema = this.makePrimitiveFilterSchema(
+                                            def.type as BuiltinType,
+                                            !!def.optional,
+                                            false,
+                                        );
+                                    }
+                                    return [key, fieldSchema];
                                 }),
-                            ]);
-                        } else {
-                            // to-one relation
-                            fieldSchema = z.union([
-                                fieldSchema,
-                                z.strictObject({
-                                    is: fieldSchema.optional(),
-                                    isNot: fieldSchema.optional(),
-                                }),
-                            ]);
-                        }
-                    } else {
-                        const enumDef = getEnum(this.schema, fieldDef.type);
-                        if (enumDef) {
-                            // enum
-                            if (Object.keys(enumDef.values).length > 0) {
-                                fieldSchema = this.makeEnumFilterSchema(
-                                    fieldDef.type,
-                                    enumDef,
-                                    !!fieldDef.optional,
-                                    withAggregations,
-                                    !!fieldDef.array,
-                                );
-                            }
-                        } else if (fieldDef.array) {
-                            // array field
-                            fieldSchema = this.makeArrayFilterSchema(fieldDef.type as BuiltinType);
-                        } else if (this.isTypeDefType(fieldDef.type)) {
-                            fieldSchema = this.makeTypedJsonFilterSchema(
-                                fieldDef.type,
-                                !!fieldDef.optional,
-                                !!fieldDef.array,
-                            );
-                        } else {
-                            // primitive field
-                            fieldSchema = this.makePrimitiveFilterSchema(
-                                fieldDef.type as BuiltinType,
-                                !!fieldDef.optional,
-                                withAggregations,
-                            );
-                        }
-                    }
-
-                    if (fieldSchema) {
-                        fields[field] = fieldSchema.optional();
-                    }
+                            ),
+                        )
+                        .optional();
                 }
+            }
+        }
 
-                if (unique) {
-                    // add compound unique fields, e.g. `{ id1_id2: { id1: 1, id2: 1 } }`
-                    const uniqueFields = getUniqueFields(this.schema, model);
-                    for (const uniqueField of uniqueFields) {
-                        if ('defs' in uniqueField) {
-                            fields[uniqueField.name] = z
-                                .object(
-                                    Object.fromEntries(
-                                        Object.entries(uniqueField.defs).map(([key, def]) => {
-                                            invariant(!def.relation, 'unique field cannot be a relation');
-                                            let fieldSchema: ZodType;
-                                            const enumDef = getEnum(this.schema, def.type);
-                                            if (enumDef) {
-                                                // enum
-                                                if (Object.keys(enumDef.values).length > 0) {
-                                                    fieldSchema = this.makeEnumFilterSchema(
-                                                        def.type,
-                                                        enumDef,
-                                                        !!def.optional,
-                                                        false,
-                                                        false,
-                                                    );
-                                                } else {
-                                                    fieldSchema = z.never();
-                                                }
-                                            } else {
-                                                // regular field
-                                                fieldSchema = this.makePrimitiveFilterSchema(
-                                                    def.type as BuiltinType,
-                                                    !!def.optional,
-                                                    false,
-                                                );
-                                            }
-                                            return [key, fieldSchema];
-                                        }),
-                                    ),
-                                )
-                                .optional();
-                        }
-                    }
-                }
+        // expression builder
+        fields['$expr'] = z.custom((v) => typeof v === 'function', { error: '"$expr" must be a function' }).optional();
 
-                // expression builder
-                fields['$expr'] = z
-                    .custom((v) => typeof v === 'function', { error: '"$expr" must be a function' })
-                    .optional();
+        // logical operators
+        fields['AND'] = this.orArray(
+            z.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields)),
+            true,
+        ).optional();
+        fields['OR'] = z
+            .lazy(() => this.makeWhereSchema(model, false, withoutRelationFields))
+            .array()
+            .optional();
+        fields['NOT'] = this.orArray(
+            z.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields)),
+            true,
+        ).optional();
 
-                // logical operators
-                fields['AND'] = this.orArray(
-                    z.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields)),
-                    true,
-                ).optional();
-                fields['OR'] = z
-                    .lazy(() => this.makeWhereSchema(model, false, withoutRelationFields))
-                    .array()
-                    .optional();
-                fields['NOT'] = this.orArray(
-                    z.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields)),
-                    true,
-                ).optional();
+        const baseWhere = z.strictObject(fields);
+        let result: ZodType = baseWhere;
 
-                const baseWhere = z.strictObject(fields);
-                let result: ZodType = baseWhere;
+        if (unique) {
+            // requires at least one unique field (field set) is required
+            const uniqueFields = getUniqueFields(this.schema, model);
+            if (uniqueFields.length === 0) {
+                throw createInternalError(`Model "${model}" has no unique fields`);
+            }
 
-                if (unique) {
-                    // requires at least one unique field (field set) is required
-                    const uniqueFields = getUniqueFields(this.schema, model);
-                    if (uniqueFields.length === 0) {
-                        throw createInternalError(`Model "${model}" has no unique fields`);
-                    }
+            if (uniqueFields.length === 1) {
+                // only one unique field (set), mark the field(s) required
+                result = baseWhere.required({
+                    [uniqueFields[0]!.name]: true,
+                } as any);
+            } else {
+                result = baseWhere.refine((value) => {
+                    // check that at least one unique field is set
+                    return uniqueFields.some(({ name }) => value[name] !== undefined);
+                }, `At least one unique field or field set must be set`);
+            }
+        }
 
-                    if (uniqueFields.length === 1) {
-                        // only one unique field (set), mark the field(s) required
-                        result = baseWhere.required({
-                            [uniqueFields[0]!.name]: true,
-                        } as any);
-                    } else {
-                        result = baseWhere.refine((value) => {
-                            // check that at least one unique field is set
-                            return uniqueFields.some(({ name }) => value[name] !== undefined);
-                        }, `At least one unique field or field set must be set`);
-                    }
-                }
-
-                return result;
-            },
-        );
+        return result;
     }
 
+    @cache()
     private makeTypedJsonFilterSchema(type: string, optional: boolean, array: boolean) {
-        return this.cached(
-            {
-                type: 'typedJsonFilter',
-                dataType: type,
-                optional,
-                array,
-            },
-            () => {
-                const typeDef = getTypeDef(this.schema, type);
-                invariant(typeDef, `Type definition "${type}" not found in schema`);
+        const typeDef = getTypeDef(this.schema, type);
+        invariant(typeDef, `Type definition "${type}" not found in schema`);
 
-                const candidates: z.ZodType[] = [];
+        const candidates: z.ZodType[] = [];
 
-                if (!array) {
-                    // fields filter
-                    const fieldSchemas: Record<string, z.ZodType> = {};
-                    for (const [fieldName, fieldDef] of Object.entries(typeDef.fields)) {
-                        if (this.isTypeDefType(fieldDef.type)) {
-                            // recursive typed JSON
-                            fieldSchemas[fieldName] = this.makeTypedJsonFilterSchema(
-                                fieldDef.type,
-                                !!fieldDef.optional,
-                                !!fieldDef.array,
-                            ).optional();
-                        } else {
-                            // enum, array, primitives
-                            const enumDef = getEnum(this.schema, fieldDef.type);
-                            if (enumDef) {
-                                fieldSchemas[fieldName] = this.makeEnumFilterSchema(
-                                    fieldDef.type,
-                                    enumDef,
-                                    !!fieldDef.optional,
-                                    false,
-                                    !!fieldDef.array,
-                                ).optional();
-                            } else if (fieldDef.array) {
-                                fieldSchemas[fieldName] = this.makeArrayFilterSchema(
-                                    fieldDef.type as BuiltinType,
-                                ).optional();
-                            } else {
-                                fieldSchemas[fieldName] = this.makePrimitiveFilterSchema(
-                                    fieldDef.type as BuiltinType,
-                                    !!fieldDef.optional,
-                                    false,
-                                ).optional();
-                            }
-                        }
-                    }
-
-                    candidates.push(z.strictObject(fieldSchemas));
-                }
-
-                const recursiveSchema = z.lazy(() => this.makeTypedJsonFilterSchema(type, optional, false)).optional();
-                if (array) {
-                    // array filter
-                    candidates.push(
-                        z.strictObject({
-                            some: recursiveSchema,
-                            every: recursiveSchema,
-                            none: recursiveSchema,
-                        }),
-                    );
+        if (!array) {
+            // fields filter
+            const fieldSchemas: Record<string, z.ZodType> = {};
+            for (const [fieldName, fieldDef] of Object.entries(typeDef.fields)) {
+                if (this.isTypeDefType(fieldDef.type)) {
+                    // recursive typed JSON
+                    fieldSchemas[fieldName] = this.makeTypedJsonFilterSchema(
+                        fieldDef.type,
+                        !!fieldDef.optional,
+                        !!fieldDef.array,
+                    ).optional();
                 } else {
-                    // is / isNot filter
-                    candidates.push(
-                        z.strictObject({
-                            is: recursiveSchema,
-                            isNot: recursiveSchema,
-                        }),
-                    );
+                    // enum, array, primitives
+                    const enumDef = getEnum(this.schema, fieldDef.type);
+                    if (enumDef) {
+                        fieldSchemas[fieldName] = this.makeEnumFilterSchema(
+                            fieldDef.type,
+                            enumDef,
+                            !!fieldDef.optional,
+                            false,
+                            !!fieldDef.array,
+                        ).optional();
+                    } else if (fieldDef.array) {
+                        fieldSchemas[fieldName] = this.makeArrayFilterSchema(fieldDef.type as BuiltinType).optional();
+                    } else {
+                        fieldSchemas[fieldName] = this.makePrimitiveFilterSchema(
+                            fieldDef.type as BuiltinType,
+                            !!fieldDef.optional,
+                            false,
+                        ).optional();
+                    }
                 }
+            }
 
-                // plain json filter
-                candidates.push(this.makeJsonFilterSchema(optional));
+            candidates.push(z.strictObject(fieldSchemas));
+        }
 
-                if (optional) {
-                    // allow null as well
-                    candidates.push(z.null());
-                }
+        const recursiveSchema = z.lazy(() => this.makeTypedJsonFilterSchema(type, optional, false)).optional();
+        if (array) {
+            // array filter
+            candidates.push(
+                z.strictObject({
+                    some: recursiveSchema,
+                    every: recursiveSchema,
+                    none: recursiveSchema,
+                }),
+            );
+        } else {
+            // is / isNot filter
+            candidates.push(
+                z.strictObject({
+                    is: recursiveSchema,
+                    isNot: recursiveSchema,
+                }),
+            );
+        }
 
-                // either plain json filter or field filters
-                return z.union(candidates);
-            },
-        );
+        // plain json filter
+        candidates.push(this.makeJsonFilterSchema(optional));
+
+        if (optional) {
+            // allow null as well
+            candidates.push(z.null());
+        }
+
+        // either plain json filter or field filters
+        return z.union(candidates);
     }
 
     private isTypeDefType(type: string) {
         return this.schema.typeDefs && type in this.schema.typeDefs;
     }
 
+    @cache()
     private makeEnumFilterSchema(
         enumName: string,
         enumDef: EnumDef,
@@ -855,39 +805,23 @@ export class InputValidator<Schema extends SchemaDef> {
         withAggregations: boolean,
         array: boolean,
     ) {
-        return this.cached(
-            {
-                type: 'enumFilter',
-                enum: enumName,
-                optional,
-                array,
-                withAggregations,
-            },
-            () => {
-                const baseSchema = z.enum(Object.keys(enumDef.values) as [string, ...string[]]);
-                if (array) {
-                    return this.internalMakeArrayFilterSchema(baseSchema);
-                }
-                const components = this.makeCommonPrimitiveFilterComponents(
-                    baseSchema,
-                    optional,
-                    () => z.lazy(() => this.makeEnumFilterSchema(enumName, enumDef, optional, withAggregations, array)),
-                    ['equals', 'in', 'notIn', 'not'],
-                    withAggregations ? ['_count', '_min', '_max'] : undefined,
-                );
-                return z.union([this.nullableIf(baseSchema, optional), z.strictObject(components)]);
-            },
+        const baseSchema = z.enum(Object.keys(enumDef.values) as [string, ...string[]]);
+        if (array) {
+            return this.internalMakeArrayFilterSchema(baseSchema);
+        }
+        const components = this.makeCommonPrimitiveFilterComponents(
+            baseSchema,
+            optional,
+            () => z.lazy(() => this.makeEnumFilterSchema(enumName, enumDef, optional, withAggregations, array)),
+            ['equals', 'in', 'notIn', 'not'],
+            withAggregations ? ['_count', '_min', '_max'] : undefined,
         );
+        return z.union([this.nullableIf(baseSchema, optional), z.strictObject(components)]);
     }
 
+    @cache()
     private makeArrayFilterSchema(type: BuiltinType) {
-        return this.cached(
-            {
-                type: 'arrayFilter',
-                dataType: type,
-            },
-            () => this.internalMakeArrayFilterSchema(this.makeScalarSchema(type)),
-        );
+        return this.internalMakeArrayFilterSchema(this.makeScalarSchema(type));
     }
 
     private internalMakeArrayFilterSchema(elementSchema: ZodType) {
@@ -900,27 +834,19 @@ export class InputValidator<Schema extends SchemaDef> {
         });
     }
 
+    @cache()
     private makePrimitiveFilterSchema(type: BuiltinType, optional: boolean, withAggregations: boolean) {
-        return this.cached(
-            {
-                type: 'primitiveFilter',
-                dataType: type,
-                optional,
-                withAggregations,
-            },
-            () =>
-                match(type)
-                    .with('String', () => this.makeStringFilterSchema(optional, withAggregations))
-                    .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
-                        this.makeNumberFilterSchema(this.makeScalarSchema(type), optional, withAggregations),
-                    )
-                    .with('Boolean', () => this.makeBooleanFilterSchema(optional, withAggregations))
-                    .with('DateTime', () => this.makeDateTimeFilterSchema(optional, withAggregations))
-                    .with('Bytes', () => this.makeBytesFilterSchema(optional, withAggregations))
-                    .with('Json', () => this.makeJsonFilterSchema(optional))
-                    .with('Unsupported', () => z.never())
-                    .exhaustive(),
-        );
+        return match(type)
+            .with('String', () => this.makeStringFilterSchema(optional, withAggregations))
+            .with(P.union('Int', 'Float', 'Decimal', 'BigInt'), (type) =>
+                this.makeNumberFilterSchema(this.makeScalarSchema(type), optional, withAggregations),
+            )
+            .with('Boolean', () => this.makeBooleanFilterSchema(optional, withAggregations))
+            .with('DateTime', () => this.makeDateTimeFilterSchema(optional, withAggregations))
+            .with('Bytes', () => this.makeBytesFilterSchema(optional, withAggregations))
+            .with('Json', () => this.makeJsonFilterSchema(optional))
+            .with('Unsupported', () => z.never())
+            .exhaustive();
     }
 
     private makeJsonValueSchema(nullable: boolean, forFilter: boolean): z.ZodType {
@@ -950,85 +876,56 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.nullableIf(schema, nullable);
     }
 
+    @cache()
     private makeJsonFilterSchema(optional: boolean) {
-        return this.cached(
-            {
-                type: 'jsonFilter',
-                optional,
-            },
-            () => {
-                const valueSchema = this.makeJsonValueSchema(optional, true);
-                return z.strictObject({
-                    path: z.string().optional(),
-                    equals: valueSchema.optional(),
-                    not: valueSchema.optional(),
-                    string_contains: z.string().optional(),
-                    string_starts_with: z.string().optional(),
-                    string_ends_with: z.string().optional(),
-                    mode: this.makeStringModeSchema().optional(),
-                    array_contains: valueSchema.optional(),
-                    array_starts_with: valueSchema.optional(),
-                    array_ends_with: valueSchema.optional(),
-                });
-            },
-        );
+        const valueSchema = this.makeJsonValueSchema(optional, true);
+        return z.strictObject({
+            path: z.string().optional(),
+            equals: valueSchema.optional(),
+            not: valueSchema.optional(),
+            string_contains: z.string().optional(),
+            string_starts_with: z.string().optional(),
+            string_ends_with: z.string().optional(),
+            mode: this.makeStringModeSchema().optional(),
+            array_contains: valueSchema.optional(),
+            array_starts_with: valueSchema.optional(),
+            array_ends_with: valueSchema.optional(),
+        });
     }
 
+    @cache()
     private makeDateTimeFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
-        return this.cached(
-            {
-                type: 'dateTimeFilter',
-                optional,
-                withAggregations,
-            },
-            () =>
-                this.makeCommonPrimitiveFilterSchema(
-                    z.union([z.iso.datetime(), z.date()]),
-                    optional,
-                    () => z.lazy(() => this.makeDateTimeFilterSchema(optional, withAggregations)),
-                    withAggregations ? ['_count', '_min', '_max'] : undefined,
-                ),
+        return this.makeCommonPrimitiveFilterSchema(
+            z.union([z.iso.datetime(), z.date()]),
+            optional,
+            () => z.lazy(() => this.makeDateTimeFilterSchema(optional, withAggregations)),
+            withAggregations ? ['_count', '_min', '_max'] : undefined,
         );
     }
 
+    @cache()
     private makeBooleanFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
-        return this.cached(
-            {
-                type: 'booleanFilter',
-                optional,
-                withAggregations,
-            },
-            () => {
-                const components = this.makeCommonPrimitiveFilterComponents(
-                    z.boolean(),
-                    optional,
-                    () => z.lazy(() => this.makeBooleanFilterSchema(optional, withAggregations)),
-                    ['equals', 'not'],
-                    withAggregations ? ['_count', '_min', '_max'] : undefined,
-                );
-                return z.union([this.nullableIf(z.boolean(), optional), z.strictObject(components)]);
-            },
+        const components = this.makeCommonPrimitiveFilterComponents(
+            z.boolean(),
+            optional,
+            () => z.lazy(() => this.makeBooleanFilterSchema(optional, withAggregations)),
+            ['equals', 'not'],
+            withAggregations ? ['_count', '_min', '_max'] : undefined,
         );
+        return z.union([this.nullableIf(z.boolean(), optional), z.strictObject(components)]);
     }
 
+    @cache()
     private makeBytesFilterSchema(optional: boolean, withAggregations: boolean): ZodType {
-        return this.cached(
-            {
-                type: 'bytesFilter',
-                withAggregations,
-            },
-            () => {
-                const baseSchema = z.instanceof(Uint8Array);
-                const components = this.makeCommonPrimitiveFilterComponents(
-                    baseSchema,
-                    optional,
-                    () => z.instanceof(Uint8Array),
-                    ['equals', 'in', 'notIn', 'not'],
-                    withAggregations ? ['_count', '_min', '_max'] : undefined,
-                );
-                return z.union([this.nullableIf(baseSchema, optional), z.strictObject(components)]);
-            },
+        const baseSchema = z.instanceof(Uint8Array);
+        const components = this.makeCommonPrimitiveFilterComponents(
+            baseSchema,
+            optional,
+            () => z.instanceof(Uint8Array),
+            ['equals', 'in', 'notIn', 'not'],
+            withAggregations ? ['_count', '_min', '_max'] : undefined,
         );
+        return z.union([this.nullableIf(baseSchema, optional), z.strictObject(components)]);
     }
 
     private makeCommonPrimitiveFilterComponents(
@@ -1116,250 +1013,192 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.union([z.literal('default'), z.literal('insensitive')]);
     }
 
+    @cache()
     private makeSelectSchema(model: string) {
-        return this.cached(
-            {
-                type: 'select',
-                model,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
-                const fields: Record<string, ZodType> = {};
-                for (const field of Object.keys(modelDef.fields)) {
-                    const fieldDef = requireField(this.schema, model, field);
-                    if (fieldDef.relation) {
-                        fields[field] = this.makeRelationSelectIncludeSchema(fieldDef).optional();
-                    } else {
-                        fields[field] = z.boolean().optional();
-                    }
-                }
+        const modelDef = requireModel(this.schema, model);
+        const fields: Record<string, ZodType> = {};
+        for (const field of Object.keys(modelDef.fields)) {
+            const fieldDef = requireField(this.schema, model, field);
+            if (fieldDef.relation) {
+                fields[field] = this.makeRelationSelectIncludeSchema(fieldDef).optional();
+            } else {
+                fields[field] = z.boolean().optional();
+            }
+        }
 
-                const _countSchema = this.makeCountSelectionSchema(modelDef);
-                if (!(_countSchema instanceof z.ZodNever)) {
-                    fields['_count'] = _countSchema;
-                }
+        const _countSchema = this.makeCountSelectionSchema(modelDef);
+        if (!(_countSchema instanceof z.ZodNever)) {
+            fields['_count'] = _countSchema;
+        }
 
-                return z.strictObject(fields);
-            },
-        );
+        return z.strictObject(fields);
     }
 
+    @cache()
     private makeCountSelectionSchema(modelDef: ModelDef) {
-        return this.cached(
-            {
-                type: 'countSelection',
-                model: modelDef.name,
-            },
-            () => {
-                const toManyRelations = Object.values(modelDef.fields).filter((def) => def.relation && def.array);
-                if (toManyRelations.length > 0) {
-                    return z
+        const toManyRelations = Object.values(modelDef.fields).filter((def) => def.relation && def.array);
+        if (toManyRelations.length > 0) {
+            return z
+                .union([
+                    z.literal(true),
+                    z.strictObject({
+                        select: z.strictObject(
+                            toManyRelations.reduce(
+                                (acc, fieldDef) => ({
+                                    ...acc,
+                                    [fieldDef.name]: z
+                                        .union([
+                                            z.boolean(),
+                                            z.strictObject({
+                                                where: this.makeWhereSchema(fieldDef.type, false, false),
+                                            }),
+                                        ])
+                                        .optional(),
+                                }),
+                                {} as Record<string, ZodType>,
+                            ),
+                        ),
+                    }),
+                ])
+                .optional();
+        } else {
+            return z.never();
+        }
+    }
+
+    @cache()
+    private makeRelationSelectIncludeSchema(fieldDef: FieldDef) {
+        let objSchema: z.ZodType = z.strictObject({
+            ...(fieldDef.array || fieldDef.optional
+                ? {
+                      // to-many relations and optional to-one relations are filterable
+                      where: z.lazy(() => this.makeWhereSchema(fieldDef.type, false)).optional(),
+                  }
+                : {}),
+            select: z
+                .lazy(() => this.makeSelectSchema(fieldDef.type))
+                .optional()
+                .nullable(),
+            include: z
+                .lazy(() => this.makeIncludeSchema(fieldDef.type))
+                .optional()
+                .nullable(),
+            omit: z
+                .lazy(() => this.makeOmitSchema(fieldDef.type))
+                .optional()
+                .nullable(),
+            ...(fieldDef.array
+                ? {
+                      // to-many relations can be ordered, skipped, taken, and cursor-located
+                      orderBy: z
+                          .lazy(() => this.orArray(this.makeOrderBySchema(fieldDef.type, true, false), true))
+                          .optional(),
+                      skip: this.makeSkipSchema().optional(),
+                      take: this.makeTakeSchema().optional(),
+                      cursor: this.makeCursorSchema(fieldDef.type).optional(),
+                      distinct: this.makeDistinctSchema(fieldDef.type).optional(),
+                  }
+                : {}),
+        });
+
+        objSchema = this.refineForSelectIncludeMutuallyExclusive(objSchema);
+        objSchema = this.refineForSelectOmitMutuallyExclusive(objSchema);
+
+        return z.union([z.boolean(), objSchema]);
+    }
+
+    @cache()
+    private makeOmitSchema(model: string) {
+        const modelDef = requireModel(this.schema, model);
+        const fields: Record<string, ZodType> = {};
+        for (const field of Object.keys(modelDef.fields)) {
+            const fieldDef = requireField(this.schema, model, field);
+            if (!fieldDef.relation) {
+                if (this.options.allowQueryTimeOmitOverride !== false) {
+                    // if override is allowed, use boolean
+                    fields[field] = z.boolean().optional();
+                } else {
+                    // otherwise only allow true
+                    fields[field] = z.literal(true).optional();
+                }
+            }
+        }
+        return z.strictObject(fields);
+    }
+
+    @cache()
+    private makeIncludeSchema(model: string) {
+        const modelDef = requireModel(this.schema, model);
+        const fields: Record<string, ZodType> = {};
+        for (const field of Object.keys(modelDef.fields)) {
+            const fieldDef = requireField(this.schema, model, field);
+            if (fieldDef.relation) {
+                fields[field] = this.makeRelationSelectIncludeSchema(fieldDef).optional();
+            }
+        }
+
+        const _countSchema = this.makeCountSelectionSchema(modelDef);
+        if (!(_countSchema instanceof z.ZodNever)) {
+            fields['_count'] = _countSchema;
+        }
+
+        return z.strictObject(fields);
+    }
+
+    @cache()
+    private makeOrderBySchema(model: string, withRelation: boolean, WithAggregation: boolean) {
+        const modelDef = requireModel(this.schema, model);
+        const fields: Record<string, ZodType> = {};
+        const sort = z.union([z.literal('asc'), z.literal('desc')]);
+        for (const field of Object.keys(modelDef.fields)) {
+            const fieldDef = requireField(this.schema, model, field);
+            if (fieldDef.relation) {
+                // relations
+                if (withRelation) {
+                    fields[field] = z.lazy(() => {
+                        let relationOrderBy = this.makeOrderBySchema(fieldDef.type, withRelation, WithAggregation);
+                        if (fieldDef.array) {
+                            relationOrderBy = relationOrderBy.extend({
+                                _count: sort,
+                            });
+                        }
+                        return relationOrderBy.optional();
+                    });
+                }
+            } else {
+                // scalars
+                if (fieldDef.optional) {
+                    fields[field] = z
                         .union([
-                            z.literal(true),
+                            sort,
                             z.strictObject({
-                                select: z.strictObject(
-                                    toManyRelations.reduce(
-                                        (acc, fieldDef) => ({
-                                            ...acc,
-                                            [fieldDef.name]: z
-                                                .union([
-                                                    z.boolean(),
-                                                    z.strictObject({
-                                                        where: this.makeWhereSchema(fieldDef.type, false, false),
-                                                    }),
-                                                ])
-                                                .optional(),
-                                        }),
-                                        {} as Record<string, ZodType>,
-                                    ),
-                                ),
+                                sort,
+                                nulls: z.union([z.literal('first'), z.literal('last')]),
                             }),
                         ])
                         .optional();
                 } else {
-                    return z.never();
+                    fields[field] = sort.optional();
                 }
-            },
-        );
+            }
+        }
+
+        // aggregations
+        if (WithAggregation) {
+            const aggregationFields = ['_count', '_avg', '_sum', '_min', '_max'];
+            for (const agg of aggregationFields) {
+                fields[agg] = z.lazy(() => this.makeOrderBySchema(model, true, false).optional());
+            }
+        }
+
+        return z.strictObject(fields);
     }
 
-    private makeRelationSelectIncludeSchema(fieldDef: FieldDef) {
-        return this.cached(
-            {
-                type: 'relationSelectInclude',
-                model: fieldDef.type,
-                field: fieldDef.name,
-            },
-            () => {
-                let objSchema: z.ZodType = z.strictObject({
-                    ...(fieldDef.array || fieldDef.optional
-                        ? {
-                              // to-many relations and optional to-one relations are filterable
-                              where: z.lazy(() => this.makeWhereSchema(fieldDef.type, false)).optional(),
-                          }
-                        : {}),
-                    select: z
-                        .lazy(() => this.makeSelectSchema(fieldDef.type))
-                        .optional()
-                        .nullable(),
-                    include: z
-                        .lazy(() => this.makeIncludeSchema(fieldDef.type))
-                        .optional()
-                        .nullable(),
-                    omit: z
-                        .lazy(() => this.makeOmitSchema(fieldDef.type))
-                        .optional()
-                        .nullable(),
-                    ...(fieldDef.array
-                        ? {
-                              // to-many relations can be ordered, skipped, taken, and cursor-located
-                              orderBy: z
-                                  .lazy(() => this.orArray(this.makeOrderBySchema(fieldDef.type, true, false), true))
-                                  .optional(),
-                              skip: this.makeSkipSchema().optional(),
-                              take: this.makeTakeSchema().optional(),
-                              cursor: this.makeCursorSchema(fieldDef.type).optional(),
-                              distinct: this.makeDistinctSchema(fieldDef.type).optional(),
-                          }
-                        : {}),
-                });
-
-                objSchema = this.refineForSelectIncludeMutuallyExclusive(objSchema);
-                objSchema = this.refineForSelectOmitMutuallyExclusive(objSchema);
-
-                return z.union([z.boolean(), objSchema]);
-            },
-        );
-    }
-
-    private makeOmitSchema(model: string) {
-        return this.cached(
-            {
-                type: 'omit',
-                model,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
-                const fields: Record<string, ZodType> = {};
-                for (const field of Object.keys(modelDef.fields)) {
-                    const fieldDef = requireField(this.schema, model, field);
-                    if (!fieldDef.relation) {
-                        if (this.options.allowQueryTimeOmitOverride !== false) {
-                            // if override is allowed, use boolean
-                            fields[field] = z.boolean().optional();
-                        } else {
-                            // otherwise only allow true
-                            fields[field] = z.literal(true).optional();
-                        }
-                    }
-                }
-                return z.strictObject(fields);
-            },
-        );
-    }
-
-    private makeIncludeSchema(model: string) {
-        return this.cached(
-            {
-                type: 'include',
-                model,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
-                const fields: Record<string, ZodType> = {};
-                for (const field of Object.keys(modelDef.fields)) {
-                    const fieldDef = requireField(this.schema, model, field);
-                    if (fieldDef.relation) {
-                        fields[field] = this.makeRelationSelectIncludeSchema(fieldDef).optional();
-                    }
-                }
-
-                const _countSchema = this.makeCountSelectionSchema(modelDef);
-                if (!(_countSchema instanceof z.ZodNever)) {
-                    fields['_count'] = _countSchema;
-                }
-
-                return z.strictObject(fields);
-            },
-        );
-    }
-
-    private makeOrderBySchema(model: string, withRelation: boolean, WithAggregation: boolean) {
-        return this.cached(
-            {
-                type: 'orderBy',
-                model,
-                withRelation,
-                WithAggregation,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
-                const fields: Record<string, ZodType> = {};
-                const sort = z.union([z.literal('asc'), z.literal('desc')]);
-                for (const field of Object.keys(modelDef.fields)) {
-                    const fieldDef = requireField(this.schema, model, field);
-                    if (fieldDef.relation) {
-                        // relations
-                        if (withRelation) {
-                            fields[field] = z.lazy(() => {
-                                let relationOrderBy = this.makeOrderBySchema(
-                                    fieldDef.type,
-                                    withRelation,
-                                    WithAggregation,
-                                );
-                                if (fieldDef.array) {
-                                    relationOrderBy = relationOrderBy.extend({
-                                        _count: sort,
-                                    });
-                                }
-                                return relationOrderBy.optional();
-                            });
-                        }
-                    } else {
-                        // scalars
-                        if (fieldDef.optional) {
-                            fields[field] = z
-                                .union([
-                                    sort,
-                                    z.strictObject({
-                                        sort,
-                                        nulls: z.union([z.literal('first'), z.literal('last')]),
-                                    }),
-                                ])
-                                .optional();
-                        } else {
-                            fields[field] = sort.optional();
-                        }
-                    }
-                }
-
-                // aggregations
-                if (WithAggregation) {
-                    const aggregationFields = ['_count', '_avg', '_sum', '_min', '_max'];
-                    for (const agg of aggregationFields) {
-                        fields[agg] = z.lazy(() => this.makeOrderBySchema(model, true, false).optional());
-                    }
-                }
-
-                return z.strictObject(fields);
-            },
-        );
-    }
-
+    @cache()
     private makeDistinctSchema(model: string) {
-        return this.cached(
-            {
-                type: 'distinct',
-                model,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
-                const nonRelationFields = Object.keys(modelDef.fields).filter(
-                    (field) => !modelDef.fields[field]?.relation,
-                );
-                return this.orArray(z.enum(nonRelationFields as any), true);
-            },
-        );
+        const modelDef = requireModel(this.schema, model);
+        const nonRelationFields = Object.keys(modelDef.fields).filter((field) => !modelDef.fields[field]?.relation);
+        return this.orArray(z.enum(nonRelationFields as any), true);
     }
 
     private makeCursorSchema(model: string) {
@@ -1371,191 +1210,165 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Create
 
+    @cache()
     private makeCreateSchema(model: string) {
-        return this.cached(
-            {
-                type: 'create',
-                model,
-            },
-            () => {
-                const dataSchema = this.makeCreateDataSchema(model, false);
-                const baseSchema = z.strictObject({
-                    data: dataSchema,
-                    select: this.makeSelectSchema(model).optional().nullable(),
-                    include: this.makeIncludeSchema(model).optional().nullable(),
-                    omit: this.makeOmitSchema(model).optional().nullable(),
-                });
-                let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'create');
-                schema = this.refineForSelectIncludeMutuallyExclusive(schema);
-                schema = this.refineForSelectOmitMutuallyExclusive(schema);
-                return schema;
-            },
-        );
+        const dataSchema = this.makeCreateDataSchema(model, false);
+        const baseSchema = z.strictObject({
+            data: dataSchema,
+            select: this.makeSelectSchema(model).optional().nullable(),
+            include: this.makeIncludeSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
+        });
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'create');
+        schema = this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
+    @cache()
     private makeCreateManySchema(model: string) {
-        return this.cached(
-            {
-                type: 'createMany',
-                model,
-            },
-            () => this.mergePluginArgsSchema(this.makeCreateManyDataSchema(model, []), 'createMany').optional(),
-        );
+        return this.mergePluginArgsSchema(this.makeCreateManyDataSchema(model, []), 'createMany').optional();
     }
 
+    @cache()
     private makeCreateManyAndReturnSchema(model: string) {
-        return this.cached(
-            {
-                type: 'createManyAndReturn',
-                model,
-            },
-            () => {
-                const base = this.makeCreateManyDataSchema(model, []);
-                let result: ZodObject = base.extend({
-                    select: this.makeSelectSchema(model).optional().nullable(),
-                    omit: this.makeOmitSchema(model).optional().nullable(),
-                });
-                result = this.mergePluginArgsSchema(result, 'createManyAndReturn');
-                return this.refineForSelectOmitMutuallyExclusive(result).optional();
-            },
-        );
+        const base = this.makeCreateManyDataSchema(model, []);
+        let result: ZodObject = base.extend({
+            select: this.makeSelectSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
+        });
+        result = this.mergePluginArgsSchema(result, 'createManyAndReturn');
+        return this.refineForSelectOmitMutuallyExclusive(result).optional();
     }
 
+    @cache({ includeProperties: ['extraValidationsEnabled'] })
     private makeCreateDataSchema(
         model: string,
         canBeArray: boolean,
         withoutFields: string[] = [],
         withoutRelationFields = false,
     ) {
-        return this.cached(
-            {
-                type: 'createData',
-                model,
-                canBeArray,
-                withoutFields: [...withoutFields].sort(),
-                withoutRelationFields,
-            },
-            () => {
-                const uncheckedVariantFields: Record<string, ZodType> = {};
-                const checkedVariantFields: Record<string, ZodType> = {};
-                const modelDef = requireModel(this.schema, model);
-                const hasRelation =
-                    !withoutRelationFields &&
-                    Object.entries(modelDef.fields).some(([f, def]) => !withoutFields.includes(f) && def.relation);
+        // Normalize array argument for consistent cache keys
+        withoutFields = [...withoutFields].sort();
 
-                Object.keys(modelDef.fields).forEach((field) => {
-                    if (withoutFields.includes(field)) {
-                        return;
-                    }
-                    const fieldDef = requireField(this.schema, model, field);
-                    if (fieldDef.computed) {
-                        return;
-                    }
+        const uncheckedVariantFields: Record<string, ZodType> = {};
+        const checkedVariantFields: Record<string, ZodType> = {};
+        const modelDef = requireModel(this.schema, model);
+        const hasRelation =
+            !withoutRelationFields &&
+            Object.entries(modelDef.fields).some(([f, def]) => !withoutFields.includes(f) && def.relation);
 
-                    if (this.isDelegateDiscriminator(fieldDef)) {
-                        // discriminator field is auto-assigned
-                        return;
-                    }
+        Object.keys(modelDef.fields).forEach((field) => {
+            if (withoutFields.includes(field)) {
+                return;
+            }
+            const fieldDef = requireField(this.schema, model, field);
+            if (fieldDef.computed) {
+                return;
+            }
 
-                    if (fieldDef.relation) {
-                        if (withoutRelationFields) {
-                            return;
-                        }
-                        const excludeFields: string[] = [];
-                        const oppositeField = fieldDef.relation.opposite;
-                        if (oppositeField) {
-                            excludeFields.push(oppositeField);
-                            const oppositeFieldDef = requireField(this.schema, fieldDef.type, oppositeField);
-                            if (oppositeFieldDef.relation?.fields) {
-                                excludeFields.push(...oppositeFieldDef.relation.fields);
-                            }
-                        }
+            if (this.isDelegateDiscriminator(fieldDef)) {
+                // discriminator field is auto-assigned
+                return;
+            }
 
-                        let fieldSchema: ZodType = z.lazy(() =>
-                            this.makeRelationManipulationSchema(fieldDef, excludeFields, 'create'),
-                        );
-
-                        if (fieldDef.optional || fieldDef.array) {
-                            // optional or array relations are optional
-                            fieldSchema = fieldSchema.optional();
-                        } else {
-                            // if all fk fields are optional, the relation is optional
-                            let allFksOptional = false;
-                            if (fieldDef.relation.fields) {
-                                allFksOptional = fieldDef.relation.fields.every((f) => {
-                                    const fkDef = requireField(this.schema, model, f);
-                                    return fkDef.optional || fieldHasDefaultValue(fkDef);
-                                });
-                            }
-                            if (allFksOptional) {
-                                fieldSchema = fieldSchema.optional();
-                            }
-                        }
-
-                        // optional to-one relation can be null
-                        if (fieldDef.optional && !fieldDef.array) {
-                            fieldSchema = fieldSchema.nullable();
-                        }
-                        checkedVariantFields[field] = fieldSchema;
-                        if (fieldDef.array || !fieldDef.relation.references) {
-                            // non-owned relation
-                            uncheckedVariantFields[field] = fieldSchema;
-                        }
-                    } else {
-                        let fieldSchema = this.makeScalarSchema(fieldDef.type, fieldDef.attributes);
-
-                        if (fieldDef.array) {
-                            fieldSchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
-                            fieldSchema = z
-                                .union([
-                                    fieldSchema,
-                                    z.strictObject({
-                                        set: fieldSchema,
-                                    }),
-                                ])
-                                .optional();
-                        }
-
-                        if (fieldDef.optional || fieldHasDefaultValue(fieldDef)) {
-                            fieldSchema = fieldSchema.optional();
-                        }
-
-                        if (fieldDef.optional) {
-                            if (fieldDef.type === 'Json') {
-                                // DbNull for Json fields
-                                fieldSchema = z.union([fieldSchema, z.instanceof(DbNullClass)]);
-                            } else {
-                                fieldSchema = fieldSchema.nullable();
-                            }
-                        }
-
-                        uncheckedVariantFields[field] = fieldSchema;
-                        if (!fieldDef.foreignKeyFor) {
-                            // non-fk field
-                            checkedVariantFields[field] = fieldSchema;
-                        }
-                    }
-                });
-
-                const uncheckedCreateSchema = this.extraValidationsEnabled
-                    ? addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes)
-                    : z.strictObject(uncheckedVariantFields);
-                const checkedCreateSchema = this.extraValidationsEnabled
-                    ? addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes)
-                    : z.strictObject(checkedVariantFields);
-
-                if (!hasRelation) {
-                    return this.orArray(uncheckedCreateSchema, canBeArray);
-                } else {
-                    return z.union([
-                        uncheckedCreateSchema,
-                        checkedCreateSchema,
-                        ...(canBeArray ? [z.array(uncheckedCreateSchema)] : []),
-                        ...(canBeArray ? [z.array(checkedCreateSchema)] : []),
-                    ]);
+            if (fieldDef.relation) {
+                if (withoutRelationFields) {
+                    return;
                 }
-            },
-        );
+                const excludeFields: string[] = [];
+                const oppositeField = fieldDef.relation.opposite;
+                if (oppositeField) {
+                    excludeFields.push(oppositeField);
+                    const oppositeFieldDef = requireField(this.schema, fieldDef.type, oppositeField);
+                    if (oppositeFieldDef.relation?.fields) {
+                        excludeFields.push(...oppositeFieldDef.relation.fields);
+                    }
+                }
+
+                let fieldSchema: ZodType = z.lazy(() =>
+                    this.makeRelationManipulationSchema(fieldDef, excludeFields, 'create'),
+                );
+
+                if (fieldDef.optional || fieldDef.array) {
+                    // optional or array relations are optional
+                    fieldSchema = fieldSchema.optional();
+                } else {
+                    // if all fk fields are optional, the relation is optional
+                    let allFksOptional = false;
+                    if (fieldDef.relation.fields) {
+                        allFksOptional = fieldDef.relation.fields.every((f) => {
+                            const fkDef = requireField(this.schema, model, f);
+                            return fkDef.optional || fieldHasDefaultValue(fkDef);
+                        });
+                    }
+                    if (allFksOptional) {
+                        fieldSchema = fieldSchema.optional();
+                    }
+                }
+
+                // optional to-one relation can be null
+                if (fieldDef.optional && !fieldDef.array) {
+                    fieldSchema = fieldSchema.nullable();
+                }
+                checkedVariantFields[field] = fieldSchema;
+                if (fieldDef.array || !fieldDef.relation.references) {
+                    // non-owned relation
+                    uncheckedVariantFields[field] = fieldSchema;
+                }
+            } else {
+                let fieldSchema = this.makeScalarSchema(fieldDef.type, fieldDef.attributes);
+
+                if (fieldDef.array) {
+                    fieldSchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
+                    fieldSchema = z
+                        .union([
+                            fieldSchema,
+                            z.strictObject({
+                                set: fieldSchema,
+                            }),
+                        ])
+                        .optional();
+                }
+
+                if (fieldDef.optional || fieldHasDefaultValue(fieldDef)) {
+                    fieldSchema = fieldSchema.optional();
+                }
+
+                if (fieldDef.optional) {
+                    if (fieldDef.type === 'Json') {
+                        // DbNull for Json fields
+                        fieldSchema = z.union([fieldSchema, z.instanceof(DbNullClass)]);
+                    } else {
+                        fieldSchema = fieldSchema.nullable();
+                    }
+                }
+
+                uncheckedVariantFields[field] = fieldSchema;
+                if (!fieldDef.foreignKeyFor) {
+                    // non-fk field
+                    checkedVariantFields[field] = fieldSchema;
+                }
+            }
+        });
+
+        const uncheckedCreateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes)
+            : z.strictObject(uncheckedVariantFields);
+        const checkedCreateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes)
+            : z.strictObject(checkedVariantFields);
+
+        if (!hasRelation) {
+            return this.orArray(uncheckedCreateSchema, canBeArray);
+        } else {
+            return z.union([
+                uncheckedCreateSchema,
+                checkedCreateSchema,
+                ...(canBeArray ? [z.array(uncheckedCreateSchema)] : []),
+                ...(canBeArray ? [z.array(checkedCreateSchema)] : []),
+            ]);
+        }
     }
 
     private isDelegateDiscriminator(fieldDef: FieldDef) {
@@ -1567,634 +1380,498 @@ export class InputValidator<Schema extends SchemaDef> {
         return discriminatorField === fieldDef.name;
     }
 
+    @cache()
     private makeRelationManipulationSchema(fieldDef: FieldDef, withoutFields: string[], mode: 'create' | 'update') {
-        return this.cached(
-            {
-                type: 'relationManipulation',
-                model: fieldDef.type,
-                field: fieldDef.name,
-                withoutFields: [...withoutFields].sort(),
-                mode,
-            },
-            () => {
-                const fieldType = fieldDef.type;
-                const array = !!fieldDef.array;
-                const fields: Record<string, ZodType> = {
-                    create: this.makeCreateDataSchema(fieldDef.type, !!fieldDef.array, withoutFields).optional(),
+        // Normalize array argument for consistent cache keys
+        withoutFields = [...withoutFields].sort();
 
-                    connect: this.makeConnectDataSchema(fieldType, array).optional(),
+        const fieldType = fieldDef.type;
+        const array = !!fieldDef.array;
+        const fields: Record<string, ZodType> = {
+            create: this.makeCreateDataSchema(fieldDef.type, !!fieldDef.array, withoutFields).optional(),
 
-                    connectOrCreate: this.makeConnectOrCreateDataSchema(fieldType, array, withoutFields).optional(),
-                };
+            connect: this.makeConnectDataSchema(fieldType, array).optional(),
 
-                if (array) {
-                    fields['createMany'] = this.makeCreateManyDataSchema(fieldType, withoutFields).optional();
-                }
+            connectOrCreate: this.makeConnectOrCreateDataSchema(fieldType, array, withoutFields).optional(),
+        };
 
-                if (mode === 'update') {
-                    if (fieldDef.optional || fieldDef.array) {
-                        // disconnect and delete are only available for optional/to-many relations
-                        fields['disconnect'] = this.makeDisconnectDataSchema(fieldType, array).optional();
+        if (array) {
+            fields['createMany'] = this.makeCreateManyDataSchema(fieldType, withoutFields).optional();
+        }
 
-                        fields['delete'] = this.makeDeleteRelationDataSchema(fieldType, array, true).optional();
-                    }
+        if (mode === 'update') {
+            if (fieldDef.optional || fieldDef.array) {
+                // disconnect and delete are only available for optional/to-many relations
+                fields['disconnect'] = this.makeDisconnectDataSchema(fieldType, array).optional();
 
-                    fields['update'] = array
-                        ? this.orArray(
-                              z.strictObject({
-                                  where: this.makeWhereSchema(fieldType, true),
-                                  data: this.makeUpdateDataSchema(fieldType, withoutFields),
-                              }),
-                              true,
-                          ).optional()
-                        : z
-                              .union([
-                                  z.strictObject({
-                                      where: this.makeWhereSchema(fieldType, false).optional(),
-                                      data: this.makeUpdateDataSchema(fieldType, withoutFields),
-                                  }),
-                                  this.makeUpdateDataSchema(fieldType, withoutFields),
-                              ])
-                              .optional();
+                fields['delete'] = this.makeDeleteRelationDataSchema(fieldType, array, true).optional();
+            }
 
-                    let upsertWhere = this.makeWhereSchema(fieldType, true);
-                    if (!fieldDef.array) {
-                        // to-one relation, can upsert without where clause
-                        upsertWhere = upsertWhere.optional();
-                    }
-                    fields['upsert'] = this.orArray(
-                        z.strictObject({
-                            where: upsertWhere,
-                            create: this.makeCreateDataSchema(fieldType, false, withoutFields),
-                            update: this.makeUpdateDataSchema(fieldType, withoutFields),
-                        }),
-                        true,
-                    ).optional();
+            fields['update'] = array
+                ? this.orArray(
+                      z.strictObject({
+                          where: this.makeWhereSchema(fieldType, true),
+                          data: this.makeUpdateDataSchema(fieldType, withoutFields),
+                      }),
+                      true,
+                  ).optional()
+                : z
+                      .union([
+                          z.strictObject({
+                              where: this.makeWhereSchema(fieldType, false).optional(),
+                              data: this.makeUpdateDataSchema(fieldType, withoutFields),
+                          }),
+                          this.makeUpdateDataSchema(fieldType, withoutFields),
+                      ])
+                      .optional();
 
-                    if (array) {
-                        // to-many relation specifics
-                        fields['set'] = this.makeSetDataSchema(fieldType, true).optional();
-
-                        fields['updateMany'] = this.orArray(
-                            z.strictObject({
-                                where: this.makeWhereSchema(fieldType, false, true),
-                                data: this.makeUpdateDataSchema(fieldType, withoutFields),
-                            }),
-                            true,
-                        ).optional();
-
-                        fields['deleteMany'] = this.makeDeleteRelationDataSchema(fieldType, true, false).optional();
-                    }
-                }
-
-                return z.strictObject(fields);
-            },
-        );
-    }
-
-    private makeSetDataSchema(model: string, canBeArray: boolean) {
-        return this.cached(
-            {
-                type: 'setData',
-                model,
-                canBeArray,
-            },
-            () => this.orArray(this.makeWhereSchema(model, true), canBeArray),
-        );
-    }
-
-    private makeConnectDataSchema(model: string, canBeArray: boolean) {
-        return this.cached(
-            {
-                type: 'connectData',
-                model,
-                canBeArray,
-            },
-            () => this.orArray(this.makeWhereSchema(model, true), canBeArray),
-        );
-    }
-
-    private makeDisconnectDataSchema(model: string, canBeArray: boolean) {
-        return this.cached(
-            {
-                type: 'disconnectData',
-                model,
-                canBeArray,
-            },
-            () => {
-                if (canBeArray) {
-                    // to-many relation, must be unique filters
-                    return this.orArray(this.makeWhereSchema(model, true), canBeArray);
-                } else {
-                    // to-one relation, can be boolean or a regular filter - the entity
-                    // being disconnected is already uniquely identified by its parent
-                    return z.union([z.boolean(), this.makeWhereSchema(model, false)]);
-                }
-            },
-        );
-    }
-
-    private makeDeleteRelationDataSchema(model: string, toManyRelation: boolean, uniqueFilter: boolean) {
-        return this.cached(
-            {
-                type: 'deleteRelationData',
-                model,
-                toManyRelation,
-                uniqueFilter,
-            },
-            () =>
-                toManyRelation
-                    ? this.orArray(this.makeWhereSchema(model, uniqueFilter), true)
-                    : z.union([z.boolean(), this.makeWhereSchema(model, uniqueFilter)]),
-        );
-    }
-
-    private makeConnectOrCreateDataSchema(model: string, canBeArray: boolean, withoutFields: string[]) {
-        return this.cached(
-            {
-                type: 'connectOrCreateData',
-                model,
-                canBeArray,
-                withoutFields: [...withoutFields].sort(),
-            },
-            () => {
-                const whereSchema = this.makeWhereSchema(model, true);
-                const createSchema = this.makeCreateDataSchema(model, false, withoutFields);
-                return this.orArray(
-                    z.strictObject({
-                        where: whereSchema,
-                        create: createSchema,
-                    }),
-                    canBeArray,
-                );
-            },
-        );
-    }
-
-    private makeCreateManyDataSchema(model: string, withoutFields: string[]) {
-        return this.cached(
-            {
-                type: 'createManyData',
-                model,
-                withoutFields: [...withoutFields].sort(),
-            },
-            () =>
+            let upsertWhere = this.makeWhereSchema(fieldType, true);
+            if (!fieldDef.array) {
+                // to-one relation, can upsert without where clause
+                upsertWhere = upsertWhere.optional();
+            }
+            fields['upsert'] = this.orArray(
                 z.strictObject({
-                    data: this.makeCreateDataSchema(model, true, withoutFields, true),
-                    skipDuplicates: z.boolean().optional(),
+                    where: upsertWhere,
+                    create: this.makeCreateDataSchema(fieldType, false, withoutFields),
+                    update: this.makeUpdateDataSchema(fieldType, withoutFields),
                 }),
+                true,
+            ).optional();
+
+            if (array) {
+                // to-many relation specifics
+                fields['set'] = this.makeSetDataSchema(fieldType, true).optional();
+
+                fields['updateMany'] = this.orArray(
+                    z.strictObject({
+                        where: this.makeWhereSchema(fieldType, false, true),
+                        data: this.makeUpdateDataSchema(fieldType, withoutFields),
+                    }),
+                    true,
+                ).optional();
+
+                fields['deleteMany'] = this.makeDeleteRelationDataSchema(fieldType, true, false).optional();
+            }
+        }
+
+        return z.strictObject(fields);
+    }
+
+    @cache()
+    private makeSetDataSchema(model: string, canBeArray: boolean) {
+        return this.orArray(this.makeWhereSchema(model, true), canBeArray);
+    }
+
+    @cache()
+    private makeConnectDataSchema(model: string, canBeArray: boolean) {
+        return this.orArray(this.makeWhereSchema(model, true), canBeArray);
+    }
+
+    @cache()
+    private makeDisconnectDataSchema(model: string, canBeArray: boolean) {
+        if (canBeArray) {
+            // to-many relation, must be unique filters
+            return this.orArray(this.makeWhereSchema(model, true), canBeArray);
+        } else {
+            // to-one relation, can be boolean or a regular filter - the entity
+            // being disconnected is already uniquely identified by its parent
+            return z.union([z.boolean(), this.makeWhereSchema(model, false)]);
+        }
+    }
+
+    @cache()
+    private makeDeleteRelationDataSchema(model: string, toManyRelation: boolean, uniqueFilter: boolean) {
+        return toManyRelation
+            ? this.orArray(this.makeWhereSchema(model, uniqueFilter), true)
+            : z.union([z.boolean(), this.makeWhereSchema(model, uniqueFilter)]);
+    }
+
+    @cache()
+    private makeConnectOrCreateDataSchema(model: string, canBeArray: boolean, withoutFields: string[]) {
+        // Normalize array argument for consistent cache keys
+        withoutFields = [...withoutFields].sort();
+
+        const whereSchema = this.makeWhereSchema(model, true);
+        const createSchema = this.makeCreateDataSchema(model, false, withoutFields);
+        return this.orArray(
+            z.strictObject({
+                where: whereSchema,
+                create: createSchema,
+            }),
+            canBeArray,
         );
+    }
+
+    @cache()
+    private makeCreateManyDataSchema(model: string, withoutFields: string[]) {
+        // Normalize array argument for consistent cache keys
+        withoutFields = [...withoutFields].sort();
+
+        return z.strictObject({
+            data: this.makeCreateDataSchema(model, true, withoutFields, true),
+            skipDuplicates: z.boolean().optional(),
+        });
     }
 
     // #endregion
 
     // #region Update
 
+    @cache()
     private makeUpdateSchema(model: string) {
-        return this.cached(
-            {
-                type: 'update',
-                model,
-            },
-            () => {
-                const baseSchema = z.strictObject({
-                    where: this.makeWhereSchema(model, true),
-                    data: this.makeUpdateDataSchema(model),
-                    select: this.makeSelectSchema(model).optional().nullable(),
-                    include: this.makeIncludeSchema(model).optional().nullable(),
-                    omit: this.makeOmitSchema(model).optional().nullable(),
-                });
-                let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'update');
-                schema = this.refineForSelectIncludeMutuallyExclusive(schema);
-                schema = this.refineForSelectOmitMutuallyExclusive(schema);
-                return schema;
-            },
-        );
+        const baseSchema = z.strictObject({
+            where: this.makeWhereSchema(model, true),
+            data: this.makeUpdateDataSchema(model),
+            select: this.makeSelectSchema(model).optional().nullable(),
+            include: this.makeIncludeSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
+        });
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'update');
+        schema = this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
+    @cache()
     private makeUpdateManySchema(model: string) {
-        return this.cached(
-            {
-                type: 'updateMany',
-                model,
-            },
-            () =>
-                this.mergePluginArgsSchema(
-                    z.strictObject({
-                        where: this.makeWhereSchema(model, false).optional(),
-                        data: this.makeUpdateDataSchema(model, [], true),
-                        limit: z.number().int().nonnegative().optional(),
-                    }),
-                    'updateMany',
-                ),
+        return this.mergePluginArgsSchema(
+            z.strictObject({
+                where: this.makeWhereSchema(model, false).optional(),
+                data: this.makeUpdateDataSchema(model, [], true),
+                limit: z.number().int().nonnegative().optional(),
+            }),
+            'updateMany',
         );
     }
 
+    @cache()
     private makeUpdateManyAndReturnSchema(model: string) {
-        return this.cached(
-            {
-                type: 'updateManyAndReturn',
-                model,
-            },
-            () => {
-                // plugin extended args schema is merged in `makeUpdateManySchema`
-                const baseSchema: ZodObject = this.makeUpdateManySchema(model);
-                let schema: ZodType = baseSchema.extend({
-                    select: this.makeSelectSchema(model).optional().nullable(),
-                    omit: this.makeOmitSchema(model).optional().nullable(),
-                });
-                schema = this.refineForSelectOmitMutuallyExclusive(schema);
-                return schema;
-            },
-        );
+        // plugin extended args schema is merged in `makeUpdateManySchema`
+        const baseSchema: ZodObject = this.makeUpdateManySchema(model);
+        let schema: ZodType = baseSchema.extend({
+            select: this.makeSelectSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
+        });
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
+    @cache()
     private makeUpsertSchema(model: string) {
-        return this.cached(
-            {
-                type: 'upsert',
-                model,
-            },
-            () => {
-                const baseSchema = z.strictObject({
-                    where: this.makeWhereSchema(model, true),
-                    create: this.makeCreateDataSchema(model, false),
-                    update: this.makeUpdateDataSchema(model),
-                    select: this.makeSelectSchema(model).optional().nullable(),
-                    include: this.makeIncludeSchema(model).optional().nullable(),
-                    omit: this.makeOmitSchema(model).optional().nullable(),
-                });
-                let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'upsert');
-                schema = this.refineForSelectIncludeMutuallyExclusive(schema);
-                schema = this.refineForSelectOmitMutuallyExclusive(schema);
-                return schema;
-            },
-        );
+        const baseSchema = z.strictObject({
+            where: this.makeWhereSchema(model, true),
+            create: this.makeCreateDataSchema(model, false),
+            update: this.makeUpdateDataSchema(model),
+            select: this.makeSelectSchema(model).optional().nullable(),
+            include: this.makeIncludeSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
+        });
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'upsert');
+        schema = this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
+    @cache({ includeProperties: ['extraValidationsEnabled'] })
     private makeUpdateDataSchema(model: string, withoutFields: string[] = [], withoutRelationFields = false) {
-        return this.cached(
-            {
-                type: 'updateData',
-                model,
-                withoutFields: [...withoutFields].sort(),
-                withoutRelationFields,
-            },
-            () => {
-                const uncheckedVariantFields: Record<string, ZodType> = {};
-                const checkedVariantFields: Record<string, ZodType> = {};
-                const modelDef = requireModel(this.schema, model);
-                const hasRelation = Object.entries(modelDef.fields).some(
-                    ([key, value]) => value.relation && !withoutFields.includes(key),
-                );
+        // Normalize array argument for consistent cache keys
+        withoutFields = [...withoutFields].sort();
 
-                Object.keys(modelDef.fields).forEach((field) => {
-                    if (withoutFields.includes(field)) {
-                        return;
-                    }
-                    const fieldDef = requireField(this.schema, model, field);
-
-                    if (fieldDef.relation) {
-                        if (withoutRelationFields) {
-                            return;
-                        }
-                        const excludeFields: string[] = [];
-                        const oppositeField = fieldDef.relation.opposite;
-                        if (oppositeField) {
-                            excludeFields.push(oppositeField);
-                            const oppositeFieldDef = requireField(this.schema, fieldDef.type, oppositeField);
-                            if (oppositeFieldDef.relation?.fields) {
-                                excludeFields.push(...oppositeFieldDef.relation.fields);
-                            }
-                        }
-                        let fieldSchema: ZodType = z
-                            .lazy(() => this.makeRelationManipulationSchema(fieldDef, excludeFields, 'update'))
-                            .optional();
-                        // optional to-one relation can be null
-                        if (fieldDef.optional && !fieldDef.array) {
-                            fieldSchema = fieldSchema.nullable();
-                        }
-                        checkedVariantFields[field] = fieldSchema;
-                        if (fieldDef.array || !fieldDef.relation.references) {
-                            // non-owned relation
-                            uncheckedVariantFields[field] = fieldSchema;
-                        }
-                    } else {
-                        let fieldSchema = this.makeScalarSchema(fieldDef.type, fieldDef.attributes);
-
-                        if (this.isNumericField(fieldDef)) {
-                            fieldSchema = z.union([
-                                fieldSchema,
-                                z
-                                    .object({
-                                        set: this.nullableIf(z.number().optional(), !!fieldDef.optional).optional(),
-                                        increment: z.number().optional(),
-                                        decrement: z.number().optional(),
-                                        multiply: z.number().optional(),
-                                        divide: z.number().optional(),
-                                    })
-                                    .refine(
-                                        (v) => Object.keys(v).length === 1,
-                                        'Only one of "set", "increment", "decrement", "multiply", or "divide" can be provided',
-                                    ),
-                            ]);
-                        }
-
-                        if (fieldDef.array) {
-                            const arraySchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
-                            fieldSchema = z.union([
-                                arraySchema,
-                                z
-                                    .object({
-                                        set: arraySchema.optional(),
-                                        push: z.union([fieldSchema, fieldSchema.array()]).optional(),
-                                    })
-                                    .refine(
-                                        (v) => Object.keys(v).length === 1,
-                                        'Only one of "set", "push" can be provided',
-                                    ),
-                            ]);
-                        }
-
-                        if (fieldDef.optional) {
-                            if (fieldDef.type === 'Json') {
-                                // DbNull for Json fields
-                                fieldSchema = z.union([fieldSchema, z.instanceof(DbNullClass)]);
-                            } else {
-                                fieldSchema = fieldSchema.nullable();
-                            }
-                        }
-
-                        // all fields are optional in update
-                        fieldSchema = fieldSchema.optional();
-
-                        uncheckedVariantFields[field] = fieldSchema;
-                        if (!fieldDef.foreignKeyFor) {
-                            // non-fk field
-                            checkedVariantFields[field] = fieldSchema;
-                        }
-                    }
-                });
-
-                const uncheckedUpdateSchema = this.extraValidationsEnabled
-                    ? addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes)
-                    : z.strictObject(uncheckedVariantFields);
-                const checkedUpdateSchema = this.extraValidationsEnabled
-                    ? addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes)
-                    : z.strictObject(checkedVariantFields);
-                if (!hasRelation) {
-                    return uncheckedUpdateSchema;
-                } else {
-                    return z.union([uncheckedUpdateSchema, checkedUpdateSchema]);
-                }
-            },
+        const uncheckedVariantFields: Record<string, ZodType> = {};
+        const checkedVariantFields: Record<string, ZodType> = {};
+        const modelDef = requireModel(this.schema, model);
+        const hasRelation = Object.entries(modelDef.fields).some(
+            ([key, value]) => value.relation && !withoutFields.includes(key),
         );
+
+        Object.keys(modelDef.fields).forEach((field) => {
+            if (withoutFields.includes(field)) {
+                return;
+            }
+            const fieldDef = requireField(this.schema, model, field);
+
+            if (fieldDef.relation) {
+                if (withoutRelationFields) {
+                    return;
+                }
+                const excludeFields: string[] = [];
+                const oppositeField = fieldDef.relation.opposite;
+                if (oppositeField) {
+                    excludeFields.push(oppositeField);
+                    const oppositeFieldDef = requireField(this.schema, fieldDef.type, oppositeField);
+                    if (oppositeFieldDef.relation?.fields) {
+                        excludeFields.push(...oppositeFieldDef.relation.fields);
+                    }
+                }
+                let fieldSchema: ZodType = z
+                    .lazy(() => this.makeRelationManipulationSchema(fieldDef, excludeFields, 'update'))
+                    .optional();
+                // optional to-one relation can be null
+                if (fieldDef.optional && !fieldDef.array) {
+                    fieldSchema = fieldSchema.nullable();
+                }
+                checkedVariantFields[field] = fieldSchema;
+                if (fieldDef.array || !fieldDef.relation.references) {
+                    // non-owned relation
+                    uncheckedVariantFields[field] = fieldSchema;
+                }
+            } else {
+                let fieldSchema = this.makeScalarSchema(fieldDef.type, fieldDef.attributes);
+
+                if (this.isNumericField(fieldDef)) {
+                    fieldSchema = z.union([
+                        fieldSchema,
+                        z
+                            .object({
+                                set: this.nullableIf(z.number().optional(), !!fieldDef.optional).optional(),
+                                increment: z.number().optional(),
+                                decrement: z.number().optional(),
+                                multiply: z.number().optional(),
+                                divide: z.number().optional(),
+                            })
+                            .refine(
+                                (v) => Object.keys(v).length === 1,
+                                'Only one of "set", "increment", "decrement", "multiply", or "divide" can be provided',
+                            ),
+                    ]);
+                }
+
+                if (fieldDef.array) {
+                    const arraySchema = addListValidation(fieldSchema.array(), fieldDef.attributes);
+                    fieldSchema = z.union([
+                        arraySchema,
+                        z
+                            .object({
+                                set: arraySchema.optional(),
+                                push: z.union([fieldSchema, fieldSchema.array()]).optional(),
+                            })
+                            .refine((v) => Object.keys(v).length === 1, 'Only one of "set", "push" can be provided'),
+                    ]);
+                }
+
+                if (fieldDef.optional) {
+                    if (fieldDef.type === 'Json') {
+                        // DbNull for Json fields
+                        fieldSchema = z.union([fieldSchema, z.instanceof(DbNullClass)]);
+                    } else {
+                        fieldSchema = fieldSchema.nullable();
+                    }
+                }
+
+                // all fields are optional in update
+                fieldSchema = fieldSchema.optional();
+
+                uncheckedVariantFields[field] = fieldSchema;
+                if (!fieldDef.foreignKeyFor) {
+                    // non-fk field
+                    checkedVariantFields[field] = fieldSchema;
+                }
+            }
+        });
+
+        const uncheckedUpdateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(uncheckedVariantFields), modelDef.attributes)
+            : z.strictObject(uncheckedVariantFields);
+        const checkedUpdateSchema = this.extraValidationsEnabled
+            ? addCustomValidation(z.strictObject(checkedVariantFields), modelDef.attributes)
+            : z.strictObject(checkedVariantFields);
+        if (!hasRelation) {
+            return uncheckedUpdateSchema;
+        } else {
+            return z.union([uncheckedUpdateSchema, checkedUpdateSchema]);
+        }
     }
 
     // #endregion
 
     // #region Delete
 
+    @cache()
     private makeDeleteSchema(model: GetModels<Schema>) {
-        return this.cached(
-            {
-                type: 'delete',
-                model,
-            },
-            () => {
-                const baseSchema = z.strictObject({
-                    where: this.makeWhereSchema(model, true),
-                    select: this.makeSelectSchema(model).optional().nullable(),
-                    include: this.makeIncludeSchema(model).optional().nullable(),
-                    omit: this.makeOmitSchema(model).optional().nullable(),
-                });
-                let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'delete');
-                schema = this.refineForSelectIncludeMutuallyExclusive(schema);
-                schema = this.refineForSelectOmitMutuallyExclusive(schema);
-                return schema;
-            },
-        );
+        const baseSchema = z.strictObject({
+            where: this.makeWhereSchema(model, true),
+            select: this.makeSelectSchema(model).optional().nullable(),
+            include: this.makeIncludeSchema(model).optional().nullable(),
+            omit: this.makeOmitSchema(model).optional().nullable(),
+        });
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'delete');
+        schema = this.refineForSelectIncludeMutuallyExclusive(schema);
+        schema = this.refineForSelectOmitMutuallyExclusive(schema);
+        return schema;
     }
 
+    @cache()
     private makeDeleteManySchema(model: GetModels<Schema>) {
-        return this.cached(
-            {
-                type: 'deleteMany',
-                model,
-            },
-            () =>
-                this.mergePluginArgsSchema(
-                    z.strictObject({
-                        where: this.makeWhereSchema(model, false).optional(),
-                        limit: z.number().int().nonnegative().optional(),
-                    }),
-                    'deleteMany',
-                ).optional(),
-        );
+        return this.mergePluginArgsSchema(
+            z.strictObject({
+                where: this.makeWhereSchema(model, false).optional(),
+                limit: z.number().int().nonnegative().optional(),
+            }),
+            'deleteMany',
+        ).optional();
     }
 
     // #endregion
 
     // #region Count
 
+    @cache()
     makeCountSchema(model: GetModels<Schema>) {
-        return this.cached(
-            {
-                type: 'count',
-                model,
-            },
-            () =>
-                this.mergePluginArgsSchema(
-                    z.strictObject({
-                        where: this.makeWhereSchema(model, false).optional(),
-                        skip: this.makeSkipSchema().optional(),
-                        take: this.makeTakeSchema().optional(),
-                        orderBy: this.orArray(this.makeOrderBySchema(model, true, false), true).optional(),
-                        select: this.makeCountAggregateInputSchema(model).optional(),
-                    }),
-                    'count',
-                ).optional(),
-        );
+        return this.mergePluginArgsSchema(
+            z.strictObject({
+                where: this.makeWhereSchema(model, false).optional(),
+                skip: this.makeSkipSchema().optional(),
+                take: this.makeTakeSchema().optional(),
+                orderBy: this.orArray(this.makeOrderBySchema(model, true, false), true).optional(),
+                select: this.makeCountAggregateInputSchema(model).optional(),
+            }),
+            'count',
+        ).optional();
     }
 
+    @cache()
     private makeCountAggregateInputSchema(model: GetModels<Schema>) {
-        return this.cached(
-            {
-                type: 'countAggregateInput',
-                model,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
-                return z.union([
-                    z.literal(true),
-                    z.strictObject({
-                        _all: z.literal(true).optional(),
-                        ...Object.keys(modelDef.fields).reduce(
-                            (acc, field) => {
-                                acc[field] = z.literal(true).optional();
-                                return acc;
-                            },
-                            {} as Record<string, ZodType>,
-                        ),
-                    }),
-                ]);
-            },
-        );
+        const modelDef = requireModel(this.schema, model);
+        return z.union([
+            z.literal(true),
+            z.strictObject({
+                _all: z.literal(true).optional(),
+                ...Object.keys(modelDef.fields).reduce(
+                    (acc, field) => {
+                        acc[field] = z.literal(true).optional();
+                        return acc;
+                    },
+                    {} as Record<string, ZodType>,
+                ),
+            }),
+        ]);
     }
 
     // #endregion
 
     // #region Aggregate
 
+    @cache()
     makeAggregateSchema(model: GetModels<Schema>) {
-        return this.cached(
-            {
-                type: 'aggregate',
-                model,
-            },
-            () =>
-                this.mergePluginArgsSchema(
-                    z.strictObject({
-                        where: this.makeWhereSchema(model, false).optional(),
-                        skip: this.makeSkipSchema().optional(),
-                        take: this.makeTakeSchema().optional(),
-                        orderBy: this.orArray(this.makeOrderBySchema(model, true, false), true).optional(),
-                        _count: this.makeCountAggregateInputSchema(model).optional(),
-                        _avg: this.makeSumAvgInputSchema(model).optional(),
-                        _sum: this.makeSumAvgInputSchema(model).optional(),
-                        _min: this.makeMinMaxInputSchema(model).optional(),
-                        _max: this.makeMinMaxInputSchema(model).optional(),
-                    }),
-                    'aggregate',
-                ).optional(),
-        );
+        return this.mergePluginArgsSchema(
+            z.strictObject({
+                where: this.makeWhereSchema(model, false).optional(),
+                skip: this.makeSkipSchema().optional(),
+                take: this.makeTakeSchema().optional(),
+                orderBy: this.orArray(this.makeOrderBySchema(model, true, false), true).optional(),
+                _count: this.makeCountAggregateInputSchema(model).optional(),
+                _avg: this.makeSumAvgInputSchema(model).optional(),
+                _sum: this.makeSumAvgInputSchema(model).optional(),
+                _min: this.makeMinMaxInputSchema(model).optional(),
+                _max: this.makeMinMaxInputSchema(model).optional(),
+            }),
+            'aggregate',
+        ).optional();
     }
 
+    @cache()
     makeSumAvgInputSchema(model: GetModels<Schema>) {
-        return this.cached(
-            {
-                type: 'sumAvgInput',
-                model,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
-                return z.strictObject(
-                    Object.keys(modelDef.fields).reduce(
-                        (acc, field) => {
-                            const fieldDef = requireField(this.schema, model, field);
-                            if (this.isNumericField(fieldDef)) {
-                                acc[field] = z.literal(true).optional();
-                            }
-                            return acc;
-                        },
-                        {} as Record<string, ZodType>,
-                    ),
-                );
-            },
+        const modelDef = requireModel(this.schema, model);
+        return z.strictObject(
+            Object.keys(modelDef.fields).reduce(
+                (acc, field) => {
+                    const fieldDef = requireField(this.schema, model, field);
+                    if (this.isNumericField(fieldDef)) {
+                        acc[field] = z.literal(true).optional();
+                    }
+                    return acc;
+                },
+                {} as Record<string, ZodType>,
+            ),
         );
     }
 
+    @cache()
     makeMinMaxInputSchema(model: GetModels<Schema>) {
-        return this.cached(
-            {
-                type: 'minMaxInput',
-                model,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
-                return z.strictObject(
-                    Object.keys(modelDef.fields).reduce(
-                        (acc, field) => {
-                            const fieldDef = requireField(this.schema, model, field);
-                            if (!fieldDef.relation && !fieldDef.array) {
-                                acc[field] = z.literal(true).optional();
-                            }
-                            return acc;
-                        },
-                        {} as Record<string, ZodType>,
-                    ),
-                );
-            },
+        const modelDef = requireModel(this.schema, model);
+        return z.strictObject(
+            Object.keys(modelDef.fields).reduce(
+                (acc, field) => {
+                    const fieldDef = requireField(this.schema, model, field);
+                    if (!fieldDef.relation && !fieldDef.array) {
+                        acc[field] = z.literal(true).optional();
+                    }
+                    return acc;
+                },
+                {} as Record<string, ZodType>,
+            ),
         );
     }
 
+    @cache()
     private makeGroupBySchema(model: GetModels<Schema>) {
-        return this.cached(
-            {
-                type: 'groupBy',
-                model,
-            },
-            () => {
-                const modelDef = requireModel(this.schema, model);
-                const nonRelationFields = Object.keys(modelDef.fields).filter(
-                    (field) => !modelDef.fields[field]?.relation,
-                );
-                const bySchema =
-                    nonRelationFields.length > 0
-                        ? this.orArray(z.enum(nonRelationFields as [string, ...string[]]), true)
-                        : z.never();
+        const modelDef = requireModel(this.schema, model);
+        const nonRelationFields = Object.keys(modelDef.fields).filter((field) => !modelDef.fields[field]?.relation);
+        const bySchema =
+            nonRelationFields.length > 0
+                ? this.orArray(z.enum(nonRelationFields as [string, ...string[]]), true)
+                : z.never();
 
-                const baseSchema = z.strictObject({
-                    where: this.makeWhereSchema(model, false).optional(),
-                    orderBy: this.orArray(this.makeOrderBySchema(model, false, true), true).optional(),
-                    by: bySchema,
-                    having: this.makeHavingSchema(model).optional(),
-                    skip: this.makeSkipSchema().optional(),
-                    take: this.makeTakeSchema().optional(),
-                    _count: this.makeCountAggregateInputSchema(model).optional(),
-                    _avg: this.makeSumAvgInputSchema(model).optional(),
-                    _sum: this.makeSumAvgInputSchema(model).optional(),
-                    _min: this.makeMinMaxInputSchema(model).optional(),
-                    _max: this.makeMinMaxInputSchema(model).optional(),
-                });
+        const baseSchema = z.strictObject({
+            where: this.makeWhereSchema(model, false).optional(),
+            orderBy: this.orArray(this.makeOrderBySchema(model, false, true), true).optional(),
+            by: bySchema,
+            having: this.makeHavingSchema(model).optional(),
+            skip: this.makeSkipSchema().optional(),
+            take: this.makeTakeSchema().optional(),
+            _count: this.makeCountAggregateInputSchema(model).optional(),
+            _avg: this.makeSumAvgInputSchema(model).optional(),
+            _sum: this.makeSumAvgInputSchema(model).optional(),
+            _min: this.makeMinMaxInputSchema(model).optional(),
+            _max: this.makeMinMaxInputSchema(model).optional(),
+        });
 
-                let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'groupBy');
+        let schema: ZodType = this.mergePluginArgsSchema(baseSchema, 'groupBy');
 
-                // fields used in `having` must be either in the `by` list, or aggregations
-                schema = schema.refine((value: any) => {
-                    const bys = typeof value.by === 'string' ? [value.by] : value.by;
-                    if (value.having && typeof value.having === 'object') {
-                        for (const [key, val] of Object.entries(value.having)) {
-                            if (AGGREGATE_OPERATORS.includes(key as any)) {
-                                continue;
-                            }
-                            if (bys.includes(key)) {
-                                continue;
-                            }
-                            // we have a key not mentioned in `by`, in this case it must only use
-                            // aggregations in the condition
-
-                            // 1. payload must be an object
-                            if (!val || typeof val !== 'object') {
-                                return false;
-                            }
-                            // 2. payload must only contain aggregations
-                            if (!this.onlyAggregationFields(val)) {
-                                return false;
-                            }
-                        }
+        // fields used in `having` must be either in the `by` list, or aggregations
+        schema = schema.refine((value: any) => {
+            const bys = typeof value.by === 'string' ? [value.by] : value.by;
+            if (value.having && typeof value.having === 'object') {
+                for (const [key, val] of Object.entries(value.having)) {
+                    if (AGGREGATE_OPERATORS.includes(key as any)) {
+                        continue;
                     }
-                    return true;
-                }, 'fields in "having" must be in "by"');
+                    if (bys.includes(key)) {
+                        continue;
+                    }
+                    // we have a key not mentioned in `by`, in this case it must only use
+                    // aggregations in the condition
 
-                // fields used in `orderBy` must be either in the `by` list, or aggregations
-                schema = schema.refine((value: any) => {
-                    const bys = typeof value.by === 'string' ? [value.by] : value.by;
-                    if (
-                        value.orderBy &&
-                        Object.keys(value.orderBy)
-                            .filter((f) => !AGGREGATE_OPERATORS.includes(f as AGGREGATE_OPERATORS))
-                            .some((key) => !bys.includes(key))
-                    ) {
+                    // 1. payload must be an object
+                    if (!val || typeof val !== 'object') {
                         return false;
-                    } else {
-                        return true;
                     }
-                }, 'fields in "orderBy" must be in "by"');
+                    // 2. payload must only contain aggregations
+                    if (!this.onlyAggregationFields(val)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }, 'fields in "having" must be in "by"');
 
-                return schema;
-            },
-        );
+        // fields used in `orderBy` must be either in the `by` list, or aggregations
+        schema = schema.refine((value: any) => {
+            const bys = typeof value.by === 'string' ? [value.by] : value.by;
+            if (
+                value.orderBy &&
+                Object.keys(value.orderBy)
+                    .filter((f) => !AGGREGATE_OPERATORS.includes(f as AGGREGATE_OPERATORS))
+                    .some((key) => !bys.includes(key))
+            ) {
+                return false;
+            } else {
+                return true;
+            }
+        }, 'fields in "orderBy" must be in "by"');
+
+        return schema;
     }
 
     private onlyAggregationFields(val: object) {
@@ -2223,65 +1900,47 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Procedures
 
+    @cache()
     private makeProcedureParamSchema(param: { type: string; array?: boolean; optional?: boolean }): z.ZodType {
-        return this.cached(
-            {
-                type: 'procedureParam',
-                param,
-            },
-            () => {
-                let schema: z.ZodType;
+        let schema: z.ZodType;
 
-                if (isTypeDef(this.schema, param.type)) {
-                    schema = this.makeTypeDefSchema(param.type);
-                } else if (isEnum(this.schema, param.type)) {
-                    schema = this.makeEnumSchema(param.type);
-                } else if (param.type in (this.schema.models ?? {})) {
-                    // For model-typed values, accept any object (no deep shape validation).
-                    schema = z.record(z.string(), z.unknown());
-                } else {
-                    // Builtin scalar types.
-                    schema = this.makeScalarSchema(param.type as BuiltinType);
+        if (isTypeDef(this.schema, param.type)) {
+            schema = this.makeTypeDefSchema(param.type);
+        } else if (isEnum(this.schema, param.type)) {
+            schema = this.makeEnumSchema(param.type);
+        } else if (param.type in (this.schema.models ?? {})) {
+            // For model-typed values, accept any object (no deep shape validation).
+            schema = z.record(z.string(), z.unknown());
+        } else {
+            // Builtin scalar types.
+            schema = this.makeScalarSchema(param.type as BuiltinType);
 
-                    // If a type isn't recognized by any of the above branches, `makeScalarSchema` returns `unknown`.
-                    // Treat it as configuration/schema error.
-                    if (schema instanceof z.ZodUnknown) {
-                        throw createInternalError(`Unsupported procedure parameter type: ${param.type}`);
-                    }
-                }
+            // If a type isn't recognized by any of the above branches, `makeScalarSchema` returns `unknown`.
+            // Treat it as configuration/schema error.
+            if (schema instanceof z.ZodUnknown) {
+                throw createInternalError(`Unsupported procedure parameter type: ${param.type}`);
+            }
+        }
 
-                if (param.array) {
-                    schema = schema.array();
-                }
-                if (param.optional) {
-                    schema = schema.optional();
-                }
+        if (param.array) {
+            schema = schema.array();
+        }
+        if (param.optional) {
+            schema = schema.optional();
+        }
 
-                return schema;
-            },
-        );
+        return schema;
     }
 
     // #endregion
 
     // #region Cache Management
 
-    private cached<T extends ZodType>(key: Record<string, unknown>, factory: () => T): T {
-        const cacheKey = stableStringify(key);
-        let schema = this.getSchemaCache(cacheKey!);
-        if (schema) {
-            return schema as T;
-        }
-        schema = factory();
-        this.setSchemaCache(cacheKey!, schema);
-        return schema as T;
-    }
-
-    private getSchemaCache(cacheKey: string) {
+    getCache(cacheKey: string) {
         return this.schemaCache.get(cacheKey);
     }
 
-    private setSchemaCache(cacheKey: string, schema: ZodType) {
+    setCache(cacheKey: string, schema: ZodType) {
         return this.schemaCache.set(cacheKey, schema);
     }
 
@@ -2299,12 +1958,14 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Helpers
 
+    @cache()
     private makeSkipSchema() {
-        return this.cached({ type: 'skip' }, () => z.number().int().nonnegative());
+        return z.number().int().nonnegative();
     }
 
+    @cache()
     private makeTakeSchema() {
-        return this.cached({ type: 'take' }, () => z.number().int());
+        return z.number().int();
     }
 
     private refineForSelectIncludeMutuallyExclusive(schema: ZodType) {

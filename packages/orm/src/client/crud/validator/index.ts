@@ -65,6 +65,12 @@ import {
 
 type GetSchemaFunc<Schema extends SchemaDef> = (model: GetModels<Schema>) => ZodType;
 
+/**
+ * Helper decorator that caches schema builders with class's state included
+ * as part of the key (here the `extraValidationsEnabled` property).
+ */
+const cacheWithState = () => cache({ includeProperties: ['extraValidationsEnabled'] });
+
 export class InputValidator<Schema extends SchemaDef> {
     private readonly schemaCache = new Map<string, ZodType>();
 
@@ -312,25 +318,8 @@ export class InputValidator<Schema extends SchemaDef> {
     // #region Validation helpers
 
     private validate<T>(model: GetModels<Schema>, operation: string, getSchema: GetSchemaFunc<Schema>, args: unknown) {
-        // const schema = this.cached(
-        //     {
-        //         type: 'model',
-        //         model,
-        //         operation,
-        //         extraValidationsEnabled: this.extraValidationsEnabled,
-        //     },
-        //     () => getSchema(model),
-        // );
-
         const schema = getSchema(model);
-
         const { error, data } = schema.safeParse(args);
-
-        // const start1 = new Date();
-        // schema.safeParse(args);
-        // const took1 = new Date().getTime() - start1.getTime();
-        // console.log('Validation took:', took1);
-
         if (error) {
             throw createInvalidInputError(
                 `Invalid ${operation} args for model "${model}": ${formatError(error)}`,
@@ -431,7 +420,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Find
 
-    @cache()
+    @cacheWithState()
     private makeFindSchema(model: string, operation: CoreCrudOperations) {
         const fields: Record<string, z.ZodSchema> = {};
         const unique = operation === 'findUnique';
@@ -470,7 +459,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return result;
     }
 
-    @cache()
+    @cacheWithState()
     private makeExistsSchema(model: string) {
         const baseSchema = z.strictObject({
             where: this.makeWhereSchema(model, false).optional(),
@@ -524,7 +513,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return z.enum(Object.keys(enumDef.values) as [string, ...string[]]);
     }
 
-    @cache({ includeProperties: ['extraValidationsEnabled'] })
+    @cacheWithState()
     private makeTypeDefSchema(type: string): z.ZodType {
         const typeDef = getTypeDef(this.schema, type);
         invariant(typeDef, `Type definition "${type}" not found in schema`);
@@ -1210,7 +1199,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Create
 
-    @cache()
+    @cacheWithState()
     private makeCreateSchema(model: string) {
         const dataSchema = this.makeCreateDataSchema(model, false);
         const baseSchema = z.strictObject({
@@ -1225,12 +1214,12 @@ export class InputValidator<Schema extends SchemaDef> {
         return schema;
     }
 
-    @cache()
+    @cacheWithState()
     private makeCreateManySchema(model: string) {
         return this.mergePluginArgsSchema(this.makeCreateManyDataSchema(model, []), 'createMany').optional();
     }
 
-    @cache()
+    @cacheWithState()
     private makeCreateManyAndReturnSchema(model: string) {
         const base = this.makeCreateManyDataSchema(model, []);
         let result: ZodObject = base.extend({
@@ -1241,7 +1230,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return this.refineForSelectOmitMutuallyExclusive(result).optional();
     }
 
-    @cache({ includeProperties: ['extraValidationsEnabled'] })
+    @cacheWithState()
     private makeCreateDataSchema(
         model: string,
         canBeArray: boolean,
@@ -1518,7 +1507,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Update
 
-    @cache()
+    @cacheWithState()
     private makeUpdateSchema(model: string) {
         const baseSchema = z.strictObject({
             where: this.makeWhereSchema(model, true),
@@ -1533,7 +1522,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return schema;
     }
 
-    @cache()
+    @cacheWithState()
     private makeUpdateManySchema(model: string) {
         return this.mergePluginArgsSchema(
             z.strictObject({
@@ -1545,7 +1534,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    @cache()
+    @cacheWithState()
     private makeUpdateManyAndReturnSchema(model: string) {
         // plugin extended args schema is merged in `makeUpdateManySchema`
         const baseSchema: ZodObject = this.makeUpdateManySchema(model);
@@ -1557,7 +1546,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return schema;
     }
 
-    @cache()
+    @cacheWithState()
     private makeUpsertSchema(model: string) {
         const baseSchema = z.strictObject({
             where: this.makeWhereSchema(model, true),
@@ -1573,7 +1562,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return schema;
     }
 
-    @cache({ includeProperties: ['extraValidationsEnabled'] })
+    @cacheWithState()
     private makeUpdateDataSchema(model: string, withoutFields: string[] = [], withoutRelationFields = false) {
         // Normalize array argument for consistent cache keys
         withoutFields = [...withoutFields].sort();
@@ -1687,7 +1676,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Delete
 
-    @cache()
+    @cacheWithState()
     private makeDeleteSchema(model: GetModels<Schema>) {
         const baseSchema = z.strictObject({
             where: this.makeWhereSchema(model, true),
@@ -1701,7 +1690,7 @@ export class InputValidator<Schema extends SchemaDef> {
         return schema;
     }
 
-    @cache()
+    @cacheWithState()
     private makeDeleteManySchema(model: GetModels<Schema>) {
         return this.mergePluginArgsSchema(
             z.strictObject({
@@ -1716,7 +1705,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Count
 
-    @cache()
+    @cacheWithState()
     makeCountSchema(model: GetModels<Schema>) {
         return this.mergePluginArgsSchema(
             z.strictObject({
@@ -1752,7 +1741,7 @@ export class InputValidator<Schema extends SchemaDef> {
 
     // #region Aggregate
 
-    @cache()
+    @cacheWithState()
     makeAggregateSchema(model: GetModels<Schema>) {
         return this.mergePluginArgsSchema(
             z.strictObject({
@@ -1804,7 +1793,7 @@ export class InputValidator<Schema extends SchemaDef> {
         );
     }
 
-    @cache()
+    @cacheWithState()
     private makeGroupBySchema(model: GetModels<Schema>) {
         const modelDef = requireModel(this.schema, model);
         const nonRelationFields = Object.keys(modelDef.fields).filter((field) => !modelDef.fields[field]?.relation);

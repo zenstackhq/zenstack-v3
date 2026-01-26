@@ -29,7 +29,7 @@ export function cache() {
 
             // Check cache
             const cached = this.getCache(cacheKey);
-            if (cached === undefined) {
+            if (cached !== undefined) {
                 return cached;
             }
 

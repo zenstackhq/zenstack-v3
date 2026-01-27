@@ -1,21 +1,23 @@
-import { isDataSource } from '@zenstackhq/language/ast';
-import { getOutputPath, getSchemaFile, loadSchemaDocument } from './action-utils';
-import { CliError } from '../cli-error';
 import { ZModelCodeGenerator } from '@zenstackhq/language';
+import { isDataSource } from '@zenstackhq/language/ast';
 import { getStringLiteral } from '@zenstackhq/language/utils';
-import { SqliteDialect } from '@zenstackhq/orm/dialects/sqlite';
-import { PostgresDialect } from '@zenstackhq/orm/dialects/postgres';
-import SQLite from 'better-sqlite3';
-import { Pool } from 'pg';
-import path from 'node:path';
 import { ZenStackClient, type ClientContract } from '@zenstackhq/orm';
+import { MysqlDialect } from '@zenstackhq/orm/dialects/mysql';
+import { PostgresDialect } from '@zenstackhq/orm/dialects/postgres';
+import { SqliteDialect } from '@zenstackhq/orm/dialects/sqlite';
 import { RPCApiHandler } from '@zenstackhq/server/api';
 import { ZenStackMiddleware } from '@zenstackhq/server/express';
-import express from 'express';
+import SQLite from 'better-sqlite3';
 import colors from 'colors';
-import { createJiti } from 'jiti';
-import { getVersion } from '../utils/version-utils';
 import cors from 'cors';
+import express from 'express';
+import { createJiti } from 'jiti';
+import { createPool as createMysqlPool } from 'mysql2';
+import path from 'node:path';
+import { Pool as PgPool } from 'pg';
+import { CliError } from '../cli-error';
+import { getVersion } from '../utils/version-utils';
+import { getOutputPath, getSchemaFile, loadSchemaDocument } from './action-utils';
 
 type Options = {
     output?: string;
@@ -125,10 +127,17 @@ function createDialect(provider: string, databaseUrl: string, outputPath: string
         case 'postgresql':
             console.log(colors.gray(`Connecting to PostgreSQL database at: ${databaseUrl}`));
             return new PostgresDialect({
-                pool: new Pool({
+                pool: new PgPool({
                     connectionString: databaseUrl,
                 }),
             });
+
+        case 'mysql':
+            console.log(colors.gray(`Connecting to MySQL database at: ${databaseUrl}`));
+            return new MysqlDialect({
+                pool: createMysqlPool(databaseUrl),
+            });
+
         default:
             throw new CliError(`Unsupported database provider: ${provider}`);
     }

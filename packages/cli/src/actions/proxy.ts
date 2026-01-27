@@ -135,7 +135,7 @@ function createDialect(provider: string, databaseUrl: string, outputPath: string
                     resolvedUrl = path.join(outputPath, filePath);
                 }
             }
-            console.log(colors.gray(`Connecting to SQLite database at: ${resolvedUrl}`));
+            console.log(colors.gray(`Connecting to SQLite database at: ${redactDatabaseUrl(resolvedUrl)}`));
             return new SqliteDialect({
                 database: new SQLite(resolvedUrl),
             });

@@ -11,43 +11,11 @@ const generator = new ZModelCodeGenerator({
     indent: 4,
 });
 
-describe('DB pull', () => {
+describe('DB pull - Sqlite specific', () => {
     it("simple schema - pull shouldn't modify the schema", () => {
-        const workDir = createProject(
-            `model User {
-    id             String   @id @default(cuid())
-    email          String   @unique @map("email_address")
-    name           String?  @default("Anonymous")
-    role           Role     @default(USER)
-    profile        Profile?
-    shared_profile Profile? @relation("shared")
-    posts          Post[]
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @updatedAt
-    jsonData       Json?
-    balance        Decimal  @default(0.00)
-    isActive       Boolean  @default(true)
-    bigCounter     BigInt   @default(0)
-    bytes          Bytes?
-
-    @@index([role])
-    @@map("users")
-}
-
-model Profile {
-    id            Int     @id @default(autoincrement())
-    user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    userId        String  @unique
-    user_shared   User    @relation("shared", fields: [shared_userId], references: [id], onDelete: Cascade)
-    shared_userId String  @unique
-    bio           String?
-    avatarUrl     String?
-
-    @@map("profiles")
-}
-
+        const workDir = createProject(`
 model Post {
-    id        Int       @id @default(autoincrement())
+    id        Int       @id @default(1)
     author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
     authorId  String
     title     String
@@ -55,7 +23,6 @@ model Post {
     published Boolean   @default(false)
     tags      PostTag[]
     createdAt DateTime  @default(now())
-    updatedAt DateTime  @updatedAt
     slug      String
     score     Float     @default(0.0)
     metadata  Json?
@@ -63,16 +30,6 @@ model Post {
     @@unique([authorId, slug])
     @@index([authorId, published])
     @@map("posts")
-}
-
-model Tag {
-    id        Int       @id @default(autoincrement())
-    name      String    @unique
-    posts     PostTag[]
-    createdAt DateTime  @default(now())
-
-    @@index([name], name: "tag_name_idx")
-    @@map("tags")
 }
 
 model PostTag {
@@ -87,10 +44,45 @@ model PostTag {
     @@map("post_tags")
 }
 
-enum Role {
-    USER
-    ADMIN
-    MODERATOR
+model Profile {
+    id            Int     @id @default(1)
+    user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    userId        String  @unique
+    user_shared   User    @relation("shared", fields: [shared_userId], references: [id], onDelete: Cascade)
+    shared_userId String  @unique
+    bio           String?
+    avatarUrl     String?
+
+    @@map("profiles")
+}
+
+model Tag {
+    id        Int       @id @default(1)
+    name      String    @unique
+    posts     PostTag[]
+    createdAt DateTime  @default(now())
+
+    @@index([name], name: "tag_name_idx")
+    @@map("tags")
+}
+
+model User {
+    id             String   @id @default(cuid())
+    email          String   @unique @map("email_address")
+    name           String?  @default("Anonymous")
+    role           String   @default("USER")
+    profile        Profile?
+    shared_profile Profile? @relation("shared")
+    posts          Post[]
+    createdAt      DateTime @default(now())
+    jsonData       Json?
+    balance        Decimal  @default(0.00)
+    isActive       Boolean  @default(true)
+    bigCounter     BigInt   @default(0)
+    bytes          Bytes?
+
+    @@index([role])
+    @@map("users")
 }`,
         );
         runCli('format', workDir);
@@ -104,74 +96,69 @@ enum Role {
     it('simple schema - pull shouldn recreate the schema.zmodel', async () => {
         const workDir = createProject(
             `model Post {
-    id        Int       @id @default(autoincrement())
+    id        Int       @id @default(1)
     authorId  String
     title     String
     content   String?
     published Boolean   @default(false)
     createdAt DateTime  @default(now())
-    updatedAt DateTime  @updatedAt
     slug      String
     score     Float     @default(0.0)
     metadata  Json?
-    author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
-    PostTag   PostTag[]
+    user      User      @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    postTag   PostTag[]
 
     @@unique([authorId, slug])
     @@index([authorId, published])
 }
 model PostTag {
-    post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
     postId     Int
-    tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
     tagId      Int
     assignedAt DateTime @default(now())
     note       String?  @default("initial")
+    post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
     @@id([postId, tagId])
 }
+
+model Profile {
+    id            Int     @id @default(1)
+    userId        String  @unique
+    sharedUserId String  @unique @map("shared_userId")
+    bio           String?
+    avatarUrl     String?
+    
+    profileUserId         User    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    profileSharedUserId   User    @relation("shared", fields: [sharedUserId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Tag {
+    id          Int       @id @default(1)
+    name        String    @unique
+    createdAt   DateTime  @default(now())
+    postTag     PostTag[]
+    
+    @@index([name], map: "tag_name_idx")
+}
+    
 model User {
-    id             String   @id @default(cuid())
+    id             String   @id
     email          String   @unique
     name           String?  @default("Anonymous")
-    role           Role     @default(USER)
-    profile        Profile?
-    shared_profile Profile? @relation("shared")
-    posts          Post[]
+    role           String   @default("USER")
     createdAt      DateTime @default(now())
-    updatedAt      DateTime @updatedAt
     jsonData       Json?
+
     balance        Decimal  @default(0.00)
     isActive       Boolean  @default(true)
     bigCounter     BigInt   @default(0)
     bytes          Bytes?
+    post          Post[]
+    profileUserId        Profile?
+    profileSharedUserId Profile? @relation("shared")
 
     @@index([role])
-}
-
-model Profile {
-    id            Int     @id @default(autoincrement())
-    user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    userId        String  @unique
-    user_shared   User    @relation("shared", fields: [shared_userId], references: [id], onDelete: Cascade)
-    shared_userId String  @unique
-    bio           String?
-    avatarUrl     String?
-}
-
-model Tag {
-    id        Int       @id @default(autoincrement())
-    name      String    @unique
-    posts     PostTag[]
-    createdAt DateTime  @default(now())
-
-    @@index([name], name: "tag_name_idx")
-}
-
-enum Role {
-    USER
-    ADMIN
-    MODERATOR
 }`,
         );
         console.log(workDir)

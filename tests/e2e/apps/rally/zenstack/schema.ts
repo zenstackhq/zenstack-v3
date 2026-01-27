@@ -2391,6 +2391,7 @@ export class SchemaType implements SchemaDef {
     } as const;
     enums = {
         TimeFormat: {
+            name: "TimeFormat",
             values: {
                 hours12: "hours12",
                 hours24: "hours24"
@@ -2400,6 +2401,7 @@ export class SchemaType implements SchemaDef {
             ]
         },
         UserRole: {
+            name: "UserRole",
             values: {
                 admin: "admin",
                 user: "user"
@@ -2409,6 +2411,7 @@ export class SchemaType implements SchemaDef {
             ]
         },
         ParticipantVisibility: {
+            name: "ParticipantVisibility",
             values: {
                 full: "full",
                 scoresOnly: "scoresOnly",
@@ -2419,6 +2422,7 @@ export class SchemaType implements SchemaDef {
             ]
         },
         PollStatus: {
+            name: "PollStatus",
             values: {
                 live: "live",
                 paused: "paused",
@@ -2429,6 +2433,7 @@ export class SchemaType implements SchemaDef {
             ]
         },
         VoteType: {
+            name: "VoteType",
             values: {
                 yes: "yes",
                 no: "no",
@@ -2439,12 +2444,14 @@ export class SchemaType implements SchemaDef {
             ]
         },
         SpaceMemberRole: {
+            name: "SpaceMemberRole",
             values: {
                 ADMIN: "ADMIN",
                 MEMBER: "MEMBER"
             }
         },
         SpaceTier: {
+            name: "SpaceTier",
             values: {
                 hobby: "hobby",
                 pro: "pro"
@@ -2454,6 +2461,7 @@ export class SchemaType implements SchemaDef {
             ]
         },
         SubscriptionStatus: {
+            name: "SubscriptionStatus",
             values: {
                 incomplete: "incomplete",
                 incomplete_expired: "incomplete_expired",
@@ -2469,6 +2477,7 @@ export class SchemaType implements SchemaDef {
             ]
         },
         SubscriptionInterval: {
+            name: "SubscriptionInterval",
             values: {
                 month: "month",
                 year: "year"
@@ -2478,6 +2487,7 @@ export class SchemaType implements SchemaDef {
             ]
         },
         ScheduledEventStatus: {
+            name: "ScheduledEventStatus",
             values: {
                 confirmed: "confirmed",
                 canceled: "canceled",
@@ -2488,6 +2498,7 @@ export class SchemaType implements SchemaDef {
             ]
         },
         ScheduledEventInviteStatus: {
+            name: "ScheduledEventInviteStatus",
             values: {
                 pending: "pending",
                 accepted: "accepted",
@@ -2499,11 +2510,13 @@ export class SchemaType implements SchemaDef {
             ]
         },
         CredentialType: {
+            name: "CredentialType",
             values: {
                 OAUTH: "OAUTH"
             }
         },
         LicenseType: {
+            name: "LicenseType",
             values: {
                 PLUS: "PLUS",
                 ORGANIZATION: "ORGANIZATION",
@@ -2511,6 +2524,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         LicenseStatus: {
+            name: "LicenseStatus",
             values: {
                 ACTIVE: "ACTIVE",
                 REVOKED: "REVOKED"

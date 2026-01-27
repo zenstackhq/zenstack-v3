@@ -9185,6 +9185,7 @@ export class SchemaType implements SchemaDef {
     } as const;
     enums = {
         SchedulingType: {
+            name: "SchedulingType",
             values: {
                 ROUND_ROBIN: "ROUND_ROBIN",
                 COLLECTIVE: "COLLECTIVE",
@@ -9212,6 +9213,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         PeriodType: {
+            name: "PeriodType",
             values: {
                 UNLIMITED: "UNLIMITED",
                 ROLLING: "ROLLING",
@@ -9246,6 +9248,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         CreationSource: {
+            name: "CreationSource",
             values: {
                 API_V1: "API_V1",
                 API_V2: "API_V2",
@@ -9273,6 +9276,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         IdentityProvider: {
+            name: "IdentityProvider",
             values: {
                 CAL: "CAL",
                 GOOGLE: "GOOGLE",
@@ -9280,18 +9284,21 @@ export class SchemaType implements SchemaDef {
             }
         },
         UserPermissionRole: {
+            name: "UserPermissionRole",
             values: {
                 USER: "USER",
                 ADMIN: "ADMIN"
             }
         },
         CreditType: {
+            name: "CreditType",
             values: {
                 MONTHLY: "MONTHLY",
                 ADDITIONAL: "ADDITIONAL"
             }
         },
         MembershipRole: {
+            name: "MembershipRole",
             values: {
                 MEMBER: "MEMBER",
                 ADMIN: "ADMIN",
@@ -9299,6 +9306,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         BookingStatus: {
+            name: "BookingStatus",
             values: {
                 CANCELLED: "CANCELLED",
                 ACCEPTED: "ACCEPTED",
@@ -9340,6 +9348,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         EventTypeCustomInputType: {
+            name: "EventTypeCustomInputType",
             values: {
                 TEXT: "TEXT",
                 TEXTLONG: "TEXTLONG",
@@ -9388,17 +9397,20 @@ export class SchemaType implements SchemaDef {
             }
         },
         ReminderType: {
+            name: "ReminderType",
             values: {
                 PENDING_BOOKING_CONFIRMATION: "PENDING_BOOKING_CONFIRMATION"
             }
         },
         PaymentOption: {
+            name: "PaymentOption",
             values: {
                 ON_BOOKING: "ON_BOOKING",
                 HOLD: "HOLD"
             }
         },
         WebhookTriggerEvents: {
+            name: "WebhookTriggerEvents",
             values: {
                 BOOKING_CREATED: "BOOKING_CREATED",
                 BOOKING_PAYMENT_INITIATED: "BOOKING_PAYMENT_INITIATED",
@@ -9421,6 +9433,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         AppCategories: {
+            name: "AppCategories",
             values: {
                 calendar: "calendar",
                 messaging: "messaging",
@@ -9435,6 +9448,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         WorkflowTriggerEvents: {
+            name: "WorkflowTriggerEvents",
             values: {
                 BEFORE_EVENT: "BEFORE_EVENT",
                 EVENT_CANCELLED: "EVENT_CANCELLED",
@@ -9446,6 +9460,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         WorkflowActions: {
+            name: "WorkflowActions",
             values: {
                 EMAIL_HOST: "EMAIL_HOST",
                 EMAIL_ATTENDEE: "EMAIL_ATTENDEE",
@@ -9457,6 +9472,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         TimeUnit: {
+            name: "TimeUnit",
             values: {
                 DAY: "DAY",
                 HOUR: "HOUR",
@@ -9484,6 +9500,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         WorkflowTemplates: {
+            name: "WorkflowTemplates",
             values: {
                 REMINDER: "REMINDER",
                 CUSTOM: "CUSTOM",
@@ -9494,6 +9511,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         WorkflowMethods: {
+            name: "WorkflowMethods",
             values: {
                 EMAIL: "EMAIL",
                 SMS: "SMS",
@@ -9501,6 +9519,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         FeatureType: {
+            name: "FeatureType",
             values: {
                 RELEASE: "RELEASE",
                 EXPERIMENT: "EXPERIMENT",
@@ -9510,24 +9529,28 @@ export class SchemaType implements SchemaDef {
             }
         },
         RRResetInterval: {
+            name: "RRResetInterval",
             values: {
                 MONTH: "MONTH",
                 DAY: "DAY"
             }
         },
         RRTimestampBasis: {
+            name: "RRTimestampBasis",
             values: {
                 CREATED_AT: "CREATED_AT",
                 START_TIME: "START_TIME"
             }
         },
         AccessScope: {
+            name: "AccessScope",
             values: {
                 READ_BOOKING: "READ_BOOKING",
                 READ_PROFILE: "READ_PROFILE"
             }
         },
         RedirectType: {
+            name: "RedirectType",
             values: {
                 UserEventType: "UserEventType",
                 TeamEventType: "TeamEventType",
@@ -9562,6 +9585,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         SMSLockState: {
+            name: "SMSLockState",
             values: {
                 LOCKED: "LOCKED",
                 UNLOCKED: "UNLOCKED",
@@ -9569,6 +9593,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         AttributeType: {
+            name: "AttributeType",
             values: {
                 TEXT: "TEXT",
                 NUMBER: "NUMBER",
@@ -9577,6 +9602,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         AssignmentReasonEnum: {
+            name: "AssignmentReasonEnum",
             values: {
                 ROUTING_FORM_ROUTING: "ROUTING_FORM_ROUTING",
                 ROUTING_FORM_ROUTING_FALLBACK: "ROUTING_FORM_ROUTING_FALLBACK",
@@ -9587,12 +9613,14 @@ export class SchemaType implements SchemaDef {
             }
         },
         EventTypeAutoTranslatedField: {
+            name: "EventTypeAutoTranslatedField",
             values: {
                 DESCRIPTION: "DESCRIPTION",
                 TITLE: "TITLE"
             }
         },
         WatchlistType: {
+            name: "WatchlistType",
             values: {
                 EMAIL: "EMAIL",
                 DOMAIN: "DOMAIN",
@@ -9600,6 +9628,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         WatchlistSeverity: {
+            name: "WatchlistSeverity",
             values: {
                 LOW: "LOW",
                 MEDIUM: "MEDIUM",
@@ -9608,29 +9637,34 @@ export class SchemaType implements SchemaDef {
             }
         },
         BillingPeriod: {
+            name: "BillingPeriod",
             values: {
                 MONTHLY: "MONTHLY",
                 ANNUALLY: "ANNUALLY"
             }
         },
         IncompleteBookingActionType: {
+            name: "IncompleteBookingActionType",
             values: {
                 SALESFORCE: "SALESFORCE"
             }
         },
         FilterSegmentScope: {
+            name: "FilterSegmentScope",
             values: {
                 USER: "USER",
                 TEAM: "TEAM"
             }
         },
         WorkflowContactType: {
+            name: "WorkflowContactType",
             values: {
                 PHONE: "PHONE",
                 EMAIL: "EMAIL"
             }
         },
         RoleType: {
+            name: "RoleType",
             values: {
                 SYSTEM: "SYSTEM",
                 CUSTOM: "CUSTOM"

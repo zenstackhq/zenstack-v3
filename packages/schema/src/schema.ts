@@ -106,6 +106,7 @@ export type EnumField = {
 };
 
 export type EnumDef = {
+    name: string;
     fields?: Record<string, EnumField>;
     values: Record<string, string>;
     attributes?: readonly AttributeApplication[];

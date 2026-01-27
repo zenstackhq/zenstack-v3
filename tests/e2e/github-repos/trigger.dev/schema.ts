@@ -6081,18 +6081,21 @@ export class SchemaType implements SchemaDef {
     } as const;
     enums = {
         AuthenticationMethod: {
+            name: "AuthenticationMethod",
             values: {
                 GITHUB: "GITHUB",
                 MAGIC_LINK: "MAGIC_LINK"
             }
         },
         OrgMemberRole: {
+            name: "OrgMemberRole",
             values: {
                 ADMIN: "ADMIN",
                 MEMBER: "MEMBER"
             }
         },
         RuntimeEnvironmentType: {
+            name: "RuntimeEnvironmentType",
             values: {
                 PRODUCTION: "PRODUCTION",
                 STAGING: "STAGING",
@@ -6101,24 +6104,28 @@ export class SchemaType implements SchemaDef {
             }
         },
         ProjectVersion: {
+            name: "ProjectVersion",
             values: {
                 V2: "V2",
                 V3: "V3"
             }
         },
         SecretStoreProvider: {
+            name: "SecretStoreProvider",
             values: {
                 DATABASE: "DATABASE",
                 AWS_PARAM_STORE: "AWS_PARAM_STORE"
             }
         },
         TaskTriggerSource: {
+            name: "TaskTriggerSource",
             values: {
                 STANDARD: "STANDARD",
                 SCHEDULED: "SCHEDULED"
             }
         },
         TaskRunStatus: {
+            name: "TaskRunStatus",
             values: {
                 DELAYED: "DELAYED",
                 PENDING: "PENDING",
@@ -6139,12 +6146,14 @@ export class SchemaType implements SchemaDef {
             }
         },
         RunEngineVersion: {
+            name: "RunEngineVersion",
             values: {
                 V1: "V1",
                 V2: "V2"
             }
         },
         TaskRunExecutionStatus: {
+            name: "TaskRunExecutionStatus",
             values: {
                 RUN_CREATED: "RUN_CREATED",
                 QUEUED: "QUEUED",
@@ -6158,12 +6167,14 @@ export class SchemaType implements SchemaDef {
             }
         },
         TaskRunCheckpointType: {
+            name: "TaskRunCheckpointType",
             values: {
                 DOCKER: "DOCKER",
                 KUBERNETES: "KUBERNETES"
             }
         },
         WaitpointType: {
+            name: "WaitpointType",
             values: {
                 RUN: "RUN",
                 DATETIME: "DATETIME",
@@ -6172,18 +6183,21 @@ export class SchemaType implements SchemaDef {
             }
         },
         WaitpointStatus: {
+            name: "WaitpointStatus",
             values: {
                 PENDING: "PENDING",
                 COMPLETED: "COMPLETED"
             }
         },
         WorkerInstanceGroupType: {
+            name: "WorkerInstanceGroupType",
             values: {
                 MANAGED: "MANAGED",
                 UNMANAGED: "UNMANAGED"
             }
         },
         TaskRunAttemptStatus: {
+            name: "TaskRunAttemptStatus",
             values: {
                 PENDING: "PENDING",
                 EXECUTING: "EXECUTING",
@@ -6194,6 +6208,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         TaskEventLevel: {
+            name: "TaskEventLevel",
             values: {
                 TRACE: "TRACE",
                 DEBUG: "DEBUG",
@@ -6204,6 +6219,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         TaskEventKind: {
+            name: "TaskEventKind",
             values: {
                 UNSPECIFIED: "UNSPECIFIED",
                 INTERNAL: "INTERNAL",
@@ -6216,6 +6232,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         TaskEventStatus: {
+            name: "TaskEventStatus",
             values: {
                 UNSET: "UNSET",
                 OK: "OK",
@@ -6224,18 +6241,21 @@ export class SchemaType implements SchemaDef {
             }
         },
         TaskQueueType: {
+            name: "TaskQueueType",
             values: {
                 VIRTUAL: "VIRTUAL",
                 NAMED: "NAMED"
             }
         },
         TaskQueueVersion: {
+            name: "TaskQueueVersion",
             values: {
                 V1: "V1",
                 V2: "V2"
             }
         },
         BatchTaskRunStatus: {
+            name: "BatchTaskRunStatus",
             values: {
                 PENDING: "PENDING",
                 COMPLETED: "COMPLETED",
@@ -6243,6 +6263,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         BatchTaskRunItemStatus: {
+            name: "BatchTaskRunItemStatus",
             values: {
                 PENDING: "PENDING",
                 FAILED: "FAILED",
@@ -6251,18 +6272,21 @@ export class SchemaType implements SchemaDef {
             }
         },
         CheckpointType: {
+            name: "CheckpointType",
             values: {
                 DOCKER: "DOCKER",
                 KUBERNETES: "KUBERNETES"
             }
         },
         CheckpointRestoreEventType: {
+            name: "CheckpointRestoreEventType",
             values: {
                 CHECKPOINT: "CHECKPOINT",
                 RESTORE: "RESTORE"
             }
         },
         WorkerDeploymentType: {
+            name: "WorkerDeploymentType",
             values: {
                 MANAGED: "MANAGED",
                 UNMANAGED: "UNMANAGED",
@@ -6270,6 +6294,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         WorkerDeploymentStatus: {
+            name: "WorkerDeploymentStatus",
             values: {
                 PENDING: "PENDING",
                 BUILDING: "BUILDING",
@@ -6281,17 +6306,20 @@ export class SchemaType implements SchemaDef {
             }
         },
         ScheduleType: {
+            name: "ScheduleType",
             values: {
                 DECLARATIVE: "DECLARATIVE",
                 IMPERATIVE: "IMPERATIVE"
             }
         },
         ScheduleGeneratorType: {
+            name: "ScheduleGeneratorType",
             values: {
                 CRON: "CRON"
             }
         },
         ProjectAlertChannelType: {
+            name: "ProjectAlertChannelType",
             values: {
                 EMAIL: "EMAIL",
                 SLACK: "SLACK",
@@ -6299,6 +6327,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         ProjectAlertType: {
+            name: "ProjectAlertType",
             values: {
                 TASK_RUN: "TASK_RUN",
                 TASK_RUN_ATTEMPT: "TASK_RUN_ATTEMPT",
@@ -6307,6 +6336,7 @@ export class SchemaType implements SchemaDef {
             }
         },
         ProjectAlertStatus: {
+            name: "ProjectAlertStatus",
             values: {
                 PENDING: "PENDING",
                 SENT: "SENT",
@@ -6314,23 +6344,27 @@ export class SchemaType implements SchemaDef {
             }
         },
         IntegrationService: {
+            name: "IntegrationService",
             values: {
                 SLACK: "SLACK"
             }
         },
         BulkActionType: {
+            name: "BulkActionType",
             values: {
                 CANCEL: "CANCEL",
                 REPLAY: "REPLAY"
             }
         },
         BulkActionStatus: {
+            name: "BulkActionStatus",
             values: {
                 PENDING: "PENDING",
                 COMPLETED: "COMPLETED"
             }
         },
         BulkActionItemStatus: {
+            name: "BulkActionItemStatus",
             values: {
                 PENDING: "PENDING",
                 COMPLETED: "COMPLETED",

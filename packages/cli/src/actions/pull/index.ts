@@ -252,6 +252,10 @@ export function syncTable({
                 return typeBuilder;
             });
 
+            if (column.pk && !multiPk) {
+                builder.addAttribute((b) => b.setDecl(idAttribute));
+            }
+
             if (column.default) {
                 const defaultValuesAttrs = provider.getDefaultValue({
                     fieldName: column.name,
@@ -260,10 +264,6 @@ export function syncTable({
                     enums: model.declarations.filter((d) => d.$type === 'Enum') as Enum[],
                 });
                 defaultValuesAttrs.forEach(builder.addAttribute.bind(builder));
-            }
-
-            if (column.pk && !multiPk) {
-                builder.addAttribute((b) => b.setDecl(idAttribute));
             }
 
             if (column.unique && !column.pk) {
@@ -320,22 +320,8 @@ export function syncTable({
         );
     }
 
-    const uniqueColumns = table.columns.filter((c) => c.unique && !c.pk).map((c) => c.name);
-    if (uniqueColumns.length > 0) {
-        modelFactory.addAttribute((builder) =>
-            builder.setDecl(modelUniqueAttribute).addArg((argBuilder) => {
-                const arrayExpr = argBuilder.ArrayExpr;
-                uniqueColumns.forEach((c) => {
-                    const ref = modelFactory.node.fields.find((f) => getDbName(f) === c);
-                    if (!ref) {
-                        throw new Error(`Field ${c} not found`);
-                    }
-                    arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
-                });
-                return arrayExpr;
-            }),
-        );
-    } else {
+    const uniqueColumns = table.columns.filter((c) => c.unique);
+    if(uniqueColumns.length === 0) {
         modelFactory.addAttribute((a) => a.setDecl(getAttributeRef('@@ignore', services)));
         modelFactory.comments.push(
             '/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Zenstack Client.',
@@ -361,13 +347,15 @@ export function syncTable({
             return;
         }
 
-        if (index.columns.length === 1 && index.columns.find((c) => pkColumns.includes(c.name))) {
-            //skip primary key
+        if (index.columns.length === 1 && index.columns.find((c) => pkColumns.includes(c.name))
+            || index.columns.length === 1 && index.unique) {
+            //skip primary key or unique constraints as they are already handled
             return;
         }
 
         modelFactory.addAttribute((builder) =>
-            builder
+        {
+            const attr = builder
                 .setDecl(index.unique ? modelUniqueAttribute : modelindexAttribute)
                 .addArg((argBuilder) => {
                     const arrayExpr = argBuilder.ArrayExpr;
@@ -385,8 +373,17 @@ export function syncTable({
                         });
                     });
                     return arrayExpr;
-                })
-                .addArg((argBuilder) => argBuilder.StringLiteral.setValue(index.name), 'map'),
+                });
+
+                const suffix = index.unique ? '_key' : '_idx';
+
+                if(index.name !== `${table.name}_${index.columns.map(c => c.name).join('_')}${suffix}`){
+                    attr.addArg((argBuilder) => argBuilder.StringLiteral.setValue(index.name), 'map');
+                }
+
+            return attr
+        }
+                
         );
     });
     if (table.schema && table.schema !== '' && table.schema !== defaultSchema) {

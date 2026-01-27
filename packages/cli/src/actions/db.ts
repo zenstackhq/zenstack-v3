@@ -241,19 +241,30 @@ async function runPull(options: PullOptions) {
                 }
 
                 newDataModel.fields.forEach((f) => {
-                    const originalFields = originalDataModel.fields.filter((d) => {
-                        return (
-                            getDbName(d) === getDbName(f) ||
-                            (getRelationFkName(d as any) === getRelationFkName(f as any) &&
+                    // Prioritized matching: exact db name > relation FK name > type reference
+                    let originalFields = originalDataModel.fields.filter((d) => getDbName(d) === getDbName(f));
+
+                    if (originalFields.length === 0) {
+                        // Try matching by relation FK name
+                        originalFields = originalDataModel.fields.filter(
+                            (d) =>
+                                getRelationFkName(d as any) === getRelationFkName(f as any) &&
                                 !!getRelationFkName(d as any) &&
-                                !!getRelationFkName(f as any)) ||
-                            (f.$type === 'DataField' &&
+                                !!getRelationFkName(f as any),
+                        );
+                    }
+
+                    if (originalFields.length === 0) {
+                        // Try matching by type reference
+                        originalFields = originalDataModel.fields.filter(
+                            (d) =>
+                                f.$type === 'DataField' &&
                                 d.$type === 'DataField' &&
                                 f.type.reference?.ref &&
                                 d.type.reference?.ref &&
-                                getDbName(f.type.reference.ref) === getDbName(d.type.reference.ref))
+                                getDbName(f.type.reference.ref) === getDbName(d.type.reference.ref),
                         );
-                    });
+                    }
 
                     if (originalFields.length > 1) {
                         console.warn(
@@ -297,22 +308,29 @@ async function runPull(options: PullOptions) {
                         });
                 });
                 originalDataModel.fields
-                    .filter(
-                        (f) =>
-                            !newDataModel.fields.find((d) => {
-                                return (
-                                    getDbName(d) === getDbName(f) ||
-                                    (getRelationFkName(d as any) === getRelationFkName(f as any) &&
-                                        !!getRelationFkName(d as any) &&
-                                        !!getRelationFkName(f as any)) ||
-                                    (f.$type === 'DataField' &&
-                                        d.$type === 'DataField' &&
-                                        f.type.reference?.ref &&
-                                        d.type.reference?.ref &&
-                                        getDbName(f.type.reference.ref) === getDbName(d.type.reference.ref))
-                                );
-                            }),
-                    )
+                    .filter((f) => {
+                        // Prioritized matching: exact db name > relation FK name > type reference
+                        const matchByDbName = newDataModel.fields.find((d) => getDbName(d) === getDbName(f));
+                        if (matchByDbName) return false;
+
+                        const matchByFkName = newDataModel.fields.find(
+                            (d) =>
+                                getRelationFkName(d as any) === getRelationFkName(f as any) &&
+                                !!getRelationFkName(d as any) &&
+                                !!getRelationFkName(f as any),
+                        );
+                        if (matchByFkName) return false;
+
+                        const matchByTypeRef = newDataModel.fields.find(
+                            (d) =>
+                                f.$type === 'DataField' &&
+                                d.$type === 'DataField' &&
+                                f.type.reference?.ref &&
+                                d.type.reference?.ref &&
+                                getDbName(f.type.reference.ref) === getDbName(d.type.reference.ref),
+                        );
+                        return !matchByTypeRef;
+                    })
                     .forEach((f) => {
                         const _model = f.$container;
                         const index = _model.fields.findIndex((d) => d === f);

@@ -63,11 +63,26 @@ export const sqlite: IntrospectionProvider = {
                 "SELECT name, type, sql AS definition FROM sqlite_schema WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name",
             );
 
+            // SQLite maintains sqlite_sequence table for tables with AUTOINCREMENT columns
+            // If a table has an entry here, its INTEGER PRIMARY KEY column is autoincrement
+            const autoIncrementTables = new Set<string>();
+            try {
+                const seqRows = all<{ name: string }>("SELECT name FROM sqlite_sequence");
+                for (const row of seqRows) {
+                    autoIncrementTables.add(row.name);
+                }
+            } catch {
+                // sqlite_sequence table doesn't exist if no AUTOINCREMENT was ever used
+            }
+
             const tables: IntrospectedTable[] = [];
 
             for (const t of tablesRaw) {
                 const tableName = t.name;
                 const schema = '';
+
+                // Check if this table has autoincrement (via sqlite_sequence)
+                const hasAutoIncrement = autoIncrementTables.has(tableName);
 
                 // Columns with extended info; filter out hidden=1 (internal/rowid), mark computed if hidden=2 (generated)
                 const columnsInfo = all<{
@@ -88,7 +103,7 @@ export const sqlite: IntrospectionProvider = {
                     unique: number;
                     origin: string;
                     partial: number;
-                }>(`PRAGMA index_list('${tableNameEsc}')`);
+                }>(`PRAGMA index_list('${tableNameEsc}')`).filter((r) => !r.name.startsWith('sqlite_autoindex_'));
 
                 // Unique columns detection via unique indexes with single column
                 const uniqueSingleColumn = new Set<string>();
@@ -163,6 +178,13 @@ export const sqlite: IntrospectionProvider = {
 
                     const fk = fkByColumn.get(c.name);
 
+                    // Determine default value - check for autoincrement
+                    // AUTOINCREMENT in SQLite can only be on INTEGER PRIMARY KEY column
+                    let defaultValue = c.dflt_value;
+                    if (hasAutoIncrement && c.pk) {
+                        defaultValue = 'autoincrement';
+                    }
+
                     columns.push({
                         name: c.name,
                         datatype: c.type || '',
@@ -178,7 +200,7 @@ export const sqlite: IntrospectionProvider = {
                         pk: !!c.pk,
                         computed: hidden === 2,
                         nullable: c.notnull !== 1,
-                        default: c.dflt_value,
+                        default: defaultValue,
                         options: [],
                         unique: uniqueSingleColumn.has(c.name),
                         unique_name: null,
@@ -189,7 +211,7 @@ export const sqlite: IntrospectionProvider = {
             }
 
             const enums: IntrospectedEnum[] = []; // SQLite doesn't support enums
-
+            
             return { tables, enums };
         } finally {
             db.close();
@@ -208,6 +230,14 @@ export const sqlite: IntrospectionProvider = {
             if (fieldName.toLowerCase() === 'updatedat' || fieldName.toLowerCase() === 'updated_at') {
                 factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)));
             }
+            return factories;
+        }
+
+        // Handle autoincrement
+        if (val === 'autoincrement') {
+            factories.push(
+                defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services))),
+            );
             return factories;
         }
 

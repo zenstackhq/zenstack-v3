@@ -56,7 +56,8 @@
         "pg": "catalog:",
         "prisma": "catalog:",
         "semver": "^7.7.2",
-        "ts-pattern": "catalog:"
+        "ts-pattern": "catalog:",
+        "mysql2": "catalog:"
     },
     "devDependencies": {
         "@types/better-sqlite3": "catalog:",

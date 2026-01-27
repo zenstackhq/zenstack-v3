@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDataModel, isDataSource, type Model } from './ast';
 import { DB_PROVIDERS_SUPPORTING_LIST_TYPE, STD_LIB_MODULE_NAME } from './constants';
-import { createZModelServices } from './module';
+import { createZModelServices, type ZModelServices } from './module';
 import {
     getAllFields,
     getDataModelAndTypeDefs,

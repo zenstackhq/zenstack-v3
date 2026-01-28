@@ -328,7 +328,14 @@ export function syncTable({
         );
     }
 
-    table.indexes.forEach((index) => {
+    // Sort indexes: unique indexes first, then other indexes
+    const sortedIndexes = table.indexes.sort((a, b) => {
+        if (a.unique && !b.unique) return -1;
+        if (!a.unique && b.unique) return 1;
+        return 0;
+    });
+
+    sortedIndexes.forEach((index) => {
         if (index.predicate) {
             //These constraints are not supported by Zenstack, because Zenstack currently does not fully support check constraints. Read more: https://pris.ly/d/check-constraints
             console.warn(

@@ -35,7 +35,6 @@ import {
     TypeDef,
     UnaryExpr,
     type Model,
-    type ResolvedType,
 } from '@zenstackhq/language/ast';
 import { getAllAttributes, getAllFields, getAttributeArg, isDataFieldReference } from '@zenstackhq/language/utils';
 import fs from 'node:fs';

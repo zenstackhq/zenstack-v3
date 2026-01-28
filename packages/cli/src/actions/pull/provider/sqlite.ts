@@ -1,6 +1,7 @@
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
+import { writeFileSync } from 'node:fs';
 
 // Note: We dynamically import better-sqlite3 inside the async function to avoid
 // requiring it at module load time for environments that don't use SQLite.
@@ -63,16 +64,18 @@ export const sqlite: IntrospectionProvider = {
                 "SELECT name, type, sql AS definition FROM sqlite_schema WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name",
             );
 
-            // SQLite maintains sqlite_sequence table for tables with AUTOINCREMENT columns
-            // If a table has an entry here, its INTEGER PRIMARY KEY column is autoincrement
+            // Detect AUTOINCREMENT by parsing the CREATE TABLE statement
+            // The sqlite_sequence table only has entries after rows are inserted,
+            // so we need to check the actual table definition instead
             const autoIncrementTables = new Set<string>();
-            try {
-                const seqRows = all<{ name: string }>("SELECT name FROM sqlite_sequence");
-                for (const row of seqRows) {
-                    autoIncrementTables.add(row.name);
+            for (const t of tablesRaw) {
+                if (t.type === 'table' && t.definition) {
+                    // AUTOINCREMENT keyword appears in PRIMARY KEY definition
+                    // e.g., PRIMARY KEY("id" AUTOINCREMENT) or PRIMARY KEY(id AUTOINCREMENT)
+                    if (/\bAUTOINCREMENT\b/i.test(t.definition)) {
+                        autoIncrementTables.add(t.name);
+                    }
                 }
-            } catch {
-                // sqlite_sequence table doesn't exist if no AUTOINCREMENT was ever used
             }
 
             const tables: IntrospectedTable[] = [];
@@ -147,6 +150,25 @@ export const sqlite: IntrospectionProvider = {
                     on_delete: any;
                 }>(`PRAGMA foreign_key_list('${tableName.replace(/'/g, "''")}')`);
 
+                // Extract FK constraint names from CREATE TABLE statement
+                // Pattern: CONSTRAINT "name" FOREIGN KEY("column") or CONSTRAINT name FOREIGN KEY(column)
+                const fkConstraintNames = new Map<string, string>();
+                if (t.definition) {
+                    // Match: CONSTRAINT "name" FOREIGN KEY("col") or CONSTRAINT name FOREIGN KEY(col)
+                    // Use [^"'`]+ for quoted names to capture full identifier including underscores and other chars
+                    const fkRegex = /CONSTRAINT\s+(?:["'`]([^"'`]+)["'`]|(\w+))\s+FOREIGN\s+KEY\s*\(\s*(?:["'`]([^"'`]+)["'`]|(\w+))\s*\)/gi;
+                    let match;
+                    while ((match = fkRegex.exec(t.definition)) !== null) {
+                        // match[1] = quoted constraint name, match[2] = unquoted constraint name
+                        // match[3] = quoted column name, match[4] = unquoted column name
+                        const constraintName = match[1] || match[2];
+                        const columnName = match[3] || match[4];
+                        if (constraintName && columnName) {
+                            fkConstraintNames.set(columnName, constraintName);
+                        }
+                    }
+                }
+
                 const fkByColumn = new Map<
                     string,
                     {
@@ -164,7 +186,7 @@ export const sqlite: IntrospectionProvider = {
                         foreign_key_schema: '',
                         foreign_key_table: fk.table || null,
                         foreign_key_column: fk.to || null,
-                        foreign_key_name: null,
+                        foreign_key_name: fkConstraintNames.get(fk.from) ?? null,
                         foreign_key_on_update: (fk.on_update as any) ?? null,
                         foreign_key_on_delete: (fk.on_delete as any) ?? null,
                     });

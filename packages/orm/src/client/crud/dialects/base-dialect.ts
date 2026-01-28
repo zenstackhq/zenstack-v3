@@ -489,26 +489,27 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 continue;
             }
 
-            const value = this.transformInput(_value, fieldType, !!fieldDef.array);
+            invariant(fieldDef.array, 'Field must be an array type to build array filter');
+            const value = this.transformInput(_value, fieldType, true);
 
             switch (key) {
                 case 'equals': {
-                    clauses.push(this.buildLiteralFilter(fieldRef, fieldType, this.eb.val(value)));
+                    clauses.push(this.eb(fieldRef, '=', this.ensureProperArray(value, fieldType)));
                     break;
                 }
 
                 case 'has': {
-                    clauses.push(this.buildArrayContains(fieldRef, this.eb.val(value)));
+                    clauses.push(this.buildArrayContains(fieldRef, this.ensureProperEnum(value, fieldType)));
                     break;
                 }
 
                 case 'hasEvery': {
-                    clauses.push(this.buildArrayHasEvery(fieldRef, this.eb.val(value)));
+                    clauses.push(this.buildArrayHasEvery(fieldRef, this.ensureProperArray(value, fieldType)));
                     break;
                 }
 
                 case 'hasSome': {
-                    clauses.push(this.buildArrayHasSome(fieldRef, this.eb.val(value)));
+                    clauses.push(this.buildArrayHasSome(fieldRef, this.ensureProperArray(value, fieldType)));
                     break;
                 }
 
@@ -524,6 +525,27 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         return this.and(...clauses);
+    }
+
+    private ensureProperEnum(value: unknown, fieldType: string): Expression<unknown> {
+        if (isEnum(this.schema, fieldType)) {
+            return this.castEnum(this.eb.val(value), fieldType);
+        } else {
+            return this.eb.val(value);
+        }
+    }
+
+    private ensureProperArray(value: unknown, fieldType: string) {
+        if (!Array.isArray(value)) {
+            return this.eb.val(value);
+        }
+
+        if (isEnum(this.schema, fieldType)) {
+            // make sure enum values are properly casted
+            return this.buildArrayValue(value.map((v) => this.castEnum(this.eb.val(v), fieldType)));
+        } else {
+            return this.buildArrayValue(value);
+        }
     }
 
     buildPrimitiveFilter(fieldRef: Expression<any>, fieldDef: FieldDef, payload: any) {

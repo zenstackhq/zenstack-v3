@@ -628,7 +628,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     }
 
     private transformCallArg(arg: Expression, context: ExpressionTransformerContext): OperandExpression<any> {
-        return new ExpressionWrapper(this.transform(arg, context));
+        if (ExpressionUtils.isField(arg)) {
+            // field references are passed as-is, without translating to joins, etc.
+            return this.eb.ref(arg.field);
+        } else {
+            return new ExpressionWrapper(this.transform(arg, context));
+        }
     }
 
     @expr('member')

@@ -3,9 +3,10 @@ import Decimal from 'decimal.js';
 import type { AliasableExpression, TableExpression } from 'kysely';
 import {
     expressionBuilder,
+    ExpressionWrapper,
     sql,
+    ValueListNode,
     type Expression,
-    type ExpressionWrapper,
     type SelectQueryBuilder,
     type SqlBool,
 } from 'kysely';
@@ -228,8 +229,8 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
         return this.eb.fn('JSON_LENGTH', [array]);
     }
 
-    override buildArrayValue(_values: Expression<unknown>[]): AliasableExpression<number> {
-        throw createNotSupportedError('MySQL does not support array value');
+    override buildArrayValue(values: Expression<unknown>[]): AliasableExpression<number> {
+        return new ExpressionWrapper(ValueListNode.create(values.map((v) => v.toOperationNode())));
     }
 
     override buildArrayContains(

@@ -320,7 +320,7 @@ export function syncTable({
         );
     }
 
-    const uniqueColumns = table.columns.filter((c) => c.unique);
+    const uniqueColumns = table.columns.filter((c) => c.unique || c.pk);
     if(uniqueColumns.length === 0) {
         modelFactory.addAttribute((a) => a.setDecl(getAttributeRef('@@ignore', services)));
         modelFactory.comments.push(
@@ -418,7 +418,7 @@ export function syncRelation({
     const fieldMapAttribute = getAttributeRef('@map', services);
     const tableMapAttribute = getAttributeRef('@@map', services);
 
-    const includeRelationName = selfRelation || simmilarRelations > 1;
+    const includeRelationName = selfRelation || simmilarRelations > 0;
 
     if (!idAttribute || !uniqueAttribute || !relationAttribute || !fieldMapAttribute || !tableMapAttribute) {
         throw new Error('Cannot find required attributes in the model.');
@@ -442,7 +442,7 @@ export function syncRelation({
 
     const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : '';
 
-    const relationName = `${relation.table}${simmilarRelations > 1 ? `_${relation.column}` : ''}To${relation.references.table}`;
+    const relationName = `${relation.table}${simmilarRelations > 0 ? `_${relation.column}` : ''}To${relation.references.table}`;
     let { name: sourceFieldName } = resolveNameCasing(
         options.fieldCasing,
         simmilarRelations > 0
@@ -491,7 +491,7 @@ export function syncRelation({
             ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onUpdate');
         }
 
-        if (relation.fk_name) ab.addArg((ab) => ab.StringLiteral.setValue(relation.fk_name), 'map');
+        if (relation.fk_name && relation.fk_name !== `${relation.table}_${relation.column}_fkey`) ab.addArg((ab) => ab.StringLiteral.setValue(relation.fk_name), 'map');
 
         return ab;
     });

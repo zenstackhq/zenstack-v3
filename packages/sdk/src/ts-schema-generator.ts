@@ -35,6 +35,7 @@ import {
     TypeDef,
     UnaryExpr,
     type Model,
+    type ResolvedType,
 } from '@zenstackhq/language/ast';
 import { getAllAttributes, getAllFields, getAttributeArg, isDataFieldReference } from '@zenstackhq/language/utils';
 import fs from 'node:fs';
@@ -1292,7 +1293,11 @@ export class TsSchemaGenerator {
             .when(isDataField, () =>
                 this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]),
             )
-            .when(isEnumField, () => this.createLiteralExpression('StringLiteral', expr.target.$refText))
+            .when(isEnumField, () => {
+                const ref = expr.target.ref;
+                invariant(isEnumField(ref), 'Expected enum field reference');
+                return this.createEnumExpression(ref.$container.name, expr.target.$refText);
+            })
             .when(isCollectionPredicateBinding, () =>
                 this.createExpressionUtilsCall('binding', [this.createLiteralNode(expr.target.$refText)]),
             )
@@ -1320,6 +1325,13 @@ export class TsSchemaGenerator {
             .otherwise(() => {
                 throw new Error(`Unsupported literal type: ${type}`);
             });
+    }
+
+    private createEnumExpression(type: string, value: string) {
+        return this.createExpressionUtilsCall('enum', [
+            ts.factory.createStringLiteral(type),
+            ts.factory.createStringLiteral(value),
+        ]);
     }
 
     private generateModelsAndTypeDefs(model: Model, options: TsSchemaGeneratorOptions) {

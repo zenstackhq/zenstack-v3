@@ -16,7 +16,7 @@ import type { BuiltinType, FieldDef, SchemaDef } from '../../../schema';
 import type { SortOrder } from '../../crud-types';
 import { createInternalError, createInvalidInputError } from '../../errors';
 import type { ClientOptions } from '../../options';
-import { getEnum, isEnum, isTypeDef } from '../../query-utils';
+import { isEnum, isTypeDef } from '../../query-utils';
 import { LateralJoinDialectBase } from './lateral-join-dialect-base';
 
 export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDialectBase<Schema> {
@@ -95,18 +95,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
             if (type === 'Json' && !forArrayField) {
                 // scalar `Json` fields need their input stringified
                 return JSON.stringify(value);
-            }
-            if (isEnum(this.schema, type)) {
-                // cast to enum array `CAST(ARRAY[...] AS "enum_type"[])`
-                return this.eb.cast(
-                    sql`ARRAY[${sql.join(
-                        value.map((v) => this.transformInput(v, type, false)),
-                        sql.raw(','),
-                    )}]`,
-                    this.createSchemaQualifiedEnumType(type, true),
-                );
             } else {
-                // `Json[]` fields need their input as array (not stringified)
                 return value.map((v) => this.transformInput(v, type, false));
             }
         } else {
@@ -134,32 +123,6 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
                 })
                 .otherwise(() => value);
         }
-    }
-
-    private createSchemaQualifiedEnumType(type: string, array: boolean) {
-        // determines the postgres schema name for the enum type, and returns the
-        // qualified name
-
-        let qualified = type;
-
-        const enumDef = getEnum(this.schema, type);
-        if (enumDef) {
-            // check if the enum has a custom "@@schema" attribute
-            const schemaAttr = enumDef.attributes?.find((attr) => attr.name === '@@schema');
-            if (schemaAttr) {
-                const mapArg = schemaAttr.args?.find((arg) => arg.name === 'map');
-                if (mapArg && mapArg.value.kind === 'literal') {
-                    const schemaName = mapArg.value.value as string;
-                    qualified = `"${schemaName}"."${type}"`;
-                }
-            } else {
-                // no custom schema, use default from datasource or 'public'
-                const defaultSchema = this.schema.provider.defaultSchema ?? 'public';
-                qualified = `"${defaultSchema}"."${type}"`;
-            }
-        }
-
-        return array ? sql.raw(`${qualified}[]`) : sql.raw(qualified);
     }
 
     override transformOutput(value: unknown, type: BuiltinType, array: boolean) {
@@ -282,6 +245,10 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
         return this.eb.cast(expression, 'text') as unknown as T;
     }
 
+    override castEnum<T extends Expression<any>>(expression: T, enumType: string): T {
+        return this.eb.cast(expression, sql.ref(enumType)) as unknown as T;
+    }
+
     override trimTextQuotes<T extends Expression<string>>(expression: T): T {
         return this.eb.fn('trim', [expression, sql.lit('"')]) as unknown as T;
     }
@@ -290,15 +257,27 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
         return this.eb.fn('array_length', [array]);
     }
 
-    override buildArrayLiteralSQL(values: unknown[]): AliasableExpression<unknown> {
+    override buildArrayValue(values: Expression<unknown>[]): AliasableExpression<unknown> {
         if (values.length === 0) {
             return sql`{}`;
         } else {
-            return sql`ARRAY[${sql.join(
-                values.map((v) => sql.val(v)),
-                sql.raw(','),
-            )}]`;
+            return sql`ARRAY[${sql.join(values, sql.raw(','))}]`;
         }
+    }
+
+    override buildArrayContains(field: Expression<unknown>, value: Expression<unknown>): AliasableExpression<SqlBool> {
+        // PostgreSQL @> operator expects array on both sides, so wrap single value in array
+        return this.eb(field, '@>', sql`ARRAY[${value}]`);
+    }
+
+    override buildArrayHasEvery(field: Expression<unknown>, values: Expression<unknown>): AliasableExpression<SqlBool> {
+        // PostgreSQL @> operator: field contains all elements in values
+        return this.eb(field, '@>', values);
+    }
+
+    override buildArrayHasSome(field: Expression<unknown>, values: Expression<unknown>): AliasableExpression<SqlBool> {
+        // PostgreSQL && operator: arrays have any elements in common
+        return this.eb(field, '&&', values);
     }
 
     protected override buildJsonPathSelection(receiver: Expression<any>, path: string | undefined) {

@@ -32,6 +32,7 @@ import {
     BinaryOperationNode,
     ColumnNode,
     expressionBuilder,
+    ExpressionWrapper,
     FromNode,
     FunctionNode,
     IdentifierNode,
@@ -43,7 +44,6 @@ import {
     ValueListNode,
     ValueNode,
     WhereNode,
-    type ExpressionBuilder,
     type OperandExpression,
     type OperationNode,
 } from 'kysely';
@@ -127,6 +127,7 @@ function expr(kind: Expression['kind']) {
 
 export class ExpressionTransformer<Schema extends SchemaDef> {
     private readonly dialect: BaseCrudDialect<Schema>;
+    private readonly eb = expressionBuilder<any, any>();
 
     constructor(private readonly client: ClientContract<Schema>) {
         this.dialect = getCrudDialect(this.schema, this.clientOptions);
@@ -156,7 +157,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         if (!handler) {
             throw new Error(`Unsupported expression kind: ${expression.kind}`);
         }
-        return handler.value.call(this, expression, context);
+        const result = handler.value.call(this, expression, context);
+        invariant('kind' in result, `expression handler must return an OperationNode: transforming ${expression.kind}`);
+        return result;
     }
 
     @expr('literal')
@@ -168,10 +171,18 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         );
     }
 
+    @expr('enum')
+    // @ts-expect-error
+    private _enum(expr: { type: string; value: string }) {
+        return this.dialect.castEnum(this.eb.val(expr.value), expr.type).toOperationNode();
+    }
+
     @expr('array')
     // @ts-expect-error
     private _array(expr: ArrayExpression, context: ExpressionTransformerContext) {
-        return ValueListNode.create(expr.items.map((item) => this.transform(item, context)));
+        return this.dialect
+            .buildArrayValue(expr.items.map((item) => new ExpressionWrapper(this.transform(item, context))))
+            .toOperationNode();
     }
 
     @expr('field')
@@ -539,15 +550,21 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
     }
 
-    private transformValue(value: unknown, type: BuiltinType) {
+    private transformValue(value: unknown, type: BuiltinType): OperationNode {
         if (value === true) {
             return trueNode(this.dialect);
         } else if (value === false) {
             return falseNode(this.dialect);
+        } else if (Array.isArray(value)) {
+            return this.dialect
+                .buildArrayValue(value.map((v) => new ExpressionWrapper(this.transformValue(v, type))))
+                .toOperationNode();
+        } else if (QueryUtils.isEnum(this.schema, type)) {
+            return this.dialect.castEnum(this.eb.val(value), type).toOperationNode();
         } else {
             const transformed = this.dialect.transformInput(value, type, false) ?? null;
-            if (!Array.isArray(transformed)) {
-                // simple primitives can be immediate values
+            if (typeof transformed !== 'string') {
+                // simple non-string primitives can be immediate values
                 return ValueNode.createImmediate(transformed);
             } else {
                 return ValueNode.create(transformed);
@@ -582,10 +599,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         if (!func) {
             throw createUnsupportedError(`Function not implemented: ${expr.function}`);
         }
-        const eb = expressionBuilder<any, any>();
         return func(
-            eb,
-            (expr.args ?? []).map((arg) => this.transformCallArg(eb, arg, context)),
+            this.eb,
+            (expr.args ?? []).map((arg) => this.transformCallArg(arg, context)),
             {
                 client: this.client,
                 dialect: this.dialect,
@@ -611,33 +627,33 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         return func;
     }
 
-    private transformCallArg(
-        eb: ExpressionBuilder<any, any>,
-        arg: Expression,
-        context: ExpressionTransformerContext,
-    ): OperandExpression<any> {
-        if (ExpressionUtils.isLiteral(arg)) {
-            return eb.val(arg.value);
-        }
-
-        if (ExpressionUtils.isField(arg)) {
-            return eb.ref(arg.field);
-        }
-
-        if (ExpressionUtils.isCall(arg)) {
-            return this.transformCall(arg, context);
-        }
-
-        if (this.isAuthMember(arg)) {
-            const valNode = this.valueMemberAccess(this.auth, arg as MemberExpression, this.authType);
-            return valNode ? eb.val(valNode.value) : eb.val(null);
-        }
-
-        // TODO
-        // if (Expression.isMember(arg)) {
-        // }
-
-        throw createUnsupportedError(`Unsupported argument expression: ${arg.kind}`);
+    private transformCallArg(arg: Expression, context: ExpressionTransformerContext): OperandExpression<any> {
+        return new ExpressionWrapper(this.transform(arg, context));
+        // return (
+        //     match<Expression, OperandExpression<any>>(arg)
+        //         .when(ExpressionUtils.isLiteral, (arg) => eb.val(arg.value))
+        //         .when(ExpressionUtils.isEnum, (arg) => this.dialect.castEnum(eb.val(arg.value), arg.type))
+        //         .when(ExpressionUtils.isArray, (arr) =>
+        //             this.dialect.buildArrayValue(
+        //                 arr.items.map((item) => new ExpressionWrapper(this.transform(item, context))),
+        //             ),
+        //         )
+        //         .when(ExpressionUtils.isField, (arg) => eb.ref(arg.field))
+        //         .when(ExpressionUtils.isCall, (arg) => this.transformCall(arg, context))
+        //         .when(
+        //             (a) => this.isAuthMember(a),
+        //             (arg) => {
+        //                 const valNode = this.valueMemberAccess(this.auth, arg as MemberExpression, this.authType);
+        //                 return new ExpressionWrapper(valNode);
+        //                 // return valNode ? eb.val(valNode.value) : eb.val(null);
+        //             },
+        //         )
+        //         // TODO:
+        //         // .when(ExpressionUtils.isMember, (arg) => {});
+        //         .otherwise((arg) => {
+        //             throw createUnsupportedError(`Unsupported argument expression: ${arg.kind}`);
+        //         })
+        // );
     }
 
     @expr('member')
@@ -792,7 +808,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         return binding;
     }
 
-    private valueMemberAccess(receiver: any, expr: MemberExpression, receiverType: string) {
+    private valueMemberAccess(receiver: any, expr: MemberExpression, receiverType: string): OperationNode {
         if (!receiver) {
             return ValueNode.createImmediate(null);
         }

@@ -3,6 +3,7 @@ import {
     AliasNode,
     BinaryOperationNode,
     CaseWhenBuilder,
+    CastNode,
     ColumnNode,
     ColumnUpdateNode,
     DeleteQueryNode,
@@ -14,6 +15,8 @@ import {
     type OperationNode,
     OperationNodeTransformer,
     PrimitiveValueListNode,
+    type QueryId,
+    RawNode,
     ReferenceNode,
     ReturningNode,
     SelectAllNode,
@@ -52,6 +55,7 @@ type SelectionNodeChild = SimpleReferenceExpressionNode | AliasNode | SelectAllN
 export class QueryNameMapper extends OperationNodeTransformer {
     private readonly modelToTableMap = new Map<string, string>();
     private readonly fieldToColumnMap = new Map<string, string>();
+    private readonly enumTypeMap = new Map<string, string>();
     private readonly scopes: Scope[] = [];
     private readonly dialect: BaseCrudDialect<SchemaDef>;
 
@@ -71,6 +75,13 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 }
             }
         }
+
+        for (const [enumName, enumDef] of Object.entries(client.$schema.enums ?? {})) {
+            const mappedName = this.getMappedName(enumDef);
+            if (mappedName) {
+                this.enumTypeMap.set(enumName, mappedName);
+            }
+        }
     }
 
     private get schema() {
@@ -79,9 +90,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
 
     // #region overrides
 
-    protected override transformSelectQuery(node: SelectQueryNode) {
+    protected override transformSelectQuery(node: SelectQueryNode, queryId?: QueryId) {
         if (!node.from?.froms) {
-            return super.transformSelectQuery(node);
+            return super.transformSelectQuery(node, queryId);
         }
 
         // process "from" clauses
@@ -109,7 +120,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
                   }))
                 : undefined;
             const selections = this.processSelectQuerySelections(node);
-            const baseResult = super.transformSelectQuery(node);
+            const baseResult = super.transformSelectQuery(node, queryId);
 
             return {
                 ...baseResult,
@@ -120,16 +131,16 @@ export class QueryNameMapper extends OperationNodeTransformer {
         });
     }
 
-    protected override transformInsertQuery(node: InsertQueryNode) {
+    protected override transformInsertQuery(node: InsertQueryNode, queryId?: QueryId) {
         if (!node.into) {
-            return super.transformInsertQuery(node);
+            return super.transformInsertQuery(node, queryId);
         }
 
         const model = extractModelName(node.into);
         invariant(model, 'InsertQueryNode must have a model name in the "into" clause');
 
         return this.withScope({ model }, () => {
-            const baseResult = super.transformInsertQuery(node);
+            const baseResult = super.transformInsertQuery(node, queryId);
             let values = baseResult.values;
             if (node.columns && values) {
                 // process enum values with name mapping
@@ -156,9 +167,9 @@ export class QueryNameMapper extends OperationNodeTransformer {
         };
     }
 
-    protected override transformReference(node: ReferenceNode) {
+    protected override transformReference(node: ReferenceNode, queryId?: QueryId) {
         if (!ColumnNode.is(node.column)) {
-            return super.transformReference(node);
+            return super.transformReference(node, queryId);
         }
 
         // resolve the reference to a field from outer scopes
@@ -187,16 +198,16 @@ export class QueryNameMapper extends OperationNodeTransformer {
         }
     }
 
-    protected override transformColumn(node: ColumnNode) {
+    protected override transformColumn(node: ColumnNode, queryId?: QueryId) {
         const scope = this.resolveFieldFromScopes(node.column.name);
         if (!scope || scope.namesMapped || !scope.model) {
-            return super.transformColumn(node);
+            return super.transformColumn(node, queryId);
         }
         const mappedName = this.mapFieldName(scope.model, node.column.name);
         return ColumnNode.create(mappedName);
     }
 
-    protected override transformBinaryOperation(node: BinaryOperationNode) {
+    protected override transformBinaryOperation(node: BinaryOperationNode, queryId?: QueryId) {
         // transform enum name mapping for enum values used inside binary operations
         //   1. simple value: column = EnumValue
         //   2. list value: column IN [EnumValue, EnumValue2]
@@ -236,19 +247,22 @@ export class QueryNameMapper extends OperationNodeTransformer {
                     );
                 }
 
-                return super.transformBinaryOperation({
-                    ...node,
-                    rightOperand: resultValue,
-                });
+                return super.transformBinaryOperation(
+                    {
+                        ...node,
+                        rightOperand: resultValue,
+                    },
+                    queryId,
+                );
             }
         }
 
-        return super.transformBinaryOperation(node);
+        return super.transformBinaryOperation(node, queryId);
     }
 
-    protected override transformUpdateQuery(node: UpdateQueryNode) {
+    protected override transformUpdateQuery(node: UpdateQueryNode, queryId?: QueryId) {
         if (!node.table) {
-            return super.transformUpdateQuery(node);
+            return super.transformUpdateQuery(node, queryId);
         }
 
         const { alias, node: innerTable } = stripAlias(node.table);
@@ -260,7 +274,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         invariant(model, 'UpdateQueryNode must have a model name in the "table" clause');
 
         return this.withScope({ model, alias }, () => {
-            const baseResult = super.transformUpdateQuery(node);
+            const baseResult = super.transformUpdateQuery(node, queryId);
 
             // process enum value mappings in update set values
             const updates = baseResult.updates?.map((update, i) => {
@@ -285,7 +299,7 @@ export class QueryNameMapper extends OperationNodeTransformer {
         });
     }
 
-    protected override transformDeleteQuery(node: DeleteQueryNode) {
+    protected override transformDeleteQuery(node: DeleteQueryNode, queryId?: QueryId) {
         // all "from" nodes are pushed as scopes
         const scopes: Scope[] = node.from.froms.map((node) => {
             const { alias, node: innerNode } = stripAlias(node);
@@ -303,16 +317,53 @@ export class QueryNameMapper extends OperationNodeTransformer {
                 // map table name
                 return this.wrapAlias(this.processTableRef(innerNode), alias);
             } else {
-                return super.transformNode(from);
+                return super.transformNode(from, queryId);
             }
         });
 
         return this.withScopes(scopes, () => {
             return {
-                ...super.transformDeleteQuery(node),
+                ...super.transformDeleteQuery(node, queryId),
                 from: FromNode.create(froms),
             };
         });
+    }
+
+    // process enum type and value mappings for `CAST(value as type)` nodes
+    protected override transformCast(node: CastNode, queryId?: QueryId) {
+        if (RawNode.is(node.dataType)) {
+            invariant(node.dataType.parameters.length === 1);
+            if (ReferenceNode.is(node.dataType.parameters[0]!) && ColumnNode.is(node.dataType.parameters[0].column)) {
+                // extract cast target type name
+                const castTypeName = node.dataType.parameters[0].column.column.name;
+
+                const enumDef = getEnum(this.schema, castTypeName)!;
+                if (enumDef) {
+                    // casting to an enum type, apply name mapping if any
+                    const mappedName = this.mapEnumTypeName(castTypeName);
+                    if (mappedName !== castTypeName) {
+                        const updatedDataType = {
+                            ...this.transformNode(node.dataType, queryId),
+                            parameters: [ReferenceNode.create(ColumnNode.create(mappedName))],
+                        };
+
+                        let updatedExpression = this.transformNode(node.expression, queryId);
+                        if (ValueNode.is(updatedExpression) && typeof updatedExpression.value === 'string') {
+                            // map enum value
+                            const enumValueMapping = this.getEnumValueMapping(enumDef);
+                            const mappedValue = enumValueMapping[updatedExpression.value];
+                            if (mappedValue) {
+                                updatedExpression = ValueNode.create(mappedValue);
+                            }
+                        }
+
+                        return CastNode.create(updatedExpression, updatedDataType);
+                    }
+                }
+            }
+        }
+
+        return super.transformCast(node, queryId);
     }
 
     // #endregion
@@ -493,6 +544,11 @@ export class QueryNameMapper extends OperationNodeTransformer {
         } else {
             return tableName;
         }
+    }
+
+    private mapEnumTypeName(enumTypeName: string) {
+        const mappedName = this.enumTypeMap.get(enumTypeName);
+        return mappedName ?? enumTypeName;
     }
 
     private hasMappedColumns(modelName: string) {

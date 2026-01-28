@@ -1,5 +1,6 @@
 export type Expression =
     | LiteralExpression
+    | EnumExpression
     | ArrayExpression
     | FieldExpression
     | MemberExpression
@@ -13,6 +14,12 @@ export type Expression =
 export type LiteralExpression = {
     kind: 'literal';
     value: string | number | boolean;
+};
+
+export type EnumExpression = {
+    kind: 'enum';
+    type: string;
+    value: string;
 };
 
 export type ArrayExpression = {

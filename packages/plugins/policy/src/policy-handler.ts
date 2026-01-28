@@ -946,7 +946,7 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
                 // handle the case for list column
                 if (Array.isArray(value)) {
                     result.push({
-                        node: this.dialect.buildArrayLiteralSQL(value).toOperationNode(),
+                        node: this.dialect.buildArrayValue(value).toOperationNode(),
                         raw: value,
                     });
                 } else {

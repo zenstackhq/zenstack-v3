@@ -498,17 +498,17 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 }
 
                 case 'has': {
-                    clauses.push(this.eb(fieldRef, '@>', this.eb.val([value])));
+                    clauses.push(this.buildArrayContains(fieldRef, this.eb.val(value)));
                     break;
                 }
 
                 case 'hasEvery': {
-                    clauses.push(this.eb(fieldRef, '@>', this.eb.val(value)));
+                    clauses.push(this.buildArrayHasEvery(fieldRef, this.eb.val(value)));
                     break;
                 }
 
                 case 'hasSome': {
-                    clauses.push(this.eb(fieldRef, '&&', this.eb.val(value)));
+                    clauses.push(this.buildArrayHasSome(fieldRef, this.eb.val(value)));
                     break;
                 }
 
@@ -1420,9 +1420,24 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     abstract buildArrayLength(array: Expression<unknown>): AliasableExpression<number>;
 
     /**
-     * Builds an array literal SQL string for the given values.
+     * Builds an array value expression.
      */
-    abstract buildArrayLiteralSQL(values: unknown[]): AliasableExpression<unknown>;
+    abstract buildArrayValue(values: Expression<unknown>[]): AliasableExpression<unknown>;
+
+    /**
+     * Builds an expression that checks if an array contains a single value.
+     */
+    abstract buildArrayContains(field: Expression<unknown>, value: Expression<unknown>): AliasableExpression<SqlBool>;
+
+    /**
+     * Builds an expression that checks if an array contains all values from another array.
+     */
+    abstract buildArrayHasEvery(field: Expression<unknown>, values: Expression<unknown>): AliasableExpression<SqlBool>;
+
+    /**
+     * Builds an expression that checks if an array overlaps with another array.
+     */
+    abstract buildArrayHasSome(field: Expression<unknown>, values: Expression<unknown>): AliasableExpression<SqlBool>;
 
     /**
      * Casts the given expression to an integer type.
@@ -1433,6 +1448,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Casts the given expression to a text type.
      */
     abstract castText<T extends Expression<any>>(expression: T): T;
+
+    /**
+     * Casts the given expression to an enum type.
+     */
+    abstract castEnum<T extends Expression<any>>(expression: T, enumType: string): T;
 
     /**
      * Trims double quotes from the start and end of a text expression.

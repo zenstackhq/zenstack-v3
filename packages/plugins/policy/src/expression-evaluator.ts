@@ -5,6 +5,7 @@ import {
     type BinaryExpression,
     type BindingExpression,
     type CallExpression,
+    type EnumExpression,
     type Expression,
     type FieldExpression,
     type LiteralExpression,
@@ -30,6 +31,7 @@ export class ExpressionEvaluator {
             .when(ExpressionUtils.isBinary, (expr) => this.evaluateBinary(expr, context))
             .when(ExpressionUtils.isField, (expr) => this.evaluateField(expr, context))
             .when(ExpressionUtils.isLiteral, (expr) => this.evaluateLiteral(expr))
+            .when(ExpressionUtils.isEnum, (expr) => this.evaluateEnum(expr))
             .when(ExpressionUtils.isMember, (expr) => this.evaluateMember(expr, context))
             .when(ExpressionUtils.isUnary, (expr) => this.evaluateUnary(expr, context))
             .when(ExpressionUtils.isCall, (expr) => this.evaluateCall(expr, context))
@@ -64,6 +66,10 @@ export class ExpressionEvaluator {
     }
 
     private evaluateLiteral(expr: LiteralExpression): any {
+        return expr.value;
+    }
+
+    private evaluateEnum(expr: EnumExpression) {
         return expr.value;
     }
 

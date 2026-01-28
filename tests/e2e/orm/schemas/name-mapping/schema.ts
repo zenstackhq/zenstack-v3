@@ -30,7 +30,7 @@ export class SchemaType implements SchemaDef {
                 role: {
                     name: "role",
                     type: "Role",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("USER") }] }, { name: "@map", args: [{ name: "name", value: ExpressionUtils.literal("user_role") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("Role", "USER") }] }, { name: "@map", args: [{ name: "name", value: ExpressionUtils.literal("user_role") }] }],
                     default: "USER"
                 },
                 posts: {

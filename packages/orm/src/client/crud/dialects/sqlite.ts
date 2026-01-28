@@ -447,8 +447,29 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return this.eb.fn('json_array_length', [array]);
     }
 
-    override buildArrayLiteralSQL(_values: unknown[]): AliasableExpression<unknown> {
-        throw new Error('SQLite does not support array literals');
+    override buildArrayValue(_values: Expression<unknown>[]): AliasableExpression<unknown> {
+        throw new Error('SQLite does not support array values');
+    }
+
+    override buildArrayContains(
+        _field: Expression<unknown>,
+        _value: Expression<unknown>,
+    ): AliasableExpression<SqlBool> {
+        throw createNotSupportedError('SQLite does not support native array operations');
+    }
+
+    override buildArrayHasEvery(
+        _field: Expression<unknown>,
+        _values: Expression<unknown>,
+    ): AliasableExpression<SqlBool> {
+        throw createNotSupportedError('SQLite does not support native array operations');
+    }
+
+    override buildArrayHasSome(
+        _field: Expression<unknown>,
+        _values: Expression<unknown>,
+    ): AliasableExpression<SqlBool> {
+        throw createNotSupportedError('SQLite does not support native array operations');
     }
 
     override castInt<T extends Expression<any>>(expression: T): T {
@@ -457,6 +478,11 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
 
     override castText<T extends Expression<any>>(expression: T): T {
         return this.eb.cast(expression, 'text') as unknown as T;
+    }
+
+    override castEnum<T extends Expression<any>>(expression: T, _enumType: string): T {
+        // sqlite doesn't need special enum casting
+        return expression;
     }
 
     override trimTextQuotes<T extends Expression<string>>(expression: T): T {

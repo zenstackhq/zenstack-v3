@@ -46,13 +46,13 @@ export class SchemaType implements SchemaDef {
                 source: {
                     name: "source",
                     type: "WebhookSource",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("user") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("WebhookSource", "user") }] }],
                     default: "user"
                 },
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "webhooks", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 environmentId: {
@@ -106,7 +106,7 @@ export class SchemaType implements SchemaDef {
                 attributeKey: {
                     name: "attributeKey",
                     type: "ContactAttributeKey",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("attributeKeyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("attributeKeyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "attributes", fields: ["attributeKeyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 attributeKeyId: {
@@ -119,7 +119,7 @@ export class SchemaType implements SchemaDef {
                 contact: {
                     name: "contact",
                     type: "Contact",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("contactId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("contactId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "attributes", fields: ["contactId"], references: ["id"], onDelete: "Cascade" }
                 },
                 contactId: {
@@ -189,13 +189,13 @@ export class SchemaType implements SchemaDef {
                 type: {
                     name: "type",
                     type: "ContactAttributeType",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("custom") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("ContactAttributeType", "custom") }] }],
                     default: "custom"
                 },
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "attributeKeys", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 environmentId: {
@@ -258,7 +258,7 @@ export class SchemaType implements SchemaDef {
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "contacts", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 environmentId: {
@@ -327,7 +327,7 @@ export class SchemaType implements SchemaDef {
                 survey: {
                     name: "survey",
                     type: "Survey",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "responses", fields: ["surveyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 surveyId: {
@@ -341,7 +341,7 @@ export class SchemaType implements SchemaDef {
                     name: "contact",
                     type: "Contact",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("contactId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("contactId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "responses", fields: ["contactId"], references: ["id"], onDelete: "Cascade" }
                 },
                 contactId: {
@@ -471,7 +471,7 @@ export class SchemaType implements SchemaDef {
                 response: {
                     name: "response",
                     type: "Response",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("responseId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("responseId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "notes", fields: ["responseId"], references: ["id"], onDelete: "Cascade" }
                 },
                 responseId: {
@@ -484,7 +484,7 @@ export class SchemaType implements SchemaDef {
                 user: {
                     name: "user",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "responseNotes", fields: ["userId"], references: ["id"], onDelete: "Cascade" }
                 },
                 userId: {
@@ -561,7 +561,7 @@ export class SchemaType implements SchemaDef {
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "tags", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 }
             },
@@ -589,7 +589,7 @@ export class SchemaType implements SchemaDef {
                 response: {
                     name: "response",
                     type: "Response",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("responseId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("responseId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "tags", fields: ["responseId"], references: ["id"], onDelete: "Cascade" }
                 },
                 tagId: {
@@ -603,7 +603,7 @@ export class SchemaType implements SchemaDef {
                 tag: {
                     name: "tag",
                     type: "Tag",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("tagId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("tagId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "responses", fields: ["tagId"], references: ["id"], onDelete: "Cascade" }
                 }
             },
@@ -641,7 +641,7 @@ export class SchemaType implements SchemaDef {
                 survey: {
                     name: "survey",
                     type: "Survey",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "displays", fields: ["surveyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 surveyId: {
@@ -655,7 +655,7 @@ export class SchemaType implements SchemaDef {
                     name: "contact",
                     type: "Contact",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("contactId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("contactId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "displays", fields: ["contactId"], references: ["id"], onDelete: "Cascade" }
                 },
                 contactId: {
@@ -720,7 +720,7 @@ export class SchemaType implements SchemaDef {
                 survey: {
                     name: "survey",
                     type: "Survey",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "triggers", fields: ["surveyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 surveyId: {
@@ -733,7 +733,7 @@ export class SchemaType implements SchemaDef {
                 actionClass: {
                     name: "actionClass",
                     type: "ActionClass",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("actionClassId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("actionClassId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "surveyTriggers", fields: ["actionClassId"], references: ["id"], onDelete: "Cascade" }
                 },
                 actionClassId: {
@@ -779,7 +779,7 @@ export class SchemaType implements SchemaDef {
                 attributeKey: {
                     name: "attributeKey",
                     type: "ContactAttributeKey",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("attributeKeyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("attributeKeyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "attributeFilters", fields: ["attributeKeyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 attributeKeyId: {
@@ -792,7 +792,7 @@ export class SchemaType implements SchemaDef {
                 survey: {
                     name: "survey",
                     type: "Survey",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "attributeFilters", fields: ["surveyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 surveyId: {
@@ -856,13 +856,13 @@ export class SchemaType implements SchemaDef {
                 type: {
                     name: "type",
                     type: "SurveyType",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("web") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("SurveyType", "web") }] }],
                     default: "web"
                 },
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "surveys", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 environmentId: {
@@ -890,7 +890,7 @@ export class SchemaType implements SchemaDef {
                 status: {
                     name: "status",
                     type: "SurveyStatus",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("draft") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("SurveyStatus", "draft") }] }],
                     default: "draft"
                 },
                 welcomeCard: {
@@ -938,7 +938,7 @@ export class SchemaType implements SchemaDef {
                 displayOption: {
                     name: "displayOption",
                     type: "displayOptions",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("displayOnce") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("displayOptions", "displayOnce") }] }],
                     default: "displayOnce"
                 },
                 recontactDays: {
@@ -1143,7 +1143,7 @@ export class SchemaType implements SchemaDef {
                 survey: {
                     name: "survey",
                     type: "Survey",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "followUps", fields: ["surveyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 surveyId: {
@@ -1219,7 +1219,7 @@ export class SchemaType implements SchemaDef {
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "actionClasses", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 environmentId: {
@@ -1276,7 +1276,7 @@ export class SchemaType implements SchemaDef {
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "integration", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 }
             },
@@ -1358,7 +1358,7 @@ export class SchemaType implements SchemaDef {
                 project: {
                     name: "project",
                     type: "Project",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("projectId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("projectId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "environments", fields: ["projectId"], references: ["id"], onDelete: "Cascade" }
                 },
                 projectId: {
@@ -1484,7 +1484,7 @@ export class SchemaType implements SchemaDef {
                 organization: {
                     name: "organization",
                     type: "Organization",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "projects", fields: ["organizationId"], references: ["id"], onDelete: "Cascade" }
                 },
                 organizationId: {
@@ -1543,7 +1543,7 @@ export class SchemaType implements SchemaDef {
                 placement: {
                     name: "placement",
                     type: "WidgetPlacement",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("bottomRight") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("WidgetPlacement", "bottomRight") }] }],
                     default: "bottomRight"
                 },
                 clickOutsideClose: {
@@ -1670,7 +1670,7 @@ export class SchemaType implements SchemaDef {
                 organization: {
                     name: "organization",
                     type: "Organization",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "memberships", fields: ["organizationId"], references: ["id"], onDelete: "Cascade" }
                 },
                 organizationId: {
@@ -1684,7 +1684,7 @@ export class SchemaType implements SchemaDef {
                 user: {
                     name: "user",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "memberships", fields: ["userId"], references: ["id"], onDelete: "Cascade" }
                 },
                 userId: {
@@ -1709,7 +1709,7 @@ export class SchemaType implements SchemaDef {
                 role: {
                     name: "role",
                     type: "OrganizationRole",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("member") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("OrganizationRole", "member") }] }],
                     default: "member"
                 }
             },
@@ -1745,7 +1745,7 @@ export class SchemaType implements SchemaDef {
                 organization: {
                     name: "organization",
                     type: "Organization",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "invites", fields: ["organizationId"], references: ["id"], onDelete: "Cascade" }
                 },
                 organizationId: {
@@ -1772,7 +1772,7 @@ export class SchemaType implements SchemaDef {
                     name: "acceptor",
                     type: "User",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "name", value: ExpressionUtils.literal("inviteAcceptedBy") }, { name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("acceptorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "name", value: ExpressionUtils.literal("inviteAcceptedBy") }, { name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("acceptorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "invitesAccepted", name: "inviteAcceptedBy", fields: ["acceptorId"], references: ["id"], onDelete: "Cascade" }
                 },
                 acceptorId: {
@@ -1801,7 +1801,7 @@ export class SchemaType implements SchemaDef {
                 role: {
                     name: "role",
                     type: "OrganizationRole",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("member") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("OrganizationRole", "member") }] }],
                     default: "member"
                 },
                 teamIds: {
@@ -1867,7 +1867,7 @@ export class SchemaType implements SchemaDef {
                 organization: {
                     name: "organization",
                     type: "Organization",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "apiKeys", fields: ["organizationId"], references: ["id"], onDelete: "Cascade" }
                 },
                 apiKeyEnvironments: {
@@ -1924,7 +1924,7 @@ export class SchemaType implements SchemaDef {
                 apiKey: {
                     name: "apiKey",
                     type: "ApiKey",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("apiKeyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("apiKeyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "apiKeyEnvironments", fields: ["apiKeyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 environmentId: {
@@ -1937,7 +1937,7 @@ export class SchemaType implements SchemaDef {
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "ApiKeyEnvironment", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 permission: {
@@ -1981,7 +1981,7 @@ export class SchemaType implements SchemaDef {
                     name: "user",
                     type: "User",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "accounts", fields: ["userId"], references: ["id"], onDelete: "Cascade" }
                 },
                 userId: {
@@ -2124,7 +2124,7 @@ export class SchemaType implements SchemaDef {
                 identityProvider: {
                     name: "identityProvider",
                     type: "IdentityProvider",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("email") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("IdentityProvider", "email") }] }],
                     default: "email"
                 },
                 identityProviderAccountId: {
@@ -2311,7 +2311,7 @@ export class SchemaType implements SchemaDef {
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "segments", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 surveys: {
@@ -2365,7 +2365,7 @@ export class SchemaType implements SchemaDef {
                 project: {
                     name: "project",
                     type: "Project",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("projectId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("projectId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "languages", fields: ["projectId"], references: ["id"], onDelete: "Cascade" }
                 },
                 projectId: {
@@ -2397,7 +2397,7 @@ export class SchemaType implements SchemaDef {
                 language: {
                     name: "language",
                     type: "Language",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("languageId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("languageId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "surveyLanguages", fields: ["languageId"], references: ["id"], onDelete: "Cascade" }
                 },
                 languageId: {
@@ -2419,7 +2419,7 @@ export class SchemaType implements SchemaDef {
                 survey: {
                     name: "survey",
                     type: "Survey",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "languages", fields: ["surveyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 default: {
@@ -2477,7 +2477,7 @@ export class SchemaType implements SchemaDef {
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "insights", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 category: {
@@ -2523,7 +2523,7 @@ export class SchemaType implements SchemaDef {
                 document: {
                     name: "document",
                     type: "Document",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("documentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("documentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "documentInsights", fields: ["documentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 insightId: {
@@ -2537,7 +2537,7 @@ export class SchemaType implements SchemaDef {
                 insight: {
                     name: "insight",
                     type: "Insight",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("insightId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("insightId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "documentInsights", fields: ["insightId"], references: ["id"], onDelete: "Cascade" }
                 }
             },
@@ -2582,7 +2582,7 @@ export class SchemaType implements SchemaDef {
                 environment: {
                     name: "environment",
                     type: "Environment",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("environmentId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "documents", fields: ["environmentId"], references: ["id"], onDelete: "Cascade" }
                 },
                 surveyId: {
@@ -2597,7 +2597,7 @@ export class SchemaType implements SchemaDef {
                     name: "survey",
                     type: "Survey",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("surveyId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "documents", fields: ["surveyId"], references: ["id"], onDelete: "Cascade" }
                 },
                 responseId: {
@@ -2612,7 +2612,7 @@ export class SchemaType implements SchemaDef {
                     name: "response",
                     type: "Response",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("responseId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("responseId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "documents", fields: ["responseId"], references: ["id"], onDelete: "Cascade" }
                 },
                 questionId: {
@@ -2690,7 +2690,7 @@ export class SchemaType implements SchemaDef {
                 organization: {
                     name: "organization",
                     type: "Organization",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("organizationId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "teams", fields: ["organizationId"], references: ["id"], onDelete: "Cascade" }
                 },
                 teamUsers: {
@@ -2741,7 +2741,7 @@ export class SchemaType implements SchemaDef {
                 team: {
                     name: "team",
                     type: "Team",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("teamId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("teamId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "teamUsers", fields: ["teamId"], references: ["id"], onDelete: "Cascade" }
                 },
                 userId: {
@@ -2755,7 +2755,7 @@ export class SchemaType implements SchemaDef {
                 user: {
                     name: "user",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "teamUsers", fields: ["userId"], references: ["id"], onDelete: "Cascade" }
                 },
                 role: {
@@ -2798,7 +2798,7 @@ export class SchemaType implements SchemaDef {
                 project: {
                     name: "project",
                     type: "Project",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("projectId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("projectId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "projectTeams", fields: ["projectId"], references: ["id"], onDelete: "Cascade" }
                 },
                 teamId: {
@@ -2812,13 +2812,13 @@ export class SchemaType implements SchemaDef {
                 team: {
                     name: "team",
                     type: "Team",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("teamId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("teamId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onDelete", value: ExpressionUtils.enum("ReferentialAction", "Cascade") }] }],
                     relation: { opposite: "projectTeams", fields: ["teamId"], references: ["id"], onDelete: "Cascade" }
                 },
                 permission: {
                     name: "permission",
                     type: "ProjectTeamPermission",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("read") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("ProjectTeamPermission", "read") }] }],
                     default: "read"
                 }
             },

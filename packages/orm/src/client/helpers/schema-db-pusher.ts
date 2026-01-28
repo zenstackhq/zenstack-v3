@@ -6,6 +6,7 @@ import {
     ExpressionUtils,
     type BuiltinType,
     type CascadeAction,
+    type EnumDef,
     type FieldDef,
     type ModelDef,
     type SchemaDef,
@@ -27,7 +28,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
     async push() {
         await this.kysely.transaction().execute(async (tx) => {
             if (this.schema.enums && this.providerSupportsNativeEnum) {
-                for (const [name, enumDef] of Object.entries(this.schema.enums)) {
+                for (const enumDef of Object.values(this.schema.enums)) {
                     let enumValues: string[];
                     if (enumDef.fields) {
                         enumValues = Object.values(enumDef.fields).map((f) => {
@@ -47,7 +48,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
                         enumValues = Object.values(enumDef.values);
                     }
 
-                    const createEnum = tx.schema.createType(name).asEnum(enumValues);
+                    const createEnum = tx.schema.createType(this.getEnumName(enumDef)).asEnum(enumValues);
                     await createEnum.execute();
                 }
             }
@@ -146,6 +147,17 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
             }
         }
         return modelDef.name;
+    }
+
+    private getEnumName(enumDef: EnumDef) {
+        const mapAttr = enumDef.attributes?.find((a) => a.name === '@@map');
+        if (mapAttr && mapAttr.args?.[0]) {
+            const mappedName = ExpressionUtils.getLiteralValue(mapAttr.args[0].value);
+            if (mappedName) {
+                return mappedName as string;
+            }
+        }
+        return enumDef.name;
     }
 
     private getColumnName(fieldDef: FieldDef) {

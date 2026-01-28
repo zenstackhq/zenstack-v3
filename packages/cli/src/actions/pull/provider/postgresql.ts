@@ -150,6 +150,7 @@ export const postgresql: IntrospectionProvider = {
                 case 'uuid':
                 case 'json':
                 case 'jsonb':
+                case 'text':
                     if (value === 'NULL') return [];
                     factories.push(defaultAttr.addArg((a) => a.StringLiteral.setValue(value)));
                     break;

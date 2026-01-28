@@ -167,7 +167,8 @@ model Post {
                                     {
                                         name: 'onDelete',
                                         value: {
-                                            kind: 'literal',
+                                            kind: 'enum',
+                                            type: 'ReferentialAction',
                                             value: 'Cascade',
                                         },
                                     },

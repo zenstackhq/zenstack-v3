@@ -629,31 +629,6 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
     private transformCallArg(arg: Expression, context: ExpressionTransformerContext): OperandExpression<any> {
         return new ExpressionWrapper(this.transform(arg, context));
-        // return (
-        //     match<Expression, OperandExpression<any>>(arg)
-        //         .when(ExpressionUtils.isLiteral, (arg) => eb.val(arg.value))
-        //         .when(ExpressionUtils.isEnum, (arg) => this.dialect.castEnum(eb.val(arg.value), arg.type))
-        //         .when(ExpressionUtils.isArray, (arr) =>
-        //             this.dialect.buildArrayValue(
-        //                 arr.items.map((item) => new ExpressionWrapper(this.transform(item, context))),
-        //             ),
-        //         )
-        //         .when(ExpressionUtils.isField, (arg) => eb.ref(arg.field))
-        //         .when(ExpressionUtils.isCall, (arg) => this.transformCall(arg, context))
-        //         .when(
-        //             (a) => this.isAuthMember(a),
-        //             (arg) => {
-        //                 const valNode = this.valueMemberAccess(this.auth, arg as MemberExpression, this.authType);
-        //                 return new ExpressionWrapper(valNode);
-        //                 // return valNode ? eb.val(valNode.value) : eb.val(null);
-        //             },
-        //         )
-        //         // TODO:
-        //         // .when(ExpressionUtils.isMember, (arg) => {});
-        //         .otherwise((arg) => {
-        //             throw createUnsupportedError(`Unsupported argument expression: ${arg.kind}`);
-        //         })
-        // );
     }
 
     @expr('member')

@@ -229,7 +229,7 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
     }
 
     override buildArrayValue(_values: Expression<unknown>[]): AliasableExpression<number> {
-        throw new Error('MySQL does not support array value');
+        throw createNotSupportedError('MySQL does not support array value');
     }
 
     override buildArrayContains(

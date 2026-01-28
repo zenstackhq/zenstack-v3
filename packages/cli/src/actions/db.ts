@@ -15,7 +15,7 @@ import {
 } from './action-utils';
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers } from './pull/provider';
-import { getDatasource, getDbName, getRelationFkName } from './pull/utils';
+import { getDatasource, getDbName, getRelationFieldsKey, getRelationFkName } from './pull/utils';
 
 type PushOptions = {
     schema?: string;
@@ -241,11 +241,22 @@ async function runPull(options: PullOptions) {
                 }
 
                 newDataModel.fields.forEach((f) => {
-                    // Prioritized matching: exact db name > relation FK name > type reference
+                    // Prioritized matching: exact db name > relation fields key > relation FK name > type reference
                     let originalFields = originalDataModel.fields.filter((d) => getDbName(d) === getDbName(f));
 
                     if (originalFields.length === 0) {
-                        // Try matching by relation FK name
+                        // Try matching by relation fields key (the `fields` attribute in @relation)
+                        // This matches relation fields by their FK field references
+                        const newFieldsKey = getRelationFieldsKey(f as any);
+                        if (newFieldsKey) {
+                            originalFields = originalDataModel.fields.filter(
+                                (d) => getRelationFieldsKey(d as any) === newFieldsKey,
+                            );
+                        }
+                    }
+
+                    if (originalFields.length === 0) {
+                        // Try matching by relation FK name (the `map` attribute in @relation)
                         originalFields = originalDataModel.fields.filter(
                             (d) =>
                                 getRelationFkName(d as any) === getRelationFkName(f as any) &&
@@ -267,11 +278,16 @@ async function runPull(options: PullOptions) {
                     }
 
                     if (originalFields.length > 1) {
-                        console.warn(
-                            colors.yellow(
-                                `Found more original fields, need to tweak the search algorith. ${originalDataModel.name}->[${originalFields.map((of) => of.name).join(', ')}](${f.name})`,
-                            ),
-                        );
+                        // If this is a back-reference relation field (no `fields` attribute),
+                        // silently skip when there are multiple potential matches
+                        const isBackReferenceField = !getRelationFieldsKey(f as any);
+                        if (!isBackReferenceField) {
+                            console.warn(
+                                colors.yellow(
+                                    `Found more original fields, need to tweak the search algorithm. ${originalDataModel.name}->[${originalFields.map((of) => of.name).join(', ')}](${f.name})`,
+                                ),
+                            );
+                        }
                         return;
                     }
                     const originalField = originalFields.at(0);
@@ -309,9 +325,18 @@ async function runPull(options: PullOptions) {
                 });
                 originalDataModel.fields
                     .filter((f) => {
-                        // Prioritized matching: exact db name > relation FK name > type reference
+                        // Prioritized matching: exact db name > relation fields key > relation FK name > type reference
                         const matchByDbName = newDataModel.fields.find((d) => getDbName(d) === getDbName(f));
                         if (matchByDbName) return false;
+
+                        // Try matching by relation fields key (the `fields` attribute in @relation)
+                        const originalFieldsKey = getRelationFieldsKey(f as any);
+                        if (originalFieldsKey) {
+                            const matchByFieldsKey = newDataModel.fields.find(
+                                (d) => getRelationFieldsKey(d as any) === originalFieldsKey,
+                            );
+                            if (matchByFieldsKey) return false;
+                        }
 
                         const matchByFkName = newDataModel.fields.find(
                             (d) =>

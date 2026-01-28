@@ -9,6 +9,7 @@ import {
     isInvocationExpr,
     type Attribute,
     type Model,
+    type ReferenceExpr,
     type StringLiteral,
 } from '@zenstackhq/language/ast';
 import { getLiteralArray, getStringLiteral } from '@zenstackhq/language/utils';
@@ -106,6 +107,28 @@ export function getRelationFkName(decl: DataField): string | undefined {
     const relationAttr = decl?.attributes.find((a) => a.decl.ref?.name === '@relation');
     const schemaAttrValue = relationAttr?.args.find((a) => a.name === 'map')?.value as StringLiteral;
     return schemaAttrValue?.value;
+}
+
+/**
+ * Gets the FK field names from the @relation attribute's `fields` argument.
+ * Returns a sorted, comma-separated string of field names for comparison.
+ * e.g., @relation(fields: [userId], references: [id]) -> "userId"
+ * e.g., @relation(fields: [postId, tagId], references: [id, id]) -> "postId,tagId"
+ */
+export function getRelationFieldsKey(decl: DataField): string | undefined {
+    const relationAttr = decl?.attributes.find((a) => a.decl.ref?.name === '@relation');
+    if (!relationAttr) return undefined;
+    
+    const fieldsArg = relationAttr.args.find((a) => a.name === 'fields')?.value;
+    if (!fieldsArg || fieldsArg.$type !== 'ArrayExpr') return undefined;
+    
+    const fieldNames = fieldsArg.items
+        .filter((item): item is ReferenceExpr => item.$type === 'ReferenceExpr')
+        .map((item) => item.target?.$refText || item.target?.ref?.name)
+        .filter((name): name is string => !!name)
+        .sort();
+    
+    return fieldNames.length > 0 ? fieldNames.join(',') : undefined;
 }
 
 export function getDbSchemaName(decl: DataModel | Enum): string {

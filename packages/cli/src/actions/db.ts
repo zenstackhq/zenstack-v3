@@ -16,6 +16,7 @@ import {
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers } from './pull/provider';
 import { getDatasource, getDbName, getRelationFieldsKey, getRelationFkName } from './pull/utils';
+import type { DataSourceProviderType } from '@zenstackhq/schema';
 
 type PushOptions = {
     schema?: string;
@@ -86,7 +87,7 @@ async function runPull(options: PullOptions) {
         config({
             ignore: ['MISSING_ENV_FILE'],
         });
-        const SUPPORTED_PROVIDERS = ['sqlite', 'postgresql'];
+        const SUPPORTED_PROVIDERS = Object.keys(providers) as DataSourceProviderType[];
         const datasource = getDatasource(model);
         if (!datasource) {
             throw new Error('No datasource found in the schema.');

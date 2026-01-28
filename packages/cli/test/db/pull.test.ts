@@ -100,7 +100,7 @@ enum Role {
         expect(getSchema(workDir)).toEqual(originalSchema);
     });
 
-    it('simple schema - pull shouldn recreate the schema.zmodel', async () => {
+    it('simple schema - pull should recreate the schema.zmodel', async () => {
         const workDir = createProject(
             `model Post {
     id        Int       @id @default(autoincrement())

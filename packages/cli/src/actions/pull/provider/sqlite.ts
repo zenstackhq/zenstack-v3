@@ -234,6 +234,11 @@ export const sqlite: IntrospectionProvider = {
 
             const enums: IntrospectedEnum[] = []; // SQLite doesn't support enums
             
+            writeFileSync(
+                'D:/Projects/GitHub/zenstack-v3/packages/cli/sqlite-introspected.json',
+                JSON.stringify({ tables, enums }, null, 4),
+            );
+
             return { tables, enums };
         } finally {
             db.close();

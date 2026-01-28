@@ -118,7 +118,7 @@ export class SchemaType implements SchemaDef {
                 author: {
                     name: "author",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "posts", fields: ["authorId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
                 },
                 authorId: {
@@ -175,7 +175,7 @@ export class SchemaType implements SchemaDef {
                     name: "post",
                     type: "Post",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("postId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("postId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "comments", fields: ["postId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
                 },
                 postId: {
@@ -227,7 +227,7 @@ export class SchemaType implements SchemaDef {
                     name: "user",
                     type: "User",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "profile", fields: ["userId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
                 },
                 userId: {

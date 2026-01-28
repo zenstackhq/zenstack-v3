@@ -17,6 +17,7 @@ export type LiteralExpression = {
 
 export type ArrayExpression = {
     kind: 'array';
+    type: string;
     items: Expression[];
 };
 

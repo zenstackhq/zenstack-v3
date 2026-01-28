@@ -2,7 +2,9 @@ import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import {
     expressionBuilder,
+    ExpressionWrapper,
     sql,
+    ValueListNode,
     type AliasableExpression,
     type Expression,
     type ExpressionBuilder,
@@ -447,8 +449,29 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return this.eb.fn('json_array_length', [array]);
     }
 
-    override buildArrayLiteralSQL(_values: unknown[]): AliasableExpression<unknown> {
-        throw new Error('SQLite does not support array literals');
+    override buildArrayValue(values: Expression<unknown>[], _elemType: string): AliasableExpression<unknown> {
+        return new ExpressionWrapper(ValueListNode.create(values.map((v) => v.toOperationNode())));
+    }
+
+    override buildArrayContains(
+        _field: Expression<unknown>,
+        _value: Expression<unknown>,
+    ): AliasableExpression<SqlBool> {
+        throw createNotSupportedError('SQLite does not support native array operations');
+    }
+
+    override buildArrayHasEvery(
+        _field: Expression<unknown>,
+        _values: Expression<unknown>,
+    ): AliasableExpression<SqlBool> {
+        throw createNotSupportedError('SQLite does not support native array operations');
+    }
+
+    override buildArrayHasSome(
+        _field: Expression<unknown>,
+        _values: Expression<unknown>,
+    ): AliasableExpression<SqlBool> {
+        throw createNotSupportedError('SQLite does not support native array operations');
     }
 
     override castInt<T extends Expression<any>>(expression: T): T {
@@ -461,36 +484,6 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
 
     override trimTextQuotes<T extends Expression<string>>(expression: T): T {
         return this.eb.fn('trim', [expression, sql.lit('"')]) as unknown as T;
-    }
-
-    override getFieldSqlType(fieldDef: FieldDef) {
-        // TODO: respect `@db.x` attributes
-        if (fieldDef.relation) {
-            throw createInternalError('Cannot get SQL type of a relation field');
-        }
-        if (fieldDef.array) {
-            throw createInternalError('SQLite does not support scalar list type');
-        }
-
-        if (this.schema.enums?.[fieldDef.type]) {
-            // enums are stored as text
-            return 'text';
-        }
-
-        return (
-            match(fieldDef.type)
-                .with('String', () => 'text')
-                .with('Boolean', () => 'integer')
-                .with('Int', () => 'integer')
-                .with('BigInt', () => 'integer')
-                .with('Float', () => 'real')
-                .with('Decimal', () => 'decimal')
-                .with('DateTime', () => 'numeric')
-                .with('Bytes', () => 'blob')
-                .with('Json', () => 'jsonb')
-                // fallback to text
-                .otherwise(() => 'text')
-        );
     }
 
     override getStringCasingBehavior() {

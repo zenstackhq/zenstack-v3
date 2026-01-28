@@ -12,6 +12,13 @@ const TEST_PG_CONFIG = {
     password: process.env['TEST_PG_PASSWORD'] ?? 'postgres',
 };
 
+const TEST_MYSQL_CONFIG = {
+    host: process.env['TEST_MYSQL_HOST'] ?? 'localhost',
+    port: process.env['TEST_MYSQL_PORT'] ? parseInt(process.env['TEST_MYSQL_PORT']) : 3306,
+    user: process.env['TEST_MYSQL_USER'] ?? 'root',
+    password: process.env['TEST_MYSQL_PASSWORD'] ?? 'mysql',
+};
+
 function getTestDbName(provider: string) {
     if (provider === 'sqlite') {
         return './test.db';
@@ -34,13 +41,24 @@ function getTestDbName(provider: string) {
     );
 }
 
-export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql' }) {
+export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql' | 'mysql' }) {
     const provider = (options?.provider || getTestDbProvider()) ?? 'sqlite';
     const dbName = getTestDbName(provider);
-    const dbUrl =
-        provider === 'sqlite'
-            ? `file:${dbName}`
-            : `postgres://${TEST_PG_CONFIG.user}:${TEST_PG_CONFIG.password}@${TEST_PG_CONFIG.host}:${TEST_PG_CONFIG.port}/${dbName}`;
+    let dbUrl: string;
+
+    switch (provider) {
+        case 'sqlite':
+            dbUrl = `file:${dbName}`;
+            break;
+        case 'postgresql':
+            dbUrl = `postgres://${TEST_PG_CONFIG.user}:${TEST_PG_CONFIG.password}@${TEST_PG_CONFIG.host}:${TEST_PG_CONFIG.port}/${dbName}`;
+            break;
+        case 'mysql':
+            dbUrl = `mysql://${TEST_MYSQL_CONFIG.user}:${TEST_MYSQL_CONFIG.password}@${TEST_MYSQL_CONFIG.host}:${TEST_MYSQL_CONFIG.port}/${dbName}`;
+            break;
+        default:
+            throw new Error(`Unsupported provider: ${provider}`);
+    }
 
     const ZMODEL_PRELUDE = `datasource db {
   provider = "${provider}"
@@ -52,7 +70,7 @@ export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql'
 
 export function createProject(
     zmodel: string,
-    options?: { customPrelude?: boolean; provider?: 'sqlite' | 'postgresql' },
+    options?: { customPrelude?: boolean; provider?: 'sqlite' | 'postgresql' | 'mysql' },
 ) {
     const workDir = createTestProject();
     fs.mkdirSync(path.join(workDir, 'zenstack'), { recursive: true });

@@ -4,7 +4,6 @@ import type {
     BinaryOperator,
     BindingExpression,
     CallExpression,
-    EnumExpression,
     Expression,
     FieldExpression,
     LiteralExpression,
@@ -23,12 +22,8 @@ export const ExpressionUtils = {
         return { kind: 'literal', value };
     },
 
-    enum: (type: string, value: string): EnumExpression => {
-        return { kind: 'enum', type, value };
-    },
-
-    array: (items: Expression[]): ArrayExpression => {
-        return { kind: 'array', items };
+    array: (type: string, items: Expression[]): ArrayExpression => {
+        return { kind: 'array', type, items };
     },
 
     call: (functionName: string, args?: Expression[]): CallExpression => {
@@ -80,8 +75,6 @@ export const ExpressionUtils = {
     },
 
     isLiteral: (value: unknown): value is LiteralExpression => ExpressionUtils.is(value, 'literal'),
-
-    isEnum: (value: unknown): value is EnumExpression => ExpressionUtils.is(value, 'enum'),
 
     isArray: (value: unknown): value is ArrayExpression => ExpressionUtils.is(value, 'array'),
 

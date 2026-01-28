@@ -449,7 +449,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return this.eb.fn('json_array_length', [array]);
     }
 
-    override buildArrayValue(values: Expression<unknown>[]): AliasableExpression<unknown> {
+    override buildArrayValue(values: Expression<unknown>[], _elemType: string): AliasableExpression<unknown> {
         return new ExpressionWrapper(ValueListNode.create(values.map((v) => v.toOperationNode())));
     }
 
@@ -482,43 +482,8 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
         return this.eb.cast(expression, 'text') as unknown as T;
     }
 
-    override castEnum<T extends Expression<any>>(expression: T, _enumType: string): T {
-        // sqlite doesn't need special enum casting
-        return expression;
-    }
-
     override trimTextQuotes<T extends Expression<string>>(expression: T): T {
         return this.eb.fn('trim', [expression, sql.lit('"')]) as unknown as T;
-    }
-
-    override getFieldSqlType(fieldDef: FieldDef) {
-        // TODO: respect `@db.x` attributes
-        if (fieldDef.relation) {
-            throw createInternalError('Cannot get SQL type of a relation field');
-        }
-        if (fieldDef.array) {
-            throw createInternalError('SQLite does not support scalar list type');
-        }
-
-        if (this.schema.enums?.[fieldDef.type]) {
-            // enums are stored as text
-            return 'text';
-        }
-
-        return (
-            match(fieldDef.type)
-                .with('String', () => 'text')
-                .with('Boolean', () => 'integer')
-                .with('Int', () => 'integer')
-                .with('BigInt', () => 'integer')
-                .with('Float', () => 'real')
-                .with('Decimal', () => 'decimal')
-                .with('DateTime', () => 'numeric')
-                .with('Bytes', () => 'blob')
-                .with('Json', () => 'jsonb')
-                // fallback to text
-                .otherwise(() => 'text')
-        );
     }
 
     override getStringCasingBehavior() {

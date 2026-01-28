@@ -945,8 +945,9 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
 
                 // handle the case for list column
                 if (Array.isArray(value)) {
+                    const fieldDef = QueryUtils.requireField(this.client.$schema, model, fields[i]!);
                     result.push({
-                        node: this.dialect.buildArrayValue(value).toOperationNode(),
+                        node: this.dialect.buildArrayValue(value, fieldDef.type).toOperationNode(),
                         raw: value,
                     });
                 } else {

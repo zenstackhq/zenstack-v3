@@ -302,7 +302,6 @@ function applyValidation(
 function evalExpression(data: any, expr: Expression): unknown {
     return match(expr)
         .with({ kind: 'literal' }, (e) => e.value)
-        .with({ kind: 'enum' }, (e) => e.value)
         .with({ kind: 'array' }, (e) => e.items.map((item) => evalExpression(data, item)))
         .with({ kind: 'field' }, (e) => evalField(data, e))
         .with({ kind: 'member' }, (e) => evalMember(data, e))

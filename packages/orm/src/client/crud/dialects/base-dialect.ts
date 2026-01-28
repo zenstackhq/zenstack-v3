@@ -492,24 +492,38 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             invariant(fieldDef.array, 'Field must be an array type to build array filter');
             const value = this.transformInput(_value, fieldType, true);
 
+            let receiver = fieldRef;
+            if (isEnum(this.schema, fieldType)) {
+                // cast enum array to `text[]` for type compatibility
+                receiver = this.eb.cast(fieldRef, sql.raw('text[]'));
+            }
+
+            const buildArray = (value: unknown) => {
+                invariant(Array.isArray(value), 'Array filter value must be an array');
+                return this.buildArrayValue(
+                    value.map((v) => this.eb.val(v)),
+                    fieldType,
+                );
+            };
+
             switch (key) {
                 case 'equals': {
-                    clauses.push(this.eb(fieldRef, '=', this.ensureProperArray(value, fieldType)));
+                    clauses.push(this.eb(receiver, '=', buildArray(value)));
                     break;
                 }
 
                 case 'has': {
-                    clauses.push(this.buildArrayContains(fieldRef, this.ensureProperEnum(value, fieldType)));
+                    clauses.push(this.buildArrayContains(receiver, this.eb.val(value)));
                     break;
                 }
 
                 case 'hasEvery': {
-                    clauses.push(this.buildArrayHasEvery(fieldRef, this.ensureProperArray(value, fieldType)));
+                    clauses.push(this.buildArrayHasEvery(receiver, buildArray(value)));
                     break;
                 }
 
                 case 'hasSome': {
-                    clauses.push(this.buildArrayHasSome(fieldRef, this.ensureProperArray(value, fieldType)));
+                    clauses.push(this.buildArrayHasSome(receiver, buildArray(value)));
                     break;
                 }
 
@@ -525,27 +539,6 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         }
 
         return this.and(...clauses);
-    }
-
-    private ensureProperEnum(value: unknown, fieldType: string): Expression<unknown> {
-        if (isEnum(this.schema, fieldType)) {
-            return this.castEnum(this.eb.val(value), fieldType);
-        } else {
-            return this.eb.val(value);
-        }
-    }
-
-    private ensureProperArray(value: unknown, fieldType: string) {
-        if (!Array.isArray(value)) {
-            return this.eb.val(value);
-        }
-
-        if (isEnum(this.schema, fieldType)) {
-            // make sure enum values are properly casted
-            return this.buildArrayValue(value.map((v) => this.castEnum(this.eb.val(v), fieldType)));
-        } else {
-            return this.buildArrayValue(value);
-        }
     }
 
     buildPrimitiveFilter(fieldRef: Expression<any>, fieldDef: FieldDef, payload: any) {
@@ -1444,7 +1437,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     /**
      * Builds an array value expression.
      */
-    abstract buildArrayValue(values: Expression<unknown>[]): AliasableExpression<unknown>;
+    abstract buildArrayValue(values: Expression<unknown>[], elemType: string): AliasableExpression<unknown>;
 
     /**
      * Builds an expression that checks if an array contains a single value.
@@ -1472,19 +1465,9 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     abstract castText<T extends Expression<any>>(expression: T): T;
 
     /**
-     * Casts the given expression to an enum type.
-     */
-    abstract castEnum<T extends Expression<any>>(expression: T, enumType: string): T;
-
-    /**
      * Trims double quotes from the start and end of a text expression.
      */
     abstract trimTextQuotes<T extends Expression<string>>(expression: T): T;
-
-    /**
-     * Gets the SQL column type for the given field definition.
-     */
-    abstract getFieldSqlType(fieldDef: FieldDef): string;
 
     /*
      * Gets the string casing behavior for the dialect.

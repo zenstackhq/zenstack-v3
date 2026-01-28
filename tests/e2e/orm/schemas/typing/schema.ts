@@ -46,7 +46,7 @@ export class SchemaType implements SchemaDef {
                 role: {
                     name: "role",
                     type: "Role",
-                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.enum("Role", "USER") }] }],
+                    attributes: [{ name: "@default", args: [{ name: "value", value: ExpressionUtils.literal("USER") }] }],
                     default: "USER"
                 },
                 status: {
@@ -113,7 +113,7 @@ export class SchemaType implements SchemaDef {
                 author: {
                     name: "author",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array("Int", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "posts", fields: ["authorId"], references: ["id"] }
                 },
                 authorId: {
@@ -159,7 +159,7 @@ export class SchemaType implements SchemaDef {
                     name: "region",
                     type: "Region",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("regionCountry"), ExpressionUtils.field("regionCity")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("country"), ExpressionUtils.field("city")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("regionCountry"), ExpressionUtils.field("regionCity")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("country"), ExpressionUtils.field("city")]) }] }],
                     relation: { opposite: "profiles", fields: ["regionCountry", "regionCity"], references: ["country", "city"] }
                 },
                 regionCountry: {
@@ -181,7 +181,7 @@ export class SchemaType implements SchemaDef {
                 user: {
                     name: "user",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array("Int", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "profile", fields: ["userId"], references: ["id"] }
                 },
                 userId: {
@@ -252,7 +252,7 @@ export class SchemaType implements SchemaDef {
                 }
             },
             attributes: [
-                { name: "@@id", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("country"), ExpressionUtils.field("city")]) }] }
+                { name: "@@id", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("country"), ExpressionUtils.field("city")]) }] }
             ],
             idFields: ["country", "city"],
             uniqueFields: {
@@ -280,7 +280,7 @@ export class SchemaType implements SchemaDef {
                 post: {
                     name: "post",
                     type: "Post",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("postId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("postId")]) }, { name: "references", value: ExpressionUtils.array("Int", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "meta", fields: ["postId"], references: ["id"] }
                 },
                 postId: {

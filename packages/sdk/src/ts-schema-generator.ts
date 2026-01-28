@@ -1281,7 +1281,11 @@ export class TsSchemaGenerator {
     }
 
     private createArrayExpression(expr: ArrayExpr): any {
+        const arrayResolved = expr.$resolvedType?.decl;
+        const arrayType = typeof arrayResolved === 'string' ? arrayResolved : arrayResolved?.name;
+        invariant(arrayType, 'Array type must be resolved to a string or declaration');
         return this.createExpressionUtilsCall('array', [
+            this.createLiteralNode(arrayType),
             ts.factory.createArrayLiteralExpression(expr.items.map((item) => this.createExpression(item))),
         ]);
     }
@@ -1292,11 +1296,7 @@ export class TsSchemaGenerator {
             .when(isDataField, () =>
                 this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]),
             )
-            .when(isEnumField, () => {
-                const ref = expr.target.ref;
-                invariant(isEnumField(ref), 'Expected enum field reference');
-                return this.createEnumExpression(ref.$container.name, expr.target.$refText);
-            })
+            .when(isEnumField, () => this.createLiteralExpression('StringLiteral', expr.target.$refText))
             .when(isCollectionPredicateBinding, () =>
                 this.createExpressionUtilsCall('binding', [this.createLiteralNode(expr.target.$refText)]),
             )
@@ -1324,13 +1324,6 @@ export class TsSchemaGenerator {
             .otherwise(() => {
                 throw new Error(`Unsupported literal type: ${type}`);
             });
-    }
-
-    private createEnumExpression(type: string, value: string) {
-        return this.createExpressionUtilsCall('enum', [
-            ts.factory.createStringLiteral(type),
-            ts.factory.createStringLiteral(value),
-        ]);
     }
 
     private generateModelsAndTypeDefs(model: Model, options: TsSchemaGeneratorOptions) {

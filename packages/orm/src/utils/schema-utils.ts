@@ -4,7 +4,6 @@ import type {
     BinaryExpression,
     BindingExpression,
     CallExpression,
-    EnumExpression,
     Expression,
     FieldExpression,
     LiteralExpression,
@@ -20,7 +19,6 @@ export class ExpressionVisitor {
     visit(expr: Expression): VisitResult {
         return match(expr)
             .with({ kind: 'literal' }, (e) => this.visitLiteral(e))
-            .with({ kind: 'enum' }, (e) => this.visitEnum(e))
             .with({ kind: 'array' }, (e) => this.visitArray(e))
             .with({ kind: 'field' }, (e) => this.visitField(e))
             .with({ kind: 'member' }, (e) => this.visitMember(e))
@@ -34,8 +32,6 @@ export class ExpressionVisitor {
     }
 
     protected visitLiteral(_e: LiteralExpression): VisitResult {}
-
-    protected visitEnum(_e: EnumExpression): VisitResult {}
 
     protected visitArray(e: ArrayExpression): VisitResult {
         for (const item of e.items) {

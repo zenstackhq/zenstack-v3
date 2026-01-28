@@ -14,7 +14,7 @@ import z from 'zod';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, SchemaDef } from '../../../schema';
 import type { SortOrder } from '../../crud-types';
-import { createInternalError, createInvalidInputError } from '../../errors';
+import { createInvalidInputError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import { isEnum, isTypeDef } from '../../query-utils';
 import { LateralJoinDialectBase } from './lateral-join-dialect-base';
@@ -245,10 +245,6 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
         return this.eb.cast(expression, 'text') as unknown as T;
     }
 
-    override castEnum<T extends Expression<any>>(expression: T, enumType: string): T {
-        return this.eb.cast(expression, sql.ref(enumType)) as unknown as T;
-    }
-
     override trimTextQuotes<T extends Expression<string>>(expression: T): T {
         return this.eb.fn('trim', [expression, sql.lit('"')]) as unknown as T;
     }
@@ -257,12 +253,10 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
         return this.eb.fn('array_length', [array]);
     }
 
-    override buildArrayValue(values: Expression<unknown>[]): AliasableExpression<unknown> {
-        if (values.length === 0) {
-            return sql`{}`;
-        } else {
-            return sql`ARRAY[${sql.join(values, sql.raw(','))}]`;
-        }
+    override buildArrayValue(values: Expression<unknown>[], elemType: string): AliasableExpression<unknown> {
+        const arr = sql`ARRAY[${sql.join(values, sql.raw(','))}]`;
+        const mappedType = this.getSqlType(elemType);
+        return this.eb.cast(arr, sql`${sql.raw(mappedType)}[]`);
     }
 
     override buildArrayContains(field: Expression<unknown>, value: Expression<unknown>): AliasableExpression<SqlBool> {
@@ -327,37 +321,26 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
         );
     }
 
-    override getFieldSqlType(fieldDef: FieldDef) {
-        // TODO: respect `@db.x` attributes
-        if (fieldDef.relation) {
-            throw createInternalError('Cannot get SQL type of a relation field');
-        }
-
-        let result: string;
-
-        if (this.schema.enums?.[fieldDef.type]) {
-            // enums are treated as text
-            result = 'text';
+    private getSqlType(zmodelType: string) {
+        if (isEnum(this.schema, zmodelType)) {
+            // reduce enum to text for type compatibility
+            return 'text';
         } else {
-            result = match(fieldDef.type)
-                .with('String', () => 'text')
-                .with('Boolean', () => 'boolean')
-                .with('Int', () => 'integer')
-                .with('BigInt', () => 'bigint')
-                .with('Float', () => 'double precision')
-                .with('Decimal', () => 'decimal')
-                .with('DateTime', () => 'timestamp')
-                .with('Bytes', () => 'bytea')
-                .with('Json', () => 'jsonb')
-                // fallback to text
-                .otherwise(() => 'text');
+            return (
+                match(zmodelType)
+                    .with('String', () => 'text')
+                    .with('Boolean', () => 'boolean')
+                    .with('Int', () => 'integer')
+                    .with('BigInt', () => 'bigint')
+                    .with('Float', () => 'double precision')
+                    .with('Decimal', () => 'decimal')
+                    .with('DateTime', () => 'timestamp')
+                    .with('Bytes', () => 'bytea')
+                    .with('Json', () => 'jsonb')
+                    // fallback to text
+                    .otherwise(() => 'text')
+            );
         }
-
-        if (fieldDef.array) {
-            result += '[]';
-        }
-
-        return result;
     }
 
     override getStringCasingBehavior() {
@@ -393,9 +376,11 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
                 )})`.as('$values'),
             )
             .select(
-                fields.map((f, i) =>
-                    sql`CAST(${sql.ref(`$values.column${i + 1}`)} AS ${sql.raw(this.getFieldSqlType(f))})`.as(f.name),
-                ),
+                fields.map((f, i) => {
+                    const mappedType = this.getSqlType(f.type);
+                    const castType = f.array ? sql`${sql.raw(mappedType)}[]` : sql.raw(mappedType);
+                    return this.eb.cast(sql.ref(`$values.column${i + 1}`), castType).as(f.name);
+                }),
             );
     }
 

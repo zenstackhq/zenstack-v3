@@ -171,17 +171,14 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         );
     }
 
-    @expr('enum')
-    // @ts-expect-error
-    private _enum(expr: { type: string; value: string }) {
-        return this.dialect.castEnum(this.eb.val(expr.value), expr.type).toOperationNode();
-    }
-
     @expr('array')
     // @ts-expect-error
     private _array(expr: ArrayExpression, context: ExpressionTransformerContext) {
         return this.dialect
-            .buildArrayValue(expr.items.map((item) => new ExpressionWrapper(this.transform(item, context))))
+            .buildArrayValue(
+                expr.items.map((item) => new ExpressionWrapper(this.transform(item, context))),
+                expr.type,
+            )
             .toOperationNode();
     }
 
@@ -557,10 +554,11 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             return falseNode(this.dialect);
         } else if (Array.isArray(value)) {
             return this.dialect
-                .buildArrayValue(value.map((v) => new ExpressionWrapper(this.transformValue(v, type))))
+                .buildArrayValue(
+                    value.map((v) => new ExpressionWrapper(this.transformValue(v, type))),
+                    type,
+                )
                 .toOperationNode();
-        } else if (QueryUtils.isEnum(this.schema, type)) {
-            return this.dialect.castEnum(this.eb.val(value), type).toOperationNode();
         } else {
             const transformed = this.dialect.transformInput(value, type, false) ?? null;
             if (typeof transformed !== 'string') {

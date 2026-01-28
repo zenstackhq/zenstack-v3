@@ -14,7 +14,7 @@ import { match } from 'ts-pattern';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, SchemaDef } from '../../../schema';
 import type { SortOrder } from '../../crud-types';
-import { createInternalError, createInvalidInputError, createNotSupportedError } from '../../errors';
+import { createInvalidInputError, createNotSupportedError } from '../../errors';
 import type { ClientOptions } from '../../options';
 import { isTypeDef } from '../../query-utils';
 import { LateralJoinDialectBase } from './lateral-join-dialect-base';
@@ -216,11 +216,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
         return sql`CAST(${expression} AS CHAR CHARACTER SET utf8mb4)` as unknown as T;
     }
 
-    override castEnum<T extends Expression<any>>(expression: T, _enumType: string): T {
-        // mysql doesn't need special enum casting
-        return expression;
-    }
-
     override trimTextQuotes<T extends Expression<string>>(expression: T): T {
         return sql`TRIM(BOTH ${sql.lit('"')} FROM ${expression})` as unknown as T;
     }
@@ -229,7 +224,7 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
         return this.eb.fn('JSON_LENGTH', [array]);
     }
 
-    override buildArrayValue(values: Expression<unknown>[]): AliasableExpression<number> {
+    override buildArrayValue(values: Expression<unknown>[], _elemType: string): AliasableExpression<unknown> {
         return new ExpressionWrapper(ValueListNode.create(values.map((v) => v.toOperationNode())));
     }
 
@@ -313,40 +308,6 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
                 .select(this.eb.lit(1).as('$t'))
                 .where(buildFilter(this.eb.ref('$items.value'))),
         );
-    }
-
-    override getFieldSqlType(fieldDef: FieldDef) {
-        // TODO: respect `@db.x` attributes
-        if (fieldDef.relation) {
-            throw createInternalError('Cannot get SQL type of a relation field');
-        }
-
-        let result: string;
-
-        if (this.schema.enums?.[fieldDef.type]) {
-            // enums are treated as text/varchar
-            result = 'varchar(255)';
-        } else {
-            result = match(fieldDef.type)
-                .with('String', () => 'varchar(255)')
-                .with('Boolean', () => 'tinyint(1)') // MySQL uses tinyint(1) for boolean
-                .with('Int', () => 'int')
-                .with('BigInt', () => 'bigint')
-                .with('Float', () => 'double')
-                .with('Decimal', () => 'decimal')
-                .with('DateTime', () => 'datetime')
-                .with('Bytes', () => 'blob')
-                .with('Json', () => 'json')
-                // fallback to text
-                .otherwise(() => 'text');
-        }
-
-        if (fieldDef.array) {
-            // MySQL stores arrays as JSON
-            result = 'json';
-        }
-
-        return result;
     }
 
     override getStringCasingBehavior() {

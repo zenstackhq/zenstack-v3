@@ -3,7 +3,6 @@ import {
     AliasNode,
     BinaryOperationNode,
     CaseWhenBuilder,
-    CastNode,
     ColumnNode,
     ColumnUpdateNode,
     DeleteQueryNode,
@@ -16,7 +15,6 @@ import {
     OperationNodeTransformer,
     PrimitiveValueListNode,
     type QueryId,
-    RawNode,
     ReferenceNode,
     ReturningNode,
     SelectAllNode,
@@ -329,45 +327,6 @@ export class QueryNameMapper extends OperationNodeTransformer {
         });
     }
 
-    // process enum type and value mappings for `CAST(value as type)` nodes
-    protected override transformCast(node: CastNode, queryId?: QueryId) {
-        if (
-            RawNode.is(node.dataType) &&
-            node.dataType.parameters.length === 1 &&
-            ReferenceNode.is(node.dataType.parameters[0]!) &&
-            ColumnNode.is(node.dataType.parameters[0].column)
-        ) {
-            // extract cast target type name
-            const castTypeName = node.dataType.parameters[0].column.column.name;
-
-            const enumDef = getEnum(this.schema, castTypeName)!;
-            if (enumDef) {
-                // casting to an enum type, apply name mapping if any
-                const mappedName = this.mapEnumTypeName(castTypeName);
-                if (mappedName !== castTypeName) {
-                    const updatedDataType = {
-                        ...this.transformNode(node.dataType, queryId),
-                        parameters: [ReferenceNode.create(ColumnNode.create(mappedName))],
-                    };
-
-                    let updatedExpression = this.transformNode(node.expression, queryId);
-                    if (ValueNode.is(updatedExpression) && typeof updatedExpression.value === 'string') {
-                        // map enum value
-                        const enumValueMapping = this.getEnumValueMapping(enumDef);
-                        const mappedValue = enumValueMapping[updatedExpression.value];
-                        if (mappedValue) {
-                            updatedExpression = ValueNode.create(mappedValue);
-                        }
-                    }
-
-                    return CastNode.create(updatedExpression, updatedDataType);
-                }
-            }
-        }
-
-        return super.transformCast(node, queryId);
-    }
-
     // #endregion
 
     // #region utils
@@ -546,11 +505,6 @@ export class QueryNameMapper extends OperationNodeTransformer {
         } else {
             return tableName;
         }
-    }
-
-    private mapEnumTypeName(enumTypeName: string) {
-        const mappedName = this.enumTypeMap.get(enumTypeName);
-        return mappedName ?? enumTypeName;
     }
 
     private hasMappedColumns(modelName: string) {

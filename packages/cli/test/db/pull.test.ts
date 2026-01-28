@@ -167,7 +167,6 @@ model User {
     @@index([role])
 }`,
         );
-        console.log(workDir)
         runCli('format', workDir);
         runCli('db push', workDir);
         const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');

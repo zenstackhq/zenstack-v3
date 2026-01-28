@@ -1,7 +1,6 @@
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
-import { writeFileSync } from 'node:fs';
 
 // Note: We dynamically import better-sqlite3 inside the async function to avoid
 // requiring it at module load time for environments that don't use SQLite.
@@ -233,11 +232,6 @@ export const sqlite: IntrospectionProvider = {
             }
 
             const enums: IntrospectedEnum[] = []; // SQLite doesn't support enums
-            
-            writeFileSync(
-                'D:/Projects/GitHub/zenstack-v3/packages/cli/sqlite-introspected.json',
-                JSON.stringify({ tables, enums }, null, 4),
-            );
 
             return { tables, enums };
         } finally {

@@ -269,7 +269,7 @@ export function syncTable({
             if (column.unique && !column.pk) {
                 builder.addAttribute((b) => {
                     b.setDecl(uniqueAttribute);
-                    if (column.unique_name) b.addArg((ab) => ab.StringLiteral.setValue(column.unique_name!), 'map');
+                    if (column.unique_name && column.unique_name != `${table.name}_${column.name}_key`) b.addArg((ab) => ab.StringLiteral.setValue(column.unique_name!), 'map');
 
                     return b;
                 });

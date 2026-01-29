@@ -264,6 +264,8 @@ export const mysql: IntrospectionProvider = {
 };
 
 function getTableIntrospectionQuery(databaseName: string) {
+    // Note: We use subqueries with ORDER BY before JSON_ARRAYAGG to ensure ordering
+    // since MySQL < 8.0.21 doesn't support ORDER BY inside JSON_ARRAYAGG
     return `
 SELECT
     t.TABLE_SCHEMA AS \`schema\`,
@@ -278,8 +280,9 @@ SELECT
         ELSE NULL
     END AS \`definition\`,
     (
-        SELECT JSON_ARRAYAGG(
-            JSON_OBJECT(
+        SELECT JSON_ARRAYAGG(col_json)
+        FROM (
+            SELECT JSON_OBJECT(
                 'name', c.COLUMN_NAME,
                 'datatype', c.DATA_TYPE,
                 'datatype_schema', c.TABLE_SCHEMA,
@@ -298,24 +301,25 @@ SELECT
                 'foreign_key_name', kcu_fk.CONSTRAINT_NAME,
                 'foreign_key_on_update', rc.UPDATE_RULE,
                 'foreign_key_on_delete', rc.DELETE_RULE
-            )
-        )
-        FROM INFORMATION_SCHEMA.COLUMNS c
-        LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu_fk 
-            ON c.TABLE_SCHEMA = kcu_fk.TABLE_SCHEMA 
-            AND c.TABLE_NAME = kcu_fk.TABLE_NAME 
-            AND c.COLUMN_NAME = kcu_fk.COLUMN_NAME
-            AND kcu_fk.REFERENCED_TABLE_NAME IS NOT NULL
-        LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
-            ON kcu_fk.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
-            AND kcu_fk.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
-        WHERE c.TABLE_SCHEMA = t.TABLE_SCHEMA
-            AND c.TABLE_NAME = t.TABLE_NAME
-        ORDER BY c.ORDINAL_POSITION
+            ) AS col_json
+            FROM INFORMATION_SCHEMA.COLUMNS c
+            LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu_fk 
+                ON c.TABLE_SCHEMA = kcu_fk.TABLE_SCHEMA 
+                AND c.TABLE_NAME = kcu_fk.TABLE_NAME 
+                AND c.COLUMN_NAME = kcu_fk.COLUMN_NAME
+                AND kcu_fk.REFERENCED_TABLE_NAME IS NOT NULL
+            LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+                ON kcu_fk.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
+                AND kcu_fk.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+            WHERE c.TABLE_SCHEMA = t.TABLE_SCHEMA
+                AND c.TABLE_NAME = t.TABLE_NAME
+            ORDER BY c.ORDINAL_POSITION
+        ) AS cols_ordered
     ) AS \`columns\`,
     (
-        SELECT JSON_ARRAYAGG(
-            JSON_OBJECT(
+        SELECT JSON_ARRAYAGG(idx_json)
+        FROM (
+            SELECT JSON_OBJECT(
                 'name', s.INDEX_NAME,
                 'method', s.INDEX_TYPE,
                 'unique', s.NON_UNIQUE = 0,
@@ -325,27 +329,28 @@ SELECT
                 'partial', FALSE,
                 'predicate', NULL,
                 'columns', (
-                    SELECT JSON_ARRAYAGG(
-                        JSON_OBJECT(
+                    SELECT JSON_ARRAYAGG(idx_col_json)
+                    FROM (
+                        SELECT JSON_OBJECT(
                             'name', s2.COLUMN_NAME,
                             'expression', NULL,
                             'order', CASE s2.COLLATION WHEN 'A' THEN 'ASC' WHEN 'D' THEN 'DESC' ELSE NULL END,
                             'nulls', NULL
-                        )
+                        ) AS idx_col_json
+                        FROM INFORMATION_SCHEMA.STATISTICS s2
+                        WHERE s2.TABLE_SCHEMA = s.TABLE_SCHEMA
+                            AND s2.TABLE_NAME = s.TABLE_NAME
+                            AND s2.INDEX_NAME = s.INDEX_NAME
                         ORDER BY s2.SEQ_IN_INDEX
-                    )
-                    FROM INFORMATION_SCHEMA.STATISTICS s2
-                    WHERE s2.TABLE_SCHEMA = s.TABLE_SCHEMA
-                        AND s2.TABLE_NAME = s.TABLE_NAME
-                        AND s2.INDEX_NAME = s.INDEX_NAME
+                    ) AS idx_cols_ordered
                 )
-            )
-        )
-        FROM (
-            SELECT DISTINCT INDEX_NAME, INDEX_TYPE, NON_UNIQUE, TABLE_SCHEMA, TABLE_NAME
-            FROM INFORMATION_SCHEMA.STATISTICS
-            WHERE TABLE_SCHEMA = t.TABLE_SCHEMA AND TABLE_NAME = t.TABLE_NAME
-        ) s
+            ) AS idx_json
+            FROM (
+                SELECT DISTINCT INDEX_NAME, INDEX_TYPE, NON_UNIQUE, TABLE_SCHEMA, TABLE_NAME
+                FROM INFORMATION_SCHEMA.STATISTICS
+                WHERE TABLE_SCHEMA = t.TABLE_SCHEMA AND TABLE_NAME = t.TABLE_NAME
+            ) s
+        ) AS idxs_ordered
     ) AS \`indexes\`
 FROM INFORMATION_SCHEMA.TABLES t
 LEFT JOIN INFORMATION_SCHEMA.VIEWS v 

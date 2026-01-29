@@ -10,7 +10,6 @@ import {
 } from 'kysely';
 import { parse as parsePostgresArray } from 'postgres-array';
 import { match } from 'ts-pattern';
-import z from 'zod';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
 import type { BuiltinType, FieldDef, SchemaDef } from '../../../schema';
 import type { SortOrder } from '../../crud-types';
@@ -20,14 +19,41 @@ import { isEnum, isTypeDef } from '../../query-utils';
 import { LateralJoinDialectBase } from './lateral-join-dialect-base';
 
 export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDialectBase<Schema> {
-    private isoDateSchema = z.iso.datetime({ local: true, offset: true });
-
     constructor(schema: Schema, options: ClientOptions<Schema>) {
         super(schema, options);
+        this.overrideTypeParsers();
     }
 
     override get provider() {
         return 'postgresql' as const;
+    }
+
+    private overrideTypeParsers() {
+        if (this.options.fixPostgresTimezone !== false) {
+            // override node-pg's default type parser to resolve the timezone handling issue
+            // with "TIMESTAMP WITHOUT TIME ZONE" fields
+            // https://github.com/brianc/node-postgres/issues/429
+            import('pg')
+                .then((pg) => {
+                    pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (value) => {
+                        if (typeof value !== 'string') {
+                            return value;
+                        }
+                        if (!this.hasTimezoneOffset(value)) {
+                            // force UTC if no offset
+                            value += 'Z';
+                        }
+                        try {
+                            return new Date(value);
+                        } catch {
+                            return value;
+                        }
+                    });
+                })
+                .catch(() => {
+                    // ignore
+                });
+        }
     }
 
     // #region capabilities
@@ -165,25 +191,22 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
 
     private transformOutputDate(value: unknown) {
         if (typeof value === 'string') {
-            // PostgreSQL's jsonb_build_object serializes timestamp as ISO 8601 strings
-            // without timezone, (e.g., "2023-01-01T12:00:00.123456"). Since Date is always
-            // stored as UTC `timestamp` type, we add 'Z' to explicitly mark them as UTC for
-            // correct Date object creation.
-            if (this.isoDateSchema.safeParse(value).success) {
-                const hasOffset = value.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(value);
-                return new Date(hasOffset ? value : `${value}Z`);
-            } else {
+            // PostgreSQL's jsonb_build_object serializes timestamp as ISO 8601 strings,
+            // we force interpret them as UTC dates here if the value does not carry timezone
+            // offset (this happens with "TIMESTAMP WITHOUT TIME ZONE" field type)
+
+            try {
+                return new Date(this.hasTimezoneOffset(value) ? value : `${value}Z`);
+            } catch {
                 return value;
             }
-        } else if (value instanceof Date && this.options.fixPostgresTimezone !== false) {
-            // SPECIAL NOTES:
-            // node-pg has a terrible quirk that it returns the date value in local timezone
-            // as a `Date` object although for `DateTime` field the data in DB is stored in UTC
-            // see: https://github.com/brianc/node-postgres/issues/429
-            return new Date(value.getTime() - value.getTimezoneOffset() * 60 * 1000);
         } else {
             return value;
         }
+    }
+
+    private hasTimezoneOffset(value: string) {
+        return value.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(value);
     }
 
     private transformOutputBytes(value: unknown) {

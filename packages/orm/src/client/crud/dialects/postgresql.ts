@@ -19,6 +19,8 @@ import { isEnum, isTypeDef } from '../../query-utils';
 import { LateralJoinDialectBase } from './lateral-join-dialect-base';
 
 export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDialectBase<Schema> {
+    private static typeParserOverrideApplied = false;
+
     constructor(schema: Schema, options: ClientOptions<Schema>) {
         super(schema, options);
         this.overrideTypeParsers();
@@ -29,7 +31,9 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
     }
 
     private overrideTypeParsers() {
-        if (this.options.fixPostgresTimezone !== false) {
+        if (this.options.fixPostgresTimezone !== false && !PostgresCrudDialect.typeParserOverrideApplied) {
+            PostgresCrudDialect.typeParserOverrideApplied = true;
+
             // override node-pg's default type parser to resolve the timezone handling issue
             // with "TIMESTAMP WITHOUT TIME ZONE" fields
             // https://github.com/brianc/node-postgres/issues/429
@@ -43,11 +47,10 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
                             // force UTC if no offset
                             value += 'Z';
                         }
-                        try {
-                            return new Date(value);
-                        } catch {
-                            return value;
-                        }
+                        const result = new Date(value);
+                        return isNaN(result.getTime())
+                            ? value // fallback to original value if parsing fails
+                            : result;
                     });
                 })
                 .catch(() => {
@@ -194,12 +197,11 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
             // PostgreSQL's jsonb_build_object serializes timestamp as ISO 8601 strings,
             // we force interpret them as UTC dates here if the value does not carry timezone
             // offset (this happens with "TIMESTAMP WITHOUT TIME ZONE" field type)
-
-            try {
-                return new Date(this.hasTimezoneOffset(value) ? value : `${value}Z`);
-            } catch {
-                return value;
-            }
+            const normalized = this.hasTimezoneOffset(value) ? value : `${value}Z`;
+            const parsed = new Date(normalized);
+            return Number.isNaN(parsed.getTime())
+                ? value // fallback to original value if parsing fails
+                : parsed;
         } else {
             return value;
         }

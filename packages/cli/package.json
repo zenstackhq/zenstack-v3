@@ -46,18 +46,19 @@
         "colors": "1.4.0",
         "commander": "^8.3.0",
         "cors": "^2.8.5",
+        "dotenv": "^17.2.3",
         "execa": "^9.6.0",
         "express": "^5.0.0",
         "jiti": "^2.6.1",
         "langium": "catalog:",
         "mixpanel": "^0.18.1",
+        "mysql2": "catalog:",
         "ora": "^5.4.1",
         "package-manager-detector": "^1.3.0",
         "pg": "catalog:",
         "prisma": "catalog:",
         "semver": "^7.7.2",
-        "ts-pattern": "catalog:",
-        "mysql2": "catalog:"
+        "ts-pattern": "catalog:"
     },
     "devDependencies": {
         "@types/better-sqlite3": "catalog:",

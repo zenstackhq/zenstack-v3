@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { ZModelLanguageMetaData } from '@zenstackhq/language';
 import colors from 'colors';
 import { Command, CommanderError, Option } from 'commander';

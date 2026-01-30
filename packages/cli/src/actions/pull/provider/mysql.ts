@@ -146,13 +146,20 @@ export const mysql: IntrospectionProvider = {
                         (a.ordinal_position ?? 0) - (b.ordinal_position ?? 0)
                 );
 
+                // Filter out auto-generated FK indexes (MySQL creates these automatically)
+                // Pattern: {Table}_{column}_fkey for single-column FK indexes
+                const filteredIndexes = (indexes || []).filter(
+                    (idx: { name: string; columns: { name: string }[] }) =>
+                        !(idx.columns.length === 1 && idx.name === `${row.name}_${idx.columns[0]?.name}_fkey`)
+                );
+
                 tables.push({
                     schema: '', // MySQL doesn't support multi-schema
                     name: row.name,
                     type: row.type as 'table' | 'view',
                     definition: row.definition,
                     columns: sortedColumns,
-                    indexes: indexes || [],
+                    indexes: filteredIndexes,
                 });
             }
 

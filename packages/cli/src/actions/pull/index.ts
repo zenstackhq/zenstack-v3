@@ -256,15 +256,30 @@ export function syncTable({
                 builder.addAttribute((b) => b.setDecl(idAttribute));
             }
 
+            // Add field-type-based attributes (e.g., @updatedAt for DateTime fields, @db.* attributes)
+            const fieldAttrs = provider.getFieldAttributes({
+                fieldName: column.name,
+                fieldType: builtinType.type,
+                datatype: column.datatype,
+                length: column.length,
+                precision: column.precision,
+                services,
+            });
+            fieldAttrs.forEach(builder.addAttribute.bind(builder));
+
             if (column.default) {
-                const defaultValuesAttrs = provider.getDefaultValue({
-                    fieldName: column.name,
+                const defaultExprBuilder = provider.getDefaultValue({
                     fieldType: builtinType.type,
                     defaultValue: column.default,
                     services,
                     enums: model.declarations.filter((d) => d.$type === 'Enum') as Enum[],
                 });
-                defaultValuesAttrs.forEach(builder.addAttribute.bind(builder));
+                if (defaultExprBuilder) {
+                    const defaultAttr = new DataFieldAttributeFactory()
+                        .setDecl(getAttributeRef('@default', services))
+                        .addArg(defaultExprBuilder);
+                    builder.addAttribute(defaultAttr);
+                }
             }
 
             if (column.unique && !column.pk) {
@@ -272,7 +287,7 @@ export function syncTable({
                     b.setDecl(uniqueAttribute);
                     // Only add map if the unique constraint name differs from default patterns
                     // Default patterns: TableName_columnName_key (Prisma) or just columnName (MySQL)
-                    const isDefaultName = !column.unique_name 
+                    const isDefaultName = !column.unique_name
                         || column.unique_name === `${table.name}_${column.name}_key`
                         || column.unique_name === column.name;
                     if (!isDefaultName) {
@@ -286,25 +301,6 @@ export function syncTable({
                 builder.addAttribute((ab) =>
                     ab.setDecl(fieldMapAttribute).addArg((ab) => ab.StringLiteral.setValue(column.name)),
                 );
-            }
-
-            const dbAttr = services.shared.workspace.IndexManager.allElements('Attribute').find(
-                (d) => d.name.toLowerCase() === `@db.${column.datatype.toLowerCase()}`,
-            )?.node as Attribute | undefined;
-
-            const defaultDatabaseType = provider.getDefaultDatabaseType(builtinType.type as BuiltinType);
-
-            if (
-                dbAttr &&
-                defaultDatabaseType &&
-                (defaultDatabaseType.type !== column.datatype ||
-                    (defaultDatabaseType.precisition &&
-                        defaultDatabaseType.precisition !== (column.length || column.precision)))
-            ) {
-                const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
-                if (column.length || column.precision)
-                    dbAttrFactory.addArg((a) => a.NumberLiteral.setValue(column.length! || column.precision!));
-                builder.addAttribute(dbAttrFactory);
             }
 
             return builder;

@@ -1,6 +1,6 @@
 import type { ZModelServices } from '@zenstackhq/language';
-import type { BuiltinType, Enum } from '@zenstackhq/language/ast';
-import type { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
+import type { BuiltinType, Enum, Expression } from '@zenstackhq/language/ast';
+import type { AstFactory, DataFieldAttributeFactory, ExpressionBuilder } from '@zenstackhq/language/factory';
 
 export type Cascade = 'NO ACTION' | 'RESTRICT' | 'CASCADE' | 'SET NULL' | 'SET DEFAULT' | null;
 
@@ -67,12 +67,28 @@ export interface IntrospectionProvider {
         isArray: boolean;
     };
     getDefaultDatabaseType(type: BuiltinType): { precisition?: number; type: string } | undefined;
+    /**
+     * Get the expression builder callback for a field's @default attribute value.
+     * Returns null if no @default attribute should be added.
+     * The callback will be passed to DataFieldAttributeFactory.addArg().
+     */
     getDefaultValue(args: {
-        fieldName: string;
         fieldType: BuiltinType | 'Unsupported';
         defaultValue: string;
         services: ZModelServices;
         enums: Enum[];
+    }): ((builder: ExpressionBuilder) => AstFactory<Expression>) | null;
+    /**
+     * Get additional field attributes based on field type and name (e.g., @updatedAt for DateTime fields, @db.* attributes).
+     * This is separate from getDefaultValue to keep concerns separated.
+     */
+    getFieldAttributes(args: {
+        fieldName: string;
+        fieldType: BuiltinType | 'Unsupported';
+        datatype: string;
+        length: number | null;
+        precision: number | null;
+        services: ZModelServices;
     }): DataFieldAttributeFactory[];
     isSupportedFeature(feature: DatabaseFeature): boolean;
 }

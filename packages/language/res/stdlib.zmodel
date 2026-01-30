@@ -402,8 +402,12 @@ attribute @omit()
 
 /**
  * Automatically stores the time when a record was last updated.
+ *
+ * @param ignore: A list of field names that are not considered when the ORM client is determining whether any
+ * updates have been made to a record. An update that only contains ignored fields does not change the
+ * timestamp.
  */
-attribute @updatedAt() @@@targetField([DateTimeField]) @@@prisma
+attribute @updatedAt(_ ignore: FieldReference[]?) @@@targetField([DateTimeField]) @@@prisma
 
 /**
  * Add full text index (MySQL only).

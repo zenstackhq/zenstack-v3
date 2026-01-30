@@ -31,6 +31,7 @@ import type {
     SchemaDef,
     TypeDefFieldIsArray,
     TypeDefFieldIsOptional,
+    UpdatedAtInfo,
 } from '../schema';
 import type {
     AtLeast,
@@ -994,7 +995,7 @@ type OptionalFieldsForCreate<Schema extends SchemaDef, Model extends GetModels<S
           ? Key
           : FieldIsArray<Schema, Model, Key> extends true
             ? Key
-            : GetModelField<Schema, Model, Key>['updatedAt'] extends true
+            : GetModelField<Schema, Model, Key>['updatedAt'] extends (true | UpdatedAtInfo)
               ? Key
               : never]: GetModelField<Schema, Model, Key>;
 };

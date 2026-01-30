@@ -522,6 +522,14 @@ export class TsSchemaGenerator {
         );
     }
 
+    private createUpdatedAtObject(ignoreArg: AttributeArg) {
+        return ts.factory.createObjectLiteralExpression([
+            ts.factory.createPropertyAssignment('ignore', ts.factory.createArrayLiteralExpression(
+                (ignoreArg.value as ArrayExpr).items.map((item) => ts.factory.createStringLiteral((item as ReferenceExpr).target.$refText))
+            ))
+        ]);
+    }
+
     private mapFieldTypeToTSType(type: DataFieldType) {
         let result = match(type.type)
             .with('String', () => 'string')
@@ -564,8 +572,14 @@ export class TsSchemaGenerator {
             objectFields.push(ts.factory.createPropertyAssignment('array', ts.factory.createTrue()));
         }
 
-        if (hasAttribute(field, '@updatedAt')) {
-            objectFields.push(ts.factory.createPropertyAssignment('updatedAt', ts.factory.createTrue()));
+        const updatedAtAttrib = getAttribute(field, '@updatedAt') as DataFieldAttribute | undefined;
+        if (updatedAtAttrib) {
+            const ignoreArg = updatedAtAttrib.args.find(arg => arg.$resolvedParam?.name === 'ignore');
+            objectFields.push(ts.factory.createPropertyAssignment('updatedAt',
+                ignoreArg
+                    ? this.createUpdatedAtObject(ignoreArg)
+                    : ts.factory.createTrue()
+            ));
         }
 
         if (hasAttribute(field, '@omit')) {

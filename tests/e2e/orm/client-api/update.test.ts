@@ -115,6 +115,30 @@ describe('Client update tests', () => {
             ).resolves.toMatchObject({ id: 'user2' });
         });
 
+        it('works with update with unchanged data or no data', async () => {
+            const user = await createUser(client, 'u1@test.com');
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {
+                        email: user.email,
+                        // force a no-op update
+                        updatedAt: user.updatedAt,
+                    },
+                }),
+            ).resolves.toEqual(user);
+
+            await expect(
+                client.user.update({
+                    where: { id: user.id },
+                    data: {},
+                }),
+            ).resolves.toEqual(user);
+
+            const plain = await client.plain.create({ data: { value: 42 } });
+            await expect(client.plain.update({ where: { id: plain.id }, data: { value: 42 } })).resolves.toEqual(plain);
+        });
+
         it('does not update updatedAt if no other scalar fields are updated', async () => {
             const user = await createUser(client, 'u1@test.com');
             const originalUpdatedAt = user.updatedAt;
@@ -128,6 +152,68 @@ describe('Client update tests', () => {
 
             const updatedUser = await client.user.findUnique({ where: { id: user.id } });
             expect(updatedUser?.updatedAt).toEqual(originalUpdatedAt);
+        });
+
+        it('does not update updatedAt if only ignored fields are present', async () => {
+            const user = await createUser(client, 'u1@test.com');
+            const originalUpdatedAt = user.updatedAt;
+
+            await client.user.update({
+                where: {
+                    id: user.id,
+                },
+
+                data: {
+                    createdAt: new Date(),
+                },
+            })
+
+            let updatedUser = await client.user.findUnique({ where: { id: user.id } });
+            expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
+
+            await client.user.update({
+                where: {
+                    id: user.id,
+                },
+
+                data: {
+                    id: 'User2',
+                },
+            })
+
+            updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
+            expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
+
+            // multiple ignored fields
+            await client.user.update({
+                where: {
+                    id: 'User2',
+                },
+
+                data: {
+                    id: 'User3',
+                    createdAt: new Date(),
+                },
+            })
+
+            updatedUser = await client.user.findUnique({ where: { id: 'User3' } });
+            expect(updatedUser?.updatedAt.getTime()).toEqual(originalUpdatedAt.getTime());
+        });
+
+        it('updates updatedAt if any non-ignored fields are present', async () => {
+            const user = await createUser(client, 'u1@test.com');
+            const originalUpdatedAt = user.updatedAt;
+
+            await client.user.update({
+                where: { id: user.id },
+                data: {
+                    id: 'User2',
+                    name: 'User2',
+                },
+            });
+
+            const updatedUser = await client.user.findUnique({ where: { id: 'User2' } });
+            expect(updatedUser?.updatedAt.getTime()).toBeGreaterThan(originalUpdatedAt.getTime());
         });
 
         it('works with numeric incremental update', async () => {
@@ -1050,7 +1136,7 @@ describe('Client update tests', () => {
                         },
                     },
                 }),
-            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
+            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().match(/(constraint)|(duplicate)/i));
             //  transaction fails as a whole
             await expect(client.comment.findUnique({ where: { id: '3' } })).resolves.toMatchObject({
                 content: 'Comment3',

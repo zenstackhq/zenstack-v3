@@ -1,7 +1,7 @@
 import type Decimal from 'decimal.js';
 import type { Expression } from './expression';
 
-export type DataSourceProviderType = 'sqlite' | 'postgresql';
+export type DataSourceProviderType = 'sqlite' | 'postgresql' | 'mysql';
 
 export type DataSourceProvider = {
     type: DataSourceProviderType;
@@ -59,6 +59,10 @@ export type RelationInfo = {
     onUpdate?: CascadeAction;
 };
 
+export type UpdatedAtInfo = {
+    ignore?: readonly string[];
+};
+
 export type FieldDef = {
     name: string;
     type: string;
@@ -66,7 +70,7 @@ export type FieldDef = {
     array?: boolean;
     optional?: boolean;
     unique?: boolean;
-    updatedAt?: boolean;
+    updatedAt?: boolean | UpdatedAtInfo;
     attributes?: readonly AttributeApplication[];
     default?: MappedBuiltinType | Expression | readonly unknown[];
     omit?: boolean;
@@ -106,6 +110,7 @@ export type EnumField = {
 };
 
 export type EnumDef = {
+    name: string;
     fields?: Record<string, EnumField>;
     values: Record<string, string>;
     attributes?: readonly AttributeApplication[];
@@ -282,7 +287,7 @@ export type FieldHasDefault<
     Field extends GetModelFields<Schema, Model>,
 > = GetModelField<Schema, Model, Field>['default'] extends object | number | string | boolean
     ? true
-    : GetModelField<Schema, Model, Field>['updatedAt'] extends true
+    : GetModelField<Schema, Model, Field>['updatedAt'] extends (true | UpdatedAtInfo)
       ? true
       : GetModelField<Schema, Model, Field>['relation'] extends { hasDefault: true }
         ? true

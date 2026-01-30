@@ -25,7 +25,9 @@ describe('Regression for issue #1681', () => {
         const user = await db.user.create({ data: {} });
         await expect(authDb.post.createMany({ data: [{ title: 'Post1' }] })).resolves.toMatchObject({ count: 1 });
 
-        const r = await authDb.post.createManyAndReturn({ data: [{ title: 'Post2' }] });
-        expect(r[0].authorId).toBe(user.id);
+        if (db.$schema.provider.type !== 'mysql') {
+            const r = await authDb.post.createManyAndReturn({ data: [{ title: 'Post2' }] });
+            expect(r[0].authorId).toBe(user.id);
+        }
     });
 });

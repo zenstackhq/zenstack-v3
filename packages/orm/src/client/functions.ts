@@ -53,8 +53,11 @@ const textMatch = (
         op = 'like';
     }
 
+    // coalesce to empty string to consistently handle nulls across databases
+    searchExpr = eb.fn.coalesce(searchExpr, sql.lit(''));
+
     // escape special characters in search string
-    const escapedSearch = sql`REPLACE(REPLACE(REPLACE(CAST(${searchExpr} as text), '\\', '\\\\'), '%', '\\%'), '_', '\\_')`;
+    const escapedSearch = sql`REPLACE(REPLACE(REPLACE(${dialect.castText(searchExpr)}, ${sql.val('\\')}, ${sql.val('\\\\')}), ${sql.val('%')}, ${sql.val('\\%')}), ${sql.val('_')}, ${sql.val('\\_')})`;
 
     searchExpr = match(method)
         .with('contains', () => eb.fn('CONCAT', [sql.lit('%'), escapedSearch, sql.lit('%')]))
@@ -62,10 +65,10 @@ const textMatch = (
         .with('endsWith', () => eb.fn('CONCAT', [sql.lit('%'), escapedSearch]))
         .exhaustive();
 
-    return sql<SqlBool>`${fieldExpr} ${sql.raw(op)} ${searchExpr} escape '\\'`;
+    return sql<SqlBool>`${fieldExpr} ${sql.raw(op)} ${searchExpr} escape ${sql.val('\\')}`;
 };
 
-export const has: ZModelFunction<any> = (eb, args) => {
+export const has: ZModelFunction<any> = (_eb, args, context) => {
     const [field, search] = args;
     if (!field) {
         throw new Error('"field" parameter is required');
@@ -73,10 +76,10 @@ export const has: ZModelFunction<any> = (eb, args) => {
     if (!search) {
         throw new Error('"search" parameter is required');
     }
-    return eb(field, '@>', [search]);
+    return context.dialect.buildArrayContains(field, search);
 };
 
-export const hasEvery: ZModelFunction<any> = (eb: ExpressionBuilder<any, any>, args: Expression<any>[]) => {
+export const hasEvery: ZModelFunction<any> = (_eb, args, { dialect }: ZModelFunctionContext<any>) => {
     const [field, search] = args;
     if (!field) {
         throw new Error('"field" parameter is required');
@@ -84,10 +87,10 @@ export const hasEvery: ZModelFunction<any> = (eb: ExpressionBuilder<any, any>, a
     if (!search) {
         throw new Error('"search" parameter is required');
     }
-    return eb(field, '@>', search);
+    return dialect.buildArrayHasEvery(field, search);
 };
 
-export const hasSome: ZModelFunction<any> = (eb, args) => {
+export const hasSome: ZModelFunction<any> = (_eb, args, { dialect }: ZModelFunctionContext<any>) => {
     const [field, search] = args;
     if (!field) {
         throw new Error('"field" parameter is required');
@@ -95,7 +98,7 @@ export const hasSome: ZModelFunction<any> = (eb, args) => {
     if (!search) {
         throw new Error('"search" parameter is required');
     }
-    return eb(field, '&&', search);
+    return dialect.buildArrayHasSome(field, search);
 };
 
 export const isEmpty: ZModelFunction<any> = (eb, args, { dialect }: ZModelFunctionContext<any>) => {

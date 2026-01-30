@@ -52,7 +52,14 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
             subQuery = this.dialect.buildSkipTake(subQuery, skip, take);
 
             // orderBy
-            subQuery = this.dialect.buildOrderBy(subQuery, this.model, this.model, parsedArgs.orderBy, negateOrderBy);
+            subQuery = this.dialect.buildOrderBy(
+                subQuery,
+                this.model,
+                this.model,
+                parsedArgs.orderBy,
+                negateOrderBy,
+                take,
+            );
 
             return subQuery.as('$sub');
         });
@@ -62,18 +69,18 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
             switch (key) {
                 case '_count': {
                     if (value === true) {
-                        query = query.select((eb) => eb.cast(eb.fn.countAll(), 'integer').as('_count'));
+                        query = query.select((eb) => this.dialect.castInt(eb.fn.countAll()).as('_count'));
                     } else {
                         Object.entries(value).forEach(([field, val]) => {
                             if (val === true) {
                                 if (field === '_all') {
                                     query = query.select((eb) =>
-                                        eb.cast(eb.fn.countAll(), 'integer').as(`_count._all`),
+                                        this.dialect.castInt(eb.fn.countAll()).as(`_count._all`),
                                     );
                                 } else {
                                     query = query.select((eb) =>
-                                        eb
-                                            .cast(eb.fn.count(eb.ref(`$sub.${field}` as any)), 'integer')
+                                        this.dialect
+                                            .castInt(eb.fn.count(eb.ref(`$sub.${field}`)))
                                             .as(`${key}.${field}`),
                                     );
                                 }
@@ -96,7 +103,7 @@ export class AggregateOperationHandler<Schema extends SchemaDef> extends BaseOpe
                                     .with('_max', () => eb.fn.max)
                                     .with('_min', () => eb.fn.min)
                                     .exhaustive();
-                                return fn(eb.ref(`$sub.${field}` as any)).as(`${key}.${field}`);
+                                return fn(eb.ref(`$sub.${field}`)).as(`${key}.${field}`);
                             });
                         }
                     });

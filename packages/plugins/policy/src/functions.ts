@@ -94,9 +94,14 @@ export const check: ZModelFunction<any> = (
 
     // build the final nested select that evaluates the policy condition
     const result = eb
-        .selectFrom(relationModel)
-        .where(joinCondition)
-        .select(new ExpressionWrapper(policyCondition).as('$condition'));
+        .selectFrom(
+            eb
+                .selectFrom(relationModel)
+                .where(joinCondition)
+                .select(new ExpressionWrapper(policyCondition).as('$condition'))
+                .as('$sub'),
+        )
+        .selectAll();
 
     return result;
 };

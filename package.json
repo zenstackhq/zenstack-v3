@@ -1,6 +1,6 @@
 {
     "name": "zenstack-v3",
-    "version": "3.2.1",
+    "version": "3.3.0",
     "description": "ZenStack",
     "packageManager": "pnpm@10.23.0",
     "type": "module",
@@ -9,8 +9,9 @@
         "watch": "turbo run watch build",
         "lint": "turbo run lint",
         "test": "turbo run test",
-        "test:all": "pnpm run test:sqlite && pnpm run test:pg",
+        "test:all": "pnpm run test:sqlite && pnpm run test:pg && pnpm run test:mysql",
         "test:pg": "TEST_DB_PROVIDER=postgresql turbo run test",
+        "test:mysql": "TEST_DB_PROVIDER=mysql turbo run test",
         "test:sqlite": "TEST_DB_PROVIDER=sqlite turbo run test",
         "test:coverage": "vitest run --coverage",
         "format": "prettier --write \"**/*.{ts,tsx,md}\"",
@@ -19,6 +20,7 @@
         "bump-patch": "gh workflow run .github/workflows/bump-version.yml --ref dev -f version_type=patch",
         "bump-minor": "gh workflow run .github/workflows/bump-version.yml --ref dev -f version_type=minor",
         "publish-all": "pnpm --filter \"./packages/**\" -r publish --access public",
+        "publish-canary": "pnpm --filter \"./packages/**\" -r publish --access public --tag canary --no-git-checks",
         "publish-preview": "pnpm --filter \"./packages/**\" -r publish --force --registry https://preview.registry.zenstack.dev/",
         "unpublish-preview": "pnpm --filter \"./packages/**\" -r --shell-mode exec -- npm unpublish -f --registry https://preview.registry.zenstack.dev/ \"\\$PNPM_PACKAGE_NAME\""
     },

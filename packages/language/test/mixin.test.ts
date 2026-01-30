@@ -1,6 +1,12 @@
+import { invariant } from '@zenstackhq/common-helpers';
+import fs from 'node:fs';
+import path from 'node:path';
+import tmp from 'tmp';
 import { describe, expect, it } from 'vitest';
-import { loadSchema, loadSchemaWithError } from './utils';
+import { loadDocument } from '../src';
 import { DataModel, TypeDef } from '../src/ast';
+import { getAllFields } from '../src/utils';
+import { loadSchema, loadSchemaWithError } from './utils';
 
 describe('Mixin Tests', () => {
     it('supports model mixing types to Model', async () => {
@@ -136,4 +142,95 @@ describe('Mixin Tests', () => {
             'Type field cannot be a relation',
         );
     });
+
+    it('supports mixin fields from imported file', async () => {
+        const { name } = tmp.dirSync();
+
+        fs.writeFileSync(
+            path.join(name, 'base.zmodel'),
+            `
+type Timestamped {
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+            `,
+        );
+
+        fs.writeFileSync(
+            path.join(name, 'main.zmodel'),
+            `
+import './base'
+
+datasource db {
+    provider = 'sqlite'
+    url = 'file:./dev.db'
+}
+
+model Post with Timestamped {
+    id String @id
+    title String
+}
+            `,
+        );
+
+        const model = await expectLoaded(path.join(name, 'main.zmodel'));
+        const post = model.declarations.find((d) => d.name === 'Post') as DataModel;
+        expect(post.mixins[0].ref?.name).toBe('Timestamped');
+
+        // Verify fields from imported mixin are accessible
+        const allFields = getAllFields(post);
+        expect(allFields.map((f) => f.name)).toContain('createdAt');
+        expect(allFields.map((f) => f.name)).toContain('updatedAt');
+    });
+
+    it('can reference imported mixin fields in policy rules', async () => {
+        const { name } = tmp.dirSync();
+
+        fs.writeFileSync(
+            path.join(name, 'base.zmodel'),
+            `
+type Owned {
+    ownerId String
+}
+            `,
+        );
+
+        fs.writeFileSync(
+            path.join(name, 'main.zmodel'),
+            `
+import './base'
+
+datasource db {
+    provider = 'sqlite'
+    url = 'file:./dev.db'
+}
+
+model User {
+    id String @id
+    @@auth()
+}
+
+model Post with Owned {
+    id String @id
+
+    @@allow('update', auth().id == ownerId)
+}
+            `,
+        );
+
+        // If this loads without "Could not resolve reference" error, the fix works
+        const model = await expectLoaded(path.join(name, 'main.zmodel'));
+        expect(model).toBeDefined();
+    });
+
+    async function expectLoaded(file: string) {
+        const pluginDocs = [path.resolve(__dirname, '../../plugins/policy/plugin.zmodel')];
+        const result = await loadDocument(file, pluginDocs);
+        if (!result.success) {
+            console.error('Errors:', result.errors);
+            throw new Error(`Failed to load document from ${file}`);
+        }
+        invariant(result.success);
+        return result.model;
+    }
 });

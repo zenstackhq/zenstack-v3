@@ -6,10 +6,12 @@ import {
     type BaseCrudDialect,
     type ClientContract,
     type CRUD_EXT,
+    type ZModelFunction,
 } from '@zenstackhq/orm';
 import type {
     BinaryExpression,
     BinaryOperator,
+    BindingExpression,
     BuiltinType,
     FieldDef,
     GetModels,
@@ -30,6 +32,7 @@ import {
     BinaryOperationNode,
     ColumnNode,
     expressionBuilder,
+    ExpressionWrapper,
     FromNode,
     FunctionNode,
     IdentifierNode,
@@ -41,7 +44,6 @@ import {
     ValueListNode,
     ValueNode,
     WhereNode,
-    type ExpressionBuilder,
     type OperandExpression,
     type OperationNode,
 } from 'kysely';
@@ -57,6 +59,8 @@ import {
     logicalNot,
     trueNode,
 } from './utils';
+
+type BindingScope = Record<string, { type: string; alias: string; value?: any }>;
 
 /**
  * Context for transforming a policy expression
@@ -93,6 +97,11 @@ export type ExpressionTransformerContext = {
     contextValue?: Record<string, any>;
 
     /**
+     * Additional named collection predicate bindings available during transformation
+     */
+    bindingScope?: BindingScope;
+
+    /**
      * The model or type name that `this` keyword refers to
      */
     thisType: string;
@@ -118,6 +127,7 @@ function expr(kind: Expression['kind']) {
 
 export class ExpressionTransformer<Schema extends SchemaDef> {
     private readonly dialect: BaseCrudDialect<Schema>;
+    private readonly eb = expressionBuilder<any, any>();
 
     constructor(private readonly client: ClientContract<Schema>) {
         this.dialect = getCrudDialect(this.schema, this.clientOptions);
@@ -147,7 +157,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         if (!handler) {
             throw new Error(`Unsupported expression kind: ${expression.kind}`);
         }
-        return handler.value.call(this, expression, context);
+        const result = handler.value.call(this, expression, context);
+        invariant('kind' in result, `expression handler must return an OperationNode: transforming ${expression.kind}`);
+        return result;
     }
 
     @expr('literal')
@@ -162,7 +174,12 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
     @expr('array')
     // @ts-expect-error
     private _array(expr: ArrayExpression, context: ExpressionTransformerContext) {
-        return ValueListNode.create(expr.items.map((item) => this.transform(item, context)));
+        return this.dialect
+            .buildArrayValue(
+                expr.items.map((item) => new ExpressionWrapper(this.transform(item, context))),
+                expr.type,
+            )
+            .toOperationNode();
     }
 
     @expr('field')
@@ -310,7 +327,11 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
             // LHS of the expression is evaluated as a value
             const evaluator = new ExpressionEvaluator();
-            const receiver = evaluator.evaluate(expr.left, { thisValue: context.contextValue, auth: this.auth });
+            const receiver = evaluator.evaluate(expr.left, {
+                thisValue: context.contextValue,
+                auth: this.auth,
+                bindingScope: this.getEvaluationBindingScope(context.bindingScope),
+            });
 
             // get LHS's type
             const baseType = this.isAuthMember(expr.left) ? this.authType : context.modelOrType;
@@ -334,21 +355,38 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             newContextModel = fieldDef.type;
         } else {
             invariant(
-                ExpressionUtils.isMember(expr.left) && ExpressionUtils.isField(expr.left.receiver),
+                ExpressionUtils.isMember(expr.left) &&
+                    (ExpressionUtils.isField(expr.left.receiver) || ExpressionUtils.isBinding(expr.left.receiver)),
                 'left operand must be member access with field receiver',
             );
-            const fieldDef = QueryUtils.requireField(this.schema, context.modelOrType, expr.left.receiver.field);
-            newContextModel = fieldDef.type;
+            if (ExpressionUtils.isField(expr.left.receiver)) {
+                // collection is a field access, context model is the field's type
+                const fieldDef = QueryUtils.requireField(this.schema, context.modelOrType, expr.left.receiver.field);
+                newContextModel = fieldDef.type;
+            } else {
+                // collection is a binding reference, get type from binding scope
+                const binding = this.requireBindingScope(expr.left.receiver, context);
+                newContextModel = binding.type;
+            }
+
             for (const member of expr.left.members) {
                 const memberDef = QueryUtils.requireField(this.schema, newContextModel, member);
                 newContextModel = memberDef.type;
             }
         }
 
+        const bindingScope = expr.binding
+            ? {
+                  ...(context.bindingScope ?? {}),
+                  [expr.binding]: { type: newContextModel, alias: newContextModel },
+              }
+            : context.bindingScope;
+
         let predicateFilter = this.transform(expr.right, {
             ...context,
             modelOrType: newContextModel,
             alias: undefined,
+            bindingScope: bindingScope,
         });
 
         if (expr.op === '!') {
@@ -391,6 +429,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             const value = new ExpressionEvaluator().evaluate(expr, {
                 auth: this.auth,
                 thisValue: context.contextValue,
+                bindingScope: this.getEvaluationBindingScope(context.bindingScope),
             });
             return this.transformValue(value, 'Boolean');
         } else {
@@ -402,15 +441,27 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             // e.g.: `auth().profiles[age == this.age]`, each `auth().profiles` element (which is a value)
             // is used to build an expression for the RHS `age == this.age`
             // the transformation happens recursively for nested collection predicates
-            const components = receiver.map((item) =>
-                this.transform(expr.right, {
+            const components = receiver.map((item) => {
+                const bindingScope = expr.binding
+                    ? {
+                          ...(context.bindingScope ?? {}),
+                          [expr.binding]: {
+                              type: context.modelOrType,
+                              alias: context.thisAlias ?? context.modelOrType,
+                              value: item,
+                          },
+                      }
+                    : context.bindingScope;
+
+                return this.transform(expr.right, {
                     operation: context.operation,
                     thisType: context.thisType,
                     thisAlias: context.thisAlias,
                     modelOrType: context.modelOrType,
                     contextValue: item,
-                }),
-            );
+                    bindingScope: bindingScope,
+                });
+            });
 
             // compose the components based on the operator
             return (
@@ -496,15 +547,22 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
     }
 
-    private transformValue(value: unknown, type: BuiltinType) {
+    private transformValue(value: unknown, type: BuiltinType): OperationNode {
         if (value === true) {
             return trueNode(this.dialect);
         } else if (value === false) {
             return falseNode(this.dialect);
+        } else if (Array.isArray(value)) {
+            return this.dialect
+                .buildArrayValue(
+                    value.map((v) => new ExpressionWrapper(this.transformValue(v, type))),
+                    type,
+                )
+                .toOperationNode();
         } else {
-            const transformed = this.dialect.transformPrimitive(value, type, false) ?? null;
-            if (!Array.isArray(transformed)) {
-                // simple primitives can be immediate values
+            const transformed = this.dialect.transformInput(value, type, false) ?? null;
+            if (typeof transformed !== 'string') {
+                // simple non-string primitives can be immediate values
                 return ValueNode.createImmediate(transformed);
             } else {
                 return ValueNode.create(transformed);
@@ -539,10 +597,9 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         if (!func) {
             throw createUnsupportedError(`Function not implemented: ${expr.function}`);
         }
-        const eb = expressionBuilder<any, any>();
         return func(
-            eb,
-            (expr.args ?? []).map((arg) => this.transformCallArg(eb, arg, context)),
+            this.eb,
+            (expr.args ?? []).map((arg) => this.transformCallArg(arg, context)),
             {
                 client: this.client,
                 dialect: this.dialect,
@@ -560,7 +617,7 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
             // check plugins
             for (const plugin of this.clientOptions.plugins ?? []) {
                 if (plugin.functions?.[functionName]) {
-                    func = plugin.functions[functionName];
+                    func = plugin.functions[functionName] as unknown as ZModelFunction<Schema>;
                     break;
                 }
             }
@@ -568,38 +625,26 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         return func;
     }
 
-    private transformCallArg(
-        eb: ExpressionBuilder<any, any>,
-        arg: Expression,
-        context: ExpressionTransformerContext,
-    ): OperandExpression<any> {
-        if (ExpressionUtils.isLiteral(arg)) {
-            return eb.val(arg.value);
-        }
-
+    private transformCallArg(arg: Expression, context: ExpressionTransformerContext): OperandExpression<any> {
         if (ExpressionUtils.isField(arg)) {
-            return eb.ref(arg.field);
+            // field references are passed as-is, without translating to joins, etc.
+            return this.eb.ref(arg.field);
+        } else {
+            return new ExpressionWrapper(this.transform(arg, context));
         }
-
-        if (ExpressionUtils.isCall(arg)) {
-            return this.transformCall(arg, context);
-        }
-
-        if (this.isAuthMember(arg)) {
-            const valNode = this.valueMemberAccess(this.auth, arg as MemberExpression, this.authType);
-            return valNode ? eb.val(valNode.value) : eb.val(null);
-        }
-
-        // TODO
-        // if (Expression.isMember(arg)) {
-        // }
-
-        throw createUnsupportedError(`Unsupported argument expression: ${arg.kind}`);
     }
 
     @expr('member')
     // @ts-ignore
     private _member(expr: MemberExpression, context: ExpressionTransformerContext) {
+        if (ExpressionUtils.isBinding(expr.receiver)) {
+            // if the binding has a plain value in the scope, evaluate directly
+            const scope = this.requireBindingScope(expr.receiver, context);
+            if (scope.value !== undefined) {
+                return this.valueMemberAccess(scope.value, expr, scope.type);
+            }
+        }
+
         // `auth()` member access
         if (this.isAuthCall(expr.receiver)) {
             return this.valueMemberAccess(this.auth, expr, this.authType);
@@ -615,12 +660,15 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         invariant(
-            ExpressionUtils.isField(expr.receiver) || ExpressionUtils.isThis(expr.receiver),
-            'expect receiver to be field expression or "this"',
+            ExpressionUtils.isField(expr.receiver) ||
+                ExpressionUtils.isThis(expr.receiver) ||
+                ExpressionUtils.isBinding(expr.receiver),
+            'expect receiver to be field expression, collection predicate binding, or "this"',
         );
 
         let members = expr.members;
         let receiver: OperationNode;
+        let startType: string | undefined;
         const { memberFilter, memberSelect, ...restContext } = context;
 
         if (ExpressionUtils.isThis(expr.receiver)) {
@@ -638,6 +686,32 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
                 const firstMemberFieldDef = QueryUtils.requireField(this.schema, context.thisType, expr.members[0]!);
                 receiver = this.transformRelationAccess(expr.members[0]!, firstMemberFieldDef.type, restContext);
                 members = expr.members.slice(1);
+                // startType should be the type of the relation access
+                startType = firstMemberFieldDef.type;
+            }
+        } else if (ExpressionUtils.isBinding(expr.receiver)) {
+            if (expr.members.length === 1) {
+                const bindingScope = this.requireBindingScope(expr.receiver, context);
+                // `binding.relation` case, equivalent to field access
+                return this._field(ExpressionUtils.field(expr.members[0]!), {
+                    ...context,
+                    modelOrType: bindingScope.type,
+                    alias: bindingScope.alias,
+                    thisType: context.thisType,
+                    contextValue: undefined,
+                });
+            } else {
+                // transform the first segment into a relation access, then continue with the rest of the members
+                const bindingScope = this.requireBindingScope(expr.receiver, context);
+                const firstMemberFieldDef = QueryUtils.requireField(this.schema, bindingScope.type, expr.members[0]!);
+                receiver = this.transformRelationAccess(expr.members[0]!, firstMemberFieldDef.type, {
+                    ...restContext,
+                    modelOrType: bindingScope.type,
+                    alias: bindingScope.alias,
+                });
+                members = expr.members.slice(1);
+                // startType should be the type of the relation access
+                startType = firstMemberFieldDef.type;
             }
         } else {
             receiver = this.transform(expr.receiver, restContext);
@@ -645,13 +719,14 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
 
         invariant(SelectQueryNode.is(receiver), 'expected receiver to be select query');
 
-        let startType: string;
-        if (ExpressionUtils.isField(expr.receiver)) {
-            const receiverField = QueryUtils.requireField(this.schema, context.modelOrType, expr.receiver.field);
-            startType = receiverField.type;
-        } else {
-            // "this." case
-            startType = context.thisType;
+        if (startType === undefined) {
+            if (ExpressionUtils.isField(expr.receiver)) {
+                const receiverField = QueryUtils.requireField(this.schema, context.modelOrType, expr.receiver.field);
+                startType = receiverField.type;
+            } else {
+                // "this." case - already handled above if members were sliced
+                startType = context.thisType;
+            }
         }
 
         // traverse forward to collect member types
@@ -705,7 +780,13 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         };
     }
 
-    private valueMemberAccess(receiver: any, expr: MemberExpression, receiverType: string) {
+    private requireBindingScope(expr: BindingExpression, context: ExpressionTransformerContext) {
+        const binding = context.bindingScope?.[expr.name];
+        invariant(binding, `binding not found: ${expr.name}`);
+        return binding;
+    }
+
+    private valueMemberAccess(receiver: any, expr: MemberExpression, receiverType: string): OperationNode {
         if (!receiver) {
             return ValueNode.createImmediate(null);
         }
@@ -831,6 +912,22 @@ export class ExpressionTransformer<Schema extends SchemaDef> {
         }
 
         return this.buildDelegateBaseFieldSelect(context.modelOrType, tableName, column, fieldDef.originModel);
+    }
+
+    // convert transformer's binding scope to equivalent expression evaluator binding scope
+    private getEvaluationBindingScope(scope?: BindingScope) {
+        if (!scope) {
+            return undefined;
+        }
+
+        const result: Record<string, any> = {};
+        for (const [key, value] of Object.entries(scope)) {
+            if (value.value !== undefined) {
+                result[key] = value.value;
+            }
+        }
+
+        return Object.keys(result).length > 0 ? result : undefined;
     }
 
     private buildDelegateBaseFieldSelect(model: string, modelAlias: string, field: string, baseModel: string) {

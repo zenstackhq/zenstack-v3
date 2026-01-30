@@ -1,6 +1,6 @@
 {
     "name": "@zenstackhq/orm",
-    "version": "3.2.1",
+    "version": "3.3.0",
     "description": "ZenStack ORM",
     "type": "module",
     "scripts": {
@@ -56,6 +56,16 @@
                 "default": "./dist/dialects/postgres.cjs"
             }
         },
+        "./dialects/mysql": {
+            "import": {
+                "types": "./dist/dialects/mysql.d.ts",
+                "default": "./dist/dialects/mysql.js"
+            },
+            "require": {
+                "types": "./dist/dialects/mysql.d.cts",
+                "default": "./dist/dialects/mysql.cjs"
+            }
+        },
         "./dialects/sql.js": {
             "import": {
                 "types": "./dist/dialects/sql.js.d.ts",
@@ -100,6 +110,7 @@
     "peerDependencies": {
         "better-sqlite3": "catalog:",
         "pg": "catalog:",
+        "mysql2": "catalog:",
         "sql.js": "catalog:",
         "zod": "catalog:"
     },
@@ -108,6 +119,9 @@
             "optional": true
         },
         "pg": {
+            "optional": true
+        },
+        "mysql2": {
             "optional": true
         },
         "sql.js": {

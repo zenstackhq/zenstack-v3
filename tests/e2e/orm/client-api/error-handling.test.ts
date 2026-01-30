@@ -1,5 +1,6 @@
 import { ORMError, ORMErrorReason, RejectedByPolicyReason } from '@zenstackhq/orm';
 import { createPolicyTestClient, createTestClient } from '@zenstackhq/testtools';
+import { match } from 'ts-pattern';
 import { describe, expect, it } from 'vitest';
 
 describe('Error handling tests', () => {
@@ -39,14 +40,20 @@ model User {
         await db.user.create({ data: { email: 'user1@example.com' } });
 
         const provider = db.$schema.provider.type;
-        const expectedCode = provider === 'sqlite' ? 'SQLITE_CONSTRAINT_UNIQUE' : '23505';
+        const expectedCode = match(provider)
+            .with('sqlite', () => 'SQLITE_CONSTRAINT_UNIQUE')
+            .with('postgresql', () => '23505')
+            .with('mysql', () => 'ER_DUP_ENTRY')
+            .otherwise(() => {
+                throw new Error(`Unsupported provider: ${provider}`);
+            });
 
         await expect(db.user.create({ data: { email: 'user1@example.com' } })).rejects.toSatisfy(
             (e) =>
                 e instanceof ORMError &&
                 e.reason === ORMErrorReason.DB_QUERY_ERROR &&
                 e.dbErrorCode === expectedCode &&
-                !!e.dbErrorMessage?.includes('constraint'),
+                !!e.dbErrorMessage?.match(/(constraint)|(duplicate)/i),
         );
     });
 });

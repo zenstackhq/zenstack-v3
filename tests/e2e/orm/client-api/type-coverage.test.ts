@@ -35,6 +35,7 @@ describe('Zmodel type coverage tests', () => {
                 Json Json
             }
             `,
+                { usePrismaPush: true },
             );
 
             await db.foo.create({ data });
@@ -80,7 +81,7 @@ describe('Zmodel type coverage tests', () => {
     });
 
     it('supports all types - array', async () => {
-        if (getTestDbProvider() === 'sqlite') {
+        if (getTestDbProvider() !== 'postgresql') {
             return;
         }
 

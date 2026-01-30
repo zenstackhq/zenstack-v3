@@ -13,6 +13,7 @@ import {
     InvocationExpr,
     isArrayExpr,
     isBinaryExpr,
+    isCollectionPredicateBinding,
     isDataField,
     isDataModel,
     isDataSource,
@@ -521,6 +522,14 @@ export class TsSchemaGenerator {
         );
     }
 
+    private createUpdatedAtObject(ignoreArg: AttributeArg) {
+        return ts.factory.createObjectLiteralExpression([
+            ts.factory.createPropertyAssignment('ignore', ts.factory.createArrayLiteralExpression(
+                (ignoreArg.value as ArrayExpr).items.map((item) => ts.factory.createStringLiteral((item as ReferenceExpr).target.$refText))
+            ))
+        ]);
+    }
+
     private mapFieldTypeToTSType(type: DataFieldType) {
         let result = match(type.type)
             .with('String', () => 'string')
@@ -563,8 +572,14 @@ export class TsSchemaGenerator {
             objectFields.push(ts.factory.createPropertyAssignment('array', ts.factory.createTrue()));
         }
 
-        if (hasAttribute(field, '@updatedAt')) {
-            objectFields.push(ts.factory.createPropertyAssignment('updatedAt', ts.factory.createTrue()));
+        const updatedAtAttrib = getAttribute(field, '@updatedAt') as DataFieldAttribute | undefined;
+        if (updatedAtAttrib) {
+            const ignoreArg = updatedAtAttrib.args.find(arg => arg.$resolvedParam?.name === 'ignore');
+            objectFields.push(ts.factory.createPropertyAssignment('updatedAt',
+                ignoreArg
+                    ? this.createUpdatedAtObject(ignoreArg)
+                    : ts.factory.createTrue()
+            ));
         }
 
         if (hasAttribute(field, '@omit')) {
@@ -1029,6 +1044,8 @@ export class TsSchemaGenerator {
     private createEnumObject(e: Enum) {
         return ts.factory.createObjectLiteralExpression(
             [
+                ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(e.name)),
+
                 ts.factory.createPropertyAssignment(
                     'values',
                     ts.factory.createObjectLiteralExpression(
@@ -1257,11 +1274,17 @@ export class TsSchemaGenerator {
     }
 
     private createBinaryExpression(expr: BinaryExpr) {
-        return this.createExpressionUtilsCall('binary', [
+        const args = [
             this.createExpression(expr.left),
             this.createLiteralNode(expr.operator),
             this.createExpression(expr.right),
-        ]);
+        ];
+
+        if (expr.binding) {
+            args.push(this.createLiteralNode(expr.binding.name));
+        }
+
+        return this.createExpressionUtilsCall('binary', args);
     }
 
     private createUnaryExpression(expr: UnaryExpr) {
@@ -1272,19 +1295,28 @@ export class TsSchemaGenerator {
     }
 
     private createArrayExpression(expr: ArrayExpr): any {
+        const arrayResolved = expr.$resolvedType?.decl;
+        const arrayType = typeof arrayResolved === 'string' ? arrayResolved : arrayResolved?.name;
+        invariant(arrayType, 'Array type must be resolved to a string or declaration');
         return this.createExpressionUtilsCall('array', [
+            this.createLiteralNode(arrayType),
             ts.factory.createArrayLiteralExpression(expr.items.map((item) => this.createExpression(item))),
         ]);
     }
 
     private createRefExpression(expr: ReferenceExpr): any {
-        if (isDataField(expr.target.ref)) {
-            return this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]);
-        } else if (isEnumField(expr.target.ref)) {
-            return this.createLiteralExpression('StringLiteral', expr.target.$refText);
-        } else {
-            throw new Error(`Unsupported reference type: ${expr.target.$refText}`);
-        }
+        const target = expr.target.ref;
+        return match(target)
+            .when(isDataField, () =>
+                this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]),
+            )
+            .when(isEnumField, () => this.createLiteralExpression('StringLiteral', expr.target.$refText))
+            .when(isCollectionPredicateBinding, () =>
+                this.createExpressionUtilsCall('binding', [this.createLiteralNode(expr.target.$refText)]),
+            )
+            .otherwise(() => {
+                throw Error(`Unsupported reference type: ${expr.target.$refText}`);
+            });
     }
 
     private createCallExpression(expr: InvocationExpr) {

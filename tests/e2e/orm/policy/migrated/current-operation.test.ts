@@ -99,7 +99,13 @@ describe('currentOperation tests', () => {
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+
+        if (db.$schema.provider.type !== 'mysql') {
+            await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+        } else {
+            // mysql string comparison is case insensitive by default
+            await expect(db.post.create({ data: { id: 1 } })).toResolveTruthy();
+        }
     });
 
     it('works with uncapitalization', async () => {

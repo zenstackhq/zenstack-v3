@@ -66,7 +66,7 @@ ConfigArrayExpr:
 ConfigExpr:
     LiteralExpr | InvocationExpr | ConfigArrayExpr;
 
-type ReferenceTarget = FunctionParam | DataField | EnumField;
+type ReferenceTarget = FunctionParam | DataField | EnumField | CollectionPredicateBinding;
 
 ThisExpr:
     value='this';
@@ -109,12 +109,16 @@ UnaryExpr:
 // binary operator precedence follow Javascript's rules:
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence#table
 
+// TODO: promote CollectionPredicateExpr to a first-class expression type
 CollectionPredicateExpr infers Expression:
     MemberAccessExpr (
         {infer BinaryExpr.left=current}
         operator=('?'|'!'|'^')
-        '[' right=Expression ']'
+        '[' (binding=CollectionPredicateBinding ',')? right=Expression ']'
     )*;
+
+CollectionPredicateBinding:
+    name=RegularID;
 
 InExpr infers Expression:
     CollectionPredicateExpr (

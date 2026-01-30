@@ -42,7 +42,7 @@ describe('Regression for issue #1894', () => {
             },
         );
 
-        await db.a.create({ data: { id: 0 } });
-        await expect(db.c.create({ data: { a: { connect: { id: 0 } } } })).toResolveTruthy();
+        const r = await db.a.create({ data: { id: 0 } });
+        await expect(db.c.create({ data: { a: { connect: { id: r.id } } } })).toResolveTruthy();
     });
 });

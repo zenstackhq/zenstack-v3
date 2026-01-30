@@ -23,9 +23,12 @@ model Foo {
             await expect(
                 db.$qb.updateTable('Foo').set({ x: 1 }).where('id', '=', 1).executeTakeFirst(),
             ).resolves.toMatchObject({ numUpdatedRows: 0n });
-            await expect(
-                db.$qb.updateTable('Foo').set({ x: 3 }).where('id', '=', 2).returningAll().execute(),
-            ).resolves.toMatchObject([{ id: 2, x: 3 }]);
+
+            if (db.$schema.provider.type !== 'mysql') {
+                await expect(
+                    db.$qb.updateTable('Foo').set({ x: 3 }).where('id', '=', 2).returningAll().execute(),
+                ).resolves.toMatchObject([{ id: 2, x: 3 }]);
+            }
         });
 
         it('works with this scalar member check', async () => {
@@ -758,7 +761,7 @@ model Post {
                         },
                     },
                 }),
-            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
+            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().match(/(constraint)|(duplicate)/));
             await db.$unuseAll().post.update({ where: { id: 1 }, data: { title: 'Bar Post' } });
             // can update
             await expect(
@@ -1124,7 +1127,7 @@ model Foo {
             // can't update, but create violates unique constraint
             await expect(
                 db.foo.upsert({ where: { id: 1 }, create: { id: 1, x: 1 }, update: { x: 1 } }),
-            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
+            ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().match(/(constraint)|(duplicate)/));
             await db.$unuseAll().foo.update({ where: { id: 1 }, data: { x: 2 } });
             // can update now
             await expect(
@@ -1226,38 +1229,51 @@ model Foo {
                 ],
             });
 
+            const mysql = db.$schema.provider.type === 'mysql';
+
             // #1 not updatable
-            await expect(
-                db.$qb
-                    .insertInto('Foo')
-                    .values({ id: 1, x: 5 })
-                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 5 }))
-                    .executeTakeFirst(),
-            ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 0n });
+            const r = await db.$qb
+                .insertInto('Foo')
+                .values({ id: 1, x: 5 })
+                .$if(mysql, (qb) => qb.onDuplicateKeyUpdate({ x: 5 }))
+                .$if(!mysql, (qb) => qb.onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 5 })))
+                .executeTakeFirst();
+
+            if (!mysql) {
+                expect(r).toMatchObject({ numInsertedOrUpdatedRows: 0n });
+            } else {
+                // mysql's on duplicate key update returns rows affected even if no values are changed
+                expect(r).toMatchObject({ numInsertedOrUpdatedRows: 1n });
+            }
+            // verify not updated
+            await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 1 });
+
             await expect(db.foo.count()).resolves.toBe(3);
             await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 1 });
 
-            // with where, #1 not updatable
-            await expect(
-                db.$qb
-                    .insertInto('Foo')
-                    .values({ id: 1, x: 5 })
-                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 5 }).where('Foo.id', '=', 1))
-                    .executeTakeFirst(),
-            ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 0n });
-            await expect(db.foo.count()).resolves.toBe(3);
-            await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 1 });
+            if (!mysql) {
+                // with where, #1 not updatable
+                await expect(
+                    db.$qb
+                        .insertInto('Foo')
+                        .values({ id: 1, x: 5 })
+                        .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 5 }).where('Foo.id', '=', 1))
+                        .executeTakeFirst(),
+                ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 0n });
+                await expect(db.foo.count()).resolves.toBe(3);
+                await expect(db.foo.findUnique({ where: { id: 1 } })).resolves.toMatchObject({ x: 1 });
 
-            // with where, #2 updatable
-            await expect(
-                db.$qb
-                    .insertInto('Foo')
-                    .values({ id: 2, x: 5 })
-                    .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 6 }).where('Foo.id', '=', 2))
-                    .executeTakeFirst(),
-            ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 1n });
-            await expect(db.foo.count()).resolves.toBe(3);
-            await expect(db.foo.findUnique({ where: { id: 2 } })).resolves.toMatchObject({ x: 6 });
+                // with where, #2 updatable
+                await expect(
+                    db.$qb
+                        .insertInto('Foo')
+                        .values({ id: 2, x: 5 })
+                        .onConflict((oc: any) => oc.column('id').doUpdateSet({ x: 6 }).where('Foo.id', '=', 2))
+                        .executeTakeFirst(),
+                ).resolves.toMatchObject({ numInsertedOrUpdatedRows: 1n });
+                await expect(db.foo.count()).resolves.toBe(3);
+                await expect(db.foo.findUnique({ where: { id: 2 } })).resolves.toMatchObject({ x: 6 });
+            }
         });
     });
 });

@@ -78,7 +78,7 @@ export class SchemaType implements SchemaDef {
                     name: "order",
                     type: "Order",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("orderId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("orderId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "pets", fields: ["orderId"], references: ["id"] }
                 },
                 orderId: {
@@ -131,7 +131,7 @@ export class SchemaType implements SchemaDef {
                 user: {
                     name: "user",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "orders", fields: ["userId"], references: ["id"] }
                 },
                 userId: {

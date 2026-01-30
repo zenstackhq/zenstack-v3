@@ -420,6 +420,8 @@ describe('REST server tests', () => {
                 });
 
                 it('toplevel filtering', async () => {
+                    const now = new Date();
+                    const past = new Date(now.getTime() - 1);
                     await client.user.create({
                         data: {
                             myId: 'user1',
@@ -436,7 +438,7 @@ describe('REST server tests', () => {
                             myId: 'user2',
                             email: 'user2@abc.com',
                             posts: {
-                                create: { id: 2, title: 'Post2', viewCount: 1, published: true },
+                                create: { id: 2, title: 'Post2', viewCount: 1, published: true, publishedAt: now },
                             },
                         },
                     });
@@ -523,6 +525,38 @@ describe('REST server tests', () => {
                     });
                     expect(r.body.data).toHaveLength(0);
 
+                    r = await handler({
+                        method: 'get',
+                        path: '/user',
+                        query: { ['filter[email$between]']: ',user1@abc.com' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(1);
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/user',
+                        query: { ['filter[email$between]']: 'user1@abc.com,' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(0);
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/user',
+                        query: { ['filter[email$between]']: ',user2@abc.com' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(2);
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/user',
+                        query: { ['filter[email$between]']: 'user1@abc.com,user2@abc.com' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(2);
+
                     // Int filter
                     r = await handler({
                         method: 'get',
@@ -567,6 +601,58 @@ describe('REST server tests', () => {
                     });
                     expect(r.body.data).toHaveLength(1);
                     expect(r.body.data[0]).toMatchObject({ id: 1 });
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[viewCount$between]']: '1,2' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(1);
+                    expect(r.body.data[0]).toMatchObject({ id: 2 });
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[viewCount$between]']: '2,1' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(0);
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[viewCount$between]']: '0,2' },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(2);
+
+                    // DateTime filter
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[publishedAt$between]']: `${now.toISOString()},${now.toISOString()}` },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(1);
+                    expect(r.body.data[0]).toMatchObject({ id: 2 });
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[publishedAt$between]']: `${past.toISOString()},${now.toISOString()}` },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(1);
+                    expect(r.body.data[0]).toMatchObject({ id: 2 });
+
+                    r = await handler({
+                        method: 'get',
+                        path: '/post',
+                        query: { ['filter[publishedAt$between]']: `${now.toISOString()},${past.toISOString()}` },
+                        client,
+                    });
+                    expect(r.body.data).toHaveLength(0);
 
                     // Boolean filter
                     r = await handler({
@@ -1330,8 +1416,8 @@ describe('REST server tests', () => {
                             email: `user1@abc.com`,
                             posts: {
                                 create: [...Array(10).keys()].map((i) => ({
-                                    id: i,
-                                    title: `Post${i}`,
+                                    id: i + 1,
+                                    title: `Post${i + 1}`,
                                 })),
                             },
                         },
@@ -1392,8 +1478,8 @@ describe('REST server tests', () => {
                             email: `user1@abc.com`,
                             posts: {
                                 create: [...Array(10).keys()].map((i) => ({
-                                    id: i,
-                                    title: `Post${i}`,
+                                    id: i + 1,
+                                    title: `Post${i + 1}`,
                                 })),
                             },
                         },
@@ -3097,6 +3183,7 @@ describe('REST server tests', () => {
     model Post {
         id Int @id @default(autoincrement())
         title String
+        short_title String @unique()
         author User? @relation(fields: [authorId], references: [id])
         authorId Int?
     }
@@ -3109,6 +3196,7 @@ describe('REST server tests', () => {
                 endpoint: 'http://localhost/api',
                 externalIdMapping: {
                     User: 'name_source',
+                    Post: 'short_title',
                 },
             });
             handler = (args) => _handler.handleRequest({ ...args, url: new URL(`http://localhost/${args.path}`) });
@@ -3143,13 +3231,13 @@ describe('REST server tests', () => {
             expect(r.body.data.attributes.name).toBe('User1');
 
             await client.post.create({
-                data: { id: 1, title: 'Title1', authorId: 1 },
+                data: { id: 1, title: 'Title1', short_title: 'post-title-1', authorId: 1 },
             });
 
             // post is exposed using the `id` field
             r = await handler({
                 method: 'get',
-                path: '/post/1',
+                path: '/post/post-title-1',
                 query: { include: 'author' },
                 client,
             });
@@ -3266,7 +3354,8 @@ mutation procedure sum(a: Int, b: Int): Int
                         const b = args?.b as number | undefined;
                         return (a ?? 0) + (b ?? 0);
                     },
-                    sumIds: async ({ args }: ProcCtx<SumIdsArgs>) => (args.ids as number[]).reduce((acc, x) => acc + x, 0),
+                    sumIds: async ({ args }: ProcCtx<SumIdsArgs>) =>
+                        (args.ids as number[]).reduce((acc, x) => acc + x, 0),
                     echoRole: async ({ args }: ProcCtx<EchoRoleArgs>) => args.r,
                     echoOverview: async ({ args }: ProcCtx<EchoOverviewArgs>) => args.o,
                     sum: async ({ args }: ProcCtx<SumArgs>) => args.a + args.b,
@@ -3287,7 +3376,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'get',
                 path: '/$procs/echoDecimal',
-                query: { ...json as object, meta: { serialization: meta } } as any,
+                query: { ...(json as object), meta: { serialization: meta } } as any,
                 client,
             });
 
@@ -3400,7 +3489,7 @@ mutation procedure sum(a: Int, b: Int): Int
             const r = await handler({
                 method: 'post',
                 path: '/$procs/sum',
-                requestBody: { ...json as object, meta: { serialization: meta } } as any,
+                requestBody: { ...(json as object), meta: { serialization: meta } } as any,
                 client,
             });
 

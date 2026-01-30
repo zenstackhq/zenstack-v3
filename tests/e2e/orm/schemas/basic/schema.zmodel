@@ -15,7 +15,7 @@ enum Role {
 type CommonFields {
     id        String   @id @default(cuid())
     createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    updatedAt DateTime @updatedAt(ignore: [id, createdAt])
 }
 
 model User with CommonFields {
@@ -64,3 +64,7 @@ model Foo {
     @@ignore
 }
 
+model Plain {
+    id    Int @id @default(autoincrement())
+    value Int
+}

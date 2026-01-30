@@ -104,9 +104,7 @@ export function typeAssignable(destType: ExpressionType, sourceType: ExpressionT
 /**
  * Maps a ZModel builtin type to expression type
  */
-export function mapBuiltinTypeToExpressionType(
-    type: BuiltinType | ExpressionType,
-): ExpressionType {
+export function mapBuiltinTypeToExpressionType(type: BuiltinType | ExpressionType): ExpressionType {
     switch (type) {
         case 'Any':
         case 'Boolean':
@@ -170,6 +168,7 @@ export function resolved<T extends AstNode>(ref: Reference<T>): T {
 export function getRecursiveBases(
     decl: DataModel | TypeDef,
     includeDelegate = true,
+    documents?: LangiumDocuments,
     seen = new Set<DataModel | TypeDef>(),
 ): (TypeDef | DataModel)[] {
     const result: (TypeDef | DataModel)[] = [];
@@ -179,16 +178,28 @@ export function getRecursiveBases(
     seen.add(decl);
     const bases = [...decl.mixins, ...(isDataModel(decl) && decl.baseModel ? [decl.baseModel] : [])];
     bases.forEach((base) => {
-        // avoid using .ref since this function can be called before linking
-        const baseDecl = decl.$container.declarations.find(
-            (d): d is TypeDef | DataModel => (isTypeDef(d) || isDataModel(d)) && d.name === base.$refText,
-        );
+        let baseDecl: TypeDef | DataModel | undefined;
+
+        if (base.ref && (isTypeDef(base.ref) || isDataModel(base.ref))) {
+            // base is already resolved
+            baseDecl = base.ref;
+        } else {
+            // otherwise, search by name, in all imported documents if provided
+            const declarations = documents
+                ? getAllDeclarationsIncludingImports(documents, decl.$container)
+                : decl.$container.declarations;
+
+            baseDecl = declarations.find(
+                (d): d is TypeDef | DataModel => (isTypeDef(d) || isDataModel(d)) && d.name === base.$refText,
+            );
+        }
+
         if (baseDecl) {
             if (!includeDelegate && isDelegateModel(baseDecl)) {
                 return;
             }
             result.push(baseDecl);
-            result.push(...getRecursiveBases(baseDecl, includeDelegate, seen));
+            result.push(...getRecursiveBases(baseDecl, includeDelegate, documents, seen));
         }
     });
     return result;

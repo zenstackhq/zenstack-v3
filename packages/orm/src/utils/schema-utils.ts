@@ -2,6 +2,7 @@ import { match } from 'ts-pattern';
 import type {
     ArrayExpression,
     BinaryExpression,
+    BindingExpression,
     CallExpression,
     Expression,
     FieldExpression,
@@ -24,6 +25,7 @@ export class ExpressionVisitor {
             .with({ kind: 'binary' }, (e) => this.visitBinary(e))
             .with({ kind: 'unary' }, (e) => this.visitUnary(e))
             .with({ kind: 'call' }, (e) => this.visitCall(e))
+            .with({ kind: 'binding' }, (e) => this.visitBinding(e))
             .with({ kind: 'this' }, (e) => this.visitThis(e))
             .with({ kind: 'null' }, (e) => this.visitNull(e))
             .exhaustive();
@@ -67,6 +69,8 @@ export class ExpressionVisitor {
             }
         }
     }
+
+    protected visitBinding(_e: BindingExpression): VisitResult {}
 
     protected visitThis(_e: ThisExpression): VisitResult {}
 

@@ -31,6 +31,7 @@ import type {
     SchemaDef,
     TypeDefFieldIsArray,
     TypeDefFieldIsOptional,
+    UpdatedAtInfo,
 } from '../schema';
 import type {
     AtLeast,
@@ -215,10 +216,10 @@ export type ModelResult<
                     FieldIsArray<Schema, Model, Key>
                 >;
             } & ('_count' extends keyof I
-                ? I['_count'] extends false | undefined
-                    ? {}
-                    : { _count: SelectCountResult<Schema, Model, I['_count']> }
-                : {})
+                    ? I['_count'] extends false | undefined
+                        ? {}
+                        : { _count: SelectCountResult<Schema, Model, I['_count']> }
+                    : {})
           : Args extends { omit: infer O } & Record<string, unknown>
             ? DefaultModelResult<Schema, Model, O, Options, false, false>
             : DefaultModelResult<Schema, Model, undefined, Options, false, false>,
@@ -449,6 +450,11 @@ type CommonPrimitiveFilter<
      * Checks if the value is greater than or equal to the specified value.
      */
     gte?: DataType;
+
+    /**
+     * Checks if the value is between the specified values (inclusive).
+     */
+    between?: [start: DataType, end: DataType];
 
     /**
      * Builds a negated filter.
@@ -989,7 +995,7 @@ type OptionalFieldsForCreate<Schema extends SchemaDef, Model extends GetModels<S
           ? Key
           : FieldIsArray<Schema, Model, Key> extends true
             ? Key
-            : GetModelField<Schema, Model, Key>['updatedAt'] extends true
+            : GetModelField<Schema, Model, Key>['updatedAt'] extends (true | UpdatedAtInfo)
               ? Key
               : never]: GetModelField<Schema, Model, Key>;
 };
@@ -1074,12 +1080,15 @@ export type FindArgs<
     Collection extends boolean,
     AllowFilter extends boolean = true,
 > = (Collection extends true
-    ? SortAndTakeArgs<Schema, Model> & {
-          /**
-           * Distinct fields
-           */
-          distinct?: OrArray<NonRelationFields<Schema, Model>>;
-      }
+    ? SortAndTakeArgs<Schema, Model> &
+          (ProviderSupportsDistinct<Schema> extends true
+              ? {
+                    /**
+                     * Distinct fields. Only supported by providers that natively support SQL "DISTINCT ON".
+                     */
+                    distinct?: OrArray<NonRelationFields<Schema, Model>>;
+                }
+              : {})
     : {}) &
     (AllowFilter extends true ? FilterArgs<Schema, Model> : {}) &
     SelectIncludeOmit<Schema, Model, Collection>;
@@ -2103,8 +2112,8 @@ type MapType<Schema extends SchemaDef, T extends string> = T extends keyof TypeM
           ? EnumValue<Schema, T>
           : unknown;
 
-// type ProviderSupportsDistinct<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
-//     ? true
-//     : false;
+type ProviderSupportsDistinct<Schema extends SchemaDef> = Schema['provider']['type'] extends 'postgresql'
+    ? true
+    : false;
 
 // #endregion

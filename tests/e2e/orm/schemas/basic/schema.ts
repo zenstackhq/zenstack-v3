@@ -30,8 +30,8 @@ export class SchemaType implements SchemaDef {
                 updatedAt: {
                     name: "updatedAt",
                     type: "DateTime",
-                    updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    updatedAt: { ignore: ["id", "createdAt"] },
+                    attributes: [{ name: "@updatedAt", args: [{ name: "ignore", value: ExpressionUtils.array("String", [ExpressionUtils.field("id"), ExpressionUtils.field("createdAt")]) }] }]
                 },
                 email: {
                     name: "email",
@@ -97,8 +97,8 @@ export class SchemaType implements SchemaDef {
                 updatedAt: {
                     name: "updatedAt",
                     type: "DateTime",
-                    updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    updatedAt: { ignore: ["id", "createdAt"] },
+                    attributes: [{ name: "@updatedAt", args: [{ name: "ignore", value: ExpressionUtils.array("String", [ExpressionUtils.field("id"), ExpressionUtils.field("createdAt")]) }] }]
                 },
                 title: {
                     name: "title",
@@ -118,7 +118,7 @@ export class SchemaType implements SchemaDef {
                 author: {
                     name: "author",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "posts", fields: ["authorId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
                 },
                 authorId: {
@@ -164,8 +164,8 @@ export class SchemaType implements SchemaDef {
                 updatedAt: {
                     name: "updatedAt",
                     type: "DateTime",
-                    updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    updatedAt: { ignore: ["id", "createdAt"] },
+                    attributes: [{ name: "@updatedAt", args: [{ name: "ignore", value: ExpressionUtils.array("String", [ExpressionUtils.field("id"), ExpressionUtils.field("createdAt")]) }] }]
                 },
                 content: {
                     name: "content",
@@ -175,7 +175,7 @@ export class SchemaType implements SchemaDef {
                     name: "post",
                     type: "Post",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("postId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("postId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "comments", fields: ["postId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
                 },
                 postId: {
@@ -211,8 +211,8 @@ export class SchemaType implements SchemaDef {
                 updatedAt: {
                     name: "updatedAt",
                     type: "DateTime",
-                    updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    updatedAt: { ignore: ["id", "createdAt"] },
+                    attributes: [{ name: "@updatedAt", args: [{ name: "ignore", value: ExpressionUtils.array("String", [ExpressionUtils.field("id"), ExpressionUtils.field("createdAt")]) }] }]
                 },
                 bio: {
                     name: "bio",
@@ -227,7 +227,7 @@ export class SchemaType implements SchemaDef {
                     name: "user",
                     type: "User",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }, { name: "onUpdate", value: ExpressionUtils.literal("Cascade") }, { name: "onDelete", value: ExpressionUtils.literal("Cascade") }] }],
                     relation: { opposite: "profile", fields: ["userId"], references: ["id"], onUpdate: "Cascade", onDelete: "Cascade" }
                 },
                 userId: {
@@ -245,6 +245,26 @@ export class SchemaType implements SchemaDef {
             uniqueFields: {
                 id: { type: "String" },
                 userId: { type: "String" }
+            }
+        },
+        Plain: {
+            name: "Plain",
+            fields: {
+                id: {
+                    name: "id",
+                    type: "Int",
+                    id: true,
+                    attributes: [{ name: "@id" }, { name: "@default", args: [{ name: "value", value: ExpressionUtils.call("autoincrement") }] }],
+                    default: ExpressionUtils.call("autoincrement")
+                },
+                value: {
+                    name: "value",
+                    type: "Int"
+                }
+            },
+            idFields: ["id"],
+            uniqueFields: {
+                id: { type: "Int" }
             }
         }
     } as const;
@@ -267,14 +287,15 @@ export class SchemaType implements SchemaDef {
                 updatedAt: {
                     name: "updatedAt",
                     type: "DateTime",
-                    updatedAt: true,
-                    attributes: [{ name: "@updatedAt" }]
+                    updatedAt: { ignore: ["id", "createdAt"] },
+                    attributes: [{ name: "@updatedAt", args: [{ name: "ignore", value: ExpressionUtils.array("String", [ExpressionUtils.field("id"), ExpressionUtils.field("createdAt")]) }] }]
                 }
             }
         }
     } as const;
     enums = {
         Role: {
+            name: "Role",
             values: {
                 ADMIN: "ADMIN",
                 USER: "USER"

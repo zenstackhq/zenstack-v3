@@ -14,8 +14,8 @@ describe('policy functions tests', () => {
         );
 
         await expect(db.foo.create({ data: { string: 'bcd' } })).toBeRejectedByPolicy();
-        if (db.$schema.provider.type === 'sqlite') {
-            // sqlite is always case-insensitive
+        if (['sqlite', 'mysql'].includes(db.$schema.provider.type)) {
+            // sqlite and mysql are always case-insensitive
             await expect(db.foo.create({ data: { string: 'Acd' } })).toResolveTruthy();
         } else {
             await expect(db.foo.create({ data: { string: 'Acd' } })).toBeRejectedByPolicy();
@@ -51,8 +51,8 @@ describe('policy functions tests', () => {
         );
 
         await expect(db.foo.create({ data: { string: 'bcd' } })).toBeRejectedByPolicy();
-        if (db.$schema.provider.type === 'sqlite') {
-            // sqlite is always case-insensitive
+        if (['sqlite', 'mysql'].includes(db.$schema.provider.type)) {
+            // sqlite and mysql are always case-insensitive
             await expect(db.foo.create({ data: { string: 'Acd' } })).toResolveTruthy();
         } else {
             await expect(db.foo.create({ data: { string: 'Acd' } })).toBeRejectedByPolicy();
@@ -93,8 +93,8 @@ describe('policy functions tests', () => {
         await expect(db.foo.create({ data: {} })).toBeRejectedByPolicy();
         await expect(db.$setAuth({ id: 'user1', name: 'bcd' }).foo.create({ data: {} })).toBeRejectedByPolicy();
         await expect(db.$setAuth({ id: 'user1', name: 'bac' }).foo.create({ data: {} })).toResolveTruthy();
-        if (db.$schema.provider.type === 'sqlite') {
-            // sqlite is always case-insensitive
+        if (['sqlite', 'mysql'].includes(db.$schema.provider.type)) {
+            // sqlite and mysql are always case-insensitive
             await expect(db.$setAuth({ id: 'user1', name: 'Abc' }).foo.create({ data: {} })).toResolveTruthy();
         } else {
             await expect(db.$setAuth({ id: 'user1', name: 'Abc' }).foo.create({ data: {} })).toBeRejectedByPolicy();

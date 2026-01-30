@@ -41,7 +41,13 @@ describe('currentModel tests', () => {
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+
+        if (db.$schema.provider.type !== 'mysql') {
+            await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+        } else {
+            // mysql string comparison is case insensitive by default
+            await expect(db.post.create({ data: { id: 1 } })).toResolveTruthy();
+        }
     });
 
     it('works with lower case', async () => {
@@ -62,7 +68,13 @@ describe('currentModel tests', () => {
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+
+        if (db.$schema.provider.type !== 'mysql') {
+            await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+        } else {
+            // mysql string comparison is case insensitive by default
+            await expect(db.post.create({ data: { id: 1 } })).toResolveTruthy();
+        }
     });
 
     it('works with capitalization', async () => {
@@ -83,7 +95,13 @@ describe('currentModel tests', () => {
         );
 
         await expect(db.user.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+
+        if (db.$schema.provider.type !== 'mysql') {
+            await expect(db.post.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+        } else {
+            // mysql string comparison is case insensitive by default
+            await expect(db.post.create({ data: { id: 1 } })).toResolveTruthy();
+        }
     });
 
     it('works with uncapitalization', async () => {
@@ -104,7 +122,13 @@ describe('currentModel tests', () => {
         );
 
         await expect(db.USER.create({ data: { id: 1 } })).toResolveTruthy();
-        await expect(db.POST.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+
+        if (db.$schema.provider.type !== 'mysql') {
+            await expect(db.POST.create({ data: { id: 1 } })).toBeRejectedByPolicy();
+        } else {
+            // mysql string comparison is case insensitive by default
+            await expect(db.POST.create({ data: { id: 1 } })).toResolveTruthy();
+        }
     });
 
     it('works when inherited from abstract base', async () => {

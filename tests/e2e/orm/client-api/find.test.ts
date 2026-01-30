@@ -262,6 +262,11 @@ describe('Client find tests ', () => {
     });
 
     it('works with distinct', async () => {
+        if (['sqlite', 'mysql'].includes(client.$schema.provider.type)) {
+            await expect(client.user.findMany({ distinct: ['role'] } as any)).rejects.toThrow('not supported');
+            return;
+        }
+
         const user1 = await createUser(client, 'u1@test.com', {
             name: 'Admin1',
             role: 'ADMIN',
@@ -281,11 +286,6 @@ describe('Client find tests ', () => {
             name: 'User',
             role: 'USER',
         });
-
-        if (client.$schema.provider.type === 'sqlite') {
-            await expect(client.user.findMany({ distinct: ['role'] } as any)).rejects.toThrow('not supported');
-            return;
-        }
 
         // single field distinct
         let r: any = await client.user.findMany({ distinct: ['role'] } as any);
@@ -907,7 +907,7 @@ describe('Client find tests ', () => {
                 // @ts-expect-error
                 include: { author: { where: { email: user.email } } },
             }),
-        ).rejects.toThrow(`Invalid find args`);
+        ).rejects.toThrow(`Invalid findFirst args`);
 
         // sorting
         let u = await client.user.findUniqueOrThrow({

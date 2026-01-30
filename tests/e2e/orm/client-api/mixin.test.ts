@@ -75,7 +75,7 @@ model Bar with CommonFields {
                     description: 'Bar',
                 },
             }),
-        ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().includes('constraint'));
+        ).rejects.toSatisfy((e) => e.cause.message.toLowerCase().match(/(constraint)|(duplicate)/i));
     });
 
     it('supports multiple-level mixins', async () => {

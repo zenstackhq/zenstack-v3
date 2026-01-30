@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
 import { createTestClient } from '@zenstackhq/testtools';
+import { afterEach, describe, expect, it } from 'vitest';
 
 describe('Self relation tests', () => {
     let client: any;

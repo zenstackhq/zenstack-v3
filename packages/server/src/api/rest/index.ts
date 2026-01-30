@@ -106,6 +106,7 @@ const FilterOperations = [
     'lte',
     'gt',
     'gte',
+    'between',
     'contains',
     'icontains',
     'search',
@@ -1343,7 +1344,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             if (name === externalIdName) {
                 if (typeof info.type === 'string') {
                     // single unique field
-                    return [this.requireField(model, info.type)];
+                    return [this.requireField(model, name)];
                 } else {
                     // compound unique fields
                     return Object.keys(info).map((f) => this.requireField(model, f));
@@ -2058,6 +2059,15 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
                 }
             }
         } else {
+            if (op === 'between') {
+                const parts = value
+                    .split(',')
+                    .map((v) => this.coerce(fieldDef, v));
+                if (parts.length !== 2) {
+                    throw new InvalidValueError(`"between" expects exactly 2 comma-separated values`);
+                }
+                return { between: [parts[0]!, parts[1]!] };
+            }
             const coerced = this.coerce(fieldDef, value);
             switch (op) {
                 case 'icontains':

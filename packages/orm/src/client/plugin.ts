@@ -1,14 +1,33 @@
 import type { OperationNode, QueryId, QueryResult, RootOperationNode, UnknownRow } from 'kysely';
-import type { ClientContract } from '.';
+import type { ZodType } from 'zod';
+import type { ClientContract, ZModelFunction } from '.';
 import type { GetModels, SchemaDef } from '../schema';
 import type { MaybePromise } from '../utils/type-utils';
-import type { AllCrudOperation } from './crud/operations/base';
-import type { ZModelFunction } from './options';
+import type { AllCrudOperations, CoreCrudOperations } from './crud/operations/base';
+
+type AllowedExtQueryArgKeys = CoreCrudOperations | '$create' | '$read' | '$update' | '$delete' | '$all';
+
+/**
+ * Base shape of plugin-extended query args.
+ */
+export type ExtQueryArgsBase = {
+    [K in AllowedExtQueryArgKeys]?: object;
+};
+
+/**
+ * Base type for plugin-extended client members (methods and properties).
+ * Member names should start with '$' to avoid model name conflicts.
+ */
+export type ExtClientMembersBase = Record<string, unknown>;
 
 /**
  * ZenStack runtime plugin.
  */
-export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
+export interface RuntimePlugin<
+    Schema extends SchemaDef,
+    ExtQueryArgs extends ExtQueryArgsBase,
+    ExtClientMembers extends Record<string, unknown>,
+> {
     /**
      * Plugin ID.
      */
@@ -50,16 +69,32 @@ export interface RuntimePlugin<Schema extends SchemaDef = SchemaDef> {
      * Intercepts a Kysely query.
      */
     onKyselyQuery?: OnKyselyQueryCallback<Schema>;
+
+    /**
+     * Extended query args configuration.
+     */
+    queryArgs?: {
+        [K in keyof ExtQueryArgs]: ZodType<ExtQueryArgs[K]>;
+    };
+
+    /**
+     * Extended client members (methods and properties).
+     */
+    client?: ExtClientMembers;
 }
+
+export type AnyPlugin = RuntimePlugin<any, any, any>;
 
 /**
  * Defines a ZenStack runtime plugin.
  */
-export function definePlugin<Schema extends SchemaDef>(plugin: RuntimePlugin<Schema>) {
+export function definePlugin<
+    Schema extends SchemaDef,
+    const ExtQueryArgs extends ExtQueryArgsBase = {},
+    const ExtClientMembers extends Record<string, unknown> = {},
+>(plugin: RuntimePlugin<Schema, ExtQueryArgs, ExtClientMembers>): RuntimePlugin<any, ExtQueryArgs, ExtClientMembers> {
     return plugin;
 }
-
-export { type CoreCrudOperation as CrudOperation } from './crud/operations/base';
 
 // #region OnProcedure hooks
 
@@ -110,12 +145,12 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
     /**
      * The operation that is being performed.
      */
-    operation: AllCrudOperation;
+    operation: AllCrudOperations;
 
     /**
      * The query arguments.
      */
-    args: unknown;
+    args: Record<string, unknown> | undefined;
 
     /**
      * The function to proceed with the original query.
@@ -123,7 +158,7 @@ type OnQueryHookContext<Schema extends SchemaDef> = {
      *
      * @param args The query arguments.
      */
-    proceed: (args: unknown) => Promise<unknown>;
+    proceed: (args: Record<string, unknown> | undefined) => Promise<unknown>;
 
     /**
      * The ZenStack client that is performing the operation.
@@ -214,6 +249,12 @@ export type PluginAfterEntityMutationArgs<Schema extends SchemaDef> = MutationHo
      * Loads the entities that have been mutated.
      */
     loadAfterMutationEntities(): Promise<Record<string, unknown>[] | undefined>;
+
+    /**
+     * The entities before mutation. Only available if `beforeEntityMutation` hook is provided and
+     * the `loadBeforeMutationEntities` function is called in that hook.
+     */
+    beforeMutationEntities?: Record<string, unknown>[];
 
     /**
      * The ZenStack client you can use to perform additional operations.

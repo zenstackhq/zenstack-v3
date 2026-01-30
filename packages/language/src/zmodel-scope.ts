@@ -18,7 +18,9 @@ import {
 import { match } from 'ts-pattern';
 import {
     BinaryExpr,
+    Expression,
     MemberAccessExpr,
+    isCollectionPredicateBinding,
     isDataField,
     isDataModel,
     isEnumField,
@@ -78,7 +80,7 @@ export class ZModelScopeComputation extends DefaultScopeComputation {
         super.processNode(node, document, scopes);
         if (isDataModel(node) || isTypeDef(node)) {
             // add base fields to the scope recursively
-            const bases = getRecursiveBases(node);
+            const bases = getRecursiveBases(node, true, this.services.shared.workspace.LangiumDocuments);
             for (const base of bases) {
                 for (const field of base.fields) {
                     scopes.add(node, this.descriptions.createDescription(field, this.nameProvider.getName(field)));
@@ -124,7 +126,7 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             // when reference expression is resolved inside a collection predicate, the scope is the collection
             const containerCollectionPredicate = getCollectionPredicateContext(context.container);
             if (containerCollectionPredicate) {
-                return this.getCollectionPredicateScope(context, containerCollectionPredicate as BinaryExpr);
+                return this.getCollectionPredicateScope(context, containerCollectionPredicate);
             }
         }
 
@@ -145,10 +147,20 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             .when(isReferenceExpr, (operand) => {
                 // operand is a reference, it can only be a model/type-def field
                 const ref = operand.target.ref;
-                if (isDataField(ref)) {
-                    return this.createScopeForContainer(ref.type.reference?.ref, globalScope, allowTypeDefScope);
-                }
-                return EMPTY_SCOPE;
+                return match(ref)
+                    .when(isDataField, (r) =>
+                        // build a scope with model/typedef members
+                        this.createScopeForContainer(r.type.reference?.ref, globalScope, allowTypeDefScope),
+                    )
+                    .when(isCollectionPredicateBinding, (r) =>
+                        // build a scope from the collection predicate's collection
+                        this.createScopeForCollectionPredicateCollection(
+                            r.$container.left,
+                            globalScope,
+                            allowTypeDefScope,
+                        ),
+                    )
+                    .otherwise(() => EMPTY_SCOPE);
             })
             .when(isMemberAccessExpr, (operand) => {
                 // operand is a member access, it must be resolved to a non-array model/typedef type
@@ -179,15 +191,44 @@ export class ZModelScopeProvider extends DefaultScopeProvider {
             .otherwise(() => EMPTY_SCOPE);
     }
 
-    private getCollectionPredicateScope(context: ReferenceInfo, collectionPredicate: BinaryExpr) {
-        const referenceType = this.reflection.getReferenceType(context);
-        const globalScope = this.getGlobalScope(referenceType, context);
+    private getCollectionPredicateScope(context: ReferenceInfo, collectionPredicate: BinaryExpr): Scope {
+        // walk up to collect all collection predicate bindings, which are all available in the scope
+        let currPredicate: BinaryExpr | undefined = collectionPredicate;
+        const bindingStack: AstNode[] = [];
+        while (currPredicate) {
+            if (currPredicate.binding) {
+                bindingStack.unshift(currPredicate.binding);
+            }
+            currPredicate = AstUtils.getContainerOfType(currPredicate.$container, isCollectionPredicate);
+        }
+
+        // build a scope chain: global scope -> bindings' scope -> collection scope
+        const globalScope = this.getGlobalScope(this.reflection.getReferenceType(context), context);
+        const parentScope = bindingStack.reduce(
+            (scope, binding) => this.createScopeForNodes([binding], scope),
+            globalScope,
+        );
+
         const collection = collectionPredicate.left;
 
         // TODO: full support of typedef member access
-        // // typedef's fields are only added to the scope if the access starts with `auth().`
+        // typedef's fields are only added to the scope if the access starts with `auth().`
         const allowTypeDefScope = isAuthOrAuthMemberAccess(collection);
 
+        const collectionScope = this.createScopeForCollectionPredicateCollection(
+            collection,
+            parentScope,
+            allowTypeDefScope,
+        );
+
+        return collectionScope;
+    }
+
+    private createScopeForCollectionPredicateCollection(
+        collection: Expression,
+        globalScope: Scope,
+        allowTypeDefScope: boolean,
+    ) {
         return match(collection)
             .when(isReferenceExpr, (expr) => {
                 // collection is a reference - model or typedef field

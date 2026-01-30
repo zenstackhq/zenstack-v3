@@ -1,17 +1,19 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import type { Model } from '@zenstackhq/language/ast';
 import { ZenStackClient, type ClientContract, type ClientOptions } from '@zenstackhq/orm';
-import type { SchemaDef } from '@zenstackhq/orm/schema';
+import type { DataSourceProviderType, SchemaDef } from '@zenstackhq/orm/schema';
 import { PolicyPlugin } from '@zenstackhq/plugin-policy';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import SQLite from 'better-sqlite3';
 import { glob } from 'glob';
-import { PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
+import { MysqlDialect, PostgresDialect, SqliteDialect, type LogEvent } from 'kysely';
+import { createPool as createMysqlPool } from 'mysql2';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client as PGClient, Pool } from 'pg';
+import { match } from 'ts-pattern';
 import { expect } from 'vitest';
 import { createTestProject } from './project';
 import { generateTsSchema } from './schema';
@@ -19,10 +21,10 @@ import { loadDocumentWithPlugins } from './utils';
 
 export function getTestDbProvider() {
     const val = process.env['TEST_DB_PROVIDER'] ?? 'sqlite';
-    if (!['sqlite', 'postgresql'].includes(val!)) {
+    if (!['sqlite', 'postgresql', 'mysql'].includes(val!)) {
         throw new Error(`Invalid TEST_DB_PROVIDER value: ${val}`);
     }
-    return val as 'sqlite' | 'postgresql';
+    return val as 'sqlite' | 'postgresql' | 'mysql';
 }
 
 export const TEST_PG_CONFIG = {
@@ -34,11 +36,21 @@ export const TEST_PG_CONFIG = {
 
 export const TEST_PG_URL = `postgres://${TEST_PG_CONFIG.user}:${TEST_PG_CONFIG.password}@${TEST_PG_CONFIG.host}:${TEST_PG_CONFIG.port}`;
 
+export const TEST_MYSQL_CONFIG = {
+    host: process.env['TEST_MYSQL_HOST'] ?? 'localhost',
+    port: process.env['TEST_MYSQL_PORT'] ? parseInt(process.env['TEST_MYSQL_PORT']) : 3306,
+    user: process.env['TEST_MYSQL_USER'] ?? 'root',
+    password: process.env['TEST_MYSQL_PASSWORD'] ?? 'mysql',
+    timezone: 'Z',
+};
+
+export const TEST_MYSQL_URL = `mysql://${TEST_MYSQL_CONFIG.user}:${TEST_MYSQL_CONFIG.password}@${TEST_MYSQL_CONFIG.host}:${TEST_MYSQL_CONFIG.port}`;
+
 type ExtraTestClientOptions = {
     /**
      * Database provider
      */
-    provider?: 'sqlite' | 'postgresql';
+    provider?: 'sqlite' | 'postgresql' | 'mysql';
 
     /**
      * The main ZModel file. Only used when `usePrismaPush` is true and `schema` is an object.
@@ -56,7 +68,12 @@ type ExtraTestClientOptions = {
     usePrismaPush?: boolean;
 
     /**
-     * Extra source files to create and compile.
+     * Extra ZModel files to be created in the working directory.
+     */
+    extraZModelFiles?: Record<string, string>;
+
+    /**
+     * Extra TypeScript source files to create and compile.
      */
     extraSourceFiles?: Record<string, string>;
 
@@ -106,12 +123,22 @@ export async function createTestClient(
     let _schema: SchemaDef;
     const provider = options?.provider ?? getTestDbProvider() ?? 'sqlite';
     const dbName = options?.dbName ?? getTestDbName(provider);
-    const dbUrl = provider === 'sqlite' ? `file:${dbName}` : `${TEST_PG_URL}/${dbName}`;
-
+    const dbUrl = match(provider)
+        .with('sqlite', () => `file:${dbName}`)
+        .with('mysql', () => `${TEST_MYSQL_URL}/${dbName}`)
+        .with('postgresql', () => `${TEST_PG_URL}/${dbName}`)
+        .exhaustive();
     let model: Model | undefined;
 
     if (typeof schema === 'string') {
-        const generated = await generateTsSchema(schema, provider, dbUrl, options?.extraSourceFiles, undefined);
+        const generated = await generateTsSchema(
+            schema,
+            provider,
+            dbUrl,
+            options?.extraSourceFiles,
+            undefined,
+            options?.extraZModelFiles,
+        );
         workDir = generated.workDir;
         model = generated.model;
         // replace schema's provider
@@ -158,7 +185,7 @@ export async function createTestClient(
     if (options?.debug) {
         console.log(`Work directory: ${workDir}`);
         console.log(`Database name: ${dbName}`);
-        _options.log = testLogger;
+        _options.log ??= testLogger;
     }
 
     // copy db file to workDir if specified
@@ -208,29 +235,12 @@ export async function createTestClient(
                 stdio: options.debug ? 'inherit' : 'ignore',
             });
         } else {
-            if (provider === 'postgresql') {
-                invariant(dbName, 'dbName is required');
-                const pgClient = new PGClient(TEST_PG_CONFIG);
-                await pgClient.connect();
-                await pgClient.query(`DROP DATABASE IF EXISTS "${dbName}"`);
-                await pgClient.query(`CREATE DATABASE "${dbName}"`);
-                await pgClient.end();
-            }
+            await prepareDatabase(provider, dbName);
         }
     }
 
-    if (provider === 'postgresql') {
-        _options.dialect = new PostgresDialect({
-            pool: new Pool({
-                ...TEST_PG_CONFIG,
-                database: dbName,
-            }),
-        });
-    } else {
-        _options.dialect = new SqliteDialect({
-            database: new SQLite(path.join(workDir!, dbName)),
-        });
-    }
+    // create Kysely dialect
+    _options.dialect = createDialect(provider, dbName, workDir);
 
     let client = new ZenStackClient(_schema, _options);
 
@@ -238,6 +248,7 @@ export async function createTestClient(
         await client.$pushSchema();
     }
 
+    // install plugins
     if (plugins) {
         for (const plugin of plugins) {
             client = client.$use(plugin);
@@ -245,6 +256,55 @@ export async function createTestClient(
     }
 
     return client;
+}
+
+function createDialect(provider: DataSourceProviderType, dbName: string, workDir: string) {
+    return match(provider)
+        .with(
+            'postgresql',
+            () =>
+                new PostgresDialect({
+                    pool: new Pool({
+                        ...TEST_PG_CONFIG,
+                        database: dbName,
+                    }),
+                }),
+        )
+        .with(
+            'mysql',
+            () =>
+                new MysqlDialect({
+                    pool: createMysqlPool({
+                        ...TEST_MYSQL_CONFIG,
+                        database: dbName,
+                    }),
+                }),
+        )
+        .with(
+            'sqlite',
+            () =>
+                new SqliteDialect({
+                    database: new SQLite(path.join(workDir!, dbName)),
+                }),
+        )
+        .exhaustive();
+}
+
+async function prepareDatabase(provider: string, dbName: string) {
+    if (provider === 'postgresql') {
+        invariant(dbName, 'dbName is required');
+        const pgClient = new PGClient(TEST_PG_CONFIG);
+        await pgClient.connect();
+        await pgClient.query(`DROP DATABASE IF EXISTS "${dbName}"`);
+        await pgClient.query(`CREATE DATABASE "${dbName}"`);
+        await pgClient.end();
+    } else if (provider === 'mysql') {
+        invariant(dbName, 'dbName is required');
+        const mysqlPool = createMysqlPool(TEST_MYSQL_CONFIG);
+        await mysqlPool.promise().query(`DROP DATABASE IF EXISTS \`${dbName}\``);
+        await mysqlPool.promise().query(`CREATE DATABASE \`${dbName}\``);
+        await mysqlPool.promise().end();
+    }
 }
 
 export async function createPolicyTestClient<Schema extends SchemaDef>(

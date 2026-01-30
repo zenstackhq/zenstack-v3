@@ -122,7 +122,7 @@ export class SchemaType implements SchemaDef {
                     name: "user",
                     type: "User",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "profile", fields: ["userId"], references: ["id"] }
                 },
                 userId: {
@@ -184,7 +184,7 @@ export class SchemaType implements SchemaDef {
                 author: {
                     name: "author",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("String", [ExpressionUtils.field("authorId")]) }, { name: "references", value: ExpressionUtils.array("String", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "posts", fields: ["authorId"], references: ["id"] }
                 },
                 authorId: {
@@ -232,6 +232,7 @@ export class SchemaType implements SchemaDef {
     } as const;
     enums = {
         Role: {
+            name: "Role",
             values: {
                 ADMIN: "ADMIN",
                 USER: "USER"

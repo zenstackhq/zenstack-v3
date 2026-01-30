@@ -61,14 +61,14 @@ export class SchemaType implements SchemaDef {
                 user: {
                     name: "user",
                     type: "User",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("userId")]) }, { name: "references", value: ExpressionUtils.array("Int", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "profile", fields: ["userId"], references: ["id"], hasDefault: true }
                 },
                 address: {
                     name: "address",
                     type: "Address",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("addressId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("addressId")]) }, { name: "references", value: ExpressionUtils.array("Int", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "profile", fields: ["addressId"], references: ["id"] }
                 },
                 addressId: {

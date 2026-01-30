@@ -64,12 +64,11 @@ export function getDatasource(model: Model) {
 
     const schemasField = datasource.fields.find((f) => f.name === 'schemas');
     const schemas =
-        (schemasField &&
-            getLiteralArray(schemasField.value)
-                ?.map(getStringLiteral)
-                .filter((s) => s !== undefined)) ||
+    (schemasField &&
+        getLiteralArray(schemasField.value)
+        ?.filter((s) => s !== undefined)) as string[] ||
         [];
-
+    
     return {
         name: datasource.name,
         provider: getStringLiteral(

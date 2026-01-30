@@ -42,7 +42,7 @@ function getTestDbName(provider: string) {
     );
 }
 
-export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql' | 'mysql' }) {
+export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql' | 'mysql', extra?: Record<string, string | string[]> }) {
     const provider = (options?.provider || getTestDbProvider()) ?? 'sqlite';
     const dbName = getTestDbName(provider);
     let dbUrl: string;
@@ -60,11 +60,24 @@ export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql'
         default:
             throw new Error(`Unsupported provider: ${provider}`);
     }
+    // Build fields array for proper alignment (matching ZModelCodeGenerator)
+    const fields: [string, string][] = [
+        ['provider', `"${provider}"`],
+        ['url', `"${dbUrl}"`],
+        ...Object.entries(options?.extra || {}).map(([k, v]) => {
+            const value = Array.isArray(v) ? `[${v.map(item => `"${item}"`).join(', ')}]` : `"${v}"`;
+            return [k, value] as [string, string];
+        }),
+    ];
 
-    const ZMODEL_PRELUDE = `datasource db {
-  provider = "${provider}"
-  url      = "${dbUrl}"
-}`;
+    // Calculate alignment padding based on longest field name
+    const longestName = Math.max(...fields.map(([name]) => name.length));
+    const formattedFields = fields.map(([name, value]) => {
+        const padding = ' '.repeat(longestName - name.length + 1);
+        return `    ${name}${padding}= ${value}`;
+    }).join('\n');
+
+    const ZMODEL_PRELUDE = `datasource db {\n${formattedFields}\n}`;
     return ZMODEL_PRELUDE;
 }
 
@@ -81,9 +94,9 @@ export function createProject(
 
 export async function createFormattedProject(
     zmodel: string,
-    options?: { provider?: 'sqlite' | 'postgresql' | 'mysql' },
+    options?: { provider?: 'sqlite' | 'postgresql' | 'mysql', extra?: Record<string, string | string[]> },
 ) {
-    const fullContent = `${getDefaultPrelude({ provider: options?.provider })}\n\n${zmodel}`;
+    const fullContent = `${getDefaultPrelude({ provider: options?.provider, extra: options?.extra })}\n\n${zmodel}`;
     const formatted = await formatDocument(fullContent);
     return createProject(formatted, { customPrelude: true, provider: options?.provider });
 }

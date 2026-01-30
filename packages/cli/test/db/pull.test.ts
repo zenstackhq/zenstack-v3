@@ -353,7 +353,7 @@ model Post {
 
     @@schema("content")
 }`,
-            { provider: 'postgresql' },
+            { provider: 'postgresql', extra:{ schemas: ["public", "content", "auth"] } },
         );
         runCli('db push', workDir);
 
@@ -361,13 +361,11 @@ model Post {
         const { model } = await loadSchemaDocument(schemaFile, { returnServices: true });
         const expectedSchema = generator.generate(model);
 
-        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql' }));
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql', extra:{ schemas: ["public", "content", "auth"]} }));
         runCli('db pull --indent 4', workDir);
 
         const restoredSchema = getSchema(workDir);
         expect(restoredSchema).toEqual(expectedSchema);
-        expect(restoredSchema).toContain('@@schema("auth")');
-        expect(restoredSchema).toContain('@@schema("content")');
     });
 
     it('should preserve native PostgreSQL enums when schema exists', async ({ skip }) => {
@@ -404,8 +402,6 @@ enum UserRole {
         const pulledSchema = getSchema(workDir);
 
         expect(pulledSchema).toEqual(originalSchema);
-        expect(pulledSchema).toContain('enum UserStatus');
-        expect(pulledSchema).toContain('enum UserRole');
     });
 
     it('should not modify schema with PostgreSQL-specific features', async ({ skip }) => {
@@ -442,7 +438,7 @@ enum UserStatus {
     INACTIVE
     SUSPENDED
 }`,
-            { provider: 'postgresql' },
+            { provider: 'postgresql', extra:{ schemas: ["public", "content", "auth"] }  },
         );
         runCli('db push', workDir);
 

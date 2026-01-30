@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { ZModelLanguageMetaData } from '@zenstackhq/language';
 import colors from 'colors';
 import { Command, CommanderError, Option } from 'commander';
@@ -5,7 +6,6 @@ import * as actions from './actions';
 import { CliError } from './cli-error';
 import { telemetry } from './telemetry';
 import { checkNewVersion, getVersion } from './utils/version-utils';
-import 'dotenv/config';
 
 const generateAction = async (options: Parameters<typeof actions.generate>[0]): Promise<void> => {
     await telemetry.trackCommand('generate', () => actions.generate(options));

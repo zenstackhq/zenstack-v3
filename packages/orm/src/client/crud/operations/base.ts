@@ -1148,7 +1148,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         // fill in automatically updated fields
         const autoUpdatedFields: string[] = [];
         for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
-            if (fieldDef.updatedAt) {
+            if (fieldDef.updatedAt && finalData[fieldName] === undefined) {
                 const ignoredFields = new Set(typeof fieldDef.updatedAt === 'boolean' ? [] : fieldDef.updatedAt.ignore);
                 const hasNonIgnoredFields = Object.keys(data).some(
                     (field) =>

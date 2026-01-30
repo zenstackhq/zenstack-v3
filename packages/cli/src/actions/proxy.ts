@@ -88,7 +88,7 @@ export async function run(options: Options) {
 
 function evaluateUrl(value: string): string {
     // Check if it's an env() function call
-    const envMatch = value.match(/^env\(['"]([^'"]+)['"]\)$/);
+    const envMatch = value.trim().match(/^env\s*\(\s*['"]([^'"]+)['"]\s*\)$/);
     if (envMatch) {
         const varName = envMatch[1];
         const envValue = process.env[varName!];

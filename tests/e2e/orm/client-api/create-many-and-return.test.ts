@@ -15,6 +15,11 @@ describe('Client createManyAndReturn tests', () => {
     });
 
     it('works with toplevel createManyAndReturn', async () => {
+        if (client.$schema.provider.type === ('mysql' as any)) {
+            // mysql doesn't support createManyAndReturn
+            return;
+        }
+
         // empty
         await expect(client.user.createManyAndReturn()).toResolveWithLength(0);
 
@@ -59,6 +64,11 @@ describe('Client createManyAndReturn tests', () => {
     });
 
     it('works with select and omit', async () => {
+        if (client.$schema.provider.type === ('mysql' as any)) {
+            // mysql doesn't support createManyAndReturn
+            return;
+        }
+
         const r = await client.user.createManyAndReturn({
             data: [{ email: 'u1@test.com', name: 'name' }],
             select: { email: true },

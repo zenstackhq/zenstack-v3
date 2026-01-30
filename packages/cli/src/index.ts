@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { ZModelLanguageMetaData } from '@zenstackhq/language';
 import colors from 'colors';
 import { Command, CommanderError, Option } from 'commander';
@@ -36,6 +37,10 @@ const formatAction = async (options: Parameters<typeof actions.format>[0]): Prom
 
 const seedAction = async (options: Parameters<typeof actions.seed>[0], args: string[]): Promise<void> => {
     await telemetry.trackCommand('db seed', () => actions.seed(options, args));
+};
+
+const proxyAction = async (options: Parameters<typeof actions.proxy>[0]): Promise<void> => {
+    await telemetry.trackCommand('proxy', () => actions.proxy(options));
 };
 
 function createProgram() {
@@ -186,6 +191,18 @@ Arguments following -- are passed to the seed script. E.g.: "zen db seed -- --us
         .addOption(noVersionCheckOption)
         .action(formatAction);
 
+    program
+        .command('proxy')
+        .alias('studio')
+        .description('Start the ZenStack proxy server')
+        .addOption(schemaOption)
+        .addOption(new Option('-p, --port <port>', 'port to run the proxy server on').default(8008))
+        .addOption(new Option('-o, --output <path>', 'output directory for `zen generate` command'))
+        .addOption(new Option('-d, --databaseUrl <url>', 'database connection URL'))
+        .addOption(new Option('-l, --logLevel <level>', 'Query log levels (e.g., query, error)'))
+        .addOption(noVersionCheckOption)
+        .action(proxyAction);
+
     program.addHelpCommand('help [command]', 'Display help for a command');
 
     program.hook('preAction', async (_thisCommand, actionCommand) => {
@@ -221,7 +238,10 @@ async function main() {
         }
     }
 
-    if (program.args.includes('generate') && (program.args.includes('-w') || program.args.includes('--watch'))) {
+    if (
+        (program.args.includes('generate') && (program.args.includes('-w') || program.args.includes('--watch'))) ||
+        ['proxy', 'studio'].some((cmd) => program.args.includes(cmd))
+    ) {
         // A "hack" way to prevent the process from terminating because we don't want to stop it.
         return;
     }

@@ -15,9 +15,15 @@ describe('Policy tests for nonexistent models and fields', () => {
         const dbRaw = db.$unuseAll();
 
         // create a Bar table
-        await dbRaw.$executeRawUnsafe(
-            `CREATE TABLE "Bar" ("id" TEXT PRIMARY KEY, "string" TEXT, "fooId" TEXT, FOREIGN KEY ("fooId") REFERENCES "Foo" ("id"));`,
-        );
+        if (['postgresql', 'sqlite'].includes(dbRaw.$schema.provider.type)) {
+            await dbRaw.$executeRawUnsafe(
+                `CREATE TABLE "Bar" ("id" TEXT PRIMARY KEY, "string" TEXT, "fooId" TEXT, FOREIGN KEY ("fooId") REFERENCES "Foo" ("id"));`,
+            );
+        } else {
+            await dbRaw.$executeRawUnsafe(
+                `CREATE TABLE Bar (id VARCHAR(191) PRIMARY KEY, string VARCHAR(191), fooId VARCHAR(191), FOREIGN KEY (fooId) REFERENCES Foo (id));`,
+            );
+        }
 
         await dbRaw.$qb.insertInto('Foo').values({ id: '1', string: 'test' }).execute();
         await dbRaw.$qb.insertInto('Bar').values({ id: '1', string: 'test', fooId: '1' }).execute();

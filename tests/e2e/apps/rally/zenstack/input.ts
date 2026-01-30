@@ -6,11 +6,12 @@
 /* eslint-disable */
 
 import { type SchemaType as $Schema } from "./schema";
-import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
+import type { FindManyArgs as $FindManyArgs, FindUniqueArgs as $FindUniqueArgs, FindFirstArgs as $FindFirstArgs, ExistsArgs as $ExistsArgs, CreateArgs as $CreateArgs, CreateManyArgs as $CreateManyArgs, CreateManyAndReturnArgs as $CreateManyAndReturnArgs, UpdateArgs as $UpdateArgs, UpdateManyArgs as $UpdateManyArgs, UpdateManyAndReturnArgs as $UpdateManyAndReturnArgs, UpsertArgs as $UpsertArgs, DeleteArgs as $DeleteArgs, DeleteManyArgs as $DeleteManyArgs, CountArgs as $CountArgs, AggregateArgs as $AggregateArgs, GroupByArgs as $GroupByArgs, WhereInput as $WhereInput, SelectInput as $SelectInput, IncludeInput as $IncludeInput, OmitInput as $OmitInput, QueryOptions as $QueryOptions } from "@zenstackhq/orm";
 import type { SimplifiedPlainResult as $Result, SelectIncludeOmit as $SelectIncludeOmit } from "@zenstackhq/orm";
 export type AccountFindManyArgs = $FindManyArgs<$Schema, "Account">;
 export type AccountFindUniqueArgs = $FindUniqueArgs<$Schema, "Account">;
 export type AccountFindFirstArgs = $FindFirstArgs<$Schema, "Account">;
+export type AccountExistsArgs = $ExistsArgs<$Schema, "Account">;
 export type AccountCreateArgs = $CreateArgs<$Schema, "Account">;
 export type AccountCreateManyArgs = $CreateManyArgs<$Schema, "Account">;
 export type AccountCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Account">;
@@ -31,6 +32,7 @@ export type AccountGetPayload<Args extends $SelectIncludeOmit<$Schema, "Account"
 export type UserFindManyArgs = $FindManyArgs<$Schema, "User">;
 export type UserFindUniqueArgs = $FindUniqueArgs<$Schema, "User">;
 export type UserFindFirstArgs = $FindFirstArgs<$Schema, "User">;
+export type UserExistsArgs = $ExistsArgs<$Schema, "User">;
 export type UserCreateArgs = $CreateArgs<$Schema, "User">;
 export type UserCreateManyArgs = $CreateManyArgs<$Schema, "User">;
 export type UserCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "User">;
@@ -51,6 +53,7 @@ export type UserGetPayload<Args extends $SelectIncludeOmit<$Schema, "User", true
 export type VerificationTokenFindManyArgs = $FindManyArgs<$Schema, "VerificationToken">;
 export type VerificationTokenFindUniqueArgs = $FindUniqueArgs<$Schema, "VerificationToken">;
 export type VerificationTokenFindFirstArgs = $FindFirstArgs<$Schema, "VerificationToken">;
+export type VerificationTokenExistsArgs = $ExistsArgs<$Schema, "VerificationToken">;
 export type VerificationTokenCreateArgs = $CreateArgs<$Schema, "VerificationToken">;
 export type VerificationTokenCreateManyArgs = $CreateManyArgs<$Schema, "VerificationToken">;
 export type VerificationTokenCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "VerificationToken">;
@@ -71,6 +74,7 @@ export type VerificationTokenGetPayload<Args extends $SelectIncludeOmit<$Schema,
 export type SessionFindManyArgs = $FindManyArgs<$Schema, "Session">;
 export type SessionFindUniqueArgs = $FindUniqueArgs<$Schema, "Session">;
 export type SessionFindFirstArgs = $FindFirstArgs<$Schema, "Session">;
+export type SessionExistsArgs = $ExistsArgs<$Schema, "Session">;
 export type SessionCreateArgs = $CreateArgs<$Schema, "Session">;
 export type SessionCreateManyArgs = $CreateManyArgs<$Schema, "Session">;
 export type SessionCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Session">;
@@ -91,6 +95,7 @@ export type SessionGetPayload<Args extends $SelectIncludeOmit<$Schema, "Session"
 export type VerificationFindManyArgs = $FindManyArgs<$Schema, "Verification">;
 export type VerificationFindUniqueArgs = $FindUniqueArgs<$Schema, "Verification">;
 export type VerificationFindFirstArgs = $FindFirstArgs<$Schema, "Verification">;
+export type VerificationExistsArgs = $ExistsArgs<$Schema, "Verification">;
 export type VerificationCreateArgs = $CreateArgs<$Schema, "Verification">;
 export type VerificationCreateManyArgs = $CreateManyArgs<$Schema, "Verification">;
 export type VerificationCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Verification">;
@@ -111,6 +116,7 @@ export type VerificationGetPayload<Args extends $SelectIncludeOmit<$Schema, "Ver
 export type PollFindManyArgs = $FindManyArgs<$Schema, "Poll">;
 export type PollFindUniqueArgs = $FindUniqueArgs<$Schema, "Poll">;
 export type PollFindFirstArgs = $FindFirstArgs<$Schema, "Poll">;
+export type PollExistsArgs = $ExistsArgs<$Schema, "Poll">;
 export type PollCreateArgs = $CreateArgs<$Schema, "Poll">;
 export type PollCreateManyArgs = $CreateManyArgs<$Schema, "Poll">;
 export type PollCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Poll">;
@@ -131,6 +137,7 @@ export type PollGetPayload<Args extends $SelectIncludeOmit<$Schema, "Poll", true
 export type WatcherFindManyArgs = $FindManyArgs<$Schema, "Watcher">;
 export type WatcherFindUniqueArgs = $FindUniqueArgs<$Schema, "Watcher">;
 export type WatcherFindFirstArgs = $FindFirstArgs<$Schema, "Watcher">;
+export type WatcherExistsArgs = $ExistsArgs<$Schema, "Watcher">;
 export type WatcherCreateArgs = $CreateArgs<$Schema, "Watcher">;
 export type WatcherCreateManyArgs = $CreateManyArgs<$Schema, "Watcher">;
 export type WatcherCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Watcher">;
@@ -151,6 +158,7 @@ export type WatcherGetPayload<Args extends $SelectIncludeOmit<$Schema, "Watcher"
 export type ParticipantFindManyArgs = $FindManyArgs<$Schema, "Participant">;
 export type ParticipantFindUniqueArgs = $FindUniqueArgs<$Schema, "Participant">;
 export type ParticipantFindFirstArgs = $FindFirstArgs<$Schema, "Participant">;
+export type ParticipantExistsArgs = $ExistsArgs<$Schema, "Participant">;
 export type ParticipantCreateArgs = $CreateArgs<$Schema, "Participant">;
 export type ParticipantCreateManyArgs = $CreateManyArgs<$Schema, "Participant">;
 export type ParticipantCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Participant">;
@@ -171,6 +179,7 @@ export type ParticipantGetPayload<Args extends $SelectIncludeOmit<$Schema, "Part
 export type OptionFindManyArgs = $FindManyArgs<$Schema, "Option">;
 export type OptionFindUniqueArgs = $FindUniqueArgs<$Schema, "Option">;
 export type OptionFindFirstArgs = $FindFirstArgs<$Schema, "Option">;
+export type OptionExistsArgs = $ExistsArgs<$Schema, "Option">;
 export type OptionCreateArgs = $CreateArgs<$Schema, "Option">;
 export type OptionCreateManyArgs = $CreateManyArgs<$Schema, "Option">;
 export type OptionCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Option">;
@@ -191,6 +200,7 @@ export type OptionGetPayload<Args extends $SelectIncludeOmit<$Schema, "Option", 
 export type VoteFindManyArgs = $FindManyArgs<$Schema, "Vote">;
 export type VoteFindUniqueArgs = $FindUniqueArgs<$Schema, "Vote">;
 export type VoteFindFirstArgs = $FindFirstArgs<$Schema, "Vote">;
+export type VoteExistsArgs = $ExistsArgs<$Schema, "Vote">;
 export type VoteCreateArgs = $CreateArgs<$Schema, "Vote">;
 export type VoteCreateManyArgs = $CreateManyArgs<$Schema, "Vote">;
 export type VoteCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Vote">;
@@ -211,6 +221,7 @@ export type VoteGetPayload<Args extends $SelectIncludeOmit<$Schema, "Vote", true
 export type CommentFindManyArgs = $FindManyArgs<$Schema, "Comment">;
 export type CommentFindUniqueArgs = $FindUniqueArgs<$Schema, "Comment">;
 export type CommentFindFirstArgs = $FindFirstArgs<$Schema, "Comment">;
+export type CommentExistsArgs = $ExistsArgs<$Schema, "Comment">;
 export type CommentCreateArgs = $CreateArgs<$Schema, "Comment">;
 export type CommentCreateManyArgs = $CreateManyArgs<$Schema, "Comment">;
 export type CommentCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Comment">;
@@ -231,6 +242,7 @@ export type CommentGetPayload<Args extends $SelectIncludeOmit<$Schema, "Comment"
 export type PollViewFindManyArgs = $FindManyArgs<$Schema, "PollView">;
 export type PollViewFindUniqueArgs = $FindUniqueArgs<$Schema, "PollView">;
 export type PollViewFindFirstArgs = $FindFirstArgs<$Schema, "PollView">;
+export type PollViewExistsArgs = $ExistsArgs<$Schema, "PollView">;
 export type PollViewCreateArgs = $CreateArgs<$Schema, "PollView">;
 export type PollViewCreateManyArgs = $CreateManyArgs<$Schema, "PollView">;
 export type PollViewCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "PollView">;
@@ -251,6 +263,7 @@ export type PollViewGetPayload<Args extends $SelectIncludeOmit<$Schema, "PollVie
 export type SpaceFindManyArgs = $FindManyArgs<$Schema, "Space">;
 export type SpaceFindUniqueArgs = $FindUniqueArgs<$Schema, "Space">;
 export type SpaceFindFirstArgs = $FindFirstArgs<$Schema, "Space">;
+export type SpaceExistsArgs = $ExistsArgs<$Schema, "Space">;
 export type SpaceCreateArgs = $CreateArgs<$Schema, "Space">;
 export type SpaceCreateManyArgs = $CreateManyArgs<$Schema, "Space">;
 export type SpaceCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Space">;
@@ -271,6 +284,7 @@ export type SpaceGetPayload<Args extends $SelectIncludeOmit<$Schema, "Space", tr
 export type SpaceMemberFindManyArgs = $FindManyArgs<$Schema, "SpaceMember">;
 export type SpaceMemberFindUniqueArgs = $FindUniqueArgs<$Schema, "SpaceMember">;
 export type SpaceMemberFindFirstArgs = $FindFirstArgs<$Schema, "SpaceMember">;
+export type SpaceMemberExistsArgs = $ExistsArgs<$Schema, "SpaceMember">;
 export type SpaceMemberCreateArgs = $CreateArgs<$Schema, "SpaceMember">;
 export type SpaceMemberCreateManyArgs = $CreateManyArgs<$Schema, "SpaceMember">;
 export type SpaceMemberCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "SpaceMember">;
@@ -291,6 +305,7 @@ export type SpaceMemberGetPayload<Args extends $SelectIncludeOmit<$Schema, "Spac
 export type SpaceMemberInviteFindManyArgs = $FindManyArgs<$Schema, "SpaceMemberInvite">;
 export type SpaceMemberInviteFindUniqueArgs = $FindUniqueArgs<$Schema, "SpaceMemberInvite">;
 export type SpaceMemberInviteFindFirstArgs = $FindFirstArgs<$Schema, "SpaceMemberInvite">;
+export type SpaceMemberInviteExistsArgs = $ExistsArgs<$Schema, "SpaceMemberInvite">;
 export type SpaceMemberInviteCreateArgs = $CreateArgs<$Schema, "SpaceMemberInvite">;
 export type SpaceMemberInviteCreateManyArgs = $CreateManyArgs<$Schema, "SpaceMemberInvite">;
 export type SpaceMemberInviteCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "SpaceMemberInvite">;
@@ -311,6 +326,7 @@ export type SpaceMemberInviteGetPayload<Args extends $SelectIncludeOmit<$Schema,
 export type SubscriptionFindManyArgs = $FindManyArgs<$Schema, "Subscription">;
 export type SubscriptionFindUniqueArgs = $FindUniqueArgs<$Schema, "Subscription">;
 export type SubscriptionFindFirstArgs = $FindFirstArgs<$Schema, "Subscription">;
+export type SubscriptionExistsArgs = $ExistsArgs<$Schema, "Subscription">;
 export type SubscriptionCreateArgs = $CreateArgs<$Schema, "Subscription">;
 export type SubscriptionCreateManyArgs = $CreateManyArgs<$Schema, "Subscription">;
 export type SubscriptionCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Subscription">;
@@ -331,6 +347,7 @@ export type SubscriptionGetPayload<Args extends $SelectIncludeOmit<$Schema, "Sub
 export type PaymentMethodFindManyArgs = $FindManyArgs<$Schema, "PaymentMethod">;
 export type PaymentMethodFindUniqueArgs = $FindUniqueArgs<$Schema, "PaymentMethod">;
 export type PaymentMethodFindFirstArgs = $FindFirstArgs<$Schema, "PaymentMethod">;
+export type PaymentMethodExistsArgs = $ExistsArgs<$Schema, "PaymentMethod">;
 export type PaymentMethodCreateArgs = $CreateArgs<$Schema, "PaymentMethod">;
 export type PaymentMethodCreateManyArgs = $CreateManyArgs<$Schema, "PaymentMethod">;
 export type PaymentMethodCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "PaymentMethod">;
@@ -351,6 +368,7 @@ export type PaymentMethodGetPayload<Args extends $SelectIncludeOmit<$Schema, "Pa
 export type ScheduledEventFindManyArgs = $FindManyArgs<$Schema, "ScheduledEvent">;
 export type ScheduledEventFindUniqueArgs = $FindUniqueArgs<$Schema, "ScheduledEvent">;
 export type ScheduledEventFindFirstArgs = $FindFirstArgs<$Schema, "ScheduledEvent">;
+export type ScheduledEventExistsArgs = $ExistsArgs<$Schema, "ScheduledEvent">;
 export type ScheduledEventCreateArgs = $CreateArgs<$Schema, "ScheduledEvent">;
 export type ScheduledEventCreateManyArgs = $CreateManyArgs<$Schema, "ScheduledEvent">;
 export type ScheduledEventCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "ScheduledEvent">;
@@ -371,6 +389,7 @@ export type ScheduledEventGetPayload<Args extends $SelectIncludeOmit<$Schema, "S
 export type RescheduledEventDateFindManyArgs = $FindManyArgs<$Schema, "RescheduledEventDate">;
 export type RescheduledEventDateFindUniqueArgs = $FindUniqueArgs<$Schema, "RescheduledEventDate">;
 export type RescheduledEventDateFindFirstArgs = $FindFirstArgs<$Schema, "RescheduledEventDate">;
+export type RescheduledEventDateExistsArgs = $ExistsArgs<$Schema, "RescheduledEventDate">;
 export type RescheduledEventDateCreateArgs = $CreateArgs<$Schema, "RescheduledEventDate">;
 export type RescheduledEventDateCreateManyArgs = $CreateManyArgs<$Schema, "RescheduledEventDate">;
 export type RescheduledEventDateCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "RescheduledEventDate">;
@@ -391,6 +410,7 @@ export type RescheduledEventDateGetPayload<Args extends $SelectIncludeOmit<$Sche
 export type ScheduledEventInviteFindManyArgs = $FindManyArgs<$Schema, "ScheduledEventInvite">;
 export type ScheduledEventInviteFindUniqueArgs = $FindUniqueArgs<$Schema, "ScheduledEventInvite">;
 export type ScheduledEventInviteFindFirstArgs = $FindFirstArgs<$Schema, "ScheduledEventInvite">;
+export type ScheduledEventInviteExistsArgs = $ExistsArgs<$Schema, "ScheduledEventInvite">;
 export type ScheduledEventInviteCreateArgs = $CreateArgs<$Schema, "ScheduledEventInvite">;
 export type ScheduledEventInviteCreateManyArgs = $CreateManyArgs<$Schema, "ScheduledEventInvite">;
 export type ScheduledEventInviteCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "ScheduledEventInvite">;
@@ -411,6 +431,7 @@ export type ScheduledEventInviteGetPayload<Args extends $SelectIncludeOmit<$Sche
 export type CredentialFindManyArgs = $FindManyArgs<$Schema, "Credential">;
 export type CredentialFindUniqueArgs = $FindUniqueArgs<$Schema, "Credential">;
 export type CredentialFindFirstArgs = $FindFirstArgs<$Schema, "Credential">;
+export type CredentialExistsArgs = $ExistsArgs<$Schema, "Credential">;
 export type CredentialCreateArgs = $CreateArgs<$Schema, "Credential">;
 export type CredentialCreateManyArgs = $CreateManyArgs<$Schema, "Credential">;
 export type CredentialCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "Credential">;
@@ -431,6 +452,7 @@ export type CredentialGetPayload<Args extends $SelectIncludeOmit<$Schema, "Crede
 export type CalendarConnectionFindManyArgs = $FindManyArgs<$Schema, "CalendarConnection">;
 export type CalendarConnectionFindUniqueArgs = $FindUniqueArgs<$Schema, "CalendarConnection">;
 export type CalendarConnectionFindFirstArgs = $FindFirstArgs<$Schema, "CalendarConnection">;
+export type CalendarConnectionExistsArgs = $ExistsArgs<$Schema, "CalendarConnection">;
 export type CalendarConnectionCreateArgs = $CreateArgs<$Schema, "CalendarConnection">;
 export type CalendarConnectionCreateManyArgs = $CreateManyArgs<$Schema, "CalendarConnection">;
 export type CalendarConnectionCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "CalendarConnection">;
@@ -451,6 +473,7 @@ export type CalendarConnectionGetPayload<Args extends $SelectIncludeOmit<$Schema
 export type ProviderCalendarFindManyArgs = $FindManyArgs<$Schema, "ProviderCalendar">;
 export type ProviderCalendarFindUniqueArgs = $FindUniqueArgs<$Schema, "ProviderCalendar">;
 export type ProviderCalendarFindFirstArgs = $FindFirstArgs<$Schema, "ProviderCalendar">;
+export type ProviderCalendarExistsArgs = $ExistsArgs<$Schema, "ProviderCalendar">;
 export type ProviderCalendarCreateArgs = $CreateArgs<$Schema, "ProviderCalendar">;
 export type ProviderCalendarCreateManyArgs = $CreateManyArgs<$Schema, "ProviderCalendar">;
 export type ProviderCalendarCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "ProviderCalendar">;
@@ -471,6 +494,7 @@ export type ProviderCalendarGetPayload<Args extends $SelectIncludeOmit<$Schema, 
 export type InstanceSettingsFindManyArgs = $FindManyArgs<$Schema, "InstanceSettings">;
 export type InstanceSettingsFindUniqueArgs = $FindUniqueArgs<$Schema, "InstanceSettings">;
 export type InstanceSettingsFindFirstArgs = $FindFirstArgs<$Schema, "InstanceSettings">;
+export type InstanceSettingsExistsArgs = $ExistsArgs<$Schema, "InstanceSettings">;
 export type InstanceSettingsCreateArgs = $CreateArgs<$Schema, "InstanceSettings">;
 export type InstanceSettingsCreateManyArgs = $CreateManyArgs<$Schema, "InstanceSettings">;
 export type InstanceSettingsCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "InstanceSettings">;
@@ -491,6 +515,7 @@ export type InstanceSettingsGetPayload<Args extends $SelectIncludeOmit<$Schema, 
 export type LicenseFindManyArgs = $FindManyArgs<$Schema, "License">;
 export type LicenseFindUniqueArgs = $FindUniqueArgs<$Schema, "License">;
 export type LicenseFindFirstArgs = $FindFirstArgs<$Schema, "License">;
+export type LicenseExistsArgs = $ExistsArgs<$Schema, "License">;
 export type LicenseCreateArgs = $CreateArgs<$Schema, "License">;
 export type LicenseCreateManyArgs = $CreateManyArgs<$Schema, "License">;
 export type LicenseCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "License">;
@@ -511,6 +536,7 @@ export type LicenseGetPayload<Args extends $SelectIncludeOmit<$Schema, "License"
 export type LicenseValidationFindManyArgs = $FindManyArgs<$Schema, "LicenseValidation">;
 export type LicenseValidationFindUniqueArgs = $FindUniqueArgs<$Schema, "LicenseValidation">;
 export type LicenseValidationFindFirstArgs = $FindFirstArgs<$Schema, "LicenseValidation">;
+export type LicenseValidationExistsArgs = $ExistsArgs<$Schema, "LicenseValidation">;
 export type LicenseValidationCreateArgs = $CreateArgs<$Schema, "LicenseValidation">;
 export type LicenseValidationCreateManyArgs = $CreateManyArgs<$Schema, "LicenseValidation">;
 export type LicenseValidationCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "LicenseValidation">;
@@ -531,6 +557,7 @@ export type LicenseValidationGetPayload<Args extends $SelectIncludeOmit<$Schema,
 export type InstanceLicenseFindManyArgs = $FindManyArgs<$Schema, "InstanceLicense">;
 export type InstanceLicenseFindUniqueArgs = $FindUniqueArgs<$Schema, "InstanceLicense">;
 export type InstanceLicenseFindFirstArgs = $FindFirstArgs<$Schema, "InstanceLicense">;
+export type InstanceLicenseExistsArgs = $ExistsArgs<$Schema, "InstanceLicense">;
 export type InstanceLicenseCreateArgs = $CreateArgs<$Schema, "InstanceLicense">;
 export type InstanceLicenseCreateManyArgs = $CreateManyArgs<$Schema, "InstanceLicense">;
 export type InstanceLicenseCreateManyAndReturnArgs = $CreateManyAndReturnArgs<$Schema, "InstanceLicense">;

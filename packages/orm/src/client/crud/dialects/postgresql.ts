@@ -1,49 +1,99 @@
 import { invariant } from '@zenstackhq/common-helpers';
 import Decimal from 'decimal.js';
 import {
+    expressionBuilder,
     sql,
+    type AliasableExpression,
     type Expression,
-    type ExpressionBuilder,
-    type ExpressionWrapper,
-    type RawBuilder,
     type SelectQueryBuilder,
     type SqlBool,
 } from 'kysely';
 import { parse as parsePostgresArray } from 'postgres-array';
 import { match } from 'ts-pattern';
-import z from 'zod';
 import { AnyNullClass, DbNullClass, JsonNullClass } from '../../../common-types';
-import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../../../schema';
-import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
-import type { FindArgs } from '../../crud-types';
-import { createInternalError } from '../../errors';
+import type { BuiltinType, FieldDef, SchemaDef } from '../../../schema';
+import type { SortOrder } from '../../crud-types';
+import { createInvalidInputError } from '../../errors';
 import type { ClientOptions } from '../../options';
-import {
-    buildJoinPairs,
-    getDelegateDescendantModels,
-    getEnum,
-    getManyToManyRelation,
-    isEnum,
-    isRelationField,
-    isTypeDef,
-    requireField,
-    requireIdFields,
-    requireModel,
-} from '../../query-utils';
-import { BaseCrudDialect } from './base-dialect';
+import { isEnum, isTypeDef } from '../../query-utils';
+import { LateralJoinDialectBase } from './lateral-join-dialect-base';
 
-export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect<Schema> {
-    private isoDateSchema = z.iso.datetime({ local: true, offset: true });
+export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDialectBase<Schema> {
+    private static typeParserOverrideApplied = false;
 
     constructor(schema: Schema, options: ClientOptions<Schema>) {
         super(schema, options);
+        this.overrideTypeParsers();
     }
 
     override get provider() {
         return 'postgresql' as const;
     }
 
-    override transformPrimitive(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
+    private overrideTypeParsers() {
+        if (this.options.fixPostgresTimezone !== false && !PostgresCrudDialect.typeParserOverrideApplied) {
+            PostgresCrudDialect.typeParserOverrideApplied = true;
+
+            // override node-pg's default type parser to resolve the timezone handling issue
+            // with "TIMESTAMP WITHOUT TIME ZONE" fields
+            // https://github.com/brianc/node-postgres/issues/429
+            import('pg')
+                .then((pg) => {
+                    pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (value) => {
+                        if (typeof value !== 'string') {
+                            return value;
+                        }
+                        if (!this.hasTimezoneOffset(value)) {
+                            // force UTC if no offset
+                            value += 'Z';
+                        }
+                        const result = new Date(value);
+                        return isNaN(result.getTime())
+                            ? value // fallback to original value if parsing fails
+                            : result;
+                    });
+                })
+                .catch(() => {
+                    // ignore
+                });
+        }
+    }
+
+    // #region capabilities
+
+    override get supportsUpdateWithLimit(): boolean {
+        return false;
+    }
+
+    override get supportsDeleteWithLimit(): boolean {
+        return false;
+    }
+
+    override get supportsDistinctOn(): boolean {
+        return true;
+    }
+
+    override get supportsReturning(): boolean {
+        return true;
+    }
+
+    override get supportsDefaultAsFieldValue() {
+        return true;
+    }
+
+    override get supportsInsertDefaultValues(): boolean {
+        return true;
+    }
+
+    override get insertIgnoreMethod() {
+        return 'onConflict' as const;
+    }
+
+    // #endregion
+
+    // #region value transformation
+
+    override transformInput(value: unknown, type: BuiltinType, forArrayField: boolean): unknown {
         if (value === undefined) {
             return value;
         }
@@ -74,19 +124,8 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
             if (type === 'Json' && !forArrayField) {
                 // scalar `Json` fields need their input stringified
                 return JSON.stringify(value);
-            }
-            if (isEnum(this.schema, type)) {
-                // cast to enum array `CAST(ARRAY[...] AS "enum_type"[])`
-                return this.eb.cast(
-                    sql`ARRAY[${sql.join(
-                        value.map((v) => this.transformPrimitive(v, type, false)),
-                        sql.raw(','),
-                    )}]`,
-                    this.createSchemaQualifiedEnumType(type, true),
-                );
             } else {
-                // `Json[]` fields need their input as array (not stringified)
-                return value.map((v) => this.transformPrimitive(v, type, false));
+                return value.map((v) => this.transformInput(v, type, false));
             }
         } else {
             return match(type)
@@ -99,7 +138,12 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 )
                 .with('Decimal', () => (value !== null ? value.toString() : value))
                 .with('Json', () => {
-                    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                    if (
+                        value === null ||
+                        typeof value === 'string' ||
+                        typeof value === 'number' ||
+                        typeof value === 'boolean'
+                    ) {
                         // postgres requires simple JSON values to be stringified
                         return JSON.stringify(value);
                     } else {
@@ -108,32 +152,6 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 })
                 .otherwise(() => value);
         }
-    }
-
-    private createSchemaQualifiedEnumType(type: string, array: boolean) {
-        // determines the postgres schema name for the enum type, and returns the
-        // qualified name
-
-        let qualified = type;
-
-        const enumDef = getEnum(this.schema, type);
-        if (enumDef) {
-            // check if the enum has a custom "@@schema" attribute
-            const schemaAttr = enumDef.attributes?.find((attr) => attr.name === '@@schema');
-            if (schemaAttr) {
-                const mapArg = schemaAttr.args?.find((arg) => arg.name === 'map');
-                if (mapArg && mapArg.value.kind === 'literal') {
-                    const schemaName = mapArg.value.value as string;
-                    qualified = `"${schemaName}"."${type}"`;
-                }
-            } else {
-                // no custom schema, use default from datasource or 'public'
-                const defaultSchema = this.schema.provider.defaultSchema ?? 'public';
-                qualified = `"${defaultSchema}"."${type}"`;
-            }
-        }
-
-        return array ? sql.raw(`${qualified}[]`) : sql.raw(qualified);
     }
 
     override transformOutput(value: unknown, type: BuiltinType, array: boolean) {
@@ -176,25 +194,21 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
 
     private transformOutputDate(value: unknown) {
         if (typeof value === 'string') {
-            // PostgreSQL's jsonb_build_object serializes timestamp as ISO 8601 strings
-            // without timezone, (e.g., "2023-01-01T12:00:00.123456"). Since Date is always
-            // stored as UTC `timestamp` type, we add 'Z' to explicitly mark them as UTC for
-            // correct Date object creation.
-            if (this.isoDateSchema.safeParse(value).success) {
-                const hasOffset = value.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(value);
-                return new Date(hasOffset ? value : `${value}Z`);
-            } else {
-                return value;
-            }
-        } else if (value instanceof Date && this.options.fixPostgresTimezone !== false) {
-            // SPECIAL NOTES:
-            // node-pg has a terrible quirk that it returns the date value in local timezone
-            // as a `Date` object although for `DateTime` field the data in DB is stored in UTC
-            // see: https://github.com/brianc/node-postgres/issues/429
-            return new Date(value.getTime() - value.getTimezoneOffset() * 60 * 1000);
+            // PostgreSQL's jsonb_build_object serializes timestamp as ISO 8601 strings,
+            // we force interpret them as UTC dates here if the value does not carry timezone
+            // offset (this happens with "TIMESTAMP WITHOUT TIME ZONE" field type)
+            const normalized = this.hasTimezoneOffset(value) ? value : `${value}Z`;
+            const parsed = new Date(normalized);
+            return Number.isNaN(parsed.getTime())
+                ? value // fallback to original value if parsing fails
+                : parsed;
         } else {
             return value;
         }
+    }
+
+    private hasTimezoneOffset(value: string) {
+        return value.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(value);
     }
 
     private transformOutputBytes(value: unknown) {
@@ -219,264 +233,12 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         return value;
     }
 
-    override buildRelationSelection(
-        query: SelectQueryBuilder<any, any, any>,
-        model: string,
-        relationField: string,
-        parentAlias: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-    ): SelectQueryBuilder<any, any, any> {
-        const relationResultName = `${parentAlias}$${relationField}`;
-        const joinedQuery = this.buildRelationJSON(
-            model,
-            query,
-            relationField,
-            parentAlias,
-            payload,
-            relationResultName,
-        );
-        return joinedQuery.select(`${relationResultName}.$data as ${relationField}`);
-    }
+    // #endregion
 
-    private buildRelationJSON(
-        model: string,
-        qb: SelectQueryBuilder<any, any, any>,
-        relationField: string,
-        parentAlias: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-        resultName: string,
-    ) {
-        const relationFieldDef = requireField(this.schema, model, relationField);
-        const relationModel = relationFieldDef.type as GetModels<Schema>;
+    // #region other overrides
 
-        return qb.leftJoinLateral(
-            (eb) => {
-                const relationSelectName = `${resultName}$sub`;
-                const relationModelDef = requireModel(this.schema, relationModel);
-
-                let tbl: SelectQueryBuilder<any, any, any>;
-
-                if (this.canJoinWithoutNestedSelect(relationModelDef, payload)) {
-                    // build join directly
-                    tbl = this.buildModelSelect(relationModel, relationSelectName, payload, false);
-
-                    // parent join filter
-                    tbl = this.buildRelationJoinFilter(
-                        tbl,
-                        model,
-                        relationField,
-                        relationModel,
-                        relationSelectName,
-                        parentAlias,
-                    );
-                } else {
-                    // join with a nested query
-                    tbl = eb.selectFrom(() => {
-                        let subQuery = this.buildModelSelect(relationModel, `${relationSelectName}$t`, payload, true);
-
-                        // parent join filter
-                        subQuery = this.buildRelationJoinFilter(
-                            subQuery,
-                            model,
-                            relationField,
-                            relationModel,
-                            `${relationSelectName}$t`,
-                            parentAlias,
-                        );
-
-                        return subQuery.as(relationSelectName);
-                    });
-                }
-
-                // select relation result
-                tbl = this.buildRelationObjectSelect(
-                    relationModel,
-                    relationSelectName,
-                    relationFieldDef,
-                    tbl,
-                    payload,
-                    resultName,
-                );
-
-                // add nested joins for each relation
-                tbl = this.buildRelationJoins(tbl, relationModel, relationSelectName, payload, resultName);
-
-                // alias the join table
-                return tbl.as(resultName);
-            },
-            (join) => join.onTrue(),
-        );
-    }
-
-    private buildRelationJoinFilter(
-        query: SelectQueryBuilder<any, any, {}>,
-        model: string,
-        relationField: string,
-        relationModel: GetModels<Schema>,
-        relationModelAlias: string,
-        parentAlias: string,
-    ) {
-        const m2m = getManyToManyRelation(this.schema, model, relationField);
-        if (m2m) {
-            // many-to-many relation
-            const parentIds = requireIdFields(this.schema, model);
-            const relationIds = requireIdFields(this.schema, relationModel);
-            invariant(parentIds.length === 1, 'many-to-many relation must have exactly one id field');
-            invariant(relationIds.length === 1, 'many-to-many relation must have exactly one id field');
-            query = query.where((eb) =>
-                eb(
-                    eb.ref(`${relationModelAlias}.${relationIds[0]}`),
-                    'in',
-                    eb
-                        .selectFrom(m2m.joinTable)
-                        .select(`${m2m.joinTable}.${m2m.otherFkName}`)
-                        .whereRef(`${parentAlias}.${parentIds[0]}`, '=', `${m2m.joinTable}.${m2m.parentFkName}`),
-                ),
-            );
-        } else {
-            const joinPairs = buildJoinPairs(this.schema, model, parentAlias, relationField, relationModelAlias);
-            query = query.where((eb) =>
-                this.and(...joinPairs.map(([left, right]) => eb(this.eb.ref(left), '=', this.eb.ref(right)))),
-            );
-        }
-        return query;
-    }
-
-    private buildRelationObjectSelect(
-        relationModel: string,
-        relationModelAlias: string,
-        relationFieldDef: FieldDef,
-        qb: SelectQueryBuilder<any, any, any>,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-        parentResultName: string,
-    ) {
-        qb = qb.select((eb) => {
-            const objArgs = this.buildRelationObjectArgs(
-                relationModel,
-                relationModelAlias,
-                eb,
-                payload,
-                parentResultName,
-            );
-
-            if (relationFieldDef.array) {
-                return eb.fn
-                    .coalesce(sql`jsonb_agg(jsonb_build_object(${sql.join(objArgs)}))`, sql`'[]'::jsonb`)
-                    .as('$data');
-            } else {
-                return sql`jsonb_build_object(${sql.join(objArgs)})`.as('$data');
-            }
-        });
-
-        return qb;
-    }
-
-    private buildRelationObjectArgs(
-        relationModel: string,
-        relationModelAlias: string,
-        eb: ExpressionBuilder<any, any>,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-        parentResultName: string,
-    ) {
-        const relationModelDef = requireModel(this.schema, relationModel);
-        const objArgs: Array<
-            string | ExpressionWrapper<any, any, any> | SelectQueryBuilder<any, any, any> | RawBuilder<any>
-        > = [];
-
-        const descendantModels = getDelegateDescendantModels(this.schema, relationModel);
-        if (descendantModels.length > 0) {
-            // select all JSONs built from delegate descendants
-            objArgs.push(
-                ...descendantModels
-                    .map((subModel) => [
-                        sql.lit(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`),
-                        eb.ref(`${DELEGATE_JOINED_FIELD_PREFIX}${subModel.name}`),
-                    ])
-                    .flatMap((v) => v),
-            );
-        }
-
-        if (payload === true || !payload.select) {
-            // select all scalar fields except for omitted
-            const omit = typeof payload === 'object' ? payload.omit : undefined;
-            objArgs.push(
-                ...Object.entries(relationModelDef.fields)
-                    .filter(([, value]) => !value.relation)
-                    .filter(([name]) => !this.shouldOmitField(omit, relationModel, name))
-                    .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, relationModelAlias, false)])
-                    .flatMap((v) => v),
-            );
-        } else if (payload.select) {
-            // select specific fields
-            objArgs.push(
-                ...Object.entries<any>(payload.select)
-                    .filter(([, value]) => value)
-                    .map(([field, value]) => {
-                        if (field === '_count') {
-                            const subJson = this.buildCountJson(
-                                relationModel as GetModels<Schema>,
-                                eb,
-                                relationModelAlias,
-                                value,
-                            );
-                            return [sql.lit(field), subJson];
-                        } else {
-                            const fieldDef = requireField(this.schema, relationModel, field);
-                            const fieldValue = fieldDef.relation
-                                ? // reference the synthesized JSON field
-                                  eb.ref(`${parentResultName}$${field}.$data`)
-                                : // reference a plain field
-                                  this.fieldRef(relationModel, field, relationModelAlias, false);
-                            return [sql.lit(field), fieldValue];
-                        }
-                    })
-                    .flatMap((v) => v),
-            );
-        }
-
-        if (typeof payload === 'object' && payload.include && typeof payload.include === 'object') {
-            // include relation fields
-            objArgs.push(
-                ...Object.entries<any>(payload.include)
-                    .filter(([, value]) => value)
-                    .map(([field]) => [
-                        sql.lit(field),
-                        // reference the synthesized JSON field
-                        eb.ref(`${parentResultName}$${field}.$data`),
-                    ])
-                    .flatMap((v) => v),
-            );
-        }
-        return objArgs;
-    }
-
-    private buildRelationJoins(
-        query: SelectQueryBuilder<any, any, any>,
-        relationModel: string,
-        relationModelAlias: string,
-        payload: true | FindArgs<Schema, GetModels<Schema>, true>,
-        parentResultName: string,
-    ) {
-        let result = query;
-        if (typeof payload === 'object') {
-            const selectInclude = payload.include ?? payload.select;
-            if (selectInclude && typeof selectInclude === 'object') {
-                Object.entries<any>(selectInclude)
-                    .filter(([, value]) => value)
-                    .filter(([field]) => isRelationField(this.schema, relationModel, field))
-                    .forEach(([field, value]) => {
-                        result = this.buildRelationJSON(
-                            relationModel,
-                            result,
-                            field,
-                            relationModelAlias,
-                            value,
-                            `${parentResultName}$${field}`,
-                        );
-                    });
-            }
-        }
-        return result;
+    protected buildArrayAgg(arg: Expression<any>) {
+        return this.eb.fn.coalesce(sql`jsonb_agg(${arg})`, sql`'[]'::jsonb`);
     }
 
     override buildSkipTake(
@@ -500,28 +262,41 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         );
     }
 
-    override get supportsUpdateWithLimit(): boolean {
-        return false;
+    override castInt<T extends Expression<any>>(expression: T): T {
+        return this.eb.cast(expression, 'integer') as unknown as T;
     }
 
-    override get supportsDeleteWithLimit(): boolean {
-        return false;
+    override castText<T extends Expression<any>>(expression: T): T {
+        return this.eb.cast(expression, 'text') as unknown as T;
     }
 
-    override get supportsDistinctOn(): boolean {
-        return true;
+    override trimTextQuotes<T extends Expression<string>>(expression: T): T {
+        return this.eb.fn('trim', [expression, sql.lit('"')]) as unknown as T;
     }
 
-    override buildArrayLength(array: Expression<unknown>): ExpressionWrapper<any, any, number> {
+    override buildArrayLength(array: Expression<unknown>): AliasableExpression<number> {
         return this.eb.fn('array_length', [array]);
     }
 
-    override buildArrayLiteralSQL(values: unknown[]): string {
-        if (values.length === 0) {
-            return '{}';
-        } else {
-            return `ARRAY[${values.map((v) => (typeof v === 'string' ? `'${v}'` : v))}]`;
-        }
+    override buildArrayValue(values: Expression<unknown>[], elemType: string): AliasableExpression<unknown> {
+        const arr = sql`ARRAY[${sql.join(values, sql.raw(','))}]`;
+        const mappedType = this.getSqlType(elemType);
+        return this.eb.cast(arr, sql`${sql.raw(mappedType)}[]`);
+    }
+
+    override buildArrayContains(field: Expression<unknown>, value: Expression<unknown>): AliasableExpression<SqlBool> {
+        // PostgreSQL @> operator expects array on both sides, so wrap single value in array
+        return this.eb(field, '@>', sql`ARRAY[${value}]`);
+    }
+
+    override buildArrayHasEvery(field: Expression<unknown>, values: Expression<unknown>): AliasableExpression<SqlBool> {
+        // PostgreSQL @> operator: field contains all elements in values
+        return this.eb(field, '@>', values);
+    }
+
+    override buildArrayHasSome(field: Expression<unknown>, values: Expression<unknown>): AliasableExpression<SqlBool> {
+        // PostgreSQL && operator: arrays have any elements in common
+        return this.eb(field, '&&', values);
     }
 
     protected override buildJsonPathSelection(receiver: Expression<any>, path: string | undefined) {
@@ -546,14 +321,14 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
                 this.eb(
                     this.eb.fn('jsonb_extract_path', [lhs, this.eb.val('0')]),
                     '=',
-                    this.transformPrimitive(value, 'Json', false),
+                    this.transformInput(value, 'Json', false),
                 ),
             )
             .with('array_ends_with', () =>
                 this.eb(
                     this.eb.fn('jsonb_extract_path', [lhs, sql`(jsonb_array_length(${lhs}) - 1)::text`]),
                     '=',
-                    this.transformPrimitive(value, 'Json', false),
+                    this.transformInput(value, 'Json', false),
                 ),
             )
             .exhaustive();
@@ -571,45 +346,81 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends BaseCrudDiale
         );
     }
 
-    override get supportInsertWithDefault() {
-        return true;
-    }
-
-    override getFieldSqlType(fieldDef: FieldDef) {
-        // TODO: respect `@db.x` attributes
-        if (fieldDef.relation) {
-            throw createInternalError('Cannot get SQL type of a relation field');
-        }
-
-        let result: string;
-
-        if (this.schema.enums?.[fieldDef.type]) {
-            // enums are treated as text
-            result = 'text';
+    private getSqlType(zmodelType: string) {
+        if (isEnum(this.schema, zmodelType)) {
+            // reduce enum to text for type compatibility
+            return 'text';
         } else {
-            result = match(fieldDef.type)
-                .with('String', () => 'text')
-                .with('Boolean', () => 'boolean')
-                .with('Int', () => 'integer')
-                .with('BigInt', () => 'bigint')
-                .with('Float', () => 'double precision')
-                .with('Decimal', () => 'decimal')
-                .with('DateTime', () => 'timestamp')
-                .with('Bytes', () => 'bytea')
-                .with('Json', () => 'jsonb')
-                // fallback to text
-                .otherwise(() => 'text');
+            return (
+                match(zmodelType)
+                    .with('String', () => 'text')
+                    .with('Boolean', () => 'boolean')
+                    .with('Int', () => 'integer')
+                    .with('BigInt', () => 'bigint')
+                    .with('Float', () => 'double precision')
+                    .with('Decimal', () => 'decimal')
+                    .with('DateTime', () => 'timestamp')
+                    .with('Bytes', () => 'bytea')
+                    .with('Json', () => 'jsonb')
+                    // fallback to text
+                    .otherwise(() => 'text')
+            );
         }
-
-        if (fieldDef.array) {
-            result += '[]';
-        }
-
-        return result;
     }
 
     override getStringCasingBehavior() {
         // Postgres `LIKE` is case-sensitive, `ILIKE` is case-insensitive
         return { supportsILike: true, likeCaseSensitive: true };
     }
+
+    override buildValuesTableSelect(fields: FieldDef[], rows: unknown[][]) {
+        if (rows.length === 0) {
+            throw createInvalidInputError('At least one row is required to build values table');
+        }
+
+        // check all rows have the same length
+        const rowLength = rows[0]!.length;
+
+        if (fields.length !== rowLength) {
+            throw createInvalidInputError('Number of fields must match number of columns in each row');
+        }
+
+        for (const row of rows) {
+            if (row.length !== rowLength) {
+                throw createInvalidInputError('All rows must have the same number of columns');
+            }
+        }
+
+        const eb = expressionBuilder<any, any>();
+
+        return eb
+            .selectFrom(
+                sql`(VALUES ${sql.join(
+                    rows.map((row) => sql`(${sql.join(row.map((v) => sql.val(v)))})`),
+                    sql.raw(', '),
+                )})`.as('$values'),
+            )
+            .select(
+                fields.map((f, i) => {
+                    const mappedType = this.getSqlType(f.type);
+                    const castType = f.array ? sql`${sql.raw(mappedType)}[]` : sql.raw(mappedType);
+                    return this.eb.cast(sql.ref(`$values.column${i + 1}`), castType).as(f.name);
+                }),
+            );
+    }
+
+    protected override buildOrderByField(
+        query: SelectQueryBuilder<any, any, any>,
+        field: Expression<unknown>,
+        sort: SortOrder,
+        nulls: 'first' | 'last',
+    ) {
+        return query.orderBy(field, (ob) => {
+            ob = sort === 'asc' ? ob.asc() : ob.desc();
+            ob = nulls === 'first' ? ob.nullsFirst() : ob.nullsLast();
+            return ob;
+        });
+    }
+
+    // #endregion
 }

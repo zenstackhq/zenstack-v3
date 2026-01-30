@@ -1,7 +1,7 @@
 import type Decimal from 'decimal.js';
 import type { Expression } from './expression';
 
-export type DataSourceProviderType = 'sqlite' | 'postgresql';
+export type DataSourceProviderType = 'sqlite' | 'postgresql' | 'mysql';
 
 export type DataSourceProvider = {
     type: DataSourceProviderType;
@@ -110,6 +110,7 @@ export type EnumField = {
 };
 
 export type EnumDef = {
+    name: string;
     fields?: Record<string, EnumField>;
     values: Record<string, string>;
     attributes?: readonly AttributeApplication[];

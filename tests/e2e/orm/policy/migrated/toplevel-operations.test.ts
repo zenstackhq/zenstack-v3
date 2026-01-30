@@ -166,16 +166,38 @@ describe('Policy toplevel operations tests', () => {
             }),
         ).toBeRejectedByPolicy();
 
-        // update success
-        await expect(
-            db.model.update({
+        if (db.$schema.provider.type !== 'mysql') {
+            // update success
+            await expect(
+                db.model.update({
+                    where: { id: '1' },
+                    data: {
+                        id: '2',
+                        value: 3,
+                    },
+                }),
+            ).resolves.toMatchObject({ id: '2', value: 3 });
+        } else {
+            // mysql doesn't support post-update with id updates
+            await expect(
+                db.model.update({
+                    where: { id: '1' },
+                    data: {
+                        id: '2',
+                        value: 3,
+                    },
+                }),
+            ).toBeRejectedByPolicy();
+
+            // force update
+            await db.$unuseAll().model.update({
                 where: { id: '1' },
                 data: {
                     id: '2',
                     value: 3,
                 },
-            }),
-        ).resolves.toMatchObject({ id: '2', value: 3 });
+            });
+        }
 
         // upsert denied
         await expect(
@@ -192,20 +214,22 @@ describe('Policy toplevel operations tests', () => {
             }),
         ).toBeRejectedByPolicy();
 
-        // upsert success
-        await expect(
-            db.model.upsert({
-                where: { id: '2' },
-                update: {
-                    id: '3',
-                    value: 4,
-                },
-                create: {
-                    id: '4',
-                    value: 5,
-                },
-            }),
-        ).resolves.toMatchObject({ id: '3', value: 4 });
+        if (db.$schema.provider.type !== 'mysql') {
+            // upsert success
+            await expect(
+                db.model.upsert({
+                    where: { id: '2' },
+                    update: {
+                        id: '3',
+                        value: 4,
+                    },
+                    create: {
+                        id: '4',
+                        value: 5,
+                    },
+                }),
+            ).resolves.toMatchObject({ id: '3', value: 4 });
+        }
     });
 
     it('delete tests', async () => {

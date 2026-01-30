@@ -1,9 +1,9 @@
 import type { GetModels, SchemaDef } from '../../../schema';
 import type { FindArgs } from '../../crud-types';
-import { BaseOperationHandler, type CoreCrudOperation } from './base';
+import { BaseOperationHandler, type CoreCrudOperations } from './base';
 
 export class FindOperationHandler<Schema extends SchemaDef> extends BaseOperationHandler<Schema> {
-    async handle(operation: CoreCrudOperation, args: unknown, validateArgs = true): Promise<unknown> {
+    async handle(operation: CoreCrudOperations, args: unknown, validateArgs = true): Promise<unknown> {
         // normalize args to strip `undefined` fields
         const normalizedArgs = this.normalizeArgs(args);
 
@@ -11,10 +11,7 @@ export class FindOperationHandler<Schema extends SchemaDef> extends BaseOperatio
 
         // parse args
         let parsedArgs = validateArgs
-            ? this.inputValidator.validateFindArgs(this.model, normalizedArgs, {
-                  unique: operation === 'findUnique',
-                  findOne,
-              })
+            ? this.inputValidator.validateFindArgs(this.model, normalizedArgs, operation)
             : (normalizedArgs as FindArgs<Schema, GetModels<Schema>, true> | undefined);
 
         if (findOne) {

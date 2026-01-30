@@ -17,7 +17,7 @@ describe('Client API tests', () => {
             .values({
                 id: uid,
                 email: 'a@b.com',
-                updatedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString().replace('Z', '+00:00'),
             })
             .execute();
 
@@ -31,7 +31,7 @@ describe('Client API tests', () => {
                 authorId: uid,
                 title: 'Post1',
                 content: 'My post',
-                updatedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString().replace('Z', '+00:00'),
             })
             .execute();
 

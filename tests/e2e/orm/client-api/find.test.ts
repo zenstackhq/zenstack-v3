@@ -262,6 +262,11 @@ describe('Client find tests ', () => {
     });
 
     it('works with distinct', async () => {
+        if (['sqlite', 'mysql'].includes(client.$schema.provider.type)) {
+            await expect(client.user.findMany({ distinct: ['role'] } as any)).rejects.toThrow('not supported');
+            return;
+        }
+
         const user1 = await createUser(client, 'u1@test.com', {
             name: 'Admin1',
             role: 'ADMIN',
@@ -281,11 +286,6 @@ describe('Client find tests ', () => {
             name: 'User',
             role: 'USER',
         });
-
-        if (client.$schema.provider.type === 'sqlite') {
-            await expect(client.user.findMany({ distinct: ['role'] } as any)).rejects.toThrow('not supported');
-            return;
-        }
 
         // single field distinct
         let r: any = await client.user.findMany({ distinct: ['role'] } as any);
@@ -907,7 +907,7 @@ describe('Client find tests ', () => {
                 // @ts-expect-error
                 include: { author: { where: { email: user.email } } },
             }),
-        ).rejects.toThrow(`Invalid find args`);
+        ).rejects.toThrow(`Invalid findFirst args`);
 
         // sorting
         let u = await client.user.findUniqueOrThrow({
@@ -1120,6 +1120,52 @@ describe('Client find tests ', () => {
         ).resolves.toMatchObject({
             _count: { posts: 0 },
         });
+    });
+
+    it('supports _count inside include', async () => {
+        const user = await createUser(client, 'u1@test.com');
+        await createPosts(client, user.id);
+
+        // Test _count with select inside include
+        const result = await client.user.findFirst({
+            include: {
+                posts: { select: { title: true } },
+                _count: { select: { posts: true } },
+            },
+        });
+
+        expect(result).toBeDefined();
+        expect(result?.posts).toHaveLength(2);
+        expect(result?.posts[0]).toHaveProperty('title');
+        // TypeScript should recognize _count property exists
+        expect(result?._count).toBeDefined();
+        expect(result?._count.posts).toBe(2);
+
+        // Test _count with boolean true inside include
+        const result2 = await client.user.findFirst({
+            include: {
+                posts: true,
+                _count: true,
+            },
+        });
+
+        expect(result2).toBeDefined();
+        expect(result2?.posts).toHaveLength(2);
+        expect(result2?._count).toBeDefined();
+        expect(result2?._count.posts).toBe(2);
+
+        // Test _count with filtered posts inside include
+        const result3 = await client.user.findFirst({
+            include: {
+                posts: { where: { published: true } },
+                _count: { select: { posts: { where: { published: true } } } },
+            },
+        });
+
+        expect(result3).toBeDefined();
+        expect(result3?.posts).toHaveLength(1);
+        expect(result3?._count).toBeDefined();
+        expect(result3?._count.posts).toBe(1);
     });
 
     it('supports $expr', async () => {

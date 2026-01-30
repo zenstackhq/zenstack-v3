@@ -2,6 +2,7 @@ import type {
     ArrayExpression,
     BinaryExpression,
     BinaryOperator,
+    BindingExpression,
     CallExpression,
     Expression,
     FieldExpression,
@@ -18,69 +19,43 @@ import type {
  */
 export const ExpressionUtils = {
     literal: (value: string | number | boolean): LiteralExpression => {
-        return {
-            kind: 'literal',
-            value,
-        };
+        return { kind: 'literal', value };
     },
 
-    array: (items: Expression[]): ArrayExpression => {
-        return {
-            kind: 'array',
-            items,
-        };
+    array: (type: string, items: Expression[]): ArrayExpression => {
+        return { kind: 'array', type, items };
     },
 
     call: (functionName: string, args?: Expression[]): CallExpression => {
-        return {
-            kind: 'call',
-            function: functionName,
-            args,
-        };
+        return { kind: 'call', function: functionName, args };
     },
 
-    binary: (left: Expression, op: BinaryOperator, right: Expression): BinaryExpression => {
-        return {
-            kind: 'binary',
-            op,
-            left,
-            right,
-        };
+    binary: (left: Expression, op: BinaryOperator, right: Expression, binding?: string): BinaryExpression => {
+        return { kind: 'binary', op, left, right, binding };
     },
 
     unary: (op: UnaryOperator, operand: Expression): UnaryExpression => {
-        return {
-            kind: 'unary',
-            op,
-            operand,
-        };
+        return { kind: 'unary', op, operand };
     },
 
     field: (field: string): FieldExpression => {
-        return {
-            kind: 'field',
-            field,
-        };
+        return { kind: 'field', field };
     },
 
     member: (receiver: Expression, members: string[]): MemberExpression => {
-        return {
-            kind: 'member',
-            receiver: receiver,
-            members,
-        };
+        return { kind: 'member', receiver: receiver, members };
+    },
+
+    binding: (name: string): BindingExpression => {
+        return { kind: 'binding', name };
     },
 
     _this: (): ThisExpression => {
-        return {
-            kind: 'this',
-        };
+        return { kind: 'this' };
     },
 
     _null: (): NullExpression => {
-        return {
-            kind: 'null',
-        };
+        return { kind: 'null' };
     },
 
     and: (expr: Expression, ...expressions: Expression[]) => {
@@ -116,6 +91,8 @@ export const ExpressionUtils = {
     isField: (value: unknown): value is FieldExpression => ExpressionUtils.is(value, 'field'),
 
     isMember: (value: unknown): value is MemberExpression => ExpressionUtils.is(value, 'member'),
+
+    isBinding: (value: unknown): value is BindingExpression => ExpressionUtils.is(value, 'binding'),
 
     getLiteralValue: (expr: Expression): string | number | boolean | undefined => {
         return ExpressionUtils.isLiteral(expr) ? expr.value : undefined;

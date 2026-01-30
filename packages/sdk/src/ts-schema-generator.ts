@@ -13,6 +13,7 @@ import {
     InvocationExpr,
     isArrayExpr,
     isBinaryExpr,
+    isCollectionPredicateBinding,
     isDataField,
     isDataModel,
     isDataSource,
@@ -621,12 +622,15 @@ export class TsSchemaGenerator {
 
         const defaultValue = this.getFieldMappedDefault(field);
         if (defaultValue !== undefined) {
-            if (typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
+            if (defaultValue === null) {
+                objectFields.push(
+                    ts.factory.createPropertyAssignment('default', this.createExpressionUtilsCall('_null')),
+                );
+            } else if (typeof defaultValue === 'object' && !Array.isArray(defaultValue)) {
                 if ('call' in defaultValue) {
                     objectFields.push(
                         ts.factory.createPropertyAssignment(
                             'default',
-
                             this.createExpressionUtilsCall('call', [
                                 ts.factory.createStringLiteral(defaultValue.call),
                                 ...(defaultValue.args.length > 0
@@ -739,7 +743,15 @@ export class TsSchemaGenerator {
 
     private getFieldMappedDefault(
         field: DataField,
-    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
+    ):
+        | string
+        | number
+        | boolean
+        | unknown[]
+        | { call: string; args: any[] }
+        | { authMember: string[] }
+        | null
+        | undefined {
         const defaultAttr = getAttribute(field, '@default');
         if (!defaultAttr) {
             return undefined;
@@ -752,7 +764,7 @@ export class TsSchemaGenerator {
     private getMappedValue(
         expr: Expression,
         fieldType: DataFieldType,
-    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | undefined {
+    ): string | number | boolean | unknown[] | { call: string; args: any[] } | { authMember: string[] } | null {
         if (isLiteralExpr(expr)) {
             const lit = (expr as LiteralExpr).value;
             return fieldType.type === 'Boolean'
@@ -773,8 +785,10 @@ export class TsSchemaGenerator {
             return {
                 authMember: this.getMemberAccessChain(expr),
             };
+        } else if (isNullExpr(expr)) {
+            return null;
         } else {
-            throw new Error(`Unsupported default value type for ${expr.$type}`);
+            throw new Error(`Unsupported expression type: ${expr.$type}`);
         }
     }
 
@@ -1030,6 +1044,8 @@ export class TsSchemaGenerator {
     private createEnumObject(e: Enum) {
         return ts.factory.createObjectLiteralExpression(
             [
+                ts.factory.createPropertyAssignment('name', ts.factory.createStringLiteral(e.name)),
+
                 ts.factory.createPropertyAssignment(
                     'values',
                     ts.factory.createObjectLiteralExpression(
@@ -1258,11 +1274,17 @@ export class TsSchemaGenerator {
     }
 
     private createBinaryExpression(expr: BinaryExpr) {
-        return this.createExpressionUtilsCall('binary', [
+        const args = [
             this.createExpression(expr.left),
             this.createLiteralNode(expr.operator),
             this.createExpression(expr.right),
-        ]);
+        ];
+
+        if (expr.binding) {
+            args.push(this.createLiteralNode(expr.binding.name));
+        }
+
+        return this.createExpressionUtilsCall('binary', args);
     }
 
     private createUnaryExpression(expr: UnaryExpr) {
@@ -1273,19 +1295,28 @@ export class TsSchemaGenerator {
     }
 
     private createArrayExpression(expr: ArrayExpr): any {
+        const arrayResolved = expr.$resolvedType?.decl;
+        const arrayType = typeof arrayResolved === 'string' ? arrayResolved : arrayResolved?.name;
+        invariant(arrayType, 'Array type must be resolved to a string or declaration');
         return this.createExpressionUtilsCall('array', [
+            this.createLiteralNode(arrayType),
             ts.factory.createArrayLiteralExpression(expr.items.map((item) => this.createExpression(item))),
         ]);
     }
 
     private createRefExpression(expr: ReferenceExpr): any {
-        if (isDataField(expr.target.ref)) {
-            return this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]);
-        } else if (isEnumField(expr.target.ref)) {
-            return this.createLiteralExpression('StringLiteral', expr.target.$refText);
-        } else {
-            throw new Error(`Unsupported reference type: ${expr.target.$refText}`);
-        }
+        const target = expr.target.ref;
+        return match(target)
+            .when(isDataField, () =>
+                this.createExpressionUtilsCall('field', [this.createLiteralNode(expr.target.$refText)]),
+            )
+            .when(isEnumField, () => this.createLiteralExpression('StringLiteral', expr.target.$refText))
+            .when(isCollectionPredicateBinding, () =>
+                this.createExpressionUtilsCall('binding', [this.createLiteralNode(expr.target.$refText)]),
+            )
+            .otherwise(() => {
+                throw Error(`Unsupported reference type: ${expr.target.$refText}`);
+            });
     }
 
     private createCallExpression(expr: InvocationExpr) {

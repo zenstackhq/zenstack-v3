@@ -1,5 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import type { SchemaDef } from '@zenstackhq/schema';
+import type { DataSourceProviderType, SchemaDef } from '@zenstackhq/schema';
 import { TsSchemaGenerator } from '@zenstackhq/sdk';
 import { execSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -11,7 +11,7 @@ import { expect } from 'vitest';
 import { createTestProject } from './project';
 import { loadDocumentWithPlugins } from './utils';
 
-function makePrelude(provider: 'sqlite' | 'postgresql', dbUrl?: string) {
+function makePrelude(provider: DataSourceProviderType, dbUrl?: string) {
     return match(provider)
         .with('sqlite', () => {
             return `
@@ -29,20 +29,39 @@ datasource db {
 }
 `;
         })
+        .with('mysql', () => {
+            return `
+datasource db {
+    provider = 'mysql'
+    url = '${dbUrl ?? 'mysql://root:mysql@localhost:3306/db'}'
+}
+`;
+        })
         .exhaustive();
 }
 
-function replacePlaceholders(schemaText: string, provider: 'sqlite' | 'postgresql', dbUrl: string | undefined) {
-    const url = dbUrl ?? (provider === 'sqlite' ? 'file:./test.db' : 'postgres://postgres:postgres@localhost:5432/db');
+function replacePlaceholders(
+    schemaText: string,
+    provider: 'sqlite' | 'postgresql' | 'mysql',
+    dbUrl: string | undefined,
+) {
+    const url =
+        dbUrl ??
+        (provider === 'sqlite'
+            ? 'file:./test.db'
+            : provider === 'mysql'
+              ? 'mysql://root:mysql@localhost:3306/db'
+              : 'postgres://postgres:postgres@localhost:5432/db');
     return schemaText.replace(/\$DB_URL/g, url).replace(/\$PROVIDER/g, provider);
 }
 
 export async function generateTsSchema(
     schemaText: string,
-    provider: 'sqlite' | 'postgresql' = 'sqlite',
+    provider: DataSourceProviderType = 'sqlite',
     dbUrl?: string,
     extraSourceFiles?: Record<string, string>,
     withLiteSchema?: boolean,
+    extraZModelFiles?: Record<string, string>,
 ) {
     const workDir = createTestProject();
 
@@ -52,6 +71,19 @@ export async function generateTsSchema(
         zmodelPath,
         `${noPrelude ? '' : makePrelude(provider, dbUrl)}\n\n${replacePlaceholders(schemaText, provider, dbUrl)}`,
     );
+
+    // write extra ZModel files before loading the schema
+    if (extraZModelFiles) {
+        for (const [fileName, content] of Object.entries(extraZModelFiles)) {
+            let name = fileName;
+            if (!name.endsWith('.zmodel')) {
+                name += '.zmodel';
+            }
+            const filePath = path.join(workDir, name);
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+            fs.writeFileSync(filePath, content);
+        }
+    }
 
     const result = await loadDocumentWithPlugins(zmodelPath);
     if (!result.success) {

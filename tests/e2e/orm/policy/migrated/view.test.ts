@@ -36,7 +36,13 @@ describe('View Policy Test', () => {
 
         const rawDb = db.$unuseAll();
 
-        await rawDb.$executeRaw`CREATE VIEW "UserInfo" as select "User"."id", "User"."name", "User"."email", "User"."id" as "userId", count("Post"."id") as "postCount" from "User" left join "Post" on "User"."id" = "Post"."authorId" group by "User"."id";`;
+        if (['postgresql', 'sqlite'].includes(rawDb.$schema.provider.type)) {
+            await rawDb.$executeRaw`CREATE VIEW "UserInfo" as select "User"."id", "User"."name", "User"."email", "User"."id" as "userId", count("Post"."id") as "postCount" from "User" left join "Post" on "User"."id" = "Post"."authorId" group by "User"."id";`;
+        } else if (rawDb.$schema.provider.type === 'mysql') {
+            await rawDb.$executeRaw`CREATE VIEW UserInfo as select User.id, User.name, User.email, User.id as userId, count(Post.id) as postCount from User left join Post on User.id = Post.authorId group by User.id;`;
+        } else {
+            throw new Error(`Unsupported provider: ${rawDb.$schema.provider.type}`);
+        }
 
         await rawDb.user.create({
             data: {

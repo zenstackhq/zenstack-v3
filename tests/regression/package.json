@@ -1,12 +1,15 @@
 {
     "name": "regression",
-    "version": "3.2.0",
+    "version": "3.2.1",
     "private": true,
     "type": "module",
     "scripts": {
         "build": "pnpm run test:generate",
         "test:generate": "tsx ../../scripts/test-generate.ts ./test",
-        "test": "pnpm test:generate && tsc && vitest run"
+        "test": "pnpm test:generate && tsc && vitest run",
+        "test:sqlite": "TEST_DB_PROVIDER=sqlite vitest run",
+        "test:postgresql": "TEST_DB_PROVIDER=postgresql vitest run",
+        "test:mysql": "TEST_DB_PROVIDER=mysql vitest run"
     },
     "dependencies": {
         "@zenstackhq/testtools": "workspace:*",
@@ -17,6 +20,7 @@
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/orm": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",
+        "@zenstackhq/plugin-policy": "workspace:*",
         "@zenstackhq/typescript-config": "workspace:*",
         "@zenstackhq/vitest-config": "workspace:*",
         "@types/node": "catalog:"

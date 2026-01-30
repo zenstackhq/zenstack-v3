@@ -85,20 +85,34 @@ describe('Name mapping tests', () => {
             user_role: 'MODERATOR',
         });
 
-        await expect(
-            db.$qb
+        const mysql = db.$schema.provider.type === ('mysql' as any);
+
+        if (!mysql) {
+            await expect(
+                db.$qb
+                    .insertInto('User')
+                    .values({
+                        email: 'u2@test.com',
+                        role: 'ADMIN',
+                    })
+                    .returning(['id', 'email', 'role'])
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({
+                id: expect.any(Number),
+                email: 'u2@test.com',
+                role: 'ADMIN',
+            });
+        } else {
+            // mysql doesn't support returning, simply insert
+            await db.$qb
                 .insertInto('User')
                 .values({
                     email: 'u2@test.com',
                     role: 'ADMIN',
                 })
-                .returning(['id', 'email', 'role'])
-                .executeTakeFirst(),
-        ).resolves.toMatchObject({
-            id: expect.any(Number),
-            email: 'u2@test.com',
-            role: 'ADMIN',
-        });
+                .executeTakeFirst();
+        }
+
         rawRead = await db.$qbRaw
             .selectFrom('users')
             .where('user_email', '=', 'u2@test.com')
@@ -108,32 +122,34 @@ describe('Name mapping tests', () => {
             user_role: 'role_admin',
         });
 
-        await expect(
-            db.$qb
-                .insertInto('User')
-                .values({
-                    email: 'u3@test.com',
-                })
-                .returning(['User.id', 'User.email'])
-                .executeTakeFirst(),
-        ).resolves.toMatchObject({
-            id: expect.any(Number),
-            email: 'u3@test.com',
-        });
+        if (!mysql) {
+            await expect(
+                db.$qb
+                    .insertInto('User')
+                    .values({
+                        email: 'u3@test.com',
+                    })
+                    .returning(['User.id', 'User.email'])
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({
+                id: expect.any(Number),
+                email: 'u3@test.com',
+            });
 
-        await expect(
-            db.$qb
-                .insertInto('User')
-                .values({
-                    email: 'u4@test.com',
-                })
-                .returningAll()
-                .executeTakeFirst(),
-        ).resolves.toMatchObject({
-            id: expect.any(Number),
-            email: 'u4@test.com',
-            role: 'USER',
-        });
+            await expect(
+                db.$qb
+                    .insertInto('User')
+                    .values({
+                        email: 'u4@test.com',
+                    })
+                    .returningAll()
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({
+                id: expect.any(Number),
+                email: 'u4@test.com',
+                role: 'USER',
+            });
+        }
     });
 
     it('works with find', async () => {
@@ -379,18 +395,20 @@ describe('Name mapping tests', () => {
             posts: [expect.objectContaining({ title: 'Post2' })],
         });
 
-        await expect(
-            db.$qb
-                .updateTable('User')
-                .set({ email: (eb) => eb.fn('upper', [eb.ref('email')]), role: 'USER' })
-                .where('email', '=', 'u2@test.com')
-                .returning(['email', 'role'])
-                .executeTakeFirst(),
-        ).resolves.toMatchObject({ email: 'U2@TEST.COM', role: 'USER' });
+        if (db.$schema.provider.type !== ('mysql' as any)) {
+            await expect(
+                db.$qb
+                    .updateTable('User')
+                    .set({ email: (eb) => eb.fn('upper', [eb.ref('email')]), role: 'USER' })
+                    .where('email', '=', 'u2@test.com')
+                    .returning(['email', 'role'])
+                    .executeTakeFirst(),
+            ).resolves.toMatchObject({ email: 'U2@TEST.COM', role: 'USER' });
 
-        await expect(
-            db.$qb.updateTable('User as u').set({ email: 'u3@test.com' }).returningAll().executeTakeFirst(),
-        ).resolves.toMatchObject({ id: expect.any(Number), email: 'u3@test.com', role: 'USER' });
+            await expect(
+                db.$qb.updateTable('User as u').set({ email: 'u3@test.com' }).returningAll().executeTakeFirst(),
+            ).resolves.toMatchObject({ id: expect.any(Number), email: 'u3@test.com', role: 'USER' });
+        }
     });
 
     it('works with delete', async () => {
@@ -406,12 +424,17 @@ describe('Name mapping tests', () => {
             },
         });
 
-        await expect(
-            db.$qb.deleteFrom('Post').where('title', '=', 'Post1').returning(['id', 'title']).executeTakeFirst(),
-        ).resolves.toMatchObject({
-            id: user.id,
-            title: 'Post1',
-        });
+        if (db.$schema.provider.type !== ('mysql' as any)) {
+            await expect(
+                db.$qb.deleteFrom('Post').where('title', '=', 'Post1').returning(['id', 'title']).executeTakeFirst(),
+            ).resolves.toMatchObject({
+                id: user.id,
+                title: 'Post1',
+            });
+        } else {
+            // mysql doesn't support returning, simply delete
+            await db.$qb.deleteFrom('Post').where('title', '=', 'Post1').executeTakeFirst();
+        }
 
         await expect(
             db.user.delete({

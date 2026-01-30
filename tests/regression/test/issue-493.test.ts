@@ -40,7 +40,7 @@ model Foo {
 }
 `;
 
-        const db = await createTestClient(schema, { provider: 'postgresql', debug: true });
+        const db = await createTestClient(schema, { provider: 'postgresql' });
 
         // plain JSON non-array
         await expect(

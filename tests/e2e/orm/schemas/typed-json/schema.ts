@@ -94,6 +94,7 @@ export class SchemaType implements SchemaDef {
     } as const;
     enums = {
         Gender: {
+            name: "Gender",
             values: {
                 MALE: "MALE",
                 FEMALE: "FEMALE"

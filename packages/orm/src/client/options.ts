@@ -4,7 +4,7 @@ import type { PrependParameter } from '../utils/type-utils';
 import type { ClientContract, CRUD_EXT } from './contract';
 import type { GetProcedureNames, ProcedureHandlerFunc } from './crud-types';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
-import type { RuntimePlugin } from './plugin';
+import type { AnyPlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
 
 export type ZModelFunctionContext<Schema extends SchemaDef> = {
@@ -59,7 +59,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
     /**
      * Plugins.
      */
-    plugins?: RuntimePlugin<Schema>[];
+    plugins?: AnyPlugin[];
 
     /**
      * Logging configuration.
@@ -85,7 +85,7 @@ export type ClientOptions<Schema extends SchemaDef> = {
     /**
      * Options for omitting fields in ORM query results.
      */
-    omit?: OmitOptions<Schema>;
+    omit?: OmitConfig<Schema>;
 
     /**
      * Whether to allow overriding omit settings at query time. Defaults to `true`. When set to
@@ -111,9 +111,9 @@ export type ClientOptions<Schema extends SchemaDef> = {
         : {});
 
 /**
- * Options for omitting fields in ORM query results.
+ * Config for omitting fields in ORM query results.
  */
-export type OmitOptions<Schema extends SchemaDef> = {
+export type OmitConfig<Schema extends SchemaDef> = {
     [Model in GetModels<Schema>]?: {
         [Field in GetModelFields<Schema, Model> as Field extends ScalarFields<Schema, Model> ? Field : never]?: boolean;
     };

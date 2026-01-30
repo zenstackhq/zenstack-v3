@@ -407,7 +407,7 @@ attribute @omit()
  * updates have been made to a record. An update that only contains ignored fields does not change the
  * timestamp.
  */
-attribute @updatedAt(_ ignore: FieldReference[]?) @@@targetField([DateTimeField]) @@@prisma
+attribute @updatedAt(ignore: FieldReference[]?) @@@targetField([DateTimeField]) @@@prisma
 
 /**
  * Add full text index (MySQL only).

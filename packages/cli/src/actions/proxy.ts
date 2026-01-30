@@ -87,25 +87,17 @@ export async function run(options: Options) {
 }
 
 function evaluateUrl(value: string): string {
-    // Create env helper function
-    const env = (varName: string) => {
-        const envValue = process.env[varName];
+    // Check if it's an env() function call
+    const envMatch = value.match(/^env\(['"]([^'"]+)['"]\)$/);
+    if (envMatch) {
+        const varName = envMatch[1];
+        const envValue = process.env[varName!];
         if (!envValue) {
             throw new CliError(`Environment variable ${varName} is not set`);
         }
         return envValue;
-    };
-
-    try {
-        // Use Function constructor to evaluate the url value
-        const urlFn = new Function('env', `return ${value}`);
-        const url = urlFn(env);
-        return url;
-    } catch (err) {
-        if (err instanceof CliError) {
-            throw err;
-        }
-        throw new CliError('Could not evaluate datasource url from schema, you could provide it via -d option.');
+    } else {
+        return value;
     }
 }
 

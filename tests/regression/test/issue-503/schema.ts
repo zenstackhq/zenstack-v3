@@ -46,7 +46,7 @@ export class SchemaType implements SchemaDef {
                 chat: {
                     name: "chat",
                     type: "InternalChat",
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("chatId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("chatId")]) }, { name: "references", value: ExpressionUtils.array("Int", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "messages", fields: ["chatId"], references: ["id"] }
                 },
                 chatId: {
@@ -60,7 +60,7 @@ export class SchemaType implements SchemaDef {
                     name: "media",
                     type: "Media",
                     optional: true,
-                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array([ExpressionUtils.field("mediaId")]) }, { name: "references", value: ExpressionUtils.array([ExpressionUtils.field("id")]) }] }],
+                    attributes: [{ name: "@relation", args: [{ name: "fields", value: ExpressionUtils.array("Int", [ExpressionUtils.field("mediaId")]) }, { name: "references", value: ExpressionUtils.array("Int", [ExpressionUtils.field("id")]) }] }],
                     relation: { opposite: "messages", fields: ["mediaId"], references: ["id"] }
                 },
                 mediaId: {

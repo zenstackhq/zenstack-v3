@@ -489,26 +489,41 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 continue;
             }
 
-            const value = this.transformInput(_value, fieldType, !!fieldDef.array);
+            invariant(fieldDef.array, 'Field must be an array type to build array filter');
+            const value = this.transformInput(_value, fieldType, true);
+
+            let receiver = fieldRef;
+            if (isEnum(this.schema, fieldType)) {
+                // cast enum array to `text[]` for type compatibility
+                receiver = this.eb.cast(fieldRef, sql.raw('text[]'));
+            }
+
+            const buildArray = (value: unknown) => {
+                invariant(Array.isArray(value), 'Array filter value must be an array');
+                return this.buildArrayValue(
+                    value.map((v) => this.eb.val(v)),
+                    fieldType,
+                );
+            };
 
             switch (key) {
                 case 'equals': {
-                    clauses.push(this.buildLiteralFilter(fieldRef, fieldType, this.eb.val(value)));
+                    clauses.push(this.eb(receiver, '=', buildArray(value)));
                     break;
                 }
 
                 case 'has': {
-                    clauses.push(this.eb(fieldRef, '@>', this.eb.val([value])));
+                    clauses.push(this.buildArrayContains(receiver, this.eb.val(value)));
                     break;
                 }
 
                 case 'hasEvery': {
-                    clauses.push(this.eb(fieldRef, '@>', this.eb.val(value)));
+                    clauses.push(this.buildArrayHasEvery(receiver, buildArray(value)));
                     break;
                 }
 
                 case 'hasSome': {
-                    clauses.push(this.eb(fieldRef, '&&', this.eb.val(value)));
+                    clauses.push(this.buildArrayHasSome(receiver, buildArray(value)));
                     break;
                 }
 
@@ -1420,9 +1435,24 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     abstract buildArrayLength(array: Expression<unknown>): AliasableExpression<number>;
 
     /**
-     * Builds an array literal SQL string for the given values.
+     * Builds an array value expression.
      */
-    abstract buildArrayLiteralSQL(values: unknown[]): AliasableExpression<unknown>;
+    abstract buildArrayValue(values: Expression<unknown>[], elemType: string): AliasableExpression<unknown>;
+
+    /**
+     * Builds an expression that checks if an array contains a single value.
+     */
+    abstract buildArrayContains(field: Expression<unknown>, value: Expression<unknown>): AliasableExpression<SqlBool>;
+
+    /**
+     * Builds an expression that checks if an array contains all values from another array.
+     */
+    abstract buildArrayHasEvery(field: Expression<unknown>, values: Expression<unknown>): AliasableExpression<SqlBool>;
+
+    /**
+     * Builds an expression that checks if an array overlaps with another array.
+     */
+    abstract buildArrayHasSome(field: Expression<unknown>, values: Expression<unknown>): AliasableExpression<SqlBool>;
 
     /**
      * Casts the given expression to an integer type.
@@ -1438,11 +1468,6 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
      * Trims double quotes from the start and end of a text expression.
      */
     abstract trimTextQuotes<T extends Expression<string>>(expression: T): T;
-
-    /**
-     * Gets the SQL column type for the given field definition.
-     */
-    abstract getFieldSqlType(fieldDef: FieldDef): string;
 
     /*
      * Gets the string casing behavior for the dialect.

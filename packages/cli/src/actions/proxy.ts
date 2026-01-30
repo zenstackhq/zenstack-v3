@@ -120,7 +120,7 @@ function redactDatabaseUrl(url: string): string {
         }
         return parsedUrl.toString();
     } catch {
-        // If URL parsing fails, return the original (might be a file path for SQLite)
+        // If URL parsing fails, return the original
         return url;
     }
 }
@@ -135,7 +135,7 @@ function createDialect(provider: string, databaseUrl: string, outputPath: string
                     resolvedUrl = path.join(outputPath, filePath);
                 }
             }
-            console.log(colors.gray(`Connecting to SQLite database at: ${redactDatabaseUrl(resolvedUrl)}`));
+            console.log(colors.gray(`Connecting to SQLite database at: ${resolvedUrl}`));
             return new SqliteDialect({
                 database: new SQLite(resolvedUrl),
             });

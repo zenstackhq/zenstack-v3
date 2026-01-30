@@ -1281,7 +1281,11 @@ export class TsSchemaGenerator {
     }
 
     private createArrayExpression(expr: ArrayExpr): any {
+        const arrayResolved = expr.$resolvedType?.decl;
+        const arrayType = typeof arrayResolved === 'string' ? arrayResolved : arrayResolved?.name;
+        invariant(arrayType, 'Array type must be resolved to a string or declaration');
         return this.createExpressionUtilsCall('array', [
+            this.createLiteralNode(arrayType),
             ts.factory.createArrayLiteralExpression(expr.items.map((item) => this.createExpression(item))),
         ]);
     }

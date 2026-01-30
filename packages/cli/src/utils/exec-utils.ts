@@ -57,5 +57,5 @@ export function execPrisma(args: string, options?: Omit<ExecSyncOptions, 'env'> 
         return;
     }
 
-    execSync(`node ${prismaPath} ${args}`, _options);
+    execSync(`node "${prismaPath}" ${args}`, _options);
 }

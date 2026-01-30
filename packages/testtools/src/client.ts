@@ -68,7 +68,12 @@ type ExtraTestClientOptions = {
     usePrismaPush?: boolean;
 
     /**
-     * Extra source files to create and compile.
+     * Extra ZModel files to be created in the working directory.
+     */
+    extraZModelFiles?: Record<string, string>;
+
+    /**
+     * Extra TypeScript source files to create and compile.
      */
     extraSourceFiles?: Record<string, string>;
 
@@ -126,7 +131,14 @@ export async function createTestClient(
     let model: Model | undefined;
 
     if (typeof schema === 'string') {
-        const generated = await generateTsSchema(schema, provider, dbUrl, options?.extraSourceFiles, undefined);
+        const generated = await generateTsSchema(
+            schema,
+            provider,
+            dbUrl,
+            options?.extraSourceFiles,
+            undefined,
+            options?.extraZModelFiles,
+        );
         workDir = generated.workDir;
         model = generated.model;
         // replace schema's provider

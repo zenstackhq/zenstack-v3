@@ -61,6 +61,7 @@ export async function generateTsSchema(
     dbUrl?: string,
     extraSourceFiles?: Record<string, string>,
     withLiteSchema?: boolean,
+    extraZModelFiles?: Record<string, string>,
 ) {
     const workDir = createTestProject();
 
@@ -70,6 +71,19 @@ export async function generateTsSchema(
         zmodelPath,
         `${noPrelude ? '' : makePrelude(provider, dbUrl)}\n\n${replacePlaceholders(schemaText, provider, dbUrl)}`,
     );
+
+    // write extra ZModel files before loading the schema
+    if (extraZModelFiles) {
+        for (const [fileName, content] of Object.entries(extraZModelFiles)) {
+            let name = fileName;
+            if (!name.endsWith('.zmodel')) {
+                name += '.zmodel';
+            }
+            const filePath = path.join(workDir, name);
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+            fs.writeFileSync(filePath, content);
+        }
+    }
 
     const result = await loadDocumentWithPlugins(zmodelPath);
     if (!result.success) {

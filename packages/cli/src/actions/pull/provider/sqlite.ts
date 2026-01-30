@@ -1,3 +1,4 @@
+import type { Attribute, BuiltinType } from '@zenstackhq/language/ast';
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
@@ -141,7 +142,7 @@ export const sqlite: IntrospectionProvider = {
                             nulls: null,
                         })),
                     };
-                });
+                }).reverse(); // Reverse to maintain creation order
 
                 // Foreign keys mapping by column name
                 const fkRows = all<{
@@ -244,37 +245,87 @@ export const sqlite: IntrospectionProvider = {
         }
     },
 
-    getDefaultValue({ defaultValue, fieldName, fieldType: _fieldType, services, enums }) {
+    getDefaultValue({ defaultValue, fieldType, services, enums }) {
         const val = defaultValue.trim();
-        const factories: DataFieldAttributeFactory[] = [];
 
-        const defaultAttr = new DataFieldAttributeFactory().setDecl(getAttributeRef('@default', services));
+        switch (fieldType) {
+            case 'DateTime':
+                if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
+                    return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services));
+                }
+                // Fallback to string literal for other DateTime defaults
+                return (ab) => ab.StringLiteral.setValue(val);
 
-        if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
-            factories.push(defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services))));
+            case 'Int':
+            case 'BigInt':
+                if (val === 'autoincrement') {
+                    return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
+                }
+                if (/^-?\d+$/.test(val)) {
+                    return (ab) => ab.NumberLiteral.setValue(val);
+                }
+                break;
 
-            if (fieldName.toLowerCase() === 'updatedat' || fieldName.toLowerCase() === 'updated_at') {
-                factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)));
-            }
-            return factories;
+            case 'Float':
+                if (/^-?\d+\.\d+$/.test(val)) {
+                    const numVal = parseFloat(val);
+                    return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(1) : String(numVal));
+                }
+                if (/^-?\d+$/.test(val)) {
+                    return (ab) => ab.NumberLiteral.setValue(val + '.0');
+                }
+                break;
+
+            case 'Decimal':
+                if (/^-?\d+\.\d+$/.test(val)) {
+                    const numVal = parseFloat(val);
+                    if (numVal === Math.floor(numVal)) {
+                        return (ab) => ab.NumberLiteral.setValue(numVal.toFixed(2));
+                    }
+                    return (ab) => ab.NumberLiteral.setValue(String(numVal));
+                }
+                if (/^-?\d+$/.test(val)) {
+                    return (ab) => ab.NumberLiteral.setValue(val + '.00');
+                }
+                break;
+
+            case 'Boolean':
+                if (val === 'true' || val === '1') {
+                    return (ab) => ab.BooleanLiteral.setValue(true);
+                }
+                if (val === 'false' || val === '0') {
+                    return (ab) => ab.BooleanLiteral.setValue(false);
+                }
+                break;
+
+            case 'String':
+                if (val.startsWith("'") && val.endsWith("'")) {
+                    const strippedName = val.slice(1, -1);
+                    const enumDef = enums.find((e) => e.fields.find((v) => getDbName(v) === strippedName));
+                    if (enumDef) {
+                        const enumField = enumDef.fields.find((v) => getDbName(v) === strippedName);
+                        if (enumField) return (ab) => ab.ReferenceExpr.setTarget(enumField);
+                    }
+                    return (ab) => ab.StringLiteral.setValue(strippedName);
+                }
+                break;
         }
 
-        // Handle autoincrement
+        // Fallback handlers for values that don't match field type-specific patterns
+        if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
+            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services));
+        }
+
         if (val === 'autoincrement') {
-            factories.push(
-                defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services))),
-            );
-            return factories;
+            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
         }
 
         if (val === 'true' || val === 'false') {
-            factories.push(defaultAttr.addArg((a) => a.BooleanLiteral.setValue(val === 'true')));
-            return factories;
+            return (ab) => ab.BooleanLiteral.setValue(val === 'true');
         }
 
-        if (!Number.isNaN(parseFloat(val)) || !Number.isNaN(parseInt(val))) {
-            factories.push(defaultAttr.addArg((a) => a.NumberLiteral.setValue(val)));
-            return factories;
+        if (/^-?\d+\.\d+$/.test(val) || /^-?\d+$/.test(val)) {
+            return (ab) => ab.NumberLiteral.setValue(val);
         }
 
         if (val.startsWith("'") && val.endsWith("'")) {
@@ -282,16 +333,46 @@ export const sqlite: IntrospectionProvider = {
             const enumDef = enums.find((e) => e.fields.find((v) => getDbName(v) === strippedName));
             if (enumDef) {
                 const enumField = enumDef.fields.find((v) => getDbName(v) === strippedName);
-                if (enumField) factories.push(defaultAttr.addArg((ab) => ab.ReferenceExpr.setTarget(enumField)));
-            } else {
-                factories.push(defaultAttr.addArg((a) => a.StringLiteral.setValue(strippedName)));
+                if (enumField) return (ab) => ab.ReferenceExpr.setTarget(enumField);
             }
-            return factories;
+            return (ab) => ab.StringLiteral.setValue(strippedName);
         }
 
         //TODO: add more default value factories if exists
         throw new Error(
-            `This default value type currently is not supported. Plesase open an issue on github. Values: "${defaultValue}"`,
+            `This default value type currently is not supported. Please open an issue on github. Values: "${defaultValue}"`,
         );
+    },
+
+    getFieldAttributes({ fieldName, fieldType, datatype, length, precision, services }) {
+        const factories: DataFieldAttributeFactory[] = [];
+
+        // Add @updatedAt for DateTime fields named updatedAt or updated_at
+        if (fieldType === 'DateTime' && (fieldName.toLowerCase() === 'updatedat' || fieldName.toLowerCase() === 'updated_at')) {
+            factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)));
+        }
+
+        // Add @db.* attribute if the datatype differs from the default
+        const dbAttr = services.shared.workspace.IndexManager.allElements('Attribute').find(
+            (d) => d.name.toLowerCase() === `@db.${datatype.toLowerCase()}`,
+        )?.node as Attribute | undefined;
+
+        const defaultDatabaseType = this.getDefaultDatabaseType(fieldType as BuiltinType);
+
+        if (
+            dbAttr &&
+            defaultDatabaseType &&
+            (defaultDatabaseType.type !== datatype ||
+                (defaultDatabaseType.precisition &&
+                    defaultDatabaseType.precisition !== (length || precision)))
+        ) {
+            const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
+            if (length || precision) {
+                dbAttrFactory.addArg((a) => a.NumberLiteral.setValue(length! || precision!));
+            }
+            factories.push(dbAttrFactory);
+        }
+
+        return factories;
     },
 };

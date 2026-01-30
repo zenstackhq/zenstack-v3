@@ -142,7 +142,7 @@ export const sqlite: IntrospectionProvider = {
                             nulls: null,
                         })),
                     };
-                }).reverse(); // Reverse to maintain creation order
+                });
 
                 // Foreign keys mapping by column name
                 const fkRows = all<{

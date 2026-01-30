@@ -1,8 +1,9 @@
-import type { Attribute, BuiltinType } from '@zenstackhq/language/ast';
-import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
+import type { Attribute, BuiltinType, Enum, Expression } from '@zenstackhq/language/ast';
+import { AstFactory, DataFieldAttributeFactory, ExpressionBuilder } from '@zenstackhq/language/factory';
 import { Client } from 'pg';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
+import type { ZModelServices } from '@zenstackhq/language';
 
 export const postgresql: IntrospectionProvider = {
     isSupportedFeature(feature) {
@@ -112,46 +113,16 @@ export const postgresql: IntrospectionProvider = {
     getDefaultValue({ defaultValue, fieldType, services, enums }) {
         const val = defaultValue.trim();
 
-        // Handle type casts early (PostgreSQL-specific pattern like 'value'::type)
-        if (val.includes('::')) {
-            const [value, type] = val
-                .replace(/'/g, '')
-                .split('::')
-                .map((s) => s.trim()) as [string, string];
-            switch (type) {
-                case 'character varying':
-                case 'uuid':
-                case 'json':
-                case 'jsonb':
-                case 'text':
-                    if (value === 'NULL') return null;
-                    return (ab) => ab.StringLiteral.setValue(value);
-                case 'real':
-                    return (ab) => ab.NumberLiteral.setValue(value);
-                default: {
-                    const enumDef = enums.find((e) => getDbName(e, true) === type);
-                    if (!enumDef) {
-                        return (ab) =>
-                            ab.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
-                                a.setValue((v) => v.StringLiteral.setValue(val)),
-                            );
-                    }
-                    const enumField = enumDef.fields.find((v) => getDbName(v) === value);
-                    if (!enumField) {
-                        throw new Error(
-                            `Enum value ${value} not found in enum ${type} for default value ${defaultValue}`,
-                        );
-                    }
-                    return (ab) => ab.ReferenceExpr.setTarget(enumField);
-                }
-            }
-        }
-
         switch (fieldType) {
             case 'DateTime':
                 if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
                     return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services));
                 }
+                
+                if (val.includes('::')) {
+                    return typeCastingConvert({defaultValue,enums,val,services});
+                }
+
                 // Fallback to string literal for other DateTime defaults
                 return (ab) => ab.StringLiteral.setValue(val);
 
@@ -160,12 +131,21 @@ export const postgresql: IntrospectionProvider = {
                 if (val.startsWith('nextval(')) {
                     return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
                 }
+
+                if (val.includes('::')) {
+                    return typeCastingConvert({defaultValue,enums,val,services});
+                }
+
                 if (/^-?\d+$/.test(val)) {
                     return (ab) => ab.NumberLiteral.setValue(val);
                 }
                 break;
 
             case 'Float':
+                if (val.includes('::')) {
+                    return typeCastingConvert({defaultValue,enums,val,services});
+                }
+
                 if (/^-?\d+\.\d+$/.test(val)) {
                     const numVal = parseFloat(val);
                     return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(1) : String(numVal));
@@ -176,6 +156,10 @@ export const postgresql: IntrospectionProvider = {
                 break;
 
             case 'Decimal':
+                if (val.includes('::')) {
+                    return typeCastingConvert({defaultValue,enums,val,services});
+                }
+
                 if (/^-?\d+\.\d+$/.test(val)) {
                     const numVal = parseFloat(val);
                     if (numVal === Math.floor(numVal)) {
@@ -198,10 +182,18 @@ export const postgresql: IntrospectionProvider = {
                 break;
 
             case 'String':
+                if (val.includes('::')) {
+                    return typeCastingConvert({defaultValue,enums,val,services});
+                }
+
                 if (val.startsWith("'") && val.endsWith("'")) {
                     return (ab) => ab.StringLiteral.setValue(val.slice(1, -1).replace(/''/g, "'"));
                 }
                 break;
+        }
+
+        if (val.includes('::')) {
+            return typeCastingConvert({defaultValue,enums,val,services});
         }
 
         // Fallback handlers for values that don't match field type-specific patterns
@@ -447,3 +439,37 @@ WHERE
   AND "cls"."relname" !~ '_prisma_migrations'
   ORDER BY "ns"."nspname", "cls"."relname" ASC;
 `;
+
+function typeCastingConvert({defaultValue, enums, val, services}:{val: string, enums: Enum[], defaultValue:string, services:ZModelServices}): ((builder: ExpressionBuilder) => AstFactory<Expression>) | null {
+    const [value, type] = val
+        .replace(/'/g, '')
+        .split('::')
+        .map((s) => s.trim()) as [string, string];
+    switch (type) {
+        case 'character varying':
+        case 'uuid':
+        case 'json':
+        case 'jsonb':
+        case 'text':
+            if (value === 'NULL') return null;
+            return (ab) => ab.StringLiteral.setValue(value);
+        case 'real':
+            return (ab) => ab.NumberLiteral.setValue(value);
+        default: {
+            const enumDef = enums.find((e) => getDbName(e, true) === type);
+            if (!enumDef) {
+                return (ab) =>
+                    ab.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
+                        a.setValue((v) => v.StringLiteral.setValue(val)),
+                    );
+            }
+            const enumField = enumDef.fields.find((v) => getDbName(v) === value);
+            if (!enumField) {
+                throw new Error(
+                    `Enum value ${value} not found in enum ${type} for default value ${defaultValue}`,
+                );
+            }
+            return (ab) => ab.ReferenceExpr.setTarget(enumField);
+        }
+    }
+}

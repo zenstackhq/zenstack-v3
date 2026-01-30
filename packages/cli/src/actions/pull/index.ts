@@ -331,7 +331,7 @@ export function syncTable({
     }
 
     // Sort indexes: unique indexes first, then other indexes
-    const sortedIndexes = table.indexes.sort((a, b) => {
+    const sortedIndexes = table.indexes.reverse().sort((a, b) => {
         if (a.unique && !b.unique) return -1;
         if (!a.unique && b.unique) return 1;
         return 0;

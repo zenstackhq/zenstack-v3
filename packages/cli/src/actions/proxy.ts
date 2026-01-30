@@ -109,6 +109,22 @@ function evaluateUrl(value: string): string {
     }
 }
 
+function redactDatabaseUrl(url: string): string {
+    try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.password) {
+            parsedUrl.password = '***';
+        }
+        if (parsedUrl.username) {
+            parsedUrl.username = '***';
+        }
+        return parsedUrl.toString();
+    } catch {
+        // If URL parsing fails, return the original
+        return url;
+    }
+}
+
 function createDialect(provider: string, databaseUrl: string, outputPath: string) {
     switch (provider) {
         case 'sqlite': {
@@ -125,7 +141,7 @@ function createDialect(provider: string, databaseUrl: string, outputPath: string
             });
         }
         case 'postgresql':
-            console.log(colors.gray(`Connecting to PostgreSQL database at: ${databaseUrl}`));
+            console.log(colors.gray(`Connecting to PostgreSQL database at: ${redactDatabaseUrl(databaseUrl)}`));
             return new PostgresDialect({
                 pool: new PgPool({
                     connectionString: databaseUrl,
@@ -133,7 +149,7 @@ function createDialect(provider: string, databaseUrl: string, outputPath: string
             });
 
         case 'mysql':
-            console.log(colors.gray(`Connecting to MySQL database at: ${databaseUrl}`));
+            console.log(colors.gray(`Connecting to MySQL database at: ${redactDatabaseUrl(databaseUrl)}`));
             return new MysqlDialect({
                 pool: createMysqlPool(databaseUrl),
             });

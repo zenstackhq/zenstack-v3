@@ -179,8 +179,8 @@ export const mysql: IntrospectionProvider = {
 
         const defaultAttr = new DataFieldAttributeFactory().setDecl(getAttributeRef('@default', services));
 
-        // Handle CURRENT_TIMESTAMP
-        if (val === 'CURRENT_TIMESTAMP' || val === 'current_timestamp()' || val === 'now()') {
+        // Handle CURRENT_TIMESTAMP with optional precision (e.g., CURRENT_TIMESTAMP(3))
+        if (/^CURRENT_TIMESTAMP(\(\d*\))?$/i.test(val) || val.toLowerCase() === 'current_timestamp()' || val.toLowerCase() === 'now()') {
             factories.push(defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services))));
 
             if (fieldName.toLowerCase() === 'updatedat' || fieldName.toLowerCase() === 'updated_at') {
@@ -190,7 +190,7 @@ export const mysql: IntrospectionProvider = {
         }
 
         // Handle auto_increment
-        if (val === 'auto_increment') {
+        if (val.toLowerCase() === 'auto_increment') {
             factories.push(
                 defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services))),
             );
@@ -212,9 +212,15 @@ export const mysql: IntrospectionProvider = {
             return factories;
         }
 
-        // Handle numeric values
-        if (/^-?\d+$/.test(val) || /^-?\d+(\.\d+)?$/.test(val)) {
+        // Handle numeric values (integers and decimals)
+        if (/^-?\d+$/.test(val)) {
             factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val)));
+            return factories;
+        }
+        if (/^-?\d+\.\d+$/.test(val)) {
+            // For decimal values, normalize to remove trailing zeros but keep reasonable precision
+            const numVal = parseFloat(val);
+            factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(String(numVal))));
             return factories;
         }
 
@@ -291,16 +297,24 @@ SELECT
             SELECT JSON_OBJECT(
                 'ordinal_position', c.ORDINAL_POSITION,
                 'name', c.COLUMN_NAME,
-                'datatype', c.DATA_TYPE,
+                'datatype', CASE 
+                    WHEN c.DATA_TYPE = 'tinyint' AND c.COLUMN_TYPE = 'tinyint(1)' THEN 'boolean'
+                    ELSE c.DATA_TYPE
+                END,
+                'datatype_schema', '',
                 'length', c.CHARACTER_MAXIMUM_LENGTH,
                 'precision', COALESCE(c.NUMERIC_PRECISION, c.DATETIME_PRECISION),
                 'nullable', c.IS_NULLABLE = 'YES',
-                'default', c.COLUMN_DEFAULT,
+                'default', CASE 
+                    WHEN c.EXTRA LIKE '%auto_increment%' THEN 'auto_increment'
+                    ELSE c.COLUMN_DEFAULT 
+                END,
                 'pk', c.COLUMN_KEY = 'PRI',
                 'unique', c.COLUMN_KEY = 'UNI',
                 'unique_name', CASE WHEN c.COLUMN_KEY = 'UNI' THEN c.COLUMN_NAME ELSE NULL END,
                 'computed', c.GENERATION_EXPRESSION IS NOT NULL AND c.GENERATION_EXPRESSION != '',
                 'options', JSON_ARRAY(),
+                'foreign_key_schema', NULL,
                 'foreign_key_table', kcu_fk.REFERENCED_TABLE_NAME,
                 'foreign_key_column', kcu_fk.REFERENCED_COLUMN_NAME,
                 'foreign_key_name', kcu_fk.CONSTRAINT_NAME,

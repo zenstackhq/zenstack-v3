@@ -269,7 +269,14 @@ export function syncTable({
             if (column.unique && !column.pk) {
                 builder.addAttribute((b) => {
                     b.setDecl(uniqueAttribute);
-                    if (column.unique_name && column.unique_name != `${table.name}_${column.name}_key`) b.addArg((ab) => ab.StringLiteral.setValue(column.unique_name!), 'map');
+                    // Only add map if the unique constraint name differs from default patterns
+                    // Default patterns: TableName_columnName_key (Prisma) or just columnName (MySQL)
+                    const isDefaultName = !column.unique_name 
+                        || column.unique_name === `${table.name}_${column.name}_key`
+                        || column.unique_name === column.name;
+                    if (!isDefaultName) {
+                        b.addArg((ab) => ab.StringLiteral.setValue(column.unique_name!), 'map');
+                    }
 
                     return b;
                 });
@@ -354,9 +361,13 @@ export function syncTable({
             return;
         }
 
-        if (index.columns.length === 1 && index.columns.find((c) => pkColumns.includes(c.name))
-            || index.columns.length === 1 && index.unique) {
-            //skip primary key or unique constraints as they are already handled
+        // Skip PRIMARY key index (handled via @id or @@id)
+        if (index.primary) {
+            return;
+        }
+
+        // Skip single-column indexes that are already handled by @id or @unique on the field
+        if (index.columns.length === 1 && (index.columns.find((c) => pkColumns.includes(c.name)) || index.unique)) {
             return;
         }
 

@@ -21,9 +21,12 @@ export class DataFieldAttributeFactory extends AstFactory<DataFieldAttribute> {
         super({ type: DataFieldAttribute, node: { args: [] } });
     }
     setDecl(decl: Attribute) {
+        if (!decl) {
+            throw new Error('Attribute declaration is required');
+        }
         this.decl = {
-            $refText: decl?.name ?? '',
-            ref: decl!,
+            $refText: decl.name,
+            ref: decl,
         };
         this.update({
             decl: this.decl,
@@ -50,9 +53,12 @@ export class DataModelAttributeFactory extends AstFactory<DataModelAttribute> {
         super({ type: DataModelAttribute, node: { args: [] } });
     }
     setDecl(decl: Attribute) {
+        if (!decl) {
+            throw new Error('Attribute declaration is required');
+        }
         this.decl = {
-            $refText: decl?.name ?? '',
-            ref: decl!,
+            $refText: decl.name,
+            ref: decl,
         };
         this.update({
             decl: this.decl,

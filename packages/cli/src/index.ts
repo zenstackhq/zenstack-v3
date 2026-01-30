@@ -150,12 +150,12 @@ function createProgram() {
         .addOption(noVersionCheckOption)
         .addOption(new Option('-o, --out <path>', 'add custom output path for the introspected schema'))
         .addOption(
-            new Option('--model-casing <pascal|camel|snake|kebab>', 'set the casing of generated models').default(
+            new Option('--model-casing <pascal|camel|snake|kebab|none>', 'set the casing of generated models').default(
                 'none',
             ),
         )
         .addOption(
-            new Option('--field-casing <pascal|camel|snake|kebab>', 'set the casing of generated fields').default(
+            new Option('--field-casing <pascal|camel|snake|kebab|none>', 'set the casing of generated fields').default(
                 'none',
             ),
         )

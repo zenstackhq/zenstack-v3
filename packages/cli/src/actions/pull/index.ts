@@ -76,8 +76,28 @@ export function syncEnums({
             .filter((d) => isEnum(d))
             .forEach((d) => {
                 const factory = new EnumFactory().setName(d.name);
+                // Copy enum-level comments
+                if (d.comments?.length) {
+                    factory.update({ comments: [...d.comments] });
+                }
+                // Copy enum-level attributes (@@map, @@schema, etc.)
+                if (d.attributes?.length) {
+                    factory.update({ attributes: [...d.attributes] });
+                }
+                // Copy fields with their attributes and comments
                 d.fields.forEach((v) => {
-                    factory.addField((builder) => builder.setName(v.name));
+                    factory.addField((builder) => {
+                        builder.setName(v.name);
+                        // Copy field-level comments
+                        if (v.comments?.length) {
+                            v.comments.forEach((c) => builder.addComment(c));
+                        }
+                        // Copy field-level attributes (@map, etc.)
+                        if (v.attributes?.length) {
+                            builder.update({ attributes: [...v.attributes] });
+                        }
+                        return builder;
+                    });
                 });
                 model.declarations.push(factory.get({ $container: model }));
             });
@@ -322,8 +342,10 @@ export function syncTable({
         );
     }
 
-    const uniqueColumns = table.columns.filter((c) => c.unique || c.pk);
-    if(uniqueColumns.length === 0) {
+    const hasUniqueConstraint =
+        table.columns.some((c) => c.unique || c.pk) ||
+        table.indexes.some((i) => i.unique);
+    if (!hasUniqueConstraint) {
         modelFactory.addAttribute((a) => a.setDecl(getAttributeRef('@@ignore', services)));
         modelFactory.comments.push(
             '/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Zenstack Client.',
@@ -415,14 +437,14 @@ export function syncRelation({
     services,
     options,
     selfRelation,
-    simmilarRelations,
+    similarRelations,
 }: {
     model: Model;
     relation: Relation;
     services: ZModelServices;
     options: PullOptions;
     //self included
-    simmilarRelations: number;
+    similarRelations: number;
     selfRelation: boolean;
 }) {
     const idAttribute = getAttributeRef('@id', services);
@@ -431,7 +453,7 @@ export function syncRelation({
     const fieldMapAttribute = getAttributeRef('@map', services);
     const tableMapAttribute = getAttributeRef('@@map', services);
 
-    const includeRelationName = selfRelation || simmilarRelations > 0;
+    const includeRelationName = selfRelation || similarRelations > 0;
 
     if (!idAttribute || !uniqueAttribute || !relationAttribute || !fieldMapAttribute || !tableMapAttribute) {
         throw new Error('Cannot find required attributes in the model.');
@@ -456,7 +478,7 @@ export function syncRelation({
 
     const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : '';
 
-    const relationName = `${relation.table}${simmilarRelations > 0 ? `_${relation.column}` : ''}To${relation.references.table}`;
+    const relationName = `${relation.table}${similarRelations > 0 ? `_${relation.column}` : ''}To${relation.references.table}`;
 
     const sourceNameFromReference = sourceField.name.toLowerCase().endsWith('id') ? `${resolveNameCasing("camel", sourceField.name.slice(0, -2)).name}${relation.type === 'many'? 's' : ''}` : undefined;
 
@@ -464,7 +486,7 @@ export function syncRelation({
     
     let { name: sourceFieldName } = resolveNameCasing(
         options.fieldCasing,
-        simmilarRelations > 0
+        similarRelations > 0
             ? `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
             : `${(!sourceFieldFromReference? sourceNameFromReference : undefined) || resolveNameCasing("camel", targetModel.name).name}${relation.type === 'many'? 's' : ''}`,
     );
@@ -523,7 +545,7 @@ export function syncRelation({
     const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : '';
     const { name: oppositeFieldName } = resolveNameCasing(
         options.fieldCasing,
-        simmilarRelations > 0
+        similarRelations > 0
             ? `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
             : `${resolveNameCasing("camel", sourceModel.name).name}${relation.references.type === 'many'? 's' : ''}`,
     );

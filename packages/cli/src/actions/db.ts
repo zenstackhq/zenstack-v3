@@ -149,7 +149,7 @@ async function runPull(options: PullOptions) {
         }
         // sync relation fields
         for (const relation of resolvedRelations) {
-            const simmilarRelations = resolvedRelations.filter((rr) => {
+            const similarRelations = resolvedRelations.filter((rr) => {
                 return (
                     rr !== relation &&
                     ((rr.schema === relation.schema &&
@@ -170,7 +170,7 @@ async function runPull(options: PullOptions) {
                 services,
                 options,
                 selfRelation,
-                simmilarRelations,
+                similarRelations: similarRelations,
             });
         }
 
@@ -390,8 +390,8 @@ async function runPull(options: PullOptions) {
             deletedFields.forEach((msg) => console.log(msg));
         }
 
-        if (options.out && !fs.lstatSync(options.out).isFile()) {
-            throw new Error(`Output path ${options.out} is not a file`);
+        if (options.out && fs.existsSync(options.out) && !fs.lstatSync(options.out).isFile()) {
+            throw new Error(`Output path ${options.out} exists but is not a file`);
         }
 
         const generator = new ZModelCodeGenerator({

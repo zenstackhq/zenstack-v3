@@ -115,7 +115,7 @@ export const sqlite: IntrospectionProvider = {
 
                 // Unique columns detection via unique indexes with single column
                 const uniqueSingleColumn = new Set<string>();
-                const uniqueIndexRows = idxList.filter((r) => r.unique === 1);
+                const uniqueIndexRows = idxList.filter((r) => r.unique === 1 && r.partial !== 1);
                 for (const idx of uniqueIndexRows) {
                     const idxCols = all<{ name: string }>(`PRAGMA index_info('${idx.name.replace(/'/g, "''")}')`);
                     if (idxCols.length === 1 && idxCols[0]?.name) {
@@ -134,7 +134,7 @@ export const sqlite: IntrospectionProvider = {
                         valid: true, // SQLite does not expose index validity
                         ready: true, // SQLite does not expose index readiness
                         partial: idx.partial === 1,
-                        predicate: null, // SQLite does not expose index predicate
+                        predicate: idx.partial === 1 ? '[partial]' : null, // SQLite does not expose index predicate
                         columns: idxCols.map((col) => ({
                             name: col.name,
                             expression: null,
@@ -363,8 +363,8 @@ export const sqlite: IntrospectionProvider = {
             dbAttr &&
             defaultDatabaseType &&
             (defaultDatabaseType.type !== datatype ||
-                (defaultDatabaseType.precisition &&
-                    defaultDatabaseType.precisition !== (length || precision)))
+                (defaultDatabaseType.precision &&
+                    defaultDatabaseType.precision !== (length || precision)))
         ) {
             const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
             if (length || precision) {

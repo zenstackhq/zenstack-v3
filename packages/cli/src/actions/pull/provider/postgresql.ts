@@ -103,7 +103,7 @@ export const postgresql: IntrospectionProvider = {
             case 'Decimal':
                 return { type: 'decimal' };
             case 'DateTime':
-                return { type: 'timestamp', precisition: 3 };
+                return { type: 'timestamp', precision: 3 };
             case 'Json':
                 return { type: 'jsonb' };
             case 'Bytes':
@@ -246,8 +246,8 @@ export const postgresql: IntrospectionProvider = {
             dbAttr &&
             defaultDatabaseType &&
             (defaultDatabaseType.type !== datatype ||
-                (defaultDatabaseType.precisition &&
-                    defaultDatabaseType.precisition !== (length || precision)))
+                (defaultDatabaseType.precision &&
+                    defaultDatabaseType.precision !== (length || precision)))
         ) {
             const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
             if (length || precision) {

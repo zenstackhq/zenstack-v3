@@ -95,7 +95,7 @@ export const mysql: IntrospectionProvider = {
     getDefaultDatabaseType(type: BuiltinType) {
         switch (type) {
             case 'String':
-                return { type: 'varchar', precisition: 191 };
+                return { type: 'varchar', precision: 191 };
             case 'Boolean':
                 // Boolean maps to 'boolean' (our synthetic type from tinyint(1))
                 // No precision needed since we handle the mapping in the query
@@ -107,9 +107,9 @@ export const mysql: IntrospectionProvider = {
             case 'Float':
                 return { type: 'double' };
             case 'Decimal':
-                return { type: 'decimal', precisition: 65 };
+                return { type: 'decimal', precision: 65 };
             case 'DateTime':
-                return { type: 'datetime', precisition: 3 };
+                return { type: 'datetime', precision: 3 };
             case 'Json':
                 return { type: 'json' };
             case 'Bytes':
@@ -338,8 +338,8 @@ export const mysql: IntrospectionProvider = {
             dbAttr &&
             defaultDatabaseType &&
             (defaultDatabaseType.type !== datatype ||
-                (defaultDatabaseType.precisition &&
-                    defaultDatabaseType.precisition !== (length || precision)))
+                (defaultDatabaseType.precision &&
+                    defaultDatabaseType.precision !== (length || precision)))
         ) {
             const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
             if (length || precision) {

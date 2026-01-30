@@ -66,7 +66,7 @@ export interface IntrospectionProvider {
         type: BuiltinType | 'Unsupported';
         isArray: boolean;
     };
-    getDefaultDatabaseType(type: BuiltinType): { precisition?: number; type: string } | undefined;
+    getDefaultDatabaseType(type: BuiltinType): { precision?: number; type: string } | undefined;
     /**
      * Get the expression builder callback for a field's @default attribute value.
      * Returns null if no @default attribute should be added.

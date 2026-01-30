@@ -75,7 +75,7 @@ export function createProject(
     const workDir = createTestProject();
     fs.mkdirSync(path.join(workDir, 'zenstack'), { recursive: true });
     const schemaPath = path.join(workDir, 'zenstack/schema.zmodel');
-    fs.writeFileSync(schemaPath, !options?.customPrelude ? `${getDefaultPrelude()}\n${zmodel}` : zmodel);
+    fs.writeFileSync(schemaPath, !options?.customPrelude ? `${getDefaultPrelude({ provider: options?.provider })}\n${zmodel}` : zmodel);
     return workDir;
 }
 

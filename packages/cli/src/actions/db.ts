@@ -1,5 +1,5 @@
 import { config } from '@dotenvx/dotenvx';
-import { ZModelCodeGenerator } from '@zenstackhq/language';
+import { formatDocument, ZModelCodeGenerator } from '@zenstackhq/language';
 import { DataModel, Enum, type Model } from '@zenstackhq/language/ast';
 import colors from 'colors';
 import fs from 'node:fs';
@@ -83,7 +83,7 @@ async function runPull(options: PullOptions) {
     const spinner = ora();
     try {
         const schemaFile = getSchemaFile(options.schema);
-        const { model, services } = await loadSchemaDocument(schemaFile, { returnServices: true });
+        const { model, services } = await loadSchemaDocument(schemaFile, { returnServices: true, keepImports: true });
         config({
             ignore: ['MISSING_ENV_FILE'],
         });
@@ -400,7 +400,7 @@ async function runPull(options: PullOptions) {
         });
 
         if (options.out) {
-            const zmodelSchema = generator.generate(newModel);
+            const zmodelSchema = await formatDocument(generator.generate(newModel));
 
             console.log(colors.blue(`Writing to ${options.out}`));
 
@@ -408,11 +408,11 @@ async function runPull(options: PullOptions) {
 
             fs.writeFileSync(outPath, zmodelSchema);
         } else {
-            docs.forEach(({ uri, parseResult: { value: model } }) => {
-                const zmodelSchema = generator.generate(model);
+            for (const { uri, parseResult: { value: model } } of docs) {
+                const zmodelSchema = await formatDocument(generator.generate(model));
                 console.log(colors.blue(`Writing to ${uri.path}`));
                 fs.writeFileSync(uri.fsPath, zmodelSchema);
-            });
+            }
         }
 
         console.log(colors.green.bold('\nPull completed successfully!'));

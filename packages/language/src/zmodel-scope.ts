@@ -80,7 +80,7 @@ export class ZModelScopeComputation extends DefaultScopeComputation {
         super.processNode(node, document, scopes);
         if (isDataModel(node) || isTypeDef(node)) {
             // add base fields to the scope recursively
-            const bases = getRecursiveBases(node);
+            const bases = getRecursiveBases(node, true, this.services.shared.workspace.LangiumDocuments);
             for (const base of bases) {
                 for (const field of base.fields) {
                     scopes.add(node, this.descriptions.createDescription(field, this.nameProvider.getName(field)));

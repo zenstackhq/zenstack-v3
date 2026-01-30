@@ -166,6 +166,17 @@ function startServer(client: ClientContract<any, any>, schema: any, options: Opt
         console.log(`You can visit ZenStack Studio at: ${colors.blue('https://studio.zenstack.dev')}`);
     });
 
+    server.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+            console.error(
+                colors.red(`Port ${options.port} is already in use. Please choose a different port using -p option.`),
+            );
+        } else {
+            throw new CliError(`Failed to start the server: ${err.message}`);
+        }
+        process.exit(1);
+    });
+
     // Graceful shutdown
     process.on('SIGTERM', async () => {
         server.close(() => {

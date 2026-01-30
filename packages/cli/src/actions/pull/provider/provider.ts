@@ -69,6 +69,7 @@ export interface IntrospectionProvider {
     getDefaultDatabaseType(type: BuiltinType): { precisition?: number; type: string } | undefined;
     getDefaultValue(args: {
         fieldName: string;
+        fieldType: BuiltinType | 'Unsupported';
         defaultValue: string;
         services: ZModelServices;
         enums: Enum[];

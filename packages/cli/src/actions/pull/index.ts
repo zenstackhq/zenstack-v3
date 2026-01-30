@@ -259,6 +259,7 @@ export function syncTable({
             if (column.default) {
                 const defaultValuesAttrs = provider.getDefaultValue({
                     fieldName: column.name,
+                    fieldType: builtinType.type,
                     defaultValue: column.default,
                     services,
                     enums: model.declarations.filter((d) => d.$type === 'Enum') as Enum[],

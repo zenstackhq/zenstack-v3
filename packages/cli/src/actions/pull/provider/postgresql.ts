@@ -109,7 +109,7 @@ export const postgresql: IntrospectionProvider = {
                 return { type: 'bytea' };
         }
     },
-    getDefaultValue({ defaultValue, fieldName, services, enums }) {
+    getDefaultValue({ defaultValue, fieldName, fieldType: _fieldType, services, enums }) {
         const val = defaultValue.trim();
         const factories: DataFieldAttributeFactory[] = [];
 

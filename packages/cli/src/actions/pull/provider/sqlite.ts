@@ -9,7 +9,12 @@ export const sqlite: IntrospectionProvider = {
     isSupportedFeature(feature) {
         switch (feature) {
             case 'Schema':
+                // Multi-schema feature is not available for SQLite because it doesn't have
+                // the same concept of schemas as namespaces (unlike PostgreSQL, CockroachDB, SQL Server).
+                return false;
             case 'NativeEnum':
+                // SQLite doesn't support native enum types
+                return false;
             default:
                 return false;
         }
@@ -239,7 +244,7 @@ export const sqlite: IntrospectionProvider = {
         }
     },
 
-    getDefaultValue({ defaultValue, fieldName, services, enums }) {
+    getDefaultValue({ defaultValue, fieldName, fieldType: _fieldType, services, enums }) {
         const val = defaultValue.trim();
         const factories: DataFieldAttributeFactory[] = [];
 

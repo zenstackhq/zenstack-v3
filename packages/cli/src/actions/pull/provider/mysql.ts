@@ -178,7 +178,7 @@ export const mysql: IntrospectionProvider = {
             await connection.end();
         }
     },
-    getDefaultValue({ defaultValue, fieldName, services, enums }) {
+    getDefaultValue({ defaultValue, fieldName, fieldType, services, enums }) {
         const val = defaultValue.trim();
         const factories: DataFieldAttributeFactory[] = [];
 
@@ -207,7 +207,19 @@ export const mysql: IntrospectionProvider = {
             return [];
         }
 
-        // Handle boolean literal values (not numeric 0/1 which should be handled as numbers)
+        // Handle boolean values based on field type
+        if (fieldType === 'Boolean') {
+            if (val === 'true' || val === '1' || val === "b'1'") {
+                factories.push(defaultAttr.addArg((ab) => ab.BooleanLiteral.setValue(true)));
+                return factories;
+            }
+            if (val === 'false' || val === '0' || val === "b'0'") {
+                factories.push(defaultAttr.addArg((ab) => ab.BooleanLiteral.setValue(false)));
+                return factories;
+            }
+        }
+
+        // Handle boolean literal values for non-boolean fields
         if (val === 'true' || val === "b'1'") {
             factories.push(defaultAttr.addArg((ab) => ab.BooleanLiteral.setValue(true)));
             return factories;
@@ -217,15 +229,35 @@ export const mysql: IntrospectionProvider = {
             return factories;
         }
 
-        // Handle numeric values (integers and decimals)
-        // Check decimals first to preserve format like 0.00
+        // Handle numeric values based on field type
         if (/^-?\d+\.\d+$/.test(val)) {
-            // Preserve the original decimal format
-            factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val)));
+            if (fieldType === 'Decimal') {
+                // For Decimal, normalize to 2 decimal places if it's all zeros after decimal
+                const numVal = parseFloat(val);
+                if (numVal === Math.floor(numVal)) {
+                    factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(numVal.toFixed(2))));
+                } else {
+                    factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(String(numVal))));
+                }
+            } else if (fieldType === 'Float') {
+                // For Float, preserve decimal point
+                const numVal = parseFloat(val);
+                factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(1) : String(numVal))));
+            } else {
+                factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val)));
+            }
             return factories;
         }
         if (/^-?\d+$/.test(val)) {
-            factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val)));
+            if (fieldType === 'Float') {
+                // For Float fields, add .0 to integer values
+                factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val + '.0')));
+            } else if (fieldType === 'Decimal') {
+                // For Decimal fields, add .00 to integer values
+                factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val + '.00')));
+            } else {
+                factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val)));
+            }
             return factories;
         }
 

@@ -10,7 +10,10 @@ export const mysql: IntrospectionProvider = {
     isSupportedFeature(feature) {
         switch (feature) {
             case 'NativeEnum':
-                return true;
+                // MySQL enums are defined inline in column definitions, not as separate types.
+                // They can't be shared across tables like PostgreSQL enums.
+                // Return false to preserve existing enums from the schema.
+                return false;
             case 'Schema':
             default:
                 return false;
@@ -94,7 +97,9 @@ export const mysql: IntrospectionProvider = {
             case 'String':
                 return { type: 'varchar', precisition: 191 };
             case 'Boolean':
-                return { type: 'tinyint', precisition: 1 };
+                // Boolean maps to 'boolean' (our synthetic type from tinyint(1))
+                // No precision needed since we handle the mapping in the query
+                return { type: 'boolean' };
             case 'Int':
                 return { type: 'int' };
             case 'BigInt':
@@ -202,25 +207,25 @@ export const mysql: IntrospectionProvider = {
             return [];
         }
 
-        // Handle boolean values
-        if (val === 'true' || val === '1' || val === "b'1'") {
+        // Handle boolean literal values (not numeric 0/1 which should be handled as numbers)
+        if (val === 'true' || val === "b'1'") {
             factories.push(defaultAttr.addArg((ab) => ab.BooleanLiteral.setValue(true)));
             return factories;
         }
-        if (val === 'false' || val === '0' || val === "b'0'") {
+        if (val === 'false' || val === "b'0'") {
             factories.push(defaultAttr.addArg((ab) => ab.BooleanLiteral.setValue(false)));
             return factories;
         }
 
         // Handle numeric values (integers and decimals)
-        if (/^-?\d+$/.test(val)) {
+        // Check decimals first to preserve format like 0.00
+        if (/^-?\d+\.\d+$/.test(val)) {
+            // Preserve the original decimal format
             factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val)));
             return factories;
         }
-        if (/^-?\d+\.\d+$/.test(val)) {
-            // For decimal values, normalize to remove trailing zeros but keep reasonable precision
-            const numVal = parseFloat(val);
-            factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(String(numVal))));
+        if (/^-?\d+$/.test(val)) {
+            factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val)));
             return factories;
         }
 
@@ -260,6 +265,13 @@ export const mysql: IntrospectionProvider = {
                     ),
                 ),
             );
+            return factories;
+        }
+
+        // Handle unquoted string values (MySQL sometimes returns defaults without quotes)
+        // If it's not a number, boolean, or function, treat it as a string
+        if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(val)) {
+            factories.push(defaultAttr.addArg((ab) => ab.StringLiteral.setValue(val)));
             return factories;
         }
 

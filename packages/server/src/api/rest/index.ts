@@ -1344,7 +1344,7 @@ export class RestApiHandler<Schema extends SchemaDef = SchemaDef> implements Api
             if (name === externalIdName) {
                 if (typeof info.type === 'string') {
                     // single unique field
-                    return [this.requireField(model, info.type)];
+                    return [this.requireField(model, name)];
                 } else {
                     // compound unique fields
                     return Object.keys(info).map((f) => this.requireField(model, f));

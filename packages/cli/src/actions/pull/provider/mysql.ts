@@ -142,7 +142,7 @@ export const mysql: IntrospectionProvider = {
                 );
 
                 tables.push({
-                    schema: row.schema || '',
+                    schema: '', // MySQL doesn't support multi-schema
                     name: row.name,
                     type: row.type as 'table' | 'view',
                     definition: row.definition,
@@ -161,7 +161,7 @@ export const mysql: IntrospectionProvider = {
                 // Parse enum values from column_type like "enum('val1','val2','val3')"
                 const values = parseEnumValues(row.column_type);
                 return {
-                    schema_name: databaseName,
+                    schema_name: '', // MySQL doesn't support multi-schema
                     // Create a unique enum type name based on table and column
                     enum_type: `${row.table_name}_${row.column_name}`,
                     values,
@@ -272,9 +272,9 @@ export const mysql: IntrospectionProvider = {
 function getTableIntrospectionQuery(databaseName: string) {
     // Note: We use subqueries with ORDER BY before JSON_ARRAYAGG to ensure ordering
     // since MySQL < 8.0.21 doesn't support ORDER BY inside JSON_ARRAYAGG
+    // MySQL doesn't support multi-schema, so we don't include schema in the result
     return `
 SELECT
-    t.TABLE_SCHEMA AS \`schema\`,
     t.TABLE_NAME AS \`name\`,
     CASE t.TABLE_TYPE
         WHEN 'BASE TABLE' THEN 'table'
@@ -292,7 +292,6 @@ SELECT
                 'ordinal_position', c.ORDINAL_POSITION,
                 'name', c.COLUMN_NAME,
                 'datatype', c.DATA_TYPE,
-                'datatype_schema', c.TABLE_SCHEMA,
                 'length', c.CHARACTER_MAXIMUM_LENGTH,
                 'precision', COALESCE(c.NUMERIC_PRECISION, c.DATETIME_PRECISION),
                 'nullable', c.IS_NULLABLE = 'YES',
@@ -302,7 +301,6 @@ SELECT
                 'unique_name', CASE WHEN c.COLUMN_KEY = 'UNI' THEN c.COLUMN_NAME ELSE NULL END,
                 'computed', c.GENERATION_EXPRESSION IS NOT NULL AND c.GENERATION_EXPRESSION != '',
                 'options', JSON_ARRAY(),
-                'foreign_key_schema', kcu_fk.REFERENCED_TABLE_SCHEMA,
                 'foreign_key_table', kcu_fk.REFERENCED_TABLE_NAME,
                 'foreign_key_column', kcu_fk.REFERENCED_COLUMN_NAME,
                 'foreign_key_name', kcu_fk.CONSTRAINT_NAME,
@@ -365,7 +363,7 @@ LEFT JOIN INFORMATION_SCHEMA.VIEWS v
 WHERE t.TABLE_SCHEMA = '${databaseName}'
     AND t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
     AND t.TABLE_NAME NOT LIKE '_prisma_migrations'
-ORDER BY t.TABLE_SCHEMA, t.TABLE_NAME;
+ORDER BY t.TABLE_NAME;
 `;
 }
 

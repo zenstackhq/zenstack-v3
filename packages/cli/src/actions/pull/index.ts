@@ -1,9 +1,7 @@
 import type { ZModelServices } from '@zenstackhq/language';
 import colors from 'colors';
 import {
-    isArrayExpr,
     isEnum,
-    isReferenceExpr,
     type DataField,
     type DataModel,
     type Enum,

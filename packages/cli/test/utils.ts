@@ -4,6 +4,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { expect } from 'vitest';
+import { formatDocument } from '@zenstackhq/language';
 
 const TEST_PG_CONFIG = {
     host: process.env['TEST_PG_HOST'] ?? 'localhost',
@@ -63,8 +64,7 @@ export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql'
     const ZMODEL_PRELUDE = `datasource db {
   provider = "${provider}"
   url      = "${dbUrl}"
-}
-`;
+}`;
     return ZMODEL_PRELUDE;
 }
 
@@ -75,8 +75,17 @@ export function createProject(
     const workDir = createTestProject();
     fs.mkdirSync(path.join(workDir, 'zenstack'), { recursive: true });
     const schemaPath = path.join(workDir, 'zenstack/schema.zmodel');
-    fs.writeFileSync(schemaPath, !options?.customPrelude ? `${getDefaultPrelude({ provider: options?.provider })}\n${zmodel}` : zmodel);
+    fs.writeFileSync(schemaPath, !options?.customPrelude ? `${getDefaultPrelude({ provider: options?.provider })}\n\n${zmodel}` : zmodel);
     return workDir;
+}
+
+export async function createFormattedProject(
+    zmodel: string,
+    options?: { provider?: 'sqlite' | 'postgresql' | 'mysql' },
+) {
+    const fullContent = `${getDefaultPrelude({ provider: options?.provider })}\n\n${zmodel}`;
+    const formatted = await formatDocument(fullContent);
+    return createProject(formatted, { customPrelude: true, provider: options?.provider });
 }
 
 export function runCli(command: string, cwd: string) {

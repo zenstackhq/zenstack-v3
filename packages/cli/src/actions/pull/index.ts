@@ -1,9 +1,9 @@
 import type { ZModelServices } from '@zenstackhq/language';
 import colors from 'colors';
 import {
+    isArrayExpr,
     isEnum,
-    type Attribute,
-    type BuiltinType,
+    isReferenceExpr,
     type DataField,
     type DataModel,
     type Enum,
@@ -444,7 +444,8 @@ export function syncRelation({
         | undefined;
     if (!sourceModel) return;
 
-    const sourceField = sourceModel.fields.find((f) => getDbName(f) === relation.column) as DataField | undefined;
+    const sourceFieldId = sourceModel.fields.findIndex((f) => getDbName(f) === relation.column);
+    const sourceField = sourceModel.fields[sourceFieldId] as DataField | undefined;
     if (!sourceField) return;
 
     const targetModel = model.declarations.find(
@@ -458,11 +459,16 @@ export function syncRelation({
     const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : '';
 
     const relationName = `${relation.table}${simmilarRelations > 0 ? `_${relation.column}` : ''}To${relation.references.table}`;
+
+    const sourceNameFromReference = sourceField.name.toLowerCase().endsWith('id') ? `${resolveNameCasing("camel", sourceField.name.slice(0, -2)).name}${relation.type === 'many'? 's' : ''}` : undefined;
+
+    const sourceFieldFromReference = sourceModel.fields.find((f) => f.name === sourceNameFromReference);
+    
     let { name: sourceFieldName } = resolveNameCasing(
         options.fieldCasing,
         simmilarRelations > 0
             ? `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
-            : targetModel.name,
+            : `${(!sourceFieldFromReference? sourceNameFromReference : undefined) || resolveNameCasing("camel", targetModel.name).name}${relation.type === 'many'? 's' : ''}`,
     );
 
     if (sourceModel.fields.find((f) => f.name === sourceFieldName)) {
@@ -486,7 +492,9 @@ export function syncRelation({
             'references',
         );
 
-        if (relation.foreign_key_on_delete && relation.foreign_key_on_delete !== 'SET NULL') {
+        // Prisma defaults: onDelete is SetNull for optional, Restrict for mandatory
+        const onDeleteDefault = relation.nullable ? 'SET NULL' : 'RESTRICT';
+        if (relation.foreign_key_on_delete && relation.foreign_key_on_delete !== onDeleteDefault) {
             const enumRef = getEnumRef('ReferentialAction', services);
             if (!enumRef) throw new Error('ReferentialAction enum not found');
             const enumFieldRef = enumRef.fields.find(
@@ -496,7 +504,8 @@ export function syncRelation({
             ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onDelete');
         }
 
-        if (relation.foreign_key_on_update && relation.foreign_key_on_update !== 'SET NULL') {
+        // Prisma default: onUpdate is Cascade
+        if (relation.foreign_key_on_update && relation.foreign_key_on_update !== 'CASCADE') {
             const enumRef = getEnumRef('ReferentialAction', services);
             if (!enumRef) throw new Error('ReferentialAction enum not found');
             const enumFieldRef = enumRef.fields.find(
@@ -511,14 +520,14 @@ export function syncRelation({
         return ab;
     });
 
-    sourceModel.fields.push(sourceFieldFactory.node);
+    sourceModel.fields.splice(sourceFieldId, 0, sourceFieldFactory.node); // Remove the original scalar foreign key field
 
     const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : '';
     const { name: oppositeFieldName } = resolveNameCasing(
         options.fieldCasing,
         simmilarRelations > 0
             ? `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
-            : sourceModel.name,
+            : `${resolveNameCasing("camel", sourceModel.name).name}${relation.references.type === 'many'? 's' : ''}`,
     );
 
     const targetFieldFactory = new DataFieldFactory()
@@ -536,9 +545,4 @@ export function syncRelation({
         );
 
     targetModel.fields.push(targetFieldFactory.node);
-
-    // targetModel.fields.sort((a, b) => {
-    //     if (a.type.reference || b.type.reference) return a.name.localeCompare(b.name);
-    //     return 0;
-    // });
 }

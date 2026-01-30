@@ -1156,10 +1156,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                             isForeignKeyField(this.schema, modelDef.name, field)) &&
                         !ignoredFields.has(field),
                 );
-                if (finalData === data) {
-                    finalData = clone(data);
-                }
                 if (hasNonIgnoredFields) {
+                    if (finalData === data) {
+                        finalData = clone(data);
+                    }
                     finalData[fieldName] = this.dialect.transformInput(new Date(), 'DateTime', false);
                     autoUpdatedFields.push(fieldName);
                 }

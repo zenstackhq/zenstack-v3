@@ -1,4 +1,4 @@
-import type { BuiltinType } from '@zenstackhq/language/ast';
+import type { Attribute, BuiltinType } from '@zenstackhq/language/ast';
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { Client } from 'pg';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
@@ -109,37 +109,10 @@ export const postgresql: IntrospectionProvider = {
                 return { type: 'bytea' };
         }
     },
-    getDefaultValue({ defaultValue, fieldName, fieldType: _fieldType, services, enums }) {
+    getDefaultValue({ defaultValue, fieldType, services, enums }) {
         const val = defaultValue.trim();
-        const factories: DataFieldAttributeFactory[] = [];
 
-        const defaultAttr = new DataFieldAttributeFactory().setDecl(getAttributeRef('@default', services));
-
-        if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
-            factories.push(defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services))));
-
-            if (fieldName.toLowerCase() === 'updatedat' || fieldName.toLowerCase() === 'updated_at') {
-                factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)));
-            }
-            return factories;
-        }
-        if (val.startsWith('nextval(')) {
-            factories.push(
-                defaultAttr.addArg((ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services))),
-            );
-            return factories;
-        }
-        if (val.includes('(') && val.includes(')')) {
-            factories.push(
-                defaultAttr.addArg((a) =>
-                    a.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
-                        a.setValue((v) => v.StringLiteral.setValue(val)),
-                    ),
-                ),
-            );
-            return factories;
-        }
-
+        // Handle type casts early (PostgreSQL-specific pattern like 'value'::type)
         if (val.includes('::')) {
             const [value, type] = val
                 .replace(/'/g, '')
@@ -151,23 +124,17 @@ export const postgresql: IntrospectionProvider = {
                 case 'json':
                 case 'jsonb':
                 case 'text':
-                    if (value === 'NULL') return [];
-                    factories.push(defaultAttr.addArg((a) => a.StringLiteral.setValue(value)));
-                    break;
+                    if (value === 'NULL') return null;
+                    return (ab) => ab.StringLiteral.setValue(value);
                 case 'real':
-                    factories.push(defaultAttr.addArg((a) => a.NumberLiteral.setValue(value)));
-                    break;
+                    return (ab) => ab.NumberLiteral.setValue(value);
                 default: {
                     const enumDef = enums.find((e) => getDbName(e, true) === type);
                     if (!enumDef) {
-                        factories.push(
-                            defaultAttr.addArg((a) =>
-                                a.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
-                                    a.setValue((v) => v.StringLiteral.setValue(val)),
-                                ),
-                            ),
-                        );
-                        break;
+                        return (ab) =>
+                            ab.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
+                                a.setValue((v) => v.StringLiteral.setValue(val)),
+                            );
                     }
                     const enumField = enumDef.fields.find((v) => getDbName(v) === value);
                     if (!enumField) {
@@ -175,30 +142,129 @@ export const postgresql: IntrospectionProvider = {
                             `Enum value ${value} not found in enum ${type} for default value ${defaultValue}`,
                         );
                     }
-
-                    factories.push(defaultAttr.addArg((ab) => ab.ReferenceExpr.setTarget(enumField)));
-                    break;
+                    return (ab) => ab.ReferenceExpr.setTarget(enumField);
                 }
             }
+        }
 
-            return factories;
+        switch (fieldType) {
+            case 'DateTime':
+                if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
+                    return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services));
+                }
+                // Fallback to string literal for other DateTime defaults
+                return (ab) => ab.StringLiteral.setValue(val);
+
+            case 'Int':
+            case 'BigInt':
+                if (val.startsWith('nextval(')) {
+                    return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
+                }
+                if (/^-?\d+$/.test(val)) {
+                    return (ab) => ab.NumberLiteral.setValue(val);
+                }
+                break;
+
+            case 'Float':
+                if (/^-?\d+\.\d+$/.test(val)) {
+                    const numVal = parseFloat(val);
+                    return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(1) : String(numVal));
+                }
+                if (/^-?\d+$/.test(val)) {
+                    return (ab) => ab.NumberLiteral.setValue(val + '.0');
+                }
+                break;
+
+            case 'Decimal':
+                if (/^-?\d+\.\d+$/.test(val)) {
+                    const numVal = parseFloat(val);
+                    if (numVal === Math.floor(numVal)) {
+                        return (ab) => ab.NumberLiteral.setValue(numVal.toFixed(2));
+                    }
+                    return (ab) => ab.NumberLiteral.setValue(String(numVal));
+                }
+                if (/^-?\d+$/.test(val)) {
+                    return (ab) => ab.NumberLiteral.setValue(val + '.00');
+                }
+                break;
+
+            case 'Boolean':
+                if (val === 'true') {
+                    return (ab) => ab.BooleanLiteral.setValue(true);
+                }
+                if (val === 'false') {
+                    return (ab) => ab.BooleanLiteral.setValue(false);
+                }
+                break;
+
+            case 'String':
+                if (val.startsWith("'") && val.endsWith("'")) {
+                    return (ab) => ab.StringLiteral.setValue(val.slice(1, -1).replace(/''/g, "'"));
+                }
+                break;
+        }
+
+        // Fallback handlers for values that don't match field type-specific patterns
+        if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
+            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services));
+        }
+
+        if (val.startsWith('nextval(')) {
+            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
+        }
+
+        if (val.includes('(') && val.includes(')')) {
+            return (ab) =>
+                ab.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
+                    a.setValue((v) => v.StringLiteral.setValue(val)),
+                );
         }
 
         if (val === 'true' || val === 'false') {
-            factories.push(defaultAttr.addArg((ab) => ab.BooleanLiteral.setValue(val === 'true')));
-            return factories;
+            return (ab) => ab.BooleanLiteral.setValue(val === 'true');
         }
 
-        if (/^\d+$/.test(val) || /^-?\d+(\.\d+)?$/.test(val)) {
-            factories.push(defaultAttr.addArg((ab) => ab.NumberLiteral.setValue(val)));
-            return factories;
+        if (/^-?\d+\.\d+$/.test(val) || /^-?\d+$/.test(val)) {
+            return (ab) => ab.NumberLiteral.setValue(val);
         }
 
         if (val.startsWith("'") && val.endsWith("'")) {
-            factories.push(defaultAttr.addArg((ab) => ab.StringLiteral.setValue(val.slice(1, -1).replace(/''/g, "'"))));
-            return factories;
+            return (ab) => ab.StringLiteral.setValue(val.slice(1, -1).replace(/''/g, "'"));
         }
-        return [];
+
+        return null;
+    },
+
+    getFieldAttributes({ fieldName, fieldType, datatype, length, precision, services }) {
+        const factories: DataFieldAttributeFactory[] = [];
+
+        // Add @updatedAt for DateTime fields named updatedAt or updated_at
+        if (fieldType === 'DateTime' && (fieldName.toLowerCase() === 'updatedat' || fieldName.toLowerCase() === 'updated_at')) {
+            factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)));
+        }
+
+        // Add @db.* attribute if the datatype differs from the default
+        const dbAttr = services.shared.workspace.IndexManager.allElements('Attribute').find(
+            (d) => d.name.toLowerCase() === `@db.${datatype.toLowerCase()}`,
+        )?.node as Attribute | undefined;
+
+        const defaultDatabaseType = this.getDefaultDatabaseType(fieldType as BuiltinType);
+
+        if (
+            dbAttr &&
+            defaultDatabaseType &&
+            (defaultDatabaseType.type !== datatype ||
+                (defaultDatabaseType.precisition &&
+                    defaultDatabaseType.precisition !== (length || precision)))
+        ) {
+            const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
+            if (length || precision) {
+                dbAttrFactory.addArg((a) => a.NumberLiteral.setValue(length! || precision!));
+            }
+            factories.push(dbAttrFactory);
+        }
+
+        return factories;
     },
 };
 

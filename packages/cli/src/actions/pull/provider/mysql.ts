@@ -135,12 +135,18 @@ export const mysql: IntrospectionProvider = {
                 const columns = typeof row.columns === 'string' ? JSON.parse(row.columns) : row.columns;
                 const indexes = typeof row.indexes === 'string' ? JSON.parse(row.indexes) : row.indexes;
 
+                // Sort columns by ordinal_position to preserve database column order
+                const sortedColumns = (columns || []).sort(
+                    (a: { ordinal_position?: number }, b: { ordinal_position?: number }) =>
+                        (a.ordinal_position ?? 0) - (b.ordinal_position ?? 0)
+                );
+
                 tables.push({
                     schema: row.schema || '',
                     name: row.name,
                     type: row.type as 'table' | 'view',
                     definition: row.definition,
-                    columns: columns || [],
+                    columns: sortedColumns,
                     indexes: indexes || [],
                 });
             }
@@ -283,6 +289,7 @@ SELECT
         SELECT JSON_ARRAYAGG(col_json)
         FROM (
             SELECT JSON_OBJECT(
+                'ordinal_position', c.ORDINAL_POSITION,
                 'name', c.COLUMN_NAME,
                 'datatype', c.DATA_TYPE,
                 'datatype_schema', c.TABLE_SCHEMA,

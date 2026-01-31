@@ -1,5 +1,11 @@
-import { ZModelCodeGenerator } from '@zenstackhq/language';
-import { isDataSource } from '@zenstackhq/language/ast';
+import {
+    ConfigExpr,
+    InvocationExpr,
+    isDataSource,
+    isInvocationExpr,
+    isLiteralExpr,
+    LiteralExpr,
+} from '@zenstackhq/language/ast';
 import { getStringLiteral } from '@zenstackhq/language/utils';
 import { ZenStackClient, type ClientContract } from '@zenstackhq/orm';
 import { MysqlDialect } from '@zenstackhq/orm/dialects/mysql';
@@ -50,16 +56,12 @@ export async function run(options: Options) {
 
     if (!databaseUrl) {
         const schemaUrl = dataSource?.fields.find((f) => f.name === 'url')?.value;
-
         if (!schemaUrl) {
             throw new CliError(
                 `The schema's "datasource" does not have a "url" field, please provide it with -d option.`,
             );
         }
-        const zModelGenerator = new ZModelCodeGenerator();
-        const url = zModelGenerator.generate(schemaUrl);
-
-        databaseUrl = evaluateUrl(url);
+        databaseUrl = evaluateUrl(schemaUrl);
     }
 
     const provider = getStringLiteral(dataSource?.fields.find((f) => f.name === 'provider')?.value)!;
@@ -85,27 +87,20 @@ export async function run(options: Options) {
     startServer(db, schemaModule.schema, options);
 }
 
-function evaluateUrl(value: string): string {
-    // Remove surrounding quotes if present
-    let trimmedValue = value.trim();
-    if (
-        (trimmedValue.startsWith('"') && trimmedValue.endsWith('"')) ||
-        (trimmedValue.startsWith("'") && trimmedValue.endsWith("'"))
-    ) {
-        trimmedValue = trimmedValue.slice(1, -1).trim();
-    }
-
-    // Check if it's an env() function call
-    const envMatch = trimmedValue.match(/^env\s*\(\s*['"]([^'"]+)['"]\s*\)$/);
-    if (envMatch) {
-        const varName = envMatch[1];
-        const envValue = process.env[varName!];
+function evaluateUrl(schemaUrl: ConfigExpr) {
+    if (isLiteralExpr(schemaUrl)) {
+        // Handle string literal
+        return getStringLiteral(schemaUrl);
+    } else if (isInvocationExpr(schemaUrl)) {
+        const envFunction = schemaUrl as InvocationExpr;
+        const envName = getStringLiteral(envFunction.args[0]?.value as LiteralExpr)!;
+        const envValue = process.env[envName];
         if (!envValue) {
-            throw new CliError(`Environment variable ${varName} is not set`);
+            throw new CliError(`Environment variable ${envName} is not set`);
         }
         return envValue;
     } else {
-        return trimmedValue;
+        throw new CliError(`Unable to resolve the "url" field value.`);
     }
 }
 

@@ -184,7 +184,7 @@ type ProcedureHookGroup<Schema extends SchemaDef> = {
           };
 };
 
-export type ProcedureHooks<Schema extends SchemaDef> = Schema extends { procedures: Record<string, any> }
+export type ProcedureHooks<Schema extends SchemaDef> = Schema['procedures'] extends Record<string, any>
     ? {
           /**
            * Custom procedures.

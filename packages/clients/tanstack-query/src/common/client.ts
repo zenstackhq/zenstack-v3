@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/query-core';
 import type { InvalidationPredicate, QueryInfo } from '@zenstackhq/client-helpers';
-import { parseQueryKey } from './query-key';
+import { parseQueryKey } from './query-key.js';
 
 export function invalidateQueriesMatchingPredicate(queryClient: QueryClient, predicate: InvalidationPredicate) {
     return queryClient.invalidateQueries({

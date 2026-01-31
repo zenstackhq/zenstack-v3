@@ -28,6 +28,10 @@ type Options = {
 };
 
 export async function run(options: Options) {
+    const allowedLogLevels = ['error', 'query'] as const;
+    const log = options.logLevel?.filter((level): level is (typeof allowedLogLevels)[number] =>
+        allowedLogLevels.includes(level as any),
+    );
     const schemaFile = getSchemaFile(options.schema);
     console.log(colors.gray(`Loading ZModel schema from: ${schemaFile}`));
 
@@ -66,11 +70,6 @@ export async function run(options: Options) {
 
     const schemaModule = (await jiti.import(path.join(outputPath, 'schema'))) as any;
 
-    const allowedLogLevels = ['error', 'query'] as const;
-    const log = options.logLevel?.filter((level): level is (typeof allowedLogLevels)[number] =>
-        allowedLogLevels.includes(level as any),
-    );
-
     const db = new ZenStackClient(schemaModule.schema, {
         dialect: dialect,
         log: log && log.length > 0 ? log : undefined,
@@ -87,8 +86,17 @@ export async function run(options: Options) {
 }
 
 function evaluateUrl(value: string): string {
+    // Remove surrounding quotes if present
+    let trimmedValue = value.trim();
+    if (
+        (trimmedValue.startsWith('"') && trimmedValue.endsWith('"')) ||
+        (trimmedValue.startsWith("'") && trimmedValue.endsWith("'"))
+    ) {
+        trimmedValue = trimmedValue.slice(1, -1);
+    }
+
     // Check if it's an env() function call
-    const envMatch = value.trim().match(/^env\s*\(\s*['"]([^'"]+)['"]\s*\)$/);
+    const envMatch = trimmedValue.match(/^env\s*\(\s*['"]([^'"]+)['"]\s*\)$/);
     if (envMatch) {
         const varName = envMatch[1];
         const envValue = process.env[varName!];
@@ -97,7 +105,7 @@ function evaluateUrl(value: string): string {
         }
         return envValue;
     } else {
-        return value;
+        return trimmedValue;
     }
 }
 

@@ -92,7 +92,7 @@ function evaluateUrl(value: string): string {
         (trimmedValue.startsWith('"') && trimmedValue.endsWith('"')) ||
         (trimmedValue.startsWith("'") && trimmedValue.endsWith("'"))
     ) {
-        trimmedValue = trimmedValue.slice(1, -1);
+        trimmedValue = trimmedValue.slice(1, -1).trim();
     }
 
     // Check if it's an env() function call

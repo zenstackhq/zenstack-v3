@@ -54,9 +54,9 @@ import type {
 } from '@zenstackhq/orm';
 import type { GetModels, SchemaDef } from '@zenstackhq/schema';
 import { createContext, useContext } from 'react';
-import { getAllQueries, invalidateQueriesMatchingPredicate } from './common/client';
-import { CUSTOM_PROC_ROUTE_NAME } from './common/constants';
-import { getQueryKey } from './common/query-key';
+import { getAllQueries, invalidateQueriesMatchingPredicate } from './common/client.js';
+import { CUSTOM_PROC_ROUTE_NAME } from './common/constants.js';
+import { getQueryKey } from './common/query-key.js';
 import type {
     ExtraMutationOptions,
     ExtraQueryOptions,
@@ -64,7 +64,7 @@ import type {
     QueryContext,
     TrimDelegateModelOperations,
     WithOptimistic,
-} from './common/types';
+} from './common/types.js';
 export type { FetchFn } from '@zenstackhq/client-helpers/fetch';
 
 type ProcedureHookFn<

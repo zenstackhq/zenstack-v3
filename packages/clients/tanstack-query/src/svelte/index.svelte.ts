@@ -182,14 +182,14 @@ type ProcedureHookGroup<Schema extends SchemaDef> = {
           };
 };
 
-export type ProcedureHooks<Schema extends SchemaDef> = Schema extends { procedures: Record<string, any> }
+export type ProcedureHooks<Schema extends SchemaDef> = Schema['procedures'] extends Record<string, any>
     ? {
           /**
            * Custom procedures.
            */
           $procs: ProcedureHookGroup<Schema>;
       }
-    : {};
+    : Record<never, never>;
 
 // Note that we can potentially use TypeScript's mapped type to directly map from ORM contract, but that seems
 // to significantly slow down tsc performance ...

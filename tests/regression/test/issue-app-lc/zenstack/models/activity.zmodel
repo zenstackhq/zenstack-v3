@@ -1,0 +1,82 @@
+import '../shared/timestamps'
+import './activity-type'
+import './attendance'
+import './organization'
+import './planning'
+import './activity-staff-requirement'
+import './task'
+import './tag'
+import './user'
+
+model Activity with Timestamps {
+  id                 String                     @id @default(cuid())
+
+  /// Name of the activity
+  name               String
+
+  /// Description of the activity
+  description        String?
+
+  /// Date (and time) of the activity
+  datetime           DateTime
+
+  /// Duration of the activity (in ms)
+  duration           Int
+
+  /// Duration of wokrbreak (in ms)
+  workbreakDuration  Int
+
+  /// Whether the activity requires attendance logging
+  requiresAttendance Boolean                    @default(false)
+
+  // Relations
+  /// ID of the activity type
+  typeId             String
+
+  /// Activity type of the activity
+  type               ActivityType               @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  /// Attendance
+  attendance         Attendance[]
+
+  /// ID of the organization
+  organizationId     String?
+
+  /// Organization of the activity
+  organization       Organization?              @relation(fields: [organizationId], references: [id])
+
+  /// Planning ID of the activity
+  planningId         String?
+
+  /// Planning of the activity
+  planning           Planning?                  @relation(fields: [planningId], references: [id])
+
+  /// Acttivity staff requirements
+  staffRequirements  ActivityStaffRequirement[]
+
+  /// Activity tasks
+  tasks              Task[]
+
+  /// Tags
+  tags               Tag[]
+
+  /// User ID
+  userId             String?
+
+  /// User of the activity
+  user               User?                      @relation(fields: [userId], references: [id])
+
+  @@allow(
+    'read',
+    user.accountId == auth().id
+    || (user.accountId == auth().id && user.roles?[claims?[id == "activity:readOwn"]]) // Own activity
+    || (user.instance.users?[accountId == auth().id && roles?[claims?[id == "activity:read" || id == "all:read"]]])
+  )
+
+  @@allow(
+    'create,update,delete',
+    user.accountId == auth().id
+    || (user.accountId == auth().id && user.roles?[claims?[id == "activity:manageOwn"]]) // Own activity
+    || (user.instance.users?[accountId == auth().id && roles?[claims?[id == "activity:manage" || id == "all:manage"]]])
+    )
+}

@@ -1,0 +1,5 @@
+enum ProcessState {
+  INACTIVE
+  IN_PROGRESS
+  DONE
+}

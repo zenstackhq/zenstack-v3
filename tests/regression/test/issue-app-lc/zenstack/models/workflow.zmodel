@@ -1,0 +1,41 @@
+import '../shared/timestamps'
+import './enumerator-option'
+import './instance'
+
+model Workflow with Timestamps {
+  id                String             @id @default(cuid())
+
+  /// Name of the workflow
+  name              String
+
+  // The condition that needs to be met for the workflow to be executed (Based on query builder filter)
+  /// [IWorkflowCondition]
+  condition         Json[]
+
+  // The action that is executed when the condition is met
+  /// [IWorkflowAction]
+  action            Json[]
+
+  // Relations
+  /// The instance ID this workflow belongs to
+  instanceId        String
+
+  /// The instance this workflow belongs to
+  instance          Instance           @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The enumerator option that this workflow belongs to
+  enumeratorOptions EnumeratorOption[]
+
+  @@allow('read', check(instance, 'read'))
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+
+  // Allow users with "workflow:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "workflow:manage" || id == "all:manage"]]]
+    )
+  )
+}

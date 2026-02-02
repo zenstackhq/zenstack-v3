@@ -1,0 +1,37 @@
+import '../shared/timestamps'
+import './note'
+import './user'
+import './activity-staff-requirement'
+
+model ActivityStaffAssignment with Timestamps {
+  @@id(name: "compositeId", fields: [userId, activityStaffRequirementId])
+  id                         String                   @unique @default(cuid())
+
+  /// Whether the user is approved to be on the activity
+  approved                   Boolean                  @default(false)
+
+
+  // Relations
+  /// ID of activity which user is on
+  activityStaffRequirementId String
+  
+  /// Activity which user is on
+  activityStaffRequirement   ActivityStaffRequirement @relation(fields: [activityStaffRequirementId], references: [id], onDelete: Cascade)
+
+  /// Notes about the user on the activity
+  notes                      Note[]
+
+  /// ID of user who is on the activity
+  userId                     String
+
+  /// User who is on the activity
+  user                       User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+
+
+  @@allow(
+    'all', 
+    user.instance.ownerId == auth().id // Allow the owner
+    || check(activityStaffRequirement, 'read')
+  )
+}

@@ -1,0 +1,43 @@
+import '../shared/timestamps'
+import './instance'
+import './user'
+
+model TableLayout with Timestamps {
+  id        String  @id @default(cuid())
+
+  /// Name of the table layout
+  name      String
+
+  /// Whether the table layout is public
+  isPublic  Boolean @default(false)
+
+  /// Whether the table layout is the default layout
+  isDefault Boolean @default(false)
+
+  /// Name of the table
+  tableName String
+
+  /// Schema of the table
+  schema    String
+
+  // Relations
+  /// The user ID for which the table layout is created
+  userId    String?
+
+  /// The user for which the table layout is created
+  user      User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@allow(
+    'read',
+    user.accountId == auth().id // Allow owner
+    || (isPublic && user.instance.users?[accountId == auth().id]) // Allow users of the instance when the schema is public
+  )
+
+  @@allow('create', auth() != null) // Allow all authenticated users to create a table layout
+
+  @@allow(
+    'update,delete',
+    user.accountId == auth().id // Allow owner
+    || (isPublic && user.instance.users?[accountId == auth().id]) // Allow users of the instance when the schema is public
+  )
+}

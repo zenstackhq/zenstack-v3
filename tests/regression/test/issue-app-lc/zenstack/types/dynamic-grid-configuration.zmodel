@@ -1,0 +1,12 @@
+import './dynamic-grid-breakpoint.zmodel'
+
+type DynamicGridConfiguration {
+  cellHeight     Int?
+  columnsCount   Json?
+  theme          String?
+  locale         String?
+  minZoom        Float?
+  maxZoom        Float?
+  dimensionsStep Int?
+  breakpoints    DynamicGridBreakpoint[] @json
+}

@@ -1,0 +1,5 @@
+type DynamicGridDataset {
+  id            String
+  schema        String?
+  contextDataId String
+}

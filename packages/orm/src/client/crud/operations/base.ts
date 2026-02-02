@@ -275,10 +275,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         args: FindArgs<Schema, GetModels<Schema>, true> | undefined,
     ): Promise<any[]> {
         // table
-        let query = this.dialect.buildSelectModel(model, model);
+        let query = this.dialect.buildSelectModel(model, model, args?.where ?? {});
 
         if (args) {
-            query = this.dialect.buildFilterSortTake(model, args, query, model);
+            query = this.dialect.buildFilterSortTake(model, args, query, model, false);
         }
 
         // select

@@ -89,8 +89,13 @@ export class PolicyHandler<Schema extends SchemaDef> extends OperationNodeTransf
         }
 
         if (!this.isMutationQueryNode(node)) {
+            console.time('policy-exec');
+
             // transform and proceed with read directly
-            return proceed(this.transformNode(node));
+            const r = await proceed(this.transformNode(node));
+
+            console.timeEnd('policy-exec');
+            return r;
         }
 
         const { mutationModel } = this.getMutationModel(node);

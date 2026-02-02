@@ -1,0 +1,41 @@
+import '../shared/timestamps'
+import './file'
+import './instance'
+import './task'
+
+model Comment with Timestamps {
+  id         String    @id @default(cuid())
+
+  /// The message
+  message    String
+
+  /// Whether the comment is resolved
+  isResolved Boolean?  @default(false)
+
+  // Relations
+  /// The children comments
+  children   Comment[] @relation("CommentToComment")
+
+  /// The files attached to this comment
+  files      File[]
+
+  /// The instance ID this comment belongs to
+  instanceId String
+
+  /// The instance this comment belongs to
+  instance   Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The user ID who created this comment
+  parentId   String?
+
+  /// The parent comment
+  parent     Comment?  @relation("CommentToComment", fields: [parentId], references: [id], onDelete: Cascade)
+
+  /// The task ID this comment belongs to
+  taskId     String?
+
+  /// The task this comment belongs to
+  task       Task?     @relation(fields: [taskId], references: [id])
+
+  @@allow('all', check(instance, 'read'))
+}

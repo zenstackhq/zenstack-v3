@@ -1,0 +1,62 @@
+import '../shared/timestamps'
+import '../enums/user-invitation-status.enum'
+import './instance'
+import './user'
+
+model UserInvitation with Timestamps {
+  @@id(name: "compositeId", fields: [instanceId, email])
+  id            String               @unique @default(cuid())
+
+  /// The dateime when the invitation was accepted
+  acceptedAt    DateTime?
+
+  /// Decline reason
+  declineReason String?
+
+  /// The email of the invited user
+  email         String
+
+  /// The status of the invitation
+  status        UserInvitationStatus @default(PENDING)
+
+
+  /// The token that is used for the invitation
+  token         String               @unique
+
+  /// The Datetime until which the invitation is valid
+  /// Note: The invitation is not valid when the `acceptedAt` is already set
+  validUntil    DateTime
+
+
+  // Relations
+  /// The instance ID this enumerator belongs to
+  instanceId    String
+
+  /// The instance this enumerator belongs to
+  instance      Instance             @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The user ID of the invitation
+  userId        String               @unique
+
+  /// The instance of the invitation
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@allow(
+    'read',
+    check(user, 'read')
+    || email == auth().email // Allow the user with the email of the invitation
+  )
+
+  @@allow(
+    'create,update,delete',
+
+  // Allow owner of the instance
+    instance.ownerId == auth().id
+
+  // Allow users with "userInvitation:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "userInvitation:manage" || id == "all:manage"]]]
+    )
+  )
+}

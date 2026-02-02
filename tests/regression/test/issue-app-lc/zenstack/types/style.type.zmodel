@@ -1,0 +1,16 @@
+type Style {
+  /// Color of the style
+  color           String?
+
+  /// Background color of the style
+  backgroundColor String?
+
+  /// Icon of the style
+  icon            String?
+
+  /// Border color of the style
+  borderColor     String?
+
+  /// Whether the style is complex (= uses a combination of color, backgroundColor, borderColor)
+  isComplex       Boolean?
+}

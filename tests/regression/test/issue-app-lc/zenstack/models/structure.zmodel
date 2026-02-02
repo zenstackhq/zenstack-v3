@@ -1,0 +1,27 @@
+import '../shared/timestamps'
+import './instance'
+import './structure-item'
+
+model Structure with Timestamps {
+  id           String          @id @default(cuid())
+
+  /// The structure's name
+  name         String
+
+  /// Internal name (used for internal references)
+  internalName String?
+
+  // Relations
+  /// The structure's items
+  items        StructureItem[]
+
+  /// The instance that this structure belongs to
+  instanceId   String
+
+  /// The instance that this structure belongs to
+  instance     Instance        @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@allow('all', check(instance, 'read'))
+
+  @@unique([instanceId, internalName])
+}

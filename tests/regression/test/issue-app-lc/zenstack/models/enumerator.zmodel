@@ -1,0 +1,44 @@
+import '../shared/timestamps'
+import './instance'
+import './enumerator-option'
+
+model Enumerator with Timestamps {
+  id           String             @id @default(cuid())
+
+  /// The name of the enumerator
+  name         String
+
+  /// Description of the enumerator
+  description  String?
+
+  /// Internal name of the enumerator for system use
+  internalName String?
+
+  // Relations
+  /// The instance ID this enumerator belongs to
+  instanceId   String?
+
+  /// The instance this enumerator belongs to
+  instance     Instance?          @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The options of the enumerator
+  options      EnumeratorOption[]
+
+  @@unique([instanceId, internalName])
+  @@index([internalName])
+
+  @@allow('read', instanceId == null || check(instance, 'read'))
+
+  @@allow(
+    'create,update,delete',
+
+    // Allow owner of the instance
+    instance.ownerId == auth().id
+
+    // Allow users with "enumerator:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "enumerator:manage" || id == "all:manage"]]]
+    )
+  )
+}

@@ -1,0 +1,23 @@
+import '../shared/timestamps'
+import './user'
+import './task'
+
+model TaskAssignment with Timestamps {
+  @@id(name: "compositeId", fields: [userId, taskId])
+  id     String @unique @default(cuid())
+
+  // Relations
+  /// The user ID of this assignment
+  userId String
+
+  /// User of this assignment
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The task ID of this assignment
+  taskId String
+
+  /// Task of this assignment
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@allow('all', check(task, 'read'))
+}

@@ -1,0 +1,28 @@
+import '../shared/timestamps'
+import './enumerator-option'
+import './user'
+
+model Contact with Timestamps {
+  id     String           @id @default(cuid())
+
+  /// Contact value
+  value  String
+
+  // Relations
+  /// Contact type ID (Enumerator option ID)
+  typeId String
+
+  /// Contact type (Enumerator option)
+  type   EnumeratorOption @relation(fields: [typeId], references: [id])
+
+  /// User ID that is attached to this contact
+  userId String
+
+  /// User that is attached to this contact
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+
+  @@allow('read', check(user, 'read'))
+  @@allow('create', check(user, 'read'))
+  @@allow('update,delete', check(user, 'update'))
+}

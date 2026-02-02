@@ -1,0 +1,25 @@
+type LanguageModelUsage {
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  model            String?
+}
+
+type ModelMessage {
+  role    String?
+  content String?
+}
+
+type AiAgentResponse {
+  id             String
+  isHelper       Boolean?
+  name           String
+  startAt        DateTime?
+  endAt          DateTime?
+  state          String
+  ui             Boolean
+  usage          LanguageModelUsage?
+  messages       ModelMessage[]
+  text           String?
+  isIntermediate Boolean?
+}

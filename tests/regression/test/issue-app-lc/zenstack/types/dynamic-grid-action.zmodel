@@ -1,0 +1,4 @@
+type DynamicGridAction {
+  id   String
+  name String
+}

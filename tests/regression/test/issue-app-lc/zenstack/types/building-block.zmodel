@@ -1,0 +1,4 @@
+type BuildingBlock {
+  type  String
+  value Json?
+}

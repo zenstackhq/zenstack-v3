@@ -450,13 +450,19 @@ function createModelCrudHandler(
         return createZenStackPromise(async (txClient?: ClientContract<any>) => {
             let proceed = async (_args: unknown) => {
                 const _handler = txClient ? handler.withClient(txClient) : handler;
+
+                console.time('handleOperation');
                 const r = await _handler.handle(operation, _args);
+                console.timeEnd('handleOperation');
+
                 if (!r && throwIfNoResult) {
                     throw createNotFoundError(model);
                 }
                 let result: unknown;
                 if (r && postProcess) {
+                    console.time('processResult');
                     result = resultProcessor.processResult(r, model, args);
+                    console.timeEnd('processResult');
                 } else {
                     result = r ?? null;
                 }

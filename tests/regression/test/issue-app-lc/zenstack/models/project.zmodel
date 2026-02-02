@@ -1,0 +1,45 @@
+import '../shared/timestamps'
+import './attendance'
+import './instance'
+import './task'
+
+model Project with Timestamps {
+  id          String       @id @default(cuid())
+
+  /// Name of the project
+  name        String
+
+  /// Description of the project
+  description String?
+
+  /// Start date of the project
+  startDate   DateTime?
+
+  /// End date of the project
+  endDate     DateTime?
+
+  // Relations
+  /// Attendance
+  attendance  Attendance[]
+
+  /// The instance ID this project belongs to
+  instanceId  String
+
+  /// The instance this project belongs to
+  instance    Instance     @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The tasks that belong to this project
+  tasks       Task[]
+
+  @@unique([instanceId, name])
+
+  @@allow(
+    'read',
+    instance.ownerId == auth().id || (instance.users?[accountId == auth().id && roles?[claims?[id == "project:read" || id == "all:read"]]])
+  )
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id || (instance.users?[accountId == auth().id && roles?[claims?[id == "project:manage" || id == "all:manage"]]])
+  )
+}

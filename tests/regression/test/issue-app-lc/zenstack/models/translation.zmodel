@@ -1,0 +1,35 @@
+import '../shared/timestamps'
+import './instance'
+
+model Translation with Timestamps {
+  id         String   @id @default(cuid())
+
+  /// Name
+  name       String
+
+  /// Value
+  value      String
+
+  /// Language
+  language   String
+
+  // Relations
+  /// The instance ID translation belongs to
+  instanceId String
+
+  /// The instance translation belongs to
+  instance   Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@allow('read', check(instance, 'read'))
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+
+    // Allow users with "translation:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "translation:manage" || id == "all:manage"]]]
+    )
+  )
+}

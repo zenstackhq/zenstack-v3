@@ -1,0 +1,6 @@
+type DynamicGridLayer {
+  id      String
+  name    String
+  enabled Boolean?
+  opacity Int?
+}

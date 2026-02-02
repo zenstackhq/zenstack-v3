@@ -1,0 +1,19 @@
+/**
+ * Marks a field to be hashed as a password. Only applicable to String fields.
+ */
+attribute @password(hasher: Any) @@@targetField([StringField])
+
+/**
+ * Bcrypt password hasher.
+ */
+function bcryptHasher(rounds: Int): Any {}
+
+/**
+ * Argon2 password hasher.
+ */
+function argon2Hasher(hashLength: Int?): Any {}
+
+/**
+ * Marks a field to be searchable. Only applicable to String fields.
+ */
+attribute @searchable() @@@targetField([StringField])

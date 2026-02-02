@@ -1,0 +1,22 @@
+import '../shared/timestamps'
+import './instance'
+import './planning-stage'
+
+model PlanningStageRule with Timestamps {
+  id             String          @id @default(cuid())
+
+  /// The name of the rule
+  name           String
+
+  // Relations
+  /// Instance ID
+  instanceId     String
+
+  /// Instance
+  instance       Instance        @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The planning stages that this rule applies to
+  planningStages PlanningStage[]
+
+  @@allow('all', check(instance, 'read'))
+}

@@ -1,0 +1,156 @@
+import '../shared/timestamps'
+import '../enums/dynamic-grid-type.enum'
+import './email-template'
+import './enumerator-option'
+import './file'
+import './instance'
+import './organization'
+import './page'
+import './structure-item'
+import '../types/dynamic-grid-item.zmodel'
+import '../types/dynamic-grid-layer.zmodel'
+import '../types/dynamic-grid-configuration.zmodel'
+import '../types/dynamic-grid-design-item.zmodel'
+import '../types/dynamic-grid-ruler.zmodel'
+import '../types/dynamic-grid-context-data.zmodel'
+import '../types/dynamic-grid-action.zmodel'
+import '../types/dynamic-grid-dataset.zmodel'
+
+model DynamicGrid {
+  id              String             @id @default(cuid())
+
+  /// Name
+  name            String
+
+  // Configuration
+  configuration   DynamicGridConfiguration? @json
+
+  /// Description
+  description     String?
+
+  // Design system
+  designSystem    DynamicGridDesignItemObj[] @json
+
+  /// Language
+  language        String?
+
+  // Layers
+  layers          DynamicGridLayer[] @json
+
+  // Building blocks
+  items           DynamicGridItem[] @json
+
+  // Rulers
+  rulers          DynamicGridRuler[] @json
+
+  /// Dynamic grid type
+  type            DynamicGridType    @default(DEFAULT)
+
+  /// Widgets
+  widgets         String[]
+
+  // Context data
+  contextData     DynamicGridContextData[] @json
+
+  // Actions - stringified JSON array of actions
+  actions         DynamicGridAction[] @json
+
+  // Datasets
+  datasets        DynamicGridDataset[] @json
+
+  /// HTML tag - the tag to use for the dynamic grid container
+  htmlTag         String             @default("div")
+
+  /// Fluid - if true, the dynamic grid will be fluid (=> the content will be fluidly stretched based on the width of the container)
+  fluid           Boolean            @default(true)
+
+  // Relations
+  /// Categories
+  categories      EnumeratorOption[] @relation("DynamicGridCategories")
+
+  /// Children
+  children        DynamicGrid[]      @relation("DynamicGridToDynamicGrid")
+
+  /// Parents
+  parents         DynamicGrid[]      @relation("DynamicGridToDynamicGrid")
+
+  /// Email template ID
+  emailTemplateId String?            @unique
+
+  /// Email template
+  emailTemplate   EmailTemplate?     @relation(fields: [emailTemplateId], references: [id], onDelete: Cascade)
+
+  /// Files
+  files           File[]
+
+  /// The instance ID it belongs to
+  instanceId      String
+
+  /// The instance it belongs to
+  instance        Instance           @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// Organization ID it belongs to
+  organizationId  String?
+
+  /// Organization it belongs to
+  organization    Organization?      @relation(fields: [organizationId], references: [id])
+
+  /// Pages
+  pages           Page[]
+
+  /// Structure item ID
+  structureItemId String?            @unique
+
+  /// Structure item
+  structureItem   StructureItem?     @relation(fields: [structureItemId], references: [id], onDelete: Cascade)
+
+  // TEMPORARY
+  /// Date and time when the record was created, the default value is the current date and time
+  createdAt       DateTime  @default(now())
+
+  /// Identifier of the account who created the record
+  createdById     String?
+
+  /// Identifier of the user who created the record
+  createdByUserId String?
+
+  /// Date and time of the last update of the record, the default value is the current date and time
+  updatedAt       DateTime? @updatedAt
+
+  /// Identifier of the account who last updated the record
+  updatedById     String?
+
+  /// Identifier of the user who last updated the record
+  updatedByUserId String?
+
+  /// Indicates whether the record is marked as deleted
+  deleted         Boolean   @default(false)
+
+  /// Date and time of deletion of the record
+  deletedAt       DateTime?
+
+  /// Identifier of the account who deleted the record
+  deletedById     String?
+
+  /// Identifier of the user who deleted the record
+  deletedByUserId String?
+
+
+  @@allow('read', true) // The `read` access is given by its relation
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+
+  // Allow users with "dynamicGrid:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "dynamicGrid:manage" || id == "all:manage"]]]
+    )
+
+  // Allow the creator of the dynamic grid
+    || (
+      createdById == auth().id && instance.users?[accountId == auth().id && roles?[claims?[id == "dynamicGrid:manageOwn"]]]
+    )
+  )
+}

@@ -1,0 +1,51 @@
+import '../shared/timestamps'
+import '../enums/structure-item-type.enum'
+import '../types/structure-item-content.type'
+import './ai-embedding'
+import './dynamic-grid'
+import './file'
+import './structure'
+
+model StructureItem with Timestamps {
+  id            String                 @id @default(cuid())
+
+  /// The item's name
+  name          String
+
+  // The item's content
+  content       StructureItemContent[] @json
+
+  /// The item's type
+  type          StructureItemType
+
+
+  // Relations
+  // Embeddings for this structure item
+  embeddings    AiEmbedding[]
+
+  /// The children organizations
+  children      StructureItem[]        @relation("StructureItemToStructureItem")
+
+  /// Dynamic grid that this structure item belongs to
+  dynamicGrid   DynamicGrid?
+
+  /// File ID
+  fileId        String?
+
+  /// The item's file
+  file          File?                  @relation(fields: [fileId], references: [id])
+
+  /// ID of the parent structure item
+  parentId      String?
+
+  /// The parent structure item
+  parent        StructureItem?         @relation("StructureItemToStructureItem", fields: [parentId], references: [id], onDelete: Cascade)
+
+  /// The structure that this structure item belongs to
+  structureId   String
+
+  /// The structure that this structure item belongs to
+  structure     Structure              @relation(fields: [structureId], references: [id])
+
+  @@allow('all', check(structure, 'read'))
+}

@@ -1,0 +1,49 @@
+import '../shared/timestamps'
+import './activity'
+import './instance'
+import './task'
+import '../types/style.type'
+
+model Tag with Timestamps {
+  id          String     @id @default(cuid())
+
+  /// Tag name
+  name        String?
+
+  /// Tag description
+  description String?
+
+  /// Entity ID
+  entityId    String?
+
+  /// Entity name
+  entityName  String?
+
+  // Style of the option
+  style       Style?       @json
+
+  // Relations
+  /// Activities that have this tag
+  activities  Activity[]
+
+  /// The instance ID this enumerator belongs to
+  instanceId  String
+
+  /// The instance this enumerator belongs to
+  instance    Instance   @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The tasks that have this tag
+  tasks       Task[]
+
+
+  @@allow('read', check(instance, 'read'))
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "tag:manage" || id == "all:manage"]]] // Allow users with "tag:manage" or "all:manage" claims
+    )
+  )
+}

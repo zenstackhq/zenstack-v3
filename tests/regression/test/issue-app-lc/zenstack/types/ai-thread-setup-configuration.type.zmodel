@@ -1,0 +1,20 @@
+type AgentConfiguration {
+  id          String?
+  model       String?
+  temperature Float?
+  maxSteps    Int?
+  maxTokens   Int?
+  system      String?
+}
+
+type AiThreadSetupConfiguration {
+  useSupervisor           Boolean
+  useComplex              Boolean
+  useIndependentAnswers   Boolean
+  usePublicKnowledge      Boolean
+  useUserKnowledge        Boolean
+  useThreadKnowledge      Boolean
+  agentsConfiguration     AgentConfiguration[]
+  supervisorConfiguration AgentConfiguration?
+  knowledgeBaseIds        String[]
+}

@@ -1,0 +1,72 @@
+import '../shared/timestamps'
+import './board-on-organization'
+import './board-column'
+import './board-layout'
+import './enumerator-option'
+import './file'
+import './instance'
+import './sprint'
+import './task'
+
+model Board with Timestamps {
+  id                    String                @id @default(cuid())
+
+  /// The name of the board
+  name                  String
+
+  /// Description of the board
+  description           String?
+
+  /// Sprint default duration [ms]
+  sprintDefaultDuration Int?                  @default(1209600000) // 14 days
+
+
+  // Relations
+  /// The columns that belong to this board
+  columns               BoardColumn[]
+
+  /// Documents
+  documents             File[]                @relation("BoardDocuments")
+
+  /// The instance ID this organization belongs to
+  instanceId            String
+
+  /// The instance this organization belongs to
+  instance              Instance              @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// Default layout schema of the board
+  layouts               BoardLayout[]
+
+  /// The organization that this board belongs to
+  organizations         BoardOnOrganization[]
+
+  /// The sprints that belong to this board
+  sprints               Sprint[]
+
+  /// The tasks that belong to this board
+  tasks                 Task[]
+
+
+  @@allow(
+    'read',
+
+  // Allow the owner
+    instance.ownerId == auth().id
+
+  // Allow members of the organization
+    || organizations?[organization.users?[user.accountId == auth().id]]
+  )
+
+  @@allow(
+    'create,update,delete',
+
+  // Allow owner of the instance
+    instance.ownerId == auth().id
+
+  // Allow users with "board:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "board:manage" || id == "all:manage"]]]
+    )
+  )
+}

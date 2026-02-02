@@ -1,0 +1,20 @@
+type QueryBuilderRow {
+  id         String?
+  field      String?
+  operator   String?
+  value      String?
+  connection String?
+}
+
+type BoardLayoutSchema {
+  columnsSelection    Int[]
+  tagsFilter          Int[]
+  usersFilter         Int[]
+  tasksQueryBuilder   QueryBuilderRow[]
+  taskFields          String[]
+  useAdvancedFilter   Boolean?
+  useUsersFilter      Boolean?
+  useTagsFilter       Boolean?
+  useSprints          Boolean?
+  taskCustomFields    String[]
+}

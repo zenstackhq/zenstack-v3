@@ -1,0 +1,11 @@
+type AiAgentModelConfiguration {
+  model             String
+  temperature       Float?
+  maxSteps          Int?
+  maxTokens         Int?
+  presencePenalty   Float?
+  frequencyPenalty  Float?
+  system            String?
+  followupPrompt    String?
+  secretId          String?
+}

@@ -1,0 +1,53 @@
+import '../shared/timestamps'
+import './activity'
+import './instance'
+import '../types/style.type'
+
+model ActivityType with Timestamps {
+  id               String     @id @default(cuid())
+
+  /// Name of the activity type
+  name             String
+
+  /// Internal name of the activity type
+  internalName     String?
+
+  /// Description of the activity type
+  description      String?
+
+  /// Whether the activity is payable
+  payable          Boolean    @default(true)
+
+  // Style of the Activity type
+  style            Style?       @json
+
+  /// Default duration of the activity type
+  /// @zod.number.min(0)
+  defaultDuration  Int?
+
+  /// Default workbreak of the activity type
+  defaultWorkbreak Int?
+
+  /// Whether the activity type requires approval
+  approvalNeeded   Boolean    @default(false)
+
+  /// Whether the activity type is highlighted (use for important activities)
+  highlight        Boolean    @default(false)
+
+  /// Whether the activity type is marketable
+  marketable       Boolean    @default(false)
+
+  // Relations
+  activities       Activity[]
+
+  /// The instance ID this activityType belongs to
+  instanceId       String
+
+  /// The instance this activityType belongs to
+  instance         Instance   @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@allow('read', instance.users?[accountId == auth().id]) // Allow only members of the instance to read it
+
+  @@unique([instanceId, internalName])
+  @@index([internalName])
+}

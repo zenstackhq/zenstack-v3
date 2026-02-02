@@ -1,0 +1,31 @@
+type Timestamps {
+  /// Date and time when the record was created, the default value is the current date and time
+  createdAt       DateTime  @default(now())
+
+  /// Identifier of the account who created the record
+  createdById     String?
+
+  /// Identifier of the user who created the record
+  createdByUserId String?
+
+  /// Date and time of the last update of the record, the default value is the current date and time
+  updatedAt       DateTime? @updatedAt
+
+  /// Identifier of the account who last updated the record
+  updatedById     String?
+
+  /// Identifier of the user who last updated the record
+  updatedByUserId String?
+
+  /// Indicates whether the record is marked as deleted
+  deleted         Boolean   @default(false)
+
+  /// Date and time of deletion of the record
+  deletedAt       DateTime?
+
+  /// Identifier of the account who deleted the record
+  deletedById     String?
+
+  /// Identifier of the user who deleted the record
+  deletedByUserId String?
+}

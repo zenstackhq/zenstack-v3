@@ -1,0 +1,6 @@
+type DynamicGridBreakpoint {
+  id         String
+  icon       String?
+  label      String
+  breakpoint Int
+}

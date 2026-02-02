@@ -1,0 +1,86 @@
+import '../shared/timestamps'
+import '../enums/attendance-approval.enum'
+import '../enums/attendance-status.enum'
+import '../types/connected-task.type'
+import './activity'
+import './enumerator-option'
+import './note'
+import './project'
+import './task'
+import './user'
+
+model Attendance with Timestamps {
+  id           String             @id @default(cuid())
+
+  /// Time of attendance start
+  from         DateTime
+
+  /// Time of attendance end
+  to           DateTime?
+
+  // Relations
+  // Attendance activity ID
+  activityId   String?
+
+  /// Attendance activity
+  activity     Activity?          @relation(fields: [activityId], references: [id])
+
+  /// Attendance notes
+  notes        Note[]
+
+  /// Attendance approval
+  approval     AttendanceApproval @default(OPEN) @@allow('update', user.instance.ownerId == auth().id || (user.instance.users?[accountId == auth().id && roles?[claims?[id == "attendance:manage" || id == "attendance:approve"]]]))
+
+  /// Attendance status
+  status       AttendanceStatus   @default(OPEN) @@allow('update', user.instance.ownerId == auth().id || (user.instance.users?[accountId == auth().id && roles?[claims?[id == "attendance:manage" || id == "attendance:approve"]]]))
+
+  // Attendance custom fields
+  customFields ConnectedTask[]    @json
+
+  // Relations
+  /// Attendance category ID
+  categoryId   String?
+
+  /// Attendance category
+  category     EnumeratorOption?  @relation(fields: [categoryId], references: [id])
+
+  /// Project ID
+  projectId    String?
+
+  /// Project
+  project      Project?           @relation(fields: [projectId], references: [id])
+
+  /// Task ID
+  taskId       String?
+
+  /// Task
+  task         Task?              @relation(fields: [taskId], references: [id])
+
+  /// Attendance user ID
+  userId       String
+
+  /// Attendance user
+  user         User               @relation(fields: [userId], references: [id])
+
+
+  @@allow(
+    'read',
+    user.instance.ownerId == auth().id // Allow owner of the instance
+    || (user.accountId == auth().id && user.roles?[claims?[id == "attendance:readOwn"]]) // Own attendance
+    || (user.instance.users?[accountId == auth().id && roles?[claims?[id == "attendance:read" || id == "all:read"]]])
+  )
+
+  @@allow(
+    'create,update',
+    user.instance.ownerId == auth().id // Allow owner of the instance
+    || (user.accountId == auth().id && status == "OPEN" && user.roles?[claims?[id == "attendance:manageOwn"]]) // Own attendance & status is OPEN
+    || (user.instance.users?[accountId == auth().id && roles?[claims?[id == "attendance:manage" || id == "all:manage"]]])
+  )
+
+  @@allow(
+    'delete',
+    user.instance.ownerId == auth().id // Allow owner of the instance
+    || (user.accountId == auth().id && user.roles?[claims?[id == "attendance:manageOwn"]]) // Own attendance
+    || (user.instance.users?[accountId == auth().id && roles?[claims?[id == "attendance:manage" || id == "all:manage"]]])
+  )
+}

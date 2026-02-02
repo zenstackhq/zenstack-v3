@@ -1,0 +1,47 @@
+import '../shared/timestamps'
+import '../types/ai-thread-setup-configuration.type'
+import './ai-embedding'
+import './ai-message'
+import './instance'
+import './user'
+
+model AiThread with Timestamps {
+  id         String                      @id @default(cuid())
+
+  /// Name
+  name       String
+
+  // Agent setup
+  setup      AiThreadSetupConfiguration? @json
+
+  /// RELATIONS
+  /// AI embeddings
+  embeddings AiEmbedding[]
+
+  /// Instance ID
+  instanceId String
+
+  /// Instance
+  instance   Instance                    @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// Messages
+  messages   AiMessage[]
+
+  /// User ID
+  userId     String?
+
+  /// User
+  user       User?                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@allow(
+    'read,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+    || user.accountId == auth().id // Allow owner of the thread
+  )
+
+  @@allow(
+    'create',
+    instance.ownerId == auth().id
+    || instance.users?[accountId == auth().id && roles?[claims?[id == "aiThread:manage" || id == "all:manage"]]]
+  )
+}

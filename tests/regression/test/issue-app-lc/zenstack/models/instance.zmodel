@@ -1,0 +1,169 @@
+import '../shared/timestamps'
+import '../enums/instance-feature.enum'
+import './activity-type'
+import './ai-agent'
+import './ai-embedding'
+import './ai-thread'
+import './ai-thread-setup'
+import './ai-tool'
+import './account'
+import './board'
+import './comment'
+import './custom-field'
+import './dynamic-grid'
+import './dynamic-grid-section'
+import './dynamic-grid-design-item'
+import './email-template'
+import './enumerator'
+import './file'
+import './labor-rule'
+import './note'
+import './organization'
+import './page'
+import './planning'
+import './planning-stage'
+import './planning-stage-rule'
+import './project'
+import './role'
+import './secret'
+import './structure'
+import './tag'
+import './task'
+import './translation'
+import './user'
+import './user-invitation'
+import './workflow'
+
+model Instance with Timestamps {
+  id                     String                @id @default(cuid())
+
+  /// Name of the instance
+  name                   String                @searchable
+
+  /// Description of the instance
+  description            String                @default("") @searchable
+
+  /// Domain name of the instance
+  domainName             String                @unique @searchable
+
+  /// Features of the instance
+  features               InstanceFeature[]
+
+  /// Whether the instance is public or not
+  isPublic               Boolean               @default(false)
+
+  /// Languages of the instance
+  languages              String[]
+
+  // Relations
+  /// Activity types of the instance
+  activityTypes          ActivityType[]
+
+  /// AI Agents
+  aiAgents               AiAgent[]
+
+  /// AI Embeddings
+  aiEmbeddings           AiEmbedding[]
+
+  /// AI Tools
+  aiTools                AiTool[]
+
+  /// AI Threads
+  aiThreads              AiThread[]
+
+  /// AI Thread setups
+  aiThreadSetups         AiThreadSetup[]
+
+  /// Boards of the instance
+  boards                 Board[]
+
+  /// Comments of the instance
+  comments               Comment[]
+
+  /// Custom fields of the instance
+  customFields           CustomField[]
+
+  /// Dynamic grids of the instance
+  dynamicGrids           DynamicGrid[]
+
+  /// Dynamic grid sections of the instance
+  dynamicGridSections    DynamicGridSection[]
+
+  /// Dynamic grid design items of the instance
+  dynamicGridDesignItems DynamicGridDesignItem[]
+
+  /// Email templates of the instance
+  emailTemplates         EmailTemplate[]
+
+  /// Enumerators of the instance
+  enumerators            Enumerator[]
+
+  /// Invitations of the instance
+  invitations            UserInvitation[]
+
+  /// Labor rules of the instance
+  laborRules             LaborRule[]
+
+  /// Logo of the instance
+  logo                   File?
+
+  /// Notes of the instance
+  notes                  Note[]
+
+  /// ID of the owner of the instance (accountId)
+  ownerId                String
+
+  /// Owner of the instance (account)
+  owner                  Account               @relation(name: "OwnedInstances", fields: [ownerId], references: [id])
+
+  /// Organizations of the instance
+  organizations          Organization[]
+
+  /// Pages of the instance
+  pages                  Page[]
+
+  /// Planning of the instance
+  planning               Planning[]
+
+  /// Planning stages of the instance
+  planningStages         PlanningStage[]
+
+  /// Planning stage rules
+  planningStageRules     PlanningStageRule[]
+
+  /// Projects of the instance
+  projects               Project[]
+
+  /// Roles of the instance
+  roles                  Role[]
+
+  /// Secrets of the instance
+  secrets                Secret[]
+
+  /// Structures of the instance
+  structures             Structure[]
+
+  /// Tags of the instance
+  tags                   Tag[]
+
+  /// Tasks of the instance
+  tasks                  Task[]
+
+  /// Translations of the instance
+  translations           Translation[]
+
+  /// Users of the instance
+  users                  User[]
+
+  /// Workflows of the instance
+  workflows              Workflow[]
+
+  @@allow(
+    'read',
+    ownerId == auth().id // Allow the owner
+    || users?[accountId == auth().id] // Allow members of the instance
+  )
+
+  @@allow('create', true) // Allow anyone
+  @@allow('update,delete', ownerId == auth().id) // Allow only the owner
+}

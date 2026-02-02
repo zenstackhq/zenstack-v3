@@ -1,0 +1,16 @@
+enum SprintStatus {
+  /// The sprint is not started yet
+  NOT_STARTED
+
+  /// The sprint is ready to start (= all the tasks are created and groomed and whatever else)
+  READY
+
+  /// The sprint is active
+  ACTIVE
+
+  /// The sprint is completed
+  COMPLETED
+
+  /// The sprint is cancelled
+  CANCELLED
+}

@@ -1,0 +1,61 @@
+import '../shared/timestamps'
+import './instance'
+import '../types/dynamic-grid-visibility-rule.zmodel'
+
+model DynamicGridDesignItem with Timestamps {
+  id          String    @id @default(cuid())
+
+  /// Name
+  name        String
+
+  /// Data
+  data        Json
+
+  /// On hover
+  onHover     Boolean?
+
+  /// Rules
+  rules       DynamicGridVisibilityRule[] @json
+
+  /// Screen sizes
+  screenSizes String[]
+
+  /// Type
+  type        String
+
+  /// Theme
+  theme       String?
+
+  /// Watchers
+  watchers    String[]
+
+  /// Widget type
+  widgetType  String
+
+  // Relations
+  /// Instance ID
+  instanceId  String
+
+  /// Instance
+  instance    Instance? @relation(fields: [instanceId], references: [id])
+
+  @@allow(
+    'read',
+    instance.ownerId == auth().id // Allow the owner
+    // Allow users with "dynamicGridDesignItem:manage" or "all:read" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "dynamicGridDesignItem:manage" || id == "all:read"]]]
+    )
+  )
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow the owner
+    // Allow users with "dynamicGridDesignItem:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "dynamicGridDesignItem:manage" || id == "all:manage"]]]
+    )
+  )
+}

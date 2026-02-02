@@ -1,0 +1,75 @@
+import '../shared/timestamps'
+import './ai-embedding'
+import './ai-message'
+import './board'
+import './comment'
+import './dynamic-grid'
+import './email-template'
+import './instance'
+import './structure-item'
+import './task'
+import './user'
+
+model File with Timestamps {
+  id             String          @id @default(cuid())
+
+  /// File name
+  name           String
+
+  /// File type
+  type           String
+
+  /// File size
+  size           Int
+
+  /// File path
+  path           String          @unique
+
+  /// A note for the file
+  note           String?
+
+  // Relations
+  /// Board document ID
+  boardId        String?
+
+  /// Board document
+  board          Board?          @relation("BoardDocuments", fields: [boardId], references: [id])
+
+  // Comments
+  comments       Comment[]
+
+  /// Embeddings
+  aiEmbeddings   AiEmbedding[]
+
+  /// Dynamic grid
+  dynamicGridId  String?
+
+  /// Dynamic grid
+  dynamicGrid    DynamicGrid?    @relation(fields: [dynamicGridId], references: [id])
+
+  /// Email templates
+  emailTemplates EmailTemplate[]
+
+  /// Instance ID (Instance's logo)
+  instanceId     String?         @unique
+
+  /// Instance (Instance's logo)
+  instance       Instance?       @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// AI messages
+  aiMessages     AiMessage[]
+
+  /// Structure items
+  structureItems StructureItem[]
+
+  /// Task ID
+  taskId         String?
+
+  /// Task
+  task           Task?           @relation(fields: [taskId], references: [id])
+
+  /// User Avatar
+  user           User?           @relation("Avatar")
+
+  @@allow('all', true)
+}

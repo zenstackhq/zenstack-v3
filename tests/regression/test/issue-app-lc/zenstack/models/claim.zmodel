@@ -1,0 +1,24 @@
+import '../shared/timestamps'
+import './role'
+import './user'
+
+model Claim with Timestamps {
+  id            String  @id @unique @deny('update', true) @searchable
+
+  /// Description of the claim
+  description   String? @deny('update', true) @searchable
+
+  // Relations
+  /// Roles that have this claim
+  roles         Role[]
+
+  /// Roles that require this claim to be set
+  requiredRoles Role[]  @relation('ClaimRequiredRoles')
+
+
+  /// Users that have this claim as a direct claim
+  // users       User[]
+
+  @@allow('read,update', true)
+  @@deny('create,delete', true)
+}

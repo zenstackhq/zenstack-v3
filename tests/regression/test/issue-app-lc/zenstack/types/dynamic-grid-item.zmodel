@@ -1,0 +1,7 @@
+import './building-block.zmodel'
+
+type DynamicGridItem {
+  id            String
+  uuid          String
+  buildingBlock BuildingBlock @json
+}

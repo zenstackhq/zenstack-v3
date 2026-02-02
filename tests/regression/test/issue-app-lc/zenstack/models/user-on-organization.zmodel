@@ -1,0 +1,29 @@
+import '../shared/timestamps'
+import '../enums/user-on-organization-occupation.enum'
+import './organization'
+import './user'
+
+model UserOnOrganization with Timestamps {
+  @@id(name: "compositeId", fields: [userId, organizationId])
+  id             String                       @unique @default(cuid())
+
+  /// The occupation of the user on the organization, e.g. supervisor, worker
+  // occupation     UserOnOrganizationOccupation
+
+  /// The organization ID the user is part of
+  organizationId String
+
+  /// The user that is part of the organization
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// The user ID that is part of the organization
+  userId         String
+
+  /// The user that is part of the organization
+  user           User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@allow(
+    'read,create,update,delete',
+    check(organization, 'update')
+  )
+}

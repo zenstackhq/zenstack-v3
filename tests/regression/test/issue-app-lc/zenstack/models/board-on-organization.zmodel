@@ -1,0 +1,25 @@
+import '../shared/timestamps'
+import './board'
+import './organization'
+
+model BoardOnOrganization with Timestamps {
+  id             String       @id @default(cuid())
+
+  // Relations
+  /// The board ID
+  boardId        String
+
+  /// Board
+  board          Board        @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  /// The organization ID
+  organizationId String
+
+  /// Organization
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@allow('read', check(board, 'read'))
+  @@allow('create', check(board, 'create') && check(organization, 'create'))
+  @@allow('update', check(board, 'update') && check(organization, 'update'))
+  @@allow('delete', check(board, 'delete') && check(organization, 'delete'))
+}

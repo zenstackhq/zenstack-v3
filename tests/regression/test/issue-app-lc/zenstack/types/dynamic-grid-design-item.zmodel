@@ -1,0 +1,5 @@
+type DynamicGridDesignItemObj {
+  id         String
+  name       String
+  widgetType String
+}

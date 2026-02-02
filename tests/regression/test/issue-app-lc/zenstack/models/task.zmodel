@@ -1,0 +1,131 @@
+import '../shared/timestamps'
+import './activity'
+import './attendance'
+import './board'
+import './comment'
+import './enumerator-option'
+import './file'
+import './instance'
+import './project'
+import './sprint'
+import './tag'
+import './task-assignment'
+
+model Task with Timestamps {
+  id               String            @id @default(cuid())
+
+  /// Archived at
+  archivedAt       DateTime?
+
+  /// The name of the task
+  name             String
+
+  // Custom fields
+  /// [ICustomFieldItem]
+  customFields     Json[]            @default([])
+
+  /// The description of the task (HTML allowed)
+  description      String?
+
+  /// The date the task was completed
+  doneDate         DateTime?
+
+  /// The due date of the task
+  dueDate          DateTime?
+
+  /// The estimated time to complete the task
+  estimateDuration Int?
+
+  /// When true, the task is considered a template
+  isTemplate       Boolean           @default(false)
+
+  /// Position
+  position         Int
+
+  /// Serial number of the task, each board has a separate range of serial numbers
+  uuid             String
+
+  // Relations
+  /// The activity ID this task belongs to
+  activityId       String?
+
+  /// The activity this task belongs to
+  activity         Activity?         @relation(fields: [activityId], references: [id])
+
+  /// Attendance
+  attendance       Attendance[]
+
+  /// The users assigned to the task
+  assignedTo       TaskAssignment[]
+
+  /// The board ID this task belongs to
+  boardId          String?
+
+  /// The board this task belongs to
+  board            Board?            @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  /// Children tasks
+  children         Task[]            @relation("SubTasks")
+
+  /// Comments
+  comments         Comment[]
+
+  /// Files
+  files            File[]
+
+  /// The instance ID this task belongs to
+  instanceId       String
+
+  /// The instance this task belongs to
+  instance         Instance          @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The parent task ID
+  parentId         String?
+
+  /// The parent task
+  parent           Task?             @relation("SubTasks", fields: [parentId], references: [id])
+
+  /// The project ID this task belongs to
+  projectId        String?
+
+  /// The project this task belongs to
+  project          Project?          @relation(fields: [projectId], references: [id])
+
+  /// The priority ID of the task (EnumeratorOptionId)
+  priorityId       String?
+
+  /// The priority of the task (EnumeratorOption)
+  priority         EnumeratorOption? @relation("TaskPriority", fields: [priorityId], references: [id])
+
+  /// The sprints that the task belongs to
+  sprints          Sprint[]
+
+  /// The status ID of the task (EnumeratorOptionId)
+  statusId         String
+
+  /// The status of the task (EnumeratorOption)
+  status           EnumeratorOption  @relation("TaskStatus", fields: [statusId], references: [id])
+
+  /// Tags
+  tags             Tag[]
+
+  /// The task type ID (EnumeratorOptionId)
+  typeId           String?
+
+  /// The task type (EnumeratorOption)
+  type             EnumeratorOption? @relation("TaskType", fields: [typeId], references: [id])
+
+  @@unique([boardId, uuid])
+
+  @@allow('read', check(board, 'read') || check(activity, 'read'))
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+
+  // Allow users that can read the board or activity
+    || (
+      check(board, 'read') || check(activity, 'read')
+    )
+  )
+}

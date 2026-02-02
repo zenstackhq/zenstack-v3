@@ -1,0 +1,26 @@
+import '../shared/timestamps'
+import './activity'
+import './instance'
+import './planning-stage-on-planning'
+
+model Planning with Timestamps {
+  id                       String                    @id @default(cuid())
+
+  /// Planning name
+  name                     String
+
+  // Relations
+  /// Actvities that this planning is used for
+  activities               Activity[]
+
+  /// The instance ID that this planning belongs to
+  instanceId               String
+
+  /// The instance that this planning belongs to
+  instance                 Instance                  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// N-N relation between planning and planning stages
+  planningStagesOnPlanning PlanningStageOnPlanning[]
+
+  @@allow('all', check(instance, 'read'))
+}

@@ -1,0 +1,83 @@
+import '../shared/timestamps'
+import './ai-agent'
+import './ai-thread'
+import './file'
+import './instance'
+import './structure-item'
+import './user'
+
+model AiEmbedding with Timestamps {
+  id              String                       @id @default(cuid())
+
+  /// Name of the embedding
+  name            String
+
+  /// Content
+  content         String
+
+  /// Description
+  description     String?
+
+  /// Entity ID - should be used with `entityName` to create dynamic relation
+  entityId        String?
+
+  /// Entity name (Should be one of the `Prisma.ModelName` enum)
+  entityName      String?
+
+  /// Summary
+  summary         String?
+
+  /// Embedding
+  embedding       Unsupported("vector(1536)")?
+
+  /// Model
+  model           String                       @default("text-embedding-ada-002")
+
+  /// Public
+  public          Boolean                      @default(false)
+
+  /// UUID - an ID that is unique to the mbedding for multiple chunks
+  /// @zod.custom.omit([input])
+  uuid            String
+
+  // RELATIONS
+  /// Agents
+  agents          AiAgent[]
+
+  /// Structure Item ID
+  structureItemId String?
+
+  /// Structure Item
+  structureItem   StructureItem?               @relation(fields: [structureItemId], references: [id], onDelete: Cascade)
+
+  /// AI Thread ID
+  threadId        String?
+
+  /// AI Thread
+  thread          AiThread?                    @relation(fields: [threadId], references: [id])
+
+  /// Files
+  files           File[]
+
+  /// Instance ID
+  instanceId      String
+
+  /// Instance
+  instance        Instance                     @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// User ID
+  userId          String?
+
+  /// User
+  user            User?                        @relation(fields: [userId], references: [id])
+
+  @@allow(
+    'read,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+    || user.accountId == auth().id // Allow owner of the embedding
+    || thread.user.accountId == auth().id // Allow owner of the thread
+    || (instance.users?[accountId == auth().id] && public) // Allow members of the instance but only if public
+  )
+
+  @@allow('create', check(instance, 'read')) // Allow members of the instance
+}

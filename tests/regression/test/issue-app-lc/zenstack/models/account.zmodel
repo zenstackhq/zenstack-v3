@@ -1,0 +1,40 @@
+import '../shared/timestamps'
+import './instance'
+import './user'
+import './credential'
+import './secret'
+
+model Account with Timestamps {
+  id             String       @id @default(cuid())
+
+  /// Account's first name
+  firstName      String       @searchable
+
+  /// Account's last name
+  lastName       String       @searchable
+
+  /// Account's email
+  email          String       @unique @searchable
+
+  /// Account's password
+  password       String?      @omit
+
+  // Relations
+  /// Account's credentials
+  credentials    Credential[]
+
+  /// Account's owned instances (~ is the owner of the instance)
+  ownedInstances Instance[]   @relation(name: "OwnedInstances")
+
+  /// Account's users
+  users          User[]
+
+  /// Account's secrets
+  secrets        Secret[]
+
+  @@allow('read', true)
+  @@allow('create', true)
+  @@allow('update', auth().id == id) // Only the owner can update self
+  @@deny('delete', true)
+  @@auth
+}

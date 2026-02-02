@@ -1,0 +1,38 @@
+import '../shared/timestamps'
+import '../enums/labor-rule-interval.enum'
+import './instance'
+import './organization'
+
+model LaborRule with Timestamps {
+  id            String             @id @default(cuid())
+
+  /// Name of the labor rule
+  name          String
+
+  /// Description of the labor rule
+  description   String?
+
+  /// The time period for which the labor rule is applicable (in ms)
+  /// Either `period` or `LaborRuleInterval` should be provided
+  period        Int?
+
+  /// The interval for which the labor rule is applicable
+  /// Either `period` or `LaborRuleInterval` should be provided
+  interval      LaborRuleInterval?
+
+  /// Duration of the rest/break during the period that needs to be followed (in ms)
+  restDuration  Int
+
+  // Relations
+  /// The instance ID this labor rule belongs to
+  instanceId    String
+
+  /// The instance this labor rule belongs to
+  instance      Instance           @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The organizations that have this labor rule
+  organizations Organization[]
+
+
+  @@allow('all', check(instance, 'read'))
+}

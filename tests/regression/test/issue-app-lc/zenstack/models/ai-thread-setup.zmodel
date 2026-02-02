@@ -1,0 +1,25 @@
+import '../shared/timestamps'
+import '../types/ai-thread-setup-configuration.type'
+import './instance'
+
+model AiThreadSetup with Timestamps {
+  id            String                     @id @default(cuid())
+
+  /// Name
+  name          String
+
+  /// Description
+  description   String?
+
+  /// Configuration
+  configuration AiThreadSetupConfiguration @json
+
+  // Relations
+  /// Instance ID
+  instanceId    String
+
+  /// Instance
+  instance      Instance                   @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@allow('all', check(instance, 'read')) // Allow members of the instance
+}

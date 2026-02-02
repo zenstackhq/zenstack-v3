@@ -1,0 +1,26 @@
+import '../shared/timestamps'
+import './planning'
+import './planning-stage'
+
+model PlanningStageOnPlanning with Timestamps {
+  @@id(name: "compositeId", fields: [planningId, planningStageId, order])
+  id              String        @unique @default(cuid())
+
+  /// The order of the stage in the planning
+  order           Int
+
+  // Relations
+  /// Planning ID that the stage is associated with
+  planningId      String
+
+  /// Planning that the stage is associated with
+  planning        Planning      @relation(fields: [planningId], references: [id])
+
+  /// Planning stage ID that the stage is associated with
+  planningStageId String
+
+  /// Planning stage that the stage is associated with
+  planningStage   PlanningStage @relation(fields: [planningStageId], references: [id])
+
+  @@allow('all', check(planning, 'read'))
+}

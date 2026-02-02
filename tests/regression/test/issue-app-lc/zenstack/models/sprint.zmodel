@@ -1,0 +1,42 @@
+import '../shared/timestamps'
+import '../enums/sprint-status.enum'
+import './board'
+import './task'
+
+model Sprint with Timestamps {
+  id        String       @id @default(cuid())
+
+  /// Sprint name
+  name      String
+
+  /// Goal of the sprint
+  goal      String?
+
+  /// Planned start date of the sprint
+  startDate DateTime?
+
+  /// Planned end date of the sprint
+  endDate   DateTime?
+
+  /// Actual start date of the sprint
+  startedAt DateTime?
+
+  /// Actual end date of the sprint
+  endedAt   DateTime?
+
+  /// Status of the sprint
+  status    SprintStatus
+
+  // Relations
+  /// The board that the sprint belongs to
+  boardId   String
+
+  /// The board that the sprint belongs to
+  board     Board        @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  /// The tasks that are part of the sprint
+  tasks     Task[]
+
+  @@allow('read,update', check(board, 'read'))
+  @@allow('create,delete', check(board, 'update'))
+}

@@ -1,0 +1,7 @@
+type DynamicGridRuler {
+  orientation String
+  position    String
+  color       String?
+  enabled     Boolean?
+  screenSizes String[]
+}

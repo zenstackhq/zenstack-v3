@@ -1,0 +1,25 @@
+import '../shared/timestamps'
+
+model Log with Timestamps {
+  id         String  @id @default(cuid())
+
+  /// The operation that was performed
+  operation  String
+
+  /// ID of the entity that was affected
+  entityId   String
+
+  /// The entity that was affected (model)
+  entityName String
+
+  /// The old value
+  oldValue   Json?
+
+  /// The new value
+  newValue   Json?
+
+  /// Message
+  message    String?
+
+  @@allow('all', true)
+}

@@ -1,0 +1,43 @@
+import '../shared/timestamps'
+import '../enums/ai-agent-type.enum'
+import '../types/ai-agent-model-configuration.type'
+import './ai-embedding'
+import './ai-tool'
+import './instance'
+
+model AiAgent with Timestamps {
+  id                 String                     @id @default(cuid())
+
+  /// Actor
+  actor              String                     @default("user")
+
+  /// Name
+  name               String
+
+  /// Description
+  description        String?
+
+  /// Use history
+  useHistory         Boolean                    @default(true)
+
+  // Type
+  type               AiAgentType                @default(AGENT)
+
+  // Model configuration
+  modelConfiguration AiAgentModelConfiguration? @json
+
+  // RELATIONS
+  /// Embeddings
+  embeddings         AiEmbedding[]
+
+  /// Instance
+  instanceId         String
+
+  /// Instance
+  instance           Instance                   @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// Tools
+  tools              AiTool[]
+
+  @@allow('all', check(instance, 'read'))
+}

@@ -1,0 +1,52 @@
+import '../shared/timestamps'
+import './dynamic-grid'
+import './file'
+import './instance'
+
+model EmailTemplate with Timestamps {
+  id          String       @id @default(cuid())
+
+  /// Name
+  name        String
+
+  /// Description
+  description String?
+
+  /// Body string (HTML for simple templates)
+  bodyString  String?
+
+
+  /// Subject
+  subject     String
+
+  // Relations
+  /// Body grid (grid for complex templates)
+  bodyGrid    DynamicGrid?
+
+  /// Instance ID
+  instanceId  String
+
+  /// Instance
+  instance    Instance     @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// Files
+  files       File[]
+
+  @@allow(
+    'read',
+    instance.ownerId == auth().id // Allow owner of the instance
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "emailTemplate:read" || id == "all:read"]]] // Allow users with "emailTemplate:manage" or "all:manage" claims
+    )
+  )
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "emailTemplate:manage" || id == "all:manage"]]] // Allow users with "emailTemplate:manage" or "all:manage" claims
+    )
+  )
+}

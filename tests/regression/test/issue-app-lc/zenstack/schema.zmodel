@@ -1,0 +1,83 @@
+// Plugins
+import './plugins/plugin'
+
+// Models
+import './models/account'
+import './models/activity-staff-assignment'
+import './models/activity-staff-requirement'
+import './models/activity-type'
+import './models/activity'
+import './models/ai-agent'
+import './models/ai-embedding'
+import './models/ai-message'
+import './models/ai-thread-setup'
+import './models/ai-thread'
+import './models/ai-tool'
+import './models/attendance'
+import './models/board-column'
+import './models/board-layout'
+import './models/board-on-organization'
+import './models/board'
+import './models/claim'
+import './models/comment'
+import './models/contact'
+import './models/credential'
+import './models/custom-field'
+import './models/dynamic-grid-design-item'
+import './models/dynamic-grid-section'
+import './models/dynamic-grid'
+import './models/email-template'
+import './models/enumerator-option'
+import './models/enumerator'
+import './models/file'
+import './models/instance'
+import './models/labor-rule'
+import './models/log'
+import './models/note'
+import './models/organization'
+import './models/page'
+import './models/planning-stage-on-planning'
+import './models/planning-stage-rule'
+import './models/planning-stage'
+import './models/planning'
+import './models/project'
+import './models/role'
+import './models/secret'
+import './models/service-account'
+import './models/sprint'
+import './models/structure-item'
+import './models/structure'
+import './models/table-layout'
+import './models/tag'
+import './models/task-assignment'
+import './models/task'
+import './models/translation'
+import './models/user-invitation'
+import './models/user-on-organization'
+import './models/user-options'
+import './models/user'
+import './models/workflow'
+
+datasource db {
+    provider = 'postgresql'
+    url = env("DB_URL")
+}
+
+plugin generateFullTypes {
+    provider = './generators/generate-zenstack-types.ts'
+    report = true
+}
+
+plugin generateSearchableFields {
+    provider = './generators/generate-searchable-fields.ts'
+    report = true
+}
+
+
+plugin policy {
+    provider = '../../../node_modules/@zenstackhq/plugin-policy/dist/index.js'
+}
+
+plugin searchable {
+    provider = "./plugins/plugin"
+}

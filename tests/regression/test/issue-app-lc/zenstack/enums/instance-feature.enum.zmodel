@@ -1,0 +1,7 @@
+enum InstanceFeature {
+  TASKS
+  SHIFT_PLANNING
+  ATTENDANCE
+  AI
+  DYNAMIC_GRID
+}

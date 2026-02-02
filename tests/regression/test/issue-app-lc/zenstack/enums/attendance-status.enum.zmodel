@@ -1,0 +1,5 @@
+enum AttendanceStatus {
+  OPEN
+  IN_REVIEW
+  LOCKED
+}

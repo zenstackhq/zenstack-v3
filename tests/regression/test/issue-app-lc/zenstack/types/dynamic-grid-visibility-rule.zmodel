@@ -1,0 +1,5 @@
+type DynamicGridVisibilityRule {
+  id         String
+  comparator String
+  value      Json?
+}

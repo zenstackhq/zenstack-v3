@@ -1,0 +1,27 @@
+import '../shared/timestamps'
+import './activity'
+import './activity-staff-assignment'
+
+model ActivityStaffRequirement with Timestamps {
+  id                               String                    @id @default(cuid())
+
+  /// The minimum number of staff required for this activity
+  /// @zod.number.min(0)
+  minimum                          Int
+
+  /// The maximum number of staff required for this activity
+  /// @zod.number.min(0)
+  maximum                          Int
+
+  // Relations
+  /// The activity ID that this staff requirement is for
+  activityId                       String
+
+  /// The activity that this staff requirement is for
+  activity                         Activity                  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  /// The users that are assigned to this activity requirement
+  usersOnActivityStaffRequirements ActivityStaffAssignment[]
+
+  @@allow('read', activity.organization.users?[user.accountId == auth().id]) // Allow only members of the activity's organization to read it
+}

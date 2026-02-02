@@ -1,0 +1,33 @@
+import '../shared/timestamps'
+import '../enums/process-state.enum'
+import './board'
+import './enumerator-option'
+import '../types/style.type'
+
+model BoardColumn with Timestamps {
+  id           String             @id @default(cuid())
+
+  /// Board column name
+  name         String
+
+  /// Process state ~ we base some filtering on this
+  processState ProcessState       @default(IN_PROGRESS)
+
+  // Style of the BoardColumn
+  style        Style?       @json
+
+  // Relations
+  /// Board ID to which this column belongs
+  boardId      String
+
+  /// Board to which this column belongs
+  board        Board              @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  /// Column statuses
+  statuses     EnumeratorOption[] @relation("BoardColumns")
+
+  @@allow('read', check(board, 'read'))
+  @@allow('create', check(board, 'create'))
+  @@allow('update', check(board, 'update'))
+  @@allow('delete', check(board, 'delete'))
+}

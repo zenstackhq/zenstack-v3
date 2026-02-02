@@ -1,0 +1,7 @@
+enum DynamicGridType {
+  /// The default dynamic grid, without limitations
+  DEFAULT
+
+  /// The dynamic grid can be used to generate an email
+  EMAIL
+}

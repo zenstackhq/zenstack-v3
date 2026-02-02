@@ -1,0 +1,80 @@
+import '../shared/timestamps'
+import '../enums/day-name'
+import './activity'
+import './board-on-organization'
+import './instance'
+import './labor-rule'
+import './user-on-organization'
+import './dynamic-grid'
+import '../types/style.type'
+
+
+model Organization with Timestamps {
+  id                String                @id @default(cuid())
+
+  /// Name of the organization
+  name              String
+
+  /// Short name of the organization
+  shortcutName      String
+
+  // Style of the Organization
+  style             Style?       @json
+
+  /// First day of the week for the organization
+  firstActivityDay  DayName                   @default(MONDAY)
+
+  /// The time for the first activity of the day (HH:mm format)
+  firstActivityTime String                @default("00:00")
+
+
+  // Relations
+  /// Activities on the organization
+  activities        Activity[]
+
+  /// Boards on the organization
+  boards            BoardOnOrganization[]
+
+  /// The instance ID this organization belongs to
+  instanceId        String
+
+  /// The instance this organization belongs to
+  instance          Instance              @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// ID of the parent organization
+  parentId          String?               @unique
+
+  /// The parent organization
+  parent            Organization?         @relation("OrganizationToOrganization", fields: [parentId], references: [id])
+
+  /// The children organizations
+  children          Organization[]        @relation("OrganizationToOrganization")
+
+  /// Dynamic grids of the organization
+  dynamicGrids      DynamicGrid[]
+
+
+  /// The organization's labor rules
+  laborRules        LaborRule[]
+
+  /// Users on the organization (N-N explicit)
+  users             UserOnOrganization[] // Users on the organization
+
+  @@allow(
+    'read',
+    instance.ownerId == auth().id // Allow the owner
+    || users?[user.accountId == auth().id] // Allow members of the organization
+    || instance.users?[accountId == auth().id && roles?[claims?[id == "organization:read" || id == "all:read"]]] // Allow members of the instance with the "organization:read" or "all:read" claims
+  )
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+
+    // Allow users with "organization:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "organization:manage" || id == "all:manage"]]]
+    )
+  )
+}

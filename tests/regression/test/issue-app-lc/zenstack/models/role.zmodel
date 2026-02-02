@@ -1,0 +1,41 @@
+import '../shared/timestamps'
+import './claim'
+import './instance'
+import './user'
+
+model Role with Timestamps {
+  id             String   @id @default(cuid())
+
+  /// Role name
+  name           String     @searchable
+
+  /// Role description
+  description    String?    @searchable
+
+  // Relations
+  /// Claims that this role has
+  claims         Claim[]
+
+  /// Instance ID
+  instanceId     String
+
+  /// Instance
+  instance       Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// User must have these claims to be able to assign this role to someone else (assuming he has the "role:assign" claim)
+  requiredClaims Claim[]  @relation('ClaimRequiredRoles')
+
+  /// Users that have this role
+  users          User[]
+
+  @@allow('read', check(instance, 'read'))
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow owner of the instance
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "role:manage" || id == "all:manage"]]] // Allow users with "role:manage" or "all:manage" claims
+    )
+  )
+}

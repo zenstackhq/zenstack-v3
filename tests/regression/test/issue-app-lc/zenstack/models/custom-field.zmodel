@@ -1,0 +1,41 @@
+import '../shared/timestamps'
+import './instance'
+
+model CustomField with Timestamps {
+  id          String   @id @default(cuid())
+
+  /// The name of the custom field
+  name        String
+
+  /// The description of the custom field
+  description String?
+
+  /// The data type of the custom field
+  dataType    String
+
+  /// The entity name that this custom field belongs to
+  entityName  String   @default('Board')
+
+  /// The entity ID that this custom field belongs to
+  entityId    String?
+
+  // Relations
+  /// The instance ID this custom field belongs to
+  instanceId  String
+
+  /// The instance this custom field belongs to
+  instance    Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@allow('read', check(instance, 'read'))
+
+  @@allow(
+    'create,update,delete',
+    
+    // Allow the owner
+    instance.ownerId == auth().id
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "customField:manage" || id == "all:manage"]]]
+    )
+  )
+}

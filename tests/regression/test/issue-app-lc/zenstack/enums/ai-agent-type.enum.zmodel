@@ -1,0 +1,4 @@
+enum AiAgentType {
+  AGENT
+  SUPERVISOR
+}

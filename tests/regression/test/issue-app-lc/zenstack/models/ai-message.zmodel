@@ -1,0 +1,26 @@
+import '../shared/timestamps'
+import '../types/ai-agent-response.type'
+import './ai-thread'
+import './file'
+
+model AiMessage with Timestamps {
+  id        String            @id @default(cuid())
+
+  /// Role
+  role      String
+  
+  // Data (extra data) that are attached to the message
+  responses AiAgentResponse[] @json
+
+  // Relations
+  /// Files
+  files     File[]
+
+  /// Thread ID
+  threadId  String
+
+  /// Thread
+  thread    AiThread          @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@allow('all', check(thread, 'read'))
+}

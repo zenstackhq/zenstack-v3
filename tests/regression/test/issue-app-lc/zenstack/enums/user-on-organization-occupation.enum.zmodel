@@ -1,0 +1,5 @@
+enum UserOnOrganizationOccupation {
+  SUPERVISOR
+  WORKER
+  GUEST
+}

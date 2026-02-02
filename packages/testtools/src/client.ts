@@ -29,7 +29,7 @@ export function getTestDbProvider() {
 
 export const TEST_PG_CONFIG = {
     host: process.env['TEST_PG_HOST'] ?? 'localhost',
-    port: process.env['TEST_PG_PORT'] ? parseInt(process.env['TEST_PG_PORT']) : 5432,
+    port: process.env['TEST_PG_PORT'] ? parseInt(process.env['TEST_PG_PORT']) : 5433,
     user: process.env['TEST_PG_USER'] ?? 'postgres',
     password: process.env['TEST_PG_PASSWORD'] ?? 'postgres',
 };
@@ -61,6 +61,11 @@ type ExtraTestClientOptions = {
      * Database name. If not provided, a name will be generated based on the test name.
      */
     dbName?: string;
+
+    /**
+     * Whether to push the database schema before running tests.
+     */
+    pushDb?: boolean;
 
     /**
      * Use `prisma db push` instead of ZenStack's `$pushSchema` for database initialization.
@@ -202,7 +207,7 @@ export async function createTestClient(
         }
     }
 
-    if (!options?.dbFile) {
+    if (options?.pushDb !== false && !options?.dbFile) {
         if (options?.usePrismaPush) {
             invariant(
                 typeof schema === 'string' || options?.schemaFile,
@@ -232,7 +237,7 @@ export async function createTestClient(
 
     let client = new ZenStackClient(_schema, _options);
 
-    if (!options?.usePrismaPush && !options?.dbFile) {
+    if (options?.pushDb !== false && !options?.usePrismaPush && !options?.dbFile) {
         await client.$pushSchema();
     }
 

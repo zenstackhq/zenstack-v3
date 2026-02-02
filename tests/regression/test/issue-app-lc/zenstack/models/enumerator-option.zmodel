@@ -1,0 +1,76 @@
+import '../shared/timestamps'
+import './attendance'
+import './board-column'
+import './contact'
+import './dynamic-grid'
+import './enumerator'
+import './secret'
+import './task'
+import './workflow'
+import '../types/style.type'
+
+model EnumeratorOption with Timestamps {
+  id                   String        @id @default(cuid())
+
+  /// Name of the option
+  name                 String?       @searchable
+
+  /// Description of the option
+  description          String?       @searchable
+
+  /// Entity ID - should be used with `entityName` to create dynamic relation
+  entityId             String?
+
+  /// Entity name (Should be one of the `Prisma.ModelName` enum)
+  entityName           String?
+
+  /// Internal name of the option for system use
+  internalName         String?       @searchable
+
+  /// Icon of the option
+  icon                 String?
+
+  // Style of the option
+  style                Style?       @json
+
+  // Relations
+  /// Attendance categories
+  attendanceCategories Attendance[]
+
+  /// Board columns that have this option as `statuses`
+  boardColumns         BoardColumn[] @relation("BoardColumns")
+
+  /// Contacts that have this option as `ContactType`
+  contacts             Contact[]
+
+  /// Dynamic grids that have this option as `Category`
+  dynamicGrids         DynamicGrid[] @relation("DynamicGridCategories")
+
+  /// Enumerator ID this option belongs to
+  enumeratorId         String
+
+  /// Enumerator this option belongs to
+  enumerator           Enumerator    @relation(fields: [enumeratorId], references: [id], onDelete: Cascade)
+
+  /// Secrets
+  secretTypes          Secret[]
+
+  /// Tasks that have this option as `Priority`
+  tasksPriorities      Task[]        @relation("TaskPriority")
+
+  /// Tasks that have this option as `Status`
+  tasksStatuses        Task[]        @relation("TaskStatus")
+
+  /// Tasks that have this option as `Type`
+  taskTypes            Task[]        @relation("TaskType")
+
+
+
+  /// Workflows of this option
+  workflows            Workflow[]
+
+  @@allow('read', check(enumerator, 'read'))
+  @@allow('create', check(enumerator, 'create'))
+  @@allow('update', check(enumerator, 'update'))
+  @@allow('delete', check(enumerator, 'delete'))
+}

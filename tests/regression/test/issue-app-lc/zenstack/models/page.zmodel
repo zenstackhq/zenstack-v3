@@ -1,0 +1,112 @@
+import '../shared/timestamps'
+import '../enums/page-type.enum'
+import './dynamic-grid'
+import './instance'
+import './user'
+
+model Page {
+  id            String       @id @default(cuid())
+
+  /// Name
+  name          String
+
+  /// Slug
+  slug          String
+
+  /// Description
+  description   String?
+
+  /// Exposed to the public
+  exposed       Boolean      @default(false)
+
+  /// Published
+  published     Boolean      @default(true)
+
+  /// Type
+  type          PageType     @default(CONTENT)
+
+  // Relations
+  /// Dynamic grid ID
+  dynamicGridId String?
+
+  /// Dynamic grid
+  dynamicGrid   DynamicGrid? @relation(fields: [dynamicGridId], references: [id])
+
+  /// Instance ID
+  instanceId    String
+
+  /// Instance
+  instance      Instance     @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// Favorite pages
+  favoritedBy   User[]       @relation("FavoritePages")
+
+  // TEMPORARY
+  /// Date and time when the record was created, the default value is the current date and time
+  createdAt       DateTime  @default(now())
+
+  /// Identifier of the account who created the record
+  createdById     String?
+
+  /// Identifier of the user who created the record
+  createdByUserId String?
+
+  /// Date and time of the last update of the record, the default value is the current date and time
+  updatedAt       DateTime? @updatedAt
+
+  /// Identifier of the account who last updated the record
+  updatedById     String?
+
+  /// Identifier of the user who last updated the record
+  updatedByUserId String?
+
+  /// Indicates whether the record is marked as deleted
+  deleted         Boolean   @default(false)
+
+  /// Date and time of deletion of the record
+  deletedAt       DateTime?
+
+  /// Identifier of the account who deleted the record
+  deletedById     String?
+
+  /// Identifier of the user who deleted the record
+  deletedByUserId String?
+
+  @@allow(
+    'read',
+    (published && exposed) // When published and exposed, anyone can read it
+    || instance.ownerId == auth().id // Allow the instance owner
+
+  // When published, users from the instance can read it
+    || (published && check(instance, 'read'))
+
+  // Allow instance users with "page:read" or "all:read" claims
+    || (
+      instance.users?[accountId == auth().id && roles?[claims?[id == "page:read" || id == "all:read"]]] 
+    )
+
+  // Allow users with "page:readOwn" claim
+    || (
+      createdById == auth().id
+      && instance.users?[accountId == auth().id && roles?[claims?[id == "page:manageOwn"]]]
+    )
+  )
+
+  @@allow(
+    'create,update,delete',
+    instance.ownerId == auth().id // Allow the owner
+  // Allow users with "dynamicGrid:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "page:manage" || id == "all:manage"]]]
+    )
+
+  // Allow the creator of the page
+    || (
+      createdById == auth().id
+      && instance.users?[accountId == auth().id && roles?[claims?[id == "page:manageOwn"]]]
+    )
+  )
+
+  @@unique([instanceId, slug])
+}

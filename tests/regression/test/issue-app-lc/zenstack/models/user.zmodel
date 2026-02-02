@@ -1,0 +1,112 @@
+import '../shared/timestamps'
+import './account'
+import './activity'
+import './ai-embedding'
+import './ai-thread'
+import './attendance'
+import './activity-staff-assignment'
+import './contact'
+import './claim'
+import './file'
+import './instance'
+import './page'
+import './user-on-organization'
+import './user-options'
+import './user-invitation'
+import './role'
+import './table-layout'
+import './task-assignment'
+import './secret'
+import './service-account'
+
+model User with Timestamps {
+  id               String                    @id @default(cuid())
+
+  /// The user's first name
+  firstName        String                    @searchable
+
+  /// The user's last name
+  lastName         String                    @searchable
+
+  // Relations
+  /// User's activities
+  activities       Activity[]
+
+  /// AI Threads
+  aiThreads        AiThread[]
+
+  /// User's attendance
+  attendance       Attendance[]
+
+  /// User's activities
+  staffAssignments ActivityStaffAssignment[]
+
+  /// User's contacts
+  contacts         Contact[]
+
+  // /// The user's claims
+  // extraClaims   Claim[]
+
+  /// The user's account ID
+  accountId        String?
+
+  /// AI Embeddings
+  embeddings       AiEmbedding[]
+
+  /// The user's account
+  account          Account?                  @relation(fields: [accountId], references: [id])
+
+  /// The user's avatar file ID
+  avatarId         String?                   @unique
+
+  /// The user's avatar file
+  avatar           File?                     @relation("Avatar", fields: [avatarId], references: [id])
+
+  /// Favorite pages
+  favoritePages    Page[]                    @relation("FavoritePages")
+
+  /// The instance ID this user belongs to
+  instanceId       String
+
+  /// The instance this user belongs to
+  instance         Instance                  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The user invitation
+  invitation       UserInvitation?
+
+  /// The user's organizations (explicit N-N)
+  organizations    UserOnOrganization[]
+
+  /// The user's options
+  options          UserOptions?
+
+  /// The user's roles
+  roles            Role[]
+
+  /// Service accounts
+  serviceAccounts  ServiceAccount[]
+
+  /// The user's saved table layouts
+  tableLayouts     TableLayout[]
+
+  /// The user's tasks
+  tasks            TaskAssignment[]
+
+  /// The user's secrets
+  secrets          Secret[]
+
+  @@allow('read', check(instance, 'read'))
+
+  @@allow(
+    'create,update,delete',
+
+  // Allow owner of the instance
+    instance.ownerId == auth().id 
+
+  // Allow users with "user:manage" or "all:manage" claims
+    || (
+      instance.users?[accountId == auth().id
+      && roles?[claims?[id == "user:manage" || id == "all:manage"]]]
+    )
+  )
+}

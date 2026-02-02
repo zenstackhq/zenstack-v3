@@ -1,0 +1,31 @@
+import '../shared/timestamps'
+import './ai-agent'
+import './instance'
+
+model AiTool with Timestamps {
+  id          String    @id @default(cuid())
+
+  /// Name
+  name        String
+
+  /// Description
+  description String
+
+  /// Content (actual code)
+  content     String
+
+  /// Parameters (actual code)
+  parameters  String
+
+  // RELATIONS
+  /// Agents
+  agents      AiAgent[]
+
+  // Instance
+  instanceId  String
+
+  /// Instance
+  instance    Instance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@allow('all', check(instance, 'read'))
+}

@@ -1,0 +1,7 @@
+/// Content for structure items - supports knowledge base or dynamic grid hierarchy
+type StructureItemContent {
+  type               String
+  content            String?
+  transformedContent String?
+  summary            String?
+}

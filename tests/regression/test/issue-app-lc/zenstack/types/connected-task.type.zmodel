@@ -1,0 +1,4 @@
+type ConnectedTask {
+  name String
+  url  String
+}

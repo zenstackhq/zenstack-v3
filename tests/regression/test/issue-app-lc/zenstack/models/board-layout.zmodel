@@ -1,0 +1,82 @@
+import '../shared/timestamps'
+import '../enums/board-layout-access.enum'
+import '../types/board-layout-schema.type'
+import './board'
+
+model BoardLayout {
+  id          String            @id @default(cuid())
+
+  /// The name of the layout
+  name        String
+
+  /// The description of the layout
+  description String?
+
+  // The schema of the layout
+  schema      BoardLayoutSchema @json
+
+  /// Whether the layout is public or not
+  access      BoardLayoutAccess @default(PRIVATE)
+
+  /// Whether the layout is the default layout for the board
+  isDefault   Boolean           @default(false)
+
+  // Relations
+  /// The board ID that this layout belongs to
+  boardId     String
+
+  /// The board that this layout belongs to
+  board       Board             @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+
+  // TEMPORARY
+  /// Date and time when the record was created, the default value is the current date and time
+  createdAt       DateTime  @default(now())
+
+  /// Identifier of the account who created the record
+  createdById     String?
+
+  /// Identifier of the user who created the record
+  createdByUserId String?
+
+  /// Date and time of the last update of the record, the default value is the current date and time
+  updatedAt       DateTime? @updatedAt
+
+  /// Identifier of the account who last updated the record
+  updatedById     String?
+
+  /// Identifier of the user who last updated the record
+  updatedByUserId String?
+
+  /// Indicates whether the record is marked as deleted
+  deleted         Boolean   @default(false)
+
+  /// Date and time of deletion of the record
+  deletedAt       DateTime?
+
+  /// Identifier of the account who deleted the record
+  deletedById     String?
+
+  /// Identifier of the user who deleted the record
+  deletedByUserId String?
+
+  @@allow(
+    'read',
+    board.instance.ownerId == auth().id // Allow the owner of instance
+    || createdById == auth().id // Allow the creator of the layout
+    || (access == "PUBLIC" && check(board, 'read'))
+  )
+
+  @@allow(
+    'create',
+    board.instance.ownerId == auth().id // Allow owner of the instance
+    || check(board, 'read') // Allow members of the instance
+  )
+
+  @@allow(
+    'update,delete',
+    board.instance.ownerId == auth().id // Allow owner of the instance
+    || createdById == auth().id // Allow the creator of the layout
+    || (access == "PUBLIC" && check(board, 'read')) // Allow members of the instance
+  )
+}

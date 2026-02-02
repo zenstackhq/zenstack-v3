@@ -1,0 +1,15 @@
+import '../shared/timestamps'
+import './user'
+
+model UserOptions with Timestamps {
+  id     String @id @default(cuid())
+
+  // Relations
+  /// The user ID that these options belong to
+  userId String @unique
+
+  /// The user that these options belong to
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@allow('read', user.accountId == auth().id) // Allow the user to read their own options
+}

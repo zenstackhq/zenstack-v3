@@ -103,7 +103,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
 
     // #region common query builders
 
-    buildSelectModel(model: string, modelAlias: string) {
+    buildSelectModel(model: string, modelAlias: string, _where: Record<string, unknown> = {}) {
         const modelDef = requireModel(this.schema, model);
         let result = this.eb.selectFrom(model === modelAlias ? model : `${model} as ${modelAlias}`);
         // join all delegate bases
@@ -112,20 +112,69 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             result = this.buildDelegateJoin(model, modelAlias, joinBase, result);
             joinBase = requireModel(this.schema, joinBase).baseModel;
         }
+
+        // const filterRelations = this.getJoinableRelationFieldsInFilter(modelDef, where);
+
+        // for (const relation of filterRelations) {
+        //     const fieldDef = requireField(this.schema, model, relation);
+        //     invariant(fieldDef.relation);
+        //     result = this.buildRelationJoin(model, modelAlias, relation, result);
+        // }
+
         return result;
     }
+
+    // private buildRelationJoin(
+    //     model: string,
+    //     modelAlias: string,
+    //     relation: string,
+    //     query: SelectQueryBuilder<any, any, {}>,
+    // ): SelectQueryBuilder<any, any, {}> {
+    //     const fieldDef = requireField(this.schema, model, relation);
+    //     const joinTableAlias = `${modelAlias}$${relation}`;
+    //     const joinPairs = buildJoinPairs(this.schema, model, modelAlias, relation, joinTableAlias);
+    //     return query.leftJoin(`${fieldDef.type} as ${joinTableAlias}`, (join) =>
+    //         joinPairs.reduce((j, [left, right]) => j.onRef(left, '=', right), join),
+    //     );
+    // }
+
+    // private getJoinableRelationFieldsInFilter(
+    //     modelDef: ModelDef,
+    //     where: Record<string, unknown>,
+    //     relations: Set<string> = new Set(),
+    // ) {
+    //     const relationFields = getModelFields(this.schema, modelDef.name, { relations: true, inherited: true }).filter(
+    //         // only to-one relation filters are joinable
+    //         (f) => !!f.relation && !f.array,
+    //     );
+
+    //     for (const [key, value] of Object.entries(where)) {
+    //         if (this.isLogicalCombinator(key)) {
+    //             this.getJoinableRelationFieldsInFilter(modelDef, value as Record<string, unknown>, relations);
+    //         }
+
+    //         if (!relationFields.find((f) => f.name === key)) {
+    //             continue;
+    //         }
+
+    //         relations.add(key);
+    //     }
+
+    //     return relations;
+    // }
 
     buildFilterSortTake(
         model: string,
         args: FindArgs<Schema, GetModels<Schema>, true>,
         query: SelectQueryBuilder<any, any, {}>,
         modelAlias: string,
+        nestedJoin = true,
     ) {
         let result = query;
 
         // where
         if (args.where) {
-            result = result.where(() => this.buildFilter(model, modelAlias, args?.where));
+            result = result.where(() => this.buildFilter(model, modelAlias, args?.where, nestedJoin));
         }
 
         // skip && take
@@ -157,7 +206,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         return result;
     }
 
-    buildFilter(model: string, modelAlias: string, where: boolean | object | undefined) {
+    buildFilter(model: string, modelAlias: string, where: boolean | object | undefined, nestedJoin = true) {
         if (where === true || where === undefined) {
             return this.true();
         }
@@ -186,7 +235,10 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             const fieldDef = requireField(this.schema, model, key);
 
             if (fieldDef.relation) {
-                result = this.and(result, this.buildRelationFilter(model, modelAlias, key, fieldDef, payload));
+                result = this.and(
+                    result,
+                    this.buildRelationFilter(model, modelAlias, key, fieldDef, payload, nestedJoin),
+                );
             } else {
                 // if the field is from a base model, build a reference from that model
                 const fieldRef = this.fieldRef(fieldDef.originModel ?? model, key, fieldDef.originModel ?? modelAlias);
@@ -271,9 +323,16 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             .exhaustive();
     }
 
-    private buildRelationFilter(model: string, modelAlias: string, field: string, fieldDef: FieldDef, payload: any) {
+    private buildRelationFilter(
+        model: string,
+        modelAlias: string,
+        field: string,
+        fieldDef: FieldDef,
+        payload: any,
+        nestedJoin: boolean,
+    ) {
         if (!fieldDef.array) {
-            return this.buildToOneRelationFilter(model, modelAlias, field, fieldDef, payload);
+            return this.buildToOneRelationFilter(model, modelAlias, field, fieldDef, payload, nestedJoin);
         } else {
             return this.buildToManyRelationFilter(model, modelAlias, field, fieldDef, payload);
         }
@@ -285,6 +344,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         field: string,
         fieldDef: FieldDef,
         payload: any,
+        nestedJoin: boolean,
     ): Expression<SqlBool> {
         if (payload === null) {
             const { ownedByModel, keyPairs } = getRelationForeignKeyFieldPairs(this.schema, model, field);
@@ -294,7 +354,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 return this.and(...keyPairs.map(({ fk }) => this.eb(this.eb.ref(`${modelAlias}.${fk}`), 'is', null)));
             } else {
                 // translate it to `{ is: null }` filter
-                return this.buildToOneRelationFilter(model, modelAlias, field, fieldDef, { is: null });
+                return this.buildToOneRelationFilter(model, modelAlias, field, fieldDef, { is: null }, nestedJoin);
             }
         }
 
@@ -443,38 +503,66 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 continue;
             }
 
-            const countSelect = (negate: boolean) => {
+            const exists = (negate: boolean) => {
                 const filter = this.buildFilter(relationModel, relationFilterSelectAlias, subPayload);
-                return (
-                    this.eb
-                        // the outer select is needed to avoid mysql's scope issue
-                        .selectFrom(
-                            this.buildSelectModel(relationModel, relationFilterSelectAlias)
-                                .select(() => this.eb.fn.count(this.eb.lit(1)).as('$count'))
-                                .where(buildPkFkWhereRefs(this.eb))
-                                .where(() => (negate ? this.eb.not(filter) : filter))
-                                .as('$sub'),
-                        )
-                        .select('$count')
+                return this.eb.exists(
+                    // the outer select is needed to avoid mysql's scope issue
+                    this.buildSelectModel(relationModel, relationFilterSelectAlias)
+                        .select(this.eb.lit(1).as('$t'))
+                        .where(buildPkFkWhereRefs(this.eb))
+                        .where(() => (negate ? this.eb.not(filter) : filter)),
                 );
             };
 
             switch (key) {
                 case 'some': {
-                    result = this.and(result, this.eb(countSelect(false), '>', 0));
+                    result = this.and(result, exists(false));
                     break;
                 }
 
                 case 'every': {
-                    result = this.and(result, this.eb(countSelect(true), '=', 0));
+                    result = this.and(result, this.eb.not(exists(true)));
                     break;
                 }
 
                 case 'none': {
-                    result = this.and(result, this.eb(countSelect(false), '=', 0));
+                    result = this.and(result, this.eb.not(exists(false)));
                     break;
                 }
             }
+
+            // const countSelect = (negate: boolean) => {
+            //     const filter = this.buildFilter(relationModel, relationFilterSelectAlias, subPayload);
+            //     return (
+            //         this.eb
+            //             // the outer select is needed to avoid mysql's scope issue
+            //             .selectFrom(
+            //                 this.buildSelectModel(relationModel, relationFilterSelectAlias)
+            //                     .select(() => this.eb.fn.count(this.eb.lit(1)).as('$count'))
+            //                     .where(buildPkFkWhereRefs(this.eb))
+            //                     .where(() => (negate ? this.eb.not(filter) : filter))
+            //                     .as('$sub'),
+            //             )
+            //             .select('$count')
+            //     );
+            // };
+
+            // switch (key) {
+            //     case 'some': {
+            //         result = this.and(result, this.eb(countSelect(false), '>', 0));
+            //         break;
+            //     }
+
+            //     case 'every': {
+            //         result = this.and(result, this.eb(countSelect(true), '=', 0));
+            //         break;
+            //     }
+
+            //     case 'none': {
+            //         result = this.and(result, this.eb(countSelect(false), '=', 0));
+            //         break;
+            //     }
+            // }
         }
 
         return result;

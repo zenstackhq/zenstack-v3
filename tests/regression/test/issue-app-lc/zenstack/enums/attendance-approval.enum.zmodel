@@ -1,0 +1,5 @@
+enum AttendanceApproval {
+  OPEN
+  APPROVED
+  REJECTED
+}

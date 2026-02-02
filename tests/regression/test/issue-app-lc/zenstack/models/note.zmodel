@@ -1,0 +1,33 @@
+import '../shared/timestamps'
+import './activity-staff-assignment'
+import './attendance'
+import './instance'
+
+model Note with Timestamps {
+  id                        String                   @id @default(cuid())
+
+  /// Note message
+  message                   String
+
+  // Relations
+  /// Id of the UserOnActivity that this note is associated with
+  activityStaffAssignmentId String?
+
+  /// UserOnActivity that this note is associated with
+  activityStaffAssignment   ActivityStaffAssignment? @relation(fields: [activityStaffAssignmentId], references: [id], onDelete: Cascade)
+
+  /// The instance ID this organization belongs to
+  instanceId                String
+
+  /// The instance this organization belongs to
+  instance                  Instance                 @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  /// The attendance ID this note is associated with
+  attendanceId              String?
+
+  /// The attendance this note is associated with
+  attendance                Attendance?              @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+
+  @@allow('all', check(instance, 'read'))
+}

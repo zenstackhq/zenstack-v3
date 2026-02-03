@@ -1,4 +1,4 @@
-import { AstFactory } from '.';
+import { AstFactory } from './ast-factory';
 import { AbstractDeclaration, type Reference } from '../ast';
 import {
     type BuiltinType,
@@ -97,6 +97,14 @@ export class DataModelFactory extends AstFactory<DataModel> {
 
     setComments(comments: string[]) {
         this.comments = comments;
+        this.update({
+            comments: this.comments,
+        });
+        return this;
+    }
+
+    addComment(comment: string) {
+        this.comments.push(comment);
         this.update({
             comments: this.comments,
         });

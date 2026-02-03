@@ -149,7 +149,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 
     @gen(ConfigField)
     private _generateConfigField(ast: ConfigField) {
-      return `${ast.name} = ${this.generate(ast.value)}`;
+        return `${ast.name} = ${this.generate(ast.value)}`;
     }
 
     @gen(ConfigArrayExpr)

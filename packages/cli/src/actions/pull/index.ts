@@ -246,7 +246,8 @@ export function syncTable({
             builder.setName(name);
             builder.setType((typeBuilder) => {
                 typeBuilder.setArray(builtinType.isArray);
-                typeBuilder.setOptional(column.nullable);
+                // Array fields cannot be optional (Prisma/ZenStack limitation)
+                typeBuilder.setOptional(builtinType.isArray ? false : column.nullable);
 
                 if (column.datatype === 'enum') {
                     const ref = model.declarations.find((d) => isEnum(d) && getDbName(d) === column.datatype_name) as
@@ -349,7 +350,7 @@ export function syncTable({
         table.indexes.some((i) => i.unique);
     if (!hasUniqueConstraint) {
         modelFactory.addAttribute((a) => a.setDecl(getAttributeRef('@@ignore', services)));
-        modelFactory.comments.push(
+        modelFactory.addComment(
             '/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Zenstack Client.',
         );
     }
@@ -542,7 +543,7 @@ export function syncRelation({
         return ab;
     });
 
-    sourceModel.fields.splice(sourceFieldId, 0, sourceFieldFactory.node); // Remove the original scalar foreign key field
+    sourceModel.fields.splice(sourceFieldId, 0, sourceFieldFactory.node); // Insert the relation field before the FK scalar fie
 
     const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : '';
     const { name: oppositeFieldName } = resolveNameCasing(

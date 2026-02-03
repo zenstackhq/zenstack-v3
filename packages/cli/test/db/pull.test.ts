@@ -2,15 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createFormattedProject, createProject, getDefaultPrelude, runCli } from '../utils';
-import { loadSchemaDocument } from '../../src/actions/action-utils';
-import { ZModelCodeGenerator, formatDocument } from '@zenstackhq/language';
+import { formatDocument } from '@zenstackhq/language';
 import { getTestDbProvider } from '@zenstackhq/testtools';
 
 const getSchema = (workDir: string) => fs.readFileSync(path.join(workDir, 'zenstack/schema.zmodel')).toString();
-const generator = new ZModelCodeGenerator({
-    quote: 'double',
-    indent: 4,
-});
 
 describe('DB pull - Common features (all providers)', () => {
     describe('Pull from zero - restore complete schema from database', () => {
@@ -365,6 +360,131 @@ model Post {
             expect(pulledPostSchema).toEqual(postModel);
         });
     });
+
+    describe('Pull should update existing field definitions when database changes', () => {
+        it('should update field type when database column type changes', async () => {
+            // Step 1: Create initial schema with String field
+            const { workDir } = await createFormattedProject(
+                `model User {
+    id    Int    @id @default(autoincrement())
+    email String @unique
+    age   String
+}`,
+            );
+            runCli('db push', workDir);
+
+            // Step 2: Modify schema to change age from String to Int
+            const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+            const updatedSchema = await formatDocument(`${getDefaultPrelude()}
+
+model User {
+    id    Int @id @default(autoincrement())
+    email String @unique
+    age   Int
+}`);
+            fs.writeFileSync(schemaFile, updatedSchema);
+            runCli('db push', workDir);
+
+            // Step 3: Revert schema back to original (with String type)
+            const originalSchema = await formatDocument(`${getDefaultPrelude()}
+
+model User {
+    id    Int    @id @default(autoincrement())
+    email String @unique
+    age   String
+}`);
+            fs.writeFileSync(schemaFile, originalSchema);
+
+            // Step 4: Pull from database - should detect that age is now Int
+            runCli('db pull --indent 4', workDir);
+
+            // Step 5: Verify that pulled schema has Int type (matching database)
+            const pulledSchema = getSchema(workDir);
+            expect(pulledSchema).toEqual(updatedSchema);
+        });
+
+        it('should update field optionality when database column nullability changes', async () => {
+            // Step 1: Create initial schema with required field
+            const { workDir } = await createFormattedProject(
+                `model User {
+    id    Int    @id @default(autoincrement())
+    email String @unique
+    name  String
+}`,
+            );
+            runCli('db push', workDir);
+
+            // Step 2: Modify schema to make name optional
+            const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+            const updatedSchema = await formatDocument(`${getDefaultPrelude()}
+
+model User {
+    id    Int     @id @default(autoincrement())
+    email String  @unique
+    name  String?
+}`);
+            fs.writeFileSync(schemaFile, updatedSchema);
+            runCli('db push', workDir);
+
+            // Step 3: Revert schema back to original (with required name)
+            const originalSchema = await formatDocument(`${getDefaultPrelude()}
+
+model User {
+    id    Int    @id @default(autoincrement())
+    email String @unique
+    name  String
+}`);
+            fs.writeFileSync(schemaFile, originalSchema);
+
+            // Step 4: Pull from database - should detect that name is now optional
+            runCli('db pull --indent 4', workDir);
+
+            // Step 5: Verify that pulled schema has optional name (matching database)
+            const pulledSchema = getSchema(workDir);
+            expect(pulledSchema).toEqual(updatedSchema);
+        });
+
+        it('should update default value when database default changes', async () => {
+            // Step 1: Create initial schema with default value
+            const { workDir } = await createFormattedProject(
+                `model User {
+    id     Int    @id @default(autoincrement())
+    email  String @unique
+    status String @default('active')
+}`,
+            );
+            runCli('db push', workDir);
+
+            // Step 2: Modify schema to change default value
+            const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+            const updatedSchema = await formatDocument(`${getDefaultPrelude()}
+
+model User {
+    id     Int    @id @default(autoincrement())
+    email  String @unique
+    status String @default('pending')
+}`);
+            fs.writeFileSync(schemaFile, updatedSchema);
+            runCli('db push', workDir);
+
+            // Step 3: Revert schema back to original default
+            const originalSchema = await formatDocument(`${getDefaultPrelude()}
+
+model User {
+    id     Int    @id @default(autoincrement())
+    email  String @unique
+    status String @default('active')
+}`);
+            fs.writeFileSync(schemaFile, originalSchema);
+
+            // Step 4: Pull from database - should detect that default changed
+            runCli('db pull --indent 4', workDir);
+
+            // Step 5: Verify that pulled schema has updated default (matching database)
+            const pulledSchema = getSchema(workDir);
+            expect(pulledSchema).toEqual(updatedSchema);
+        });
+    });
 });
 
 describe('DB pull - PostgreSQL specific features', () => {
@@ -480,6 +600,61 @@ enum UserStatus {
         runCli('db pull --indent 4', workDir);
 
         expect(getSchema(workDir)).toEqual(schema);
+    });
+
+    it('should restore native type attributes from PostgreSQL typnames', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'postgresql') {
+            skip();
+            return;
+        }
+        // PostgreSQL introspection returns typnames like 'int2', 'float8', 'bpchar',
+        // but Prisma/ZenStack attributes are named @db.SmallInt, @db.DoublePrecision, @db.Char, etc.
+        // This test verifies the mapping works correctly.
+        // Note: Default native types (jsonb for Json, bytea for Bytes) are not added when pulling from zero
+        // because they match the default database type for that field type.
+        const { workDir } = await createFormattedProject(
+            `model TypeTest {
+    id          Int      @id @default(autoincrement())
+    smallNumber Int      @db.SmallInt()
+    realNumber  Float    @db.Real()
+    doubleNum   Float    @db.DoublePrecision()
+    fixedChar   String   @db.Char(10)
+    uuid        String   @db.Uuid()
+    jsonData    Json     @db.Json()
+    jsonbData   Json     @db.JsonB()
+    binaryData  Bytes    @db.ByteA()
+}`,
+            { provider: 'postgresql' },
+        );
+        runCli('db push', workDir);
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+
+        // Remove schema content to simulate restoration from zero
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql' }));
+
+        // Pull should restore non-default native type attributes
+        // Default types (jsonb for Json, bytea for Bytes) are not added
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+        // Verify key native type mappings are restored correctly:
+        // - @db.SmallInt for int2 (non-default for Int which defaults to integer/int4)
+        // - @db.Real for float4 (non-default for Float which defaults to double precision/float8)
+        // - @db.Char(10) for bpchar with length (non-default for String which defaults to text)
+        // - @db.Uuid for uuid (non-default for String which defaults to text)
+        // - @db.Json for json (non-default for Json which defaults to jsonb)
+        expect(restoredSchema).toContain('@db.SmallInt');
+        expect(restoredSchema).toContain('@db.Real');
+        expect(restoredSchema).toContain('@db.Char(10)');
+        expect(restoredSchema).toContain('@db.Uuid');
+        expect(restoredSchema).toContain('@db.Json');
+        // Default types should NOT be added when pulling from zero
+        expect(restoredSchema).not.toContain('@db.Integer'); // integer is default for Int
+        expect(restoredSchema).not.toContain('@db.DoublePrecision'); // double precision is default for Float
+        expect(restoredSchema).not.toContain('@db.JsonB'); // jsonb is default for Json
+        expect(restoredSchema).not.toContain('@db.ByteA'); // bytea is default for Bytes
     });
 });
 

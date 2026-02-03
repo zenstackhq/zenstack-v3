@@ -97,9 +97,6 @@ async function runPull(options: PullOptions) {
 
         const SUPPORTED_PROVIDERS = Object.keys(pullProviders) as DataSourceProviderType[];
         const datasource = getDatasource(model);
-        if (!datasource) {
-            throw new CliError('No datasource found in the schema.');
-        }
 
         if (!SUPPORTED_PROVIDERS.includes(datasource.provider)) {
             throw new CliError(`Unsupported datasource provider: ${datasource.provider}`);
@@ -195,8 +192,10 @@ async function runPull(options: PullOptions) {
         type ModelChanges = {
             addedFields: string[];
             deletedFields: string[];
+            updatedFields: string[];
             addedAttributes: string[];
             deletedAttributes: string[];
+            updatedAttributes: string[];
         };
         const modelChanges = new Map<string, ModelChanges>();
 
@@ -205,8 +204,10 @@ async function runPull(options: PullOptions) {
                 modelChanges.set(modelName, {
                     addedFields: [],
                     deletedFields: [],
+                    updatedFields: [],
                     addedAttributes: [],
                     deletedAttributes: [],
+                    updatedAttributes: [],
                 });
             }
             return modelChanges.get(modelName)!;
@@ -261,7 +262,12 @@ async function runPull(options: PullOptions) {
                             const ref = declarations.find(
                                 (d) => getDbName(d.node as any) === getDbName(f.type.reference!.ref as any),
                             )?.node;
-                            if (ref) (f.type.reference.ref as any) = ref;
+                            if (ref && f.type.reference) {
+                                (f.type.reference.ref as any) = ref;
+                                // Keep the textual reference in sync with the semantic reference
+                                (f.type.reference as any).$refText =
+                                    (ref as any).name ?? (f.type.reference as any).$refText;
+                            }
                         }
                     });
                     return;
@@ -328,6 +334,103 @@ async function runPull(options: PullOptions) {
                         return;
                     }
                     const originalField = originalFields.at(0);
+
+                    // Update existing field if type, optionality, or array flag changed
+                    if (originalField && f.$type === 'DataField' && originalField.$type === 'DataField') {
+                        const newType = f.type;
+                        const oldType = originalField.type;
+                        const fieldUpdates: string[] = [];
+
+                        // Check and update builtin type (e.g., String -> Int)
+                        // Skip if old type is an Enum reference and provider doesn't support native enums
+                        const isOldTypeEnumWithoutNativeSupport =
+                            oldType.reference?.ref?.$type === 'Enum' && !provider.isSupportedFeature('NativeEnum');
+                        if (newType.type && oldType.type !== newType.type && !isOldTypeEnumWithoutNativeSupport) {
+                            fieldUpdates.push(`type: ${oldType.type} -> ${newType.type}`);
+                            (oldType as any).type = newType.type;
+                        }
+
+                        // Check and update type reference (e.g., User -> Profile)
+                        if (newType.reference?.ref && oldType.reference?.ref) {
+                            const newRefName = getDbName(newType.reference.ref);
+                            const oldRefName = getDbName(oldType.reference.ref);
+                            if (newRefName !== oldRefName) {
+                                fieldUpdates.push(`reference: ${oldType.reference.$refText} -> ${newType.reference.$refText}`);
+                                (oldType.reference as any).ref = newType.reference.ref;
+                                (oldType.reference as any).$refText = newType.reference.$refText;
+                            }
+                        } else if (newType.reference?.ref && !oldType.reference) {
+                            // Changed from builtin to reference type
+                            fieldUpdates.push(`type: ${oldType.type} -> ${newType.reference.$refText}`);
+                            (oldType as any).reference = newType.reference;
+                            (oldType as any).type = undefined;
+                        } else if (!newType.reference && oldType.reference?.ref && newType.type) {
+                            // Changed from reference to builtin type
+                            // Skip if old type is an Enum and provider doesn't support native enums (e.g., SQLite stores enums as strings)
+                            const isEnumWithoutNativeSupport =
+                                oldType.reference.ref.$type === 'Enum' && !provider.isSupportedFeature('NativeEnum');
+                            if (!isEnumWithoutNativeSupport) {
+                                fieldUpdates.push(`type: ${oldType.reference.$refText} -> ${newType.type}`);
+                                (oldType as any).type = newType.type;
+                                (oldType as any).reference = undefined;
+                            }
+                        }
+
+                        // Check and update optionality (e.g., String -> String?)
+                        if (!!newType.optional !== !!oldType.optional) {
+                            fieldUpdates.push(`optional: ${!!oldType.optional} -> ${!!newType.optional}`);
+                            (oldType as any).optional = newType.optional;
+                        }
+
+                        // Check and update array flag (e.g., String -> String[])
+                        if (!!newType.array !== !!oldType.array) {
+                            fieldUpdates.push(`array: ${!!oldType.array} -> ${!!newType.array}`);
+                            (oldType as any).array = newType.array;
+                        }
+
+                        if (fieldUpdates.length > 0) {
+                            getModelChanges(originalDataModel.name).updatedFields.push(
+                                colors.yellow(`~ ${originalField.name} (${fieldUpdates.join(', ')})`),
+                            );
+                        }
+
+                        // Update @default attribute arguments if changed
+                        const newDefaultAttr = f.attributes.find((a) => a.decl.$refText === '@default');
+                        const oldDefaultAttr = originalField.attributes.find((a) => a.decl.$refText === '@default');
+                        if (newDefaultAttr && oldDefaultAttr) {
+                            // Compare attribute arguments by serializing them (avoid circular refs with $type fallback)
+                            const serializeArgs = (args: any[]) =>
+                                args.map((arg) => {
+                                    if (arg.value?.$type === 'StringLiteral') return `"${arg.value.value}"`;
+                                    if (arg.value?.$type === 'NumberLiteral') return String(arg.value.value);
+                                    if (arg.value?.$type === 'BooleanLiteral') return String(arg.value.value);
+                                    if (arg.value?.$type === 'InvocationExpr') return arg.value.function?.$refText ?? '';
+                                    if (arg.value?.$type === 'ReferenceExpr') return arg.value.target?.$refText ?? '';
+                                    if (arg.value?.$type === 'ArrayExpr') {
+                                        return `[${(arg.value.items ?? []).map((item: any) => {
+                                            if (item.$type === 'ReferenceExpr') return item.target?.$refText ?? '';
+                                            return item.$type ?? 'unknown';
+                                        }).join(',')}]`;
+                                    }
+                                    // Fallback: use $type to avoid circular reference issues
+                                    return arg.value?.$type ?? 'unknown';
+                                }).join(',');
+
+                            const newArgsStr = serializeArgs(newDefaultAttr.args ?? []);
+                            const oldArgsStr = serializeArgs(oldDefaultAttr.args ?? []);
+
+                            if (newArgsStr !== oldArgsStr) {
+                                // Replace old @default arguments with new ones
+                                (oldDefaultAttr as any).args = newDefaultAttr.args.map((arg) => ({
+                                    ...arg,
+                                    $container: oldDefaultAttr,
+                                }));
+                                getModelChanges(originalDataModel.name).updatedAttributes.push(
+                                    colors.yellow(`~ @default on ${originalDataModel.name}.${originalField.name}`),
+                                );
+                            }
+                        }
+                    }
 
                     if (!originalField) {
                         getModelChanges(originalDataModel.name).addedFields.push(colors.green(`+ ${f.name}`));
@@ -452,8 +555,10 @@ async function runPull(options: PullOptions) {
                 const hasChanges =
                     changes.addedFields.length > 0 ||
                     changes.deletedFields.length > 0 ||
+                    changes.updatedFields.length > 0 ||
                     changes.addedAttributes.length > 0 ||
-                    changes.deletedAttributes.length > 0;
+                    changes.deletedAttributes.length > 0 ||
+                    changes.updatedAttributes.length > 0;
 
                 if (hasChanges) {
                     console.log(colors.cyan(`  ${modelName}:`));
@@ -472,6 +577,13 @@ async function runPull(options: PullOptions) {
                         });
                     }
 
+                    if (changes.updatedFields.length > 0) {
+                        console.log(colors.gray('    Updated Fields:'));
+                        changes.updatedFields.forEach((msg) => {
+                            console.log(`      ${msg}`);
+                        });
+                    }
+
                     if (changes.addedAttributes.length > 0) {
                         console.log(colors.gray('    Added Attributes:'));
                         changes.addedAttributes.forEach((msg) => {
@@ -482,6 +594,13 @@ async function runPull(options: PullOptions) {
                     if (changes.deletedAttributes.length > 0) {
                         console.log(colors.gray('    Deleted Attributes:'));
                         changes.deletedAttributes.forEach((msg) => {
+                            console.log(`      ${msg}`);
+                        });
+                    }
+
+                    if (changes.updatedAttributes.length > 0) {
+                        console.log(colors.gray('    Updated Attributes:'));
+                        changes.updatedAttributes.forEach((msg) => {
                             console.log(`      ${msg}`);
                         });
                     }

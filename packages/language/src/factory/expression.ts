@@ -1,5 +1,5 @@
 import type { Reference } from 'langium';
-import { AstFactory } from '.';
+import { AstFactory } from './ast-factory';
 import {
     Argument,
     ArrayExpr,

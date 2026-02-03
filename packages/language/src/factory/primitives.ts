@@ -1,4 +1,4 @@
-import { AstFactory } from '.';
+import { AstFactory } from './ast-factory';
 import { BooleanLiteral, NullExpr, NumberLiteral, StringLiteral, ThisExpr } from '../ast';
 
 export class ThisExprFactory extends AstFactory<ThisExpr> {

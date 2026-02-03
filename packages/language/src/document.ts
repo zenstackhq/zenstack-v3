@@ -123,7 +123,7 @@ export async function loadDocument(
 
     const model = document.parseResult.value as Model;
 
-  if (mergeImports) {
+    if (mergeImports) {
         // merge all declarations into the main document
         const imported = mergeImportsDeclarations(langiumDocuments, model);
 

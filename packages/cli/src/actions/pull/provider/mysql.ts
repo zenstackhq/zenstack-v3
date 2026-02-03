@@ -328,8 +328,9 @@ export const mysql: IntrospectionProvider = {
                     defaultDatabaseType.precision !== (length || precision)))
         ) {
             const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
-            if (length || precision) {
-                dbAttrFactory.addArg((a) => a.NumberLiteral.setValue(length! || precision!));
+            const sizeValue = length ?? precision;
+            if (sizeValue !== undefined && sizeValue !== null) {
+                dbAttrFactory.addArg((a) => a.NumberLiteral.setValue(sizeValue));
             }
             factories.push(dbAttrFactory);
         }
@@ -446,7 +447,7 @@ LEFT JOIN INFORMATION_SCHEMA.VIEWS v
     ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
 WHERE t.TABLE_SCHEMA = '${databaseName}'
     AND t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
-    AND t.TABLE_NAME NOT LIKE '_prisma_migrations'
+    AND t.TABLE_NAME <> '_prisma_migrations'
 ORDER BY t.TABLE_NAME;
 `;
 }

@@ -1,4 +1,4 @@
-import { AstFactory } from '.';
+import { AstFactory } from './ast-factory';
 import {
     Attribute,
     AttributeArg,

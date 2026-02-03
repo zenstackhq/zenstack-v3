@@ -29,7 +29,7 @@ export function getAttribute(model: Model, attrName: string) {
 export function getDatasource(model: Model) {
     const datasource = model.declarations.find((d) => d.$type === 'DataSource');
     if (!datasource) {
-        throw new CliError('The schema\'s "datasource" must have a "url" field to use this command.');
+        throw new CliError('No datasource declaration found in the schema.');
     }
 
     const urlField = datasource.fields.find((f) => f.name === 'url');

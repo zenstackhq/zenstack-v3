@@ -6,6 +6,108 @@ import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, Introspec
 import type { ZModelServices } from '@zenstackhq/language';
 import { CliError } from '../../../cli-error';
 
+/**
+ * Maps PostgreSQL internal type names to their standard SQL names for comparison.
+ * This is used to normalize type names when checking against default database types.
+ */
+const pgTypnameToStandard: Record<string, string> = {
+    int2: 'smallint',
+    int4: 'integer',
+    int8: 'bigint',
+    float4: 'real',
+    float8: 'double precision',
+    bool: 'boolean',
+    bpchar: 'character',
+    numeric: 'decimal',
+};
+
+/**
+ * Standard bit widths for integer/float types that shouldn't be added as precision arguments.
+ * PostgreSQL returns these as precision values, but they're implicit for the type.
+ */
+const standardTypePrecisions: Record<string, number> = {
+    int2: 16,
+    smallint: 16,
+    int4: 32,
+    integer: 32,
+    int8: 64,
+    bigint: 64,
+    float4: 24,
+    real: 24,
+    float8: 53,
+    'double precision': 53,
+};
+
+/**
+ * Maps PostgreSQL typnames (from pg_type.typname) to Prisma native type attribute names.
+ * PostgreSQL introspection returns internal type names like 'int2', 'int4', 'float8', 'bpchar',
+ * but Prisma/ZenStack attributes are named @db.SmallInt, @db.Integer, @db.DoublePrecision, @db.Char, etc.
+ */
+const pgTypnameToPrismaNativeType: Record<string, string> = {
+    // integers
+    int2: 'SmallInt',
+    smallint: 'SmallInt',
+    int4: 'Integer',
+    integer: 'Integer',
+    int8: 'BigInt',
+    bigint: 'BigInt',
+
+    // decimals and floats
+    numeric: 'Decimal',
+    decimal: 'Decimal',
+    float4: 'Real',
+    real: 'Real',
+    float8: 'DoublePrecision',
+    'double precision': 'DoublePrecision',
+
+    // boolean
+    bool: 'Boolean',
+    boolean: 'Boolean',
+
+    // strings
+    text: 'Text',
+    varchar: 'VarChar',
+    'character varying': 'VarChar',
+    bpchar: 'Char',
+    character: 'Char',
+
+    // uuid
+    uuid: 'Uuid',
+
+    // dates/times
+    date: 'Date',
+    time: 'Time',
+    timetz: 'Timetz',
+    timestamp: 'Timestamp',
+    timestamptz: 'Timestamptz',
+
+    // binary
+    bytea: 'ByteA',
+
+    // json
+    json: 'Json',
+    jsonb: 'JsonB',
+
+    // xml
+    xml: 'Xml',
+
+    // network types
+    inet: 'Inet',
+
+    // bit strings
+    bit: 'Bit',
+    varbit: 'VarBit',
+
+    // oid
+    oid: 'Oid',
+
+    // money
+    money: 'Money',
+
+    // citext extension
+    citext: 'Citext',
+};
+
 export const postgresql: IntrospectionProvider = {
     isSupportedFeature(feature) {
       const supportedFeatures = ['Schema', 'NativeEnum'];
@@ -57,6 +159,7 @@ export const postgresql: IntrospectionProvider = {
             // dates/times
             case 'date':
             case 'time':
+            case 'timetz':
             case 'timestamp':
             case 'timestamptz':
                 return { type: 'DateTime', isArray };
@@ -228,22 +331,35 @@ export const postgresql: IntrospectionProvider = {
             factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)));
         }
 
+        // Map PostgreSQL typname to Prisma native type attribute name
+        // PostgreSQL returns typnames like 'int2', 'float8', 'bpchar', but Prisma attributes
+        // are named @db.SmallInt, @db.DoublePrecision, @db.Char, etc.
+        const nativeTypeName = pgTypnameToPrismaNativeType[datatype.toLowerCase()] ?? datatype;
+
         // Add @db.* attribute if the datatype differs from the default
         const dbAttr = services.shared.workspace.IndexManager.allElements('Attribute').find(
-            (d) => d.name.toLowerCase() === `@db.${datatype.toLowerCase()}`,
+            (d) => d.name.toLowerCase() === `@db.${nativeTypeName.toLowerCase()}`,
         )?.node as Attribute | undefined;
 
         const defaultDatabaseType = this.getDefaultDatabaseType(fieldType as BuiltinType);
 
+        // Normalize datatype for comparison (e.g., 'int4' -> 'integer')
+        const normalizedDatatype = pgTypnameToStandard[datatype.toLowerCase()] ?? datatype.toLowerCase();
+
+        // Check if the precision is the standard bit width for this type (shouldn't be added)
+        const standardPrecision = standardTypePrecisions[datatype.toLowerCase()];
+        const isStandardPrecision = standardPrecision !== undefined && precision === standardPrecision;
+
         if (
             dbAttr &&
             defaultDatabaseType &&
-            (defaultDatabaseType.type !== datatype ||
+            (defaultDatabaseType.type !== normalizedDatatype ||
                 (defaultDatabaseType.precision &&
                     defaultDatabaseType.precision !== (length || precision)))
         ) {
             const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
-            if (length || precision) {
+            // Only add length/precision if it's meaningful (not the standard bit width for the type)
+            if ((length || precision) && !isStandardPrecision) {
                 dbAttrFactory.addArg((a) => a.NumberLiteral.setValue(length! || precision!));
             }
             factories.push(dbAttrFactory);

@@ -480,8 +480,8 @@ attribute @db.JsonB() @@@targetField([JsonField]) @@@prisma
 
 attribute @db.ByteA() @@@targetField([BytesField]) @@@prisma
 attribute @db.LongBlob() @@@targetField([BytesField]) @@@prisma
-attribute @db.Binary() @@@targetField([BytesField]) @@@prisma
-attribute @db.VarBinary() @@@targetField([BytesField]) @@@prisma
+attribute @db.Binary(_ n: Int?) @@@targetField([BytesField]) @@@prisma
+attribute @db.VarBinary(_ n: Int?) @@@targetField([BytesField]) @@@prisma
 attribute @db.TinyBlob() @@@targetField([BytesField]) @@@prisma
 attribute @db.Blob() @@@targetField([BytesField]) @@@prisma
 attribute @db.MediumBlob() @@@targetField([BytesField]) @@@prisma

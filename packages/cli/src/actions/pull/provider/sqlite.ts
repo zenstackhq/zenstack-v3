@@ -1,4 +1,3 @@
-import type { Attribute, BuiltinType } from '@zenstackhq/language/ast';
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
@@ -21,30 +20,95 @@ export const sqlite: IntrospectionProvider = {
         }
     },
     getBuiltinType(type) {
-        const t = (type || '').toLowerCase().trim();
+        // Strip parenthesized constraints (e.g., VARCHAR(255) → varchar, DECIMAL(10,2) → decimal)
+        const t = (type || '').toLowerCase().trim().replace(/\(.*\)$/, '').trim();
         // SQLite has no array types
         const isArray = false;
+
+        // SQLite type affinity rules (https://www.sqlite.org/datatype3.html):
+        // 1. If type contains "INT" → INTEGER affinity
+        // 2. If type contains "CHAR", "CLOB", or "TEXT" → TEXT affinity
+        // 3. If type contains "BLOB" or no type → BLOB affinity
+        // 4. If type contains "REAL", "FLOA", or "DOUB" → REAL affinity
+        // 5. Otherwise → NUMERIC affinity
+
+        // Handle specific known types first for better mapping
         switch (t) {
+            // INTEGER types (SQLite: INT, INTEGER, TINYINT, SMALLINT, MEDIUMINT, INT2, INT8)
             case 'integer':
+            case 'int':
+            case 'tinyint':
+            case 'smallint':
+            case 'mediumint':
+            case 'int2':
+            case 'int8':
                 return { type: 'Int', isArray };
-            case 'text':
-                return { type: 'String', isArray };
+
+            // BIGINT - map to BigInt for large integers
             case 'bigint':
+            case 'unsigned big int':
                 return { type: 'BigInt', isArray };
+
+            // TEXT types (SQLite: CHARACTER, VARCHAR, VARYING CHARACTER, NCHAR, NATIVE CHARACTER, NVARCHAR, TEXT, CLOB)
+            case 'text':
+            case 'varchar':
+            case 'char':
+            case 'character':
+            case 'varying character':
+            case 'nchar':
+            case 'native character':
+            case 'nvarchar':
+            case 'clob':
+                return { type: 'String', isArray };
+
+            // BLOB type
             case 'blob':
                 return { type: 'Bytes', isArray };
+
+            // REAL types (SQLite: REAL, DOUBLE, DOUBLE PRECISION, FLOAT)
             case 'real':
+            case 'float':
+            case 'double':
+            case 'double precision':
                 return { type: 'Float', isArray };
+
+            // NUMERIC types (SQLite: NUMERIC, DECIMAL)
             case 'numeric':
             case 'decimal':
                 return { type: 'Decimal', isArray };
+
+            // DateTime types
             case 'datetime':
+            case 'date':
+            case 'time':
+            case 'timestamp':
                 return { type: 'DateTime', isArray };
+
+            // JSON types
+            case 'json':
             case 'jsonb':
                 return { type: 'Json', isArray };
+
+            // Boolean types
             case 'boolean':
+            case 'bool':
                 return { type: 'Boolean', isArray };
+
             default: {
+                // Fallback: Use SQLite affinity rules for unknown types
+                if (t.includes('int')) {
+                    return { type: 'Int', isArray };
+                }
+                if (t.includes('char') || t.includes('clob') || t.includes('text')) {
+                    return { type: 'String', isArray };
+                }
+                if (t.includes('blob')) {
+                    return { type: 'Bytes', isArray };
+                }
+                if (t.includes('real') || t.includes('floa') || t.includes('doub')) {
+                    return { type: 'Float', isArray };
+                }
+                // Default to Unsupported for truly unknown types
                 return { type: 'Unsupported' as const, isArray };
             }
         }
@@ -215,6 +279,7 @@ export const sqlite: IntrospectionProvider = {
                     columns.push({
                         name: c.name,
                         datatype: c.type || '',
+                        datatype_name: null, // SQLite doesn't support native enums
                         length: null,
                         precision: null,
                         datatype_schema: schema,
@@ -245,7 +310,7 @@ export const sqlite: IntrospectionProvider = {
         }
     },
 
-    getDefaultValue({ defaultValue, fieldType, services, enums }) {
+    getDefaultValue({ defaultValue, fieldType, services, enums }) { // datatype and datatype_name not used for SQLite
         const val = defaultValue.trim();
 
         switch (fieldType) {
@@ -261,10 +326,7 @@ export const sqlite: IntrospectionProvider = {
                 if (val === 'autoincrement') {
                     return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
                 }
-                if (/^-?\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val);
-                }
-                break;
+                return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Float':
                 if (/^-?\d+\.\d+$/.test(val)) {
@@ -274,30 +336,20 @@ export const sqlite: IntrospectionProvider = {
                 if (/^-?\d+$/.test(val)) {
                     return (ab) => ab.NumberLiteral.setValue(val + '.0');
                 }
-                break;
+                return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Decimal':
                 if (/^-?\d+\.\d+$/.test(val)) {
                     const numVal = parseFloat(val);
-                    if (numVal === Math.floor(numVal)) {
-                        return (ab) => ab.NumberLiteral.setValue(numVal.toFixed(2));
-                    }
-                    return (ab) => ab.NumberLiteral.setValue(String(numVal));
+                    return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(2) : String(numVal));
                 }
                 if (/^-?\d+$/.test(val)) {
                     return (ab) => ab.NumberLiteral.setValue(val + '.00');
                 }
-                break;
+                return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Boolean':
-                if (val === 'true' || val === '1') {
-                    return (ab) => ab.BooleanLiteral.setValue(true);
-                }
-                if (val === 'false' || val === '0') {
-                    return (ab) => ab.BooleanLiteral.setValue(false);
-                }
-                break;
-
+                return (ab) => ab.BooleanLiteral.setValue(val === 'true' || val === '1');
             case 'String':
                 if (val.startsWith("'") && val.endsWith("'")) {
                     const strippedName = val.slice(1, -1);
@@ -308,69 +360,19 @@ export const sqlite: IntrospectionProvider = {
                     }
                     return (ab) => ab.StringLiteral.setValue(strippedName);
                 }
-                break;
+                return (ab) => ab.StringLiteral.setValue(val);
         }
 
-        // Fallback handlers for values that don't match field type-specific patterns
-        if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
-            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services));
-        }
-
-        if (val === 'autoincrement') {
-            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
-        }
-
-        if (val === 'true' || val === 'false') {
-            return (ab) => ab.BooleanLiteral.setValue(val === 'true');
-        }
-
-        if (/^-?\d+\.\d+$/.test(val) || /^-?\d+$/.test(val)) {
-            return (ab) => ab.NumberLiteral.setValue(val);
-        }
-
-        if (val.startsWith("'") && val.endsWith("'")) {
-            const strippedName = val.slice(1, -1);
-            const enumDef = enums.find((e) => e.fields.find((v) => getDbName(v) === strippedName));
-            if (enumDef) {
-                const enumField = enumDef.fields.find((v) => getDbName(v) === strippedName);
-                if (enumField) return (ab) => ab.ReferenceExpr.setTarget(enumField);
-            }
-            return (ab) => ab.StringLiteral.setValue(strippedName);
-        }
-
-        //TODO: add more default value factories if exists
-        throw new Error(
-            `This default value type currently is not supported. Please open an issue on github. Values: "${defaultValue}"`,
-        );
+        console.warn(`Unsupported default value type: "${defaultValue}" for field type "${fieldType}". Skipping default value.`);
+        return null;
     },
 
-    getFieldAttributes({ fieldName, fieldType, datatype, length, precision, services }) {
+    getFieldAttributes({ fieldName, fieldType, services }) {
         const factories: DataFieldAttributeFactory[] = [];
 
         // Add @updatedAt for DateTime fields named updatedAt or updated_at
         if (fieldType === 'DateTime' && (fieldName.toLowerCase() === 'updatedat' || fieldName.toLowerCase() === 'updated_at')) {
             factories.push(new DataFieldAttributeFactory().setDecl(getAttributeRef('@updatedAt', services)));
-        }
-
-        // Add @db.* attribute if the datatype differs from the default
-        const dbAttr = services.shared.workspace.IndexManager.allElements('Attribute').find(
-            (d) => d.name.toLowerCase() === `@db.${datatype.toLowerCase()}`,
-        )?.node as Attribute | undefined;
-
-        const defaultDatabaseType = this.getDefaultDatabaseType(fieldType as BuiltinType);
-
-        if (
-            dbAttr &&
-            defaultDatabaseType &&
-            (defaultDatabaseType.type !== datatype ||
-                (defaultDatabaseType.precision &&
-                    defaultDatabaseType.precision !== (length || precision)))
-        ) {
-            const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
-            if (length || precision) {
-                dbAttrFactory.addArg((a) => a.NumberLiteral.setValue(length! || precision!));
-            }
-            factories.push(dbAttrFactory);
         }
 
         return factories;

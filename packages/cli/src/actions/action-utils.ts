@@ -43,20 +43,20 @@ export function getSchemaFile(file?: string) {
 
 export async function loadSchemaDocument(
     schemaFile: string,
-    opts?: { keepImports?: boolean; returnServices?: false },
+    opts?: { mergeImports?: boolean; returnServices?: false },
 ): Promise<Model>;
 export async function loadSchemaDocument(
     schemaFile: string,
-    opts: { returnServices: true; keepImports?: boolean },
+    opts: { returnServices: true; mergeImports?: boolean },
 ): Promise<{ model: Model; services: ZModelServices }>;
 export async function loadSchemaDocument(
     schemaFile: string,
-    opts: { returnServices?: boolean; keepImports?: boolean } = {},
+    opts: { returnServices?: boolean; mergeImports?: boolean } = {},
 ) {
-    const returnServices = opts.returnServices || false;
-    const keepImports = opts.keepImports || false;
+    const returnServices = opts.returnServices ?? false;
+    const mergeImports = opts.mergeImports ?? true;
 
-    const loadResult = await loadDocument(schemaFile, [], keepImports);
+    const loadResult = await loadDocument(schemaFile, [], mergeImports);
     if (!loadResult.success) {
         loadResult.errors.forEach((err) => {
             console.error(colors.red(err));

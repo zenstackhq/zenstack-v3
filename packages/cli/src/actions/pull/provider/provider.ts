@@ -12,6 +12,7 @@ export interface IntrospectedTable {
     columns: {
         name: string;
         datatype: string;
+        datatype_name: string | null;
         length: number | null;
         precision: number | null;
         datatype_schema: string;
@@ -61,7 +62,7 @@ export type IntrospectedSchema = {
 export type DatabaseFeature = 'Schema' | 'NativeEnum';
 
 export interface IntrospectionProvider {
-    introspect(connectionString: string): Promise<IntrospectedSchema>;
+    introspect(connectionString: string, options: { schemas: string[] }): Promise<IntrospectedSchema>;
     getBuiltinType(type: string): {
         type: BuiltinType | 'Unsupported';
         isArray: boolean;
@@ -74,6 +75,8 @@ export interface IntrospectionProvider {
      */
     getDefaultValue(args: {
         fieldType: BuiltinType | 'Unsupported';
+        datatype: string;
+        datatype_name: string | null;
         defaultValue: string;
         services: ZModelServices;
         enums: Enum[];

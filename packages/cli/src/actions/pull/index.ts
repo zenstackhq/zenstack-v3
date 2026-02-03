@@ -16,6 +16,7 @@ import {
 import type { PullOptions } from '../db';
 import type { Cascade, IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider';
 import { getAttributeRef, getDbName, getEnumRef } from './utils';
+import { CliError } from '../../cli-error';
 
 export function syncEnums({
     dbEnums,
@@ -90,7 +91,9 @@ export function syncEnums({
                         builder.setName(v.name);
                         // Copy field-level comments
                         if (v.comments?.length) {
-                            v.comments.forEach((c) => builder.addComment(c));
+                            v.comments.forEach((c) => {
+                                builder.addComment(c);
+                            });
                         }
                         // Copy field-level attributes (@map, etc.)
                         if (v.attributes?.length) {
@@ -104,7 +107,7 @@ export function syncEnums({
     }
 }
 
-function resolveNameCasing(casing: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none', originalName: string) {
+function resolveNameCasing(casing: 'pascal' | 'camel' | 'snake' | 'none', originalName: string) {
     let name = originalName;
     const fieldPrefix = /[0-9]/g.test(name.charAt(0)) ? '_' : '';
 
@@ -117,9 +120,6 @@ function resolveNameCasing(casing: 'pascal' | 'camel' | 'snake' | 'kebab' | 'non
             break;
         case 'snake':
             name = toSnakeCase(originalName);
-            break;
-        case 'kebab':
-            name = toKebabCase(originalName);
             break;
     }
 
@@ -141,13 +141,6 @@ function toSnakeCase(str: string): string {
     return str
         .replace(/[- ]+/g, '_')
         .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-        .toLowerCase();
-}
-
-function toKebabCase(str: string): string {
-    return str
-        .replace(/[_ ]+/g, '-')
-        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
         .toLowerCase();
 }
 
@@ -203,7 +196,7 @@ export function syncTable({
         !modelUniqueAttribute ||
         !modelindexAttribute
     ) {
-        throw new Error('Cannot find required attributes in the model.');
+        throw new CliError('Cannot find required attributes in the model.');
     }
 
     const relations: Relation[] = [];
@@ -248,13 +241,13 @@ export function syncTable({
                 typeBuilder.setArray(builtinType.isArray);
                 typeBuilder.setOptional(column.nullable);
 
-                if (column.options.length > 0) {
-                    const ref = model.declarations.find((d) => isEnum(d) && getDbName(d) === column.datatype) as
+                if (column.datatype === 'enum') {
+                    const ref = model.declarations.find((d) => isEnum(d) && getDbName(d) === column.datatype_name) as
                         | Enum
                         | undefined;
 
                     if (!ref) {
-                        throw new Error(`Enum ${column.datatype} not found`);
+                        throw new CliError(`Enum ${column.datatype_name} not found`);
                     }
                     typeBuilder.setReference(ref);
                 } else {
@@ -288,6 +281,8 @@ export function syncTable({
             if (column.default) {
                 const defaultExprBuilder = provider.getDefaultValue({
                     fieldType: builtinType.type,
+                    datatype: column.datatype,
+                    datatype_name: column.datatype_name,
                     defaultValue: column.default,
                     services,
                     enums: model.declarations.filter((d) => d.$type === 'Enum') as Enum[],
@@ -333,7 +328,7 @@ export function syncTable({
                 pkColumns.forEach((c) => {
                     const ref = modelFactory.node.fields.find((f) => getDbName(f) === c);
                     if (!ref) {
-                        throw new Error(`Field ${c} not found`);
+                        throw new CliError(`Field ${c} not found`);
                     }
                     arrayExpr.addItem((itemBuilder) => itemBuilder.ReferenceExpr.setTarget(ref));
                 });
@@ -397,7 +392,7 @@ export function syncTable({
                     index.columns.forEach((c) => {
                         const ref = modelFactory.node.fields.find((f) => getDbName(f) === c.name);
                         if (!ref) {
-                            throw new Error(`Column ${c.name} not found in model ${table.name}`);
+                            throw new CliError(`Column ${c.name} not found in model ${table.name}`);
                         }
                         arrayExpr.addItem((itemBuilder) => {
                             const refExpr = itemBuilder.ReferenceExpr.setTarget(ref);
@@ -418,7 +413,7 @@ export function syncTable({
 
             return attr
         }
-                
+
         );
     });
     if (table.schema && table.schema !== '' && table.schema !== defaultSchema) {
@@ -456,7 +451,7 @@ export function syncRelation({
     const includeRelationName = selfRelation || similarRelations > 0;
 
     if (!idAttribute || !uniqueAttribute || !relationAttribute || !fieldMapAttribute || !tableMapAttribute) {
-        throw new Error('Cannot find required attributes in the model.');
+        throw new CliError('Cannot find required attributes in the model.');
     }
 
     const sourceModel = model.declarations.find((d) => d.$type === 'DataModel' && getDbName(d) === relation.table) as
@@ -483,7 +478,7 @@ export function syncRelation({
     const sourceNameFromReference = sourceField.name.toLowerCase().endsWith('id') ? `${resolveNameCasing("camel", sourceField.name.slice(0, -2)).name}${relation.type === 'many'? 's' : ''}` : undefined;
 
     const sourceFieldFromReference = sourceModel.fields.find((f) => f.name === sourceNameFromReference);
-    
+
     let { name: sourceFieldName } = resolveNameCasing(
         options.fieldCasing,
         similarRelations > 0
@@ -516,22 +511,22 @@ export function syncRelation({
         const onDeleteDefault = relation.nullable ? 'SET NULL' : 'RESTRICT';
         if (relation.foreign_key_on_delete && relation.foreign_key_on_delete !== onDeleteDefault) {
             const enumRef = getEnumRef('ReferentialAction', services);
-            if (!enumRef) throw new Error('ReferentialAction enum not found');
+            if (!enumRef) throw new CliError('ReferentialAction enum not found');
             const enumFieldRef = enumRef.fields.find(
                 (f) => f.name.toLowerCase() === relation.foreign_key_on_delete!.replace(/ /g, '').toLowerCase(),
             );
-            if (!enumFieldRef) throw new Error(`ReferentialAction ${relation.foreign_key_on_delete} not found`);
+            if (!enumFieldRef) throw new CliError(`ReferentialAction ${relation.foreign_key_on_delete} not found`);
             ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onDelete');
         }
 
         // Prisma default: onUpdate is Cascade
         if (relation.foreign_key_on_update && relation.foreign_key_on_update !== 'CASCADE') {
             const enumRef = getEnumRef('ReferentialAction', services);
-            if (!enumRef) throw new Error('ReferentialAction enum not found');
+            if (!enumRef) throw new CliError('ReferentialAction enum not found');
             const enumFieldRef = enumRef.fields.find(
                 (f) => f.name.toLowerCase() === relation.foreign_key_on_update!.replace(/ /g, '').toLowerCase(),
             );
-            if (!enumFieldRef) throw new Error(`ReferentialAction ${relation.foreign_key_on_update} not found`);
+            if (!enumFieldRef) throw new CliError(`ReferentialAction ${relation.foreign_key_on_update} not found`);
             ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onUpdate');
         }
 

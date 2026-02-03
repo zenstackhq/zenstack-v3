@@ -15,9 +15,10 @@ import {
 import { getLiteralArray, getStringLiteral } from '@zenstackhq/language/utils';
 import type { DataSourceProviderType } from '@zenstackhq/schema';
 import type { Reference } from 'langium';
+import { CliError } from '../../cli-error';
 
 export function getAttribute(model: Model, attrName: string) {
-    if (!model.$document) throw new Error('Model is not associated with a document.');
+    if (!model.$document) throw new CliError('Model is not associated with a document.');
 
     const references = model.$document.references as Reference<AbstractDeclaration>[];
     return references.find((a) => a.ref?.$type === 'Attribute' && a.ref?.name === attrName)?.ref as
@@ -28,22 +29,22 @@ export function getAttribute(model: Model, attrName: string) {
 export function getDatasource(model: Model) {
     const datasource = model.declarations.find((d) => d.$type === 'DataSource');
     if (!datasource) {
-        throw new Error('No datasource declaration found in the schema.');
+        throw new CliError('The schema\'s "datasource" must have a "url" field to use this command.');
     }
 
     const urlField = datasource.fields.find((f) => f.name === 'url');
 
-    if (!urlField) throw new Error(`No url field found in the datasource declaration.`);
+    if (!urlField) throw new CliError(`No url field found in the datasource declaration.`);
 
     let url = getStringLiteral(urlField.value);
 
     if (!url && isInvocationExpr(urlField.value)) {
         const envName = getStringLiteral(urlField.value.args[0]?.value);
         if (!envName) {
-            throw new Error('The url field must be a string literal or an env().');
+            throw new CliError('The url field must be a string literal or an env().');
         }
         if (!process.env[envName]) {
-            throw new Error(
+            throw new CliError(
                 `Environment variable ${envName} is not set, please set it to the database connection string.`,
             );
         }
@@ -51,7 +52,7 @@ export function getDatasource(model: Model) {
     }
 
     if (!url) {
-        throw new Error('The url field must be a string literal or an env().');
+        throw new CliError('The url field must be a string literal or an env().');
     }
 
     if (url.startsWith('file:')) {
@@ -68,7 +69,7 @@ export function getDatasource(model: Model) {
         getLiteralArray(schemasField.value)
         ?.filter((s) => s !== undefined)) as string[] ||
         [];
-    
+
     return {
         name: datasource.name,
         provider: getStringLiteral(
@@ -85,11 +86,13 @@ export function getDbName(decl: AbstractDeclaration | DataField | EnumField, inc
     if (!('attributes' in decl)) return decl.name;
 
     const schemaAttr = decl.attributes.find((a) => a.decl.ref?.name === '@@schema');
-    const schemaAttrValue = schemaAttr?.args[0]?.value;
-    let schema: string;
-    if (schemaAttrValue?.$type !== 'StringLiteral') schema = 'public';
-    if (!schemaAttr) schema = 'public';
-    else schema = (schemaAttr.args[0]?.value as any)?.value as string;
+    let schema = 'public';
+    if (schemaAttr) {
+        const schemaAttrValue = schemaAttr.args[0]?.value;
+        if (schemaAttrValue?.$type === 'StringLiteral') {
+            schema = schemaAttrValue.value;
+        }
+    }
 
     const formatName = (name: string) => `${schema && includeSchema ? `${schema}.` : ''}${name}`;
 
@@ -117,16 +120,16 @@ export function getRelationFkName(decl: DataField): string | undefined {
 export function getRelationFieldsKey(decl: DataField): string | undefined {
     const relationAttr = decl?.attributes.find((a) => a.decl.ref?.name === '@relation');
     if (!relationAttr) return undefined;
-    
+
     const fieldsArg = relationAttr.args.find((a) => a.name === 'fields')?.value;
     if (!fieldsArg || fieldsArg.$type !== 'ArrayExpr') return undefined;
-    
+
     const fieldNames = fieldsArg.items
         .filter((item): item is ReferenceExpr => item.$type === 'ReferenceExpr')
         .map((item) => item.target?.$refText || item.target?.ref?.name)
         .filter((name): name is string => !!name)
         .sort();
-    
+
     return fieldNames.length > 0 ? fieldNames.join(',') : undefined;
 }
 
@@ -148,7 +151,7 @@ export function getDeclarationRef<T extends AbstractDeclaration>(
     const node = services.shared.workspace.IndexManager.allElements(type).find(
         (m) => m.node && getDbName(m.node as T) === name,
     )?.node;
-    if (!node) throw new Error(`Declaration not found: ${name}`);
+    if (!node) throw new CliError(`Declaration not found: ${name}`);
     return node as T;
 }
 

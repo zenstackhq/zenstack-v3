@@ -278,6 +278,7 @@ export class BinaryExprFactory extends AstFactory<BinaryExpr> {
     operator?: BinaryExpr['operator'];
     right?: AstFactory<Expression>;
     left?: AstFactory<Expression>;
+    // TODO: add support for CollectionPredicateBinding
 
     constructor() {
         super({ type: BinaryExpr });

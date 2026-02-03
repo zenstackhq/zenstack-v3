@@ -49,8 +49,4 @@ export abstract class AstFactory<T extends AstNode = AstNode> {
         });
         return this.node;
     }
-
-    resolveChilds(nodeArg: T | NodeFactoriesFor<T>): T {
-        return this.update(nodeArg);
-    }
 }

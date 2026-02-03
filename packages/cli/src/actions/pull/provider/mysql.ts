@@ -2,6 +2,7 @@ import type { Attribute, BuiltinType } from '@zenstackhq/language/ast';
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
+import { CliError } from '../../../cli-error';
 
 // Note: We dynamically import mysql2 inside the async function to avoid
 // requiring it at module load time for environments that don't use MySQL.
@@ -10,10 +11,7 @@ export const mysql: IntrospectionProvider = {
     isSupportedFeature(feature) {
         switch (feature) {
             case 'NativeEnum':
-                // MySQL enums are defined inline in column definitions, not as separate types.
-                // They can't be shared across tables like PostgreSQL enums.
-                // Return false to preserve existing enums from the schema.
-                return false;
+                return true;
             case 'Schema':
             default:
                 return false;
@@ -126,7 +124,7 @@ export const mysql: IntrospectionProvider = {
             const databaseName = url.pathname.replace('/', '');
 
             if (!databaseName) {
-                throw new Error('Database name not found in connection string');
+                throw new CliError('Database name not found in connection string');
             }
 
             // Introspect tables
@@ -141,10 +139,19 @@ export const mysql: IntrospectionProvider = {
                 const indexes = typeof row.indexes === 'string' ? JSON.parse(row.indexes) : row.indexes;
 
                 // Sort columns by ordinal_position to preserve database column order
-                const sortedColumns = (columns || []).sort(
-                    (a: { ordinal_position?: number }, b: { ordinal_position?: number }) =>
-                        (a.ordinal_position ?? 0) - (b.ordinal_position ?? 0)
-                );
+                const sortedColumns = (columns || [])
+                    .sort(
+                        (a: { ordinal_position?: number }, b: { ordinal_position?: number }) =>
+                            (a.ordinal_position ?? 0) - (b.ordinal_position ?? 0)
+                    )
+                    .map((col: { options?: string | string[] | null }) => ({
+                        ...col,
+                        // Parse enum options from COLUMN_TYPE if present (e.g., "enum('val1','val2')")
+                        options:
+                            typeof col.options === 'string'
+                                ? parseEnumValues(col.options)
+                                : col.options ?? [],
+                    }));
 
                 // Filter out auto-generated FK indexes (MySQL creates these automatically)
                 // Pattern: {Table}_{column}_fkey for single-column FK indexes
@@ -179,18 +186,30 @@ export const mysql: IntrospectionProvider = {
                     values,
                 };
             });
-
             return { tables, enums };
         } finally {
             await connection.end();
         }
     },
-    getDefaultValue({ defaultValue, fieldType, services, enums }) {
+    getDefaultValue({ defaultValue, fieldType, datatype, datatype_name, services, enums }) {
         const val = defaultValue.trim();
 
         // Handle NULL early
         if (val.toUpperCase() === 'NULL') {
             return null;
+        }
+
+        // Handle enum defaults
+        if (datatype === 'enum' && datatype_name) {
+            const enumDef = enums.find((e) => getDbName(e) === datatype_name);
+            if (enumDef) {
+                // Strip quotes from the value (MySQL returns 'value')
+                const enumValue = val.startsWith("'") && val.endsWith("'") ? val.slice(1, -1) : val;
+                const enumField = enumDef.fields.find((f) => getDbName(f) === enumValue);
+                if (enumField) {
+                    return (ab) => ab.ReferenceExpr.setTarget(enumField);
+                }
+            }
         }
 
         switch (fieldType) {
@@ -206,42 +225,30 @@ export const mysql: IntrospectionProvider = {
                 if (val.toLowerCase() === 'auto_increment') {
                     return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
                 }
-                if (/^-?\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val);
-                }
-                break;
+                return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Float':
-                if (/^-?\d+\.\d+$/.test(val)) {
-                    const numVal = parseFloat(val);
-                    return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(1) : String(numVal));
-                }
-                if (/^-?\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val + '.0');
-                }
-                break;
+              if (/^-?\d+\.\d+$/.test(val)) {
+                  const numVal = parseFloat(val);
+                  return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(1) : String(numVal));
+              }
+              if (/^-?\d+$/.test(val)) {
+                  return (ab) => ab.NumberLiteral.setValue(val + '.0');
+              }
+              return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Decimal':
-                if (/^-?\d+\.\d+$/.test(val)) {
-                    const numVal = parseFloat(val);
-                    if (numVal === Math.floor(numVal)) {
-                        return (ab) => ab.NumberLiteral.setValue(numVal.toFixed(2));
-                    }
-                    return (ab) => ab.NumberLiteral.setValue(String(numVal));
-                }
-                if (/^-?\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val + '.00');
-                }
-                break;
+              if (/^-?\d+\.\d+$/.test(val)) {
+                  const numVal = parseFloat(val);
+                  return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(2) : String(numVal));
+              }
+              if (/^-?\d+$/.test(val)) {
+                  return (ab) => ab.NumberLiteral.setValue(val + '.00');
+              }
+              return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Boolean':
-                if (val === 'true' || val === '1' || val === "b'1'") {
-                    return (ab) => ab.BooleanLiteral.setValue(true);
-                }
-                if (val === 'false' || val === '0' || val === "b'0'") {
-                    return (ab) => ab.BooleanLiteral.setValue(false);
-                }
-                break;
+                return (ab) => ab.BooleanLiteral.setValue(val.toLowerCase() === 'true' || val === '1' || val === "b'1'");
 
             case 'String':
                 if (val.startsWith("'") && val.endsWith("'")) {
@@ -258,30 +265,7 @@ export const mysql: IntrospectionProvider = {
                 if (val.toLowerCase() === 'uuid()') {
                     return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('uuid', services));
                 }
-                if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(val)) {
-                    return (ab) => ab.StringLiteral.setValue(val);
-                }
-                break;
-        }
-
-        // Fallback handlers for values that don't match field type-specific patterns
-        if (/^CURRENT_TIMESTAMP(\(\d*\))?$/i.test(val) || val.toLowerCase() === 'current_timestamp()' || val.toLowerCase() === 'now()') {
-            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services));
-        }
-
-        if (val.toLowerCase() === 'auto_increment') {
-            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
-        }
-
-        if (val === 'true' || val === "b'1'") {
-            return (ab) => ab.BooleanLiteral.setValue(true);
-        }
-        if (val === 'false' || val === "b'0'") {
-            return (ab) => ab.BooleanLiteral.setValue(false);
-        }
-
-        if (/^-?\d+\.\d+$/.test(val) || /^-?\d+$/.test(val)) {
-            return (ab) => ab.NumberLiteral.setValue(val);
+                return (ab) => ab.StringLiteral.setValue(val);
         }
 
         if (val.startsWith("'") && val.endsWith("'")) {
@@ -307,16 +291,8 @@ export const mysql: IntrospectionProvider = {
                 );
         }
 
-        // Handle unquoted string values
-        if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(val)) {
-            return (ab) => ab.StringLiteral.setValue(val);
-        }
-
-        // For any other unhandled cases, use dbgenerated
-        return (ab) =>
-            ab.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
-                a.setValue((v) => v.StringLiteral.setValue(val)),
-            );
+        console.warn(`Unsupported default value type: "${defaultValue}" for field type "${fieldType}". Skipping default value.`);
+        return null;
     },
 
     getFieldAttributes({ fieldName, fieldType, datatype, length, precision, services }) {
@@ -364,7 +340,7 @@ SELECT
         WHEN 'VIEW' THEN 'view'
         ELSE NULL
     END AS \`type\`,
-    CASE 
+    CASE
         WHEN t.TABLE_TYPE = 'VIEW' THEN v.VIEW_DEFINITION
         ELSE NULL
     END AS \`definition\`,
@@ -374,23 +350,30 @@ SELECT
             SELECT JSON_OBJECT(
                 'ordinal_position', c.ORDINAL_POSITION,
                 'name', c.COLUMN_NAME,
-                'datatype', CASE 
+                'datatype', CASE
                     WHEN c.DATA_TYPE = 'tinyint' AND c.COLUMN_TYPE = 'tinyint(1)' THEN 'boolean'
                     ELSE c.DATA_TYPE
+                END,
+                'datatype_name', CASE
+                    WHEN c.DATA_TYPE = 'enum' THEN CONCAT(t.TABLE_NAME, '_', c.COLUMN_NAME)
+                    ELSE NULL
                 END,
                 'datatype_schema', '',
                 'length', c.CHARACTER_MAXIMUM_LENGTH,
                 'precision', COALESCE(c.NUMERIC_PRECISION, c.DATETIME_PRECISION),
                 'nullable', c.IS_NULLABLE = 'YES',
-                'default', CASE 
+                'default', CASE
                     WHEN c.EXTRA LIKE '%auto_increment%' THEN 'auto_increment'
-                    ELSE c.COLUMN_DEFAULT 
+                    ELSE c.COLUMN_DEFAULT
                 END,
                 'pk', c.COLUMN_KEY = 'PRI',
                 'unique', c.COLUMN_KEY = 'UNI',
                 'unique_name', CASE WHEN c.COLUMN_KEY = 'UNI' THEN c.COLUMN_NAME ELSE NULL END,
                 'computed', c.GENERATION_EXPRESSION IS NOT NULL AND c.GENERATION_EXPRESSION != '',
-                'options', JSON_ARRAY(),
+                'options', CASE
+                    WHEN c.DATA_TYPE = 'enum' THEN c.COLUMN_TYPE
+                    ELSE NULL
+                END,
                 'foreign_key_schema', NULL,
                 'foreign_key_table', kcu_fk.REFERENCED_TABLE_NAME,
                 'foreign_key_column', kcu_fk.REFERENCED_COLUMN_NAME,
@@ -399,9 +382,9 @@ SELECT
                 'foreign_key_on_delete', rc.DELETE_RULE
             ) AS col_json
             FROM INFORMATION_SCHEMA.COLUMNS c
-            LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu_fk 
-                ON c.TABLE_SCHEMA = kcu_fk.TABLE_SCHEMA 
-                AND c.TABLE_NAME = kcu_fk.TABLE_NAME 
+            LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu_fk
+                ON c.TABLE_SCHEMA = kcu_fk.TABLE_SCHEMA
+                AND c.TABLE_NAME = kcu_fk.TABLE_NAME
                 AND c.COLUMN_NAME = kcu_fk.COLUMN_NAME
                 AND kcu_fk.REFERENCED_TABLE_NAME IS NOT NULL
             LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
@@ -449,7 +432,7 @@ SELECT
         ) AS idxs_ordered
     ) AS \`indexes\`
 FROM INFORMATION_SCHEMA.TABLES t
-LEFT JOIN INFORMATION_SCHEMA.VIEWS v 
+LEFT JOIN INFORMATION_SCHEMA.VIEWS v
     ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
 WHERE t.TABLE_SCHEMA = '${databaseName}'
     AND t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
@@ -460,7 +443,7 @@ ORDER BY t.TABLE_NAME;
 
 function getEnumIntrospectionQuery(databaseName: string) {
     return `
-SELECT 
+SELECT
     c.TABLE_NAME AS table_name,
     c.COLUMN_NAME AS column_name,
     c.COLUMN_TYPE AS column_type

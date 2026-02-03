@@ -32,7 +32,7 @@ import type { ZModelFormatter } from './zmodel-formatter';
 export async function loadDocument(
     fileName: string,
     additionalModelFiles: string[] = [],
-    keepImports: boolean = false,
+    mergeImports: boolean = true,
 ): Promise<
     | { success: true; model: Model; warnings: string[]; services: ZModelServices }
     | { success: false; errors: string[]; warnings: string[] }
@@ -123,7 +123,7 @@ export async function loadDocument(
 
     const model = document.parseResult.value as Model;
 
-    if (keepImports === false) {
+  if (mergeImports) {
         // merge all declarations into the main document
         const imported = mergeImportsDeclarations(langiumDocuments, model);
 
@@ -135,7 +135,7 @@ export async function loadDocument(
     }
 
     // extra validation after merging imported declarations
-    const additionalErrors = validationAfterImportMerge(model);
+    const additionalErrors = mergeImports === true ? validationAfterImportMerge(model) : [];
     if (additionalErrors.length > 0) {
         return {
             success: false,

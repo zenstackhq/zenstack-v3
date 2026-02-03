@@ -153,7 +153,9 @@ export class DataFieldFactory extends AstFactory<DataField> {
             builder.setContainer(this.node);
             this.attributes.push(builder);
         } else {
-            this.attributes.push(builder(new DataFieldAttributeFactory()));
+            const attr = builder(new DataFieldAttributeFactory());
+            attr.setContainer(this.node);
+            this.attributes.push(attr);
         }
         this.update({
             attributes: this.attributes,

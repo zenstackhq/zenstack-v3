@@ -4,15 +4,12 @@ import { Client } from 'pg';
 import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
 import type { ZModelServices } from '@zenstackhq/language';
+import { CliError } from '../../../cli-error';
 
 export const postgresql: IntrospectionProvider = {
     isSupportedFeature(feature) {
-        switch (feature) {
-            case 'Schema':
-                return true;
-            default:
-                return false;
-        }
+      const supportedFeatures = ['Schema', 'NativeEnum'];
+      return supportedFeatures.includes(feature);
     },
     getBuiltinType(type) {
         const t = (type || '').toLowerCase();
@@ -76,17 +73,25 @@ export const postgresql: IntrospectionProvider = {
                 return { type: 'Unsupported' as const, isArray };
         }
     },
-    async introspect(connectionString: string): Promise<IntrospectedSchema> {
+    async introspect(connectionString: string, options: { schemas: string[] }): Promise<IntrospectedSchema> {
         const client = new Client({ connectionString });
         await client.connect();
 
-        const { rows: tables } = await client.query<IntrospectedTable>(tableIntrospectionQuery);
-        const { rows: enums } = await client.query<IntrospectedEnum>(enumIntrospectionQuery);
+        try {
+            const { rows: tables } = await client.query<IntrospectedTable>(tableIntrospectionQuery);
+            const { rows: enums } = await client.query<IntrospectedEnum>(enumIntrospectionQuery);
 
-        return {
-            enums,
-            tables,
-        };
+            // Filter tables and enums to only include those from the selected schemas
+            const filteredTables = tables.filter((t) => options.schemas.includes(t.schema));
+            const filteredEnums = enums.filter((e) => options.schemas.includes(e.schema_name));
+
+            return {
+                enums: filteredEnums,
+                tables: filteredTables,
+            };
+        } finally {
+            await client.end();
+        }
     },
     getDefaultDatabaseType(type: BuiltinType) {
         switch (type) {
@@ -110,15 +115,30 @@ export const postgresql: IntrospectionProvider = {
                 return { type: 'bytea' };
         }
     },
-    getDefaultValue({ defaultValue, fieldType, services, enums }) {
+    getDefaultValue({ defaultValue, fieldType, datatype, datatype_name, services, enums }) {
         const val = defaultValue.trim();
+
+        // Handle enum defaults (PostgreSQL returns 'value'::enum_type)
+        if (datatype === 'enum' && datatype_name) {
+            const enumDef = enums.find((e) => getDbName(e) === datatype_name);
+            if (enumDef) {
+                // Extract the enum value from the default (format: 'VALUE'::"enum_type")
+                const enumValue = val.replace(/'/g, '').split('::')[0]?.trim();
+                const enumField = enumDef.fields.find((f) => getDbName(f) === enumValue);
+                if (enumField) {
+                    return (ab) => ab.ReferenceExpr.setTarget(enumField);
+                }
+            }
+            // Fall through to typeCastingConvert if datatype_name lookup fails
+            return typeCastingConvert({defaultValue,enums,val,services});
+        }
 
         switch (fieldType) {
             case 'DateTime':
                 if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
                     return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services));
                 }
-                
+
                 if (val.includes('::')) {
                     return typeCastingConvert({defaultValue,enums,val,services});
                 }
@@ -135,11 +155,7 @@ export const postgresql: IntrospectionProvider = {
                 if (val.includes('::')) {
                     return typeCastingConvert({defaultValue,enums,val,services});
                 }
-
-                if (/^-?\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val);
-                }
-                break;
+                return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Float':
                 if (val.includes('::')) {
@@ -153,7 +169,7 @@ export const postgresql: IntrospectionProvider = {
                 if (/^-?\d+$/.test(val)) {
                     return (ab) => ab.NumberLiteral.setValue(val + '.0');
                 }
-                break;
+                return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Decimal':
                 if (val.includes('::')) {
@@ -162,24 +178,15 @@ export const postgresql: IntrospectionProvider = {
 
                 if (/^-?\d+\.\d+$/.test(val)) {
                     const numVal = parseFloat(val);
-                    if (numVal === Math.floor(numVal)) {
-                        return (ab) => ab.NumberLiteral.setValue(numVal.toFixed(2));
-                    }
-                    return (ab) => ab.NumberLiteral.setValue(String(numVal));
+                    return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(2) : String(numVal));
                 }
                 if (/^-?\d+$/.test(val)) {
                     return (ab) => ab.NumberLiteral.setValue(val + '.00');
                 }
-                break;
+                return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Boolean':
-                if (val === 'true') {
-                    return (ab) => ab.BooleanLiteral.setValue(true);
-                }
-                if (val === 'false') {
-                    return (ab) => ab.BooleanLiteral.setValue(false);
-                }
-                break;
+                return (ab) => ab.BooleanLiteral.setValue(val === 'true');
 
             case 'String':
                 if (val.includes('::')) {
@@ -189,20 +196,7 @@ export const postgresql: IntrospectionProvider = {
                 if (val.startsWith("'") && val.endsWith("'")) {
                     return (ab) => ab.StringLiteral.setValue(val.slice(1, -1).replace(/''/g, "'"));
                 }
-                break;
-        }
-
-        if (val.includes('::')) {
-            return typeCastingConvert({defaultValue,enums,val,services});
-        }
-
-        // Fallback handlers for values that don't match field type-specific patterns
-        if (val === 'CURRENT_TIMESTAMP' || val === 'now()') {
-            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('now', services));
-        }
-
-        if (val.startsWith('nextval(')) {
-            return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('autoincrement', services));
+                return (ab) => ab.StringLiteral.setValue(val);
         }
 
         if (val.includes('(') && val.includes(')')) {
@@ -212,18 +206,7 @@ export const postgresql: IntrospectionProvider = {
                 );
         }
 
-        if (val === 'true' || val === 'false') {
-            return (ab) => ab.BooleanLiteral.setValue(val === 'true');
-        }
-
-        if (/^-?\d+\.\d+$/.test(val) || /^-?\d+$/.test(val)) {
-            return (ab) => ab.NumberLiteral.setValue(val);
-        }
-
-        if (val.startsWith("'") && val.endsWith("'")) {
-            return (ab) => ab.StringLiteral.setValue(val.slice(1, -1).replace(/''/g, "'"));
-        }
-
+        console.warn(`Unsupported default value type: "${defaultValue}" for field type "${fieldType}". Skipping default value.`);
         return null;
     },
 
@@ -289,7 +272,20 @@ SELECT
     FROM (
       SELECT
         "att"."attname" AS "name",
-        "typ"."typname" AS "datatype",
+        CASE
+          WHEN EXISTS (
+            SELECT 1 FROM "pg_catalog"."pg_enum" AS "e"
+            WHERE "e"."enumtypid" = "typ"."oid"
+          ) THEN 'enum'
+          ELSE "typ"."typname"
+        END AS "datatype",
+        CASE
+          WHEN EXISTS (
+            SELECT 1 FROM "pg_catalog"."pg_enum" AS "e"
+            WHERE "e"."enumtypid" = "typ"."oid"
+          ) THEN "typ"."typname"
+          ELSE NULL
+        END AS "datatype_name",
         "tns"."nspname" AS "datatype_schema",
         "c"."character_maximum_length" AS "length",
         COALESCE("c"."numeric_precision", "c"."datetime_precision") AS "precision",
@@ -465,7 +461,7 @@ function typeCastingConvert({defaultValue, enums, val, services}:{val: string, e
             }
             const enumField = enumDef.fields.find((v) => getDbName(v) === value);
             if (!enumField) {
-                throw new Error(
+                throw new CliError(
                     `Enum value ${value} not found in enum ${type} for default value ${defaultValue}`,
                 );
             }

@@ -62,19 +62,16 @@ export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql'
     }
     // Build fields array for proper alignment (matching ZModelCodeGenerator)
     const fields: [string, string][] = [
-        ['provider', `"${provider}"`],
-        ['url', `"${dbUrl}"`],
+        ['provider', `'${provider}'`],
+        ['url', `'${dbUrl}'`],
         ...Object.entries(options?.extra || {}).map(([k, v]) => {
-            const value = Array.isArray(v) ? `[${v.map(item => `"${item}"`).join(', ')}]` : `"${v}"`;
+            const value = Array.isArray(v) ? `[${v.map(item => `'${item}'`).join(', ')}]` : `'${v}'`;
             return [k, value] as [string, string];
         }),
     ];
 
-    // Calculate alignment padding based on longest field name
-    const longestName = Math.max(...fields.map(([name]) => name.length));
     const formattedFields = fields.map(([name, value]) => {
-        const padding = ' '.repeat(longestName - name.length + 1);
-        return `    ${name}${padding}= ${value}`;
+        return `    ${name} = ${value}`;
     }).join('\n');
 
     const ZMODEL_PRELUDE = `datasource db {\n${formattedFields}\n}`;
@@ -98,7 +95,8 @@ export async function createFormattedProject(
 ) {
     const fullContent = `${getDefaultPrelude({ provider: options?.provider, extra: options?.extra })}\n\n${zmodel}`;
     const formatted = await formatDocument(fullContent);
-    return createProject(formatted, { customPrelude: true, provider: options?.provider });
+    const workDir = createProject(formatted, { customPrelude: true, provider: options?.provider });
+    return { workDir, schema: formatted };
 }
 
 export function runCli(command: string, cwd: string) {

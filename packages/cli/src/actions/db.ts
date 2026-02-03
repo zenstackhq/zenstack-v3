@@ -1,4 +1,3 @@
-import { config } from '@dotenvx/dotenvx';
 import { formatDocument, ZModelCodeGenerator } from '@zenstackhq/language';
 import { DataModel, Enum, type Model } from '@zenstackhq/language/ast';
 import colors from 'colors';
@@ -14,9 +13,10 @@ import {
     requireDataSourceUrl,
 } from './action-utils';
 import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
-import { providers } from './pull/provider';
+import { providers as pullProviders } from './pull/provider';
 import { getDatasource, getDbName, getRelationFieldsKey, getRelationFkName } from './pull/utils';
 import type { DataSourceProviderType } from '@zenstackhq/schema';
+import { CliError } from '../cli-error';
 
 type PushOptions = {
     schema?: string;
@@ -26,9 +26,9 @@ type PushOptions = {
 
 export type PullOptions = {
     schema?: string;
-    out?: string;
-    modelCasing: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none';
-    fieldCasing: 'pascal' | 'camel' | 'snake' | 'kebab' | 'none';
+    output?: string;
+    modelCasing: 'pascal' | 'camel' | 'snake' | 'none';
+    fieldCasing: 'pascal' | 'camel' | 'snake' | 'none';
     alwaysMap: boolean;
     quote: 'single' | 'double';
     indent: number;
@@ -83,36 +83,37 @@ async function runPull(options: PullOptions) {
     const spinner = ora();
     try {
         const schemaFile = getSchemaFile(options.schema);
-        const { model, services } = await loadSchemaDocument(schemaFile, { returnServices: true, keepImports: true });
-        config({
-            ignore: ['MISSING_ENV_FILE'],
+
+        // Determine early if `--out` is a single file output (combined schema) or a directory export.
+        const outPath = options.output ? path.resolve(options.output) : undefined;
+        const treatAsFile =
+            !!outPath &&
+            ((fs.existsSync(outPath) && fs.lstatSync(outPath).isFile()) || path.extname(outPath) !== '');
+        
+        const { model, services } = await loadSchemaDocument(schemaFile, {
+            returnServices: true,
+            mergeImports: treatAsFile,
         });
-        const SUPPORTED_PROVIDERS = Object.keys(providers) as DataSourceProviderType[];
+
+        const SUPPORTED_PROVIDERS = Object.keys(pullProviders) as DataSourceProviderType[];
         const datasource = getDatasource(model);
         if (!datasource) {
-            throw new Error('No datasource found in the schema.');
+            throw new CliError('No datasource found in the schema.');
         }
 
         if (!SUPPORTED_PROVIDERS.includes(datasource.provider)) {
-            throw new Error(`Unsupported datasource provider: ${datasource.provider}`);
+            throw new CliError(`Unsupported datasource provider: ${datasource.provider}`);
         }
 
-        const provider = providers[datasource.provider];
+        const provider = pullProviders[datasource.provider];
 
         if (!provider) {
-            throw new Error(`No introspection provider found for: ${datasource.provider}`);
+            throw new CliError(`No introspection provider found for: ${datasource.provider}`);
         }
 
         spinner.start('Introspecting database...');
-        const { enums: allEnums, tables: allTables } = await provider.introspect(datasource.url);
+        const { enums, tables } = await provider.introspect(datasource.url, { schemas: datasource.allSchemas });
         spinner.succeed('Database introspected');
-
-        const enums = provider.isSupportedFeature('Schema')
-            ? allEnums.filter((e) => datasource.allSchemas.includes(e.schema_name))
-            : allEnums;
-        const tables = provider.isSupportedFeature('Schema')
-            ? allTables.filter((t) => datasource.allSchemas.includes(t.schema))
-            : allTables;
 
         console.log(colors.blue('Syncing schema...'));
 
@@ -122,8 +123,9 @@ async function runPull(options: PullOptions) {
             $containerProperty: undefined,
             $containerIndex: undefined,
             declarations: [...model.declarations.filter((d) => ['DataSource'].includes(d.$type))],
-            imports: [],
+            imports: model.imports,
         };
+
         syncEnums({
             dbEnums: enums,
             model: newModel,
@@ -176,9 +178,10 @@ async function runPull(options: PullOptions) {
 
         console.log(colors.blue('Schema synced'));
 
-        const cwd = new URL(`file://${process.cwd()}`).pathname;
+        const baseDir = path.dirname(path.resolve(schemaFile));
+        const baseDirUrlPath = new URL(`file://${baseDir}`).pathname;
         const docs = services.shared.workspace.LangiumDocuments.all
-            .filter(({ uri }) => uri.path.toLowerCase().startsWith(cwd.toLowerCase()))
+            .filter(({ uri }) => uri.path.toLowerCase().startsWith(baseDirUrlPath.toLowerCase()))
             .toArray();
         const docsSet = new Set(docs.map((d) => d.uri.toString()));
 
@@ -186,11 +189,30 @@ async function runPull(options: PullOptions) {
 
         const deletedModels: string[] = [];
         const deletedEnums: string[] = [];
-        const addedFields: string[] = [];
-        const deletedAttributes: string[] = [];
-        const deletedFields: string[] = [];
+        const addedModels: string[] = [];
+        const addedEnums: string[] = [];
+        // Hierarchical change tracking: model -> field changes -> attribute changes
+        type ModelChanges = {
+            addedFields: string[];
+            deletedFields: string[];
+            addedAttributes: string[];
+            deletedAttributes: string[];
+        };
+        const modelChanges = new Map<string, ModelChanges>();
 
-        //Delete models
+        const getModelChanges = (modelName: string): ModelChanges => {
+            if (!modelChanges.has(modelName)) {
+                modelChanges.set(modelName, {
+                    addedFields: [],
+                    deletedFields: [],
+                    addedAttributes: [],
+                    deletedAttributes: [],
+                });
+            }
+            return modelChanges.get(modelName)!;
+        };
+
+        // Delete models
         services.shared.workspace.IndexManager.allElements('DataModel', docsSet)
             .filter(
                 (declaration) =>
@@ -216,18 +238,22 @@ async function runPull(options: PullOptions) {
                     model.declarations.splice(index, 1);
                     deletedEnums.push(colors.red(`- Enum ${decl.name} deleted`));
                 });
-        //
+        // Add/update models and their fields
         newModel.declarations
             .filter((d) => [DataModel, Enum].includes(d.$type))
             .forEach((_declaration) => {
                 const newDataModel = _declaration as DataModel | Enum;
-                const declarations = services.shared.workspace.IndexManager.allElements(
-                    newDataModel.$type,
-                    docsSet,
-                ).toArray();
+                const declarations = services.shared.workspace.IndexManager.allElements(newDataModel.$type, docsSet).toArray();
                 const originalDataModel = declarations.find((d) => getDbName(d.node as any) === getDbName(newDataModel))
                     ?.node as DataModel | Enum | undefined;
                 if (!originalDataModel) {
+
+                    if (newDataModel.$type === 'DataModel') {
+                        addedModels.push(colors.green(`+ Model ${newDataModel.name} added`));
+                    } else if (newDataModel.$type === 'Enum') {
+                        addedEnums.push(colors.green(`+ Enum ${newDataModel.name} added`));
+                    }
+
                     model.declarations.push(newDataModel);
                     (newDataModel as any).$container = model;
                     newDataModel.fields.forEach((f) => {
@@ -244,6 +270,13 @@ async function runPull(options: PullOptions) {
                 newDataModel.fields.forEach((f) => {
                     // Prioritized matching: exact db name > relation fields key > relation FK name > type reference
                     let originalFields = originalDataModel.fields.filter((d) => getDbName(d) === getDbName(f));
+
+                    // If this is a back-reference relation field (has @relation but no `fields` arg), silently skip
+                    const isRelationField =
+                        f.$type === 'DataField' && !!(f as any).attributes?.some((a: any) => a?.decl?.ref?.name === '@relation');
+                    if (originalFields.length === 0 && isRelationField && !getRelationFieldsKey(f as any)) {
+                        return;
+                    }
 
                     if (originalFields.length === 0) {
                         // Try matching by relation fields key (the `fields` attribute in @relation)
@@ -268,6 +301,9 @@ async function runPull(options: PullOptions) {
 
                     if (originalFields.length === 0) {
                         // Try matching by type reference
+                        // We need this because for relations that don't have @relation, we can only check if the original exists by the field type.
+                        // Yes, in this case it can potentially result in multiple original fields, but we only want to ensure that at least one relation exists.
+                        // In the future, we might implement some logic to detect how many of these types of relations we need and add/remove fields based on this.
                         originalFields = originalDataModel.fields.filter(
                             (d) =>
                                 f.$type === 'DataField' &&
@@ -292,9 +328,9 @@ async function runPull(options: PullOptions) {
                         return;
                     }
                     const originalField = originalFields.at(0);
-                    Object.freeze(originalField);
+                    
                     if (!originalField) {
-                        addedFields.push(colors.green(`+ Field ${f.name} added to ${originalDataModel.name}`));
+                        getModelChanges(originalDataModel.name).addedFields.push(colors.green(`+ ${f.name}`));
                         (f as any).$container = originalDataModel;
                         originalDataModel.fields.push(f as any);
                         if (f.$type === 'DataField' && f.type.reference?.ref) {
@@ -308,7 +344,7 @@ async function runPull(options: PullOptions) {
                         }
                         return;
                     }
-
+                    // Track deleted attributes (in original but not in new)
                     originalField.attributes
                         .filter(
                             (attr) =>
@@ -319,8 +355,21 @@ async function runPull(options: PullOptions) {
                             const field = attr.$container;
                             const index = field.attributes.findIndex((d) => d === attr);
                             field.attributes.splice(index, 1);
-                            deletedAttributes.push(
-                                colors.yellow(`- Attribute ${attr.decl.$refText} deleted from field: ${field.name}`),
+                            getModelChanges(originalDataModel.name).deletedAttributes.push(
+                                colors.yellow(`- ${attr.decl.$refText} from field: ${originalDataModel.name}.${field.name}`),
+                            );
+                        });
+
+                    // Track added attributes (in new but not in original)
+                    f.attributes
+                        .filter(
+                            (attr) =>
+                                !originalField.attributes.find((d) => d.decl.$refText === attr.decl.$refText) &&
+                                !['@map', '@@map', '@default', '@updatedAt'].includes(attr.decl.$refText),
+                        )
+                        .forEach((attr) => {
+                            getModelChanges(originalDataModel.name).addedAttributes.push(
+                                colors.green(`+ ${attr.decl.$refText} to field: ${originalDataModel.name}.${f.name}`),
                             );
                         });
                 });
@@ -361,37 +410,80 @@ async function runPull(options: PullOptions) {
                         const _model = f.$container;
                         const index = _model.fields.findIndex((d) => d === f);
                         _model.fields.splice(index, 1);
-                        deletedFields.push(colors.red(`- Field ${f.name} deleted from ${_model.name}`));
+                        getModelChanges(_model.name).deletedFields.push(colors.red(`- ${f.name}`));
                     });
             });
 
         if (deletedModels.length > 0) {
             console.log(colors.bold('\nDeleted Models:'));
-            deletedModels.forEach((msg) => console.log(msg));
+            deletedModels.forEach((msg) => {
+                console.log(msg);
+            });
         }
 
         if (deletedEnums.length > 0) {
             console.log(colors.bold('\nDeleted Enums:'));
-            deletedEnums.forEach((msg) => console.log(msg));
+            deletedEnums.forEach((msg) => {
+                console.log(msg);
+            });
         }
 
-        if (addedFields.length > 0) {
-            console.log(colors.bold('\nAdded Fields:'));
-            addedFields.forEach((msg) => console.log(msg));
+        if (addedModels.length > 0) {
+            console.log(colors.bold('\nAdded Models:'));
+            addedModels.forEach((msg) => {
+                console.log(msg);
+            });
         }
 
-        if (deletedAttributes.length > 0) {
-            console.log(colors.bold('\nDeleted Attributes:'));
-            deletedAttributes.forEach((msg) => console.log(msg));
+        if (addedEnums.length > 0) {
+            console.log(colors.bold('\nAdded Enums:'));
+            addedEnums.forEach((msg) => {
+                console.log(msg);
+            });
         }
 
-        if (deletedFields.length > 0) {
-            console.log(colors.bold('\nDeleted Fields:'));
-            deletedFields.forEach((msg) => console.log(msg));
-        }
+        // Print hierarchical model changes
+        if (modelChanges.size > 0) {
+            console.log(colors.bold('\nModel Changes:'));
+            modelChanges.forEach((changes, modelName) => {
+                const hasChanges =
+                    changes.addedFields.length > 0 ||
+                    changes.deletedFields.length > 0 ||
+                    changes.addedAttributes.length > 0 ||
+                    changes.deletedAttributes.length > 0;
 
-        if (options.out && fs.existsSync(options.out) && !fs.lstatSync(options.out).isFile()) {
-            throw new Error(`Output path ${options.out} exists but is not a file`);
+                if (hasChanges) {
+                    console.log(colors.cyan(`  ${modelName}:`));
+
+                    if (changes.addedFields.length > 0) {
+                        console.log(colors.gray('    Added Fields:'));
+                        changes.addedFields.forEach((msg) => {
+                            console.log(`      ${msg}`);
+                        });
+                    }
+
+                    if (changes.deletedFields.length > 0) {
+                        console.log(colors.gray('    Deleted Fields:'));
+                        changes.deletedFields.forEach((msg) => {
+                            console.log(`      ${msg}`);
+                        });
+                    }
+
+                    if (changes.addedAttributes.length > 0) {
+                        console.log(colors.gray('    Added Attributes:'));
+                        changes.addedAttributes.forEach((msg) => {
+                            console.log(`      ${msg}`);
+                        });
+                    }
+
+                    if (changes.deletedAttributes.length > 0) {
+                        console.log(colors.gray('    Deleted Attributes:'));
+                        changes.deletedAttributes.forEach((msg) => {
+                            console.log(`      ${msg}`);
+                        });
+                    }
+                }
+            });
         }
 
         const generator = new ZModelCodeGenerator({
@@ -399,17 +491,47 @@ async function runPull(options: PullOptions) {
             indent: options.indent,
         });
 
-        if (options.out) {
-            const zmodelSchema = await formatDocument(generator.generate(newModel));
+        if (options.output) {
+            if (treatAsFile) {
+                const zmodelSchema = await formatDocument(generator.generate(newModel));
+                console.log(colors.blue(`Writing to ${outPath}`));
+                fs.mkdirSync(path.dirname(outPath), { recursive: true });
+                fs.writeFileSync(outPath, zmodelSchema);
+            } else {
+                // Otherwise treat `--out` as a directory path. Create it if needed.
+                fs.mkdirSync(outPath!, { recursive: true });
 
-            console.log(colors.blue(`Writing to ${options.out}`));
+                // Preserve the directory structure relative to the schema file location (options.schema base).
+                const baseDir = path.dirname(path.resolve(schemaFile));
+                const baseDirUrlPath = new URL(`file://${baseDir}`).pathname;
 
-            const outPath = options.out ? path.resolve(options.out) : schemaFile;
+                for (const {
+                    uri,
+                    parseResult: { value: documentModel },
+                } of docs) {
+                    const zmodelSchema = await formatDocument(generator.generate(documentModel));
 
-            fs.writeFileSync(outPath, zmodelSchema);
+                    // Map input file path -> output file path under `--out`
+                    let relPath = uri.path;
+                    if (relPath.toLowerCase().startsWith(baseDirUrlPath.toLowerCase())) {
+                        relPath = relPath.slice(baseDirUrlPath.length);
+                    }
+                    relPath = relPath.replace(/^\/+/, '');
+
+                    // Ensure consistent platform-specific separators for filesystem writes
+                    const targetFile = path.join(outPath!, ...relPath.split('/'));
+
+                    fs.mkdirSync(path.dirname(targetFile), { recursive: true });
+                    console.log(colors.blue(`Writing to ${targetFile}`));
+                    fs.writeFileSync(targetFile, zmodelSchema);
+                }
+            }
         } else {
-            for (const { uri, parseResult: { value: model } } of docs) {
-                const zmodelSchema = await formatDocument(generator.generate(model));
+            for (const {
+                uri,
+                parseResult: { value: documentModel },
+            } of docs) {
+                const zmodelSchema = await formatDocument(generator.generate(documentModel));
                 console.log(colors.blue(`Writing to ${uri.path}`));
                 fs.writeFileSync(uri.fsPath, zmodelSchema);
             }

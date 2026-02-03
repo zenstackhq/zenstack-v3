@@ -101,7 +101,11 @@ export class ZModelCodeGenerator {
     @gen(Model)
     private _generateModel(ast: Model) {
         return `${ast.imports.map((d) => this.generate(d)).join('\n')}${ast.imports.length > 0 ? '\n\n' : ''}${ast.declarations
-            .sort((d) => (d.$type === 'Enum' ? 1 : 0))
+            .sort((a, b) => {
+                if (a.$type === 'Enum' && b.$type !== 'Enum') return 1;
+                if (a.$type !== 'Enum' && b.$type === 'Enum') return -1;
+                return 0;
+            })
             .map((d) => this.generate(d))
             .join('\n\n')}`;
     }
@@ -145,9 +149,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 
     @gen(ConfigField)
     private _generateConfigField(ast: ConfigField) {
-        const longestName = Math.max(...ast.$container.fields.map((x) => x.name.length));
-        const padding = ' '.repeat(longestName - ast.name.length + 1);
-        return `${ast.name}${padding}= ${this.generate(ast.value)}`;
+      return `${ast.name} = ${this.generate(ast.value)}`;
     }
 
     @gen(ConfigArrayExpr)
@@ -175,9 +177,7 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 
     @gen(PluginField)
     private _generatePluginField(ast: PluginField) {
-        const longestName = Math.max(...ast.$container.fields.map((x) => x.name.length));
-        const padding = ' '.repeat(longestName - ast.name.length + 1);
-        return `${ast.name}${padding}= ${this.generate(ast.value)}`;
+        return `${ast.name} = ${this.generate(ast.value)}`;
     }
 
     @gen(DataModel)
@@ -185,14 +185,9 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
         const comments = `${ast.comments.join('\n')}\n`;
 
         return `${ast.comments.length > 0 ? comments : ''}${ast.isView ? 'view' : 'model'} ${ast.name}${
-            ast.mixins.length > 0 ? ' mixes ' + ast.mixins.map((x) => x.$refText).join(', ') : ''
+            ast.mixins.length > 0 ? ' with ' + ast.mixins.map((x) => x.$refText).join(', ') : ''
         } {
-${ast.fields
-    .map((x) => {
-        const comments = x.comments.map((c) => `${this.indent}${c}`).join('\n');
-        return (x.comments.length ? `${comments}\n` : '') + this.indent + this.generate(x);
-    })
-    .join('\n')}${
+${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
             ast.attributes.length > 0
                 ? '\n\n' + ast.attributes.map((x) => this.indent + this.generate(x)).join('\n')
                 : ''
@@ -202,13 +197,20 @@ ${ast.fields
 
     @gen(DataField)
     private _generateDataField(ast: DataField) {
-        const longestFieldName = Math.max(...ast.$container.fields.map((f) => f.name.length));
-        const longestType = Math.max(...ast.$container.fields.map((f) => this.fieldType(f.type).length));
-        const paddingLeft = longestFieldName - ast.name.length;
-        const paddingRight = ast.attributes.length > 0 ? longestType - this.fieldType(ast.type).length : 0;
-        return `${ast.name}${' '.repeat(paddingLeft)} ${this.fieldType(ast.type)}${' '.repeat(paddingRight)}${
+        const fieldLine = `${ast.name} ${this.fieldType(ast.type)}${
             ast.attributes.length > 0 ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ') : ''
         }`;
+
+        if (ast.comments.length === 0) {
+            return fieldLine;
+        }
+
+        // Build comment block with proper indentation:
+        // - First comment: no indent (caller adds it via `this.indent + this.generate(x)`)
+        // - Subsequent comments: add indent
+        // - Field line: add indent (since it comes after the comment block)
+        const commentLines = ast.comments.map((c, i) => (i === 0 ? c : this.indent + c));
+        return `${commentLines.join('\n')}\n${this.indent}${fieldLine}`;
     }
 
     private fieldType(type: DataFieldType) {

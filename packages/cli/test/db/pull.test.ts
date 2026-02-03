@@ -15,7 +15,7 @@ const generator = new ZModelCodeGenerator({
 describe('DB pull - Common features (all providers)', () => {
     describe('Pull from zero - restore complete schema from database', () => {
         it('should restore basic schema with all supported types', async () => {
-            const workDir = await createFormattedProject(
+            const { workDir, schema } = await createFormattedProject(
                 `model User {
     id         Int      @id @default(autoincrement())
     email      String   @unique
@@ -36,8 +36,6 @@ describe('DB pull - Common features (all providers)', () => {
 
             // Store the schema after db push (this is what provider names will be)
             const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
-            const { model } = await loadSchemaDocument(schemaFile, { returnServices: true });
-            const expectedSchema = generator.generate(model);
 
             // Remove schema content to simulate restoration from zero
             fs.writeFileSync(schemaFile, getDefaultPrelude());
@@ -46,11 +44,11 @@ describe('DB pull - Common features (all providers)', () => {
             runCli('db pull --indent 4', workDir);
 
             const restoredSchema = getSchema(workDir);
-            expect(restoredSchema).toEqual(expectedSchema);
+            expect(restoredSchema).toEqual(schema);
         });
 
         it('should restore schema with relations', async () => {
-            const workDir = await createFormattedProject(
+            const { workDir, schema } = await createFormattedProject(
                 `model Post {
     id       Int    @id @default(autoincrement())
     title    String
@@ -67,18 +65,16 @@ model User {
             runCli('db push', workDir);
 
             const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
-            const { model } = await loadSchemaDocument(schemaFile, { returnServices: true });
-            const expectedSchema = generator.generate(model);
 
             fs.writeFileSync(schemaFile, getDefaultPrelude());
             runCli('db pull --indent 4', workDir);
 
             const restoredSchema = getSchema(workDir);
-            expect(restoredSchema).toEqual(expectedSchema);
+            expect(restoredSchema).toEqual(schema);
         });
 
         it('should restore schema with many-to-many relations', async () => {
-            const workDir = await createFormattedProject(
+            const { workDir, schema } = await createFormattedProject(
                 `model Post {
     id   Int       @id @default(autoincrement())
     title String
@@ -103,18 +99,16 @@ model Tag {
             runCli('db push', workDir);
 
             const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
-            const { model } = await loadSchemaDocument(schemaFile, { returnServices: true });
-            const expectedSchema = generator.generate(model);
 
             fs.writeFileSync(schemaFile, getDefaultPrelude());
             runCli('db pull --indent 4', workDir);
 
             const restoredSchema = getSchema(workDir);
-            expect(restoredSchema).toEqual(expectedSchema);
+            expect(restoredSchema).toEqual(schema);
         });
 
         it('should restore schema with indexes and unique constraints', async () => {
-            const workDir = await createFormattedProject(
+            const { workDir, schema } = await createFormattedProject(
                 `model User {
     id        Int      @id @default(autoincrement())
     email     String   @unique
@@ -132,18 +126,16 @@ model Tag {
             runCli('db push', workDir);
 
             const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
-            const { model } = await loadSchemaDocument(schemaFile, { returnServices: true });
-            const expectedSchema = generator.generate(model);
 
             fs.writeFileSync(schemaFile, getDefaultPrelude());
             runCli('db pull --indent 4', workDir);
 
             const restoredSchema = getSchema(workDir);
-            expect(restoredSchema).toEqual(expectedSchema);
+            expect(restoredSchema).toEqual(schema);
         });
 
         it('should restore schema with composite primary keys', async () => {
-            const workDir = await createFormattedProject(
+            const { workDir, schema } = await createFormattedProject(
                 `model UserRole {
     userId String
     role   String
@@ -155,46 +147,43 @@ model Tag {
             runCli('db push', workDir);
 
             const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
-            const { model } = await loadSchemaDocument(schemaFile, { returnServices: true });
-            const expectedSchema = generator.generate(model);
 
             fs.writeFileSync(schemaFile, getDefaultPrelude());
             runCli('db pull --indent 4', workDir);
 
             const restoredSchema = getSchema(workDir);
-            expect(restoredSchema).toEqual(expectedSchema);
+            expect(restoredSchema).toEqual(schema);
         });
 
     });
 
     describe('Pull with existing schema - preserve schema features', () => {
         it('should preserve field and table mappings', async () => {
-            const workDir = await createFormattedProject(
+            const { workDir, schema } = await createFormattedProject(
                 `model User {
     id         Int    @id @default(autoincrement())
-    email      String @unique @map("email_address")
-    firstName  String @map("first_name")
-    lastName   String @map("last_name")
+    email      String @unique @map('email_address')
+    firstName  String @map('first_name')
+    lastName   String @map('last_name')
 
-    @@map("users")
+    @@map('users')
 }`,
             );
             runCli('db push', workDir);
 
-            const originalSchema = getSchema(workDir);
             runCli('db pull --indent 4', workDir);
 
-            expect(getSchema(workDir)).toEqual(originalSchema);
+            expect(getSchema(workDir)).toEqual(schema);
         });
 
         it('should not modify a comprehensive schema with all features', async () => {
-            const workDir = await createFormattedProject(`model User {
+            const { workDir, schema } = await createFormattedProject(`model User {
     id             Int      @id @default(autoincrement())
-    email          String   @unique @map("email_address")
-    name           String?  @default("Anonymous")
-    role           Role     @default(USER)
+    email          String   @unique @map('email_address')
+    name           String?  @default('Anonymous')
+    role           users_role     @default(USER)
     profile        Profile?
-    shared_profile Profile? @relation("shared")
+    shared_profile Profile? @relation('shared')
     posts          Post[]
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
@@ -205,19 +194,19 @@ model Tag {
     bytes          Bytes?
 
     @@index([role])
-    @@map("users")
+    @@map('users')
 }
 
 model Profile {
     id            Int     @id @default(autoincrement())
     user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
     userId        Int     @unique
-    user_shared   User    @relation("shared", fields: [shared_userId], references: [id], onDelete: Cascade)
+    user_shared   User    @relation('shared', fields: [shared_userId], references: [id], onDelete: Cascade)
     shared_userId Int     @unique
     bio           String?
     avatarUrl     String?
 
-    @@map("profiles")
+    @@map('profiles')
 }
 
 model Post {
@@ -236,7 +225,7 @@ model Post {
 
     @@unique([authorId, slug])
     @@index([authorId, published])
-    @@map("posts")
+    @@map('posts')
 }
 
 model Tag {
@@ -245,8 +234,8 @@ model Tag {
     posts     PostTag[]
     createdAt DateTime  @default(now())
 
-    @@index([name], name: "tag_name_idx")
-    @@map("tags")
+    @@index([name], name: 'tag_name_idx')
+    @@map('tags')
 }
 
 model PostTag {
@@ -255,23 +244,24 @@ model PostTag {
     tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
     tagId      Int
     assignedAt DateTime @default(now())
-    note       String?  @default("initial")
+    note       String?  @default('initial')
 
     @@id([postId, tagId])
-    @@map("post_tags")
+    @@map('post_tags')
 }
 
-enum Role {
+enum users_role {
     USER
     ADMIN
     MODERATOR
 }`,
+// When using MySQL, the introspection simply overrides the enum and cannot detect if it exists with the same name because it only stores the values.
+// TODO: Create a better way to handle this, possibly by finding enums by their values as well if the schema exists.
             );
             runCli('db push', workDir);
 
-            const originalSchema = getSchema(workDir);
             runCli('db pull --indent 4', workDir);
-            expect(getSchema(workDir)).toEqual(originalSchema);
+            expect(getSchema(workDir)).toEqual(schema);
         });
 
         it('should preserve imports when pulling with multi-file schema', async () => {
@@ -282,14 +272,14 @@ enum Role {
             fs.mkdirSync(modelsDir, { recursive: true });
 
             // Create main schema with imports
-            const mainSchema = await formatDocument(`import "./models/user"
-import "./models/post"
+            const mainSchema = await formatDocument(`import './models/user'
+import './models/post'
 
 ${getDefaultPrelude()}`);
             fs.writeFileSync(schemaPath, mainSchema);
 
             // Create user model
-            const userModel = await formatDocument(`import "./post"
+            const userModel = await formatDocument(`import './post'
 
 model User {
     id        Int      @id @default(autoincrement())
@@ -301,7 +291,7 @@ model User {
             fs.writeFileSync(path.join(modelsDir, 'user.zmodel'), userModel);
 
             // Create post model
-            const postModel = await formatDocument(`import "./user"
+            const postModel = await formatDocument(`import './user'
 
 model Post {
     id        Int      @id @default(autoincrement())
@@ -336,13 +326,13 @@ describe('DB pull - PostgreSQL specific features', () => {
             skip();
             return;
         }
-        const workDir = await createFormattedProject(
+        const { workDir, schema } = await createFormattedProject(
             `model User {
     id    Int    @id @default(autoincrement())
     email String @unique
     posts Post[]
 
-    @@schema("auth")
+    @@schema('auth')
 }
 
 model Post {
@@ -351,21 +341,19 @@ model Post {
     author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
     authorId Int
 
-    @@schema("content")
+    @@schema('content')
 }`,
-            { provider: 'postgresql', extra:{ schemas: ["public", "content", "auth"] } },
+            { provider: 'postgresql', extra:{ schemas: ['public', 'content', 'auth'] } },
         );
         runCli('db push', workDir);
 
         const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
-        const { model } = await loadSchemaDocument(schemaFile, { returnServices: true });
-        const expectedSchema = generator.generate(model);
 
-        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql', extra:{ schemas: ["public", "content", "auth"]} }));
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql', extra:{ schemas: ['public', 'content', 'auth']} }));
         runCli('db pull --indent 4', workDir);
 
         const restoredSchema = getSchema(workDir);
-        expect(restoredSchema).toEqual(expectedSchema);
+        expect(restoredSchema).toEqual(schema);
     });
 
     it('should preserve native PostgreSQL enums when schema exists', async ({ skip }) => {
@@ -374,7 +362,7 @@ model Post {
             skip();
             return;
         }
-        const workDir = await createFormattedProject(
+        const { workDir, schema } = await createFormattedProject(
             `model User {
     id     Int        @id @default(autoincrement())
     email  String     @unique
@@ -397,11 +385,10 @@ enum UserRole {
         );
         runCli('db push', workDir);
 
-        const originalSchema = getSchema(workDir);
         runCli('db pull --indent 4', workDir);
         const pulledSchema = getSchema(workDir);
 
-        expect(pulledSchema).toEqual(originalSchema);
+        expect(pulledSchema).toEqual(schema);
     });
 
     it('should not modify schema with PostgreSQL-specific features', async ({ skip }) => {
@@ -410,7 +397,7 @@ enum UserRole {
             skip();
             return;
         }
-        const workDir = await createFormattedProject(
+        const { workDir, schema } = await createFormattedProject(
             `model User {
     id       Int        @id @default(autoincrement())
     email    String     @unique
@@ -418,7 +405,7 @@ enum UserRole {
     posts    Post[]
     metadata Json?
 
-    @@schema("auth")
+    @@schema('auth')
     @@index([status])
 }
 
@@ -429,7 +416,7 @@ model Post {
     authorId Int
     tags     String[]
 
-    @@schema("content")
+    @@schema('content')
     @@index([authorId])
 }
 
@@ -438,13 +425,47 @@ enum UserStatus {
     INACTIVE
     SUSPENDED
 }`,
-            { provider: 'postgresql', extra:{ schemas: ["public", "content", "auth"] }  },
+            { provider: 'postgresql', extra:{ schemas: ['public', 'content', 'auth'] }  },
         );
         runCli('db push', workDir);
 
-        const originalSchema = getSchema(workDir);
         runCli('db pull --indent 4', workDir);
 
-        expect(getSchema(workDir)).toEqual(originalSchema);
+        expect(getSchema(workDir)).toEqual(schema);
+    });
+});
+
+describe('DB pull - SQL specific features', () => {
+    it('should restore enum fields from zero', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'mysql' && provider !== 'postgresql') {
+            skip();
+            return;
+        }
+
+        const { workDir, schema } = await createFormattedProject(
+            `model User {
+    id     Int    @id @default(autoincrement())
+    email  String @unique
+    status User_status @default(ACTIVE)
+}
+
+enum User_status {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}`);
+        runCli('db push', workDir);
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+
+        // Remove schema content to simulate restoration from zero
+        fs.writeFileSync(schemaFile, getDefaultPrelude());
+
+        // Pull should fully restore the schema including enum fields
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+        expect(restoredSchema).toEqual(schema);
     });
 });

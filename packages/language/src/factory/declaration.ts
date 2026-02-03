@@ -80,7 +80,7 @@ export class DataModelFactory extends AstFactory<DataModel> {
     }
 
     addAttribute(builder: (attr: DataModelAttributeFactory) => DataModelAttributeFactory) {
-        this.attributes.push(builder(new DataModelAttributeFactory()));
+        this.attributes.push(builder(new DataModelAttributeFactory()).setContainer(this.node));
         this.update({
             attributes: this.attributes,
         });
@@ -104,7 +104,7 @@ export class DataModelFactory extends AstFactory<DataModel> {
     }
 
     addField(builder: (field: DataFieldFactory) => DataFieldFactory) {
-        this.fields.push(builder(new DataFieldFactory()));
+        this.fields.push(builder(new DataFieldFactory()).setContainer(this.node));
         this.update({
             fields: this.fields,
         });
@@ -180,7 +180,7 @@ export class DataFieldFactory extends AstFactory<DataField> {
     }
 
     setType(builder: (type: DataFieldTypeFactory) => DataFieldTypeFactory) {
-        this.type = builder(new DataFieldTypeFactory());
+        this.type = builder(new DataFieldTypeFactory()).setContainer(this.node);
         this.update({
             type: this.type,
         });
@@ -235,7 +235,7 @@ export class DataFieldTypeFactory extends AstFactory<DataFieldType> {
     }
 
     setUnsupported(builder: (a: UnsupportedFieldTypeFactory) => UnsupportedFieldTypeFactory) {
-        this.unsupported = builder(new UnsupportedFieldTypeFactory());
+        this.unsupported = builder(new UnsupportedFieldTypeFactory()).setContainer(this.node);
         this.update({
             unsupported: this.unsupported,
         });
@@ -264,14 +264,14 @@ export class ModelFactory extends AstFactory<Model> {
         super({ type: Model, node: { declarations: [], imports: [] } });
     }
     addImport(builder: (b: ModelImportFactory) => ModelImportFactory) {
-        this.imports.push(builder(new ModelImportFactory()));
+        this.imports.push(builder(new ModelImportFactory()).setContainer(this.node));
         this.update({
             imports: this.imports,
         });
         return this;
     }
     addDeclaration(builder: (b: DeclarationBuilder) => AstFactory<AbstractDeclaration>) {
-        this.declarations.push(builder(DeclarationBuilder()));
+        this.declarations.push(builder(DeclarationBuilder()).setContainer(this.node));
         this.update({
             declarations: this.declarations,
         });
@@ -306,7 +306,7 @@ export class EnumFactory extends AstFactory<Enum> {
     }
 
     addField(builder: (b: EnumFieldFactory) => EnumFieldFactory) {
-        this.fields.push(builder(new EnumFieldFactory()));
+        this.fields.push(builder(new EnumFieldFactory()).setContainer(this.node));
         this.update({
             fields: this.fields,
         });
@@ -314,7 +314,7 @@ export class EnumFactory extends AstFactory<Enum> {
     }
 
     addAttribute(builder: (b: DataModelAttributeFactory) => DataModelAttributeFactory) {
-        this.attributes.push(builder(new DataModelAttributeFactory()));
+        this.attributes.push(builder(new DataModelAttributeFactory()).setContainer(this.node));
         this.update({
             attributes: this.attributes,
         });
@@ -348,7 +348,7 @@ export class EnumFieldFactory extends AstFactory<EnumField> {
     }
 
     addAttribute(builder: (b: DataFieldAttributeFactory) => DataFieldAttributeFactory) {
-        this.attributes.push(builder(new DataFieldAttributeFactory()));
+        this.attributes.push(builder(new DataFieldAttributeFactory()).setContainer(this.node));
         this.update({
             attributes: this.attributes,
         });

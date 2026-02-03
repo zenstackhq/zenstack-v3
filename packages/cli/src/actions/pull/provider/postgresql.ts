@@ -162,13 +162,15 @@ export const postgresql: IntrospectionProvider = {
                     return typeCastingConvert({defaultValue,enums,val,services});
                 }
 
-                if (/^-?\d+\.\d+$/.test(val)) {
-                    const numVal = parseFloat(val);
-                    return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(1) : String(numVal));
-                }
+                // Integer strings: append '.0'
                 if (/^-?\d+$/.test(val)) {
                     return (ab) => ab.NumberLiteral.setValue(val + '.0');
                 }
+                // Decimal strings: preserve exactly to avoid parseFloat precision loss
+                if (/^-?\d+\.\d+$/.test(val)) {
+                    return (ab) => ab.NumberLiteral.setValue(val);
+                }
+                // Other values: return unchanged
                 return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Decimal':
@@ -176,13 +178,21 @@ export const postgresql: IntrospectionProvider = {
                     return typeCastingConvert({defaultValue,enums,val,services});
                 }
 
-                if (/^-?\d+\.\d+$/.test(val)) {
-                    const numVal = parseFloat(val);
-                    return (ab) => ab.NumberLiteral.setValue(numVal === Math.floor(numVal) ? numVal.toFixed(2) : String(numVal));
-                }
+                // Integer strings: append '.00'
                 if (/^-?\d+$/.test(val)) {
                     return (ab) => ab.NumberLiteral.setValue(val + '.00');
                 }
+                // Decimal strings: normalize to minimum 2 decimal places, strip excess trailing zeros
+                if (/^-?\d+\.\d+$/.test(val)) {
+                    const [integerPart, fractionalPart] = val.split('.');
+                    // Strip trailing zeros, but keep at least 2 digits
+                    let normalized = fractionalPart!.replace(/0+$/, '');
+                    if (normalized.length < 2) {
+                        normalized = normalized.padEnd(2, '0');
+                    }
+                    return (ab) => ab.NumberLiteral.setValue(`${integerPart}.${normalized}`);
+                }
+                // Other values: return unchanged
                 return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Boolean':

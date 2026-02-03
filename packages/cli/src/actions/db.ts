@@ -89,7 +89,7 @@ async function runPull(options: PullOptions) {
         const treatAsFile =
             !!outPath &&
             ((fs.existsSync(outPath) && fs.lstatSync(outPath).isFile()) || path.extname(outPath) !== '');
-        
+
         const { model, services } = await loadSchemaDocument(schemaFile, {
             returnServices: true,
             mergeImports: treatAsFile,
@@ -328,7 +328,7 @@ async function runPull(options: PullOptions) {
                         return;
                     }
                     const originalField = originalFields.at(0);
-                    
+
                     if (!originalField) {
                         getModelChanges(originalDataModel.name).addedFields.push(colors.green(`+ ${f.name}`));
                         (f as any).$container = originalDataModel;
@@ -368,6 +368,9 @@ async function runPull(options: PullOptions) {
                                 !['@map', '@@map', '@default', '@updatedAt'].includes(attr.decl.$refText),
                         )
                         .forEach((attr) => {
+                          // attach the new attribute to the original field
+                            const cloned = { ...attr, $container: originalField } as typeof attr;
+                            originalField.attributes.push(cloned);
                             getModelChanges(originalDataModel.name).addedAttributes.push(
                                 colors.green(`+ ${attr.decl.$refText} to field: ${originalDataModel.name}.${f.name}`),
                             );

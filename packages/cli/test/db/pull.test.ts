@@ -107,6 +107,31 @@ model Tag {
             expect(restoredSchema).toEqual(schema);
         });
 
+        it('should restore one-to-one relation when FK is the single-column primary key', async () => {
+            const { workDir, schema } = await createFormattedProject(
+                `model Profile {
+    user User   @relation(fields: [id], references: [id], onDelete: Cascade)
+    id   Int    @id @default(autoincrement())
+    bio  String?
+}
+
+model User {
+    id      Int      @id @default(autoincrement())
+    email   String   @unique
+    profile Profile?
+}`,
+            );
+            runCli('db push', workDir);
+
+            const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+
+            fs.writeFileSync(schemaFile, getDefaultPrelude());
+            runCli('db pull --indent 4', workDir);
+
+            const restoredSchema = getSchema(workDir);
+            expect(restoredSchema).toEqual(schema);
+        });
+
         it('should restore schema with indexes and unique constraints', async () => {
             const { workDir, schema } = await createFormattedProject(
                 `model User {
@@ -142,6 +167,29 @@ model Tag {
     grantedAt DateTime @default(now())
 
     @@id([userId, role])
+}`,
+            );
+            runCli('db push', workDir);
+
+            const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+
+            fs.writeFileSync(schemaFile, getDefaultPrelude());
+            runCli('db pull --indent 4', workDir);
+
+            const restoredSchema = getSchema(workDir);
+            expect(restoredSchema).toEqual(schema);
+        });
+
+        it('should preserve Decimal and Float default value precision', async () => {
+            const { workDir, schema } = await createFormattedProject(
+                `model Product {
+    id          Int     @id @default(autoincrement())
+    price       Decimal @default(99.99)
+    discount    Decimal @default(0.50)
+    taxRate     Decimal @default(7.00)
+    weight      Float   @default(1.5)
+    rating      Float   @default(4.0)
+    temperature Float   @default(98.6)
 }`,
             );
             runCli('db push', workDir);

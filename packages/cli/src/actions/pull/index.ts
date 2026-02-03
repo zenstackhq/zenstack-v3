@@ -82,8 +82,10 @@ export function syncEnums({
                     factory.update({ comments: [...d.comments] });
                 }
                 // Copy enum-level attributes (@@map, @@schema, etc.)
+                // Re-parent attributes to the new factory node
                 if (d.attributes?.length) {
-                    factory.update({ attributes: [...d.attributes] });
+                    const reparentedAttrs = d.attributes.map((attr) => ({ ...attr, $container: factory.node }));
+                    factory.update({ attributes: reparentedAttrs });
                 }
                 // Copy fields with their attributes and comments
                 d.fields.forEach((v) => {
@@ -96,8 +98,10 @@ export function syncEnums({
                             });
                         }
                         // Copy field-level attributes (@map, etc.)
+                        // Re-parent attributes to the new builder node
                         if (v.attributes?.length) {
-                            builder.update({ attributes: [...v.attributes] });
+                            const reparentedAttrs = v.attributes.map((attr) => ({ ...attr, $container: builder.node }));
+                            builder.update({ attributes: reparentedAttrs });
                         }
                         return builder;
                     });
@@ -213,6 +217,9 @@ export function syncTable({
     }
     table.columns.forEach((column) => {
         if (column.foreign_key_table) {
+            // Check if this FK column is the table's single-column primary key
+            // If so, it should be treated as a one-to-one relation
+            const isSingleColumnPk = !multiPk && column.pk;
             relations.push({
                 schema: table.schema,
                 table: table.name,
@@ -226,7 +233,7 @@ export function syncTable({
                     schema: column.foreign_key_schema,
                     table: column.foreign_key_table,
                     column: column.foreign_key_column,
-                    type: column.unique ? 'one' : 'many',
+                    type: column.unique || isSingleColumnPk ? 'one' : 'many',
                 },
             });
         }

@@ -500,4 +500,269 @@ model Post extends Content {
             preview: 'This is the full body content of the post',
         });
     });
+
+    it('works with update operations', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    fullName String @virtual
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({
+            data: { id: 1, firstName: 'Alex', lastName: 'Smith' },
+        });
+
+        // Update should return the virtual field
+        const updated = await db.user.update({
+            where: { id: 1 },
+            data: { firstName: 'John' },
+        });
+
+        expect(updated.fullName).toBe('John Smith');
+    });
+
+    it('works with upsert operations', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    fullName String @virtual
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
+                    },
+                },
+            } as any,
+        );
+
+        // Upsert create path
+        const created = await db.user.upsert({
+            where: { id: 1 },
+            create: { id: 1, firstName: 'Alex', lastName: 'Smith' },
+            update: { firstName: 'John' },
+        });
+
+        expect(created.fullName).toBe('Alex Smith');
+
+        // Upsert update path
+        const updated = await db.user.upsert({
+            where: { id: 1 },
+            create: { id: 1, firstName: 'Alex', lastName: 'Smith' },
+            update: { firstName: 'John' },
+        });
+
+        expect(updated.fullName).toBe('John Smith');
+    });
+
+    it('works with multiple virtual fields on same model', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    email String
+    fullName String @virtual
+    displayEmail String @virtual
+    initials String @virtual
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
+                        displayEmail: (row: any) => row.email.toLowerCase(),
+                        initials: (row: any) => `${row.firstName[0]}${row.lastName[0]}`.toUpperCase(),
+                    },
+                },
+            } as any,
+        );
+
+        const user = await db.user.create({
+            data: { id: 1, firstName: 'Alex', lastName: 'Smith', email: 'ALEX@EXAMPLE.COM' },
+        });
+
+        expect(user.fullName).toBe('Alex Smith');
+        expect(user.displayEmail).toBe('alex@example.com');
+        expect(user.initials).toBe('AS');
+    });
+
+    it('works with relations and virtual fields on MySQL (lateral join dialect)', async () => {
+        // This test targets the lateral join dialect used by MySQL
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    name String
+    displayName String @virtual
+    posts Post[]
+}
+
+model Post {
+    id Int @id @default(autoincrement())
+    title String
+    author User @relation(fields: [authorId], references: [id])
+    authorId Int
+}
+`,
+            {
+                provider: 'mysql',
+                virtualFields: {
+                    User: {
+                        displayName: (row: any) => `@${row.name}`,
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({
+            data: { id: 1, name: 'alex', posts: { create: { title: 'Post1' } } },
+        });
+
+        await expect(
+            db.post.findFirst({
+                include: { author: true },
+            }),
+        ).resolves.toMatchObject({
+            title: 'Post1',
+            author: expect.objectContaining({
+                name: 'alex',
+                displayName: '@alex',
+            }),
+        });
+    });
+
+    it('virtual field can access included relation data', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    name String
+    posts Post[]
+}
+
+model Post {
+    id Int @id @default(autoincrement())
+    title String
+    author User @relation(fields: [authorId], references: [id])
+    authorId Int
+    authorDisplay String @virtual
+}
+`,
+            {
+                virtualFields: {
+                    Post: {
+                        authorDisplay: (row: any) => {
+                            // Virtual field can access included relation data
+                            if (row.author) {
+                                return `by ${row.author.name}`;
+                            }
+                            return `by user #${row.authorId}`;
+                        },
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({
+            data: { id: 1, name: 'Alex', posts: { create: { title: 'My Post' } } },
+        });
+
+        // Without including author
+        const postWithoutAuthor = await db.post.findFirst();
+        expect(postWithoutAuthor?.authorDisplay).toBe('by user #1');
+
+        // With including author
+        const postWithAuthor = await db.post.findFirst({
+            include: { author: true },
+        });
+        expect(postWithAuthor?.authorDisplay).toBe('by Alex');
+    });
+
+    it('respects omit clause - skips virtual field computation', async () => {
+        let virtualFieldCalled = false;
+
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    name String
+    displayName String @virtual
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        displayName: (row: any) => {
+                            virtualFieldCalled = true;
+                            return `@${row.name}`;
+                        },
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({
+            data: { id: 1, name: 'Alex' },
+        });
+
+        virtualFieldCalled = false;
+
+        // When omitting the virtual field, it should NOT be computed
+        const result = await db.user.findUnique({
+            where: { id: 1 },
+            omit: { displayName: true },
+        });
+
+        expect(result).toMatchObject({ id: 1, name: 'Alex' });
+        expect(result).not.toHaveProperty('displayName');
+        expect(virtualFieldCalled).toBe(false);
+    });
+
+    it('propagates errors from virtual field functions', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    name String
+    problematic String @virtual
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        problematic: () => {
+                            throw new Error('Virtual field computation failed');
+                        },
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({
+            data: { id: 1, name: 'Alex' },
+        });
+
+        // The error should propagate
+        await expect(db.user.findUnique({ where: { id: 1 } })).rejects.toThrow(
+            'Virtual field computation failed',
+        );
+    });
 });

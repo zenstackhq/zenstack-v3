@@ -2555,6 +2555,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const computedFields = Object.values(modelDef.fields)
             .filter((f) => f.computed)
             .map((f) => f.name);
+        const virtualFields = Object.values(modelDef.fields)
+            .filter((f) => f.virtual)
+            .map((f) => f.name);
 
         const allFieldsSelected: string[] = [];
 
@@ -2574,8 +2577,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
         }
 
-        if (allFieldsSelected.some((f) => relationFields.includes(f) || computedFields.includes(f))) {
-            // relation or computed field selected, need read back
+        if (
+            allFieldsSelected.some(
+                (f) => relationFields.includes(f) || computedFields.includes(f) || virtualFields.includes(f),
+            )
+        ) {
+            // relation, computed, or virtual field selected - need read back
             return { needReadBack: true, selectedFields: undefined };
         } else {
             return { needReadBack: false, selectedFields: allFieldsSelected };

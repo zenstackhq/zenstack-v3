@@ -141,6 +141,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
 
         const virtualFieldNames = Object.keys(modelDef.virtualFields);
         const selectClause = args?.select;
+        const omitClause = args?.omit;
 
         // Build the context once for all virtual fields
         const context: VirtualFieldContext<Schema> = { auth };
@@ -149,6 +150,11 @@ export class ResultProcessor<Schema extends SchemaDef> {
             virtualFieldNames.map(async (fieldName) => {
                 // Skip if select clause exists and doesn't include this virtual field
                 if (selectClause && !selectClause[fieldName]) {
+                    return;
+                }
+
+                // Skip if omit clause includes this virtual field
+                if (omitClause?.[fieldName]) {
                     return;
                 }
 

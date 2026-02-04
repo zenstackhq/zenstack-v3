@@ -113,6 +113,9 @@ export class ResultProcessor<Schema extends SchemaDef> {
         }
     }
 
+    /**
+     * Extracts relation-specific args (select/omit/include) for nested processing.
+     * */
     private getRelationArgs(args: any, relationField: string): any {
         if (!args) {
             return undefined;
@@ -146,6 +149,9 @@ export class ResultProcessor<Schema extends SchemaDef> {
         return this.doProcessResult(relationData, fieldDef.type as GetModels<Schema>, args, auth);
     }
 
+    /**
+     * Computes virtual fields at runtime using functions from client options.
+     * */
     private async applyVirtualFields(data: any, model: GetModels<Schema>, args?: any, auth?: AuthType<Schema>) {
         if (!data || typeof data !== 'object') {
             return;

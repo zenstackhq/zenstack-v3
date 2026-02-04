@@ -456,7 +456,7 @@ function createModelCrudHandler(
                 }
                 let result: unknown;
                 if (r && postProcess) {
-                    result = resultProcessor.processResult(r, model, args);
+                    result = resultProcessor.processResult(r, model, args, client.$auth);
                 } else {
                     result = r ?? null;
                 }

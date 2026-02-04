@@ -623,6 +623,11 @@ attribute @json() @@@targetField([TypeDefField])
 attribute @computed()
 
 /**
+ * Marks a field to be virtual
+ */
+attribute @virtual()
+
+/**
  * Gets the current login user.
  */
 function auth(): Any {

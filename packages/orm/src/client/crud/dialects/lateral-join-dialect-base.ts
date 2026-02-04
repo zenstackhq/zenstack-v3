@@ -204,13 +204,13 @@ export abstract class LateralJoinDialectBase<Schema extends SchemaDef> extends B
         }
 
         if (payload === true || !payload.select) {
-            // select all scalar fields except for omitted
+            // select all scalar fields except for omitted and virtual
             const omit = typeof payload === 'object' ? payload.omit : undefined;
 
             Object.assign(
                 objArgs,
                 ...Object.entries(relationModelDef.fields)
-                    .filter(([, value]) => !value.relation)
+                    .filter(([, value]) => !value.relation && !value.virtual)
                     .filter(([name]) => !this.shouldOmitField(omit, relationModel, name))
                     .map(([field]) => ({
                         [field]: this.fieldRef(relationModel, field, relationModelAlias, false),
@@ -233,6 +233,9 @@ export abstract class LateralJoinDialectBase<Schema extends SchemaDef> extends B
                             return { [field]: subJson };
                         } else {
                             const fieldDef = requireField(this.schema, relationModel, field);
+                            if (fieldDef.virtual) {
+                                return null;
+                            }
                             const fieldValue = fieldDef.relation
                                 ? // reference the synthesized JSON field
                                   eb.ref(`${parentResultName}$${field}.$data`)
@@ -240,7 +243,8 @@ export abstract class LateralJoinDialectBase<Schema extends SchemaDef> extends B
                                   this.fieldRef(relationModel, field, relationModelAlias, false);
                             return { [field]: fieldValue };
                         }
-                    }),
+                    })
+                    .filter((v) => v !== null),
             );
         }
 

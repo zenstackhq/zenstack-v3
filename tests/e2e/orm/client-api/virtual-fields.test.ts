@@ -860,4 +860,158 @@ model User {
             }),
         ).rejects.toThrow(/unrecognized.*key|displayName/i);
     });
+
+    // Real-world schema test: E-commerce-like schema with practical virtual fields
+    it('works with real-world e-commerce schema', async () => {
+        const db = await createTestClient(
+            `
+// Represents a typical e-commerce application schema
+model User {
+    id String @id @default(cuid())
+    email String @unique
+    firstName String?
+    lastName String?
+    createdAt DateTime @default(now())
+    orders Order[]
+
+    // Virtual: computed display name for UI
+    displayName String @virtual
+}
+
+model Product {
+    id String @id @default(cuid())
+    name String
+    description String?
+    priceInCents Int
+    currency String @default("USD")
+    inStock Boolean @default(true)
+    orderItems OrderItem[]
+
+    // Virtual: formatted price for display (e.g., "$19.99")
+    formattedPrice String @virtual
+}
+
+model Order {
+    id String @id @default(cuid())
+    userId String
+    user User @relation(fields: [userId], references: [id])
+    status String @default("pending")
+    createdAt DateTime @default(now())
+    items OrderItem[]
+
+    // Virtual: order summary for listing views
+    orderSummary String @virtual
+}
+
+model OrderItem {
+    id String @id @default(cuid())
+    orderId String
+    order Order @relation(fields: [orderId], references: [id])
+    productId String
+    product Product @relation(fields: [productId], references: [id])
+    quantity Int
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        displayName: (row: any) => {
+                            if (row.firstName && row.lastName) {
+                                return `${row.firstName} ${row.lastName}`;
+                            }
+                            if (row.firstName) return row.firstName;
+                            return row.email?.split('@')[0] ?? 'Anonymous';
+                        },
+                    },
+                    Product: {
+                        formattedPrice: (row: any) => {
+                            const dollars = (row.priceInCents / 100).toFixed(2);
+                            const symbol = row.currency === 'EUR' ? '€' : '$';
+                            return `${symbol}${dollars}`;
+                        },
+                    },
+                    Order: {
+                        orderSummary: (row: any) => {
+                            const itemCount = row.items?.length ?? 0;
+                            const statusLabel = row.status === 'pending' ? 'Pending' : 'Completed';
+                            return `${statusLabel} - ${itemCount} item(s)`;
+                        },
+                    },
+                },
+            } as any,
+        );
+
+        // Create test data
+        const user = await db.user.create({
+            data: {
+                id: 'user-1',
+                email: 'john.doe@example.com',
+                firstName: 'John',
+                lastName: 'Doe',
+            },
+        });
+        expect(user.displayName).toBe('John Doe');
+
+        const product = await db.product.create({
+            data: {
+                id: 'prod-1',
+                name: 'TypeScript Handbook',
+                priceInCents: 2999,
+                currency: 'USD',
+            },
+        });
+        expect(product.formattedPrice).toBe('$29.99');
+
+        // Create order with items and verify virtual field with relation data
+        await db.order.create({
+            data: {
+                id: 'order-1',
+                userId: 'user-1',
+                status: 'pending',
+                items: {
+                    create: [{ id: 'item-1', productId: 'prod-1', quantity: 2 }],
+                },
+            },
+            select: { id: true },
+        });
+
+        // Query order with items included - virtual field should use relation data
+        const order = await db.order.findUnique({
+            where: { id: 'order-1' },
+            include: { items: true },
+        });
+        expect(order?.orderSummary).toBe('Pending - 1 item(s)');
+
+        // Query user with orders - nested virtual fields should work
+        const userWithOrders = await db.user.findUnique({
+            where: { id: 'user-1' },
+            include: {
+                orders: {
+                    include: { items: true },
+                },
+            },
+        });
+        expect(userWithOrders?.displayName).toBe('John Doe');
+        expect(userWithOrders?.orders[0]?.orderSummary).toBe('Pending - 1 item(s)');
+
+        // Test user with only email (no name) - fallback logic
+        const userEmailOnly = await db.user.create({
+            data: {
+                id: 'user-2',
+                email: 'anonymous@example.com',
+            },
+        });
+        expect(userEmailOnly.displayName).toBe('anonymous');
+
+        // Test product with EUR currency
+        const euroProduct = await db.product.create({
+            data: {
+                id: 'prod-2',
+                name: 'Euro Product',
+                priceInCents: 1999,
+                currency: 'EUR',
+            },
+        });
+        expect(euroProduct.formattedPrice).toBe('€19.99');
+    });
 });

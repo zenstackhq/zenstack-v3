@@ -32,6 +32,7 @@ export type ModelDef = {
     >;
     idFields: readonly string[];
     computedFields?: Record<string, Function>;
+    virtualFields?: Record<string, Function>;
     isDelegate?: boolean;
     subModels?: readonly string[];
     isView?: boolean;
@@ -77,6 +78,7 @@ export type FieldDef = {
     relation?: RelationInfo;
     foreignKeyFor?: readonly string[];
     computed?: boolean;
+    virtual?: boolean;
     originModel?: string;
     isDiscriminator?: boolean;
 };
@@ -205,7 +207,9 @@ export type ScalarFields<
             ? Key
             : FieldIsComputed<Schema, Model, Key> extends true
               ? never
-              : Key]: Key;
+              : FieldIsVirtual<Schema, Model, Key> extends true
+                ? never
+                : Key]: Key;
 };
 
 export type ForeignKeyFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
@@ -228,6 +232,20 @@ export type RelationFields<Schema extends SchemaDef, Model extends GetModels<Sch
     [Key in GetModelFields<Schema, Model> as GetModelField<Schema, Model, Key>['relation'] extends object
         ? Key
         : never]: Key;
+};
+
+export type NonVirtualFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
+    [Key in GetModelFields<Schema, Model> as GetModelField<Schema, Model, Key>['virtual'] extends true
+        ? never
+        : Key]: Key;
+};
+
+export type NonVirtualNonRelationFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
+    [Key in GetModelFields<Schema, Model> as GetModelField<Schema, Model, Key>['virtual'] extends true
+        ? never
+        : GetModelField<Schema, Model, Key>['relation'] extends object
+          ? never
+          : Key]: Key;
 };
 
 export type FieldType<
@@ -280,6 +298,12 @@ export type FieldIsComputed<
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,
 > = GetModelField<Schema, Model, Field>['computed'] extends true ? true : false;
+
+export type FieldIsVirtual<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends GetModelFields<Schema, Model>,
+> = GetModelField<Schema, Model, Field>['virtual'] extends true ? true : false;
 
 export type FieldHasDefault<
     Schema extends SchemaDef,

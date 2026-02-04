@@ -90,7 +90,9 @@ export class ResultProcessor<Schema extends SchemaDef> {
             }
 
             if (fieldDef.relation) {
-                data[key] = await this.processRelation(value, fieldDef, args, auth);
+                // Extract relation-specific args (select/omit/include) for nested processing
+                const relationArgs = this.getRelationArgs(args, key);
+                data[key] = await this.processRelation(value, fieldDef, relationArgs, auth);
             } else {
                 data[key] = this.processFieldValue(value, fieldDef);
             }
@@ -109,6 +111,26 @@ export class ResultProcessor<Schema extends SchemaDef> {
         } else {
             return this.dialect.transformOutput(value, type, !!fieldDef.array);
         }
+    }
+
+    private getRelationArgs(args: any, relationField: string): any {
+        if (!args) {
+            return undefined;
+        }
+
+        // Check include clause for relation-specific args
+        const includeArgs = args.include?.[relationField];
+        if (includeArgs && typeof includeArgs === 'object') {
+            return includeArgs;
+        }
+
+        // Check select clause for relation-specific args
+        const selectArgs = args.select?.[relationField];
+        if (selectArgs && typeof selectArgs === 'object') {
+            return selectArgs;
+        }
+
+        return undefined;
     }
 
     private async processRelation(value: unknown, fieldDef: FieldDef, args?: any, auth?: AuthType<Schema>) {

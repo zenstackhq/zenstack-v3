@@ -827,4 +827,37 @@ model Post {
         expect(post?.author).not.toHaveProperty('displayName');
         expect(virtualFieldCalled).toBe(false);
     });
+
+    it('rejects virtual fields in update data', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    name String
+    displayName String @virtual
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        displayName: (row: any) => `@${row.name}`,
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({
+            data: { id: 1, name: 'Alex' },
+            select: { id: true },
+        });
+
+        // Virtual fields should not be allowed in update data
+        // The validator should reject it as an unrecognized key
+        await expect(
+            db.user.update({
+                where: { id: 1 },
+                data: { displayName: 'should fail' } as any,
+            }),
+        ).rejects.toThrow(/unrecognized.*key|displayName/i);
+    });
 });

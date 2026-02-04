@@ -322,6 +322,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         parentAlias: string,
     ) {
         let result = query;
+        let hasNonVirtualField = false;
 
         for (const [field, payload] of Object.entries(selectOrInclude)) {
             if (!payload) {
@@ -330,6 +331,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             if (field === '_count') {
                 result = this.buildCountSelection(result, model, parentAlias, payload);
+                hasNonVirtualField = true;
                 continue;
             }
 
@@ -338,6 +340,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 // scalar field - skip virtual fields as they're computed at runtime
                 if (!fieldDef.virtual) {
                     result = this.dialect.buildSelectField(result, model, parentAlias, field);
+                    hasNonVirtualField = true;
                 }
             } else {
                 if (!fieldDef.array && !fieldDef.optional && payload.where) {
@@ -355,7 +358,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     //  regular relation
                     result = this.dialect.buildRelationSelection(result, model, field, parentAlias, payload);
                 }
+                hasNonVirtualField = true;
             }
+        }
+
+        if (!hasNonVirtualField) {
+            throw createInternalError('Cannot select only virtual fields', model);
         }
 
         return result;

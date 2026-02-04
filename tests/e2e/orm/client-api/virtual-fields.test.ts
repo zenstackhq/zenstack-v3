@@ -157,6 +157,39 @@ model User {
         expect(virtualFieldCalled).toBe(false);
     });
 
+    it('throws error when selecting only virtual fields', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    fullName String @virtual
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({
+            data: { id: 1, firstName: 'Alex', lastName: 'Smith' },
+            select: { id: true },
+        });
+
+        // Selecting only virtual fields should throw a clear error
+        await expect(
+            db.user.findUnique({
+                where: { id: 1 },
+                select: { fullName: true },
+            }),
+        ).rejects.toThrow(/cannot select only virtual fields/i);
+    });
+
     it('works with optional virtual fields', async () => {
         const db = await createTestClient(
             `

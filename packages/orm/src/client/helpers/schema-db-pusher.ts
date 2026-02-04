@@ -115,7 +115,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
             if (fieldDef.relation) {
                 table = this.addForeignKeyConstraint(table, modelDef.name, fieldName, fieldDef);
-            } else if (!this.isComputedField(fieldDef)) {
+            } else if (!this.isComputedField(fieldDef) && !this.isVirtualField(fieldDef)) {
                 table = this.createModelField(table, fieldDef, modelDef);
             }
         }
@@ -173,6 +173,10 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
     private isComputedField(fieldDef: FieldDef) {
         return fieldDef.attributes?.some((a) => a.name === '@computed');
+    }
+
+    private isVirtualField(fieldDef: FieldDef) {
+        return fieldDef.attributes?.some((a) => a.name === '@virtual');
     }
 
     private addPrimaryKeyConstraint(table: CreateTableBuilder<string, any>, modelDef: ModelDef) {

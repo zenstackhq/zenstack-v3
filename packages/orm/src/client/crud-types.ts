@@ -23,6 +23,8 @@ import type {
     GetTypeDefs,
     ModelFieldIsOptional,
     NonRelationFields,
+    NonVirtualFields,
+    NonVirtualNonRelationFields,
     ProcedureDef,
     RelationFields,
     RelationFieldType,
@@ -281,7 +283,8 @@ export type WhereInput<
     ScalarOnly extends boolean = false,
     WithAggregations extends boolean = false,
 > = {
-    [Key in GetModelFields<Schema, Model> as ScalarOnly extends true
+    // Use NonVirtualFields to exclude virtual fields - they are computed at runtime and cannot be filtered in the database
+    [Key in NonVirtualFields<Schema, Model> as ScalarOnly extends true
         ? Key extends RelationFields<Schema, Model>
             ? never
             : Key
@@ -755,7 +758,8 @@ export type OrderBy<
     WithRelation extends boolean,
     WithAggregation extends boolean,
 > = {
-    [Key in NonRelationFields<Schema, Model>]?: ModelFieldIsOptional<Schema, Model, Key> extends true
+    // Use NonVirtualNonRelationFields to exclude virtual fields - they are computed at runtime and cannot be sorted in the database
+    [Key in NonVirtualNonRelationFields<Schema, Model>]?: ModelFieldIsOptional<Schema, Model, Key> extends true
         ?
               | SortOrder
               | {

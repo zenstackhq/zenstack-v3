@@ -1236,7 +1236,7 @@ export class InputValidator<Schema extends SchemaDef> {
                 return;
             }
             const fieldDef = requireField(this.schema, model, field);
-            if (fieldDef.computed) {
+            if (fieldDef.computed || fieldDef.virtual) {
                 return;
             }
 

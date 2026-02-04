@@ -1306,9 +1306,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     // collect id field/values from the original filter
                     const idFields = requireIdFields(this.schema, model);
                     const filterIdValues: any = {};
+                    const whereRecord = combinedWhere as Record<string, unknown>;
                     for (const key of idFields) {
-                        if (combinedWhere[key] !== undefined && typeof combinedWhere[key] !== 'object') {
-                            filterIdValues[key] = combinedWhere[key];
+                        if (whereRecord[key] !== undefined && typeof whereRecord[key] !== 'object') {
+                            filterIdValues[key] = whereRecord[key];
                         }
                     }
 

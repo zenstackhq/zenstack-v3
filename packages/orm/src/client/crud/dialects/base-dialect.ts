@@ -1148,9 +1148,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             result = result.select((eb) => {
                 const jsonObject: Record<string, Expression<any>> = {};
                 for (const field of Object.keys(subModel.fields)) {
+                    const fieldDef = subModel.fields[field];
                     if (
                         isRelationField(this.schema, subModel.name, field) ||
-                        isInheritedField(this.schema, subModel.name, field)
+                        isInheritedField(this.schema, subModel.name, field) ||
+                        fieldDef?.virtual
                     ) {
                         continue;
                     }

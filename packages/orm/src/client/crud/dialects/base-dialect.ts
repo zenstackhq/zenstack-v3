@@ -1133,6 +1133,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             if (this.shouldOmitField(omit, model, field)) {
                 continue;
             }
+            // virtual fields don't exist in the database, skip them
+            const fieldDef = modelDef.fields[field];
+            if (fieldDef?.virtual) {
+                continue;
+            }
             result = this.buildSelectField(result, model, modelAlias, field);
         }
 

@@ -335,8 +335,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             const fieldDef = this.requireField(model, field);
             if (!fieldDef.relation) {
-                // scalar field
-                result = this.dialect.buildSelectField(result, model, parentAlias, field);
+                // scalar field - skip virtual fields as they're computed at runtime
+                if (!fieldDef.virtual) {
+                    result = this.dialect.buildSelectField(result, model, parentAlias, field);
+                }
             } else {
                 if (!fieldDef.array && !fieldDef.optional && payload.where) {
                     throw createInternalError(`Field "${field}" does not support filtering`, model);

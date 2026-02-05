@@ -17,6 +17,7 @@
         "@zenstackhq/cli": "workspace:*",
         "@zenstackhq/language": "workspace:*",
         "@zenstackhq/orm": "workspace:*",
+        "@zenstackhq/plugin-encryption": "workspace:*",
         "@zenstackhq/plugin-policy": "workspace:*",
         "@zenstackhq/schema": "workspace:*",
         "@zenstackhq/sdk": "workspace:*",

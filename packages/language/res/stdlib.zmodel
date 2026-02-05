@@ -669,3 +669,11 @@ attribute @meta(_ name: String, _ value: Any)
  * Marks an attribute as deprecated.
  */
 attribute @@@deprecated(_ message: String)
+
+/**
+ * Indicates that the field should be encrypted when storing in the database and decrypted when read.
+ * Only applicable to String fields. The encryption uses AES-256-GCM via the Web Crypto API.
+ *
+ * To use this attribute, you must configure encryption options when creating the ZenStackClient.
+ */
+attribute @encrypted() @@@targetField([StringField])

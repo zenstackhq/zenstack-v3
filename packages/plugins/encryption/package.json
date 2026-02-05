@@ -1,0 +1,48 @@
+{
+    "name": "@zenstackhq/plugin-encryption",
+    "version": "3.3.2",
+    "description": "ZenStack Encryption Plugin - Automatic field encryption/decryption for @encrypted fields",
+    "type": "module",
+    "scripts": {
+        "build": "tsc --noEmit && tsup-node",
+        "watch": "tsup-node --watch",
+        "lint": "eslint src --ext ts",
+        "pack": "pnpm pack"
+    },
+    "keywords": [
+        "zenstack",
+        "encryption",
+        "aes",
+        "crypto"
+    ],
+    "author": "ZenStack Team",
+    "license": "MIT",
+    "files": [
+        "dist"
+    ],
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        },
+        "./package.json": {
+            "import": "./package.json",
+            "require": "./package.json"
+        }
+    },
+    "dependencies": {
+        "@zenstackhq/orm": "workspace:*",
+        "zod": "catalog:"
+    },
+    "devDependencies": {
+        "@zenstackhq/eslint-config": "workspace:*",
+        "@zenstackhq/typescript-config": "workspace:*",
+        "@zenstackhq/vitest-config": "workspace:*"
+    }
+}

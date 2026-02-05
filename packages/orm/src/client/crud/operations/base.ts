@@ -363,7 +363,7 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         }
 
         if (!hasNonVirtualField) {
-            throw createInternalError('Cannot select only virtual fields', model);
+            throw createInvalidInputError('Cannot select only virtual fields', model);
         }
 
         return result;

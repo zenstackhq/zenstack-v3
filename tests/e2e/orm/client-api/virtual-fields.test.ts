@@ -381,10 +381,16 @@ async function main() {
     // @ts-expect-error - virtual field should not be allowed in _max
     await client.post.aggregate({ _max: { computedScore: true } });
 
+    // @ts-expect-error - virtual field should not be allowed in _sum
+    await client.post.aggregate({ _sum: { computedScore: true } });
+
+    // @ts-expect-error - virtual field should not be allowed in _avg
+    await client.post.aggregate({ _avg: { computedScore: true } });
+
     // Regular fields should still work in all these operations
     await client.post.groupBy({ by: ['title'] });
     await client.post.count({ select: { title: true } });
-    await client.post.aggregate({ _min: { views: true }, _max: { views: true } });
+    await client.post.aggregate({ _min: { views: true }, _max: { views: true }, _sum: { views: true }, _avg: { views: true } });
 }
 
 main();

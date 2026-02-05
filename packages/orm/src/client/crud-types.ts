@@ -1666,7 +1666,9 @@ type NumericFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = 
         | 'Decimal'
         ? FieldIsArray<Schema, Model, Key> extends true
             ? never
-            : Key
+            : FieldIsVirtual<Schema, Model, Key> extends true
+              ? never
+              : Key
         : never]: GetModelField<Schema, Model, Key>;
 };
 

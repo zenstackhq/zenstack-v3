@@ -1359,7 +1359,7 @@ type UpdateScalarInput<
     Without extends string = never,
 > = Omit<
     {
-        [Key in NonRelationFields<Schema, Model> as FieldIsDelegateDiscriminator<Schema, Model, Key> extends true
+        [Key in NonVirtualNonRelationFields<Schema, Model> as FieldIsDelegateDiscriminator<Schema, Model, Key> extends true
             ? // discriminator fields cannot be assigned
               never
             : Key]?: ScalarUpdatePayload<Schema, Model, Key>;
@@ -1370,7 +1370,7 @@ type UpdateScalarInput<
 type ScalarUpdatePayload<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends NonRelationFields<Schema, Model>,
+    Field extends NonVirtualNonRelationFields<Schema, Model>,
 > =
     | ScalarFieldMutationPayload<Schema, Model, Field>
     | (Field extends NumericFields<Schema, Model>

@@ -331,9 +331,17 @@ async function main() {
     // @ts-expect-error - virtual field should not be allowed in orderBy
     await client.post.findMany({ orderBy: { canEdit: 'asc' } });
 
+    // @ts-expect-error - virtual field should not be allowed in create data
+    await client.post.create({ data: { title: 'test', canEdit: true } });
+
+    // @ts-expect-error - virtual field should not be allowed in update data
+    await client.post.update({ where: { id: 1 }, data: { canEdit: false } });
+
     // Regular fields should still work
     await client.post.findMany({ where: { title: 'test' } });
     await client.post.findMany({ orderBy: { title: 'asc' } });
+    await client.post.create({ data: { title: 'test' } });
+    await client.post.update({ where: { id: 1 }, data: { title: 'updated' } });
 }
 
 main();

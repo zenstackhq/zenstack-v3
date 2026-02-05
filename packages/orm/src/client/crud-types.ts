@@ -8,6 +8,7 @@ import type {
     FieldIsDelegateDiscriminator,
     FieldIsDelegateRelation,
     FieldIsRelation,
+    FieldIsVirtual,
     FieldType,
     ForeignKeyFields,
     GetEnum,
@@ -1591,7 +1592,7 @@ export type CountArgs<Schema extends SchemaDef, Model extends GetModels<Schema>>
 };
 
 type CountAggregateInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in NonRelationFields<Schema, Model>]?: true;
+    [Key in NonVirtualNonRelationFields<Schema, Model>]?: true;
 } & { _all?: true };
 
 export type CountResult<Schema extends SchemaDef, _Model extends GetModels<Schema>, Args> = Args extends {
@@ -1678,7 +1679,9 @@ type MinMaxInput<Schema extends SchemaDef, Model extends GetModels<Schema>, Valu
         ? never
         : FieldIsRelation<Schema, Model, Key> extends true
           ? never
-          : Key]?: ValueType;
+          : FieldIsVirtual<Schema, Model, Key> extends true
+            ? never
+            : Key]?: ValueType;
 };
 
 export type AggregateResult<Schema extends SchemaDef, _Model extends GetModels<Schema>, Args> = (Args extends {
@@ -1755,7 +1758,7 @@ export type GroupByArgs<Schema extends SchemaDef, Model extends GetModels<Schema
     /**
      * Fields to group by
      */
-    by: NonRelationFields<Schema, Model> | NonEmptyArray<NonRelationFields<Schema, Model>>;
+    by: NonVirtualNonRelationFields<Schema, Model> | NonEmptyArray<NonVirtualNonRelationFields<Schema, Model>>;
 
     /**
      * Filter conditions for the grouped records

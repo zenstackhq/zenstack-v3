@@ -343,6 +343,57 @@ main();
         );
     });
 
+    it('virtual fields are excluded from groupBy and aggregate types', async () => {
+        await createTestClient(
+            `
+model Post {
+    id Int @id @default(autoincrement())
+    title String
+    views Int
+    computedScore Int @virtual
+}
+`,
+            {
+                extraSourceFiles: {
+                    main: `
+import { ZenStackClient } from '@zenstackhq/orm';
+import { schema } from './schema';
+
+async function main() {
+    const client = new ZenStackClient(schema, {
+        dialect: {} as any,
+        virtualFields: {
+            Post: {
+                computedScore: () => 100,
+            },
+        }
+    });
+
+    // @ts-expect-error - virtual field should not be allowed in groupBy.by
+    await client.post.groupBy({ by: ['computedScore'] });
+
+    // @ts-expect-error - virtual field should not be allowed in _count select
+    await client.post.count({ select: { computedScore: true } });
+
+    // @ts-expect-error - virtual field should not be allowed in _min
+    await client.post.aggregate({ _min: { computedScore: true } });
+
+    // @ts-expect-error - virtual field should not be allowed in _max
+    await client.post.aggregate({ _max: { computedScore: true } });
+
+    // Regular fields should still work in all these operations
+    await client.post.groupBy({ by: ['title'] });
+    await client.post.count({ select: { title: true } });
+    await client.post.aggregate({ _min: { views: true }, _max: { views: true } });
+}
+
+main();
+`,
+                },
+            },
+        );
+    });
+
     it('receives auth context in virtual field function', async () => {
         const db = await createTestClient(
             `

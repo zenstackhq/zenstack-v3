@@ -1482,7 +1482,7 @@ export class TsSchemaGenerator {
         const printer = ts.createPrinter();
         const enumsOutputFile = path.join(options.outDir, 'enums.ts');
 
-        if (enumStatements.length > 0) {
+        if (enums.length > 0) {
             this.generateBannerComments(enumStatements);
 
             const enumsSourceFile = ts.createSourceFile(enumsOutputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);

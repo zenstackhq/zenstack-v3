@@ -456,7 +456,7 @@ function createModelCrudHandler(
                 }
                 let result: unknown;
                 if (r && postProcess) {
-                    result = await resultProcessor.processResult(r, model, args, client);
+                    result = await resultProcessor.processResult(r, model, args, txClient ?? client);
                 } else {
                     result = r ?? null;
                 }

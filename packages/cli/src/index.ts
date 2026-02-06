@@ -156,12 +156,12 @@ function createProgram() {
         )
         .addOption(
             new Option('--model-casing <pascal|camel|snake|none>', 'set the casing of generated models').default(
-                'none',
+                'pascal',
             ),
         )
         .addOption(
             new Option('--field-casing <pascal|camel|snake|none>', 'set the casing of generated fields').default(
-                'none',
+                'camel',
             ),
         )
         .addOption(

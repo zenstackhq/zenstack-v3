@@ -95,7 +95,7 @@ export function syncEnums({
 export type Relation = {
     schema: string;
     table: string;
-    column: string;
+    columns: string[];
     type: 'one' | 'many';
     fk_name: string;
     foreign_key_on_update: Cascade;
@@ -104,7 +104,7 @@ export type Relation = {
     references: {
         schema: string | null;
         table: string | null;
-        column: string | null;
+        columns: (string | null)[];
         type: 'one' | 'many';
     };
 };
@@ -145,28 +145,42 @@ export function syncTable({
             builder.setDecl(tableMapAttribute).addArg((argBuilder) => argBuilder.StringLiteral.setValue(table.name)),
         );
     }
+    // Group FK columns by constraint name to handle composite foreign keys.
+    // Each FK constraint (identified by fk_name) may span multiple columns.
+    const fkGroups = new Map<string, typeof table.columns>();
     table.columns.forEach((column) => {
-        if (column.foreign_key_table) {
-            // Check if this FK column is the table's single-column primary key
-            // If so, it should be treated as a one-to-one relation
-            const isSingleColumnPk = !multiPk && column.pk;
-            relations.push({
-                schema: table.schema,
-                table: table.name,
-                column: column.name,
-                type: 'one',
-                fk_name: column.foreign_key_name!,
-                foreign_key_on_delete: column.foreign_key_on_delete,
-                foreign_key_on_update: column.foreign_key_on_update,
-                nullable: column.nullable,
-                references: {
-                    schema: column.foreign_key_schema,
-                    table: column.foreign_key_table,
-                    column: column.foreign_key_column,
-                    type: column.unique || isSingleColumnPk ? 'one' : 'many',
-                },
-            });
+        if (column.foreign_key_table && column.foreign_key_name) {
+            const group = fkGroups.get(column.foreign_key_name) ?? [];
+            group.push(column);
+            fkGroups.set(column.foreign_key_name, group);
         }
+    });
+
+    for (const [fkName, fkColumns] of fkGroups) {
+        const firstCol = fkColumns[0]!;
+        // For single-column FKs, check if the column is the table's single-column PK (one-to-one)
+        const isSingleColumnPk = fkColumns.length === 1 && !multiPk && firstCol.pk;
+        // A single-column FK with unique constraint means one-to-one on the opposite side
+        const isUniqueRelation = (fkColumns.length === 1 && firstCol.unique) || isSingleColumnPk;
+        relations.push({
+            schema: table.schema,
+            table: table.name,
+            columns: fkColumns.map((c) => c.name),
+            type: 'one',
+            fk_name: fkName,
+            foreign_key_on_delete: firstCol.foreign_key_on_delete,
+            foreign_key_on_update: firstCol.foreign_key_on_update,
+            nullable: firstCol.nullable,
+            references: {
+                schema: firstCol.foreign_key_schema,
+                table: firstCol.foreign_key_table,
+                columns: fkColumns.map((c) => c.foreign_key_column),
+                type: isUniqueRelation ? 'one' : 'many',
+            },
+        });
+    }
+
+    table.columns.forEach((column) => {
 
         const { name, modified } = resolveNameCasing(options.fieldCasing, column.name);
 
@@ -397,25 +411,39 @@ export function syncRelation({
         | undefined;
     if (!sourceModel) return;
 
-    const sourceFieldId = sourceModel.fields.findIndex((f) => getDbName(f) === relation.column);
-    const sourceField = sourceModel.fields[sourceFieldId] as DataField | undefined;
-    if (!sourceField) return;
+    // Resolve all source and target fields for the relation (supports composite FKs)
+    const sourceFields: { field: DataField; index: number }[] = [];
+    for (const colName of relation.columns) {
+        const idx = sourceModel.fields.findIndex((f) => getDbName(f) === colName);
+        const field = sourceModel.fields[idx] as DataField | undefined;
+        if (!field) return;
+        sourceFields.push({ field, index: idx });
+    }
 
     const targetModel = model.declarations.find(
         (d) => d.$type === 'DataModel' && getDbName(d) === relation.references.table,
     ) as DataModel | undefined;
     if (!targetModel) return;
 
-    const targetField = targetModel.fields.find((f) => getDbName(f) === relation.references.column);
-    if (!targetField) return;
+    const targetFields: DataField[] = [];
+    for (const colName of relation.references.columns) {
+        const field = targetModel.fields.find((f) => getDbName(f) === colName);
+        if (!field) return;
+        targetFields.push(field);
+    }
+
+    // Use the first source field for naming heuristics
+    const firstSourceField = sourceFields[0]!.field;
+    const firstSourceFieldId = sourceFields[0]!.index;
+    const firstColumn = relation.columns[0]!;
 
     const fieldPrefix = /[0-9]/g.test(sourceModel.name.charAt(0)) ? '_' : '';
 
-    const relationName = `${relation.table}${similarRelations > 0 ? `_${relation.column}` : ''}To${relation.references.table}`;
+    const relationName = `${relation.table}${similarRelations > 0 ? `_${firstColumn}` : ''}To${relation.references.table}`;
 
     // Derive a relation field name from the FK scalar field: if the field ends with "Id",
     // strip the suffix and use the remainder (e.g., "authorId" -> "author").
-    const sourceNameFromReference = sourceField.name.toLowerCase().endsWith('id') ? `${resolveNameCasing(options.fieldCasing, sourceField.name.slice(0, -2)).name}${relation.type === 'many'? 's' : ''}` : undefined;
+    const sourceNameFromReference = firstSourceField.name.toLowerCase().endsWith('id') ? `${resolveNameCasing(options.fieldCasing, firstSourceField.name.slice(0, -2)).name}${relation.type === 'many'? 's' : ''}` : undefined;
 
     // Check if the derived name would clash with an existing field
     const sourceFieldFromReference = sourceModel.fields.find((f) => f.name === sourceNameFromReference);
@@ -426,12 +454,12 @@ export function syncRelation({
     let { name: sourceFieldName } = resolveNameCasing(
         options.fieldCasing,
         similarRelations > 0
-            ? `${fieldPrefix}${lowerCaseFirst(sourceModel.name)}_${relation.column}`
+            ? `${fieldPrefix}${lowerCaseFirst(sourceModel.name)}_${firstColumn}`
             : `${(!sourceFieldFromReference? sourceNameFromReference : undefined) || lowerCaseFirst(resolveNameCasing(options.fieldCasing, targetModel.name).name)}${relation.type === 'many'? 's' : ''}`,
     );
 
     if (sourceModel.fields.find((f) => f.name === sourceFieldName)) {
-        sourceFieldName = `${sourceFieldName}To${lowerCaseFirst(targetModel.name)}_${relation.references.column}`;
+        sourceFieldName = `${sourceFieldName}To${lowerCaseFirst(targetModel.name)}_${relation.references.columns[0]}`;
     }
 
     const sourceFieldFactory = new DataFieldFactory()
@@ -446,10 +474,24 @@ export function syncRelation({
     sourceFieldFactory.addAttribute((ab) => {
         ab.setDecl(relationAttribute);
         if (includeRelationName) ab.addArg((ab) => ab.StringLiteral.setValue(relationName));
-        ab.addArg((ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(sourceField)), 'fields').addArg(
-            (ab) => ab.ArrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(targetField)),
-            'references',
-        );
+
+        // Build fields array (all source FK columns)
+        ab.addArg((ab) => {
+            const arrayExpr = ab.ArrayExpr;
+            for (const { field } of sourceFields) {
+                arrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(field));
+            }
+            return arrayExpr;
+        }, 'fields');
+
+        // Build references array (all target columns)
+        ab.addArg((ab) => {
+            const arrayExpr = ab.ArrayExpr;
+            for (const field of targetFields) {
+                arrayExpr.addItem((aeb) => aeb.ReferenceExpr.setTarget(field));
+            }
+            return arrayExpr;
+        }, 'references');
 
         // Prisma defaults: onDelete is SetNull for optional, Restrict for mandatory
         const onDeleteDefault = relation.nullable ? 'SET NULL' : 'RESTRICT';
@@ -474,18 +516,20 @@ export function syncRelation({
             ab.addArg((a) => a.ReferenceExpr.setTarget(enumFieldRef), 'onUpdate');
         }
 
-        if (relation.fk_name && relation.fk_name !== `${relation.table}_${relation.column}_fkey`) ab.addArg((ab) => ab.StringLiteral.setValue(relation.fk_name), 'map');
+        // Check if the FK constraint name differs from the default pattern
+        const defaultFkName = `${relation.table}_${relation.columns.join('_')}_fkey`;
+        if (relation.fk_name && relation.fk_name !== defaultFkName) ab.addArg((ab) => ab.StringLiteral.setValue(relation.fk_name), 'map');
 
         return ab;
     });
 
-    sourceModel.fields.splice(sourceFieldId, 0, sourceFieldFactory.node); // Insert the relation field before the FK scalar fie
+    sourceModel.fields.splice(firstSourceFieldId, 0, sourceFieldFactory.node); // Insert the relation field before the first FK scalar field
 
     const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : '';
     const { name: oppositeFieldName } = resolveNameCasing(
         options.fieldCasing,
         similarRelations > 0
-            ? `${oppositeFieldPrefix}${lowerCaseFirst(sourceModel.name)}_${relation.column}`
+            ? `${oppositeFieldPrefix}${lowerCaseFirst(sourceModel.name)}_${firstColumn}`
             : `${lowerCaseFirst(resolveNameCasing(options.fieldCasing, sourceModel.name).name)}${relation.references.type === 'many'? 's' : ''}`,
     );
 

@@ -176,7 +176,7 @@ export const postgresql: IntrospectionProvider = {
                 return { type: 'Unsupported' as const, isArray };
         }
     },
-    async introspect(connectionString: string, options: { schemas: string[] }): Promise<IntrospectedSchema> {
+    async introspect(connectionString: string, options: { schemas: string[]; modelCasing: 'pascal' | 'camel' | 'snake' | 'none' }): Promise<IntrospectedSchema> {
         const client = new Client({ connectionString });
         await client.connect();
 
@@ -523,9 +523,12 @@ SELECT
       -- pg_namespace for FK target: get the schema of the referenced table
       LEFT JOIN "pg_catalog"."pg_namespace" AS "fk_ns" ON "fk_ns"."oid" = "fk_cls"."relnamespace"
 
-      -- pg_attribute for FK target column: resolve the referenced column number to its name
+      -- pg_attribute for FK target column: resolve the referenced column number to its name.
+      -- Use array_position to correlate by position: find this source column's index in conkey,
+      -- then pick the referenced attnum at that same index from confkey.
+      -- This ensures composite FKs correctly map each source column to its corresponding target column.
       LEFT JOIN "pg_catalog"."pg_attribute" AS "fk_att" ON "fk_att"."attrelid" = "fk_cls"."oid"
-        AND "fk_att"."attnum" = ANY ("fk_con"."confkey")
+        AND "fk_att"."attnum" = "fk_con"."confkey"[array_position("fk_con"."conkey", "att"."attnum")]
 
       -- pg_attrdef: column defaults; adbin contains the internal expression, decoded via pg_get_expr()
       LEFT JOIN "pg_catalog"."pg_attrdef" AS "def" ON "def"."adrelid" = "cls"."oid" AND "def"."adnum" = "att"."attnum"

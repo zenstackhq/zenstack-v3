@@ -118,7 +118,7 @@ export const sqlite: IntrospectionProvider = {
         return undefined;
     },
 
-    async introspect(connectionString: string): Promise<IntrospectedSchema> {
+    async introspect(connectionString: string, _options: { schemas: string[]; modelCasing: 'pascal' | 'camel' | 'snake' | 'none' }): Promise<IntrospectedSchema> {
         const SQLite = (await import('better-sqlite3')).default;
         const db = new SQLite(connectionString, { readonly: true });
 

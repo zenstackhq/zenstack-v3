@@ -224,7 +224,7 @@ model User {
     id             Int      @id @default(autoincrement())
     email          String   @unique @map('email_address')
     name           String?  @default('Anonymous')
-    role           users_role     @default(USER)
+    role           UsersRole     @default(USER)
     profile        Profile?
     shared_profile Profile? @relation('shared')
     posts          Post[]
@@ -293,7 +293,7 @@ model PostTag {
     @@map('post_tags')
 }
 
-enum users_role {
+enum UsersRole {
     USER
     ADMIN
     MODERATOR
@@ -655,6 +655,81 @@ enum UserStatus {
         expect(restoredSchema).not.toContain('@db.DoublePrecision'); // double precision is default for Float
         expect(restoredSchema).not.toContain('@db.JsonB'); // jsonb is default for Json
         expect(restoredSchema).not.toContain('@db.ByteA'); // bytea is default for Bytes
+    });
+
+    it('should correctly map composite foreign key columns by position', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'postgresql') {
+            skip();
+            return;
+        }
+        // Composite FK: (tenantId, authorId) REFERENCES Tenant(tenantId, userId)
+        // The introspection must correlate by position, not match each source column
+        // to every target column. Without the fix, tenantId would incorrectly map to
+        // both tenantId AND userId in the target table.
+        const { workDir, schema } = await createProject(
+            `model Post {
+    id       Int    @id @default(autoincrement())
+    title    String
+    tenant   Tenant @relation(fields: [tenantId, authorId], references: [tenantId, userId], onDelete: Cascade)
+    tenantId Int
+    authorId Int
+
+    @@index([tenantId, authorId])
+}
+
+model Tenant {
+    tenantId Int
+    userId   Int
+    name     String
+    posts    Post[]
+
+    @@id([tenantId, userId])
+}`,
+            { provider: 'postgresql' },
+        );
+        runCli('db push', workDir);
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql' }));
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+        expect(restoredSchema).toEqual(schema);
+    });
+});
+
+describe('DB pull - MySQL specific features', () => {
+    it('should detect single-column unique indexes via STATISTICS', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'mysql') {
+            skip();
+            return;
+        }
+        // MySQL's COLUMN_KEY may not reliably reflect unique indexes in all cases.
+        // The introspection should also check INFORMATION_SCHEMA.STATISTICS for
+        // NON_UNIQUE = 0 single-column indexes to correctly detect uniqueness,
+        // so that the index-processing skip logic (which checks index.unique +
+        // single-column) doesn't cause a missing @unique attribute.
+        const { workDir, schema } = await createProject(
+            `model User {
+    id       Int     @id @default(autoincrement())
+    email    String  @unique
+    nickname String? @unique
+}`,
+            { provider: 'mysql' },
+        );
+        runCli('db push', workDir);
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+
+        // Pull from zero to test introspection detects unique columns correctly
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'mysql' }));
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+        expect(restoredSchema).toEqual(schema);
     });
 });
 

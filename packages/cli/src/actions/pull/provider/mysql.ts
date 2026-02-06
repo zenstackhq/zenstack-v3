@@ -3,6 +3,7 @@ import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
 import { getAttributeRef, getDbName, getFunctionRef, normalizeDecimalDefault, normalizeFloatDefault } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
 import { CliError } from '../../../cli-error';
+import { resolveNameCasing } from '../casing';
 
 // Note: We dynamically import mysql2 inside the async function to avoid
 // requiring it at module load time for environments that don't use MySQL.
@@ -114,7 +115,7 @@ export const mysql: IntrospectionProvider = {
                 return { type: 'longblob' };
         }
     },
-    async introspect(connectionString: string): Promise<IntrospectedSchema> {
+    async introspect(connectionString: string, options: { schemas: string[]; modelCasing: 'pascal' | 'camel' | 'snake' | 'none' }): Promise<IntrospectedSchema> {
         const mysql = await import('mysql2/promise');
         const connection = await mysql.createConnection(connectionString);
 
@@ -143,7 +144,15 @@ export const mysql: IntrospectionProvider = {
                 .sort(
                   (a: { ordinal_position?: number }, b: { ordinal_position?: number }) =>
                     (a.ordinal_position ?? 0) - (b.ordinal_position ?? 0)
-                );
+                )
+                .map((col: any) => {
+                    // MySQL enum datatype_name is synthetic (TableName_ColumnName).
+                    // Apply model casing so it matches the cased enum_type.
+                    if (col.datatype === 'enum' && col.datatype_name) {
+                        return { ...col, datatype_name: resolveNameCasing(options.modelCasing, col.datatype_name).name };
+                    }
+                    return col;
+                });
 
                 // Filter out auto-generated FK indexes (MySQL creates these automatically)
                 // Pattern: {Table}_{column}_fkey for single-column FK indexes
@@ -171,10 +180,14 @@ export const mysql: IntrospectionProvider = {
             const enums: IntrospectedEnum[] = enumRows.map((row) => {
                 // Parse enum values from column_type like "enum('val1','val2','val3')"
                 const values = parseEnumValues(row.column_type);
+                // MySQL doesn't have standalone enum types; the name is entirely
+                // synthetic (TableName_ColumnName). Apply model casing here so it
+                // arrives already cased — there is no raw DB name to @@map back to.
+                const syntheticName = `${row.table_name}_${row.column_name}`;
+                const { name } = resolveNameCasing(options.modelCasing, syntheticName);
                 return {
                     schema_name: '', // MySQL doesn't support multi-schema
-                    // Create a unique enum type name based on table and column
-                    enum_type: `${row.table_name}_${row.column_name}`,
+                    enum_type: name,
                     values,
                 };
             });
@@ -337,8 +350,53 @@ SELECT
                 END,
 
                 'pk', c.COLUMN_KEY = 'PRI',                -- true if column is part of the primary key
-                'unique', c.COLUMN_KEY = 'UNI',            -- true if column has a unique constraint
-                'unique_name', CASE WHEN c.COLUMN_KEY = 'UNI' THEN c.COLUMN_NAME ELSE NULL END,
+
+                -- unique: true if the column has a single-column unique index.
+                -- COLUMN_KEY = 'UNI' covers most cases, but may not be set when the column
+                -- also participates in other indexes (showing 'MUL' instead on some MySQL versions).
+                -- Also check INFORMATION_SCHEMA.STATISTICS for single-column unique indexes
+                -- (NON_UNIQUE = 0) to match the PostgreSQL introspection behavior.
+                'unique', (
+                    c.COLUMN_KEY = 'UNI'
+                    OR EXISTS (
+                        SELECT 1
+                        FROM INFORMATION_SCHEMA.STATISTICS s_uni
+                        WHERE s_uni.TABLE_SCHEMA = c.TABLE_SCHEMA
+                            AND s_uni.TABLE_NAME = c.TABLE_NAME
+                            AND s_uni.COLUMN_NAME = c.COLUMN_NAME
+                            AND s_uni.NON_UNIQUE = 0
+                            AND s_uni.INDEX_NAME != 'PRIMARY'
+                            AND (
+                                SELECT COUNT(*)
+                                FROM INFORMATION_SCHEMA.STATISTICS s_cnt
+                                WHERE s_cnt.TABLE_SCHEMA = s_uni.TABLE_SCHEMA
+                                    AND s_cnt.TABLE_NAME = s_uni.TABLE_NAME
+                                    AND s_cnt.INDEX_NAME = s_uni.INDEX_NAME
+                            ) = 1
+                    )
+                ),
+                'unique_name', (
+                    SELECT COALESCE(
+                        CASE WHEN c.COLUMN_KEY = 'UNI' THEN c.COLUMN_NAME ELSE NULL END,
+                        (
+                            SELECT s_uni.INDEX_NAME
+                            FROM INFORMATION_SCHEMA.STATISTICS s_uni
+                            WHERE s_uni.TABLE_SCHEMA = c.TABLE_SCHEMA
+                                AND s_uni.TABLE_NAME = c.TABLE_NAME
+                                AND s_uni.COLUMN_NAME = c.COLUMN_NAME
+                                AND s_uni.NON_UNIQUE = 0
+                                AND s_uni.INDEX_NAME != 'PRIMARY'
+                                AND (
+                                    SELECT COUNT(*)
+                                    FROM INFORMATION_SCHEMA.STATISTICS s_cnt
+                                    WHERE s_cnt.TABLE_SCHEMA = s_uni.TABLE_SCHEMA
+                                        AND s_cnt.TABLE_NAME = s_uni.TABLE_NAME
+                                        AND s_cnt.INDEX_NAME = s_uni.INDEX_NAME
+                                ) = 1
+                            LIMIT 1
+                        )
+                    )
+                ),
 
                 -- computed: true if column has a generation expression (virtual or stored)
                 'computed', c.GENERATION_EXPRESSION IS NOT NULL AND c.GENERATION_EXPRESSION != '',

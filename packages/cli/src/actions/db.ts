@@ -109,7 +109,7 @@ async function runPull(options: PullOptions) {
         }
 
         spinner.start('Introspecting database...');
-        const { enums, tables } = await provider.introspect(datasource.url, { schemas: datasource.allSchemas });
+        const { enums, tables } = await provider.introspect(datasource.url, { schemas: datasource.allSchemas, modelCasing: options.modelCasing });
         spinner.succeed('Database introspected');
 
         console.log(colors.blue('Syncing schema...'));
@@ -156,7 +156,7 @@ async function runPull(options: PullOptions) {
                         rr.references.schema === relation.references.schema &&
                         rr.references.table === relation.references.table) ||
                         (rr.schema === relation.references.schema &&
-                            rr.column === relation.references.column &&
+                            rr.columns[0] === relation.references.columns[0] &&
                             rr.references.schema === relation.schema &&
                             rr.references.table === relation.table))
                 );
@@ -263,10 +263,12 @@ async function runPull(options: PullOptions) {
                                 (d) => getDbName(d.node as any) === getDbName(f.type.reference!.ref as any),
                             )?.node;
                             if (ref && f.type.reference) {
-                                (f.type.reference.ref as any) = ref;
-                                // Keep the textual reference in sync with the semantic reference
-                                (f.type.reference as any).$refText =
-                                    (ref as any).name ?? (f.type.reference as any).$refText;
+                                // Replace the entire reference object — Langium References
+                                // from parsed documents expose `ref` as a getter-only property.
+                                (f.type as any).reference = {
+                                    ref,
+                                    $refText: (ref as any).name ?? (f.type.reference as any).$refText,
+                                };
                             }
                         }
                     });
@@ -356,8 +358,12 @@ async function runPull(options: PullOptions) {
                             const oldRefName = getDbName(oldType.reference.ref);
                             if (newRefName !== oldRefName) {
                                 fieldUpdates.push(`reference: ${oldType.reference.$refText} -> ${newType.reference.$refText}`);
-                                (oldType.reference as any).ref = newType.reference.ref;
-                                (oldType.reference as any).$refText = newType.reference.$refText;
+                                // Replace the entire reference object — Langium References
+                                // from parsed documents expose `ref` as a getter-only property.
+                                (oldType as any).reference = {
+                                    ref: newType.reference.ref,
+                                    $refText: newType.reference.$refText,
+                                };
                             }
                         } else if (newType.reference?.ref && !oldType.reference) {
                             // Changed from builtin to reference type
@@ -441,8 +447,12 @@ async function runPull(options: PullOptions) {
                                 (d) => getDbName(d.node as any) === getDbName(f.type.reference!.ref as any),
                             )?.node as DataModel | undefined;
                             if (ref) {
-                                (f.type.reference.$refText as any) = ref.name;
-                                (f.type.reference.ref as any) = ref;
+                                // Replace the entire reference object — Langium References
+                                // from parsed documents expose `ref` as a getter-only property.
+                                (f.type as any).reference = {
+                                    ref,
+                                    $refText: ref.name ?? (f.type.reference as any).$refText,
+                                };
                             }
                         }
                         return;

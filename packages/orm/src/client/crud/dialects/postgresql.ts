@@ -290,12 +290,13 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
         elemType?: string,
     ): AliasableExpression<SqlBool> {
         // PostgreSQL @> operator expects array on both sides, so wrap single value in a typed array
+        const arrayExpr = sql`ARRAY[${value}]`;
         if (elemType) {
             const mappedType = this.getSqlType(elemType);
-            const typedArray = this.eb.cast(sql`ARRAY[${value}]`, sql`${sql.raw(mappedType)}[]`);
+            const typedArray = this.eb.cast(arrayExpr, sql`${sql.raw(mappedType)}[]`);
             return this.eb(field, '@>', typedArray);
         } else {
-            return this.eb(field, '@>', sql`ARRAY[${value}]`);
+            return this.eb(field, '@>', arrayExpr);
         }
     }
 

@@ -733,6 +733,80 @@ describe('DB pull - MySQL specific features', () => {
     });
 });
 
+describe('DB pull - SQLite specific features', () => {
+    it('should restore composite foreign key relations', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'sqlite') {
+            skip();
+            return;
+        }
+        // Composite FK: (tenantId, authorId) REFERENCES Tenant(tenantId, userId).
+        // The SQLite introspection extracts FK constraint names by parsing the
+        // CREATE TABLE DDL. The current regex only captures a single column inside
+        // FOREIGN KEY(...), so composite FK constraint names are lost. Without a
+        // constraint name, the downstream relation grouping (pull/index.ts) skips
+        // the FK columns entirely and the relation is not restored.
+        const { workDir, schema } = await createProject(
+            `model Post {
+    id       Int    @id @default(autoincrement())
+    title    String
+    tenant   Tenant @relation(fields: [tenantId, authorId], references: [tenantId, userId], onDelete: Cascade)
+    tenantId Int
+    authorId Int
+
+    @@index([tenantId, authorId])
+}
+
+model Tenant {
+    tenantId Int
+    userId   Int
+    name     String
+    posts    Post[]
+
+    @@id([tenantId, userId])
+}`,
+        );
+        runCli('db push', workDir);
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+
+        fs.writeFileSync(schemaFile, getDefaultPrelude());
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+        expect(restoredSchema).toEqual(schema);
+    });
+
+    it('should map columns without a declared type to Bytes', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'sqlite') {
+            skip();
+            return;
+        }
+        // Create a minimal project and push to get the database file.
+        const { workDir } = await createProject("");
+
+        // Open the SQLite database directly and add a table with an untyped column.
+        // In SQLite, CREATE TABLE t("data") gives column "data" no declared type,
+        // which per affinity rules means BLOB affinity — should map to Bytes.
+        const dbPath = path.join(workDir, 'zenstack', 'test.db');
+        const SQLite = (await import('better-sqlite3')).default;
+        const db = new SQLite(dbPath);
+        db.exec('CREATE TABLE "UntypedTest" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "data")');
+        db.close();
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+        fs.writeFileSync(schemaFile, getDefaultPrelude());
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+        // The untyped "data" column should be pulled as Bytes (BLOB affinity),
+        // not as Unsupported.
+        expect(restoredSchema).toContain('data Bytes?');
+        expect(restoredSchema).not.toContain('Unsupported');
+    });
+});
+
 describe('DB pull - SQL specific features', () => {
     it('should restore enum fields from zero', async ({ skip }) => {
         const provider = getTestDbProvider();

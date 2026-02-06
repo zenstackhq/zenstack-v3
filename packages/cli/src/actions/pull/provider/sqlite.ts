@@ -95,6 +95,10 @@ export const sqlite: IntrospectionProvider = {
                 return { type: 'Boolean', isArray };
 
             default: {
+                // SQLite affinity rule #3: columns with no declared type have BLOB affinity
+                if (!t) {
+                    return { type: 'Bytes', isArray };
+                }
                 // Fallback: Use SQLite affinity rules for unknown types
                 if (t.includes('int')) {
                     return { type: 'Int', isArray };
@@ -234,21 +238,29 @@ export const sqlite: IntrospectionProvider = {
                     on_delete: any;
                 }>(`PRAGMA foreign_key_list('${tableName.replace(/'/g, "''")}')`);
 
-                // Extract FK constraint names from CREATE TABLE statement
-                // Pattern: CONSTRAINT "name" FOREIGN KEY("column") or CONSTRAINT name FOREIGN KEY(column)
+                // Extract FK constraint names from CREATE TABLE statement.
+                // Captures the constraint name and the full parenthesized column list from
+                // FOREIGN KEY(...), then splits and parses individual column names so that
+                // composite FKs (e.g., FOREIGN KEY("col1", "col2")) are handled correctly.
                 const fkConstraintNames = new Map<string, string>();
                 if (t.definition) {
-                    // Match: CONSTRAINT "name" FOREIGN KEY("col") or CONSTRAINT name FOREIGN KEY(col)
-                    // Use [^"'`]+ for quoted names to capture full identifier including underscores and other chars
-                    const fkRegex = /CONSTRAINT\s+(?:["'`]([^"'`]+)["'`]|(\w+))\s+FOREIGN\s+KEY\s*\(\s*(?:["'`]([^"'`]+)["'`]|(\w+))\s*\)/gi;
+                    // Match: CONSTRAINT "name" FOREIGN KEY(<column list>)
+                    // Group 1/2: quoted/unquoted constraint name
+                    // Group 3: the full content inside FOREIGN KEY(...)
+                    const fkRegex = /CONSTRAINT\s+(?:["'`]([^"'`]+)["'`]|(\w+))\s+FOREIGN\s+KEY\s*\(([^)]+)\)/gi;
                     let match;
                     while ((match = fkRegex.exec(t.definition)) !== null) {
-                        // match[1] = quoted constraint name, match[2] = unquoted constraint name
-                        // match[3] = quoted column name, match[4] = unquoted column name
                         const constraintName = match[1] || match[2];
-                        const columnName = match[3] || match[4];
-                        if (constraintName && columnName) {
-                            fkConstraintNames.set(columnName, constraintName);
+                        const columnList = match[3];
+                        if (constraintName && columnList) {
+                            // Split the column list on commas and strip quotes/whitespace
+                            // to extract each individual column name.
+                            const columns = columnList.split(',').map((col) => col.trim().replace(/^["'`]|["'`]$/g, ''));
+                            for (const col of columns) {
+                                if (col) {
+                                    fkConstraintNames.set(col, constraintName);
+                                }
+                            }
                         }
                     }
                 }

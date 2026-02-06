@@ -625,7 +625,6 @@ async function runPull(options: PullOptions) {
 
                 // Preserve the directory structure relative to the schema file location (options.schema base).
                 const baseDir = path.dirname(path.resolve(schemaFile));
-                const baseDirUrlPath = new URL(`file://${baseDir}`).pathname;
 
                 for (const {
                     uri,
@@ -634,14 +633,8 @@ async function runPull(options: PullOptions) {
                     const zmodelSchema = await formatDocument(generator.generate(documentModel));
 
                     // Map input file path -> output file path under `--out`
-                    let relPath = uri.path;
-                    if (relPath.toLowerCase().startsWith(baseDirUrlPath.toLowerCase())) {
-                        relPath = relPath.slice(baseDirUrlPath.length);
-                    }
-                    relPath = relPath.replace(/^\/+/, '');
-
-                    // Ensure consistent platform-specific separators for filesystem writes
-                    const targetFile = path.join(outPath!, ...relPath.split('/'));
+                    const relPath = path.relative(baseDir, uri.fsPath);
+                    const targetFile = path.join(outPath!, relPath);
 
                     fs.mkdirSync(path.dirname(targetFile), { recursive: true });
                     console.log(colors.blue(`Writing to ${targetFile}`));

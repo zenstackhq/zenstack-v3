@@ -320,7 +320,7 @@ async function loadPluginModule(provider: string, basePath: string) {
 
 async function checkForMismatchedPackages(projectPath: string) {
     const packages = await getZenStackPackages(projectPath);
-    if (!packages) {
+    if (!packages.length) {
         return false;
     }
 

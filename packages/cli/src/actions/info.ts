@@ -6,7 +6,7 @@ import { getZenStackPackages } from './action-utils';
  */
 export async function run(projectPath: string) {
     const packages = await getZenStackPackages(projectPath);
-    if (!packages) {
+    if (!packages.length) {
         console.error('Unable to locate package.json. Are you in a valid project directory?');
         return;
     }

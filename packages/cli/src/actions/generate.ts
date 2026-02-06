@@ -340,7 +340,7 @@ async function checkForMismatchedPackages(projectPath: string) {
         const slashes = '/'.repeat(73);
         const latestVersion = semver.sort(Array.from(versions)).reverse()[0]!;
 
-        console.warn(colors.yellow(`${slashes}\n\t${message}\n`));
+        console.warn(colors.yellow(`${slashes}\n\n\t${message}\n`));
         for (const { pkg, version } of packages) {
             if (!version) continue;
 

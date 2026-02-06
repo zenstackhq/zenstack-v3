@@ -10,12 +10,14 @@ model User {
     firstName String
     lastName String
     fullName String @virtual
+    initials String @virtual
 }
 `,
             {
                 virtualFields: {
                     User: {
-                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
+                        initials: ({ row }: any) => `${row.firstName[0]}${row.lastName[0]}`.toUpperCase(),
                     },
                 },
             } as any,
@@ -27,6 +29,7 @@ model User {
             }),
         ).resolves.toMatchObject({
             fullName: 'Alex Smith',
+            initials: 'AS',
         });
 
         await expect(
@@ -35,6 +38,7 @@ model User {
             }),
         ).resolves.toMatchObject({
             fullName: 'Alex Smith',
+            initials: 'AS',
         });
 
         await expect(
@@ -42,6 +46,7 @@ model User {
         ).resolves.toEqual([
             expect.objectContaining({
                 fullName: 'Alex Smith',
+                initials: 'AS',
             }),
         ]);
     });
@@ -58,7 +63,7 @@ model Blob {
             {
                 virtualFields: {
                     Blob: {
-                        sasUrl: async (row: any) => {
+                        sasUrl: async ({ row }: any) => {
                             // Simulate async operation (e.g., generating SAS token)
                             await new Promise((resolve) => setTimeout(resolve, 10));
                             return `https://storage.example.com/${row.blobName}?sas=token123`;
@@ -85,23 +90,30 @@ model User {
     firstName String
     lastName String
     fullName String @virtual
+    posts Post[]
+}
+
+model Post {
+    id Int @id @default(autoincrement())
+    title String
+    author User @relation(fields: [authorId], references: [id])
+    authorId Int
 }
 `,
             {
                 virtualFields: {
                     User: {
-                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
                     },
                 },
             } as any,
         );
 
         await db.user.create({
-            data: { id: 1, firstName: 'Alex', lastName: 'Smith' },
+            data: { id: 1, firstName: 'Alex', lastName: 'Smith', posts: { create: { title: 'Post1' } } },
         });
 
-        // When selecting the virtual field explicitly, it should be computed
-        // Note: User must select the fields that the virtual field depends on
+        // Top-level select includes virtual field
         await expect(
             db.user.findUnique({
                 where: { id: 1 },
@@ -111,6 +123,17 @@ model User {
             id: 1,
             fullName: 'Alex Smith',
         });
+
+        // Nested select includes virtual field in relation
+        const post = await db.post.findFirst({
+            select: {
+                title: true,
+                author: {
+                    select: { firstName: true, lastName: true, fullName: true },
+                },
+            },
+        });
+        expect(post?.author?.fullName).toBe('Alex Smith');
     });
 
     it('respects select clause - skips virtual field when not selected', async () => {
@@ -128,7 +151,7 @@ model User {
             {
                 virtualFields: {
                     User: {
-                        fullName: (row: any) => {
+                        fullName: ({ row }: any) => {
                             virtualFieldCalled = true;
                             return `${row.firstName} ${row.lastName}`;
                         },
@@ -170,7 +193,7 @@ model User {
             {
                 virtualFields: {
                     User: {
-                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
                     },
                 },
             } as any,
@@ -237,7 +260,7 @@ model Post {
             {
                 virtualFields: {
                     User: {
-                        displayName: (row: any) => `@${row.name}`,
+                        displayName: ({ row }: any) => `@${row.name}`,
                     },
                 },
             } as any,
@@ -276,7 +299,7 @@ async function main() {
         dialect: {} as any,
         virtualFields: {
             User: {
-                displayName: (row) => \`@\${row.name}\`,
+                displayName: ({ row }) => \`@\${row.name}\`,
             },
         }
     });
@@ -414,11 +437,13 @@ main();
 model User {
     id Int @id @default(autoincrement())
     name String
+    posts Post[]
 }
 
 model Post {
     id Int @id @default(autoincrement())
     title String
+    author User @relation(fields: [authorId], references: [id])
     authorId Int
     canEdit Boolean @virtual
 }
@@ -426,18 +451,17 @@ model Post {
             {
                 virtualFields: {
                     Post: {
-                        canEdit: (row: any, { auth }: any) => {
+                        canEdit: ({ row, client }: any) => {
                             // User can edit if they are the author
-                            return auth?.id === row.authorId;
+                            return client?.$auth?.id === row.authorId;
                         },
                     },
                 },
             } as any,
         );
 
-        // Create a post
-        await db.post.create({
-            data: { id: 1, title: 'My Post', authorId: 1 },
+        await db.user.create({
+            data: { id: 1, name: 'Alex', posts: { create: { id: 1, title: 'My Post' } } },
         });
 
         // Without auth, canEdit should be false
@@ -453,59 +477,19 @@ model Post {
         const dbWithOtherAuth = db.$setAuth({ id: 2 });
         const postWithOtherAuth = await dbWithOtherAuth.post.findUnique({ where: { id: 1 } });
         expect(postWithOtherAuth?.canEdit).toBe(false);
-    });
 
-    it('auth context works with nested relations', async () => {
-        const db = await createTestClient(
-            `
-model User {
-    id Int @id @default(autoincrement())
-    name String
-    posts Post[]
-}
-
-model Post {
-    id Int @id @default(autoincrement())
-    title String
-    author User @relation(fields: [authorId], references: [id])
-    authorId Int
-    isOwnPost Boolean @virtual
-}
-`,
-            {
-                virtualFields: {
-                    Post: {
-                        isOwnPost: (row: any, { auth }: any) => auth?.id === row.authorId,
-                    },
-                },
-            } as any,
-        );
-
-        await db.user.create({
-            data: {
-                id: 1,
-                name: 'Alex',
-                posts: { create: { id: 1, title: 'Post1' } },
-            },
-        });
-
-        // Query posts through user relation with auth set
-        const dbWithAuth = db.$setAuth({ id: 1 });
+        // Auth context works through nested relations
         const user = await dbWithAuth.user.findUnique({
             where: { id: 1 },
             include: { posts: true },
         });
+        expect(user?.posts[0]?.canEdit).toBe(true);
 
-        expect(user?.posts[0]?.isOwnPost).toBe(true);
-
-        // With different auth
-        const dbWithOtherAuth = db.$setAuth({ id: 2 });
         const userOther = await dbWithOtherAuth.user.findUnique({
             where: { id: 1 },
             include: { posts: true },
         });
-
-        expect(userOther?.posts[0]?.isOwnPost).toBe(false);
+        expect(userOther?.posts[0]?.canEdit).toBe(false);
     });
 
     it('works with relations and virtual fields on PostgreSQL (lateral join dialect)', async () => {
@@ -532,7 +516,7 @@ model Post {
                 provider: 'postgresql',
                 virtualFields: {
                     User: {
-                        displayName: (row: any) => `@${row.name}`,
+                        displayName: ({ row }: any) => `@${row.name}`,
                     },
                 },
             } as any,
@@ -577,7 +561,7 @@ model Post extends Content {
             {
                 virtualFields: {
                     Post: {
-                        preview: (row: any) => row.body?.substring(0, 50) ?? '',
+                        preview: ({ row }: any) => row.body?.substring(0, 50) ?? '',
                     },
                 },
             } as any,
@@ -613,7 +597,7 @@ model User {
             {
                 virtualFields: {
                     User: {
-                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
                     },
                 },
             } as any,
@@ -645,7 +629,7 @@ model User {
             {
                 virtualFields: {
                     User: {
-                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
                     },
                 },
             } as any,
@@ -668,39 +652,6 @@ model User {
         });
 
         expect(updated.fullName).toBe('John Smith');
-    });
-
-    it('works with multiple virtual fields on same model', async () => {
-        const db = await createTestClient(
-            `
-model User {
-    id Int @id @default(autoincrement())
-    firstName String
-    lastName String
-    email String
-    fullName String @virtual
-    displayEmail String @virtual
-    initials String @virtual
-}
-`,
-            {
-                virtualFields: {
-                    User: {
-                        fullName: (row: any) => `${row.firstName} ${row.lastName}`,
-                        displayEmail: (row: any) => row.email.toLowerCase(),
-                        initials: (row: any) => `${row.firstName[0]}${row.lastName[0]}`.toUpperCase(),
-                    },
-                },
-            } as any,
-        );
-
-        const user = await db.user.create({
-            data: { id: 1, firstName: 'Alex', lastName: 'Smith', email: 'ALEX@EXAMPLE.COM' },
-        });
-
-        expect(user.fullName).toBe('Alex Smith');
-        expect(user.displayEmail).toBe('alex@example.com');
-        expect(user.initials).toBe('AS');
     });
 
     // Note: MySQL lateral join dialect is tested via PostgreSQL test since both use the same
@@ -726,7 +677,7 @@ model Post {
             {
                 virtualFields: {
                     Post: {
-                        authorDisplay: (row: any) => {
+                        authorDisplay: ({ row }: any) => {
                             // Virtual field can access included relation data
                             if (row.author) {
                                 return `by ${row.author.name}`;
@@ -762,12 +713,20 @@ model User {
     id Int @id @default(autoincrement())
     name String
     displayName String @virtual
+    posts Post[]
+}
+
+model Post {
+    id Int @id @default(autoincrement())
+    title String
+    author User @relation(fields: [authorId], references: [id])
+    authorId Int
 }
 `,
             {
                 virtualFields: {
                     User: {
-                        displayName: (row: any) => {
+                        displayName: ({ row }: any) => {
                             virtualFieldCalled = true;
                             return `@${row.name}`;
                         },
@@ -777,12 +736,12 @@ model User {
         );
 
         await db.user.create({
-            data: { id: 1, name: 'Alex' },
+            data: { id: 1, name: 'Alex', posts: { create: { title: 'Post1' } } },
         });
 
         virtualFieldCalled = false;
 
-        // When omitting the virtual field, it should NOT be computed
+        // Top-level omit skips virtual field
         const result = await db.user.findUnique({
             where: { id: 1 },
             omit: { displayName: true },
@@ -790,6 +749,18 @@ model User {
 
         expect(result).toMatchObject({ id: 1, name: 'Alex' });
         expect(result).not.toHaveProperty('displayName');
+        expect(virtualFieldCalled).toBe(false);
+
+        // Nested omit skips virtual field in relation
+        const post = await db.post.findFirst({
+            include: {
+                author: {
+                    omit: { displayName: true },
+                },
+            },
+        });
+
+        expect(post?.author).not.toHaveProperty('displayName');
         expect(virtualFieldCalled).toBe(false);
     });
 
@@ -825,107 +796,6 @@ model User {
         );
     });
 
-    it('respects nested select clause for virtual fields in relations', async () => {
-        let virtualFieldCalled = false;
-
-        const db = await createTestClient(
-            `
-model User {
-    id Int @id @default(autoincrement())
-    name String
-    displayName String @virtual
-    posts Post[]
-}
-
-model Post {
-    id Int @id @default(autoincrement())
-    title String
-    author User @relation(fields: [authorId], references: [id])
-    authorId Int
-}
-`,
-            {
-                virtualFields: {
-                    User: {
-                        displayName: (row: any) => {
-                            virtualFieldCalled = true;
-                            return `@${row.name}`;
-                        },
-                    },
-                },
-            } as any,
-        );
-
-        await db.user.create({
-            data: { id: 1, name: 'alex', posts: { create: { title: 'Post1' } } },
-        });
-
-        virtualFieldCalled = false;
-
-        // When nested select includes the virtual field, it should be computed
-        const post = await db.post.findFirst({
-            select: {
-                title: true,
-                author: {
-                    select: { name: true, displayName: true },
-                },
-            },
-        });
-
-        expect(post?.author?.displayName).toBe('@alex');
-        expect(virtualFieldCalled).toBe(true);
-    });
-
-    it('respects nested omit clause for virtual fields in relations', async () => {
-        let virtualFieldCalled = false;
-
-        const db = await createTestClient(
-            `
-model User {
-    id Int @id @default(autoincrement())
-    name String
-    displayName String @virtual
-    posts Post[]
-}
-
-model Post {
-    id Int @id @default(autoincrement())
-    title String
-    author User @relation(fields: [authorId], references: [id])
-    authorId Int
-}
-`,
-            {
-                virtualFields: {
-                    User: {
-                        displayName: (row: any) => {
-                            virtualFieldCalled = true;
-                            return `@${row.name}`;
-                        },
-                    },
-                },
-            } as any,
-        );
-
-        await db.user.create({
-            data: { id: 1, name: 'alex', posts: { create: { title: 'Post1' } } },
-        });
-
-        virtualFieldCalled = false;
-
-        // When nested omit excludes the virtual field, it should NOT be computed
-        const post = await db.post.findFirst({
-            include: {
-                author: {
-                    omit: { displayName: true },
-                },
-            },
-        });
-
-        expect(post?.author).not.toHaveProperty('displayName');
-        expect(virtualFieldCalled).toBe(false);
-    });
-
     it('rejects virtual fields in update data', async () => {
         const db = await createTestClient(
             `
@@ -938,7 +808,7 @@ model User {
             {
                 virtualFields: {
                     User: {
-                        displayName: (row: any) => `@${row.name}`,
+                        displayName: ({ row }: any) => `@${row.name}`,
                     },
                 },
             } as any,
@@ -959,157 +829,34 @@ model User {
         ).rejects.toThrow(/unrecognized.*key|displayName/i);
     });
 
-    // Real-world schema test: E-commerce-like schema with practical virtual fields
-    it('works with real-world e-commerce schema', async () => {
+    it('works with findMany returning multiple rows', async () => {
         const db = await createTestClient(
             `
-// Represents a typical e-commerce application schema
 model User {
-    id String @id @default(cuid())
-    email String @unique
-    firstName String?
-    lastName String?
-    createdAt DateTime @default(now())
-    orders Order[]
-
-    // Virtual: computed display name for UI
-    displayName String @virtual
-}
-
-model Product {
-    id String @id @default(cuid())
-    name String
-    description String?
-    priceInCents Int
-    currency String @default("USD")
-    inStock Boolean @default(true)
-    orderItems OrderItem[]
-
-    // Virtual: formatted price for display (e.g., "$19.99")
-    formattedPrice String @virtual
-}
-
-model Order {
-    id String @id @default(cuid())
-    userId String
-    user User @relation(fields: [userId], references: [id])
-    status String @default("pending")
-    createdAt DateTime @default(now())
-    items OrderItem[]
-
-    // Virtual: order summary for listing views
-    orderSummary String @virtual
-}
-
-model OrderItem {
-    id String @id @default(cuid())
-    orderId String
-    order Order @relation(fields: [orderId], references: [id])
-    productId String
-    product Product @relation(fields: [productId], references: [id])
-    quantity Int
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    fullName String @virtual
 }
 `,
             {
                 virtualFields: {
                     User: {
-                        displayName: (row: any) => {
-                            if (row.firstName && row.lastName) {
-                                return `${row.firstName} ${row.lastName}`;
-                            }
-                            if (row.firstName) return row.firstName;
-                            return row.email?.split('@')[0] ?? 'Anonymous';
-                        },
-                    },
-                    Product: {
-                        formattedPrice: (row: any) => {
-                            const dollars = (row.priceInCents / 100).toFixed(2);
-                            const symbol = row.currency === 'EUR' ? '€' : '$';
-                            return `${symbol}${dollars}`;
-                        },
-                    },
-                    Order: {
-                        orderSummary: (row: any) => {
-                            const itemCount = row.items?.length ?? 0;
-                            const statusLabel = row.status === 'pending' ? 'Pending' : 'Completed';
-                            return `${statusLabel} - ${itemCount} item(s)`;
-                        },
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
                     },
                 },
             } as any,
         );
 
-        // Create test data
-        const user = await db.user.create({
-            data: {
-                id: 'user-1',
-                email: 'john.doe@example.com',
-                firstName: 'John',
-                lastName: 'Doe',
-            },
-        });
-        expect(user.displayName).toBe('John Doe');
+        await db.user.create({ data: { id: 1, firstName: 'Alex', lastName: 'Smith' } });
+        await db.user.create({ data: { id: 2, firstName: 'Jane', lastName: 'Doe' } });
+        await db.user.create({ data: { id: 3, firstName: 'Bob', lastName: 'Jones' } });
 
-        const product = await db.product.create({
-            data: {
-                id: 'prod-1',
-                name: 'TypeScript Handbook',
-                priceInCents: 2999,
-                currency: 'USD',
-            },
-        });
-        expect(product.formattedPrice).toBe('$29.99');
+        const users = await db.user.findMany({ orderBy: { id: 'asc' } });
 
-        // Create order with items and verify virtual field with relation data
-        await db.order.create({
-            data: {
-                id: 'order-1',
-                userId: 'user-1',
-                status: 'pending',
-                items: {
-                    create: [{ id: 'item-1', productId: 'prod-1', quantity: 2 }],
-                },
-            },
-            select: { id: true },
-        });
-
-        // Query order with items included - virtual field should use relation data
-        const order = await db.order.findUnique({
-            where: { id: 'order-1' },
-            include: { items: true },
-        });
-        expect(order?.orderSummary).toBe('Pending - 1 item(s)');
-
-        // Query user with orders - nested virtual fields should work
-        const userWithOrders = await db.user.findUnique({
-            where: { id: 'user-1' },
-            include: {
-                orders: {
-                    include: { items: true },
-                },
-            },
-        });
-        expect(userWithOrders?.displayName).toBe('John Doe');
-        expect(userWithOrders?.orders[0]?.orderSummary).toBe('Pending - 1 item(s)');
-
-        // Test user with only email (no name) - fallback logic
-        const userEmailOnly = await db.user.create({
-            data: {
-                id: 'user-2',
-                email: 'anonymous@example.com',
-            },
-        });
-        expect(userEmailOnly.displayName).toBe('anonymous');
-
-        // Test product with EUR currency
-        const euroProduct = await db.product.create({
-            data: {
-                id: 'prod-2',
-                name: 'Euro Product',
-                priceInCents: 1999,
-                currency: 'EUR',
-            },
-        });
-        expect(euroProduct.formattedPrice).toBe('€19.99');
+        expect(users).toHaveLength(3);
+        expect(users[0].fullName).toBe('Alex Smith');
+        expect(users[1].fullName).toBe('Jane Doe');
+        expect(users[2].fullName).toBe('Bob Jones');
     });
 });

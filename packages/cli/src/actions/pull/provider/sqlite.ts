@@ -165,7 +165,7 @@ export const sqlite: IntrospectionProvider = {
 
                 // PRAGMA table_xinfo: extended version of table_info that also includes hidden/generated columns.
                 // Returns one row per column with: cid (column index), name, type, notnull, dflt_value, pk.
-                // hidden: 0 = normal, 1 = hidden (virtual table), 2 = generated stored, 3 = generated virtual.
+                // hidden: 0 = normal, 1 = hidden (virtual table), 2 = generated VIRTUAL, 3 = generated STORED.
                 const columnsInfo = all<{
                     cid: number;
                     name: string;
@@ -288,11 +288,21 @@ export const sqlite: IntrospectionProvider = {
                     });
                 }
 
+                // Pre-extract full column type definitions from DDL for generated columns.
+                // PRAGMA table_xinfo only returns the base type (e.g., "TEXT"), but for
+                // generated columns we need the full definition including the expression
+                // (e.g., "TEXT GENERATED ALWAYS AS (...) STORED") so they are pulled as
+                // Unsupported("...") — matching Prisma's introspection behavior.
+                const generatedColDefs = t.definition ? extractColumnTypeDefs(t.definition) : new Map<string, string>();
+
                 const columns: IntrospectedTable['columns'] = [];
                 for (const c of columnsInfo) {
-                    // hidden: 1 (hidden/internal) -> skip; 2 (generated) -> mark computed
+                    // hidden: 0 = normal, 1 = hidden (virtual table) → skip,
+                    // 2 = generated VIRTUAL, 3 = generated STORED → mark computed
                     const hidden = c.hidden ?? 0;
                     if (hidden === 1) continue;
+
+                    const isGenerated = hidden === 2 || hidden === 3;
 
                     const fk = fkByColumn.get(c.name);
 
@@ -303,9 +313,20 @@ export const sqlite: IntrospectionProvider = {
                         defaultValue = 'autoincrement';
                     }
 
+                    // For generated columns, use the full DDL type definition so that
+                    // getBuiltinType returns Unsupported and the column is rendered as
+                    // Unsupported("TYPE GENERATED ALWAYS AS (...) STORED/VIRTUAL").
+                    let datatype = c.type || '';
+                    if (isGenerated) {
+                        const fullDef = generatedColDefs.get(c.name);
+                        if (fullDef) {
+                            datatype = fullDef;
+                        }
+                    }
+
                     columns.push({
                         name: c.name,
-                        datatype: c.type || '',
+                        datatype,
                         datatype_name: null, // SQLite doesn't support native enums
                         length: null,
                         precision: null,
@@ -317,7 +338,7 @@ export const sqlite: IntrospectionProvider = {
                         foreign_key_on_update: fk?.foreign_key_on_update ?? null,
                         foreign_key_on_delete: fk?.foreign_key_on_delete ?? null,
                         pk: !!c.pk,
-                        computed: hidden === 2,
+                        computed: isGenerated,
                         nullable: c.notnull !== 1,
                         default: defaultValue,
                         unique: uniqueSingleColumn.has(c.name),
@@ -390,3 +411,67 @@ export const sqlite: IntrospectionProvider = {
         return factories;
     },
 };
+
+/**
+ * Extract column type definitions from a CREATE TABLE DDL statement.
+ * Returns a map of column name → full type definition string (everything after the column name).
+ * Used to get the complete type including GENERATED ALWAYS AS (...) STORED/VIRTUAL for generated columns.
+ */
+function extractColumnTypeDefs(ddl: string): Map<string, string> {
+    // Find the content inside CREATE TABLE "name" ( ... )
+    // Use a paren-depth approach to find the matching closing paren.
+    const openIdx = ddl.indexOf('(');
+    if (openIdx === -1) return new Map();
+
+    let depth = 1;
+    let closeIdx = -1;
+    for (let i = openIdx + 1; i < ddl.length; i++) {
+        if (ddl[i] === '(') depth++;
+        else if (ddl[i] === ')') {
+            depth--;
+            if (depth === 0) {
+                closeIdx = i;
+                break;
+            }
+        }
+    }
+    if (closeIdx === -1) return new Map();
+
+    const content = ddl.substring(openIdx + 1, closeIdx);
+
+    // Split column definitions on commas, respecting nested parentheses.
+    const defs: string[] = [];
+    let current = '';
+    depth = 0;
+    for (const char of content) {
+        if (char === '(') depth++;
+        else if (char === ')') depth--;
+        else if (char === ',' && depth === 0) {
+            defs.push(current.trim());
+            current = '';
+            continue;
+        }
+        current += char;
+    }
+    if (current.trim()) defs.push(current.trim());
+
+    // Map column name → type definition (everything after the column name).
+    // Table constraints (CONSTRAINT, PRIMARY KEY, UNIQUE, FOREIGN KEY, CHECK)
+    // are skipped since they don't define columns.
+    const result = new Map<string, string>();
+    for (const def of defs) {
+        // Match: optional quote + column name + optional quote + whitespace + type definition
+        const nameMatch = def.match(/^(?:["'`]([^"'`]+)["'`]|(\w+))\s+(.+)/s);
+        if (nameMatch) {
+            const name = nameMatch[1] || nameMatch[2];
+            const typeDef = nameMatch[3];
+            // Skip table-level constraints (they start with keywords, not column names,
+            // but could still match the regex — the map lookup by actual column name
+            // ensures they never interfere).
+            if (name && typeDef) {
+                result.set(name, typeDef.trim());
+            }
+        }
+    }
+    return result;
+}

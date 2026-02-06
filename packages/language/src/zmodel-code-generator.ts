@@ -94,7 +94,7 @@ export class ZModelCodeGenerator {
     }
 
     private quotedStr(val: string): string {
-        const trimmedVal = val.replace(new RegExp(`${this.quote}`, 'g'), `\\${this.quote}`);
+        const trimmedVal = val.replace(new RegExp(`(?<!\\\\)${this.quote}`, 'g'), `\\${this.quote}`);
         return `${this.quote}${trimmedVal}${this.quote}`;
     }
 

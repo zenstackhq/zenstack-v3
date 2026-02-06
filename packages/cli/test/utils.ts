@@ -20,7 +20,7 @@ const TEST_MYSQL_CONFIG = {
     password: process.env['TEST_MYSQL_PASSWORD'] ?? 'mysql',
 };
 
-function getTestDbName(provider: string) {
+export function getTestDbName(provider: string) {
     if (provider === 'sqlite') {
         return './test.db';
     }
@@ -40,6 +40,19 @@ function getTestDbName(provider: string) {
             .substring(0, 30) +
         digest.slice(0, 6)
     );
+}
+
+export function getTestDbUrl(provider: 'sqlite' | 'postgresql' | 'mysql', dbName: string): string {
+    switch (provider) {
+        case 'sqlite':
+            return `file:${dbName}`;
+        case 'postgresql':
+            return `postgres://${TEST_PG_CONFIG.user}:${TEST_PG_CONFIG.password}@${TEST_PG_CONFIG.host}:${TEST_PG_CONFIG.port}/${dbName}`;
+        case 'mysql':
+            return `mysql://${TEST_MYSQL_CONFIG.user}:${TEST_MYSQL_CONFIG.password}@${TEST_MYSQL_CONFIG.host}:${TEST_MYSQL_CONFIG.port}/${dbName}`;
+        default:
+            throw new Error(`Unsupported provider: ${provider}`);
+    }
 }
 
 export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql' | 'mysql', datasourceFields?: Record<string, string | string[]> }) {

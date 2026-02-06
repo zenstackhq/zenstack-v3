@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createProject, getDefaultPrelude, runCli } from '../utils';
+import { createProject, getDefaultPrelude, getTestDbName, getTestDbUrl, runCli } from '../utils';
 import { formatDocument } from '@zenstackhq/language';
 import { getTestDbProvider } from '@zenstackhq/testtools';
 
@@ -698,6 +698,107 @@ model Tenant {
         const restoredSchema = getSchema(workDir);
         expect(restoredSchema).toEqual(schema);
     });
+
+    it('should pull stored generated columns as Unsupported with full expression', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'postgresql') {
+            skip();
+            return;
+        }
+        // PostgreSQL supports GENERATED ALWAYS AS (expr) STORED since PG 12.
+        // The introspection should include the full generation expression in the
+        // datatype so it is rendered as Unsupported("type GENERATED ALWAYS AS (expr) STORED").
+
+        // 1. Create a project with a base table (we need the DB to exist first)
+        const { workDir } = await createProject(
+            `model ComputedUsers {
+    id        Int    @id @default(autoincrement())
+    firstName String
+    lastName  String
+}`,
+            { provider: 'postgresql' },
+        );
+        runCli('db push', workDir);
+
+        // 2. Add a generated column via raw SQL (can't be defined in ZModel)
+        const { Client } = await import('pg');
+        const dbName = getTestDbName('postgresql');
+        const client = new Client({ connectionString: getTestDbUrl('postgresql', dbName) });
+        await client.connect();
+        try {
+            await client.query(
+                `ALTER TABLE "ComputedUsers" ADD COLUMN "fullName" text GENERATED ALWAYS AS ("firstName" || ' ' || "lastName") STORED`
+            );
+        } finally {
+            await client.end();
+        }
+
+        // 3. Pull from zero
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql' }));
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+
+        // The generated column should be pulled as Unsupported with the full expression.
+        // format_type returns 'text', and pg_get_expr returns the expression.
+        expect(restoredSchema).toEqual(await formatDocument(`${getDefaultPrelude({ provider: 'postgresql' })}
+
+model ComputedUsers {
+    id        Int                                                                                        @id @default(autoincrement())
+    firstName String
+    lastName  String
+    fullName  Unsupported('text GENERATED ALWAYS AS ((("firstName" || \\' \\'::text) || "lastName")) STORED')?
+}`));
+    });
+
+    it('should pull virtual generated columns as Unsupported with full expression', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'postgresql') {
+            skip();
+            return;
+        }
+        // PostgreSQL 17+ supports VIRTUAL generated columns.
+        // For earlier versions, only STORED is supported, so this test may need to be
+        // adapted. We test STORED here since it's universally supported.
+
+        const { workDir } = await createProject(
+            `model ComputedProducts {
+    id    Int @id @default(autoincrement())
+    price Int @default(0)
+    qty   Int @default(0)
+}`,
+            { provider: 'postgresql' },
+        );
+        runCli('db push', workDir);
+
+        const { Client } = await import('pg');
+        const dbName = getTestDbName('postgresql');
+        const client = new Client({ connectionString: getTestDbUrl('postgresql', dbName) });
+        await client.connect();
+        try {
+            await client.query(
+                `ALTER TABLE "ComputedProducts" ADD COLUMN "total" integer GENERATED ALWAYS AS ("price" * "qty") STORED`
+            );
+        } finally {
+            await client.end();
+        }
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql' }));
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+
+        expect(restoredSchema).toEqual(await formatDocument(`${getDefaultPrelude({ provider: 'postgresql' })}
+
+model ComputedProducts {
+    id    Int                                                                    @id @default(autoincrement())
+    price Int                                                                    @default(0)
+    qty   Int                                                                    @default(0)
+    total Unsupported('integer GENERATED ALWAYS AS ((price * qty)) STORED')?
+}`));
+    });
 });
 
 describe('DB pull - MySQL specific features', () => {
@@ -730,6 +831,103 @@ describe('DB pull - MySQL specific features', () => {
 
         const restoredSchema = getSchema(workDir);
         expect(restoredSchema).toEqual(schema);
+    });
+
+    it('should pull stored generated columns as Unsupported with full expression', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'mysql') {
+            skip();
+            return;
+        }
+        // MySQL supports both VIRTUAL and STORED generated columns.
+        // The introspection should include the full generation expression in the
+        // datatype so it is rendered as Unsupported("type GENERATED ALWAYS AS (expr) STORED").
+
+        // 1. Create a project with a base table (we need the DB to exist first)
+        const { workDir } = await createProject(
+            `model ComputedUsers {
+    id        Int    @id @default(autoincrement())
+    firstName String @db.VarChar(255)
+    lastName  String @db.VarChar(255)
+}`,
+            { provider: 'mysql' },
+        );
+        runCli('db push', workDir);
+
+        // 2. Add a generated column via raw SQL (can't be defined in ZModel)
+        const mysql = await import('mysql2/promise');
+        const dbName = getTestDbName('mysql');
+        const connection = await mysql.createConnection(getTestDbUrl('mysql', dbName));
+        try {
+            await connection.execute(
+                "ALTER TABLE `ComputedUsers` ADD COLUMN `fullName` varchar(511) GENERATED ALWAYS AS (CONCAT(`firstName`, ' ', `lastName`)) STORED"
+            );
+        } finally {
+            await connection.end();
+        }
+
+        // 3. Pull from zero
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'mysql' }));
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+
+        // The generated column should be pulled as Unsupported with the full expression.
+        // MySQL uses COLUMN_TYPE (e.g., 'varchar(511)') and GENERATION_EXPRESSION for the expr,
+        // and EXTRA contains 'STORED GENERATED' or 'VIRTUAL GENERATED'.
+        expect(restoredSchema).toEqual(await formatDocument(`${getDefaultPrelude({ provider: 'mysql' })}
+
+model ComputedUsers {
+    id        Int                                                                                                         @id @default(autoincrement())
+    firstName String                                                                                                      @db.VarChar(255)
+    lastName  String                                                                                                      @db.VarChar(255)
+    fullName  Unsupported('varchar(511) GENERATED ALWAYS AS (concat(\`firstName\`,\\' \\',\`lastName\`)) STORED')?
+}`));
+    });
+
+    it('should pull virtual generated columns as Unsupported with full expression', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'mysql') {
+            skip();
+            return;
+        }
+
+        const { workDir } = await createProject(
+            `model ComputedProducts {
+    id    Int @id @default(autoincrement())
+    price Int @default(0)
+    qty   Int @default(0)
+}`,
+            { provider: 'mysql' },
+        );
+        runCli('db push', workDir);
+
+        const mysql = await import('mysql2/promise');
+        const dbName = getTestDbName('mysql');
+        const connection = await mysql.createConnection(getTestDbUrl('mysql', dbName));
+        try {
+            await connection.execute(
+                "ALTER TABLE `ComputedProducts` ADD COLUMN `total` int GENERATED ALWAYS AS (`price` * `qty`) VIRTUAL"
+            );
+        } finally {
+            await connection.end();
+        }
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'mysql' }));
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+
+        expect(restoredSchema).toEqual(await formatDocument(`${getDefaultPrelude({ provider: 'mysql' })}
+
+model ComputedProducts {
+    id    Int                                                              @id @default(autoincrement())
+    price Int                                                              @default(0)
+    qty   Int                                                              @default(0)
+    total Unsupported('int GENERATED ALWAYS AS ((\`price\` * \`qty\`)) VIRTUAL')?
+}`));
     });
 });
 
@@ -804,6 +1002,88 @@ model Tenant {
         // not as Unsupported.
         expect(restoredSchema).toContain('data Bytes?');
         expect(restoredSchema).not.toContain('Unsupported');
+    });
+
+    it('should pull stored generated columns as Unsupported', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'sqlite') {
+            skip();
+            return;
+        }
+        // SQLite PRAGMA table_xinfo reports generated columns with hidden values:
+        //   hidden = 2 → VIRTUAL generated column
+        //   hidden = 3 → STORED generated column
+        // Both types should be pulled as Unsupported("full type definition")
+        // because generated columns are read-only and cannot be written to.
+
+        const { workDir } = await createProject('');
+
+        const dbPath = path.join(workDir, 'zenstack', 'test.db');
+        const SQLite = (await import('better-sqlite3')).default;
+        const db = new SQLite(dbPath);
+        db.exec(`
+            CREATE TABLE "ComputedUsers" (
+                "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "firstName" TEXT NOT NULL,
+                "lastName" TEXT NOT NULL,
+                "fullName" TEXT GENERATED ALWAYS AS (firstName || ' ' || lastName) STORED
+            )
+        `);
+        db.close();
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+        fs.writeFileSync(schemaFile, getDefaultPrelude());
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+
+        // first_name and last_name should be regular String fields
+      expect(restoredSchema).toEqual(await formatDocument(`${getDefaultPrelude()}
+
+model ComputedUsers {
+  id Int @id @default(autoincrement())
+  firstName String
+  lastName  String
+  fullName  Unsupported('TEXT GENERATED ALWAYS AS (firstName || \\' \\' || lastName) STORED')?
+}`));
+    });
+
+    it('should pull virtual generated columns as Unsupported', async ({ skip }) => {
+        const provider = getTestDbProvider();
+        if (provider !== 'sqlite') {
+            skip();
+            return;
+        }
+
+        const { workDir } = await createProject('');
+
+        const dbPath = path.join(workDir, 'zenstack', 'test.db');
+        const SQLite = (await import('better-sqlite3')).default;
+        const db = new SQLite(dbPath);
+        db.exec(`
+            CREATE TABLE "ComputedProducts" (
+                "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                "price" INTEGER NOT NULL DEFAULT 0,
+                "qty" INTEGER NOT NULL DEFAULT 0,
+                "total" INTEGER GENERATED ALWAYS AS ("price" * "qty") VIRTUAL
+            )
+        `);
+        db.close();
+
+        const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+        fs.writeFileSync(schemaFile, getDefaultPrelude());
+        runCli('db pull --indent 4', workDir);
+
+        const restoredSchema = getSchema(workDir);
+
+        expect(restoredSchema).toEqual(await formatDocument(`${getDefaultPrelude()}
+
+model ComputedProducts {
+    id    Int                                                      @id @default(autoincrement())
+    price Int                                                      @default(0)
+    qty   Int                                                      @default(0)
+    total Unsupported('INTEGER GENERATED ALWAYS AS ("price" * "qty") VIRTUAL')?
+}`));
     });
 });
 

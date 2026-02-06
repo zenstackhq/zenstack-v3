@@ -193,7 +193,14 @@ export function syncTable({
                 // Array fields cannot be optional (Prisma/ZenStack limitation)
                 typeBuilder.setOptional(builtinType.isArray ? false : column.nullable);
 
-                if (column.datatype === 'enum') {
+                if (column.computed) {
+                    // Generated/computed columns (e.g., GENERATED ALWAYS AS ... STORED/VIRTUAL)
+                    // are read-only and must be rendered as Unsupported("full type definition").
+                    // The datatype contains the full DDL type definition including the expression.
+                    typeBuilder.setUnsupported((unsupportedBuilder) =>
+                        unsupportedBuilder.setValue((lt) => lt.StringLiteral.setValue(column.datatype)),
+                    );
+                } else if (column.datatype === 'enum') {
                     const ref = model.declarations.find((d) => isEnum(d) && getDbName(d) === column.datatype_name) as
                         | Enum
                         | undefined;
@@ -230,7 +237,7 @@ export function syncTable({
             });
             fieldAttrs.forEach(builder.addAttribute.bind(builder));
 
-            if (column.default) {
+            if (column.default && !column.computed) {
                 const defaultExprBuilder = provider.getDefaultValue({
                     fieldType: builtinType.type,
                     datatype: column.datatype,

@@ -378,13 +378,26 @@ SELECT
       SELECT
         "att"."attname" AS "name",       -- column name
 
-        -- datatype: if the type is an enum, report 'enum'; otherwise use the pg_type name
+        -- datatype: if the type is an enum, report 'enum';
+        -- if the column is generated/computed, construct the full DDL-like type definition
+        -- (e.g., "text GENERATED ALWAYS AS (expr) STORED") so it can be rendered as Unsupported("...");
+        -- otherwise use the pg_type name.
         CASE
           WHEN EXISTS (
             SELECT 1 FROM "pg_catalog"."pg_enum" AS "e"
             WHERE "e"."enumtypid" = "typ"."oid"
           ) THEN 'enum'
-          ELSE "typ"."typname"           -- internal type name (e.g., 'int4', 'varchar', 'text')
+          WHEN "att"."attgenerated" != '' THEN
+            format_type("att"."atttypid", "att"."atttypmod")
+            || ' GENERATED ALWAYS AS ('
+            || pg_get_expr("def"."adbin", "def"."adrelid")
+            || ') '
+            || CASE "att"."attgenerated"
+                 WHEN 's' THEN 'STORED'
+                 WHEN 'v' THEN 'VIRTUAL'
+                 ELSE 'STORED'
+               END
+          ELSE "typ"."typname"::text     -- internal type name (e.g., 'int4', 'varchar', 'text'); cast to text to prevent CASE from coercing result to name type (max 63 chars)
         END AS "datatype",
 
         -- datatype_name: for enums only, the actual enum type name (used to look up the enum definition)
@@ -478,7 +491,12 @@ SELECT
         ) AS "unique_name",
 
         "att"."attgenerated" != '' AS "computed",  -- true if column is a generated/computed column
-        pg_get_expr("def"."adbin", "def"."adrelid") AS "default",  -- column default expression as text (e.g., 'nextval(...)', '0', 'now()')
+        -- For generated columns, pg_attrdef stores the generation expression (not a default),
+        -- so we must null it out to avoid emitting a spurious @default(dbgenerated(...)) attribute.
+        CASE
+          WHEN "att"."attgenerated" != '' THEN NULL
+          ELSE pg_get_expr("def"."adbin", "def"."adrelid")
+        END AS "default",  -- column default expression as text (e.g., 'nextval(...)', '0', 'now()')
         "att"."attnotnull" != TRUE AS "nullable",  -- true if column allows NULL values
 
         -- options: for enum columns, aggregates all allowed enum labels into a JSON array

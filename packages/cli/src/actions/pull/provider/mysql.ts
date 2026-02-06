@@ -8,6 +8,21 @@ import { resolveNameCasing } from '../casing';
 // Note: We dynamically import mysql2 inside the async function to avoid
 // requiring it at module load time for environments that don't use MySQL.
 
+function normalizeGenerationExpression(typeDef: string): string {
+    // MySQL may include character set introducers in generation expressions, e.g. `_utf8mb4' '`.
+    // Strip them to produce a stable, cleaner expression for `Unsupported("...")`.
+    // MySQL commonly returns generation expressions with SQL-style quote escaping (e.g. `\\'`),
+    // which would become an invalid ZModel string after the code generator escapes quotes again.
+    // Normalize it to raw quotes, letting the ZModel code generator re-escape appropriately.
+    return (
+        typeDef
+            // Remove character set introducers, with or without escaped quotes.
+            .replace(/_([0-9A-Za-z_]+)\\?'/g, "'")
+            // Unescape SQL-style escaped single quotes in the expression.
+            .replace(/\\'/g, "'")
+    );
+}
+
 export const mysql: IntrospectionProvider = {
     isSupportedFeature(feature) {
         switch (feature) {
@@ -151,6 +166,10 @@ export const mysql: IntrospectionProvider = {
                     if (col.datatype === 'enum' && col.datatype_name) {
                         return { ...col, datatype_name: resolveNameCasing(options.modelCasing, col.datatype_name).name };
                     }
+                    // Normalize generated column expressions for stable output.
+                    if (col.computed && typeof col.datatype === 'string') {
+                        return { ...col, datatype: normalizeGenerationExpression(col.datatype) };
+                    }
                     return col;
                 });
 
@@ -191,6 +210,7 @@ export const mysql: IntrospectionProvider = {
                     values,
                 };
             });
+
             return { tables, enums };
         } finally {
             await connection.end();
@@ -322,9 +342,22 @@ SELECT
                 'ordinal_position', c.ORDINAL_POSITION,  -- column position (used for sorting)
                 'name', c.COLUMN_NAME,                    -- column name
 
-                -- datatype: special-case tinyint(1) as 'boolean' (MySQL's boolean convention),
-                -- otherwise use the DATA_TYPE (e.g., 'int', 'varchar', 'datetime')
+                -- datatype: for generated/computed columns, construct the full DDL-like type definition
+                -- (e.g., "int GENERATED ALWAYS AS (col1 + col2) STORED") so it can be rendered as
+                -- Unsupported("..."); special-case tinyint(1) as 'boolean' (MySQL's boolean convention);
+                -- otherwise use the DATA_TYPE (e.g., 'int', 'varchar', 'datetime').
                 'datatype', CASE
+                    WHEN c.GENERATION_EXPRESSION IS NOT NULL AND c.GENERATION_EXPRESSION != '' THEN
+                        CONCAT(
+                            c.COLUMN_TYPE,
+                            ' GENERATED ALWAYS AS (',
+                            c.GENERATION_EXPRESSION,
+                            ') ',
+                            CASE
+                                WHEN c.EXTRA LIKE '%STORED GENERATED%' THEN 'STORED'
+                                ELSE 'VIRTUAL'
+                            END
+                        )
                     WHEN c.DATA_TYPE = 'tinyint' AND c.COLUMN_TYPE = 'tinyint(1)' THEN 'boolean'
                     ELSE c.DATA_TYPE
                 END,

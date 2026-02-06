@@ -159,7 +159,7 @@ export type VirtualFieldContext<Schema extends SchemaDef> = {
  */
 export type VirtualFieldFunction<Schema extends SchemaDef = SchemaDef> = (
     context: VirtualFieldContext<Schema>,
-) => unknown | Promise<unknown>;
+) => Promise<unknown> | unknown;
 
 export type VirtualFieldsOptions<Schema extends SchemaDef> = {
     [Model in GetModels<Schema> as 'virtualFields' extends keyof GetModel<Schema, Model> ? Model : never]: {

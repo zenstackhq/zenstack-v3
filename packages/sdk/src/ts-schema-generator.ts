@@ -1483,6 +1483,8 @@ export class TsSchemaGenerator {
         const enumsOutputFile = path.join(options.outDir, 'enums.ts');
 
         if (enums.length > 0) {
+            this.generateBannerComments(enumStatements);
+
             const enumsSourceFile = ts.createSourceFile(enumsOutputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
             const enumsResult = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(enumStatements), enumsSourceFile);
             fs.writeFileSync(enumsOutputFile, enumsResult);

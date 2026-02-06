@@ -513,7 +513,7 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
                 }
 
                 case 'has': {
-                    clauses.push(this.buildArrayContains(receiver, this.eb.val(value)));
+                    clauses.push(this.buildArrayContains(receiver, this.eb.val(value), fieldType));
                     break;
                 }
 
@@ -1442,7 +1442,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
     /**
      * Builds an expression that checks if an array contains a single value.
      */
-    abstract buildArrayContains(field: Expression<unknown>, value: Expression<unknown>): AliasableExpression<SqlBool>;
+    abstract buildArrayContains(
+        field: Expression<unknown>,
+        value: Expression<unknown>,
+        elemType?: string,
+    ): AliasableExpression<SqlBool>;
 
     /**
      * Builds an expression that checks if an array contains all values from another array.

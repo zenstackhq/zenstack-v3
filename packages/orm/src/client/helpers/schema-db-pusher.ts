@@ -440,6 +440,7 @@ export class SchemaDbPusher<Schema extends SchemaDef> {
 
     private get floatType() {
         return match<string, ColumnDataType | RawBuilder<unknown>>(this.schema.provider.type)
+            .with('postgresql', () => 'double precision')
             .with('mysql', () => sql.raw('double'))
             .otherwise(() => 'real');
     }

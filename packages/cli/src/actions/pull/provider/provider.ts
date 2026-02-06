@@ -25,7 +25,6 @@ export interface IntrospectedTable {
         pk: boolean;
         computed: boolean;
         nullable: boolean;
-        options: string[];
         unique: boolean;
         unique_name: string | null;
         default: string | null;

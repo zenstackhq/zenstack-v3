@@ -1,6 +1,6 @@
 import type { Attribute, BuiltinType } from '@zenstackhq/language/ast';
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
-import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
+import { getAttributeRef, getDbName, getFunctionRef, normalizeDecimalDefault, normalizeFloatDefault } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
 import { CliError } from '../../../cli-error';
 
@@ -139,19 +139,11 @@ export const mysql: IntrospectionProvider = {
                 const indexes = typeof row.indexes === 'string' ? JSON.parse(row.indexes) : row.indexes;
 
                 // Sort columns by ordinal_position to preserve database column order
-                const sortedColumns = (columns || [])
-                    .sort(
-                        (a: { ordinal_position?: number }, b: { ordinal_position?: number }) =>
-                            (a.ordinal_position ?? 0) - (b.ordinal_position ?? 0)
-                    )
-                    .map((col: { options?: string | string[] | null }) => ({
-                        ...col,
-                        // Parse enum options from COLUMN_TYPE if present (e.g., "enum('val1','val2')")
-                        options:
-                            typeof col.options === 'string'
-                                ? parseEnumValues(col.options)
-                                : col.options ?? [],
-                    }));
+              const sortedColumns = (columns || [])
+                .sort(
+                  (a: { ordinal_position?: number }, b: { ordinal_position?: number }) =>
+                    (a.ordinal_position ?? 0) - (b.ordinal_position ?? 0)
+                );
 
                 // Filter out auto-generated FK indexes (MySQL creates these automatically)
                 // Pattern: {Table}_{column}_fkey for single-column FK indexes
@@ -291,126 +283,171 @@ export const mysql: IntrospectionProvider = {
 
 function getTableIntrospectionQuery(databaseName: string) {
     // Note: We use subqueries with ORDER BY before JSON_ARRAYAGG to ensure ordering
-    // since MySQL < 8.0.21 doesn't support ORDER BY inside JSON_ARRAYAGG
-    // MySQL doesn't support multi-schema, so we don't include schema in the result
+    // since MySQL < 8.0.21 doesn't support ORDER BY inside JSON_ARRAYAGG.
+    // MySQL doesn't support multi-schema, so we don't include schema in the result.
     return `
+-- Main query: one row per table/view with columns and indexes as nested JSON arrays.
+-- Uses INFORMATION_SCHEMA which is MySQL's standard metadata catalog.
 SELECT
-    t.TABLE_NAME AS \`name\`,
-    CASE t.TABLE_TYPE
+    t.TABLE_NAME AS \`name\`,              -- table or view name
+    CASE t.TABLE_TYPE                      -- map MySQL table type strings to our internal types
         WHEN 'BASE TABLE' THEN 'table'
         WHEN 'VIEW' THEN 'view'
         ELSE NULL
     END AS \`type\`,
-    CASE
+    CASE                                   -- for views, retrieve the SQL definition
         WHEN t.TABLE_TYPE = 'VIEW' THEN v.VIEW_DEFINITION
         ELSE NULL
     END AS \`definition\`,
+
+    -- ===== COLUMNS subquery =====
+    -- Wraps an ordered subquery in JSON_ARRAYAGG to produce a JSON array of column objects.
     (
         SELECT JSON_ARRAYAGG(col_json)
         FROM (
             SELECT JSON_OBJECT(
-                'ordinal_position', c.ORDINAL_POSITION,
-                'name', c.COLUMN_NAME,
+                'ordinal_position', c.ORDINAL_POSITION,  -- column position (used for sorting)
+                'name', c.COLUMN_NAME,                    -- column name
+
+                -- datatype: special-case tinyint(1) as 'boolean' (MySQL's boolean convention),
+                -- otherwise use the DATA_TYPE (e.g., 'int', 'varchar', 'datetime')
                 'datatype', CASE
                     WHEN c.DATA_TYPE = 'tinyint' AND c.COLUMN_TYPE = 'tinyint(1)' THEN 'boolean'
                     ELSE c.DATA_TYPE
                 END,
+
+                -- datatype_name: for enum columns, generate a synthetic name "TableName_ColumnName"
+                -- (MySQL doesn't have named enum types like PostgreSQL)
                 'datatype_name', CASE
                     WHEN c.DATA_TYPE = 'enum' THEN CONCAT(t.TABLE_NAME, '_', c.COLUMN_NAME)
                     ELSE NULL
                 END,
-                'datatype_schema', '',
-                'length', c.CHARACTER_MAXIMUM_LENGTH,
-                'precision', COALESCE(c.NUMERIC_PRECISION, c.DATETIME_PRECISION),
-                'nullable', c.IS_NULLABLE = 'YES',
+
+                'datatype_schema', '',                     -- MySQL doesn't support multi-schema
+                'length', c.CHARACTER_MAXIMUM_LENGTH,      -- max length for string types (e.g., VARCHAR(255) -> 255)
+                'precision', COALESCE(c.NUMERIC_PRECISION, c.DATETIME_PRECISION),  -- numeric or datetime precision
+
+                'nullable', c.IS_NULLABLE = 'YES',         -- true if column allows NULL
+
+                -- default: for auto_increment columns, report 'auto_increment' instead of NULL;
+                -- otherwise use the COLUMN_DEFAULT value
                 'default', CASE
                     WHEN c.EXTRA LIKE '%auto_increment%' THEN 'auto_increment'
                     ELSE c.COLUMN_DEFAULT
                 END,
-                'pk', c.COLUMN_KEY = 'PRI',
-                'unique', c.COLUMN_KEY = 'UNI',
+
+                'pk', c.COLUMN_KEY = 'PRI',                -- true if column is part of the primary key
+                'unique', c.COLUMN_KEY = 'UNI',            -- true if column has a unique constraint
                 'unique_name', CASE WHEN c.COLUMN_KEY = 'UNI' THEN c.COLUMN_NAME ELSE NULL END,
+
+                -- computed: true if column has a generation expression (virtual or stored)
                 'computed', c.GENERATION_EXPRESSION IS NOT NULL AND c.GENERATION_EXPRESSION != '',
+
+                -- options: for enum columns, the full COLUMN_TYPE string (e.g., "enum('a','b','c')")
+                -- which gets parsed into individual values later
                 'options', CASE
                     WHEN c.DATA_TYPE = 'enum' THEN c.COLUMN_TYPE
                     ELSE NULL
                 END,
-                'foreign_key_schema', NULL,
-                'foreign_key_table', kcu_fk.REFERENCED_TABLE_NAME,
-                'foreign_key_column', kcu_fk.REFERENCED_COLUMN_NAME,
-                'foreign_key_name', kcu_fk.CONSTRAINT_NAME,
-                'foreign_key_on_update', rc.UPDATE_RULE,
-                'foreign_key_on_delete', rc.DELETE_RULE
+
+                -- Foreign key info (NULL if column is not part of a FK)
+                'foreign_key_schema', NULL,                 -- MySQL doesn't support cross-schema FKs here
+                'foreign_key_table', kcu_fk.REFERENCED_TABLE_NAME,   -- referenced table
+                'foreign_key_column', kcu_fk.REFERENCED_COLUMN_NAME, -- referenced column
+                'foreign_key_name', kcu_fk.CONSTRAINT_NAME,          -- FK constraint name
+                'foreign_key_on_update', rc.UPDATE_RULE,    -- referential action on update (CASCADE, SET NULL, etc.)
+                'foreign_key_on_delete', rc.DELETE_RULE      -- referential action on delete
             ) AS col_json
-            FROM INFORMATION_SCHEMA.COLUMNS c
+
+            FROM INFORMATION_SCHEMA.COLUMNS c  -- one row per column in the database
+
+            -- Join KEY_COLUMN_USAGE to find foreign key references for this column.
+            -- Filter to only FK entries (REFERENCED_TABLE_NAME IS NOT NULL).
             LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu_fk
                 ON c.TABLE_SCHEMA = kcu_fk.TABLE_SCHEMA
                 AND c.TABLE_NAME = kcu_fk.TABLE_NAME
                 AND c.COLUMN_NAME = kcu_fk.COLUMN_NAME
                 AND kcu_fk.REFERENCED_TABLE_NAME IS NOT NULL
+
+            -- Join REFERENTIAL_CONSTRAINTS to get ON UPDATE / ON DELETE rules for the FK.
             LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
                 ON kcu_fk.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
                 AND kcu_fk.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+
             WHERE c.TABLE_SCHEMA = t.TABLE_SCHEMA
                 AND c.TABLE_NAME = t.TABLE_NAME
-            ORDER BY c.ORDINAL_POSITION
+            ORDER BY c.ORDINAL_POSITION        -- preserve original column order
         ) AS cols_ordered
     ) AS \`columns\`,
+
+    -- ===== INDEXES subquery =====
+    -- Aggregates all indexes for this table into a JSON array.
     (
         SELECT JSON_ARRAYAGG(idx_json)
         FROM (
             SELECT JSON_OBJECT(
-                'name', s.INDEX_NAME,
-                'method', s.INDEX_TYPE,
-                'unique', s.NON_UNIQUE = 0,
-                'primary', s.INDEX_NAME = 'PRIMARY',
-                'valid', TRUE,
-                'ready', TRUE,
-                'partial', FALSE,
-                'predicate', NULL,
+                'name', s.INDEX_NAME,          -- index name (e.g., 'PRIMARY', 'idx_email')
+                'method', s.INDEX_TYPE,         -- index type (e.g., 'BTREE', 'HASH', 'FULLTEXT')
+                'unique', s.NON_UNIQUE = 0,    -- NON_UNIQUE=0 means it IS unique
+                'primary', s.INDEX_NAME = 'PRIMARY',  -- MySQL names the PK index 'PRIMARY'
+                'valid', TRUE,                  -- MySQL doesn't expose index validity status
+                'ready', TRUE,                  -- MySQL doesn't expose index readiness status
+                'partial', FALSE,               -- MySQL doesn't support partial indexes
+                'predicate', NULL,              -- no WHERE clause on indexes in MySQL
+
+                -- Index columns: nested subquery for columns in this index
                 'columns', (
                     SELECT JSON_ARRAYAGG(idx_col_json)
                     FROM (
                         SELECT JSON_OBJECT(
-                            'name', s2.COLUMN_NAME,
-                            'expression', NULL,
+                            'name', s2.COLUMN_NAME,           -- column name in the index
+                            'expression', NULL,               -- MySQL doesn't expose expression indexes via STATISTICS
+                            -- COLLATION: 'A' = ascending, 'D' = descending, NULL = not sorted
                             'order', CASE s2.COLLATION WHEN 'A' THEN 'ASC' WHEN 'D' THEN 'DESC' ELSE NULL END,
-                            'nulls', NULL
+                            'nulls', NULL                     -- MySQL doesn't expose NULLS FIRST/LAST
                         ) AS idx_col_json
-                        FROM INFORMATION_SCHEMA.STATISTICS s2
+                        FROM INFORMATION_SCHEMA.STATISTICS s2  -- one row per column per index
                         WHERE s2.TABLE_SCHEMA = s.TABLE_SCHEMA
                             AND s2.TABLE_NAME = s.TABLE_NAME
                             AND s2.INDEX_NAME = s.INDEX_NAME
-                        ORDER BY s2.SEQ_IN_INDEX
+                        ORDER BY s2.SEQ_IN_INDEX              -- preserve column order within the index
                     ) AS idx_cols_ordered
                 )
             ) AS idx_json
             FROM (
+                -- Deduplicate: STATISTICS has one row per (index, column), but we need one row per index.
+                -- DISTINCT on INDEX_NAME gives us one entry per index with its metadata.
                 SELECT DISTINCT INDEX_NAME, INDEX_TYPE, NON_UNIQUE, TABLE_SCHEMA, TABLE_NAME
                 FROM INFORMATION_SCHEMA.STATISTICS
                 WHERE TABLE_SCHEMA = t.TABLE_SCHEMA AND TABLE_NAME = t.TABLE_NAME
             ) s
         ) AS idxs_ordered
     ) AS \`indexes\`
+
+-- === Main FROM: INFORMATION_SCHEMA.TABLES lists all tables and views ===
 FROM INFORMATION_SCHEMA.TABLES t
+-- Join VIEWS to get VIEW_DEFINITION for view tables
 LEFT JOIN INFORMATION_SCHEMA.VIEWS v
     ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
-WHERE t.TABLE_SCHEMA = '${databaseName}'
-    AND t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')
-    AND t.TABLE_NAME <> '_prisma_migrations'
+WHERE t.TABLE_SCHEMA = '${databaseName}'             -- only the target database
+    AND t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')        -- exclude system tables like SYSTEM VIEW
+    AND t.TABLE_NAME <> '_prisma_migrations'           -- exclude Prisma migration tracking table
 ORDER BY t.TABLE_NAME;
 `;
 }
 
 function getEnumIntrospectionQuery(databaseName: string) {
+    // MySQL doesn't have standalone enum types like PostgreSQL's CREATE TYPE.
+    // Instead, enum values are embedded in column definitions (e.g., COLUMN_TYPE = "enum('a','b','c')").
+    // This query finds all enum columns so we can extract their allowed values.
     return `
 SELECT
-    c.TABLE_NAME AS table_name,
-    c.COLUMN_NAME AS column_name,
-    c.COLUMN_TYPE AS column_type
+    c.TABLE_NAME AS table_name,    -- table containing the enum column
+    c.COLUMN_NAME AS column_name,  -- column name
+    c.COLUMN_TYPE AS column_type   -- full type string including values (e.g., "enum('val1','val2')")
 FROM INFORMATION_SCHEMA.COLUMNS c
-WHERE c.TABLE_SCHEMA = '${databaseName}'
-    AND c.DATA_TYPE = 'enum'
+WHERE c.TABLE_SCHEMA = '${databaseName}'   -- only the target database
+    AND c.DATA_TYPE = 'enum'               -- only enum columns
 ORDER BY c.TABLE_NAME, c.COLUMN_NAME;
 `;
 }

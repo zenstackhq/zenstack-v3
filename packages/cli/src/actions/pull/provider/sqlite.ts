@@ -1,5 +1,5 @@
 import { DataFieldAttributeFactory } from '@zenstackhq/language/factory';
-import { getAttributeRef, getDbName, getFunctionRef } from '../utils';
+import { getAttributeRef, getDbName, getFunctionRef, normalizeDecimalDefault, normalizeFloatDefault } from '../utils';
 import type { IntrospectedEnum, IntrospectedSchema, IntrospectedTable, IntrospectionProvider } from './provider';
 
 // Note: We dynamically import better-sqlite3 inside the async function to avoid
@@ -128,7 +128,10 @@ export const sqlite: IntrospectionProvider = {
                 return stmt.all() as T[];
             };
 
-            // List user tables and views (exclude internal sqlite_*)
+            // List user tables and views from sqlite_schema (the master catalog).
+            // sqlite_schema contains one row per table, view, index, and trigger.
+            // We filter to only tables/views and exclude internal sqlite_* objects.
+            // The 'sql' column contains the original CREATE TABLE/VIEW statement.
             const tablesRaw = all<{ name: string; type: 'table' | 'view'; definition: string | null }>(
                 "SELECT name, type, sql AS definition FROM sqlite_schema WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name",
             );
@@ -156,7 +159,9 @@ export const sqlite: IntrospectionProvider = {
                 // Check if this table has autoincrement (via sqlite_sequence)
                 const hasAutoIncrement = autoIncrementTables.has(tableName);
 
-                // Columns with extended info; filter out hidden=1 (internal/rowid), mark computed if hidden=2 (generated)
+                // PRAGMA table_xinfo: extended version of table_info that also includes hidden/generated columns.
+                // Returns one row per column with: cid (column index), name, type, notnull, dflt_value, pk.
+                // hidden: 0 = normal column, 1 = hidden/internal (e.g., rowid), 2 = generated/computed column.
                 const columnsInfo = all<{
                     cid: number;
                     name: string;
@@ -167,7 +172,10 @@ export const sqlite: IntrospectionProvider = {
                     hidden?: number;
                 }>(`PRAGMA table_xinfo('${tableName.replace(/'/g, "''")}')`);
 
-                // Index list (used for both unique inference and index collection)
+                // PRAGMA index_list: returns all indexes on a table.
+                // Each row has: seq (index sequence), name, unique (1 if unique), origin ('c'=CREATE INDEX,
+                // 'u'=UNIQUE constraint, 'pk'=PRIMARY KEY), partial (1 if partial index).
+                // We exclude sqlite_autoindex_* entries which are auto-generated for UNIQUE constraints.
                 const tableNameEsc = tableName.replace(/'/g, "''");
                 const idxList = all<{
                     seq: number;
@@ -177,7 +185,9 @@ export const sqlite: IntrospectionProvider = {
                     partial: number;
                 }>(`PRAGMA index_list('${tableNameEsc}')`).filter((r) => !r.name.startsWith('sqlite_autoindex_'));
 
-                // Unique columns detection via unique indexes with single column
+                // Detect single-column unique constraints by inspecting each unique index.
+                // PRAGMA index_info: returns the columns that make up an index.
+                // If a unique (non-partial) index has exactly one column, that column is "unique".
                 const uniqueSingleColumn = new Set<string>();
                 const uniqueIndexRows = idxList.filter((r) => r.unique === 1 && r.partial !== 1);
                 for (const idx of uniqueIndexRows) {
@@ -187,7 +197,9 @@ export const sqlite: IntrospectionProvider = {
                     }
                 }
 
-                // Indexes details
+                // Build detailed index info for each index.
+                // PRAGMA index_info returns one row per column in the index.
+                // SQLite doesn't expose access method, predicate, or sort order through PRAGMAs.
                 const indexes: IntrospectedTable['indexes'] = idxList.map((idx) => {
                     const idxCols = all<{ name: string }>(`PRAGMA index_info('${idx.name.replace(/'/g, "''")}')`);
                     return {
@@ -208,7 +220,10 @@ export const sqlite: IntrospectionProvider = {
                     };
                 });
 
-                // Foreign keys mapping by column name
+                // PRAGMA foreign_key_list: returns all foreign key constraints on a table.
+                // Each row represents one column in a FK constraint with: id (FK id, shared by multi-column FKs),
+                // seq (column index within the FK), table (referenced table), from (local column),
+                // to (referenced column), on_update, on_delete (referential actions).
                 const fkRows = all<{
                     id: number;
                     seq: number;
@@ -293,7 +308,6 @@ export const sqlite: IntrospectionProvider = {
                         computed: hidden === 2,
                         nullable: c.notnull !== 1,
                         default: defaultValue,
-                        options: [],
                         unique: uniqueSingleColumn.has(c.name),
                         unique_name: null,
                     });

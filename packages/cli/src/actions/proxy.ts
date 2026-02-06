@@ -24,7 +24,7 @@ import { Pool as PgPool } from 'pg';
 import { CliError } from '../cli-error';
 import { getVersion } from '../utils/version-utils';
 import { getOutputPath, getSchemaFile, loadSchemaDocument } from './action-utils';
-import type { ModelDef, SchemaDef, SchemaDef } from '@zenstackhq/orm/schema';
+import type { SchemaDef } from '@zenstackhq/orm/schema';
 
 type Options = {
     output?: string;

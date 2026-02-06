@@ -657,7 +657,7 @@ async function runPull(options: PullOptions) {
                 parseResult: { value: documentModel },
             } of docs) {
                 const zmodelSchema = await formatDocument(generator.generate(documentModel));
-                console.log(colors.blue(`Writing to ${uri.path}`));
+                console.log(colors.blue(`Writing to ${path.relative(process.cwd(), uri.fsPath).replace(/\\/g, '/')}`));
                 fs.writeFileSync(uri.fsPath, zmodelSchema);
             }
         }

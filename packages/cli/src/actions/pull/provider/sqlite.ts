@@ -156,12 +156,12 @@ export const sqlite: IntrospectionProvider = {
                 const tableName = t.name;
                 const schema = '';
 
-                // Check if this table has autoincrement (via sqlite_sequence)
+                // Check if this table has autoincrement (detected by parsing the CREATE TABLE DDL)
                 const hasAutoIncrement = autoIncrementTables.has(tableName);
 
                 // PRAGMA table_xinfo: extended version of table_info that also includes hidden/generated columns.
                 // Returns one row per column with: cid (column index), name, type, notnull, dflt_value, pk.
-                // hidden: 0 = normal column, 1 = hidden/internal (e.g., rowid), 2 = generated/computed column.
+                // hidden: 0 = normal, 1 = hidden (virtual table), 2 = generated stored, 3 = generated virtual.
                 const columnsInfo = all<{
                     cid: number;
                     name: string;

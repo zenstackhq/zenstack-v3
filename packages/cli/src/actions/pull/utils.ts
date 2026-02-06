@@ -72,11 +72,16 @@ export function getDatasource(model: Model) {
         ?.filter((s) => s !== undefined)) as string[] ||
         [];
 
+    const provider = getStringLiteral(
+        datasource.fields.find((f) => f.name === 'provider')?.value,
+    );
+    if (!provider) {
+        throw new CliError(`Datasource "${datasource.name}" is missing a "provider" field.`);
+    }
+
     return {
         name: datasource.name,
-        provider: getStringLiteral(
-            datasource.fields.find((f) => f.name === 'provider')?.value,
-        ) as DataSourceProviderType,
+        provider: provider as DataSourceProviderType,
         url,
         defaultSchema,
         schemas,

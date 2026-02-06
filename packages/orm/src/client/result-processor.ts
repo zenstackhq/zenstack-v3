@@ -188,7 +188,10 @@ export class ResultProcessor<Schema extends SchemaDef> {
                     return;
                 }
 
-                const virtualFn = modelVirtualFieldOptions[fieldName]!;
+                const virtualFn = modelVirtualFieldOptions[fieldName];
+                if (!virtualFn) {
+                    return;
+                }
                 data[fieldName] = await virtualFn(context);
             }),
         );

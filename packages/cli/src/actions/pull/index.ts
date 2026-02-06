@@ -13,9 +13,12 @@ import {
     DataModelFactory,
     EnumFactory,
 } from '@zenstackhq/language/factory';
+import { AstUtils, type Reference, type AstNode, type CstNode } from 'langium';
+import { lowerCaseFirst } from '@zenstackhq/common-helpers';
 import type { PullOptions } from '../db';
 import type { Cascade, IntrospectedEnum, IntrospectedTable, IntrospectionProvider } from './provider';
 import { getAttributeRef, getDbName, getEnumRef } from './utils';
+import { resolveNameCasing } from './casing';
 import { CliError } from '../../cli-error';
 
 export function syncEnums({
@@ -73,79 +76,20 @@ export function syncEnums({
             model.declarations.push(factory.get({ $container: model }));
         }
     } else {
+        // For providers that don't support native enums (e.g., SQLite), carry over
+        // enum declarations from the existing schema as-is by deep-cloning the AST nodes.
+        // A dummy buildReference is used since we don't need cross-reference resolution.
+        const dummyBuildReference = (_node: AstNode, _property: string, _refNode: CstNode | undefined, refText: string): Reference<AstNode> =>
+            ({ $refText: refText }) as Reference<AstNode>;
+
         oldModel.declarations
             .filter((d) => isEnum(d))
             .forEach((d) => {
-                const factory = new EnumFactory().setName(d.name);
-                // Copy enum-level comments
-                if (d.comments?.length) {
-                    factory.update({ comments: [...d.comments] });
-                }
-                // Copy enum-level attributes (@@map, @@schema, etc.)
-                // Re-parent attributes to the new factory node
-                if (d.attributes?.length) {
-                    const reparentedAttrs = d.attributes.map((attr) => ({ ...attr, $container: factory.node }));
-                    factory.update({ attributes: reparentedAttrs });
-                }
-                // Copy fields with their attributes and comments
-                d.fields.forEach((v) => {
-                    factory.addField((builder) => {
-                        builder.setName(v.name);
-                        // Copy field-level comments
-                        if (v.comments?.length) {
-                            v.comments.forEach((c) => {
-                                builder.addComment(c);
-                            });
-                        }
-                        // Copy field-level attributes (@map, etc.)
-                        // Re-parent attributes to the new builder node
-                        if (v.attributes?.length) {
-                            const reparentedAttrs = v.attributes.map((attr) => ({ ...attr, $container: builder.node }));
-                            builder.update({ attributes: reparentedAttrs });
-                        }
-                        return builder;
-                    });
-                });
-                model.declarations.push(factory.get({ $container: model }));
+                const copy = AstUtils.copyAstNode(d, dummyBuildReference);
+                (copy as { $container: unknown }).$container = model;
+                model.declarations.push(copy);
             });
     }
-}
-
-function resolveNameCasing(casing: 'pascal' | 'camel' | 'snake' | 'none', originalName: string) {
-    let name = originalName;
-    const fieldPrefix = /[0-9]/g.test(name.charAt(0)) ? '_' : '';
-
-    switch (casing) {
-        case 'pascal':
-            name = toPascalCase(originalName);
-            break;
-        case 'camel':
-            name = toCamelCase(originalName);
-            break;
-        case 'snake':
-            name = toSnakeCase(originalName);
-            break;
-    }
-
-    return {
-        modified: name !== originalName || fieldPrefix !== '',
-        name: `${fieldPrefix}${name}`,
-    };
-}
-
-function toPascalCase(str: string): string {
-    return str.replace(/[_\- ]+(\w)/g, (_, c) => c.toUpperCase()).replace(/^\w/, (c) => c.toUpperCase());
-}
-
-function toCamelCase(str: string): string {
-    return str.replace(/[_\- ]+(\w)/g, (_, c) => c.toUpperCase()).replace(/^\w/, (c) => c.toLowerCase());
-}
-
-function toSnakeCase(str: string): string {
-    return str
-        .replace(/[- ]+/g, '_')
-        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-        .toLowerCase();
 }
 
 export type Relation = {
@@ -185,23 +129,9 @@ export function syncTable({
     const modelIdAttribute = getAttributeRef('@@id', services);
     const uniqueAttribute = getAttributeRef('@unique', services);
     const modelUniqueAttribute = getAttributeRef('@@unique', services);
-    const relationAttribute = getAttributeRef('@relation', services);
     const fieldMapAttribute = getAttributeRef('@map', services);
     const tableMapAttribute = getAttributeRef('@@map', services);
     const modelindexAttribute = getAttributeRef('@@index', services);
-
-    if (
-        !idAttribute ||
-        !uniqueAttribute ||
-        !relationAttribute ||
-        !fieldMapAttribute ||
-        !tableMapAttribute ||
-        !modelIdAttribute ||
-        !modelUniqueAttribute ||
-        !modelindexAttribute
-    ) {
-        throw new CliError('Cannot find required attributes in the model.');
-    }
 
     const relations: Relation[] = [];
     const { name, modified } = resolveNameCasing(options.modelCasing, table.name);
@@ -483,19 +413,25 @@ export function syncRelation({
 
     const relationName = `${relation.table}${similarRelations > 0 ? `_${relation.column}` : ''}To${relation.references.table}`;
 
-    const sourceNameFromReference = sourceField.name.toLowerCase().endsWith('id') ? `${resolveNameCasing("camel", sourceField.name.slice(0, -2)).name}${relation.type === 'many'? 's' : ''}` : undefined;
+    // Derive a relation field name from the FK scalar field: if the field ends with "Id",
+    // strip the suffix and use the remainder (e.g., "authorId" -> "author").
+    const sourceNameFromReference = sourceField.name.toLowerCase().endsWith('id') ? `${resolveNameCasing(options.fieldCasing, sourceField.name.slice(0, -2)).name}${relation.type === 'many'? 's' : ''}` : undefined;
 
+    // Check if the derived name would clash with an existing field
     const sourceFieldFromReference = sourceModel.fields.find((f) => f.name === sourceNameFromReference);
 
+    // Determine the relation field name:
+    // - For ambiguous relations (multiple FKs to the same table), include the source column for disambiguation.
+    // - Otherwise, prefer the name derived from the FK field (if no clash), falling back to the target model name.
     let { name: sourceFieldName } = resolveNameCasing(
         options.fieldCasing,
         similarRelations > 0
-            ? `${fieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
-            : `${(!sourceFieldFromReference? sourceNameFromReference : undefined) || resolveNameCasing("camel", targetModel.name).name}${relation.type === 'many'? 's' : ''}`,
+            ? `${fieldPrefix}${lowerCaseFirst(sourceModel.name)}_${relation.column}`
+            : `${(!sourceFieldFromReference? sourceNameFromReference : undefined) || lowerCaseFirst(resolveNameCasing(options.fieldCasing, targetModel.name).name)}${relation.type === 'many'? 's' : ''}`,
     );
 
     if (sourceModel.fields.find((f) => f.name === sourceFieldName)) {
-        sourceFieldName = `${sourceFieldName}To${targetModel.name.charAt(0).toLowerCase()}${targetModel.name.slice(1)}_${relation.references.column}`;
+        sourceFieldName = `${sourceFieldName}To${lowerCaseFirst(targetModel.name)}_${relation.references.column}`;
     }
 
     const sourceFieldFactory = new DataFieldFactory()
@@ -549,8 +485,8 @@ export function syncRelation({
     const { name: oppositeFieldName } = resolveNameCasing(
         options.fieldCasing,
         similarRelations > 0
-            ? `${oppositeFieldPrefix}${sourceModel.name.charAt(0).toLowerCase()}${sourceModel.name.slice(1)}_${relation.column}`
-            : `${resolveNameCasing("camel", sourceModel.name).name}${relation.references.type === 'many'? 's' : ''}`,
+            ? `${oppositeFieldPrefix}${lowerCaseFirst(sourceModel.name)}_${relation.column}`
+            : `${lowerCaseFirst(resolveNameCasing(options.fieldCasing, sourceModel.name).name)}${relation.references.type === 'many'? 's' : ''}`,
     );
 
     const targetFieldFactory = new DataFieldFactory()

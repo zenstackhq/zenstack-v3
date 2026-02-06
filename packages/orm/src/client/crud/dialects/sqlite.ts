@@ -456,6 +456,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
     override buildArrayContains(
         _field: Expression<unknown>,
         _value: Expression<unknown>,
+        _elemType?: string,
     ): AliasableExpression<SqlBool> {
         throw createNotSupportedError('SQLite does not support native array operations');
     }

@@ -426,6 +426,9 @@ attribute @db.Uuid() @@@targetField([StringField]) @@@prisma
 attribute @db.Xml() @@@targetField([StringField]) @@@prisma
 attribute @db.Inet() @@@targetField([StringField]) @@@prisma
 attribute @db.Citext() @@@targetField([StringField]) @@@prisma
+attribute @db.TinyText() @@@targetField([StringField]) @@@prisma
+attribute @db.MediumText() @@@targetField([StringField]) @@@prisma
+attribute @db.LongText() @@@targetField([StringField]) @@@prisma
 
 // Boolean type modifiers
 
@@ -437,16 +440,26 @@ attribute @db.Int() @@@targetField([IntField]) @@@prisma
 attribute @db.Integer() @@@targetField([IntField]) @@@prisma
 attribute @db.SmallInt() @@@targetField([IntField]) @@@prisma
 attribute @db.Oid() @@@targetField([IntField]) @@@prisma
+attribute @db.UnsignedInt() @@@targetField([IntField]) @@@prisma
+attribute @db.UnsignedSmallInt() @@@targetField([IntField]) @@@prisma
+attribute @db.MediumInt() @@@targetField([IntField]) @@@prisma
+attribute @db.UnsignedMediumInt() @@@targetField([IntField]) @@@prisma
+attribute @db.TinyInt(_ length: Int?) @@@targetField([IntField]) @@@prisma
+attribute @db.UnsignedTinyInt(_ length: Int?) @@@targetField([IntField]) @@@prisma
+attribute @db.Year() @@@targetField([IntField]) @@@prisma
 
 // BigInt type modifiers
 
 attribute @db.BigInt() @@@targetField([BigIntField]) @@@prisma
+attribute @db.UnsignedBigInt() @@@targetField([BigIntField]) @@@prisma
 
 // Float/Decimal type modifiers
 attribute @db.DoublePrecision() @@@targetField([FloatField, DecimalField]) @@@prisma
 attribute @db.Real() @@@targetField([FloatField, DecimalField]) @@@prisma
 attribute @db.Decimal(_ p: Int?, _ s: Int?) @@@targetField([FloatField, DecimalField]) @@@prisma
 attribute @db.Money() @@@targetField([FloatField, DecimalField]) @@@prisma
+attribute @db.Float() @@@targetField([FloatField]) @@@prisma
+attribute @db.Double() @@@targetField([FloatField]) @@@prisma
 
 // DateTime type modifiers
 
@@ -455,6 +468,8 @@ attribute @db.Timestamptz(_ x: Int?) @@@targetField([DateTimeField]) @@@prisma
 attribute @db.Date() @@@targetField([DateTimeField]) @@@prisma
 attribute @db.Time(_ x: Int?) @@@targetField([DateTimeField]) @@@prisma
 attribute @db.Timetz(_ x: Int?) @@@targetField([DateTimeField]) @@@prisma
+attribute @db.DateTime(_ x: Int?) @@@targetField([DateTimeField]) @@@prisma
+
 
 // Json type modifiers
 
@@ -464,6 +479,12 @@ attribute @db.JsonB() @@@targetField([JsonField]) @@@prisma
 // Bytes type modifiers
 
 attribute @db.ByteA() @@@targetField([BytesField]) @@@prisma
+attribute @db.LongBlob() @@@targetField([BytesField]) @@@prisma
+attribute @db.Binary(_ n: Int?) @@@targetField([BytesField]) @@@prisma
+attribute @db.VarBinary(_ n: Int?) @@@targetField([BytesField]) @@@prisma
+attribute @db.TinyBlob() @@@targetField([BytesField]) @@@prisma
+attribute @db.Blob() @@@targetField([BytesField]) @@@prisma
+attribute @db.MediumBlob() @@@targetField([BytesField]) @@@prisma
 
 /**
  * Specifies the schema to use in a multi-schema PostgreSQL database.

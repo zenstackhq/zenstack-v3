@@ -24,6 +24,7 @@ import { Pool as PgPool } from 'pg';
 import { CliError } from '../cli-error';
 import { getVersion } from '../utils/version-utils';
 import { getOutputPath, getSchemaFile, loadSchemaDocument } from './action-utils';
+import type { SchemaDef } from '@zenstackhq/orm/schema';
 
 type Options = {
     output?: string;
@@ -72,9 +73,25 @@ export async function run(options: Options) {
 
     const schemaModule = (await jiti.import(path.join(outputPath, 'schema'))) as any;
 
-    const db = new ZenStackClient(schemaModule.schema, {
+    // Build omit configuration for computed fields
+    const schema = schemaModule.schema as SchemaDef;
+    const omit: Record<string, Record<string, boolean>> = {};
+    for (const [modelName, modelDef] of Object.entries(schema.models)) {
+        const computedFields: Record<string, boolean> = {};
+        for (const [fieldName, fieldDef] of Object.entries(modelDef.fields)) {
+            if (fieldDef.computed === true) {
+                computedFields[fieldName] = true;
+            }
+        }
+        if (Object.keys(computedFields).length > 0) {
+            omit[modelName] = computedFields;
+        }
+    }
+
+    const db = new ZenStackClient(schema, {
         dialect: dialect,
         log: log && log.length > 0 ? log : undefined,
+        omit: Object.keys(omit).length > 0 ? omit : undefined,
     });
 
     // check whether the database is reachable

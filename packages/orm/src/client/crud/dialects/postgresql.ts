@@ -284,9 +284,20 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
         return this.eb.cast(arr, sql`${sql.raw(mappedType)}[]`);
     }
 
-    override buildArrayContains(field: Expression<unknown>, value: Expression<unknown>): AliasableExpression<SqlBool> {
-        // PostgreSQL @> operator expects array on both sides, so wrap single value in array
-        return this.eb(field, '@>', sql`ARRAY[${value}]`);
+    override buildArrayContains(
+        field: Expression<unknown>,
+        value: Expression<unknown>,
+        elemType?: string,
+    ): AliasableExpression<SqlBool> {
+        // PostgreSQL @> operator expects array on both sides, so wrap single value in a typed array
+        const arrayExpr = sql`ARRAY[${value}]`;
+        if (elemType) {
+            const mappedType = this.getSqlType(elemType);
+            const typedArray = this.eb.cast(arrayExpr, sql`${sql.raw(mappedType)}[]`);
+            return this.eb(field, '@>', typedArray);
+        } else {
+            return this.eb(field, '@>', arrayExpr);
+        }
     }
 
     override buildArrayHasEvery(field: Expression<unknown>, values: Expression<unknown>): AliasableExpression<SqlBool> {

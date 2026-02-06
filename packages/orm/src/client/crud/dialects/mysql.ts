@@ -231,6 +231,7 @@ export class MySqlCrudDialect<Schema extends SchemaDef> extends LateralJoinDiale
     override buildArrayContains(
         _field: Expression<unknown>,
         _value: Expression<unknown>,
+        _elemType?: string,
     ): AliasableExpression<SqlBool> {
         throw createNotSupportedError('MySQL does not support native array operations');
     }

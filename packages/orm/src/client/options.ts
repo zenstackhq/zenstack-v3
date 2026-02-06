@@ -1,7 +1,7 @@
 import type { Dialect, Expression, ExpressionBuilder, KyselyConfig } from 'kysely';
 import type { GetModel, GetModelFields, GetModels, ProcedureDef, ScalarFields, SchemaDef } from '../schema';
 import type { PrependParameter } from '../utils/type-utils';
-import type { AuthType, ClientContract, CRUD_EXT } from './contract';
+import type { ClientContract, CRUD_EXT } from './contract';
 import type { GetProcedureNames, ProcedureHandlerFunc } from './crud-types';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
 import type { AnyPlugin } from './plugin';
@@ -144,16 +144,20 @@ export type HasComputedFields<Schema extends SchemaDef> =
  */
 export type VirtualFieldContext<Schema extends SchemaDef> = {
     /**
-     * The current authenticated user, if set via `$setAuth()`.
+     * The database row data (only contains fields that were selected in the query).
      */
-    auth: AuthType<Schema> | undefined;
+    row: Record<string, unknown>;
+
+    /**
+     * The ZenStack client instance.
+     */
+    client: ClientContract<Schema>;
 };
 
 /**
  * Function that computes a virtual field value at runtime.
  */
 export type VirtualFieldFunction<Schema extends SchemaDef = SchemaDef> = (
-    row: Record<string, unknown>,
     context: VirtualFieldContext<Schema>,
 ) => unknown | Promise<unknown>;
 

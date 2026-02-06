@@ -1,6 +1,6 @@
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from './constants';
-import type { AuthType } from './contract';
+import type { ClientContract } from './contract';
 import { getCrudDialect } from './crud/dialects';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
 import type { ClientOptions, VirtualFieldContext, VirtualFieldFunction } from './options';
@@ -8,7 +8,7 @@ import { ensureArray, getField, getIdValues } from './query-utils';
 
 export class ResultProcessor<Schema extends SchemaDef> {
     private dialect: BaseCrudDialect<Schema>;
-    private readonly virtualFieldsOptions: Record<string, Record<string, VirtualFieldFunction>> | undefined;
+    private readonly virtualFieldsOptions: Record<string, Record<string, VirtualFieldFunction<Schema>>> | undefined;
 
     constructor(
         private readonly schema: Schema,
@@ -18,27 +18,27 @@ export class ResultProcessor<Schema extends SchemaDef> {
         this.virtualFieldsOptions = (options as any).virtualFields;
     }
 
-    async processResult(data: any, model: GetModels<Schema>, args?: any, auth?: AuthType<Schema>) {
-        const result = await this.doProcessResult(data, model, args, auth);
+    async processResult(data: any, model: GetModels<Schema>, args?: any, client?: ClientContract<Schema>) {
+        const result = await this.doProcessResult(data, model, args, client);
         // deal with correcting the reversed order due to negative take
         this.fixReversedResult(result, model, args);
         return result;
     }
 
-    private async doProcessResult(data: any, model: GetModels<Schema>, args?: any, auth?: AuthType<Schema>) {
+    private async doProcessResult(data: any, model: GetModels<Schema>, args?: any, client?: ClientContract<Schema>) {
         if (Array.isArray(data)) {
             await Promise.all(
                 data.map(async (row, i) => {
-                    data[i] = await this.processRow(row, model, args, auth);
+                    data[i] = await this.processRow(row, model, args, client);
                 }),
             );
             return data;
         } else {
-            return this.processRow(data, model, args, auth);
+            return this.processRow(data, model, args, client);
         }
     }
 
-    private async processRow(data: any, model: GetModels<Schema>, args?: any, auth?: AuthType<Schema>) {
+    private async processRow(data: any, model: GetModels<Schema>, args?: any, client?: ClientContract<Schema>) {
         if (!data || typeof data !== 'object') {
             return data;
         }
@@ -67,7 +67,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                         delete data[key];
                         continue;
                     }
-                    const processedSubRow = await this.processRow(subRow, subModel, args, auth);
+                    const processedSubRow = await this.processRow(subRow, subModel, args, client);
 
                     // merge the sub-row into the main row
                     Object.assign(data, processedSubRow);
@@ -92,13 +92,13 @@ export class ResultProcessor<Schema extends SchemaDef> {
             if (fieldDef.relation) {
                 // Extract relation-specific args (select/omit/include) for nested processing
                 const relationArgs = this.getRelationArgs(args, key);
-                data[key] = await this.processRelation(value, fieldDef, relationArgs, auth);
+                data[key] = await this.processRelation(value, fieldDef, relationArgs, client);
             } else {
                 data[key] = this.processFieldValue(value, fieldDef);
             }
         }
 
-        await this.applyVirtualFields(data, model, args, auth);
+        await this.applyVirtualFields(data, model, args, client);
 
         return data;
     }
@@ -136,7 +136,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
         return undefined;
     }
 
-    private async processRelation(value: unknown, fieldDef: FieldDef, args?: any, auth?: AuthType<Schema>) {
+    private async processRelation(value: unknown, fieldDef: FieldDef, args?: any, client?: ClientContract<Schema>) {
         let relationData = value;
         if (typeof value === 'string') {
             // relation can be returned as a JSON string
@@ -146,13 +146,13 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 return value;
             }
         }
-        return this.doProcessResult(relationData, fieldDef.type as GetModels<Schema>, args, auth);
+        return this.doProcessResult(relationData, fieldDef.type as GetModels<Schema>, args, client);
     }
 
     /**
      * Computes virtual fields at runtime using functions from client options.
      * */
-    private async applyVirtualFields(data: any, model: GetModels<Schema>, args?: any, auth?: AuthType<Schema>) {
+    private async applyVirtualFields(data: any, model: GetModels<Schema>, args?: any, client?: ClientContract<Schema>) {
         if (!data || typeof data !== 'object') {
             return;
         }
@@ -171,8 +171,10 @@ export class ResultProcessor<Schema extends SchemaDef> {
         const selectClause = args?.select;
         const omitClause = args?.omit;
 
-        // Build the context once for all virtual fields
-        const context: VirtualFieldContext<Schema> = { auth };
+        const context: VirtualFieldContext<Schema> = {
+            row: { ...data },
+            client: client!,
+        };
 
         await Promise.all(
             virtualFieldNames.map(async (fieldName) => {
@@ -187,8 +189,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 }
 
                 const virtualFn = modelVirtualFieldOptions[fieldName]!;
-
-                data[fieldName] = await virtualFn({ ...data }, context);
+                data[fieldName] = await virtualFn(context);
             }),
         );
     }

@@ -28,7 +28,11 @@ type Options = {
  * CLI action for generating code from schema
  */
 export async function run(options: Options) {
-    await checkForMismatchedPackages(process.cwd());
+    try {
+        await checkForMismatchedPackages(process.cwd());
+    } catch (err) {
+        console.warn(colors.yellow(`Failed to check for mismatched ZenStack packages: ${err}`));
+    }
     const model = await pureGenerate(options, false);
 
     if (options.watch) {

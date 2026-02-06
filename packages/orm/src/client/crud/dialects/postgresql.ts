@@ -295,7 +295,7 @@ export class PostgresCrudDialect<Schema extends SchemaDef> extends LateralJoinDi
             const typedArray = this.eb.cast(sql`ARRAY[${value}]`, sql`${sql.raw(mappedType)}[]`);
             return this.eb(field, '@>', typedArray);
         } else {
-            return this.eb(field, '@>', value);
+            return this.eb(field, '@>', sql`ARRAY[${value}]`);
         }
     }
 

@@ -18,14 +18,14 @@ export class ResultProcessor<Schema extends SchemaDef> {
         this.virtualFieldsOptions = (options as any).virtualFields;
     }
 
-    async processResult(data: any, model: GetModels<Schema>, args?: any, client?: ClientContract<Schema>) {
+    async processResult(data: any, model: GetModels<Schema>, args: any, client: ClientContract<Schema>) {
         const result = await this.doProcessResult(data, model, args, client);
         // deal with correcting the reversed order due to negative take
         this.fixReversedResult(result, model, args);
         return result;
     }
 
-    private async doProcessResult(data: any, model: GetModels<Schema>, args?: any, client?: ClientContract<Schema>) {
+    private async doProcessResult(data: any, model: GetModels<Schema>, args: any, client: ClientContract<Schema>) {
         if (Array.isArray(data)) {
             await Promise.all(
                 data.map(async (row, i) => {
@@ -38,7 +38,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
         }
     }
 
-    private async processRow(data: any, model: GetModels<Schema>, args?: any, client?: ClientContract<Schema>) {
+    private async processRow(data: any, model: GetModels<Schema>, args: any, client: ClientContract<Schema>) {
         if (!data || typeof data !== 'object') {
             return data;
         }
@@ -136,7 +136,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
         return undefined;
     }
 
-    private async processRelation(value: unknown, fieldDef: FieldDef, args?: any, client?: ClientContract<Schema>) {
+    private async processRelation(value: unknown, fieldDef: FieldDef, args: any, client: ClientContract<Schema>) {
         let relationData = value;
         if (typeof value === 'string') {
             // relation can be returned as a JSON string
@@ -152,7 +152,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
     /**
      * Computes virtual fields at runtime using functions from client options.
      * */
-    private async applyVirtualFields(data: any, model: GetModels<Schema>, args?: any, client?: ClientContract<Schema>) {
+    private async applyVirtualFields(data: any, model: GetModels<Schema>, args: any, client: ClientContract<Schema>) {
         if (!data || typeof data !== 'object') {
             return;
         }
@@ -173,7 +173,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
 
         const context: VirtualFieldContext<Schema> = {
             row: { ...data },
-            client: client!,
+            client,
         };
 
         await Promise.all(

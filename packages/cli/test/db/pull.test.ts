@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createFormattedProject, createProject, getDefaultPrelude, runCli } from '../utils';
+import { createProject, getDefaultPrelude, runCli } from '../utils';
 import { formatDocument } from '@zenstackhq/language';
 import { getTestDbProvider } from '@zenstackhq/testtools';
 
@@ -10,7 +10,7 @@ const getSchema = (workDir: string) => fs.readFileSync(path.join(workDir, 'zenst
 describe('DB pull - Common features (all providers)', () => {
     describe('Pull from zero - restore complete schema from database', () => {
         it('should restore basic schema with all supported types', async () => {
-            const { workDir, schema } = await createFormattedProject(
+            const { workDir, schema } = await createProject(
                 `model User {
     id         Int      @id @default(autoincrement())
     email      String   @unique
@@ -43,7 +43,7 @@ describe('DB pull - Common features (all providers)', () => {
         });
 
         it('should restore schema with relations', async () => {
-            const { workDir, schema } = await createFormattedProject(
+            const { workDir, schema } = await createProject(
                 `model Post {
     id       Int    @id @default(autoincrement())
     title    String
@@ -69,7 +69,7 @@ model User {
         });
 
         it('should restore schema with many-to-many relations', async () => {
-            const { workDir, schema } = await createFormattedProject(
+            const { workDir, schema } = await createProject(
                 `model Post {
     id   Int       @id @default(autoincrement())
     title String
@@ -103,7 +103,7 @@ model Tag {
         });
 
         it('should restore one-to-one relation when FK is the single-column primary key', async () => {
-            const { workDir, schema } = await createFormattedProject(
+            const { workDir, schema } = await createProject(
                 `model Profile {
     user User   @relation(fields: [id], references: [id], onDelete: Cascade)
     id   Int    @id @default(autoincrement())
@@ -128,7 +128,7 @@ model User {
         });
 
         it('should restore schema with indexes and unique constraints', async () => {
-            const { workDir, schema } = await createFormattedProject(
+            const { workDir, schema } = await createProject(
                 `model User {
     id        Int      @id @default(autoincrement())
     email     String   @unique
@@ -155,7 +155,7 @@ model User {
         });
 
         it('should restore schema with composite primary keys', async () => {
-            const { workDir, schema } = await createFormattedProject(
+            const { workDir, schema } = await createProject(
                 `model UserRole {
     userId String
     role   String
@@ -176,7 +176,7 @@ model User {
         });
 
         it('should preserve Decimal and Float default value precision', async () => {
-            const { workDir, schema } = await createFormattedProject(
+            const { workDir, schema } = await createProject(
                 `model Product {
     id          Int     @id @default(autoincrement())
     price       Decimal @default(99.99)
@@ -202,7 +202,7 @@ model User {
 
     describe('Pull with existing schema - preserve schema features', () => {
         it('should preserve field and table mappings', async () => {
-            const { workDir, schema } = await createFormattedProject(
+            const { workDir, schema } = await createProject(
                 `model User {
     id         Int    @id @default(autoincrement())
     email      String @unique @map('email_address')
@@ -220,7 +220,7 @@ model User {
         });
 
         it('should not modify a comprehensive schema with all features', async () => {
-            const { workDir, schema } = await createFormattedProject(`model User {
+            const { workDir, schema } = await createProject(`model User {
     id             Int      @id @default(autoincrement())
     email          String   @unique @map('email_address')
     name           String?  @default('Anonymous')
@@ -308,7 +308,7 @@ enum users_role {
         });
 
         it('should preserve imports when pulling with multi-file schema', async () => {
-            const workDir = createProject('', { customPrelude: true });
+            const { workDir } = await createProject('', { customPrelude: true });
             const schemaPath = path.join(workDir, 'zenstack/schema.zmodel');
             const modelsDir = path.join(workDir, 'zenstack/models');
 
@@ -364,7 +364,7 @@ model Post {
     describe('Pull should update existing field definitions when database changes', () => {
         it('should update field type when database column type changes', async () => {
             // Step 1: Create initial schema with String field
-            const { workDir } = await createFormattedProject(
+            const { workDir } = await createProject(
                 `model User {
     id    Int    @id @default(autoincrement())
     email String @unique
@@ -405,7 +405,7 @@ model User {
 
         it('should update field optionality when database column nullability changes', async () => {
             // Step 1: Create initial schema with required field
-            const { workDir } = await createFormattedProject(
+            const { workDir } = await createProject(
                 `model User {
     id    Int    @id @default(autoincrement())
     email String @unique
@@ -446,7 +446,7 @@ model User {
 
         it('should update default value when database default changes', async () => {
             // Step 1: Create initial schema with default value
-            const { workDir } = await createFormattedProject(
+            const { workDir } = await createProject(
                 `model User {
     id     Int    @id @default(autoincrement())
     email  String @unique
@@ -494,7 +494,7 @@ describe('DB pull - PostgreSQL specific features', () => {
             skip();
             return;
         }
-        const { workDir, schema } = await createFormattedProject(
+        const { workDir, schema } = await createProject(
             `model User {
     id    Int    @id @default(autoincrement())
     email String @unique
@@ -511,13 +511,13 @@ model Post {
 
     @@schema('content')
 }`,
-            { provider: 'postgresql', extra:{ schemas: ['public', 'content', 'auth'] } },
+            { provider: 'postgresql', datasourceFields:{ schemas: ['public', 'content', 'auth'] } },
         );
         runCli('db push', workDir);
 
         const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
 
-        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql', extra:{ schemas: ['public', 'content', 'auth']} }));
+        fs.writeFileSync(schemaFile, getDefaultPrelude({ provider: 'postgresql', datasourceFields:{ schemas: ['public', 'content', 'auth']} }));
         runCli('db pull --indent 4', workDir);
 
         const restoredSchema = getSchema(workDir);
@@ -530,7 +530,7 @@ model Post {
             skip();
             return;
         }
-        const { workDir, schema } = await createFormattedProject(
+        const { workDir, schema } = await createProject(
             `model User {
     id     Int        @id @default(autoincrement())
     email  String     @unique
@@ -565,7 +565,7 @@ enum UserRole {
             skip();
             return;
         }
-        const { workDir, schema } = await createFormattedProject(
+        const { workDir, schema } = await createProject(
             `model User {
     id       Int        @id @default(autoincrement())
     email    String     @unique
@@ -593,7 +593,7 @@ enum UserStatus {
     INACTIVE
     SUSPENDED
 }`,
-            { provider: 'postgresql', extra:{ schemas: ['public', 'content', 'auth'] }  },
+            { provider: 'postgresql', datasourceFields:{ schemas: ['public', 'content', 'auth'] }  },
         );
         runCli('db push', workDir);
 
@@ -613,7 +613,7 @@ enum UserStatus {
         // This test verifies the mapping works correctly.
         // Note: Default native types (jsonb for Json, bytea for Bytes) are not added when pulling from zero
         // because they match the default database type for that field type.
-        const { workDir } = await createFormattedProject(
+        const { workDir } = await createProject(
             `model TypeTest {
     id          Int      @id @default(autoincrement())
     smallNumber Int      @db.SmallInt()
@@ -666,14 +666,14 @@ describe('DB pull - SQL specific features', () => {
             return;
         }
 
-        const { workDir, schema } = await createFormattedProject(
+        const { workDir, schema } = await createProject(
             `model User {
     id     Int    @id @default(autoincrement())
     email  String @unique
-    status User_status @default(ACTIVE)
+    status UserStatus @default(ACTIVE)
 }
 
-enum User_status {
+enum UserStatus {
     ACTIVE
     INACTIVE
     SUSPENDED

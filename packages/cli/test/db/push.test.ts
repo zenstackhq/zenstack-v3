@@ -10,8 +10,8 @@ model User {
 `;
 
 describe('CLI db commands test', () => {
-    it('should generate a database with db push', () => {
-        const workDir = createProject(model, { provider: 'sqlite' });
+    it('should generate a database with db push', async () => {
+        const { workDir } = await createProject(model, { provider: 'sqlite' });
         runCli('db push', workDir);
         expect(fs.existsSync(path.join(workDir, 'zenstack/test.db'))).toBe(true);
     });

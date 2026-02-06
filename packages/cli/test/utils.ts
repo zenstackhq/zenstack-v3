@@ -42,7 +42,7 @@ function getTestDbName(provider: string) {
     );
 }
 
-export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql' | 'mysql', extra?: Record<string, string | string[]> }) {
+export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql' | 'mysql', datasourceFields?: Record<string, string | string[]> }) {
     const provider = (options?.provider || getTestDbProvider()) ?? 'sqlite';
     const dbName = getTestDbName(provider);
     let dbUrl: string;
@@ -64,7 +64,7 @@ export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql'
     const fields: [string, string][] = [
         ['provider', `'${provider}'`],
         ['url', `'${dbUrl}'`],
-        ...Object.entries(options?.extra || {}).map(([k, v]) => {
+        ...Object.entries(options?.datasourceFields || {}).map(([k, v]) => {
             const value = Array.isArray(v) ? `[${v.map(item => `'${item}'`).join(', ')}]` : `'${v}'`;
             return [k, value] as [string, string];
         }),
@@ -78,25 +78,17 @@ export function getDefaultPrelude(options?: { provider?: 'sqlite' | 'postgresql'
     return ZMODEL_PRELUDE;
 }
 
-export function createProject(
+export async function createProject(
     zmodel: string,
-    options?: { customPrelude?: boolean; provider?: 'sqlite' | 'postgresql' | 'mysql' },
+    options?: { customPrelude?: boolean; provider?: 'sqlite' | 'postgresql' | 'mysql'; datasourceFields?: Record<string, string | string[]> },
 ) {
     const workDir = createTestProject();
     fs.mkdirSync(path.join(workDir, 'zenstack'), { recursive: true });
     const schemaPath = path.join(workDir, 'zenstack/schema.zmodel');
-    fs.writeFileSync(schemaPath, !options?.customPrelude ? `${getDefaultPrelude({ provider: options?.provider })}\n\n${zmodel}` : zmodel);
-    return workDir;
-}
-
-export async function createFormattedProject(
-    zmodel: string,
-    options?: { provider?: 'sqlite' | 'postgresql' | 'mysql', extra?: Record<string, string | string[]> },
-) {
-    const fullContent = `${getDefaultPrelude({ provider: options?.provider, extra: options?.extra })}\n\n${zmodel}`;
-    const formatted = await formatDocument(fullContent);
-    const workDir = createProject(formatted, { customPrelude: true, provider: options?.provider });
-    return { workDir, schema: formatted };
+    const content = options?.customPrelude ? zmodel : `${getDefaultPrelude({ provider: options?.provider, datasourceFields: options?.datasourceFields })}\n\n${zmodel}`;
+    const schema = await formatDocument(content);
+    fs.writeFileSync(schemaPath, schema);
+    return { workDir, schema };
 }
 
 export function runCli(command: string, cwd: string) {

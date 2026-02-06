@@ -10,37 +10,37 @@ model User {
 `;
 
 describe('CLI migrate commands test', () => {
-    it('should generate a database with migrate dev', () => {
-        const workDir = createProject(model, { provider: 'sqlite' });
+    it('should generate a database with migrate dev', async () => {
+        const { workDir } = await createProject(model, { provider: 'sqlite' });
         runCli('migrate dev --name init', workDir);
         expect(fs.existsSync(path.join(workDir, 'zenstack/test.db'))).toBe(true);
         expect(fs.existsSync(path.join(workDir, 'zenstack/migrations'))).toBe(true);
     });
 
-    it('should reset the database with migrate reset', () => {
-        const workDir = createProject(model, { provider: 'sqlite' });
+    it('should reset the database with migrate reset', async () => {
+        const { workDir } = await createProject(model, { provider: 'sqlite' });
         runCli('db push', workDir);
         expect(fs.existsSync(path.join(workDir, 'zenstack/test.db'))).toBe(true);
         runCli('migrate reset --force', workDir);
         expect(fs.existsSync(path.join(workDir, 'zenstack/test.db'))).toBe(true);
     });
 
-    it('should reset the database with migrate deploy', () => {
-        const workDir = createProject(model, { provider: 'sqlite' });
+    it('should reset the database with migrate deploy', async () => {
+        const { workDir } = await createProject(model, { provider: 'sqlite' });
         runCli('migrate dev --name init', workDir);
         fs.rmSync(path.join(workDir, 'zenstack/test.db'));
         runCli('migrate deploy', workDir);
         expect(fs.existsSync(path.join(workDir, 'zenstack/test.db'))).toBe(true);
     });
 
-    it('supports migrate status', () => {
-        const workDir = createProject(model, { provider: 'sqlite' });
+    it('supports migrate status', async () => {
+        const { workDir } = await createProject(model, { provider: 'sqlite' });
         runCli('migrate dev --name init', workDir);
         runCli('migrate status', workDir);
     });
 
-    it('supports migrate resolve', () => {
-        const workDir = createProject(model, { provider: 'sqlite' });
+    it('supports migrate resolve', async () => {
+        const { workDir } = await createProject(model, { provider: 'sqlite' });
         runCli('migrate dev --name init', workDir);
 
         // find the migration record "timestamp_init"
@@ -65,8 +65,8 @@ describe('CLI migrate commands test', () => {
         runCli(`migrate resolve --applied ${migration}`, workDir);
     });
 
-    it('should throw error when neither applied nor rolled-back is provided', () => {
-        const workDir = createProject(model, { provider: 'sqlite' });
+    it('should throw error when neither applied nor rolled-back is provided', async () => {
+        const { workDir } = await createProject(model, { provider: 'sqlite' });
         expect(() => runCli('migrate resolve', workDir)).toThrow();
     });
 });

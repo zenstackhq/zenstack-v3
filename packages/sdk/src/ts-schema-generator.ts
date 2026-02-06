@@ -1504,7 +1504,9 @@ export class TsSchemaGenerator {
             ));
         }
         else {
-            fs.unlinkSync(enumsOutputFile);
+            if (fs.existsSync(enumsOutputFile)) {  
+                fs.unlinkSync(enumsOutputFile);  
+            }  
         }
 
         const modelsOutputFile = path.join(options.outDir, 'models.ts');

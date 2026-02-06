@@ -111,7 +111,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
             }
         }
         
-        // Filter out empty objects from array relations (caused by select with all false fields)
+        // Filter out objects with no properties from array relations (occurs when all select fields are false)
         if (Array.isArray(relationData) && fieldDef.array) {
             relationData = relationData.filter((item) => {
                 if (item && typeof item === 'object') {

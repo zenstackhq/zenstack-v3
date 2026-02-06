@@ -175,7 +175,7 @@ export abstract class LateralJoinDialectBase<Schema extends SchemaDef> extends B
 
             if (relationFieldDef.array) {
                 if (!hasFields) {
-                    // Return empty array for array relations when all select fields are false
+                    // Return JSON-formatted empty array literal for array relations when all select fields are false
                     return sql`CAST('[]' AS JSON)`.as('$data');
                 }
                 return this.buildArrayAgg(this.buildJsonObject(objArgs)).as('$data');
@@ -232,7 +232,7 @@ export abstract class LateralJoinDialectBase<Schema extends SchemaDef> extends B
             const hasAnyTrueField = Object.values(payload.select).some((value) => !!value);
             if (!hasAnyTrueField) {
                 // when all fields are explicitly set to false, return empty objArgs
-                // this will be filtered out later
+                // (filtered out in ResultProcessor.processRelation for array relations)
                 return objArgs;
             }
             

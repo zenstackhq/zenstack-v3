@@ -857,6 +857,21 @@ describe('Client find tests ', () => {
             select: { id: false } as any,
         });
         expect(r3).toBeNull();
+
+        // nested query with only false fields in select should return empty array for relations
+        const r4 = await client.user.findUnique({
+            where: { id: user.id },
+            select: {
+                id: true,
+                email: true,
+                posts: { select: { id: false } as any },
+            },
+        });
+        expect(r4).toMatchObject({
+            id: user.id,
+            email: user.email,
+            posts: [],
+        });
     });
 
     it('allows field omission', async () => {

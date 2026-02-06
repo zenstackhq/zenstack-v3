@@ -110,6 +110,17 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 return value;
             }
         }
+        
+        // Filter out empty objects from array relations (caused by select with all false fields)
+        if (Array.isArray(relationData) && fieldDef.array) {
+            relationData = relationData.filter((item) => {
+                if (item && typeof item === 'object') {
+                    return Object.keys(item).length > 0;
+                }
+                return true;
+            });
+        }
+        
         return this.doProcessResult(relationData, fieldDef.type as GetModels<Schema>);
     }
 

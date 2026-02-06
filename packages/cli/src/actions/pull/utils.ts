@@ -5,6 +5,7 @@ import {
     type DataModel,
     type Enum,
     type EnumField,
+    type Expression,
     type FunctionDecl,
     isInvocationExpr,
     type Attribute,
@@ -12,6 +13,7 @@ import {
     type ReferenceExpr,
     type StringLiteral,
 } from '@zenstackhq/language/ast';
+import type { AstFactory, ExpressionBuilder } from '@zenstackhq/language/factory';
 import { getLiteralArray, getStringLiteral } from '@zenstackhq/language/utils';
 import type { DataSourceProviderType } from '@zenstackhq/schema';
 import type { Reference } from 'langium';
@@ -169,4 +171,39 @@ export function getAttributeRef(name: string, services: ZModelServices) {
 
 export function getFunctionRef(name: string, services: ZModelServices) {
     return getDeclarationRef<FunctionDecl>('FunctionDecl', name, services);
+}
+
+/**
+ * Normalize a default value string for a Float field.
+ * - Integer strings get `.0` appended
+ * - Decimal strings are preserved as-is
+ */
+export function normalizeFloatDefault(val: string): (ab: ExpressionBuilder) => AstFactory<Expression> {
+    if (/^-?\d+$/.test(val)) {
+        return (ab) => ab.NumberLiteral.setValue(val + '.0');
+    }
+    if (/^-?\d+\.\d+$/.test(val)) {
+        return (ab) => ab.NumberLiteral.setValue(val);
+    }
+    return (ab) => ab.NumberLiteral.setValue(val);
+}
+
+/**
+ * Normalize a default value string for a Decimal field.
+ * - Integer strings get `.00` appended
+ * - Decimal strings are normalized to minimum 2 decimal places, stripping excess trailing zeros
+ */
+export function normalizeDecimalDefault(val: string): (ab: ExpressionBuilder) => AstFactory<Expression> {
+    if (/^-?\d+$/.test(val)) {
+        return (ab) => ab.NumberLiteral.setValue(val + '.00');
+    }
+    if (/^-?\d+\.\d+$/.test(val)) {
+        const [integerPart, fractionalPart] = val.split('.');
+        let normalized = fractionalPart!.replace(/0+$/, '');
+        if (normalized.length < 2) {
+            normalized = normalized.padEnd(2, '0');
+        }
+        return (ab) => ab.NumberLiteral.setValue(`${integerPart}.${normalized}`);
+    }
+    return (ab) => ab.NumberLiteral.setValue(val);
 }

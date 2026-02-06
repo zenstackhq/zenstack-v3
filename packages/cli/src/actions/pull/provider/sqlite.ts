@@ -329,34 +329,10 @@ export const sqlite: IntrospectionProvider = {
                 return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Float':
-                // Integer strings: append '.0'
-                if (/^-?\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val + '.0');
-                }
-                // Decimal strings: preserve exactly to avoid parseFloat precision loss
-                if (/^-?\d+\.\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val);
-                }
-                // Other values: return unchanged
-                return (ab) => ab.NumberLiteral.setValue(val);
+                return normalizeFloatDefault(val);
 
             case 'Decimal':
-                // Integer strings: append '.00'
-                if (/^-?\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val + '.00');
-                }
-                // Decimal strings: normalize to minimum 2 decimal places, strip excess trailing zeros
-                if (/^-?\d+\.\d+$/.test(val)) {
-                    const [integerPart, fractionalPart] = val.split('.');
-                    // Strip trailing zeros, but keep at least 2 digits
-                    let normalized = fractionalPart!.replace(/0+$/, '');
-                    if (normalized.length < 2) {
-                        normalized = normalized.padEnd(2, '0');
-                    }
-                    return (ab) => ab.NumberLiteral.setValue(`${integerPart}.${normalized}`);
-                }
-                // Other values: return unchanged
-                return (ab) => ab.NumberLiteral.setValue(val);
+                return normalizeDecimalDefault(val);
 
             case 'Boolean':
                 return (ab) => ab.BooleanLiteral.setValue(val === 'true' || val === '1');

@@ -228,73 +228,23 @@ export const mysql: IntrospectionProvider = {
                 return (ab) => ab.NumberLiteral.setValue(val);
 
             case 'Float':
-                // Integer strings: append '.0'
-                if (/^-?\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val + '.0');
-                }
-                // Decimal strings: preserve exactly to avoid parseFloat precision loss
-                if (/^-?\d+\.\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val);
-                }
-                // Other values: return unchanged
-                return (ab) => ab.NumberLiteral.setValue(val);
+                return normalizeFloatDefault(val);
 
             case 'Decimal':
-                // Integer strings: append '.00'
-                if (/^-?\d+$/.test(val)) {
-                    return (ab) => ab.NumberLiteral.setValue(val + '.00');
-                }
-                // Decimal strings: normalize to minimum 2 decimal places, strip excess trailing zeros
-                if (/^-?\d+\.\d+$/.test(val)) {
-                    const [integerPart, fractionalPart] = val.split('.');
-                    // Strip trailing zeros, but keep at least 2 digits
-                    let normalized = fractionalPart!.replace(/0+$/, '');
-                    if (normalized.length < 2) {
-                        normalized = normalized.padEnd(2, '0');
-                    }
-                    return (ab) => ab.NumberLiteral.setValue(`${integerPart}.${normalized}`);
-                }
-                // Other values: return unchanged
-                return (ab) => ab.NumberLiteral.setValue(val);
+                return normalizeDecimalDefault(val);
 
             case 'Boolean':
                 return (ab) => ab.BooleanLiteral.setValue(val.toLowerCase() === 'true' || val === '1' || val === "b'1'");
 
             case 'String':
-                if (val.startsWith("'") && val.endsWith("'")) {
-                    const strippedValue = val.slice(1, -1).replace(/''/g, "'");
-                    const enumDef = enums.find((e) => e.fields.find((v) => getDbName(v) === strippedValue));
-                    if (enumDef) {
-                        const enumField = enumDef.fields.find((v) => getDbName(v) === strippedValue);
-                        if (enumField) {
-                            return (ab) => ab.ReferenceExpr.setTarget(enumField);
-                        }
-                    }
-                    return (ab) => ab.StringLiteral.setValue(strippedValue);
-                }
                 if (val.toLowerCase() === 'uuid()') {
                     return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('uuid', services));
                 }
                 return (ab) => ab.StringLiteral.setValue(val);
         }
 
-        if (val.startsWith("'") && val.endsWith("'")) {
-            const strippedValue = val.slice(1, -1).replace(/''/g, "'");
-            const enumDef = enums.find((e) => e.fields.find((v) => getDbName(v) === strippedValue));
-            if (enumDef) {
-                const enumField = enumDef.fields.find((v) => getDbName(v) === strippedValue);
-                if (enumField) {
-                    return (ab) => ab.ReferenceExpr.setTarget(enumField);
-                }
-            }
-            return (ab) => ab.StringLiteral.setValue(strippedValue);
-        }
-
         // Handle function calls (e.g., uuid(), now())
         if (val.includes('(') && val.includes(')')) {
-            if (val.toLowerCase() === 'uuid()') {
-                return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('uuid', services));
-            }
             return (ab) =>
                 ab.InvocationExpr.setFunction(getFunctionRef('dbgenerated', services)).addArg((a) =>
                     a.setValue((v) => v.StringLiteral.setValue(val)),

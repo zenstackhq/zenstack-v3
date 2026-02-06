@@ -835,6 +835,30 @@ describe('Client find tests ', () => {
         });
     });
 
+    it('returns empty array when all select fields are false', async () => {
+        const user = await createUser(client);
+        await createPosts(client, user.id);
+
+        // findMany with only false fields in select should return empty array
+        const r1 = await client.user.findMany({
+            select: { id: false } as any,
+        });
+        expect(r1).toEqual([]);
+
+        // findFirst with only false fields in select should return empty array
+        const r2 = await client.user.findFirst({
+            select: { id: false, email: false } as any,
+        });
+        expect(r2).toBeNull();
+
+        // findUnique with only false fields in select should return empty object
+        const r3 = await client.user.findUnique({
+            where: { id: user.id },
+            select: { id: false } as any,
+        });
+        expect(r3).toBeNull();
+    });
+
     it('allows field omission', async () => {
         const user = await createUser(client);
         await createPosts(client, user.id);

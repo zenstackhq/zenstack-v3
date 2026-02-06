@@ -845,13 +845,13 @@ describe('Client find tests ', () => {
         });
         expect(r1).toEqual([]);
 
-        // findFirst with only false fields in select should return empty array
+        // findFirst with only false fields in select should return null
         const r2 = await client.user.findFirst({
             select: { id: false, email: false } as any,
         });
         expect(r2).toBeNull();
 
-        // findUnique with only false fields in select should return empty object
+        // findUnique with only false fields in select should return null
         const r3 = await client.user.findUnique({
             where: { id: user.id },
             select: { id: false } as any,

@@ -156,3 +156,47 @@ export function getOutputPath(options: { output?: string }, schemaFile: string) 
         return path.dirname(schemaFile);
     }
 }
+export async function getZenStackPackages(projectPath: string): Promise<Array<{ pkg: string; version: string | undefined }>> {
+    let pkgJson: {
+        dependencies: Record<string, unknown>;
+        devDependencies: Record<string, unknown>;
+    };
+    const resolvedPath = path.resolve(projectPath);
+    try {
+        pkgJson = (
+            await import(path.join(resolvedPath, 'package.json'), {
+                with: { type: 'json' },
+            })
+        ).default;
+    } catch {
+        return [];
+    }
+
+    const packages = Array.from(
+        new Set(
+            [...Object.keys(pkgJson.dependencies ?? {}), ...Object.keys(pkgJson.devDependencies ?? {})].filter(
+                (p) => p.startsWith('@zenstackhq/') || p === 'zenstack',
+            ),
+        ),
+    ).sort();
+
+    const result = await Promise.all(
+        packages.map(async (pkg) => {
+            try {
+                const depPkgJson = (
+                    await import(`${pkg}/package.json`, {
+                        with: { type: 'json' },
+                    })
+                ).default;
+                if (depPkgJson.private) {
+                    return undefined;
+                }
+                return { pkg, version: depPkgJson.version as string };
+            } catch {
+                return { pkg, version: undefined };
+            }
+        }),
+    );
+
+    return result.filter((p) => !!p);
+}

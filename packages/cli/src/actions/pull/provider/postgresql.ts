@@ -329,7 +329,7 @@ export const postgresql: IntrospectionProvider = {
             defaultDatabaseType &&
             (defaultDatabaseType.type !== normalizedDatatype ||
                 (defaultDatabaseType.precision &&
-                    defaultDatabaseType.precision !== (length || precision)))
+                    defaultDatabaseType.precision !== (length ?? precision)))
         ) {
             const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
             // Only add length/precision if it's meaningful (not the standard bit width for the type)

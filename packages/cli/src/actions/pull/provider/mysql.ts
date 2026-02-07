@@ -300,7 +300,7 @@ export const mysql: IntrospectionProvider = {
             defaultDatabaseType &&
             (defaultDatabaseType.type !== datatype ||
                 (defaultDatabaseType.precision &&
-                    defaultDatabaseType.precision !== (length || precision)))
+                    defaultDatabaseType.precision !== (length ?? precision)))
         ) {
             const dbAttrFactory = new DataFieldAttributeFactory().setDecl(dbAttr);
             const sizeValue = length ?? precision;

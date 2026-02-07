@@ -27,11 +27,9 @@
             }
         }
     },
-    "dependencies": {
-        "decimal.js": "catalog:"
-    },
     "devDependencies": {
         "@zenstackhq/eslint-config": "workspace:*",
-        "@zenstackhq/typescript-config": "workspace:*"
+        "@zenstackhq/typescript-config": "workspace:*",
+        "decimal.js": "catalog:"
     }
 }

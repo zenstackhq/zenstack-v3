@@ -144,7 +144,7 @@ export const mysql: IntrospectionProvider = {
             }
 
             // Introspect tables
-            const [tableRows] = (await connection.execute(getTableIntrospectionQuery(databaseName))) as [
+            const [tableRows] = (await connection.execute(getTableIntrospectionQuery(), [databaseName])) as [
                 IntrospectedTable[],
                 unknown,
             ];
@@ -191,7 +191,7 @@ export const mysql: IntrospectionProvider = {
             }
 
             // Introspect enums (MySQL stores enum values in column definitions)
-            const [enumRows] = (await connection.execute(getEnumIntrospectionQuery(databaseName))) as [
+            const [enumRows] = (await connection.execute(getEnumIntrospectionQuery(), [databaseName])) as [
                 { table_name: string; column_name: string; column_type: string }[],
                 unknown,
             ];
@@ -314,7 +314,7 @@ export const mysql: IntrospectionProvider = {
     },
 };
 
-function getTableIntrospectionQuery(databaseName: string) {
+function getTableIntrospectionQuery() {
     // Note: We use subqueries with ORDER BY before JSON_ARRAYAGG to ensure ordering
     // since MySQL < 8.0.21 doesn't support ORDER BY inside JSON_ARRAYAGG.
     // MySQL doesn't support multi-schema, so we don't include schema in the result.
@@ -520,14 +520,14 @@ FROM INFORMATION_SCHEMA.TABLES t
 -- Join VIEWS to get VIEW_DEFINITION for view tables
 LEFT JOIN INFORMATION_SCHEMA.VIEWS v
     ON t.TABLE_SCHEMA = v.TABLE_SCHEMA AND t.TABLE_NAME = v.TABLE_NAME
-WHERE t.TABLE_SCHEMA = '${databaseName}'             -- only the target database
+WHERE t.TABLE_SCHEMA = ?                              -- only the target database
     AND t.TABLE_TYPE IN ('BASE TABLE', 'VIEW')        -- exclude system tables like SYSTEM VIEW
     AND t.TABLE_NAME <> '_prisma_migrations'           -- exclude Prisma migration tracking table
 ORDER BY t.TABLE_NAME;
 `;
 }
 
-function getEnumIntrospectionQuery(databaseName: string) {
+function getEnumIntrospectionQuery() {
     // MySQL doesn't have standalone enum types like PostgreSQL's CREATE TYPE.
     // Instead, enum values are embedded in column definitions (e.g., COLUMN_TYPE = "enum('a','b','c')").
     // This query finds all enum columns so we can extract their allowed values.
@@ -537,7 +537,7 @@ SELECT
     c.COLUMN_NAME AS column_name,  -- column name
     c.COLUMN_TYPE AS column_type   -- full type string including values (e.g., "enum('val1','val2')")
 FROM INFORMATION_SCHEMA.COLUMNS c
-WHERE c.TABLE_SCHEMA = '${databaseName}'   -- only the target database
+WHERE c.TABLE_SCHEMA = ?                   -- only the target database
     AND c.DATA_TYPE = 'enum'               -- only enum columns
 ORDER BY c.TABLE_NAME, c.COLUMN_NAME;
 `;

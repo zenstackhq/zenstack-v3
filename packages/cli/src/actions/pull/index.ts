@@ -533,12 +533,19 @@ export function syncRelation({
     sourceModel.fields.splice(firstSourceFieldId, 0, sourceFieldFactory.node); // Insert the relation field before the first FK scalar field
 
     const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : '';
-    const { name: oppositeFieldName } = resolveNameCasing(
+    let { name: oppositeFieldName } = resolveNameCasing(
         options.fieldCasing,
         similarRelations > 0
             ? `${oppositeFieldPrefix}${lowerCaseFirst(sourceModel.name)}_${firstColumn}`
             : `${lowerCaseFirst(resolveNameCasing(options.fieldCasing, sourceModel.name).name)}${relation.references.type === 'many'? 's' : ''}`,
     );
+
+    if (targetModel.fields.find((f) => f.name === oppositeFieldName)) {
+        ({ name: oppositeFieldName } = resolveNameCasing(
+            options.fieldCasing,
+            `${lowerCaseFirst(sourceModel.name)}_${firstColumn}To${relation.references.table}_${relation.references.columns[0]}`,
+        ));
+    }
 
     const targetFieldFactory = new DataFieldFactory()
         .setContainer(targetModel)

@@ -102,6 +102,56 @@ model Tag {
             expect(restoredSchema).toEqual(schema);
         });
 
+        it('should restore self-referencing model with multiple FK columns without duplicate fields', async () => {
+            const { workDir, schema } = await createProject(
+                `model Category {
+    id               Int       @id @default(autoincrement())
+    categoryParentId Category? @relation('Category_parentIdToCategory', fields: [parentId], references: [id])
+    parentId Int?
+    categoryBuddyId    Category?  @relation('Category_buddyIdToCategory', fields: [buddyId], references: [id])
+    buddyId  Int?
+    categoryMentorId   Category?  @relation('Category_mentorIdToCategory', fields: [mentorId], references: [id])
+    mentorId Int?
+    categoryParentIdToCategoryId Category[] @relation('Category_parentIdToCategory')
+    categoryBuddyIdToCategoryId  Category[] @relation('Category_buddyIdToCategory')
+    categoryMentorIdToCategoryId  Category[] @relation('Category_mentorIdToCategory')
+}`,
+            );
+            runCli('db push', workDir);
+
+            const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+
+            fs.writeFileSync(schemaFile, getDefaultPrelude());
+            runCli('db pull --indent 4', workDir);
+
+            const restoredSchema = getSchema(workDir);
+
+            expect(restoredSchema).toEqual(schema);
+        });
+
+        it('should preserve self-referencing model with multiple FK columns', async () => {
+            const { workDir, schema } = await createProject(
+                `model Category {
+    id               Int       @id @default(autoincrement())
+    category Category? @relation('Category_parentIdToCategory', fields: [parentId], references: [id])
+    parentId Int?
+    buddy    Category?  @relation('Category_buddyIdToCategory', fields: [buddyId], references: [id])
+    buddyId  Int?
+    mentor   Category?  @relation('Category_mentorIdToCategory', fields: [mentorId], references: [id])
+    mentorId Int?
+    categories Category[] @relation('Category_parentIdToCategory')
+    buddys  Category[] @relation('Category_buddyIdToCategory')
+    mentees  Category[] @relation('Category_mentorIdToCategory')
+}`,
+            );
+            runCli('db push', workDir);
+            runCli('db pull --indent 4', workDir);
+
+            const restoredSchema = getSchema(workDir);
+
+            expect(restoredSchema).toEqual(schema);
+        });
+
         it('should restore one-to-one relation when FK is the single-column primary key', async () => {
             const { workDir, schema } = await createProject(
                 `model Profile {

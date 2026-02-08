@@ -394,6 +394,10 @@ export const sqlite: IntrospectionProvider = {
                     return (ab) => ab.StringLiteral.setValue(strippedName);
                 }
                 return (ab) => ab.StringLiteral.setValue(val);
+            case 'Json':
+                return (ab) => ab.StringLiteral.setValue(val);
+            case 'Bytes':
+                return (ab) => ab.StringLiteral.setValue(val);
         }
 
         console.warn(`Unsupported default value type: "${defaultValue}" for field type "${fieldType}". Skipping default value.`);

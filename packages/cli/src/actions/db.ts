@@ -14,7 +14,7 @@ import {
 } from './action-utils';
 import { consolidateEnums, syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers as pullProviders } from './pull/provider';
-import { getDatasource, getDbName, getRelationFieldsKey, getRelationFkName } from './pull/utils';
+import { getDatasource, getDbName, getRelationFieldsKey, getRelationFkName, isDatabaseManagedAttribute } from './pull/utils';
 import type { DataSourceProviderType } from '@zenstackhq/schema';
 import { CliError } from '../cli-error';
 
@@ -461,12 +461,13 @@ async function runPull(options: PullOptions) {
                         }
                         return;
                     }
+
                     // Track deleted attributes (in original but not in new)
                     originalField.attributes
                         .filter(
                             (attr) =>
-                                !f.attributes.find((d) => d.decl.$refText === attr.decl.$refText) &&
-                                (['@relation'].includes(attr.decl.$refText) || attr.decl.$refText.startsWith('@db.')),
+                                !f.attributes.find((d) => d.decl.$refText === attr.decl.$refText) && 
+                                isDatabaseManagedAttribute(attr.decl.$refText),
                         )
                         .forEach((attr) => {
                             const field = attr.$container;
@@ -482,7 +483,7 @@ async function runPull(options: PullOptions) {
                         .filter(
                             (attr) =>
                                 !originalField.attributes.find((d) => d.decl.$refText === attr.decl.$refText) &&
-                                (['@relation'].includes(attr.decl.$refText) || attr.decl.$refText.startsWith('@db.')),
+                                isDatabaseManagedAttribute(attr.decl.$refText),
                         )
                         .forEach((attr) => {
                           // attach the new attribute to the original field

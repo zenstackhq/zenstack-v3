@@ -1241,12 +1241,12 @@ describe('DB pull - SQL specific features', () => {
 
         const { workDir, schema } = await createProject(
             `model User {
-    id     Int    @id @default(autoincrement())
-    email  String @unique
-    status Status @default(ACTIVE)
+    id     Int        @id @default(autoincrement())
+    email  String     @unique
+    status UserStatus @default(ACTIVE)
 }
 
-enum Status {
+enum UserStatus {
     ACTIVE
     INACTIVE
     SUSPENDED
@@ -1262,13 +1262,13 @@ enum Status {
         runCli('db pull --indent 4', workDir);
 
         const restoredSchema = getSchema(workDir);
-        expect(restoredSchema).contains(`model User {
+        expect(restoredSchema).toContain(`model User {
     id     Int        @id @default(autoincrement())
     email  String     @unique
-    status Status @default(ACTIVE)
+    status UserStatus @default(ACTIVE)
 }`);
 
-        expect(restoredSchema).contains(`enum Status {
+        expect(restoredSchema).toContain(`enum UserStatus {
     ACTIVE
     INACTIVE
     SUSPENDED

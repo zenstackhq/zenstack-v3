@@ -170,7 +170,7 @@ function createProgram() {
         .addOption(
             new Option('--quote <double|single>', 'set the quote style of generated schema files').default('single'),
         )
-        .addOption(new Option('--indent <number>', 'set the indentation of the generated schema files').default(4).argParser(parseInt))
+        .addOption(new Option('--indent <number>', 'set the indentation of the generated schema files').default(4))
         .action((options) => dbAction('pull', options));
 
     dbCommand

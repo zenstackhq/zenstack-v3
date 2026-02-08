@@ -12,7 +12,7 @@ import {
     loadSchemaDocument,
     requireDataSourceUrl,
 } from './action-utils';
-import { syncEnums, syncRelation, syncTable, type Relation } from './pull';
+import { consolidateEnums, syncEnums, syncRelation, syncTable, type Relation } from './pull';
 import { providers as pullProviders } from './pull/provider';
 import { getDatasource, getDbName, getRelationFieldsKey, getRelationFkName } from './pull/utils';
 import type { DataSourceProviderType } from '@zenstackhq/schema';
@@ -172,6 +172,10 @@ async function runPull(options: PullOptions) {
                 similarRelations: similarRelations,
             });
         }
+
+        // Consolidate per-column enums (e.g., MySQL's synthetic UserStatus/GroupStatus)
+        // back to shared enums from the original schema (e.g., Status)
+        consolidateEnums({ newModel, oldModel: model });
 
         console.log(colors.blue('Schema synced'));
 
@@ -462,7 +466,7 @@ async function runPull(options: PullOptions) {
                         .filter(
                             (attr) =>
                                 !f.attributes.find((d) => d.decl.$refText === attr.decl.$refText) &&
-                                !['@map', '@@map', '@default', '@updatedAt'].includes(attr.decl.$refText),
+                                (['@relation'].includes(attr.decl.$refText) || attr.decl.$refText.startsWith('@db.')),
                         )
                         .forEach((attr) => {
                             const field = attr.$container;
@@ -478,7 +482,7 @@ async function runPull(options: PullOptions) {
                         .filter(
                             (attr) =>
                                 !originalField.attributes.find((d) => d.decl.$refText === attr.decl.$refText) &&
-                                !['@map', '@@map', '@default', '@updatedAt'].includes(attr.decl.$refText),
+                                (['@relation'].includes(attr.decl.$refText) || attr.decl.$refText.startsWith('@db.')),
                         )
                         .forEach((attr) => {
                           // attach the new attribute to the original field
@@ -619,8 +623,8 @@ async function runPull(options: PullOptions) {
         }
 
         const generator = new ZModelCodeGenerator({
-            quote: options.quote,
-            indent: options.indent,
+            quote: options.quote ?? 'single',
+            indent: options.indent ?? 4,
         });
 
         if (options.output) {

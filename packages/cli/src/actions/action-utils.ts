@@ -1,5 +1,5 @@
-import { loadDocument } from '@zenstackhq/language';
-import { isDataSource } from '@zenstackhq/language/ast';
+import { type ZModelServices, loadDocument } from '@zenstackhq/language';
+import { type Model, isDataSource } from '@zenstackhq/language/ast';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
 import fs from 'node:fs';
@@ -41,8 +41,22 @@ export function getSchemaFile(file?: string) {
     }
 }
 
-export async function loadSchemaDocument(schemaFile: string) {
-    const loadResult = await loadDocument(schemaFile);
+export async function loadSchemaDocument(
+    schemaFile: string,
+    opts?: { mergeImports?: boolean; returnServices?: false },
+): Promise<Model>;
+export async function loadSchemaDocument(
+    schemaFile: string,
+    opts: { returnServices: true; mergeImports?: boolean },
+): Promise<{ model: Model; services: ZModelServices }>;
+export async function loadSchemaDocument(
+    schemaFile: string,
+    opts: { returnServices?: boolean; mergeImports?: boolean } = {},
+) {
+    const returnServices = opts.returnServices ?? false;
+    const mergeImports = opts.mergeImports ?? true;
+
+    const loadResult = await loadDocument(schemaFile, [], mergeImports);
     if (!loadResult.success) {
         loadResult.errors.forEach((err) => {
             console.error(colors.red(err));
@@ -52,6 +66,9 @@ export async function loadSchemaDocument(schemaFile: string) {
     loadResult.warnings.forEach((warn) => {
         console.warn(colors.yellow(warn));
     });
+
+    if (returnServices) return { model: loadResult.model, services: loadResult.services };
+
     return loadResult.model;
 }
 

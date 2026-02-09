@@ -313,6 +313,14 @@ export type FieldIsVirtual<
     Field extends GetModelFields<Schema, Model>,
 > = GetModelField<Schema, Model, Field>['virtual'] extends true | VirtualFieldInfo ? true : false;
 
+export type GetVirtualFieldDependencies<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends GetModelFields<Schema, Model>,
+> = GetModelField<Schema, Model, Field>['virtual'] extends { dependencies: readonly (infer D)[] }
+    ? D & GetModelFields<Schema, Model>
+    : never;
+
 export type FieldHasDefault<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,

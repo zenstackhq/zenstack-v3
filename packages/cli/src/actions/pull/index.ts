@@ -638,6 +638,15 @@ export function consolidateEnums({
         // Rename the kept enum to match the old shared name
         keepEnum.name = oldEnum.name;
 
+        // Replace keepEnum's attributes with those from the old enum so that
+        // any synthetic @@map added by syncEnums is removed and getDbName(keepEnum)
+        // reflects the consolidated name rather than the stale per-column name.
+        // Shallow-copy and re-parent so AST $container pointers reference keepEnum.
+        keepEnum.attributes = oldEnum.attributes.map((attr) => {
+            const copy = { ...attr, $container: keepEnum };
+            return copy;
+        });
+
         // Remove duplicate enums from newModel
         for (let i = 1; i < newEnumsGroup.length; i++) {
             const idx = newModel.declarations.indexOf(newEnumsGroup[i]!);

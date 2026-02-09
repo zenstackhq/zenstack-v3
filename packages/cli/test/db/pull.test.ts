@@ -469,6 +469,45 @@ model Group {
             // consolidation should map them back to the original shared Status enum
             expect(getSchema(workDir)).toEqual(schema);
         });
+
+        it('should consolidate per-column enums with --always-map without stale @@map', async () => {
+            // This test targets a bug where consolidateEnums renames keepEnum.name
+            // to oldEnum.name but leaves the synthetic @@map attribute added by
+            // syncEnums, so getDbName(keepEnum) still returns the old mapped name
+            // (e.g., 'UserStatus') instead of the consolidated name ('Status'),
+            // preventing matching in the downstream delete/add enum logic.
+            const { workDir } = await createProject(
+                `enum Status {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}
+
+model User {
+    id     Int    @id @default(autoincrement())
+    status Status @default(ACTIVE)
+}
+
+model Group {
+    id     Int    @id @default(autoincrement())
+    status Status @default(ACTIVE)
+}`,
+            );
+            runCli('db push', workDir);
+
+            runCli('db pull --indent 4 --always-map', workDir);
+
+            const pulledSchema = getSchema(workDir);
+
+            // The consolidated enum should be named Status, not UserStatus/GroupStatus
+            expect(pulledSchema).toContain('enum Status');
+            expect(pulledSchema).not.toContain('enum UserStatus');
+            expect(pulledSchema).not.toContain('enum GroupStatus');
+
+            // There should be no stale @@map referencing the synthetic per-column name
+            expect(pulledSchema).not.toMatch(/@@map\(['"]UserStatus['"]\)/);
+            expect(pulledSchema).not.toMatch(/@@map\(['"]GroupStatus['"]\)/);
+        });
     });
 
     describe('Pull should preserve triple-slash comments on enums', () => {

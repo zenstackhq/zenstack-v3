@@ -176,6 +176,9 @@ export class ResultProcessor<Schema extends SchemaDef> {
             client,
         };
 
+        // Track dependency fields that were injected (not in original select/omit)
+        const injectedDeps = new Set<string>();
+
         await Promise.all(
             virtualFieldNames.map(async (fieldName) => {
                 // Skip if select clause exists and doesn't include this virtual field
@@ -188,10 +191,31 @@ export class ResultProcessor<Schema extends SchemaDef> {
                     return;
                 }
 
+                // Collect injected dependencies for this active virtual field
+                const fieldDef = modelDef.fields[fieldName];
+                const deps =
+                    typeof fieldDef?.virtual === 'object'
+                        ? fieldDef.virtual.dependencies
+                        : undefined;
+                if (deps) {
+                    for (const dep of deps) {
+                        if (selectClause && !selectClause[dep]) {
+                            injectedDeps.add(dep);
+                        } else if (omitClause?.[dep]) {
+                            injectedDeps.add(dep);
+                        }
+                    }
+                }
+
                 const virtualFn = modelVirtualFieldOptions[fieldName]!;
                 data[fieldName] = await virtualFn(context);
             }),
         );
+
+        // Strip dependency fields that were auto-injected and not originally requested
+        for (const dep of injectedDeps) {
+            delete data[dep];
+        }
     }
 
     private fixReversedResult(data: any, model: GetModels<Schema>, args: any) {

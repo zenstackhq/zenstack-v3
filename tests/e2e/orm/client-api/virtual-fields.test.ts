@@ -859,4 +859,128 @@ model User {
         expect(users[1].fullName).toBe('Jane Doe');
         expect(users[2].fullName).toBe('Bob Jones');
     });
+
+    it('auto-fetches dependencies when virtual field is selected', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    fullName String @virtual(dependencies: [firstName, lastName])
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({ data: { id: 1, firstName: 'Alex', lastName: 'Smith' } });
+
+        // Select only id and fullName -- firstName and lastName should be auto-fetched
+        // but NOT appear in the result
+        const result = await db.user.findUnique({
+            where: { id: 1 },
+            select: { id: true, fullName: true },
+        });
+
+        expect(result).toMatchObject({ id: 1, fullName: 'Alex Smith' });
+        expect(result).not.toHaveProperty('firstName');
+        expect(result).not.toHaveProperty('lastName');
+    });
+
+    it('keeps dependency fields when explicitly selected alongside virtual field', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    fullName String @virtual(dependencies: [firstName, lastName])
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({ data: { id: 1, firstName: 'Alex', lastName: 'Smith' } });
+
+        // firstName is explicitly selected, so it should remain in the result
+        const result = await db.user.findUnique({
+            where: { id: 1 },
+            select: { id: true, firstName: true, fullName: true },
+        });
+
+        expect(result).toMatchObject({ id: 1, firstName: 'Alex', fullName: 'Alex Smith' });
+        // lastName was not explicitly selected, so it should be stripped
+        expect(result).not.toHaveProperty('lastName');
+    });
+
+    it('auto-fetches dependencies even when omitted', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    fullName String @virtual(dependencies: [firstName, lastName])
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({ data: { id: 1, firstName: 'Alex', lastName: 'Smith' } });
+
+        // Omit the dependency fields -- virtual field should still work
+        // and the omitted deps should be stripped from the result
+        const result = await db.user.findUnique({
+            where: { id: 1 },
+            omit: { firstName: true, lastName: true },
+        });
+
+        expect(result).toMatchObject({ id: 1, fullName: 'Alex Smith' });
+        expect(result).not.toHaveProperty('firstName');
+        expect(result).not.toHaveProperty('lastName');
+    });
+
+    it('works without dependencies (backward compat)', async () => {
+        const db = await createTestClient(
+            `
+model User {
+    id Int @id @default(autoincrement())
+    firstName String
+    lastName String
+    fullName String @virtual
+}
+`,
+            {
+                virtualFields: {
+                    User: {
+                        fullName: ({ row }: any) => `${row.firstName} ${row.lastName}`,
+                    },
+                },
+            } as any,
+        );
+
+        await db.user.create({ data: { id: 1, firstName: 'Alex', lastName: 'Smith' } });
+
+        // Without dependencies declared, default select-all still works
+        const result = await db.user.findUnique({ where: { id: 1 } });
+        expect(result).toMatchObject({ fullName: 'Alex Smith' });
+    });
 });

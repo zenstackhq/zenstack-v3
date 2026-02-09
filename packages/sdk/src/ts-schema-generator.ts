@@ -738,8 +738,28 @@ export class TsSchemaGenerator {
             objectFields.push(ts.factory.createPropertyAssignment('computed', ts.factory.createTrue()));
         }
 
-        if (hasAttribute(field, '@virtual')) {
-            objectFields.push(ts.factory.createPropertyAssignment('virtual', ts.factory.createTrue()));
+        const virtualAttrib = getAttribute(field, '@virtual') as DataFieldAttribute | undefined;
+        if (virtualAttrib) {
+            const depsArg = virtualAttrib.args.find((arg) => arg.$resolvedParam?.name === 'dependencies');
+            if (depsArg) {
+                objectFields.push(
+                    ts.factory.createPropertyAssignment(
+                        'virtual',
+                        ts.factory.createObjectLiteralExpression([
+                            ts.factory.createPropertyAssignment(
+                                'dependencies',
+                                ts.factory.createArrayLiteralExpression(
+                                    (depsArg.value as ArrayExpr).items.map((item) =>
+                                        ts.factory.createStringLiteral((item as ReferenceExpr).target.$refText),
+                                    ),
+                                ),
+                            ),
+                        ]),
+                    ),
+                );
+            } else {
+                objectFields.push(ts.factory.createPropertyAssignment('virtual', ts.factory.createTrue()));
+            }
         }
 
         if (isDataModel(field.type.reference?.ref)) {

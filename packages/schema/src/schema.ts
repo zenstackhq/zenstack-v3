@@ -64,6 +64,10 @@ export type UpdatedAtInfo = {
     ignore?: readonly string[];
 };
 
+export type VirtualFieldInfo = {
+    dependencies?: readonly string[];
+};
+
 export type FieldDef = {
     name: string;
     type: string;
@@ -78,7 +82,7 @@ export type FieldDef = {
     relation?: RelationInfo;
     foreignKeyFor?: readonly string[];
     computed?: boolean;
-    virtual?: boolean;
+    virtual?: boolean | VirtualFieldInfo;
     originModel?: string;
     isDiscriminator?: boolean;
 };
@@ -235,13 +239,17 @@ export type RelationFields<Schema extends SchemaDef, Model extends GetModels<Sch
 };
 
 export type NonVirtualFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
-    [Key in GetModelFields<Schema, Model> as GetModelField<Schema, Model, Key>['virtual'] extends true
+    [Key in GetModelFields<Schema, Model> as GetModelField<Schema, Model, Key>['virtual'] extends
+        | true
+        | VirtualFieldInfo
         ? never
         : Key]: Key;
 };
 
 export type NonVirtualNonRelationFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = keyof {
-    [Key in GetModelFields<Schema, Model> as GetModelField<Schema, Model, Key>['virtual'] extends true
+    [Key in GetModelFields<Schema, Model> as GetModelField<Schema, Model, Key>['virtual'] extends
+        | true
+        | VirtualFieldInfo
         ? never
         : GetModelField<Schema, Model, Key>['relation'] extends object
           ? never
@@ -303,7 +311,7 @@ export type FieldIsVirtual<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,
-> = GetModelField<Schema, Model, Field>['virtual'] extends true ? true : false;
+> = GetModelField<Schema, Model, Field>['virtual'] extends true | VirtualFieldInfo ? true : false;
 
 export type FieldHasDefault<
     Schema extends SchemaDef,

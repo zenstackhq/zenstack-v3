@@ -644,9 +644,13 @@ attribute @json() @@@targetField([TypeDefField])
 attribute @computed()
 
 /**
- * Marks a field to be virtual
+ * Marks a field to be virtual (computed at runtime in JavaScript).
+ *
+ * @param dependencies: A list of fields that this virtual field depends on. When the virtual field
+ * is selected, these fields will be automatically included in the database query even if not
+ * explicitly selected by the user, and will be stripped from the result after computation.
  */
-attribute @virtual()
+attribute @virtual(dependencies: FieldReference[]?)
 
 /**
  * Gets the current login user.

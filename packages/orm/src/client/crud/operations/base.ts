@@ -324,6 +324,22 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         let result = query;
         let hasNonVirtualField = false;
 
+        // Collect dependency fields needed by selected virtual fields
+        const injectedDependencies = new Set<string>();
+        for (const [field, payload] of Object.entries(selectOrInclude)) {
+            if (!payload) continue;
+            const fieldDef = this.requireModel(model).fields[field];
+            const deps =
+                typeof fieldDef?.virtual === 'object' ? fieldDef.virtual.dependencies : undefined;
+            if (deps) {
+                for (const dep of deps) {
+                    if (!selectOrInclude[dep]) {
+                        injectedDependencies.add(dep);
+                    }
+                }
+            }
+        }
+
         for (const [field, payload] of Object.entries(selectOrInclude)) {
             if (!payload) {
                 continue;
@@ -360,6 +376,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                 }
                 hasNonVirtualField = true;
             }
+        }
+
+        // Add injected dependency fields to the SQL SELECT
+        for (const dep of injectedDependencies) {
+            result = this.dialect.buildSelectField(result, model, parentAlias, dep);
+            hasNonVirtualField = true;
         }
 
         if (!hasNonVirtualField) {

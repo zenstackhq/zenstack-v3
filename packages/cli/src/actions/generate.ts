@@ -336,7 +336,8 @@ async function checkForMismatchedPackages(projectPath: string) {
     }
 
     if (versions.size > 1) {
-        const message = 'WARNING: Multiple versions of ZenStack packages detected.\n\tThis will probably cause issues and break your types.';
+        const message =
+            'WARNING: Multiple versions of ZenStack packages detected.\n\tThis will probably cause issues and break your types.';
         const slashes = '/'.repeat(73);
         const latestVersion = semver.sort(Array.from(versions)).reverse()[0]!;
 
@@ -345,10 +346,9 @@ async function checkForMismatchedPackages(projectPath: string) {
             if (!version) continue;
 
             if (version === latestVersion) {
-                console.log(`\t${pkg.padEnd(20)}\t${colors.green(version)}`);
-            }
-            else {
-                console.log(`\t${pkg.padEnd(20)}\t${colors.yellow(version)}`);
+                console.log(`\t${pkg.padEnd(32)}\t${colors.green(version)}`);
+            } else {
+                console.log(`\t${pkg.padEnd(32)}\t${colors.yellow(version)}`);
             }
         }
         console.warn(`\n${colors.yellow(slashes)}`);

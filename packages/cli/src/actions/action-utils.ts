@@ -3,6 +3,7 @@ import { isDataSource } from '@zenstackhq/language/ast';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { CliError } from '../cli-error';
 
@@ -156,47 +157,45 @@ export function getOutputPath(options: { output?: string }, schemaFile: string) 
         return path.dirname(schemaFile);
     }
 }
-export async function getZenStackPackages(projectPath: string): Promise<Array<{ pkg: string; version: string | undefined }>> {
+export async function getZenStackPackages(
+    searchPath: string,
+): Promise<Array<{ pkg: string; version: string | undefined }>> {
+    const pkgJsonFile = findUp(['package.json'], searchPath, false);
+    if (!pkgJsonFile) {
+        return [];
+    }
+
     let pkgJson: {
-        dependencies: Record<string, unknown>;
-        devDependencies: Record<string, unknown>;
+        dependencies?: Record<string, unknown>;
+        devDependencies?: Record<string, unknown>;
     };
-    const resolvedPath = path.resolve(projectPath);
     try {
-        pkgJson = (
-            await import(path.join(resolvedPath, 'package.json'), {
-                with: { type: 'json' },
-            })
-        ).default;
+        pkgJson = JSON.parse(fs.readFileSync(pkgJsonFile, 'utf8'));
     } catch {
         return [];
     }
 
     const packages = Array.from(
         new Set(
-            [...Object.keys(pkgJson.dependencies ?? {}), ...Object.keys(pkgJson.devDependencies ?? {})].filter(
-                (p) => p.startsWith('@zenstackhq/') || p === 'zenstack',
+            [...Object.keys(pkgJson.dependencies ?? {}), ...Object.keys(pkgJson.devDependencies ?? {})].filter((p) =>
+                p.startsWith('@zenstackhq/'),
             ),
         ),
     ).sort();
 
-    const result = await Promise.all(
-        packages.map(async (pkg) => {
-            try {
-                const depPkgJson = (
-                    await import(`${pkg}/package.json`, {
-                        with: { type: 'json' },
-                    })
-                ).default;
-                if (depPkgJson.private) {
-                    return undefined;
-                }
-                return { pkg, version: depPkgJson.version as string };
-            } catch {
-                return { pkg, version: undefined };
+    const require = createRequire(import.meta.url);
+
+    const result = packages.map((pkg) => {
+        try {
+            const depPkgJson = require(`${pkg}/package.json`);
+            if (depPkgJson.private) {
+                return undefined;
             }
-        }),
-    );
+            return { pkg, version: depPkgJson.version as string };
+        } catch {
+            return { pkg, version: undefined };
+        }
+    });
 
     return result.filter((p) => !!p);
 }

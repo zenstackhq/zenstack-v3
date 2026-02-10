@@ -1,36 +1,44 @@
 import type { BuiltinType, FieldDef, GetModels, SchemaDef } from '../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from './constants';
+import type { ClientContract } from './contract';
 import { getCrudDialect } from './crud/dialects';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
-import type { ClientOptions } from './options';
+import type { ClientOptions, VirtualFieldContext, VirtualFieldFunction } from './options';
 import { ensureArray, getField, getIdValues } from './query-utils';
 
 export class ResultProcessor<Schema extends SchemaDef> {
     private dialect: BaseCrudDialect<Schema>;
+    private readonly virtualFieldsOptions: Record<string, Record<string, VirtualFieldFunction<Schema>>> | undefined;
+
     constructor(
         private readonly schema: Schema,
         options: ClientOptions<Schema>,
     ) {
         this.dialect = getCrudDialect(schema, options);
+        this.virtualFieldsOptions = (options as any).virtualFields;
     }
 
-    processResult(data: any, model: GetModels<Schema>, args?: any) {
-        const result = this.doProcessResult(data, model);
+    async processResult(data: any, model: GetModels<Schema>, args: any, client: ClientContract<Schema>) {
+        const result = await this.doProcessResult(data, model, args, client);
         // deal with correcting the reversed order due to negative take
         this.fixReversedResult(result, model, args);
         return result;
     }
 
-    private doProcessResult(data: any, model: GetModels<Schema>) {
+    private async doProcessResult(data: any, model: GetModels<Schema>, args: any, client: ClientContract<Schema>) {
         if (Array.isArray(data)) {
-            data.forEach((row, i) => (data[i] = this.processRow(row, model)));
+            await Promise.all(
+                data.map(async (row, i) => {
+                    data[i] = await this.processRow(row, model, args, client);
+                }),
+            );
             return data;
         } else {
-            return this.processRow(data, model);
+            return this.processRow(data, model, args, client);
         }
     }
 
-    private processRow(data: any, model: GetModels<Schema>) {
+    private async processRow(data: any, model: GetModels<Schema>, args: any, client: ClientContract<Schema>) {
         if (!data || typeof data !== 'object') {
             return data;
         }
@@ -59,7 +67,7 @@ export class ResultProcessor<Schema extends SchemaDef> {
                         delete data[key];
                         continue;
                     }
-                    const processedSubRow = this.processRow(subRow, subModel);
+                    const processedSubRow = await this.processRow(subRow, subModel, args, client);
 
                     // merge the sub-row into the main row
                     Object.assign(data, processedSubRow);
@@ -82,11 +90,16 @@ export class ResultProcessor<Schema extends SchemaDef> {
             }
 
             if (fieldDef.relation) {
-                data[key] = this.processRelation(value, fieldDef);
+                // Extract relation-specific args (select/omit/include) for nested processing
+                const relationArgs = this.getRelationArgs(args, key);
+                data[key] = await this.processRelation(value, fieldDef, relationArgs, client);
             } else {
                 data[key] = this.processFieldValue(value, fieldDef);
             }
         }
+
+        await this.applyVirtualFields(data, model, args, client);
+
         return data;
     }
 
@@ -100,7 +113,30 @@ export class ResultProcessor<Schema extends SchemaDef> {
         }
     }
 
-    private processRelation(value: unknown, fieldDef: FieldDef) {
+    /**
+     * Extracts relation-specific args (select/omit/include) for nested processing.
+     * */
+    private getRelationArgs(args: any, relationField: string): any {
+        if (!args) {
+            return undefined;
+        }
+
+        // Check include clause for relation-specific args
+        const includeArgs = args.include?.[relationField];
+        if (includeArgs && typeof includeArgs === 'object') {
+            return includeArgs;
+        }
+
+        // Check select clause for relation-specific args
+        const selectArgs = args.select?.[relationField];
+        if (selectArgs && typeof selectArgs === 'object') {
+            return selectArgs;
+        }
+
+        return undefined;
+    }
+
+    private async processRelation(value: unknown, fieldDef: FieldDef, args: any, client: ClientContract<Schema>) {
         let relationData = value;
         if (typeof value === 'string') {
             // relation can be returned as a JSON string
@@ -110,7 +146,76 @@ export class ResultProcessor<Schema extends SchemaDef> {
                 return value;
             }
         }
-        return this.doProcessResult(relationData, fieldDef.type as GetModels<Schema>);
+        return this.doProcessResult(relationData, fieldDef.type as GetModels<Schema>, args, client);
+    }
+
+    /**
+     * Computes virtual fields at runtime using functions from client options.
+     * */
+    private async applyVirtualFields(data: any, model: GetModels<Schema>, args: any, client: ClientContract<Schema>) {
+        if (!data || typeof data !== 'object') {
+            return;
+        }
+
+        const modelDef = this.schema.models[model as string];
+        if (!modelDef?.virtualFields || !this.virtualFieldsOptions) {
+            return;
+        }
+
+        const modelVirtualFieldOptions = this.virtualFieldsOptions[model as string];
+        if (!modelVirtualFieldOptions) {
+            return;
+        }
+
+        const virtualFieldNames = Object.keys(modelDef.virtualFields);
+        const selectClause = args?.select;
+        const omitClause = args?.omit;
+
+        const context: VirtualFieldContext<Schema> = {
+            row: { ...data },
+            client,
+        };
+
+        // Track dependency fields that were injected (not in original select/omit)
+        const injectedDeps = new Set<string>();
+
+        await Promise.all(
+            virtualFieldNames.map(async (fieldName) => {
+                // Skip if select clause exists and doesn't include this virtual field
+                if (selectClause && !selectClause[fieldName]) {
+                    return;
+                }
+
+                // Skip if omit clause includes this virtual field
+                if (omitClause?.[fieldName]) {
+                    return;
+                }
+
+                // Collect injected dependencies for this active virtual field
+                const fieldDef = modelDef.fields[fieldName];
+                const deps =
+                    typeof fieldDef?.virtual === 'object'
+                        ? fieldDef.virtual.dependencies
+                        : undefined;
+                if (deps) {
+                    for (const dep of deps) {
+                        if (selectClause && !selectClause[dep]) {
+                            injectedDeps.add(dep);
+                        } else if (omitClause?.[dep]) {
+                            injectedDeps.add(dep);
+                        }
+                    }
+                }
+
+                const virtualFn = modelVirtualFieldOptions[fieldName]!;
+                data[fieldName] = await virtualFn(context);
+            }),
+        );
+
+        // Strip dependency fields that were auto-injected and not originally requested
+        for (const dep of injectedDeps) {
+            delete data[dep];
+        }
     }
 
     private fixReversedResult(data: any, model: GetModels<Schema>, args: any) {

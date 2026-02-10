@@ -427,6 +427,14 @@ export class TsSchemaGenerator {
             );
         }
 
+        const virtualFields = dm.fields.filter((f) => hasAttribute(f, '@virtual'));
+
+        if (virtualFields.length > 0) {
+            fields.push(
+                ts.factory.createPropertyAssignment('virtualFields', this.createVirtualFieldsObject(virtualFields)),
+            );
+        }
+
         return ts.factory.createObjectLiteralExpression(fields, true);
     }
 
@@ -511,6 +519,52 @@ export class TsSchemaGenerator {
                             ts.factory.createThrowStatement(
                                 ts.factory.createNewExpression(ts.factory.createIdentifier('Error'), undefined, [
                                     ts.factory.createStringLiteral('This is a stub for computed field'),
+                                ]),
+                            ),
+                        ],
+                        true,
+                    ),
+                ),
+            ),
+            true,
+        );
+    }
+
+    private createVirtualFieldsObject(fields: DataField[]) {
+        return ts.factory.createObjectLiteralExpression(
+            fields.map((field) =>
+                ts.factory.createMethodDeclaration(
+                    undefined,
+                    undefined,
+                    field.name,
+                    undefined,
+                    undefined,
+                    [
+                        // parameter: `_row: Record<string, unknown>`
+                        ts.factory.createParameterDeclaration(
+                            undefined,
+                            undefined,
+                            '_row',
+                            undefined,
+                            ts.factory.createTypeReferenceNode('Record', [
+                                ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+                                ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+                            ]),
+                            undefined,
+                        ),
+                    ],
+                    // Return type: T | Promise<T>
+                    ts.factory.createUnionTypeNode([
+                        ts.factory.createTypeReferenceNode(this.mapFieldTypeToTSType(field.type)),
+                        ts.factory.createTypeReferenceNode('Promise', [
+                            ts.factory.createTypeReferenceNode(this.mapFieldTypeToTSType(field.type)),
+                        ]),
+                    ]),
+                    ts.factory.createBlock(
+                        [
+                            ts.factory.createThrowStatement(
+                                ts.factory.createNewExpression(ts.factory.createIdentifier('Error'), undefined, [
+                                    ts.factory.createStringLiteral('This is a stub for virtual field'),
                                 ]),
                             ),
                         ],
@@ -682,6 +736,30 @@ export class TsSchemaGenerator {
 
         if (hasAttribute(field, '@computed')) {
             objectFields.push(ts.factory.createPropertyAssignment('computed', ts.factory.createTrue()));
+        }
+
+        const virtualAttrib = getAttribute(field, '@virtual') as DataFieldAttribute | undefined;
+        if (virtualAttrib) {
+            const depsArg = virtualAttrib.args.find((arg) => arg.$resolvedParam?.name === 'dependencies');
+            if (depsArg) {
+                objectFields.push(
+                    ts.factory.createPropertyAssignment(
+                        'virtual',
+                        ts.factory.createObjectLiteralExpression([
+                            ts.factory.createPropertyAssignment(
+                                'dependencies',
+                                ts.factory.createArrayLiteralExpression(
+                                    (depsArg.value as ArrayExpr).items.map((item) =>
+                                        ts.factory.createStringLiteral((item as ReferenceExpr).target.$refText),
+                                    ),
+                                ),
+                            ),
+                        ]),
+                    ),
+                );
+            } else {
+                objectFields.push(ts.factory.createPropertyAssignment('virtual', ts.factory.createTrue()));
+            }
         }
 
         if (isDataModel(field.type.reference?.ref)) {

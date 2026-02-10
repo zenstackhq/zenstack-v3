@@ -154,6 +154,13 @@ export function isComputedField(field: DataField) {
     return hasAttribute(field, '@computed');
 }
 
+/**
+ * Returns if the given field is a virtual field.
+ */
+export function isVirtualField(field: DataField) {
+    return hasAttribute(field, '@virtual');
+}
+
 export function isDelegateModel(node: AstNode) {
     return isDataModel(node) && hasAttribute(node, '@@delegate');
 }

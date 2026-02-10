@@ -1,8 +1,17 @@
 import type { Dialect, Expression, ExpressionBuilder, KyselyConfig } from 'kysely';
-import type { GetModel, GetModelFields, GetModels, ProcedureDef, ScalarFields, SchemaDef } from '../schema';
+import type {
+    GetModel,
+    GetModelFields,
+    GetModels,
+    GetVirtualFieldDependencies,
+    NonVirtualNonRelationFields,
+    ProcedureDef,
+    ScalarFields,
+    SchemaDef,
+} from '../schema';
 import type { PrependParameter } from '../utils/type-utils';
 import type { ClientContract, CRUD_EXT } from './contract';
-import type { GetProcedureNames, ProcedureHandlerFunc } from './crud-types';
+import type { GetProcedureNames, MapModelFieldType, ProcedureHandlerFunc } from './crud-types';
 import type { BaseCrudDialect } from './crud/dialects/base-dialect';
 import type { AnyPlugin } from './plugin';
 import type { ToKyselySchema } from './query-builder';
@@ -101,6 +110,14 @@ export type ClientOptions<Schema extends SchemaDef> = {
           computedFields: ComputedFieldsOptions<Schema>;
       }
     : {}) &
+    (HasVirtualFields<Schema> extends true
+        ? {
+              /**
+               * Virtual field definitions (computed at runtime in JavaScript).
+               */
+              virtualFields: VirtualFieldsOptions<Schema>;
+          }
+        : {}) &
     (HasProcedures<Schema> extends true
         ? {
               /**
@@ -130,6 +147,60 @@ export type ComputedFieldsOptions<Schema extends SchemaDef> = {
 
 export type HasComputedFields<Schema extends SchemaDef> =
     string extends GetModels<Schema> ? false : keyof ComputedFieldsOptions<Schema> extends never ? false : true;
+
+/**
+ * Context passed to virtual field functions.
+ */
+export type VirtualFieldContext<Schema extends SchemaDef> = {
+    /**
+     * The database row data (only contains fields that were selected in the query).
+     */
+    row: Record<string, unknown>;
+
+    /**
+     * The ZenStack client instance.
+     */
+    client: ClientContract<Schema>;
+};
+
+/**
+ * Function that computes a virtual field value at runtime.
+ */
+export type VirtualFieldFunction<Schema extends SchemaDef = SchemaDef> = (
+    context: VirtualFieldContext<Schema>,
+) => Promise<unknown> | unknown;
+
+/**
+ * Row data passed to a virtual field function. Dependency fields are required,
+ * all other non-virtual, non-relation fields are optional, and the virtual field
+ * being defined is absent.
+ */
+export type VirtualFieldRow<
+    Schema extends SchemaDef,
+    Model extends GetModels<Schema>,
+    Field extends GetModelFields<Schema, Model>,
+> = {
+    [Key in GetVirtualFieldDependencies<Schema, Model, Field>]: MapModelFieldType<Schema, Model, Key>;
+} & {
+    [Key in Exclude<
+        NonVirtualNonRelationFields<Schema, Model>,
+        GetVirtualFieldDependencies<Schema, Model, Field>
+    >]?: MapModelFieldType<Schema, Model, Key>;
+};
+
+export type VirtualFieldsOptions<Schema extends SchemaDef> = {
+    [Model in GetModels<Schema> as 'virtualFields' extends keyof GetModel<Schema, Model> ? Model : never]: {
+        [Field in keyof Schema['models'][Model]['virtualFields']]: (
+            context: {
+                row: VirtualFieldRow<Schema, Model, Field & GetModelFields<Schema, Model>>;
+                client: ClientContract<Schema>;
+            },
+        ) => Promise<unknown> | unknown;
+    };
+};
+
+export type HasVirtualFields<Schema extends SchemaDef> =
+    string extends GetModels<Schema> ? false : keyof VirtualFieldsOptions<Schema> extends never ? false : true;
 
 export type ProceduresOptions<Schema extends SchemaDef> = Schema extends {
     procedures: Record<string, ProcedureDef>;

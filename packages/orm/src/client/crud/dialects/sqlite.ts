@@ -253,7 +253,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                 const omit = typeof payload === 'object' ? payload.omit : undefined;
                 objArgs.push(
                     ...Object.entries(relationModelDef.fields)
-                        .filter(([, value]) => !value.relation)
+                        .filter(([, value]) => !value.relation && !value.virtual)
                         .filter(([name]) => !this.shouldOmitField(omit, relationModel, name))
                         .map(([field]) => [sql.lit(field), this.fieldRef(relationModel, field, subQueryName, false)])
                         .flatMap((v) => v),
@@ -283,6 +283,8 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                                         value,
                                     );
                                     return [sql.lit(field), subJson];
+                                } else if (fieldDef.virtual) {
+                                    return null;
                                 } else {
                                     return [
                                         sql.lit(field),
@@ -291,6 +293,7 @@ export class SqliteCrudDialect<Schema extends SchemaDef> extends BaseCrudDialect
                                 }
                             }
                         })
+                        .filter((v) => v !== null)
                         .flatMap((v) => v),
                 );
             }

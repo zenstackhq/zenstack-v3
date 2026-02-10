@@ -187,8 +187,8 @@ export class PrismaSchemaGenerator {
         const model = decl.isView ? prisma.addView(decl.name) : prisma.addModel(decl.name);
         const allFields = getAllFields(decl, true);
         for (const field of allFields) {
-            if (ModelUtils.hasAttribute(field, '@computed')) {
-                continue; // skip computed fields
+            if (ModelUtils.hasAttribute(field, '@computed') || ModelUtils.hasAttribute(field, '@virtual')) {
+                continue; // skip computed and virtual fields
             }
             // exclude non-id fields inherited from delegate
             if (ModelUtils.isIdField(field, decl) || !this.isInheritedFromDelegate(field, decl)) {

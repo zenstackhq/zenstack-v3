@@ -8,6 +8,7 @@ import type {
     FieldIsDelegateDiscriminator,
     FieldIsDelegateRelation,
     FieldIsRelation,
+    FieldIsVirtual,
     FieldType,
     ForeignKeyFields,
     GetEnum,
@@ -23,6 +24,8 @@ import type {
     GetTypeDefs,
     ModelFieldIsOptional,
     NonRelationFields,
+    NonVirtualFields,
+    NonVirtualNonRelationFields,
     ProcedureDef,
     RelationFields,
     RelationFieldType,
@@ -281,7 +284,8 @@ export type WhereInput<
     ScalarOnly extends boolean = false,
     WithAggregations extends boolean = false,
 > = {
-    [Key in GetModelFields<Schema, Model> as ScalarOnly extends true
+    // Use NonVirtualFields to exclude virtual fields - they are computed at runtime and cannot be filtered in the database
+    [Key in NonVirtualFields<Schema, Model> as ScalarOnly extends true
         ? Key extends RelationFields<Schema, Model>
             ? never
             : Key
@@ -755,7 +759,8 @@ export type OrderBy<
     WithRelation extends boolean,
     WithAggregation extends boolean,
 > = {
-    [Key in NonRelationFields<Schema, Model>]?: ModelFieldIsOptional<Schema, Model, Key> extends true
+    // Use NonVirtualNonRelationFields to exclude virtual fields - they are computed at runtime and cannot be sorted in the database
+    [Key in NonVirtualNonRelationFields<Schema, Model>]?: ModelFieldIsOptional<Schema, Model, Key> extends true
         ?
               | SortOrder
               | {
@@ -968,7 +973,7 @@ type RelationFilter<
 
 //#region Field utils
 
-type MapModelFieldType<
+export type MapModelFieldType<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
     Field extends GetModelFields<Schema, Model>,
@@ -1354,7 +1359,7 @@ type UpdateScalarInput<
     Without extends string = never,
 > = Omit<
     {
-        [Key in NonRelationFields<Schema, Model> as FieldIsDelegateDiscriminator<Schema, Model, Key> extends true
+        [Key in NonVirtualNonRelationFields<Schema, Model> as FieldIsDelegateDiscriminator<Schema, Model, Key> extends true
             ? // discriminator fields cannot be assigned
               never
             : Key]?: ScalarUpdatePayload<Schema, Model, Key>;
@@ -1365,7 +1370,7 @@ type UpdateScalarInput<
 type ScalarUpdatePayload<
     Schema extends SchemaDef,
     Model extends GetModels<Schema>,
-    Field extends NonRelationFields<Schema, Model>,
+    Field extends NonVirtualNonRelationFields<Schema, Model>,
 > =
     | ScalarFieldMutationPayload<Schema, Model, Field>
     | (Field extends NumericFields<Schema, Model>
@@ -1587,7 +1592,7 @@ export type CountArgs<Schema extends SchemaDef, Model extends GetModels<Schema>>
 };
 
 type CountAggregateInput<Schema extends SchemaDef, Model extends GetModels<Schema>> = {
-    [Key in NonRelationFields<Schema, Model>]?: true;
+    [Key in NonVirtualNonRelationFields<Schema, Model>]?: true;
 } & { _all?: true };
 
 export type CountResult<Schema extends SchemaDef, _Model extends GetModels<Schema>, Args> = Args extends {
@@ -1661,7 +1666,9 @@ type NumericFields<Schema extends SchemaDef, Model extends GetModels<Schema>> = 
         | 'Decimal'
         ? FieldIsArray<Schema, Model, Key> extends true
             ? never
-            : Key
+            : FieldIsVirtual<Schema, Model, Key> extends true
+              ? never
+              : Key
         : never]: GetModelField<Schema, Model, Key>;
 };
 
@@ -1674,7 +1681,9 @@ type MinMaxInput<Schema extends SchemaDef, Model extends GetModels<Schema>, Valu
         ? never
         : FieldIsRelation<Schema, Model, Key> extends true
           ? never
-          : Key]?: ValueType;
+          : FieldIsVirtual<Schema, Model, Key> extends true
+            ? never
+            : Key]?: ValueType;
 };
 
 export type AggregateResult<Schema extends SchemaDef, _Model extends GetModels<Schema>, Args> = (Args extends {
@@ -1751,7 +1760,7 @@ export type GroupByArgs<Schema extends SchemaDef, Model extends GetModels<Schema
     /**
      * Fields to group by
      */
-    by: NonRelationFields<Schema, Model> | NonEmptyArray<NonRelationFields<Schema, Model>>;
+    by: NonVirtualNonRelationFields<Schema, Model> | NonEmptyArray<NonVirtualNonRelationFields<Schema, Model>>;
 
     /**
      * Filter conditions for the grouped records

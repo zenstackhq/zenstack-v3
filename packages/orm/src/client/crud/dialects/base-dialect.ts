@@ -1126,11 +1126,36 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
         const modelDef = requireModel(this.schema, model);
         let result = query;
 
+        // Collect dependency fields needed by non-omitted virtual fields
+        // so they're fetched even if the user omits them
+        const depsNeeded = new Set<string>();
+        if (omit && modelDef.virtualFields) {
+            for (const vFieldName of Object.keys(modelDef.virtualFields)) {
+                if (!this.shouldOmitField(omit, model, vFieldName)) {
+                    const vFieldDef = modelDef.fields[vFieldName];
+                    const deps =
+                        typeof vFieldDef?.virtual === 'object'
+                            ? vFieldDef.virtual.dependencies
+                            : undefined;
+                    if (deps) {
+                        for (const dep of deps) {
+                            depsNeeded.add(dep);
+                        }
+                    }
+                }
+            }
+        }
+
         for (const field of Object.keys(modelDef.fields)) {
             if (isRelationField(this.schema, model, field)) {
                 continue;
             }
-            if (this.shouldOmitField(omit, model, field)) {
+            if (this.shouldOmitField(omit, model, field) && !depsNeeded.has(field)) {
+                continue;
+            }
+            // virtual fields don't exist in the database, skip them
+            const fieldDef = modelDef.fields[field];
+            if (fieldDef?.virtual) {
                 continue;
             }
             result = this.buildSelectField(result, model, modelAlias, field);
@@ -1143,9 +1168,11 @@ export abstract class BaseCrudDialect<Schema extends SchemaDef> {
             result = result.select((eb) => {
                 const jsonObject: Record<string, Expression<any>> = {};
                 for (const field of Object.keys(subModel.fields)) {
+                    const fieldDef = subModel.fields[field];
                     if (
                         isRelationField(this.schema, subModel.name, field) ||
-                        isInheritedField(this.schema, subModel.name, field)
+                        isInheritedField(this.schema, subModel.name, field) ||
+                        fieldDef?.virtual
                     ) {
                         continue;
                     }

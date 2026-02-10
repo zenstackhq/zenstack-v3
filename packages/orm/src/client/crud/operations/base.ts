@@ -322,6 +322,23 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         parentAlias: string,
     ) {
         let result = query;
+        let hasNonVirtualField = false;
+
+        // Collect dependency fields needed by selected virtual fields
+        const injectedDependencies = new Set<string>();
+        for (const [field, payload] of Object.entries(selectOrInclude)) {
+            if (!payload) continue;
+            const fieldDef = this.requireModel(model).fields[field];
+            const deps =
+                typeof fieldDef?.virtual === 'object' ? fieldDef.virtual.dependencies : undefined;
+            if (deps) {
+                for (const dep of deps) {
+                    if (!selectOrInclude[dep]) {
+                        injectedDependencies.add(dep);
+                    }
+                }
+            }
+        }
 
         for (const [field, payload] of Object.entries(selectOrInclude)) {
             if (!payload) {
@@ -330,13 +347,17 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
             if (field === '_count') {
                 result = this.buildCountSelection(result, model, parentAlias, payload);
+                hasNonVirtualField = true;
                 continue;
             }
 
             const fieldDef = this.requireField(model, field);
             if (!fieldDef.relation) {
-                // scalar field
-                result = this.dialect.buildSelectField(result, model, parentAlias, field);
+                // scalar field - skip virtual fields as they're computed at runtime
+                if (!fieldDef.virtual) {
+                    result = this.dialect.buildSelectField(result, model, parentAlias, field);
+                    hasNonVirtualField = true;
+                }
             } else {
                 if (!fieldDef.array && !fieldDef.optional && payload.where) {
                     throw createInternalError(`Field "${field}" does not support filtering`, model);
@@ -353,7 +374,18 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     //  regular relation
                     result = this.dialect.buildRelationSelection(result, model, field, parentAlias, payload);
                 }
+                hasNonVirtualField = true;
             }
+        }
+
+        // Add injected dependency fields to the SQL SELECT
+        for (const dep of injectedDependencies) {
+            result = this.dialect.buildSelectField(result, model, parentAlias, dep);
+            hasNonVirtualField = true;
+        }
+
+        if (!hasNonVirtualField) {
+            throw createInvalidInputError('Cannot select only virtual fields', model);
         }
 
         return result;
@@ -1306,9 +1338,10 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
                     // collect id field/values from the original filter
                     const idFields = requireIdFields(this.schema, model);
                     const filterIdValues: any = {};
+                    const whereRecord = combinedWhere as Record<string, unknown>;
                     for (const key of idFields) {
-                        if (combinedWhere[key] !== undefined && typeof combinedWhere[key] !== 'object') {
-                            filterIdValues[key] = combinedWhere[key];
+                        if (whereRecord[key] !== undefined && typeof whereRecord[key] !== 'object') {
+                            filterIdValues[key] = whereRecord[key];
                         }
                     }
 
@@ -2554,6 +2587,9 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
         const computedFields = Object.values(modelDef.fields)
             .filter((f) => f.computed)
             .map((f) => f.name);
+        const virtualFields = Object.values(modelDef.fields)
+            .filter((f) => f.virtual)
+            .map((f) => f.name);
 
         const allFieldsSelected: string[] = [];
 
@@ -2573,8 +2609,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
             );
         }
 
-        if (allFieldsSelected.some((f) => relationFields.includes(f) || computedFields.includes(f))) {
-            // relation or computed field selected, need read back
+        if (
+            allFieldsSelected.some(
+                (f) => relationFields.includes(f) || computedFields.includes(f) || virtualFields.includes(f),
+            )
+        ) {
+            // relation, computed, or virtual field selected - need read back
             return { needReadBack: true, selectedFields: undefined };
         } else {
             return { needReadBack: false, selectedFields: allFieldsSelected };

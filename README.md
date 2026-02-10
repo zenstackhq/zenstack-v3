@@ -21,6 +21,8 @@
     </a>
 </div>
 
+> ⚠️⚠️⚠️ **V3's development is merged back to the [main repo](https://github.com/zenstackhq/zenstack). This repository is archived and will no longer receive updates.**
+
 # What's ZenStack
 
 > Read full documentation at 👉🏻 https://zenstack.dev/docs.

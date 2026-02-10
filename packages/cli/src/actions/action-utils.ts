@@ -3,6 +3,7 @@ import { type Model, isDataSource } from '@zenstackhq/language/ast';
 import { PrismaSchemaGenerator } from '@zenstackhq/sdk';
 import colors from 'colors';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { CliError } from '../cli-error';
 
@@ -142,10 +143,10 @@ function findUp<Multiple extends boolean = false>(
     }
     const target = names.find((name) => fs.existsSync(path.join(cwd, name)));
     if (multiple === false && target) {
-        return path.join(cwd, target) as FindUpResult<Multiple>;
+        return path.resolve(cwd, target) as FindUpResult<Multiple>;
     }
     if (target) {
-        result.push(path.join(cwd, target));
+        result.push(path.resolve(cwd, target));
     }
     const up = path.resolve(cwd, '..');
     if (up === cwd) {
@@ -172,4 +173,46 @@ export function getOutputPath(options: { output?: string }, schemaFile: string) 
     } else {
         return path.dirname(schemaFile);
     }
+}
+export async function getZenStackPackages(
+    searchPath: string,
+): Promise<Array<{ pkg: string; version: string | undefined }>> {
+    const pkgJsonFile = findUp(['package.json'], searchPath, false);
+    if (!pkgJsonFile) {
+        return [];
+    }
+
+    let pkgJson: {
+        dependencies?: Record<string, unknown>;
+        devDependencies?: Record<string, unknown>;
+    };
+    try {
+        pkgJson = JSON.parse(fs.readFileSync(pkgJsonFile, 'utf8'));
+    } catch {
+        return [];
+    }
+
+    const packages = Array.from(
+        new Set(
+            [...Object.keys(pkgJson.dependencies ?? {}), ...Object.keys(pkgJson.devDependencies ?? {})].filter((p) =>
+                p.startsWith('@zenstackhq/'),
+            ),
+        ),
+    ).sort();
+
+    const require = createRequire(pkgJsonFile);
+
+    const result = packages.map((pkg) => {
+        try {
+            const depPkgJson = require(`${pkg}/package.json`);
+            if (depPkgJson.private) {
+                return undefined;
+            }
+            return { pkg, version: depPkgJson.version as string };
+        } catch {
+            return { pkg, version: undefined };
+        }
+    });
+
+    return result.filter((p) => !!p);
 }

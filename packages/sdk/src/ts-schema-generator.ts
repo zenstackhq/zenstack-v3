@@ -1347,7 +1347,7 @@ export class TsSchemaGenerator {
         statements.push(
             this.generateSchemaImport(
                 model,
-                true,
+                false,
                 true,
                 !!(options.lite || options.liteOnly),
                 options.importWithFileExtension,
@@ -1420,6 +1420,15 @@ export class TsSchemaGenerator {
 
         // generate: export const Enum = $schema.enums.Enum['values'];
         const enums = model.declarations.filter(isEnum);
+        const enumStatements: ts.Statement[] = [
+            this.generateSchemaImport(
+                model,
+                true,
+                false,
+                !!(options.lite || options.liteOnly),
+                options.importWithFileExtension,
+            )
+        ];
         for (const e of enums) {
             let enumDecl = ts.factory.createVariableStatement(
                 [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -1447,7 +1456,7 @@ export class TsSchemaGenerator {
             if (e.comments.length > 0) {
                 enumDecl = this.generateDocs(enumDecl, e);
             }
-            statements.push(enumDecl);
+            enumStatements.push(enumDecl);
 
             // generate: export type Enum = (typeof Enum)[keyof typeof Enum];
             let typeAlias = ts.factory.createTypeAliasDeclaration(
@@ -1465,17 +1474,45 @@ export class TsSchemaGenerator {
             if (e.comments.length > 0) {
                 typeAlias = this.generateDocs(typeAlias, e);
             }
-            statements.push(typeAlias);
+            enumStatements.push(typeAlias);
         }
 
         this.generateBannerComments(statements);
 
-        // write to file
-        const outputFile = path.join(options.outDir, 'models.ts');
-        const sourceFile = ts.createSourceFile(outputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
         const printer = ts.createPrinter();
-        const result = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(statements), sourceFile);
-        fs.writeFileSync(outputFile, result);
+        const enumsOutputFile = path.join(options.outDir, 'enums.ts');
+
+        if (enums.length > 0) {
+            this.generateBannerComments(enumStatements);
+
+            const enumsSourceFile = ts.createSourceFile(enumsOutputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
+            const enumsResult = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(enumStatements), enumsSourceFile);
+            fs.writeFileSync(enumsOutputFile, enumsResult);
+
+            let exportFrom = './enums';
+            if (options.importWithFileExtension) {
+                exportFrom += options.importWithFileExtension.startsWith('.')
+                    ? options.importWithFileExtension
+                    : `.${options.importWithFileExtension}`;
+            }
+
+            statements.push(ts.factory.createExportDeclaration(
+                undefined,
+                false,
+                undefined,
+                ts.factory.createStringLiteral(exportFrom),
+            ));
+        }
+        else {
+            if (fs.existsSync(enumsOutputFile)) {  
+                fs.unlinkSync(enumsOutputFile);  
+            }  
+        }
+
+        const modelsOutputFile = path.join(options.outDir, 'models.ts');
+        const modelsSourceFile = ts.createSourceFile(modelsOutputFile, '', ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
+        const modelsResult = printer.printList(ts.ListFormat.MultiLine, ts.factory.createNodeArray(statements), modelsSourceFile);
+        fs.writeFileSync(modelsOutputFile, modelsResult);
     }
 
     private generateSchemaImport(

@@ -283,6 +283,12 @@ export abstract class BaseOperationHandler<Schema extends SchemaDef> {
 
         // select
         if (args && 'select' in args && args.select) {
+            // check if all fields are false - if so, return empty array
+            const hasAnyTrueField = Object.values(args.select).some((value) => !!value);
+            if (!hasAnyTrueField) {
+                // when all fields are explicitly set to false, return empty array
+                return [];
+            }
             // select is mutually exclusive with omit
             query = this.buildFieldSelection(model, query, args.select, model);
         } else {

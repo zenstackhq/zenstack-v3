@@ -1,5 +1,5 @@
 import { invariant } from '@zenstackhq/common-helpers';
-import { type AliasableExpression, type Expression, type ExpressionBuilder, type SelectQueryBuilder } from 'kysely';
+import { type AliasableExpression, type Expression, type ExpressionBuilder, type SelectQueryBuilder, sql } from 'kysely';
 import type { FieldDef, GetModels, SchemaDef } from '../../../schema';
 import { DELEGATE_JOINED_FIELD_PREFIX } from '../../constants';
 import type { FindArgs } from '../../crud-types';
@@ -170,9 +170,20 @@ export abstract class LateralJoinDialectBase<Schema extends SchemaDef> extends B
                 parentResultName,
             );
 
+            // Check if objArgs is empty (all select fields are false)
+            const hasFields = Object.keys(objArgs).length > 0;
+
             if (relationFieldDef.array) {
+                if (!hasFields) {
+                    // Return JSON-formatted empty array literal for array relations when all select fields are false
+                    return sql`CAST('[]' AS JSON)`.as('$data');
+                }
                 return this.buildArrayAgg(this.buildJsonObject(objArgs)).as('$data');
             } else {
+                if (!hasFields) {
+                    // Return null for single relations when all select fields are false
+                    return sql`NULL`.as('$data');
+                }
                 return this.buildJsonObject(objArgs).as('$data');
             }
         });
@@ -217,6 +228,14 @@ export abstract class LateralJoinDialectBase<Schema extends SchemaDef> extends B
                     })),
             );
         } else if (payload.select) {
+            // check if all select fields are false
+            const hasAnyTrueField = Object.values(payload.select).some((value) => !!value);
+            if (!hasAnyTrueField) {
+                // when all fields are explicitly set to false, return empty objArgs
+                // (filtered out in ResultProcessor.processRelation for array relations)
+                return objArgs;
+            }
+            
             // select specific fields
             Object.assign(
                 objArgs,

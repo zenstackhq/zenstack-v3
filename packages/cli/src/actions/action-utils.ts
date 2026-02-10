@@ -126,10 +126,10 @@ function findUp<Multiple extends boolean = false>(
     }
     const target = names.find((name) => fs.existsSync(path.join(cwd, name)));
     if (multiple === false && target) {
-        return path.join(cwd, target) as FindUpResult<Multiple>;
+        return path.resolve(cwd, target) as FindUpResult<Multiple>;
     }
     if (target) {
-        result.push(path.join(cwd, target));
+        result.push(path.resolve(cwd, target));
     }
     const up = path.resolve(cwd, '..');
     if (up === cwd) {
@@ -183,7 +183,7 @@ export async function getZenStackPackages(
         ),
     ).sort();
 
-    const require = createRequire(import.meta.url);
+    const require = createRequire(pkgJsonFile);
 
     const result = packages.map((pkg) => {
         try {

@@ -266,6 +266,10 @@ export const mysql: IntrospectionProvider = {
                     return (ab) => ab.InvocationExpr.setFunction(getFunctionRef('uuid', services));
                 }
                 return (ab) => ab.StringLiteral.setValue(val);
+            case 'Json':
+                return (ab) => ab.StringLiteral.setValue(val);
+            case 'Bytes':
+                return (ab) => ab.StringLiteral.setValue(val);
         }
 
         // Handle function calls (e.g., uuid(), now())

@@ -284,6 +284,16 @@ export const postgresql: IntrospectionProvider = {
                     return (ab) => ab.StringLiteral.setValue(val.slice(1, -1).replace(/''/g, "'"));
                 }
                 return (ab) => ab.StringLiteral.setValue(val);
+            case 'Json':
+                if (val.includes('::')) {
+                    return typeCastingConvert({defaultValue,enums,val,services});
+                }
+                return (ab) => ab.StringLiteral.setValue(val);
+            case 'Bytes':
+                if (val.includes('::')) {
+                    return typeCastingConvert({defaultValue,enums,val,services});
+                }
+                return (ab) => ab.StringLiteral.setValue(val);
         }
 
         if (val.includes('(') && val.includes(')')) {

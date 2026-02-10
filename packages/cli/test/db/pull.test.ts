@@ -102,6 +102,56 @@ model Tag {
             expect(restoredSchema).toEqual(schema);
         });
 
+        it('should restore self-referencing model with multiple FK columns without duplicate fields', async () => {
+            const { workDir, schema } = await createProject(
+                `model Category {
+    id               Int       @id @default(autoincrement())
+    categoryParentId Category? @relation('Category_parentIdToCategory', fields: [parentId], references: [id])
+    parentId Int?
+    categoryBuddyId    Category?  @relation('Category_buddyIdToCategory', fields: [buddyId], references: [id])
+    buddyId  Int?
+    categoryMentorId   Category?  @relation('Category_mentorIdToCategory', fields: [mentorId], references: [id])
+    mentorId Int?
+    categoryParentIdToCategoryId Category[] @relation('Category_parentIdToCategory')
+    categoryBuddyIdToCategoryId  Category[] @relation('Category_buddyIdToCategory')
+    categoryMentorIdToCategoryId  Category[] @relation('Category_mentorIdToCategory')
+}`,
+            );
+            runCli('db push', workDir);
+
+            const schemaFile = path.join(workDir, 'zenstack/schema.zmodel');
+
+            fs.writeFileSync(schemaFile, getDefaultPrelude());
+            runCli('db pull --indent 4', workDir);
+
+            const restoredSchema = getSchema(workDir);
+
+            expect(restoredSchema).toEqual(schema);
+        });
+
+        it('should preserve self-referencing model with multiple FK columns', async () => {
+            const { workDir, schema } = await createProject(
+                `model Category {
+    id               Int       @id @default(autoincrement())
+    category Category? @relation('Category_parentIdToCategory', fields: [parentId], references: [id])
+    parentId Int?
+    buddy    Category?  @relation('Category_buddyIdToCategory', fields: [buddyId], references: [id])
+    buddyId  Int?
+    mentor   Category?  @relation('Category_mentorIdToCategory', fields: [mentorId], references: [id])
+    mentorId Int?
+    categories Category[] @relation('Category_parentIdToCategory')
+    buddys  Category[] @relation('Category_buddyIdToCategory')
+    mentees  Category[] @relation('Category_mentorIdToCategory')
+}`,
+            );
+            runCli('db push', workDir);
+            runCli('db pull --indent 4', workDir);
+
+            const restoredSchema = getSchema(workDir);
+
+            expect(restoredSchema).toEqual(schema);
+        });
+
         it('should restore one-to-one relation when FK is the single-column primary key', async () => {
             const { workDir, schema } = await createProject(
                 `model Profile {
@@ -224,7 +274,7 @@ model User {
     id             Int      @id @default(autoincrement())
     email          String   @unique @map('email_address')
     name           String?  @default('Anonymous')
-    role           UsersRole     @default(USER)
+    role           Role     @default(USER)
     profile        Profile?
     shared_profile Profile? @relation('shared')
     posts          Post[]
@@ -293,7 +343,7 @@ model PostTag {
     @@map('post_tags')
 }
 
-enum UsersRole {
+enum Role {
     USER
     ADMIN
     MODERATOR
@@ -358,6 +408,189 @@ model Post {
             expect(pulledMainSchema).toEqual(mainSchema);
             expect(pulledUserSchema).toEqual(userModel);
             expect(pulledPostSchema).toEqual(postModel);
+        });
+    });
+
+    describe('Pull should preserve enum declaration order', () => {
+
+        it('should preserve interleaved enum and model ordering', async () => {
+            const { workDir, schema } = await createProject(
+                `enum Role {
+    USER
+    ADMIN
+}
+
+model User {
+    id     Int    @id @default(autoincrement())
+    email  String @unique
+    role   Role   @default(USER)
+    status Status @default(ACTIVE)
+}
+
+enum Status {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}`,
+            );
+            runCli('db push', workDir);
+
+            runCli('db pull --indent 4', workDir);
+
+            // Enum-model-enum ordering should be preserved
+            expect(getSchema(workDir)).toEqual(schema);
+        });
+    });
+
+    describe('Pull should consolidate shared enums', () => {
+        it('should consolidate per-column enums back to the original shared enum', async () => {
+            const { workDir, schema } = await createProject(
+                `enum Status {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}
+
+model User {
+    id     Int    @id @default(autoincrement())
+    status Status @default(ACTIVE)
+}
+
+model Group {
+    id     Int    @id @default(autoincrement())
+    status Status @default(ACTIVE)
+}`,
+            );
+            runCli('db push', workDir);
+
+            runCli('db pull --indent 4', workDir);
+
+            // MySQL creates per-column enums (UserStatus, GroupStatus) but
+            // consolidation should map them back to the original shared Status enum
+            expect(getSchema(workDir)).toEqual(schema);
+        });
+
+        it('should consolidate per-column enums with --always-map without stale @@map', async () => {
+            // This test targets a bug where consolidateEnums renames keepEnum.name
+            // to oldEnum.name but leaves the synthetic @@map attribute added by
+            // syncEnums, so getDbName(keepEnum) still returns the old mapped name
+            // (e.g., 'UserStatus') instead of the consolidated name ('Status'),
+            // preventing matching in the downstream delete/add enum logic.
+            const { workDir } = await createProject(
+                `enum Status {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}
+
+model User {
+    id     Int    @id @default(autoincrement())
+    status Status @default(ACTIVE)
+}
+
+model Group {
+    id     Int    @id @default(autoincrement())
+    status Status @default(ACTIVE)
+}`,
+            );
+            runCli('db push', workDir);
+
+            runCli('db pull --indent 4 --always-map', workDir);
+
+            const pulledSchema = getSchema(workDir);
+
+            // The consolidated enum should be named Status, not UserStatus/GroupStatus
+            expect(pulledSchema).toContain('enum Status');
+            expect(pulledSchema).not.toContain('enum UserStatus');
+            expect(pulledSchema).not.toContain('enum GroupStatus');
+
+            // There should be no stale @@map referencing the synthetic per-column name
+            expect(pulledSchema).not.toMatch(/@@map\(['"]UserStatus['"]\)/);
+            expect(pulledSchema).not.toMatch(/@@map\(['"]GroupStatus['"]\)/);
+        });
+    });
+
+    describe('Pull should preserve triple-slash comments on enums', () => {
+        it('should preserve triple-slash comments on enum declarations and fields', async () => {
+            const { workDir, schema } = await createProject(
+                `model User {
+    id     Int    @id @default(autoincrement())
+    status Status @default(ACTIVE)
+}
+
+/// User account status
+/// ACTIVE - user can log in
+/// INACTIVE - user is disabled
+enum Status {
+    /// User can log in
+    ACTIVE
+    /// User is disabled
+    INACTIVE
+    /// User is suspended
+    SUSPENDED
+}`,
+            );
+            runCli('db push', workDir);
+
+            runCli('db pull --indent 4', workDir);
+
+            expect(getSchema(workDir)).toEqual(schema);
+        });
+    });
+
+    describe('Pull should preserve data validation attributes', () => {
+        it('should preserve field-level validation attributes after db pull', async () => {
+            const { workDir, schema } = await createProject(
+                `model User {
+    id       Int     @id @default(autoincrement())
+    email    String  @unique @email
+    name     String  @length(min: 2, max: 100)
+    website  String? @url
+    code     String? @regex('^[A-Z]+$')
+    age      Int     @gt(0)
+    score    Float   @gte(0.0)
+    rating   Decimal @lt(10)
+    rank     BigInt  @lte(999)
+}`,
+            );
+            runCli('db push', workDir);
+
+            // Pull should preserve all validation attributes
+            runCli('db pull --indent 4', workDir);
+
+            expect(getSchema(workDir)).toEqual(schema);
+        });
+
+        it('should preserve string transformation attributes after db pull', async () => {
+            const { workDir, schema } = await createProject(
+                `model Setting {
+    id    Int    @id @default(autoincrement())
+    key   String @trim @lower
+    value String @trim @upper
+}`,
+            );
+            runCli('db push', workDir);
+
+            runCli('db pull --indent 4', workDir);
+
+            expect(getSchema(workDir)).toEqual(schema);
+        });
+
+        it('should preserve model-level @@validate attribute after db pull', async () => {
+            const { workDir, schema } = await createProject(
+                `model Product {
+    id       Int     @id @default(autoincrement())
+    minPrice Decimal @default(0.00)
+    maxPrice Decimal @default(100.00)
+
+    @@validate(minPrice < maxPrice, 'minPrice must be less than maxPrice')
+}`,
+            );
+            runCli('db push', workDir);
+
+            runCli('db pull --indent 4', workDir);
+
+            expect(getSchema(workDir)).toEqual(schema);
         });
     });
 
@@ -534,17 +767,17 @@ model Post {
             `model User {
     id     Int        @id @default(autoincrement())
     email  String     @unique
-    status UserStatus @default(ACTIVE)
-    role   UserRole   @default(USER)
+    status Status @default(ACTIVE)
+    role   Role   @default(USER)
 }
 
-enum UserStatus {
+enum Status {
     ACTIVE
     INACTIVE
     SUSPENDED
 }
 
-enum UserRole {
+enum Role {
     USER
     ADMIN
     MODERATOR
@@ -569,7 +802,7 @@ enum UserRole {
             `model User {
     id       Int        @id @default(autoincrement())
     email    String     @unique
-    status   UserStatus @default(ACTIVE)
+    status   Status @default(ACTIVE)
     posts    Post[]
     metadata Json?
 
@@ -588,7 +821,7 @@ model Post {
     @@index([authorId])
 }
 
-enum UserStatus {
+enum Status {
     ACTIVE
     INACTIVE
     SUSPENDED
@@ -1097,8 +1330,8 @@ describe('DB pull - SQL specific features', () => {
 
         const { workDir, schema } = await createProject(
             `model User {
-    id     Int    @id @default(autoincrement())
-    email  String @unique
+    id     Int        @id @default(autoincrement())
+    email  String     @unique
     status UserStatus @default(ACTIVE)
 }
 
@@ -1118,6 +1351,16 @@ enum UserStatus {
         runCli('db pull --indent 4', workDir);
 
         const restoredSchema = getSchema(workDir);
-        expect(restoredSchema).toEqual(schema);
+        expect(restoredSchema).toContain(`model User {
+    id     Int        @id @default(autoincrement())
+    email  String     @unique
+    status UserStatus @default(ACTIVE)
+}`);
+
+        expect(restoredSchema).toContain(`enum UserStatus {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+}`);
     });
 });

@@ -533,12 +533,19 @@ export function syncRelation({
     sourceModel.fields.splice(firstSourceFieldId, 0, sourceFieldFactory.node); // Insert the relation field before the first FK scalar field
 
     const oppositeFieldPrefix = /[0-9]/g.test(targetModel.name.charAt(0)) ? '_' : '';
-    const { name: oppositeFieldName } = resolveNameCasing(
+    let { name: oppositeFieldName } = resolveNameCasing(
         options.fieldCasing,
         similarRelations > 0
             ? `${oppositeFieldPrefix}${lowerCaseFirst(sourceModel.name)}_${firstColumn}`
             : `${lowerCaseFirst(resolveNameCasing(options.fieldCasing, sourceModel.name).name)}${relation.references.type === 'many'? 's' : ''}`,
     );
+
+    if (targetModel.fields.find((f) => f.name === oppositeFieldName)) {
+        ({ name: oppositeFieldName } = resolveNameCasing(
+            options.fieldCasing,
+            `${lowerCaseFirst(sourceModel.name)}_${firstColumn}To${relation.references.table}_${relation.references.columns[0]}`,
+        ));
+    }
 
     const targetFieldFactory = new DataFieldFactory()
         .setContainer(targetModel)
@@ -555,4 +562,117 @@ export function syncRelation({
         );
 
     targetModel.fields.push(targetFieldFactory.node);
+}
+
+/**
+ * Consolidates per-column enums back to shared enums when possible.
+ *
+ * MySQL doesn't have named enum types — each column gets a synthetic enum
+ * (e.g., `UserStatus`, `GroupStatus`). When the original schema used a shared
+ * enum (e.g., `Status`) across multiple fields, this function detects the
+ * mapping via field references and consolidates the synthetic enums back into
+ * the original shared enum so the merge phase can match them correctly.
+ */
+export function consolidateEnums({
+    newModel,
+    oldModel,
+}: {
+    newModel: Model;
+    oldModel: Model;
+}) {
+    const newEnums = newModel.declarations.filter((d) => isEnum(d)) as Enum[];
+    const newDataModels = newModel.declarations.filter((d) => d.$type === 'DataModel') as DataModel[];
+    const oldDataModels = oldModel.declarations.filter((d) => d.$type === 'DataModel') as DataModel[];
+
+    // For each new enum, find which old enum it corresponds to (via field references)
+    const enumMapping = new Map<Enum, Enum>(); // newEnum -> oldEnum
+
+    for (const newEnum of newEnums) {
+        for (const newDM of newDataModels) {
+            for (const field of newDM.fields) {
+                if (field.$type !== 'DataField' || field.type.reference?.ref !== newEnum) continue;
+
+                // Find matching model in old model by db name
+                const oldDM = oldDataModels.find((d) => getDbName(d) === getDbName(newDM));
+                if (!oldDM) continue;
+
+                // Find matching field in old model by db name
+                const oldField = oldDM.fields.find((f) => getDbName(f) === getDbName(field));
+                if (!oldField || oldField.$type !== 'DataField' || !oldField.type.reference?.ref) continue;
+
+                const oldEnum = oldField.type.reference.ref;
+                if (!isEnum(oldEnum)) continue;
+
+                enumMapping.set(newEnum, oldEnum as Enum);
+                break;
+            }
+            if (enumMapping.has(newEnum)) break;
+        }
+    }
+
+    // Group by old enum: oldEnum -> [newEnum1, newEnum2, ...]
+    const reverseMapping = new Map<Enum, Enum[]>();
+    for (const [newEnum, oldEnum] of enumMapping) {
+        if (!reverseMapping.has(oldEnum)) {
+            reverseMapping.set(oldEnum, []);
+        }
+        reverseMapping.get(oldEnum)!.push(newEnum);
+    }
+
+    // Consolidate: when new enums map to the same old enum with matching values
+    for (const [oldEnum, newEnumsGroup] of reverseMapping) {
+        const keepEnum = newEnumsGroup[0]!;
+
+        // Skip if already correct (single enum with matching name)
+        if (newEnumsGroup.length === 1 && keepEnum.name === oldEnum.name) continue;
+
+        // Check that all new enums have the same values as the old enum
+        const oldValues = new Set(oldEnum.fields.map((f) => getDbName(f)));
+        const allMatch = newEnumsGroup.every((ne) => {
+            const newValues = new Set(ne.fields.map((f) => getDbName(f)));
+            return oldValues.size === newValues.size && [...oldValues].every((v) => newValues.has(v));
+        });
+
+        if (!allMatch) continue;
+
+        // Rename the kept enum to match the old shared name
+        keepEnum.name = oldEnum.name;
+
+        // Replace keepEnum's attributes with those from the old enum so that
+        // any synthetic @@map added by syncEnums is removed and getDbName(keepEnum)
+        // reflects the consolidated name rather than the stale per-column name.
+        // Shallow-copy and re-parent so AST $container pointers reference keepEnum.
+        keepEnum.attributes = oldEnum.attributes.map((attr) => {
+            const copy = { ...attr, $container: keepEnum };
+            return copy;
+        });
+
+        // Remove duplicate enums from newModel
+        for (let i = 1; i < newEnumsGroup.length; i++) {
+            const idx = newModel.declarations.indexOf(newEnumsGroup[i]!);
+            if (idx >= 0) {
+                newModel.declarations.splice(idx, 1);
+            }
+        }
+
+        // Update all field references in newModel to point to the kept enum
+        for (const newDM of newDataModels) {
+            for (const field of newDM.fields) {
+                if (field.$type !== 'DataField') continue;
+                const ref = field.type.reference?.ref;
+                if (ref && newEnumsGroup.includes(ref as Enum)) {
+                    (field.type as any).reference = {
+                        ref: keepEnum,
+                        $refText: keepEnum.name,
+                    };
+                }
+            }
+        }
+
+        console.log(
+            colors.gray(
+                `Consolidated enum${newEnumsGroup.length > 1 ? 's' : ''} ${newEnumsGroup.map((e) => e.name).join(', ')} → ${oldEnum.name}`,
+            ),
+        );
+    }
 }

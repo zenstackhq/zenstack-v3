@@ -28,6 +28,10 @@ export function getAttribute(model: Model, attrName: string) {
         | undefined;
 }
 
+export function isDatabaseManagedAttribute(name: string) {
+    return ['@relation', '@id', '@unique'].includes(name) || name.startsWith('@db.');
+}
+
 export function getDatasource(model: Model) {
     const datasource = model.declarations.find((d) => d.$type === 'DataSource');
     if (!datasource) {

@@ -101,11 +101,6 @@ export class ZModelCodeGenerator {
     @gen(Model)
     private _generateModel(ast: Model) {
         return `${ast.imports.map((d) => this.generate(d)).join('\n')}${ast.imports.length > 0 ? '\n\n' : ''}${ast.declarations
-            .sort((a, b) => {
-                if (a.$type === 'Enum' && b.$type !== 'Enum') return 1;
-                if (a.$type !== 'Enum' && b.$type === 'Enum') return -1;
-                return 0;
-            })
             .map((d) => this.generate(d))
             .join('\n\n')}`;
     }
@@ -124,7 +119,8 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}
 
     @gen(Enum)
     private _generateEnum(ast: Enum) {
-        return `enum ${ast.name} {
+        const comments = `${ast.comments.join('\n')}\n`;
+        return `${ast.comments.length > 0 ? comments : ''}enum ${ast.name} {
 ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
             ast.attributes.length > 0
                 ? '\n\n' + ast.attributes.map((x) => this.indent + this.generate(x)).join('\n')
@@ -135,9 +131,20 @@ ${ast.fields.map((x) => this.indent + this.generate(x)).join('\n')}${
 
     @gen(EnumField)
     private _generateEnumField(ast: EnumField) {
-        return `${ast.name}${
+        const fieldLine = `${ast.name}${
             ast.attributes.length > 0 ? ' ' + ast.attributes.map((x) => this.generate(x)).join(' ') : ''
         }`;
+
+        if (ast.comments.length === 0) {
+            return fieldLine;
+        }
+
+        // Build comment block with proper indentation:
+        // - First comment: no indent (caller adds it via `this.indent + this.generate(x)`)
+        // - Subsequent comments: add indent
+        // - Field line: add indent (since it comes after the comment block)
+        const commentLines = ast.comments.map((c, i) => (i === 0 ? c : this.indent + c));
+        return `${commentLines.join('\n')}\n${this.indent}${fieldLine}`;
     }
 
     @gen(GeneratorDecl)
